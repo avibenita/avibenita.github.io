@@ -330,28 +330,18 @@ function computeEggersTest(studies) {
 }
 
 function approximateChiSquare(chiSq, df) {
-  // Simple chi-square p-value approximation
-  if (!isFinite(chiSq) || chiSq <= 0) return 1;
-  if (chiSq > 20) return 0.0001;
-  
-  if (df === 1) {
-    if (chiSq < 2.71) return 0.1;
-    if (chiSq < 3.84) return 0.05;
-    if (chiSq < 6.63) return 0.01;
-    return 0.001;
-  } else if (df === 2) {
-    if (chiSq < 4.61) return 0.1;
-    if (chiSq < 5.99) return 0.05;
-    if (chiSq < 9.21) return 0.01;
-    return 0.001;
-  } else if (df >= 3) {
-    if (chiSq < df + 1) return 0.5;
-    if (chiSq < df + 2) return 0.2;
-    if (chiSq < df + 3) return 0.1;
-    if (chiSq < df + 5) return 0.05;
-    return 0.01;
-  }
-  return 0.05;
+  // Upper-tail p = P(χ²_df > chiSq) via Wilson–Hilferty normal approximation.
+  // Example: Q=2.87, df=7 → p ≈ 0.897 (not the crude step-table ~0.5).
+  if (!isFinite(chiSq) || !isFinite(df) || df <= 0) return 1;
+  if (chiSq <= 0) return 1;
+  const cubeRoot = Math.pow(chiSq / df, 1 / 3);
+  const mu = 1 - 2 / (9 * df);
+  const sigma = Math.sqrt(2 / (9 * df));
+  if (!(sigma > 0)) return 1;
+  const z = (cubeRoot - mu) / sigma;
+  const p = 1 - approximateNormalCDF(z);
+  if (!isFinite(p)) return 1;
+  return Math.min(1, Math.max(0, p));
 }
 global.MetaEngine = {
   buildMetaBundle: buildMetaBundle,

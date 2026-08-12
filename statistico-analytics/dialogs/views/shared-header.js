@@ -6476,7 +6476,7 @@ const StatisticoHeader = {
       'meta-forest':
         'This is a forest plot: each study is a point with a horizontal 95% CI, and the pooled effect is usually marked as a diamond or vertical reference. Describe study-to-study consistency, which studies pull left/right, and how the pooled estimate sits relative to the null (0 or 1 depending on scale). Do not recite Egger statistics here — those belong on Publication Bias.',
       'meta-heterogeneity':
-        'Read Q, df, p(Q), I², H², and τ²/τ together with the heterogeneity interpretation. Explain whether between-study variance is low/moderate/substantial and what that implies for fixed vs random-effects interpretation. Do not re-interpret the pooled CI here except as context for heterogeneity.',
+        'Read Q, df, p for Q, I², k, and τ²/τ with the heterogeneity interpretation. Describe whether between-study variance appears low, moderate, or substantial and stress uncertainty when k is small. Do NOT recommend switching fixed vs random effects solely from a non-significant Q or I² = 0. Do not re-interpret the pooled CI here except as context.',
       'meta-bias':
         'This combines Egger\'s regression test (intercept, SE, t, p, n) with a funnel plot of effect size vs precision. Describe funnel asymmetry and whether Egger\'s p suggests small-study / publication bias. With few studies, emphasise uncertainty. Do not re-walk the full pooled-effect narrative from Summary.',
       'meta-studies':
@@ -6980,6 +6980,15 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     }
     const viewKey = this._getInsightGuideViewKey();
     try {
+      // Rule-based Insight Guide for meta heterogeneity (deterministic stats — not AI)
+      if (viewKey === 'meta-heterogeneity' &&
+          typeof window.buildMetaHeterogeneityInsightGuide === 'function') {
+        const guide = window.buildMetaHeterogeneityInsightGuide();
+        if (guide && guide.sections) {
+          this._showAiOverlay(guide.sections, viewKey, 'per-view', guide.meta || { ruleBased: true });
+          return;
+        }
+      }
       let prompt;
       if (this.module === 'factor' && viewKey === 'factor-suitability' &&
           typeof window.buildFactorSuitabilityAiPrompt === 'function') {
@@ -8415,12 +8424,13 @@ Always follow the exact output format requested.` },
           </div>
         </div>` : ''}
         ${sections.ABOUT ? `
-        <div class="sb-ai-section sb-ai-section--about sb-ai-about-hero">
+        <div class="sb-ai-section sb-ai-section--about ${meta?.ruleBased ? 'sb-ai-about-soft' : 'sb-ai-about-hero'}">
+          <div class="sb-ai-section-label" style="margin-bottom:6px;"><i class="fa-solid fa-circle-info" style="margin-right:5px;"></i>What this view shows</div>
           <div class="sb-ai-section-body sb-ai-about-line">${sections.ABOUT}</div>
         </div>` : ''}
 
-        ${/* ── What Questions This View Answers (static, per-view only) ── */ ''}
-        ${mode === 'per-view' ? (() => {
+        ${/* ── What Questions This View Answers (static, per-view only; skip for rule-based meta guides) ── */ ''}
+        ${mode === 'per-view' && !meta?.ruleBased ? (() => {
           const qs = this._getQuestionsAnsweredContent();
           if (!qs.length) return '';
           return `<div class="sb-ai-section sb-ai-section--questions">
@@ -8459,7 +8469,7 @@ Always follow the exact output format requested.` },
         ${sections.PATTERNS ? `
         <div class="sb-ai-section sb-ai-section--patterns sb-ai-collapsible">
           <div class="sb-ai-collapsible-hdr" data-target="sb-patt">
-            <span><i class="fa-solid fa-chart-line"></i> What to Look For</span>
+            <span><i class="fa-solid fa-chart-line"></i> ${meta?.guideLabels?.patterns || 'What to Look For'}</span>
             <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
           </div>
           <div class="sb-ai-collapsible-body" id="sb-patt">${renderList(sections.PATTERNS)}</div>
@@ -8467,10 +8477,13 @@ Always follow the exact output format requested.` },
         ${sections.READING ? `
         <div class="sb-ai-section sb-ai-section--reading sb-ai-collapsible">
           <div class="sb-ai-collapsible-hdr" data-target="sb-read">
-            <span><i class="fa-solid fa-magnifying-glass-chart"></i> Current Reading</span>
-            <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
+            <span><i class="fa-solid fa-magnifying-glass-chart"></i> ${meta?.guideLabels?.reading || 'Current Reading'}</span>
+            <i class="fa-solid fa-chevron-down sb-ai-chevron${meta?.openReading ? ' sb-ai-chevron--open' : ''}"></i>
           </div>
-          <div class="sb-ai-collapsible-body" id="sb-read"><p class="sb-ai-insight-body">${sections.READING}</p></div>
+          <div class="sb-ai-collapsible-body${meta?.openReading ? ' sb-ai-collapsible-body--open' : ''}" id="sb-read">
+            ${meta?.resultBadge ? `<div class="sb-ai-result-badge">${meta.resultBadge}</div>` : ''}
+            <p class="sb-ai-insight-body">${sections.READING}</p>
+          </div>
         </div>` : ''}
 
         ${/* ── Full-view structure ── */ ''}
@@ -8522,17 +8535,20 @@ Always follow the exact output format requested.` },
       `;
     }
 
+    const footerNote = meta?.ruleBased
+      ? 'Insight Guide is a rule-based explanation of the current statistics — not an AI narrative. Use Explain View AI only when you want optional domain context.'
+      : 'AI interpretations are decision aids — verify critical findings with domain experts.';
     const overlay = document.createElement('div');
     overlay.id = 'sbAiOverlay';
     overlay.className = 'sb-ai-overlay';
     overlay.innerHTML = `
-      <div class="sb-ai-panel">
+      <div class="sb-ai-panel${meta?.ruleBased ? ' sb-ai-panel--compact' : ''}">
         <div class="sb-ai-header">
           <span class="sb-ai-title"><i class="fa-solid ${titleIcon}"></i> ${title}</span>
           <button class="sb-ai-close" onclick="document.getElementById('sbAiOverlay').remove()" title="Close">&times;</button>
         </div>
         <div class="sb-ai-body">${bodyHtml}</div>
-        <div class="sb-ai-footer">AI interpretations are decision aids — verify critical findings with domain experts.</div>
+        <div class="sb-ai-footer">${footerNote}</div>
       </div>
     `;
     overlay.addEventListener('click', (e) => {

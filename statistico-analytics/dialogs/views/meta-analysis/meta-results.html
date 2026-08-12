@@ -8,10 +8,10 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://code.highcharts.com/highcharts.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260810-metachrome4"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260812-hetguide1"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260810-metachrome4"></script>
-  <script src="meta-engine.js?v=20260810measure2"></script>
+  <script src="../shared-header.js?v=20260812-hetguide1"></script>
+  <script src="meta-engine.js?v=20260812-chiP"></script>
   <style>
     :root {
       /* Deeper page vs lighter panels for clearer separation */
@@ -874,28 +874,28 @@
               <div class="value" id="qDf">—</div>
             </div>
             <div class="stat-box">
-              <div class="label">p (Q)
+              <div class="label">p for Q
                 <span class="info-icon" tabindex="0">i<span class="tip"><b>p-value for Q</b> under the null of homogeneous true effects. Small p suggests excess dispersion; with few studies power is limited.</span></span>
               </div>
               <div class="value" id="qP">—</div>
             </div>
             <div class="stat-box">
               <div class="label">I²
-                <span class="info-icon" tabindex="0">i<span class="tip"><b>I²</b> — percent of variability across studies attributable to heterogeneity rather than chance. Does not prove studies are homogeneous when near 0.</span></span>
+                <span class="info-icon" tabindex="0">i<span class="tip"><b>I²</b> estimates the proportion of observed variation attributable to between-study heterogeneity rather than sampling error. Rough guide: &lt;25% low, 25–50% moderate, &gt;50% substantial. I² = 0% does not prove homogeneity.</span></span>
               </div>
               <div class="value" id="i2">—</div>
             </div>
             <div class="stat-box">
-              <div class="label">H²
-                <span class="info-icon" tabindex="0">i<span class="tip"><b>H²</b> = Q / df. Values near <b>1</b> suggest little excess heterogeneity; larger values indicate more between-study dispersion.</span></span>
+              <div class="label">Studies (k)
+                <span class="info-icon" tabindex="0">i<span class="tip"><b>k</b> — number of studies in the pooled analysis. Heterogeneity estimates (I², τ², Q) are imprecise when k is small. Technical: unconstrained H² = Q/df is available in the interpretation tip when relevant.</span></span>
               </div>
-              <div class="value" id="h2">—</div>
+              <div class="value" id="hetK">—</div>
             </div>
             <div class="stat-box">
-              <div class="label">τ² / τ
+              <div class="label">τ² · τ
                 <span class="info-icon" tabindex="0">i<span class="tip"><b>τ²</b> is between-study variance; <b>τ</b> = √τ² is the between-study SD on the effect scale. Both are 0 under a fixed-effect model.</span></span>
               </div>
-              <div class="value" id="tauPair">—</div>
+              <div class="value" id="tauPair" style="font-size:15px;line-height:1.35;">—</div>
             </div>
           </div>
           <div class="interpretation" id="hetInterpretation">—</div>
@@ -1005,6 +1005,121 @@
       if (p == null || !isFinite(p)) return '—';
       return p < 0.001 ? '< 0.001' : p.toFixed(3);
     }
+
+    /** Upper-tail χ² p-value (Wilson–Hilferty). Corrects stale bundles with the old step-table pQ. */
+    function chiSquareUpperP(chiSq, df) {
+      if (!isFinite(chiSq) || !isFinite(df) || df <= 0) return 1;
+      if (chiSq <= 0) return 1;
+      var cubeRoot = Math.pow(chiSq / df, 1 / 3);
+      var mu = 1 - 2 / (9 * df);
+      var sigma = Math.sqrt(2 / (9 * df));
+      if (!(sigma > 0)) return 1;
+      var z = (cubeRoot - mu) / sigma;
+      var t = 1 / (1 + 0.2316419 * Math.abs(z));
+      var d = 0.3989423 * Math.exp(-z * z / 2);
+      var phi = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+      var cdf = z > 0 ? 1 - phi : phi;
+      var p = 1 - cdf;
+      return Math.min(1, Math.max(0, p));
+    }
+
+    function heteroPQ(h) {
+      if (!h) return null;
+      if (h.Q != null && h.df != null) return chiSquareUpperP(h.Q, h.df);
+      return h.pQ;
+    }
+
+    function buildHetInterpretation(bundle) {
+      var h = bundle.heterogeneity || {};
+      var i2 = h.I2;
+      var q = h.Q;
+      var df = h.df;
+      var pQ = heteroPQ(h);
+      var tau2 = h.tau2;
+      var k = bundle.k;
+      var h2 = (q != null && df > 0) ? (q / df) : h.H2;
+      var base =
+        'Little excess between-study variation was detected: I² = ' + fmt(i2, 1) +
+        '%, τ² = ' + fmt(tau2) + ', Q(' + df + ') = ' + fmt(q, 2) +
+        ', p = ' + fmtP(pQ) + '. With only ' + k +
+        ' studies, these estimates are imprecise and do not establish that the true effects are homogeneous.';
+      if (i2 >= 25 && i2 < 50) {
+        base =
+          'Moderate between-study variation was estimated: I² = ' + fmt(i2, 1) +
+          '%, τ² = ' + fmt(tau2) + ', Q(' + df + ') = ' + fmt(q, 2) +
+          ', p = ' + fmtP(pQ) + '. With k = ' + k +
+          ', interpret the random-effects average with that dispersion in mind.';
+      } else if (i2 >= 50) {
+        base =
+          'Substantial between-study variation was estimated: I² = ' + fmt(i2, 1) +
+          '%, τ² = ' + fmt(tau2) + ', Q(' + df + ') = ' + fmt(q, 2) +
+          ', p = ' + fmtP(pQ) + '. With k = ' + k +
+          ', the pooled average may not describe every study well; consider moderators or subgroups.';
+      }
+      if (h2 != null && isFinite(h2) && h2 < 1) {
+        base += ' <span class="info-icon" tabindex="0" style="margin-left:4px;">i<span class="tip"><b>Technical:</b> unconstrained H² = Q/df = ' +
+          fmt(h2, 2) + ' (&lt; 1 means Q was smaller than its df). This is shown for completeness and is not used as a main result.</span></span>';
+      }
+      return base;
+    }
+
+    function buildMetaHeterogeneityInsightGuide() {
+      var bundle = metaBundle || window.metaBundle;
+      if (!bundle || !bundle.heterogeneity) {
+        try { bundle = JSON.parse(sessionStorage.getItem('metaBundle') || 'null'); } catch (_e) { bundle = null; }
+      }
+      if (!bundle || !bundle.heterogeneity) return null;
+      var h = bundle.heterogeneity;
+      var i2 = h.I2;
+      var q = h.Q;
+      var df = h.df;
+      var pQ = heteroPQ(h);
+      var tau2 = h.tau2;
+      var k = bundle.k;
+      var low = i2 < 25;
+      var badge = low
+        ? 'Low detected heterogeneity · Limited precision'
+        : i2 < 50
+          ? 'Moderate detected heterogeneity · Limited precision'
+          : 'Substantial detected heterogeneity · Limited precision';
+      var title = low
+        ? 'Little heterogeneity detected'
+        : i2 < 50
+          ? 'Moderate heterogeneity detected'
+          : 'Substantial heterogeneity detected';
+      var reading =
+        '<strong>' + title + '</strong><br>' +
+        'The estimated between-study variance is τ² = ' + fmt(tau2) +
+        ', and I² = ' + fmt(i2, 1) + '%. Cochran’s test ' +
+        (pQ < 0.05 ? 'detected excess dispersion' : 'did not detect excess dispersion') +
+        ', Q(' + df + ') = ' + fmt(q, 2) + ', p = ' + fmtP(pQ) +
+        '. Because only ' + k + ' studies are available, ' +
+        (low
+          ? 'the absence of detected heterogeneity should be interpreted cautiously.'
+          : 'heterogeneity estimates remain imprecise.');
+      return {
+        sections: {
+          ABOUT:
+            'This view assesses whether study effects vary more than expected from sampling error alone. Q, I², and τ² describe different aspects of that variation.',
+          PATTERNS: [
+            'Q: tests whether variation exceeds sampling error; it has low power with few studies.',
+            'I²: estimated percentage of variability attributable to heterogeneity rather than sampling error.',
+            'τ²: estimated between-study variance on the effect-size scale.'
+          ],
+          READING: reading
+        },
+        meta: {
+          ruleBased: true,
+          resultBadge: badge,
+          guideLabels: {
+            patterns: 'How to Interpret',
+            reading: 'Current Result'
+          },
+          openReading: true
+        }
+      };
+    }
+    window.buildMetaHeterogeneityInsightGuide = buildMetaHeterogeneityInsightGuide;
     function escapeHtml(str) {
       return String(str == null ? '' : str)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1607,6 +1722,9 @@
       opts = opts || {};
       metaBundle = bundle;
       window.metaBundle = bundle;
+      if (metaBundle && metaBundle.heterogeneity) {
+        metaBundle.heterogeneity.pQ = heteroPQ(metaBundle.heterogeneity);
+      }
       resolveSource(bundle);
       document.getElementById('loadingState').style.display = 'none';
       setUpdating(false);
@@ -1672,25 +1790,14 @@
 
       document.getElementById('qStat').textContent = fmt(bundle.heterogeneity.Q, 2);
       document.getElementById('qDf').textContent = String(bundle.heterogeneity.df);
-      document.getElementById('qP').textContent = fmtP(bundle.heterogeneity.pQ);
+      document.getElementById('qP').textContent = fmtP(heteroPQ(bundle.heterogeneity));
       document.getElementById('i2').textContent = fmt(bundle.heterogeneity.I2, 1) + '%';
-      document.getElementById('h2').textContent = fmt(bundle.heterogeneity.H2, 2);
-      document.getElementById('tauPair').textContent =
-        fmt(bundle.heterogeneity.tau2) + ' / ' + fmt(bundle.heterogeneity.tau);
+      var hetKEl = document.getElementById('hetK');
+      if (hetKEl) hetKEl.textContent = String(bundle.k);
+      document.getElementById('tauPair').innerHTML =
+        'τ² = ' + fmt(bundle.heterogeneity.tau2) + '<br>τ = ' + fmt(bundle.heterogeneity.tau);
 
-      var i2 = bundle.heterogeneity.I2;
-      var hetText = '<strong>I² = ' + fmt(i2, 1) + '%</strong> summarizes observed between-study variation. ';
-      if (i2 < 25) {
-        hetText += 'Little excess dispersion was detected — this does <strong>not</strong> prove the studies are homogeneous, especially with only ' +
-          bundle.k + ' studies. ';
-      } else if (i2 < 50) {
-        hetText += 'Moderate excess dispersion is present; a random-effects average is appropriate. ';
-      } else {
-        hetText += 'Substantial excess dispersion — consider moderators or subgroups; the average may not fit every study. ';
-      }
-      hetText += 'Q = ' + fmt(bundle.heterogeneity.Q, 2) + ' (df = ' + bundle.heterogeneity.df +
-        ', p ' + fmtP(bundle.heterogeneity.pQ) + '); τ² = ' + fmt(bundle.heterogeneity.tau2) + '.';
-      document.getElementById('hetInterpretation').innerHTML = hetText;
+      document.getElementById('hetInterpretation').innerHTML = buildHetInterpretation(bundle);
 
       var bias = bundle.bias || {};
       if (bias.available) {

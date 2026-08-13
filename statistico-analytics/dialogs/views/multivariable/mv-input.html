@@ -146,21 +146,17 @@
               <div class="reg-zone-body drop-zone" data-zone="size" id="zoneSize"><div class="reg-zone-placeholder">Drag numeric column</div></div>
             </div>
             <div class="reg-zone-card zone-cat">
-              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Color</div><div class="zone-hint">Category or numeric</div></div><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Color / group</div><div class="zone-hint">Category → series · Numeric → scale</div></div><span class="zone-single-badge"><span>×1</span></span></div>
               <div class="reg-zone-body drop-zone" data-zone="color" id="zoneColor"><div class="reg-zone-placeholder">Optional</div></div>
             </div>
             <div class="reg-zone-card zone-any">
-              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Label</div><div class="zone-hint">Name / ID</div></div><span class="zone-single-badge"><span>×1</span></span></div>
+              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Label</div><div class="zone-hint">Name / ID (not a series)</div></div><span class="zone-single-badge"><span>×1</span></span></div>
               <div class="reg-zone-body drop-zone" data-zone="label" id="zoneLabel"><div class="reg-zone-placeholder">Optional</div></div>
-            </div>
-            <div class="reg-zone-card zone-cat">
-              <div class="reg-zone-head"><div class="dot"></div><div class="zone-head-main"><div>Group</div><div class="zone-hint">Series / legend</div></div><span class="zone-single-badge"><span>×1</span></span></div>
-              <div class="reg-zone-body drop-zone" data-zone="group" id="zoneGroup"><div class="reg-zone-placeholder">Optional</div></div>
             </div>
           </div>
           <div class="mv-hint">
             <i class="fa-solid fa-circle-info"></i>
-            <span>Bubble <strong>area</strong> (not diameter) is proportional to Size — avoiding Excel’s common scaling trap. Roles can also be adjusted in results.</span>
+            <span><strong>Color / group</strong> creates series for categories (or a color scale for numbers). <strong>Label</strong> names each bubble and never becomes a series by itself. Bubble <strong>area</strong> scales with Size.</span>
           </div>
         </div>
       </div>
@@ -176,7 +172,7 @@
   <script>
     var _headers = [], _rows = [], _address = '', _saved = null;
     var columnStats = [];
-    var assignments = { x: null, y: null, size: null, color: null, label: null, group: null };
+    var assignments = { x: null, y: null, size: null, color: null, label: null };
     var chartMode = 'bubble';
     var draggedElement = null;
     var ZONE_META = {
@@ -184,8 +180,7 @@
       y: { el: 'zoneY', kind: 'num', req: true, accept: 'num' },
       size: { el: 'zoneSize', kind: 'num', req: true, accept: 'num' },
       color: { el: 'zoneColor', kind: 'cat', req: false, accept: 'any' },
-      label: { el: 'zoneLabel', kind: 'any', req: false, accept: 'any' },
-      group: { el: 'zoneGroup', kind: 'cat', req: false, accept: 'any' }
+      label: { el: 'zoneLabel', kind: 'any', req: false, accept: 'any' }
     };
 
     function qs(id) { return document.getElementById(id); }
@@ -260,7 +255,7 @@
 
     function chipClass(zone) {
       if (zone === 'x' || zone === 'y' || zone === 'size') return 'num';
-      if (zone === 'color' || zone === 'group') return 'cat';
+      if (zone === 'color') return 'cat';
       return 'any';
     }
 
@@ -293,15 +288,15 @@
       var el = qs('modelSummary');
       if (!el) return;
       if (!assignments.x || !assignments.y || !assignments.size) {
-        el.textContent = 'Map X, Y, and Size — Color / Label / Group are optional';
+        el.textContent = 'Map X, Y, and Size — Color / group and Label are optional';
         return;
       }
       var bits = [
         '<strong>' + assignments.x + '</strong> × <strong>' + assignments.y + '</strong>',
         'size <strong>' + assignments.size + '</strong>'
       ];
-      if (assignments.color) bits.push('color <strong>' + assignments.color + '</strong>');
-      if (assignments.group) bits.push('group <strong>' + assignments.group + '</strong>');
+      if (assignments.color) bits.push('color / group <strong>' + assignments.color + '</strong>');
+      if (assignments.label) bits.push('label <strong>' + assignments.label + '</strong>');
       el.innerHTML = (chartMode === 'quadrant' ? 'Quadrant: ' : 'Bubble: ') + bits.join(' · ');
     }
 
@@ -359,20 +354,20 @@
         sizeColName: assignments.size,
         colorColName: assignments.color || null,
         labelColName: assignments.label || null,
-        groupColName: assignments.group || null,
+        groupColName: null,
         xColIndex: colIndex(assignments.x),
         yColIndex: colIndex(assignments.y),
         sizeColIndex: colIndex(assignments.size),
         colorColIndex: colIndex(assignments.color),
         labelColIndex: colIndex(assignments.label),
-        groupColIndex: colIndex(assignments.group),
+        groupColIndex: null,
         includedIndices: _headers.map(function(_, i) { return i; })
       };
     }
 
     function applySpec(spec) {
       if (!spec) return;
-      assignments = { x: null, y: null, size: null, color: null, label: null, group: null };
+      assignments = { x: null, y: null, size: null, color: null, label: null };
       chartMode = spec.chartMode === 'quadrant' ? 'quadrant' : 'bubble';
       function pick(nameKey, idxKey, requireNum) {
         if (spec[nameKey] && getStat(spec[nameKey]) && (!requireNum || getStat(spec[nameKey]).isNumeric)) return spec[nameKey];
@@ -387,7 +382,13 @@
       assignments.size = pick('sizeColName', 'sizeColIndex', true);
       assignments.color = pick('colorColName', 'colorColIndex', false);
       assignments.label = pick('labelColName', 'labelColIndex', false);
-      assignments.group = pick('groupColName', 'groupColIndex', false);
+      if (!assignments.color) {
+        var legacyGroup = pick('groupColName', 'groupColIndex', false);
+        if (legacyGroup && legacyGroup !== assignments.label) assignments.color = legacyGroup;
+      }
+      if (assignments.color && assignments.label && assignments.color === assignments.label) {
+        assignments.color = null;
+      }
       syncModeSeg();
     }
 
@@ -420,6 +421,18 @@
       send('mvModel', buildModelSpec());
     }
 
+    function countUniques(name) {
+      var idx = _headers.indexOf(name);
+      if (idx < 0) return 0;
+      var set = {};
+      _rows.forEach(function(row) {
+        var v = row[idx];
+        var k = (v === null || v === undefined || v === '') ? '__miss' : String(v);
+        set[k] = 1;
+      });
+      return Object.keys(set).length;
+    }
+
     function autoDetect() {
       var nums = columnStats.filter(function(s) { return s.isNumeric; });
       var cats = columnStats.filter(function(s) { return !s.isNumeric; });
@@ -427,8 +440,21 @@
       if (nums[1]) assignments.y = nums[1].name;
       if (nums[2]) assignments.size = nums[2].name;
       else if (nums[0] && !assignments.size) assignments.size = nums[0].name;
-      if (cats[0]) { assignments.color = cats[0].name; assignments.group = cats[0].name; }
-      if (cats[0] || nums.length) assignments.label = (cats[0] && cats[0].name) || (columnStats[0] && columnStats[0].name) || null;
+
+      // Label = identifier-like category (high cardinality). Never auto-use Label as Color / group.
+      var labelPick = cats.find(function(s) {
+        return countUniques(s.name) > Math.max(8, _rows.length * 0.5);
+      }) || columnStats[0];
+      if (labelPick) assignments.label = labelPick.name;
+
+      var colorPick = cats.find(function(s) {
+        if (assignments.label && s.name === assignments.label) return false;
+        var u = countUniques(s.name);
+        return u >= 2 && u <= 12;
+      }) || cats.find(function(s) {
+        return !assignments.label || s.name !== assignments.label;
+      });
+      if (colorPick) assignments.color = colorPick.name;
     }
 
     function applyPayload(p) {
@@ -442,7 +468,7 @@
       qs('tbRange').textContent = (_address ? _address + ' · ' : '') + _rows.length + ' rows';
       qs('metaBadge').textContent = (_rows.length + ' rows · ' + _headers.length + ' cols') + (p.isSample ? ' · sample' : '');
       buildColumnStats();
-      assignments = { x: null, y: null, size: null, color: null, label: null, group: null };
+      assignments = { x: null, y: null, size: null, color: null, label: null };
       if (_saved) applySpec(_saved);
       if (!assignments.x) autoDetect();
       renderVariables(); renderAssignments(); syncModeSeg(); validateModel();

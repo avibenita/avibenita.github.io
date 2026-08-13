@@ -44,14 +44,14 @@
     zColName: "CO2",
     colorColName: "Region",
     labelColName: "Country",
-    groupColName: "Region",
+    groupColName: null,
     xColIndex: 2,
     yColIndex: 3,
     sizeColIndex: 4,
     zColIndex: 5,
     colorColIndex: 1,
     labelColIndex: 0,
-    groupColIndex: 1,
+    groupColIndex: null,
     includedIndices: [0, 1, 2, 3, 4, 5]
   };
 

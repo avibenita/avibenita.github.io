@@ -172,6 +172,31 @@
     }
     .status-line .meta { color: var(--text-muted); }
     .status-line .sel { color: var(--accent); font-weight: 700; }
+    .map-warn {
+      display: none; align-items: flex-start; gap: 10px; flex-wrap: wrap;
+      font-size: 12px; line-height: 1.4; color: #fde68a;
+      padding: 8px 10px; border-radius: 8px;
+      background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.35);
+    }
+    .map-warn.is-visible { display: flex; }
+    .map-warn .warn-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+    .map-warn button {
+      border: 1px solid rgba(251,191,36,.45); background: rgba(15,23,42,.55);
+      color: #fde68a; border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer;
+    }
+    .map-warn button:hover { background: rgba(251,191,36,.18); }
+    .map-warn button.primary { background: rgba(251,191,36,.22); font-weight: 700; }
+    .color-scale {
+      margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border);
+    }
+    .color-scale-bar {
+      height: 10px; border-radius: 4px; margin: 6px 0 4px;
+      background: linear-gradient(90deg, #0ea5e9, #34d399, #fbbf24);
+      border: 1px solid rgba(148,163,184,.35);
+    }
+    .color-scale-ends {
+      display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted);
+    }
     .chart-row { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 112px; gap: 10px; }
     .chart-wrap {
       min-height: 360px; border: 1px solid var(--border); border-radius: 12px;
@@ -396,6 +421,7 @@
 
     <main class="main">
       <div class="status-line" id="statusStrip"></div>
+      <div class="map-warn" id="mapWarn" role="status"></div>
       <div class="chart-row">
         <div class="chart-wrap">
           <div id="chart"></div>
@@ -424,21 +450,22 @@
       chartMode: "bubble",
       xColName: "GDP", yColName: "LifeExp", sizeColName: "Population",
       zColName: "CO2",
-      colorColName: "Region", labelColName: "Country", groupColName: "Region",
+      colorColName: "Region", labelColName: "Country",
       xColIndex: 2, yColIndex: 3, sizeColIndex: 4, zColIndex: 5,
-      colorColIndex: 1, labelColIndex: 0, groupColIndex: 1
+      colorColIndex: 1, labelColIndex: 0
     }
   };
 
   var PALETTE = ["#38bdf8", "#a78bfa", "#34d399", "#fbbf24", "#fb7185", "#94a3b8"];
+  var MISSING_GROUP = "Not specified";
+  var MISSING_COLOR = "#64748b";
   var ROLES = [
     { id: "x", label: "X position", req: true, num: true },
     { id: "y", label: "Y position", req: true, num: true },
     { id: "z", label: "Z position", req: false, num: true, tip: "Used for True 3D depth axis" },
     { id: "size", label: "Bubble size", req: true, num: true },
-    { id: "color", label: "Color by", req: false, num: false, tip: "Paints points by category or value" },
-    { id: "label", label: "Label", req: false, num: false },
-    { id: "group", label: "Series by", req: false, num: false, tip: "Splits the legend into series" }
+    { id: "color", label: "Color / group", req: false, num: false, tip: "Category creates series + legend. Numeric uses a continuous color scale. Do not map an ID / Label here." },
+    { id: "label", label: "Label", req: false, num: false, tip: "Names individual bubbles (optional)" }
   ];
 
   var run = null;
@@ -446,7 +473,7 @@
   var records = [];
   var state = {
     mode: "bubble",
-    map: { x: null, y: null, z: null, size: null, color: null, label: null, group: null },
+    map: { x: null, y: null, z: null, size: null, color: null, label: null },
     sizeScale: 1,
     sizeBy: "area",
     bubbleStyle: "sphere",
@@ -462,6 +489,10 @@
     labels: "auto",
     search: "",
     selected: {},
+    seriesFocus: null,
+    seriesHidden: {},
+    colorMode: "none",
+    colorWarnAck: false,
     xCutMode: "median",
     yCutMode: "median",
     xCutCustom: null,
@@ -470,7 +501,9 @@
     quadShade: true,
     qNames: { NE: "Leaders", NW: "Opportunities", SE: "Monitor", SW: "Low priority" },
     chart: null,
-    lastCuts: { x: null, y: null }
+    lastCuts: { x: null, y: null },
+    lastColorRange: { min: null, max: null },
+    lastSeriesNames: []
   };
 
   function send(action, data) {
@@ -520,9 +553,17 @@
       z: resolve("zColName", "zColIndex"),
       size: resolve("sizeColName", "sizeColIndex"),
       color: resolve("colorColName", "colorColIndex"),
-      label: resolve("labelColName", "labelColIndex"),
-      group: resolve("groupColName", "groupColIndex")
+      label: resolve("labelColName", "labelColIndex")
     };
+    // Migrate legacy separate Group into Color / group (never invent from Label)
+    if (!state.map.color) {
+      var legacyGroup = resolve("groupColName", "groupColIndex");
+      if (legacyGroup && legacyGroup !== state.map.label) state.map.color = legacyGroup;
+    }
+    // Never treat Label as Color / group
+    if (state.map.color && state.map.label && state.map.color === state.map.label) {
+      state.map.color = null;
+    }
     if (!state.map.z) {
       var used = { };
       used[state.map.x] = 1; used[state.map.y] = 1; used[state.map.size] = 1;
@@ -531,6 +572,9 @@
     }
     state.mode = spec.chartMode === "quadrant" ? "quadrant" : "bubble";
     state.selected = {};
+    state.seriesFocus = null;
+    state.seriesHidden = {};
+    state.colorWarnAck = false;
     syncTrue3dUi();
 
     document.getElementById("waiting").style.display = "none";
@@ -578,7 +622,16 @@
         sel.appendChild(opt);
       });
       sel.addEventListener("change", function () {
+        var prev = state.map[role.id];
         state.map[role.id] = sel.value || null;
+        if (role.id === "color" && state.map.color !== prev) {
+          state.colorWarnAck = false;
+          state.seriesFocus = null;
+          state.seriesHidden = {};
+        }
+        if (role.id === "color" && state.map.color && state.map.label && state.map.color === state.map.label) {
+          // Allow explicit choice but warn via assessColorField ID heuristic
+        }
         render();
       });
       row.appendChild(lab);
@@ -598,13 +651,6 @@
     var a = vals.slice().sort(function (x, y) { return x - y; });
     var m = Math.floor(a.length / 2);
     return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
-  }
-
-  function colorFor(value, categories) {
-    if (value == null || value === "") return "#64748b";
-    var i = categories.indexOf(String(value));
-    if (i < 0) i = categories.push(String(value)) - 1;
-    return PALETTE[i % PALETTE.length];
   }
 
   function num(v) {
@@ -686,23 +732,176 @@
     }
   }
 
+  function groupKeyFromValue(v) {
+    if (v === null || v === undefined || v === "") return MISSING_GROUP;
+    return String(v);
+  }
+
+  function uniqueGroupInfo(fieldKey) {
+    var counts = {};
+    var order = [];
+    records.forEach(function (r) {
+      var k = groupKeyFromValue(r[fieldKey]);
+      if (!counts[k]) {
+        counts[k] = 0;
+        order.push(k);
+      }
+      counts[k]++;
+    });
+    return { keys: order, counts: counts, n: order.length };
+  }
+
+  function colorModeForField(key) {
+    if (!key) return "none";
+    var meta = fieldMeta(key);
+    return meta && meta.kind === "num" ? "num" : "cat";
+  }
+
+  function lerpColor(a, b, t) {
+    function parse(hex) {
+      hex = String(hex).replace("#", "");
+      return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+    }
+    var A = parse(a), B = parse(b);
+    var r = Math.round(A[0] + (B[0] - A[0]) * t);
+    var g = Math.round(A[1] + (B[1] - A[1]) * t);
+    var bl = Math.round(A[2] + (B[2] - A[2]) * t);
+    return "#" + [r, g, bl].map(function (n) {
+      var s = n.toString(16);
+      return s.length === 1 ? "0" + s : s;
+    }).join("");
+  }
+
+  function continuousColor(t) {
+    t = Math.max(0, Math.min(1, t));
+    if (t < 0.5) return lerpColor("#0ea5e9", "#34d399", t * 2);
+    return lerpColor("#34d399", "#fbbf24", (t - 0.5) * 2);
+  }
+
+  function seriesColorForKey(key, index) {
+    if (key === MISSING_GROUP) return MISSING_COLOR;
+    return PALETTE[index % PALETTE.length];
+  }
+
+  function updateMapWarn(info) {
+    var el = document.getElementById("mapWarn");
+    if (!el) return;
+    if (!info || !info.message) {
+      el.classList.remove("is-visible");
+      el.innerHTML = "";
+      return;
+    }
+    var actions = "";
+    if (info.idSuspect) {
+      actions =
+        '<div class="warn-actions">' +
+        '<button type="button" class="primary" id="warnUseLabel">Use as Label</button>' +
+        '<button type="button" id="warnKeepGroup">Keep as Color / group</button>' +
+        "</div>";
+    }
+    el.innerHTML = "<div>" + info.message + "</div>" + actions;
+    el.classList.add("is-visible");
+    var useBtn = document.getElementById("warnUseLabel");
+    var keepBtn = document.getElementById("warnKeepGroup");
+    if (useBtn) {
+      useBtn.onclick = function () {
+        if (state.map.color) {
+          state.map.label = state.map.color;
+          state.map.color = null;
+        }
+        state.colorWarnAck = false;
+        buildRoleMap();
+        render();
+      };
+    }
+    if (keepBtn) {
+      keepBtn.onclick = function () {
+        state.colorWarnAck = true;
+        updateMapWarn(null);
+        render();
+      };
+    }
+  }
+
+  function assessColorField() {
+    var key = state.map.color;
+    state.colorMode = colorModeForField(key);
+    if (state.colorMode !== "cat") {
+      if (!state.colorWarnAck) updateMapWarn(null);
+      return null;
+    }
+    var info = uniqueGroupInfo(key);
+    var nPts = records.length;
+    var idSuspect = info.n >= 2 && (info.n >= nPts || info.n / Math.max(1, nPts) >= 0.85);
+    if (idSuspect && !state.colorWarnAck) {
+      return {
+        idSuspect: true,
+        message: "<strong>" + key + "</strong> creates " + info.n + " groups for " + nPts +
+          " observations. It appears to be an identifier. Use it as the Label instead?"
+      };
+    }
+    if (info.n > 15) {
+      return {
+        idSuspect: false,
+        message: "<strong>" + key + "</strong> has " + info.n +
+          " groups - the chart will be hard to read. Prefer a variable with fewer categories."
+      };
+    }
+    if (info.n >= 9) {
+      return {
+        idSuspect: false,
+        message: "<strong>" + key + "</strong> has " + info.n +
+          " groups - readable, but dense. Consider a coarser category if the legend gets crowded."
+      };
+    }
+    return null;
+  }
+
   function buildSeries(minSize, maxSize) {
     var mx = state.map.x, my = state.map.y, mzPos = state.map.z, mSize = state.map.size;
-    var mColor = state.map.color, mLabel = state.map.label, mGroup = state.map.group;
+    var mColor = state.map.color, mLabel = state.map.label;
     var q = (state.search || "").trim().toLowerCase();
-    var categories = [];
     var grouped = {};
-    var hasSelection = Object.keys(state.selected).length > 0;
     var seriesColors = {};
+    var seriesOrder = [];
+    var hasSelection = Object.keys(state.selected).length > 0;
     var true3d = isTrue3d();
+    var mode = colorModeForField(mColor);
+    state.colorMode = mode;
 
     var sizeVals = [];
+    var colorNums = [];
     records.forEach(function (r) {
       var sv = num(r[mSize]);
       if (isFinite(sv) && sv >= 0) sizeVals.push(sv);
+      if (mode === "num") {
+        var cv = num(r[mColor]);
+        if (isFinite(cv)) colorNums.push(cv);
+      }
     });
     var sizeMin = sizeVals.length ? Math.min.apply(null, sizeVals) : 0;
     var sizeMax = sizeVals.length ? Math.max.apply(null, sizeVals) : 1;
+    var cMin = colorNums.length ? Math.min.apply(null, colorNums) : 0;
+    var cMax = colorNums.length ? Math.max.apply(null, colorNums) : 1;
+    state.lastColorRange = { min: cMin, max: cMax };
+
+    function ensureSeries(name, color) {
+      if (!grouped[name]) {
+        grouped[name] = [];
+        seriesOrder.push(name);
+        seriesColors[name] = color;
+      }
+    }
+
+    if (mode === "none") {
+      ensureSeries("All", PALETTE[0]);
+    } else if (mode === "cat") {
+      uniqueGroupInfo(mColor).keys.forEach(function (k, i) {
+        ensureSeries(k, seriesColorForKey(k, i));
+      });
+    } else {
+      ensureSeries(fieldMeta(mColor) ? fieldMeta(mColor).label : "All", PALETTE[0]);
+    }
 
     records.forEach(function (r) {
       var x = num(r[mx]), y = num(r[my]), sizeVal = num(r[mSize]);
@@ -711,27 +910,38 @@
       if (true3d && mzPos && !isFinite(zDepth)) return;
       if ((state.xScale === "logarithmic" && x <= 0) || (state.yScale === "logarithmic" && y <= 0)) return;
 
-      var seriesKey = mGroup ? String(r[mGroup]) : "All";
-      if (!grouped[seriesKey]) grouped[seriesKey] = [];
-      if (!seriesColors[seriesKey]) {
-        var si = Object.keys(seriesColors).length;
-        seriesColors[seriesKey] = PALETTE[si % PALETTE.length];
+      var seriesKey;
+      var fill;
+      if (mode === "none") {
+        seriesKey = "All";
+        fill = seriesColors[seriesKey];
+      } else if (mode === "cat") {
+        seriesKey = groupKeyFromValue(r[mColor]);
+        if (!seriesColors[seriesKey]) {
+          ensureSeries(seriesKey, seriesColorForKey(seriesKey, seriesOrder.length));
+        }
+        fill = seriesColors[seriesKey];
+      } else {
+        seriesKey = seriesOrder[0];
+        var cv = num(r[mColor]);
+        if (!isFinite(cv)) {
+          fill = MISSING_COLOR;
+        } else {
+          var t = cMax > cMin ? (cv - cMin) / (cMax - cMin) : 0.5;
+          fill = continuousColor(t);
+        }
       }
 
       var label = mLabel ? String(r[mLabel]) : ("#" + (r.__i + 1));
       var hit = !q || label.toLowerCase().indexOf(q) >= 0;
-      var key = label + "|" + x + "|" + y + "|" + sizeVal + "|" + (true3d ? zDepth : "");
+      var key = label + "|" + x + "|" + y + "|" + sizeVal + "|" + (true3d ? zDepth : "") + "|" + seriesKey;
       var isSel = !!state.selected[key];
-
-      var colorVal = mColor ? r[mColor] : seriesKey;
-      var fill = mColor && fieldMeta(mColor) && fieldMeta(mColor).kind === "num"
-        ? seriesColors[seriesKey]
-        : colorFor(colorVal, categories);
 
       var opacity = state.bubbleOpacity;
       if (q && !hit) opacity = 0.1;
       else if (hasSelection && !isSel) opacity = 0.14;
       else if (isSel) opacity = 1;
+      if (state.seriesFocus && state.seriesFocus !== seriesKey) opacity = Math.min(opacity, 0.12);
 
       var marker = {
         lineWidth: isSel ? 2.5 : (hit && q ? 2 : 1),
@@ -741,12 +951,9 @@
       if (true3d) {
         marker.radius = sizeToRadius(sizeVal, sizeMin, sizeMax, Math.max(3, minSize / 2), Math.max(8, maxSize / 2));
         marker.fillOpacity = opacity;
-        if (state.bubbleStyle === "true3d") {
-          // keep flat-ish fill in 3D for clarity; optional sphere fill still ok
-          marker.fillColor = fill || seriesColors[seriesKey];
-        }
+        marker.fillColor = fill;
       } else if (state.bubbleStyle === "sphere") {
-        marker.fillColor = sphereFill(fill || seriesColors[seriesKey], opacity);
+        marker.fillColor = sphereFill(fill, opacity);
         marker.fillOpacity = 1;
       }
 
@@ -762,28 +969,33 @@
           row: r,
           key: key,
           selected: isSel,
-          baseColor: fill || seriesColors[seriesKey],
+          baseColor: fill,
           sizeVal: sizeVal,
-          zDepth: zDepth
+          zDepth: zDepth,
+          seriesKey: seriesKey,
+          colorVal: mode === "num" ? num(r[mColor]) : r[mColor]
         }
       };
 
-      if (true3d) {
-        pt.z = isFinite(zDepth) ? zDepth : 0;
-      } else {
-        pt.z = sizeVal; // Highcharts bubble uses z as size metric
-      }
+      if (true3d) pt.z = isFinite(zDepth) ? zDepth : 0;
+      else pt.z = sizeVal;
 
       grouped[seriesKey].push(pt);
     });
 
-    return Object.keys(grouped).map(function (g, i) {
+    state.lastSeriesNames = seriesOrder.slice();
+
+    return seriesOrder.filter(function (g) {
+      return grouped[g] && grouped[g].length;
+    }).map(function (g, i) {
       return {
         type: true3d ? "scatter" : "bubble",
         name: g,
         color: seriesColors[g] || PALETTE[i % PALETTE.length],
         data: grouped[g],
-        dataLabels: { enabled: false }
+        dataLabels: { enabled: false },
+        showInLegend: mode === "cat",
+        visible: !state.seriesHidden[g]
       };
     });
   }
@@ -851,6 +1063,18 @@
         "<span>" + formatNumber(v, "compact") + "</span>";
       el.appendChild(row);
     });
+
+    if (state.colorMode === "num" && state.map.color) {
+      var box = document.createElement("div");
+      box.className = "color-scale";
+      var cField = fieldMeta(state.map.color);
+      box.innerHTML =
+        "<strong>Color scale<br/>" + (cField ? cField.label : "value") + "</strong>" +
+        '<div class="color-scale-bar"></div>' +
+        '<div class="color-scale-ends"><span>' + formatNumber(state.lastColorRange.min, "compact") +
+        "</span><span>" + formatNumber(state.lastColorRange.max, "compact") + "</span></div>";
+      el.appendChild(box);
+    }
   }
 
   function updateStatus(nPoints, nSeries, cuts) {
@@ -863,14 +1087,35 @@
       cutTxt = " | X=" + formatNumber(cuts.x, state.xFormat) + ", Y=" + formatNumber(cuts.y, state.yFormat);
     }
     var zTxt = isTrue3d() && zLabel ? (" | Z=" + zLabel) : "";
+    var colorTxt = "";
+    if (state.colorMode === "cat" && state.map.color) colorTxt = " | color / group " + state.map.color;
+    else if (state.colorMode === "num" && state.map.color) colorTxt = " | color scale " + state.map.color;
+    var seriesTxt = state.colorMode === "cat" ? (nSeries + " series") : "1 series";
+    var focusTxt = "";
+    if (state.seriesFocus) focusTxt = ' | <span class="sel">focus: ' + state.seriesFocus + "</span>";
+    var hiddenN = Object.keys(state.seriesHidden).length;
+    if (hiddenN) focusTxt += ' | <span class="sel">' + hiddenN + " hidden</span>";
+    var restore = (state.seriesFocus || hiddenN)
+      ? ' | <a href="#" id="restoreGroups" style="color:#38bdf8">Restore groups</a>'
+      : "";
     document.getElementById("statusStrip").innerHTML =
-      "<div><strong>" + modeTxt + "</strong> | " + nPoints + " points | " + nSeries + " series | size by " +
-      (state.sizeBy === "width" ? "width" : "area") + " | " + sizeLabel + zTxt + cutTxt + "</div>" +
+      "<div><strong>" + modeTxt + "</strong> | " + nPoints + " points | " + seriesTxt + " | size by " +
+      (state.sizeBy === "width" ? "width" : "area") + " | " + sizeLabel + colorTxt + zTxt + cutTxt + focusTxt + restore + "</div>" +
       "<div class=\"meta\">" + (isTrue3d()
-        ? (nSel ? '<span class="sel">' + nSel + " selected</span> | " : "") + "drag to rotate | click to select"
-        : (nSel ? '<span class="sel">' + nSel + " selected</span> | click to select | Ctrl+click multi" : "click a bubble to select")) + "</div>";
+        ? (nSel ? '<span class="sel">' + nSel + " selected</span> | " : "") + "drag to rotate | click point to select"
+        : (nSel ? '<span class="sel">' + nSel + " selected</span> | click point to select | Ctrl+click multi" : "click a bubble to select (not the whole group)")) +
+      (state.colorMode === "cat" ? " | legend: click focus ? Ctrl+click hide ? double-click only" : "") + "</div>";
     document.getElementById("chartTitle").textContent =
       isTrue3d() ? "3D scatter chart" : (state.mode === "quadrant" ? "Quadrant chart" : "Bubble chart");
+    var restoreEl = document.getElementById("restoreGroups");
+    if (restoreEl) {
+      restoreEl.onclick = function (e) {
+        e.preventDefault();
+        state.seriesFocus = null;
+        state.seriesHidden = {};
+        render();
+      };
+    }
   }
 
   function syncModeTabs() {
@@ -1054,7 +1299,12 @@
         },
         title: { text: null },
         credits: { enabled: false },
-        legend: { itemStyle: { color: "#cbd5e1" }, itemHoverStyle: { color: "#fff" } },
+        legend: {
+          enabled: state.colorMode === "cat",
+          itemStyle: { color: "#cbd5e1" },
+          itemHoverStyle: { color: "#fff" },
+          itemHiddenStyle: { color: "#64748b" }
+        },
         xAxis: {
           type: true3d ? "linear" : state.xScale,
           title: { text: xTitle, style: { color: "#94a3b8" } },
@@ -1094,8 +1344,16 @@
             } else {
               lines.push(sizeTitle + ": <b>" + formatNumber(sizeVal, "compact") + "</b>");
             }
-            if (state.map.color) lines.push((fieldMeta(state.map.color) || {}).label + ": <b>" + r[state.map.color] + "</b>");
-            if (state.map.group) lines.push("Series: <b>" + r[state.map.group] + "</b>");
+            if (state.map.color) {
+              var raw = r[state.map.color];
+              var shown = (raw === null || raw === undefined || raw === "") ? MISSING_GROUP : raw;
+              var cLab = (fieldMeta(state.map.color) || {}).label || "Color";
+              if (state.colorMode === "num" && isFinite(num(raw))) {
+                lines.push(cLab + ": <b>" + formatNumber(num(raw), "compact") + "</b>");
+              } else {
+                lines.push(cLab + ": <b>" + shown + "</b>");
+              }
+            }
             if (!true3d && state.mode === "quadrant" && state.lastCuts.x != null) {
               var qx = this.x >= state.lastCuts.x;
               var qy = this.y >= state.lastCuts.y;
@@ -1106,7 +1364,38 @@
           }
         },
         plotOptions: {
-          series: { states: { inactive: { opacity: 0.35 } } }
+          series: {
+            states: { inactive: { opacity: 0.35 } },
+            events: {
+              legendItemClick: function (e) {
+                if (state.colorMode !== "cat") return;
+                var name = this.name;
+                var be = e && e.browserEvent;
+                var now = Date.now();
+                if (this._mvLastLegendClick && now - this._mvLastLegendClick < 350) {
+                  this._mvLastLegendClick = 0;
+                  state.seriesFocus = null;
+                  state.seriesHidden = {};
+                  (state.lastSeriesNames || []).forEach(function (n) {
+                    if (n !== name) state.seriesHidden[n] = true;
+                  });
+                  render();
+                  return false;
+                }
+                this._mvLastLegendClick = now;
+                if (be && (be.ctrlKey || be.metaKey || be.altKey)) {
+                  if (state.seriesHidden[name]) delete state.seriesHidden[name];
+                  else state.seriesHidden[name] = true;
+                  if (state.seriesFocus === name) state.seriesFocus = null;
+                  render();
+                  return false;
+                }
+                state.seriesFocus = state.seriesFocus === name ? null : name;
+                render();
+                return false;
+              }
+            }
+          }
         },
         series: series
       };
@@ -1211,6 +1500,7 @@
 
   function render() {
     if (!state.map.x || !state.map.y || !state.map.size) return;
+    updateMapWarn(assessColorField());
     var maxSize = Math.round(48 * state.sizeScale);
     var minSize = Math.max(4, Math.round(6 * state.sizeScale));
     var series = buildSeries(minSize, maxSize);
@@ -1230,7 +1520,8 @@
     }
     state.lastCuts = cuts;
 
-    updateStatus(sizeVals.length, series.length, cuts);
+    var visibleSeries = series.filter(function (s) { return s.visible !== false; }).length;
+    updateStatus(sizeVals.length, visibleSeries, cuts);
     updateSizeLegend(sizeVals);
 
     var xField = fieldMeta(state.map.x);
@@ -1327,6 +1618,8 @@
     document.getElementById("btnReset").addEventListener("click", function () {
       state.selected = {};
       state.search = "";
+      state.seriesFocus = null;
+      state.seriesHidden = {};
       document.getElementById("searchBox").value = "";
       if (state.chart && state.chart.zoomOut) state.chart.zoomOut();
       render();

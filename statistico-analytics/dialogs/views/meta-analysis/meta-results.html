@@ -508,6 +508,13 @@
       font-size: 14.5px; line-height: 1.6; color: var(--text-secondary);
     }
     .interpretation strong { color: var(--accent-1); }
+    .forest-interpretation {
+      flex: 0 0 auto;
+      margin-top: 10px;
+    }
+    .forest-interpretation .interp-lead {
+      font-weight: 800; color: var(--accent-meta); margin-right: 6px;
+    }
 
     .interp-card {
       margin: 10px 0 8px;
@@ -915,6 +922,7 @@
               </div>
             </div>
           </div>
+          <div class="interpretation forest-interpretation" id="forestInterpretation" aria-live="polite">—</div>
         </div>
       </div>
 
@@ -1236,6 +1244,73 @@
       return effect > 0 ? 'treatment' : 'control';
     }
 
+    function ciExcludesNull(lo, hi) {
+      return isFinite(lo) && isFinite(hi) && (hi < 0 || lo > 0);
+    }
+
+    function numberWord(n) {
+      var words = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+        'eleven', 'twelve'];
+      return (n >= 0 && n < words.length) ? words[n] : String(n);
+    }
+
+    function buildForestInterpretation(bundle) {
+      if (!bundle || !bundle.pooled || !bundle.studies) return '—';
+      var et = effectTypeLabel(bundle.spec);
+      var better = outcomeBetterOf(bundle);
+      var arm = favoredArm(bundle.pooled.effect, better);
+      var g = fmt(bundle.pooled.effect);
+      var lo = fmt(bundle.pooled.ciLower);
+      var hi = fmt(bundle.pooled.ciUpper);
+      var k = bundle.studies.length;
+      var excluding = [];
+      var including = [];
+      bundle.studies.forEach(function (s) {
+        var ci = studyCi(s);
+        var name = s.name || 'Study';
+        if (ciExcludesNull(ci.lo, ci.hi)) excluding.push(name);
+        else including.push(name);
+      });
+
+      var lead;
+      if (better === 'none') {
+        lead = 'The pooled Treatment − Control effect is <strong>' + et + ' = ' + g +
+          '</strong>, 95% CI [<strong>' + lo + '</strong>, <strong>' + hi + '</strong>]';
+      } else if (arm) {
+        lead = 'The pooled effect favours <strong>' + arm + '</strong>, <strong>' + et + ' = ' + g +
+          '</strong>, 95% CI [<strong>' + lo + '</strong>, <strong>' + hi + '</strong>]';
+      } else {
+        lead = 'The pooled effect is near no difference, <strong>' + et + ' = ' + g +
+          '</strong>, 95% CI [<strong>' + lo + '</strong>, <strong>' + hi + '</strong>]';
+      }
+
+      var detail;
+      if (excluding.length === k) {
+        detail = 'All ' + numberWord(k) + ' individual study confidence intervals exclude no effect.';
+      } else if (excluding.length === 0) {
+        detail = 'None of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect.';
+      } else if (including.length === 1) {
+        detail = numberWord(excluding.length).charAt(0).toUpperCase() + numberWord(excluding.length).slice(1) +
+          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect; <strong>' +
+          escapeHtml(including[0]) + '</strong> is the exception.';
+      } else if (including.length <= 3) {
+        detail = numberWord(excluding.length).charAt(0).toUpperCase() + numberWord(excluding.length).slice(1) +
+          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect; exceptions: <strong>' +
+          including.map(escapeHtml).join('</strong>, <strong>') + '</strong>.';
+      } else {
+        detail = numberWord(excluding.length).charAt(0).toUpperCase() + numberWord(excluding.length).slice(1) +
+          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect.';
+      }
+
+      return '<span class="interp-lead">Interpretation:</span> ' + lead + '. ' + detail;
+    }
+
+    function syncForestInterpretation(bundle) {
+      var el = document.getElementById('forestInterpretation');
+      if (!el) return;
+      el.innerHTML = buildForestInterpretation(bundle || metaBundle);
+    }
+
     function magnitudeBand(bundle, et) {
       var absG = Math.abs(bundle.pooled.effect);
       var m = (bundle.spec && bundle.spec.effectMeasure) || '';
@@ -1404,6 +1479,7 @@
       var mEl = document.getElementById('interpMag');
       if (nEl) nEl.innerHTML = interp.narrative;
       if (mEl) mEl.textContent = interp.mag;
+      syncForestInterpretation(bundle);
       if (activeTabName === 'forest') renderForestPlot(bundle);
     }
 
@@ -2296,6 +2372,7 @@
 
     function renderForestPlot(bundle) {
       if (!bundle || !window.Highcharts || !bundle.studies) return;
+      syncForestInterpretation(bundle);
       var vm = buildForestViewModel(bundle);
       forestDrawCtx = vm;
       var anim = { duration: 700 };

@@ -6478,7 +6478,7 @@ const StatisticoHeader = {
       'meta-heterogeneity':
         'Read Q, df, p for Q, I², k, and τ²/τ with the heterogeneity interpretation. Describe whether between-study variance appears low, moderate, or substantial and stress uncertainty when k is small. Do NOT recommend switching fixed vs random effects solely from a non-significant Q or I² = 0. Do not re-interpret the pooled CI here except as context.',
       'meta-bias':
-        'This combines Egger\'s regression test (intercept, SE of intercept, t(df), p, n) with a funnel plot of effect vs SE, including the pooled-effect line and pseudo-95% funnel boundaries (μ̂ ± 1.96×SE). Describe whether points sit inside the funnel and whether Egger suggests small-study effects. Stress that asymmetry is not only publication bias, and with k < 10 power is limited. Do not re-walk the full pooled-effect narrative from Summary.',
+        'This combines Egger\'s regression test (intercept, SE of intercept, t(df), p, n) with a funnel plot of effect vs SE, including the pooled-effect line and Pseudo-95% limits (μ̂ ± 1.96×SE; expected funnel limits, not a CI for the pooled effect). Describe whether points sit inside the funnel and whether Egger suggests small-study effects. Stress that asymmetry is not only publication bias, and with k < 10 power is limited. Do not re-walk the full pooled-effect narrative from Summary.',
       'meta-studies':
         'Read the study table (study id, effect, variance, weight, weight %). Use this view to identify influential or heavily weighted studies and to verify the inputs feeding the pooled estimate — not to restate I² or Egger results.',
       'factor-suitability':

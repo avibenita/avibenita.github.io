@@ -479,6 +479,10 @@
       font-size: 12.5px; line-height: 1.45; color: var(--text-muted);
       margin: -2px 0 12px;
     }
+    .funnel-plot-note {
+      font-size: 12.5px; line-height: 1.45; color: var(--text-muted);
+      margin: 10px 0 0;
+    }
 
     /* Dark info tooltips on metric labels */
     .info-icon {
@@ -1031,7 +1035,7 @@
               <div class="value" id="eggerP">—</div>
             </div>
             <div class="stat-box">
-              <div class="label">Studies
+              <div class="label">Studies (k)
                 <span class="info-icon" tabindex="0">i<span class="tip">Number of studies used in Egger’s regression. Power is low when this count is small (e.g. &lt; 10).</span></span>
               </div>
               <div class="value" id="eggerN">—</div>
@@ -1048,6 +1052,7 @@
         <div class="panel-card">
           <div class="panel-heading">Funnel Plot</div>
           <div id="funnelPlot"></div>
+          <p class="funnel-plot-note" id="funnelPlotNote"></p>
         </div>
       </div>
 
@@ -1283,6 +1288,31 @@
       if (m === 'rom') return 'Ratio of means (log)';
       if (m === 'cohend') return "Cohen's d";
       return "Hedges' g (SMD)";
+    }
+    /** Compact measure name for tooltips (e.g. Hedges' g). */
+    function effectMeasureShort(spec) {
+      var m = (spec && spec.effectMeasure) || '';
+      var t = (spec && spec.effectType) || 'continuous';
+      if (t === 'binary') {
+        if (m === 'rr') return 'log RR';
+        if (m === 'rd') return 'RD';
+        return 'log OR';
+      }
+      if (t === 'direct') {
+        if (m === 'logor') return 'log OR';
+        if (m === 'logrr') return 'log RR';
+        if (m === 'smd') return 'SMD';
+        if (m === 'fisherz') return "Fisher's z";
+        return 'Effect';
+      }
+      if (m === 'md') return 'MD';
+      if (m === 'rom') return 'log RoM';
+      if (m === 'cohend') return "Cohen's d";
+      return "Hedges' g";
+    }
+    function fmtSigned(n, d) {
+      var s = fmt(n, d);
+      return s.charAt(0) === '-' ? ('\u2212' + s.slice(1)) : s;
     }
 
     function modelLabel(bundle) {
@@ -2628,6 +2658,7 @@
       if (!bundle || !window.Highcharts || !bundle.studies || !bundle.pooled) return;
       var t = chartTheme();
       var mu = bundle.pooled.effect;
+      var measureShort = effectMeasureShort(bundle.spec);
       var points = bundle.studies.map(function (s) {
         var se = (s.se != null && isFinite(s.se)) ? s.se : Math.sqrt(s.vi);
         return { x: s.yi, y: se, name: s.name || 'Study' };
@@ -2649,8 +2680,21 @@
       xMin -= pad;
       xMax += pad;
 
+      var noteEl = document.getElementById('funnelPlotNote');
+      if (noteEl) {
+        var k = bundle.k || points.length;
+        noteEl.textContent =
+          'Greater symmetry around the pooled effect is expected in the absence of small-study effects, although interpretation is unreliable with only ' +
+          numberWord(k) + ' studies.';
+      }
+
       Highcharts.chart('funnelPlot', {
-        chart: { type: 'scatter', height: 400, backgroundColor: t.bg },
+        chart: {
+          type: 'scatter',
+          height: 400,
+          backgroundColor: t.bg,
+          marginTop: 36
+        },
         title: { text: null },
         credits: { enabled: false },
         xAxis: {
@@ -2665,16 +2709,9 @@
           plotLines: [{
             value: mu,
             color: t.orange,
-            width: 1.5,
+            width: 1,
             dashStyle: 'Dash',
-            zIndex: 4,
-            label: {
-              text: 'Pooled effect',
-              align: 'left',
-              x: 6,
-              y: 14,
-              style: { color: t.orange, fontSize: '11px', fontWeight: '700' }
-            }
+            zIndex: 4
           }]
         },
         yAxis: {
@@ -2697,13 +2734,17 @@
           backgroundColor: t.bg,
           borderColor: t.grid,
           style: { color: t.text },
+          useHTML: true,
           formatter: function () {
             if (this.series && this.series.options && this.series.options.isFunnelBoundary) {
               return false;
             }
+            if (this.series && this.series.options && this.series.options.isPooledLabel) {
+              return false;
+            }
             return '<b>' + escapeHtml(this.point.name || 'Study') + '</b><br/>' +
-              'Effect: ' + Highcharts.numberFormat(this.point.x, 3) + '<br/>' +
-              'SE: ' + Highcharts.numberFormat(this.point.y, 3);
+              escapeHtml(measureShort) + '=' + fmtSigned(this.point.x, 3) + '<br/>' +
+              'SE=' + fmt(this.point.y, 3);
           }
         },
         series: [{
@@ -2714,7 +2755,33 @@
           marker: { radius: 5, symbol: 'circle' },
           zIndex: 5
         }, {
-          name: 'Pseudo 95% CI',
+          name: 'Pooled',
+          type: 'scatter',
+          isPooledLabel: true,
+          data: [{ x: mu, y: 0 }],
+          color: t.orange,
+          marker: { enabled: false },
+          enableMouseTracking: false,
+          showInLegend: false,
+          dataLabels: {
+            enabled: true,
+            format: 'Pooled effect',
+            allowOverlap: true,
+            crop: false,
+            overflow: 'allow',
+            align: 'center',
+            verticalAlign: 'bottom',
+            y: -4,
+            style: {
+              color: t.orange,
+              fontSize: '10px',
+              fontWeight: '600',
+              textOutline: 'none'
+            }
+          },
+          zIndex: 6
+        }, {
+          name: 'Pseudo-95% limits',
           type: 'line',
           isFunnelBoundary: true,
           data: [[leftMax, maxSe], [mu, 0]],
@@ -2726,7 +2793,7 @@
           showInLegend: true,
           zIndex: 2
         }, {
-          name: 'Pseudo 95% CI ',
+          name: 'Pseudo-95% limits ',
           type: 'line',
           isFunnelBoundary: true,
           data: [[rightMax, maxSe], [mu, 0]],

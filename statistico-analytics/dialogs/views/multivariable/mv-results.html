@@ -9,6 +9,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
   <script src="../shared/vendor/highcharts/highcharts.js"></script>
   <script src="../shared/vendor/highcharts/highcharts-more.js"></script>
+  <script src="../shared/vendor/highcharts/highcharts-3d.js"></script>
   <script src="../shared/vendor/highcharts/modules/exporting.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260812mv3" />
   <script src="../shared-brand-logo.js?v=20260812mv3"></script>
@@ -337,7 +338,19 @@
             <label>Look</label>
             <div class="seg" id="bubbleStyle">
               <button type="button" data-style="flat">Flat</button>
-              <button type="button" data-style="sphere" class="active">Sphere (3D)</button>
+              <button type="button" data-style="sphere" class="active">Sphere</button>
+              <button type="button" data-style="true3d">True 3D</button>
+            </div>
+          </div>
+          <div id="true3dControls" style="display:none;">
+            <div class="hint-mini">Perspective 3D scatter with X / Y / Z axes. Drag the chart to rotate. Bubble size still comes from the size variable.</div>
+            <div class="ctrl-row">
+              <label>Tilt (alpha)</label>
+              <input id="viewAlpha" type="range" min="0" max="45" step="1" value="12" />
+            </div>
+            <div class="ctrl-row">
+              <label>Turn (beta)</label>
+              <input id="viewBeta" type="range" min="-60" max="60" step="1" value="22" />
             </div>
           </div>
           <div class="ctrl-row">
@@ -356,7 +369,7 @@
             <label>Opacity</label>
             <input id="bubbleOpacity" type="range" min="0.35" max="1" step="0.05" value="0.9" />
           </div>
-          <div class="hint">Sphere adds a radial highlight so bubbles look dimensional (not true 3D rotation).</div>
+          <div class="hint" id="lookHint">Sphere = shaded 2D discs. True 3D = rotatable XYZ space (Highcharts perspective 3D).</div>
         </div>
       </div>
 
@@ -410,8 +423,9 @@
     spec: {
       chartMode: "bubble",
       xColName: "GDP", yColName: "LifeExp", sizeColName: "Population",
+      zColName: "CO2",
       colorColName: "Region", labelColName: "Country", groupColName: "Region",
-      xColIndex: 2, yColIndex: 3, sizeColIndex: 4,
+      xColIndex: 2, yColIndex: 3, sizeColIndex: 4, zColIndex: 5,
       colorColIndex: 1, labelColIndex: 0, groupColIndex: 1
     }
   };
@@ -420,6 +434,7 @@
   var ROLES = [
     { id: "x", label: "X position", req: true, num: true },
     { id: "y", label: "Y position", req: true, num: true },
+    { id: "z", label: "Z position", req: false, num: true, tip: "Used for True 3D depth axis" },
     { id: "size", label: "Bubble size", req: true, num: true },
     { id: "color", label: "Color by", req: false, num: false, tip: "Paints points by category or value" },
     { id: "label", label: "Label", req: false, num: false },
@@ -431,11 +446,13 @@
   var records = [];
   var state = {
     mode: "bubble",
-    map: { x: null, y: null, size: null, color: null, label: null, group: null },
+    map: { x: null, y: null, z: null, size: null, color: null, label: null, group: null },
     sizeScale: 1,
     sizeBy: "area",
     bubbleStyle: "sphere",
     bubbleOpacity: 0.9,
+    viewAlpha: 12,
+    viewBeta: 22,
     xScale: "linear",
     yScale: "linear",
     xFormat: "auto",
@@ -500,13 +517,21 @@
     state.map = {
       x: resolve("xColName", "xColIndex"),
       y: resolve("yColName", "yColIndex"),
+      z: resolve("zColName", "zColIndex"),
       size: resolve("sizeColName", "sizeColIndex"),
       color: resolve("colorColName", "colorColIndex"),
       label: resolve("labelColName", "labelColIndex"),
       group: resolve("groupColName", "groupColIndex")
     };
+    if (!state.map.z) {
+      var used = { };
+      used[state.map.x] = 1; used[state.map.y] = 1; used[state.map.size] = 1;
+      var zPick = fields.find(function (f) { return f.kind === "num" && !used[f.key]; });
+      if (zPick) state.map.z = zPick.key;
+    }
     state.mode = spec.chartMode === "quadrant" ? "quadrant" : "bubble";
     state.selected = {};
+    syncTrue3dUi();
 
     document.getElementById("waiting").style.display = "none";
     document.getElementById("appShell").style.display = "grid";
@@ -632,18 +657,58 @@
     };
   }
 
-  function buildSeries() {
-    var mx = state.map.x, my = state.map.y, mz = state.map.size;
+  function sizeToRadius(v, minV, maxV, minR, maxR) {
+    if (!isFinite(v)) return minR;
+    if (!(maxV > minV)) return (minR + maxR) / 2;
+    var t = (v - minV) / (maxV - minV);
+    t = Math.max(0, Math.min(1, t));
+    if (state.sizeBy !== "width") t = Math.sqrt(t);
+    return minR + t * (maxR - minR);
+  }
+
+  function isTrue3d() {
+    return state.bubbleStyle === "true3d";
+  }
+
+  function syncTrue3dUi() {
+    var box = document.getElementById("true3dControls");
+    if (box) box.style.display = isTrue3d() ? "block" : "none";
+    var hint = document.getElementById("lookHint");
+    if (hint) {
+      hint.textContent = isTrue3d()
+        ? "True 3D uses perspective XYZ axes (drag to rotate). Not photorealistic WebGL ? Highcharts 3D projection."
+        : "Sphere = shaded 2D discs. True 3D = rotatable XYZ space (Highcharts perspective 3D).";
+    }
+    // Quadrant overlays are 2D-only
+    var quad = document.getElementById("accQuad");
+    if (quad && isTrue3d()) {
+      // keep available but note in status; still allow viewing without overlays
+    }
+  }
+
+  function buildSeries(minSize, maxSize) {
+    var mx = state.map.x, my = state.map.y, mzPos = state.map.z, mSize = state.map.size;
     var mColor = state.map.color, mLabel = state.map.label, mGroup = state.map.group;
     var q = (state.search || "").trim().toLowerCase();
     var categories = [];
     var grouped = {};
     var hasSelection = Object.keys(state.selected).length > 0;
     var seriesColors = {};
+    var true3d = isTrue3d();
+
+    var sizeVals = [];
+    records.forEach(function (r) {
+      var sv = num(r[mSize]);
+      if (isFinite(sv) && sv >= 0) sizeVals.push(sv);
+    });
+    var sizeMin = sizeVals.length ? Math.min.apply(null, sizeVals) : 0;
+    var sizeMax = sizeVals.length ? Math.max.apply(null, sizeVals) : 1;
 
     records.forEach(function (r) {
-      var x = num(r[mx]), y = num(r[my]), z = num(r[mz]);
-      if (!isFinite(x) || !isFinite(y) || !isFinite(z) || z < 0) return;
+      var x = num(r[mx]), y = num(r[my]), sizeVal = num(r[mSize]);
+      var zDepth = mzPos ? num(r[mzPos]) : 0;
+      if (!isFinite(x) || !isFinite(y) || !isFinite(sizeVal) || sizeVal < 0) return;
+      if (true3d && mzPos && !isFinite(zDepth)) return;
       if ((state.xScale === "logarithmic" && x <= 0) || (state.yScale === "logarithmic" && y <= 0)) return;
 
       var seriesKey = mGroup ? String(r[mGroup]) : "All";
@@ -655,7 +720,7 @@
 
       var label = mLabel ? String(r[mLabel]) : ("#" + (r.__i + 1));
       var hit = !q || label.toLowerCase().indexOf(q) >= 0;
-      var key = label + "|" + x + "|" + y + "|" + z;
+      var key = label + "|" + x + "|" + y + "|" + sizeVal + "|" + (true3d ? zDepth : "");
       var isSel = !!state.selected[key];
 
       var colorVal = mColor ? r[mColor] : seriesKey;
@@ -672,24 +737,49 @@
         lineWidth: isSel ? 2.5 : (hit && q ? 2 : 1),
         lineColor: isSel ? "#fff" : (hit && q ? "#fff" : "rgba(255,255,255,.28)")
       };
-      if (state.bubbleStyle === "sphere") {
+
+      if (true3d) {
+        marker.radius = sizeToRadius(sizeVal, sizeMin, sizeMax, Math.max(3, minSize / 2), Math.max(8, maxSize / 2));
+        marker.fillOpacity = opacity;
+        if (state.bubbleStyle === "true3d") {
+          // keep flat-ish fill in 3D for clarity; optional sphere fill still ok
+          marker.fillColor = fill || seriesColors[seriesKey];
+        }
+      } else if (state.bubbleStyle === "sphere") {
         marker.fillColor = sphereFill(fill || seriesColors[seriesKey], opacity);
         marker.fillOpacity = 1;
       }
 
-      grouped[seriesKey].push({
-        x: x, y: y, z: z, name: label,
-        color: state.bubbleStyle === "sphere" ? undefined : fill,
-        opacity: state.bubbleStyle === "sphere" ? 1 : opacity,
+      var pt = {
+        x: x,
+        y: y,
+        name: label,
+        color: (!true3d && state.bubbleStyle === "sphere") ? undefined : fill,
+        opacity: (!true3d && state.bubbleStyle === "sphere") ? 1 : opacity,
         marker: marker,
         dataLabels: { enabled: false },
-        custom: { row: r, key: key, selected: isSel, baseColor: fill || seriesColors[seriesKey] }
-      });
+        custom: {
+          row: r,
+          key: key,
+          selected: isSel,
+          baseColor: fill || seriesColors[seriesKey],
+          sizeVal: sizeVal,
+          zDepth: zDepth
+        }
+      };
+
+      if (true3d) {
+        pt.z = isFinite(zDepth) ? zDepth : 0;
+      } else {
+        pt.z = sizeVal; // Highcharts bubble uses z as size metric
+      }
+
+      grouped[seriesKey].push(pt);
     });
 
     return Object.keys(grouped).map(function (g, i) {
       return {
-        type: "bubble",
+        type: true3d ? "scatter" : "bubble",
         name: g,
         color: seriesColors[g] || PALETTE[i % PALETTE.length],
         data: grouped[g],
@@ -765,18 +855,22 @@
 
   function updateStatus(nPoints, nSeries, cuts) {
     var sizeLabel = (fieldMeta(state.map.size) || {}).label || "size";
+    var zLabel = state.map.z ? ((fieldMeta(state.map.z) || {}).label || "Z") : null;
     var nSel = Object.keys(state.selected).length;
-    var modeTxt = state.mode === "quadrant" ? "Quadrant" : "Bubble";
+    var modeTxt = isTrue3d() ? "True 3D" : (state.mode === "quadrant" ? "Quadrant" : "Bubble");
     var cutTxt = "";
-    if (state.mode === "quadrant" && cuts && cuts.x != null) {
+    if (!isTrue3d() && state.mode === "quadrant" && cuts && cuts.x != null) {
       cutTxt = " | X=" + formatNumber(cuts.x, state.xFormat) + ", Y=" + formatNumber(cuts.y, state.yFormat);
     }
+    var zTxt = isTrue3d() && zLabel ? (" | Z=" + zLabel) : "";
     document.getElementById("statusStrip").innerHTML =
       "<div><strong>" + modeTxt + "</strong> | " + nPoints + " points | " + nSeries + " series | size by " +
-      (state.sizeBy === "width" ? "width" : "area") + " | " + sizeLabel + cutTxt + "</div>" +
-      "<div class=\"meta\">" + (nSel ? '<span class="sel">' + nSel + " selected</span> | click to select | Ctrl+click multi" : "click a bubble to select") + "</div>";
+      (state.sizeBy === "width" ? "width" : "area") + " | " + sizeLabel + zTxt + cutTxt + "</div>" +
+      "<div class=\"meta\">" + (isTrue3d()
+        ? (nSel ? '<span class="sel">' + nSel + " selected</span> | " : "") + "drag to rotate | click to select"
+        : (nSel ? '<span class="sel">' + nSel + " selected</span> | click to select | Ctrl+click multi" : "click a bubble to select")) + "</div>";
     document.getElementById("chartTitle").textContent =
-      state.mode === "quadrant" ? "Quadrant chart" : "Bubble chart";
+      isTrue3d() ? "3D scatter chart" : (state.mode === "quadrant" ? "Quadrant chart" : "Bubble chart");
   }
 
   function syncModeTabs() {
@@ -808,6 +902,10 @@
   }
 
   function destroyChart() {
+    if (state.chart && state.chart._mvUnbindDrag) {
+      try { state.chart._mvUnbindDrag(); } catch (e) {}
+      state.chart._mvUnbindDrag = null;
+    }
     if (state.chart && typeof state.chart.destroy === "function") {
       try { state.chart.destroy(); } catch (e) {}
     }
@@ -842,13 +940,75 @@
     });
   }
 
+  function pointClickHandler(e) {
+    var key = this.custom && this.custom.key;
+    if (!key) return;
+    var multi = e && (e.ctrlKey || e.metaKey);
+    if (!multi) {
+      var only = {};
+      only[key] = true;
+      if (state.selected[key] && Object.keys(state.selected).length === 1) state.selected = {};
+      else state.selected = only;
+    } else {
+      if (state.selected[key]) delete state.selected[key];
+      else state.selected[key] = true;
+    }
+    render();
+  }
+
+  function bindChartDragRotate(chart) {
+    if (!chart || !Highcharts.addEvent) return;
+    var unbindDown = Highcharts.addEvent(chart.container, "mousedown", function (eStart) {
+      if (!chart.options.chart.options3d || !chart.options.chart.options3d.enabled) return;
+      eStart = chart.pointer.normalize(eStart);
+      var posX = eStart.chartX;
+      var posY = eStart.chartY;
+      var alpha = chart.options.chart.options3d.alpha;
+      var beta = chart.options.chart.options3d.beta;
+      var sensitivity = 5;
+      var handlers = [];
+      var onMove = Highcharts.addEvent(document, "mousemove", function (e) {
+        e = chart.pointer.normalize(e);
+        var newAlpha = alpha + (e.chartY - posY) / sensitivity;
+        var newBeta = beta + (posX - e.chartX) / sensitivity;
+        newAlpha = Math.max(0, Math.min(45, newAlpha));
+        newBeta = Math.max(-90, Math.min(90, newBeta));
+        state.viewAlpha = Math.round(newAlpha);
+        state.viewBeta = Math.round(newBeta);
+        var aEl = document.getElementById("viewAlpha");
+        var bEl = document.getElementById("viewBeta");
+        if (aEl) aEl.value = String(state.viewAlpha);
+        if (bEl) bEl.value = String(state.viewBeta);
+        chart.update({
+          chart: { options3d: { alpha: newAlpha, beta: newBeta } }
+        }, undefined, undefined, false);
+      });
+      var onUp = Highcharts.addEvent(document, "mouseup", function () {
+        handlers.forEach(function (u) { if (u) u(); });
+        handlers.length = 0;
+      });
+      handlers.push(onMove, onUp);
+    });
+    chart._mvUnbindDrag = unbindDown;
+  }
+
   function drawChart(series, xField, yField, cuts, xs, ys, minSize, maxSize) {
     hideChartError();
     if (typeof Highcharts === "undefined") {
       showChartError("Highcharts did not load.<br/>Expected local files under <code>dialogs/views/shared/vendor/highcharts/</code>.");
       return;
     }
-    if (!Highcharts.seriesTypes || !Highcharts.seriesTypes.bubble) {
+    var true3d = isTrue3d();
+    if (true3d) {
+      if (!Highcharts.seriesTypes || !Highcharts.seriesTypes.scatter3d) {
+        showChartError("3D scatter unavailable.<br/>Check that <code>highcharts-3d.js</code> loaded.");
+        return;
+      }
+      if (!state.map.z) {
+        showChartError("True 3D needs a Z field.<br/>Map a numeric column to <strong>Z position</strong> in Data mapping.");
+        return;
+      }
+    } else if (!Highcharts.seriesTypes || !Highcharts.seriesTypes.bubble) {
       showChartError("Bubble series unavailable.<br/>Check that <code>highcharts-more.js</code> loaded.");
       return;
     }
@@ -860,7 +1020,7 @@
     destroyChart();
 
     var xPlot = [], yPlot = [];
-    if (state.mode === "quadrant" && state.showCuts && cuts.x != null) {
+    if (!true3d && state.mode === "quadrant" && state.showCuts && cuts.x != null) {
       var xLab = (state.xCutMode === "mean" ? "Mean" : state.xCutMode === "custom" ? "Custom" : "Median") +
         " X = " + formatNumber(cuts.x, state.xFormat);
       var yLab = (state.yCutMode === "mean" ? "Mean" : state.yCutMode === "custom" ? "Custom" : "Median") +
@@ -877,22 +1037,26 @@
 
     var xTitle = state.xTitle || (xField ? xField.label : "X");
     var yTitle = state.yTitle || (yField ? yField.label : "Y");
+    var zField = fieldMeta(state.map.z);
+    var zTitle = zField ? zField.label : "Z";
+    var sizeTitle = ((fieldMeta(state.map.size) || {}).label || "Size");
 
     try {
-      state.chart = Highcharts.chart("chart", {
+      var opts = {
         chart: {
-          type: "bubble",
+          type: true3d ? "scatter" : "bubble",
           backgroundColor: "transparent",
-          zoomType: "xy",
+          zoomType: true3d ? undefined : "xy",
           height: height,
           reflow: true,
-          style: { fontFamily: '"Segoe UI", system-ui, sans-serif' }
+          style: { fontFamily: '"Segoe UI", system-ui, sans-serif' },
+          animation: false
         },
         title: { text: null },
         credits: { enabled: false },
         legend: { itemStyle: { color: "#cbd5e1" }, itemHoverStyle: { color: "#fff" } },
         xAxis: {
-          type: state.xScale,
+          type: true3d ? "linear" : state.xScale,
           title: { text: xTitle, style: { color: "#94a3b8" } },
           gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
           labels: {
@@ -902,7 +1066,7 @@
           plotLines: xPlot
         },
         yAxis: {
-          type: state.yScale,
+          type: true3d ? "linear" : state.yScale,
           title: { text: yTitle, style: { color: "#94a3b8" } },
           gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
           labels: {
@@ -918,15 +1082,21 @@
           style: { color: "#e2e8f0" },
           pointFormatter: function () {
             var r = this.custom.row;
+            var sizeVal = this.custom.sizeVal != null ? this.custom.sizeVal : this.z;
             var lines = [
               "<b>" + this.name + "</b>",
               xTitle + ": <b>" + formatNumber(this.x, state.xFormat) + "</b>",
-              yTitle + ": <b>" + formatNumber(this.y, state.yFormat) + "</b>",
-              ((fieldMeta(state.map.size) || {}).label || "Size") + ": <b>" + formatNumber(this.z, "compact") + "</b>"
+              yTitle + ": <b>" + formatNumber(this.y, state.yFormat) + "</b>"
             ];
+            if (true3d) {
+              lines.push(zTitle + ": <b>" + formatNumber(this.z, "compact") + "</b>");
+              lines.push(sizeTitle + ": <b>" + formatNumber(sizeVal, "compact") + "</b>");
+            } else {
+              lines.push(sizeTitle + ": <b>" + formatNumber(sizeVal, "compact") + "</b>");
+            }
             if (state.map.color) lines.push((fieldMeta(state.map.color) || {}).label + ": <b>" + r[state.map.color] + "</b>");
             if (state.map.group) lines.push("Series: <b>" + r[state.map.group] + "</b>");
-            if (state.mode === "quadrant" && state.lastCuts.x != null) {
+            if (!true3d && state.mode === "quadrant" && state.lastCuts.x != null) {
               var qx = this.x >= state.lastCuts.x;
               var qy = this.y >= state.lastCuts.y;
               var qn = qx && qy ? state.qNames.NE : (!qx && qy ? state.qNames.NW : (qx && !qy ? state.qNames.SE : state.qNames.SW));
@@ -936,44 +1106,68 @@
           }
         },
         plotOptions: {
-          bubble: {
-            minSize: minSize,
-            maxSize: maxSize,
-            sizeBy: state.sizeBy === "width" ? "width" : "area",
-            cursor: "pointer",
-            stickyTracking: false,
-            marker: state.bubbleStyle === "sphere" ? {
-              lineWidth: 1,
-              lineColor: "rgba(255,255,255,.25)"
-            } : {
-              fillOpacity: state.bubbleOpacity
-            },
-            point: {
-              events: {
-                click: function (e) {
-                  var key = this.custom && this.custom.key;
-                  if (!key) return;
-                  var multi = e && (e.ctrlKey || e.metaKey);
-                  if (!multi) {
-                    var only = {};
-                    only[key] = true;
-                    if (state.selected[key] && Object.keys(state.selected).length === 1) state.selected = {};
-                    else state.selected = only;
-                  } else {
-                    if (state.selected[key]) delete state.selected[key];
-                    else state.selected[key] = true;
-                  }
-                  render();
-                }
-              }
-            }
-          },
           series: { states: { inactive: { opacity: 0.35 } } }
         },
         series: series
-      });
+      };
 
-      if (state.mode === "quadrant" && cuts.x != null && state.chart) {
+      if (true3d) {
+        opts.chart.options3d = {
+          enabled: true,
+          alpha: state.viewAlpha,
+          beta: state.viewBeta,
+          depth: 280,
+          viewDistance: 5,
+          fitToPlot: true,
+          frame: {
+            bottom: { size: 1, color: "rgba(148,163,184,.35)" },
+            back: { size: 1, color: "rgba(148,163,184,.22)" },
+            side: { size: 1, color: "rgba(148,163,184,.18)" }
+          }
+        };
+        opts.zAxis = {
+          minPadding: 0.05,
+          maxPadding: 0.05,
+          title: { text: zTitle, style: { color: "#94a3b8" } },
+          labels: {
+            style: { color: "#94a3b8" },
+            formatter: function () { return formatNumber(this.value, "compact"); }
+          }
+        };
+        opts.plotOptions.scatter = {
+          cursor: "pointer",
+          stickyTracking: false,
+          marker: {
+            symbol: "circle",
+            fillOpacity: state.bubbleOpacity,
+            lineWidth: 1,
+            lineColor: "rgba(255,255,255,.28)"
+          },
+          point: { events: { click: pointClickHandler } }
+        };
+        opts.plotOptions.scatter3d = opts.plotOptions.scatter;
+      } else {
+        opts.plotOptions.bubble = {
+          minSize: minSize,
+          maxSize: maxSize,
+          sizeBy: state.sizeBy === "width" ? "width" : "area",
+          cursor: "pointer",
+          stickyTracking: false,
+          marker: state.bubbleStyle === "sphere" ? {
+            lineWidth: 1,
+            lineColor: "rgba(255,255,255,.25)"
+          } : {
+            fillOpacity: state.bubbleOpacity
+          },
+          point: { events: { click: pointClickHandler } }
+        };
+      }
+
+      state.chart = Highcharts.chart("chart", opts);
+
+      if (true3d) bindChartDragRotate(state.chart);
+
+      if (!true3d && state.mode === "quadrant" && cuts.x != null && state.chart) {
         drawQuadrantShading(state.chart, cuts);
 
         var xExt = state.chart.xAxis[0].getExtremes();
@@ -1017,26 +1211,30 @@
 
   function render() {
     if (!state.map.x || !state.map.y || !state.map.size) return;
-    var series = buildSeries();
-    var zs = [], xs = [], ys = [];
+    var maxSize = Math.round(48 * state.sizeScale);
+    var minSize = Math.max(4, Math.round(6 * state.sizeScale));
+    var series = buildSeries(minSize, maxSize);
+    var sizeVals = [], xs = [], ys = [];
     series.forEach(function (s) {
-      s.data.forEach(function (p) { zs.push(p.z); xs.push(p.x); ys.push(p.y); });
+      s.data.forEach(function (p) {
+        xs.push(p.x);
+        ys.push(p.y);
+        sizeVals.push(p.custom && p.custom.sizeVal != null ? p.custom.sizeVal : p.z);
+      });
     });
 
     var cuts = { x: null, y: null };
-    if (state.mode === "quadrant" && xs.length) {
+    if (!isTrue3d() && state.mode === "quadrant" && xs.length) {
       cuts.x = cutValue(state.xCutMode, state.xCutCustom, xs);
       cuts.y = cutValue(state.yCutMode, state.yCutCustom, ys);
     }
     state.lastCuts = cuts;
 
-    updateStatus(zs.length, series.length, cuts);
-    updateSizeLegend(zs);
+    updateStatus(sizeVals.length, series.length, cuts);
+    updateSizeLegend(sizeVals);
 
     var xField = fieldMeta(state.map.x);
     var yField = fieldMeta(state.map.y);
-    var maxSize = Math.round(48 * state.sizeScale);
-    var minSize = Math.max(4, Math.round(6 * state.sizeScale));
 
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
@@ -1092,9 +1290,30 @@
       btn.addEventListener("click", function () {
         setSegActive(document.getElementById("bubbleStyle"), "data-style", btn.dataset.style);
         state.bubbleStyle = btn.dataset.style;
+        syncTrue3dUi();
         render();
       });
     });
+    var alphaEl = document.getElementById("viewAlpha");
+    var betaEl = document.getElementById("viewBeta");
+    if (alphaEl) {
+      alphaEl.value = String(state.viewAlpha);
+      alphaEl.addEventListener("input", function (e) {
+        state.viewAlpha = +e.target.value;
+        if (isTrue3d() && state.chart && state.chart.options.chart.options3d) {
+          state.chart.update({ chart: { options3d: { alpha: state.viewAlpha } } }, undefined, undefined, false);
+        } else if (isTrue3d()) render();
+      });
+    }
+    if (betaEl) {
+      betaEl.value = String(state.viewBeta);
+      betaEl.addEventListener("input", function (e) {
+        state.viewBeta = +e.target.value;
+        if (isTrue3d() && state.chart && state.chart.options.chart.options3d) {
+          state.chart.update({ chart: { options3d: { beta: state.viewBeta } } }, undefined, undefined, false);
+        } else if (isTrue3d()) render();
+      });
+    }
     document.querySelectorAll("#sizeBy button").forEach(function (btn) {
       btn.addEventListener("click", function () {
         setSegActive(document.getElementById("sizeBy"), "data-sizeby", btn.dataset.sizeby);
@@ -1202,6 +1421,8 @@
       layoutPanels();
       if (state.chart && typeof state.chart.reflow === "function") state.chart.reflow();
     });
+
+    syncTrue3dUi();
   }
 
   bindControls();

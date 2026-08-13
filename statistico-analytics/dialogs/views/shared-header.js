@@ -6334,7 +6334,7 @@ const StatisticoHeader = {
       'meta-summary': 'Summary',
       'meta-forest': 'Forest Plot',
       'meta-heterogeneity': 'Heterogeneity',
-      'meta-bias': 'Publication Bias',
+      'meta-bias': 'Small-study Effects',
       'meta-studies': 'Study Details',
       'dependent-explore': 'Descriptives',
       'dependent-trajectories': 'Trajectories',
@@ -6474,11 +6474,11 @@ const StatisticoHeader = {
       'meta-summary':
         'Read the model setup (fixed vs random-effects), effect type, pooled effect with ± and 95% CI bar, KPI tiles (LCL / point / UCL / z·p / I² / k), and the plain-language interpretation. Use this view to decide whether the pooled estimate is significant and practically meaningful before drilling into forest, heterogeneity, or bias.',
       'meta-forest':
-        'This is a forest plot: each study is a point with a horizontal 95% CI, and the pooled effect is usually marked as a diamond or vertical reference. Describe study-to-study consistency, which studies pull left/right, and how the pooled estimate sits relative to the null (0 or 1 depending on scale). Do not recite Egger statistics here — those belong on Publication Bias.',
+        'This is a forest plot: each study is a point with a horizontal 95% CI, and the pooled effect is usually marked as a diamond or vertical reference. Describe study-to-study consistency, which studies pull left/right, and how the pooled estimate sits relative to the null (0 or 1 depending on scale). Do not recite Egger statistics here — those belong on Small-study Effects.',
       'meta-heterogeneity':
         'Read Q, df, p for Q, I², k, and τ²/τ with the heterogeneity interpretation. Describe whether between-study variance appears low, moderate, or substantial and stress uncertainty when k is small. Do NOT recommend switching fixed vs random effects solely from a non-significant Q or I² = 0. Do not re-interpret the pooled CI here except as context.',
       'meta-bias':
-        'This combines Egger\'s regression test (intercept, SE, t, p, n) with a funnel plot of effect size vs precision. Describe funnel asymmetry and whether Egger\'s p suggests small-study / publication bias. With few studies, emphasise uncertainty. Do not re-walk the full pooled-effect narrative from Summary.',
+        'This combines Egger\'s regression test (intercept, SE of intercept, t(df), p, n) with a funnel plot of effect vs SE, including the pooled-effect line and pseudo-95% funnel boundaries (μ̂ ± 1.96×SE). Describe whether points sit inside the funnel and whether Egger suggests small-study effects. Stress that asymmetry is not only publication bias, and with k < 10 power is limited. Do not re-walk the full pooled-effect narrative from Summary.',
       'meta-studies':
         'Read the study table (study id, effect, variance, weight, weight %). Use this view to identify influential or heavily weighted studies and to verify the inputs feeding the pooled estimate — not to restate I² or Egger results.',
       'factor-suitability':
@@ -6683,7 +6683,7 @@ const StatisticoHeader = {
       'meta-forest':
         'This is a forest plot of study effects with CIs and the pooled estimate. Describe study consistency, outliers, and where the pooled effect sits relative to the null — not Egger funnel statistics.',
       'meta-bias':
-        'This is a funnel plot plus Egger\'s test. Describe asymmetry / small-study effects and the Egger p-value — not the full Summary narrative.',
+        'This is a funnel plot (with pseudo-95% boundaries) plus Egger\'s test. Describe asymmetry / small-study effects and the Egger t(df)/p — not the full Summary narrative.',
       'regression-power': POWER_PLANNING_GUARD,
       'anova-power': POWER_PLANNING_GUARD,
       'dependent-power': POWER_PLANNING_GUARD

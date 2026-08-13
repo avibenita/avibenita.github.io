@@ -317,12 +317,14 @@ function computeEggersTest(studies) {
     return { available: false, reason: "Egger's test could not be estimated" };
   }
   const t = intercept / seIntercept;
+  const df = n - 2;
   const p = 2 * (1 - approximateNormalCDF(Math.abs(t)));
   return {
     available: true,
     intercept: intercept,
     se: seIntercept,
     t: t,
+    df: df,
     p: p,
     slope: slope,
     n: n

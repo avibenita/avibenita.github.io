@@ -10,8 +10,8 @@
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260812-hetguide1"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260812-hetguide1"></script>
-  <script src="meta-engine.js?v=20260812-chiP"></script>
+  <script src="../shared-header.js?v=20260813-funnel1"></script>
+  <script src="meta-engine.js?v=20260813-funnel1"></script>
   <style>
     :root {
       /* Deeper page vs lighter panels for clearer separation */
@@ -460,6 +460,25 @@
       font-size: 12.5px; font-weight: 800; color: var(--accent-meta);
       margin-bottom: 8px; letter-spacing: .2px;
     }
+    #tab-bias .stat-box .label {
+      text-transform: none;
+      letter-spacing: .15px;
+      font-size: 11.5px;
+    }
+    .bias-power-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin: 0 0 10px;
+      padding: 5px 10px; border-radius: 6px;
+      font-size: 12px; font-weight: 700;
+      color: #fbbf24;
+      background: rgba(251, 191, 36, .12);
+      border: 1px solid rgba(251, 191, 36, .4);
+    }
+    .bias-power-badge[hidden] { display: none !important; }
+    .bias-page-note {
+      font-size: 12.5px; line-height: 1.45; color: var(--text-muted);
+      margin: -2px 0 12px;
+    }
 
     /* Dark info tooltips on metric labels */
     .info-icon {
@@ -746,8 +765,8 @@
           <button class="sb-item" onclick="switchTab('bias')" data-tab="bias">
             <i class="fa-solid fa-triangle-exclamation sb-item-icon"></i>
             <span class="sb-item-copy">
-              <span class="sb-item-label">Publication Bias</span>
-              <span class="sb-item-description">Funnel plot and Egger's test.</span>
+              <span class="sb-item-label">Small-study Effects</span>
+              <span class="sb-item-description">Funnel plot and Egger's regression test.</span>
             </span>
           </button>
           <button class="sb-item" onclick="switchTab('studies')" data-tab="studies">
@@ -982,30 +1001,32 @@
       </div>
 
       <div id="tab-bias" class="tab-panel">
+        <p class="bias-page-note">Funnel plot and Egger’s regression test. Funnel asymmetry can arise from small-study effects, heterogeneity, methodological differences, or chance—not only publication bias.</p>
+        <div id="biasPowerBadge" class="bias-power-badge" hidden>Limited power: fewer than 10 studies</div>
         <div class="panel-card">
           <div class="panel-heading">Egger's Regression Test</div>
           <div class="stats-grid">
             <div class="stat-box">
-              <div class="label">Intercept
+              <div class="label">Egger intercept
                 <span class="info-icon" tabindex="0">i<span class="tip"><b>Egger intercept</b> — estimated funnel asymmetry. Values near 0 suggest little small-study skew; non-zero intercept can reflect bias or other small-study effects.</span></span>
               </div>
               <div class="value" id="eggerIntercept">—</div>
             </div>
             <div class="stat-box">
-              <div class="label">SE
-                <span class="info-icon" tabindex="0">i<span class="tip"><b>Standard error</b> of the Egger intercept. Used with the intercept to form the t test.</span></span>
+              <div class="label">SE of intercept
+                <span class="info-icon" tabindex="0">i<span class="tip"><b>Standard error of the Egger intercept</b>. Used with the intercept to form the t test.</span></span>
               </div>
               <div class="value" id="eggerSE">—</div>
             </div>
             <div class="stat-box">
-              <div class="label">t
-                <span class="info-icon" tabindex="0">i<span class="tip"><b>t statistic</b> for the Egger intercept (intercept / SE). Large |t| suggests asymmetry.</span></span>
+              <div class="label" id="eggerTLabel">t
+                <span class="info-icon" tabindex="0">i<span class="tip"><b>t statistic</b> for the Egger intercept (intercept / SE), with df = k − 2. Large |t| suggests asymmetry.</span></span>
               </div>
               <div class="value" id="eggerT">—</div>
             </div>
             <div class="stat-box">
               <div class="label">p-value
-                <span class="info-icon" tabindex="0">i<span class="tip"><b>p-value</b> for Egger’s test. With few studies the test is often inconclusive — a non-significant p does not prove absence of publication bias.</span></span>
+                <span class="info-icon" tabindex="0">i<span class="tip"><b>p-value</b> for Egger’s test. With few studies the test has low power — a non-significant result does not prove absence of small-study effects.</span></span>
               </div>
               <div class="value" id="eggerP">—</div>
             </div>
@@ -1017,7 +1038,7 @@
             </div>
             <div class="stat-box">
               <div class="label">Status
-                <span class="info-icon" tabindex="0">i<span class="tip">Quick flag: <b>Asymmetry</b> if p &lt; 0.05; otherwise treated as inconclusive rather than “no bias.”</span></span>
+                <span class="info-icon" tabindex="0">i<span class="tip">Quick flag: <b>Asymmetry</b> if p &lt; 0.05; otherwise treated as inconclusive rather than “no small-study effects.”</span></span>
               </div>
               <div class="value" id="eggerStatus">—</div>
             </div>
@@ -1072,7 +1093,7 @@
       summary: 'Summary',
       forest: 'Forest Plot',
       heterogeneity: 'Heterogeneity',
-      bias: 'Publication Bias',
+      bias: 'Small-study Effects',
       studies: 'Study Details'
     };
 
@@ -1122,6 +1143,28 @@
           ? 'Moderate detected heterogeneity'
           : 'Substantial detected heterogeneity';
       return band + ((k != null && k < 20) ? ' · Limited precision' : '');
+    }
+
+    function buildBiasInterpretation(bundle) {
+      var bias = (bundle && bundle.bias) || {};
+      if (!bias.available) return bias.reason || "Egger's test unavailable.";
+      var k = bias.n || bundle.k;
+      var df = (bias.df != null) ? bias.df : (k != null ? k - 2 : null);
+      var tPart = 't' + (df != null ? '(' + df + ')' : '') + ' = ' + fmt(bias.t) +
+        ', p = ' + fmtPProse(bias.p);
+      var kWord = numberWord(k);
+      var lowPower = k != null && k < 10;
+      if (bias.p < 0.05) {
+        return "Egger’s test detected funnel-plot asymmetry, <strong>" + tPart + '</strong>. ' +
+          (lowPower
+            ? ('With only ' + kWord + ' studies, the test has low power; ')
+            : ('With ' + kWord + ' studies, ')) +
+          'asymmetry can reflect small-study effects, heterogeneity, or chance—not only publication bias.';
+      }
+      return "Egger’s test did not detect funnel-plot asymmetry, <strong>" + tPart + '</strong>. ' +
+        (lowPower
+          ? ('With only ' + kWord + ' studies, the test has low power; the evidence about small-study effects is inconclusive.')
+          : ('With ' + kWord + ' studies, treat this as one piece of evidence about small-study effects.'));
     }
 
     function buildHetInterpretation(bundle) {
@@ -1621,6 +1664,7 @@
           intercept: bias.intercept,
           se: bias.se,
           t: bias.t,
+          df: bias.df != null ? bias.df : (bias.n != null ? bias.n - 2 : null),
           p: bias.p,
           n: bias.n
         } : { available: false, reason: bias.reason || null },
@@ -1964,19 +2008,23 @@
       document.getElementById('hetInterpretation').innerHTML = buildHetInterpretation(bundle);
 
       var bias = bundle.bias || {};
+      var biasK = bias.n || bundle.k;
+      var biasDf = (bias.df != null) ? bias.df : (biasK != null ? biasK - 2 : null);
+      var powerBadge = document.getElementById('biasPowerBadge');
+      if (powerBadge) powerBadge.hidden = !(biasK != null && biasK < 10);
+      var tLabel = document.getElementById('eggerTLabel');
+      if (tLabel) {
+        tLabel.innerHTML = 't' + (biasDf != null ? '(' + biasDf + ')' : '') +
+          ' <span class="info-icon" tabindex="0">i<span class="tip"><b>t statistic</b> for the Egger intercept (intercept / SE), with df = k − 2. Large |t| suggests asymmetry.</span></span>';
+      }
       if (bias.available) {
         document.getElementById('eggerIntercept').textContent = fmt(bias.intercept);
         document.getElementById('eggerSE').textContent = fmt(bias.se);
         document.getElementById('eggerT').textContent = fmt(bias.t);
         document.getElementById('eggerP').textContent = fmtP(bias.p);
-        document.getElementById('eggerN').textContent = String(bias.n || bundle.k);
+        document.getElementById('eggerN').textContent = String(biasK);
         document.getElementById('eggerStatus').textContent = bias.p < 0.05 ? 'Asymmetry' : 'Inconclusive';
-        document.getElementById('biasInterpretation').innerHTML = bias.p < 0.05
-          ? "Egger's test is <strong>significant</strong> (p " + fmtP(bias.p) +
-            '), suggesting possible small-study effects. This does not prove publication bias.'
-          : "Egger's test is <strong>not significant</strong> (p = " + fmt(bias.p) +
-            '). With ' + (bias.n || bundle.k) +
-            ' studies this test is often inconclusive — do not treat a non-significant result as “no publication bias.”';
+        document.getElementById('biasInterpretation').innerHTML = buildBiasInterpretation(bundle);
       } else {
         ['eggerIntercept', 'eggerSE', 'eggerT', 'eggerP', 'eggerN'].forEach(function (id) {
           document.getElementById(id).textContent = '—';
@@ -2577,31 +2625,118 @@
     }
 
     function renderFunnelPlot(bundle) {
-      if (!bundle || !window.Highcharts) return;
+      if (!bundle || !window.Highcharts || !bundle.studies || !bundle.pooled) return;
       var t = chartTheme();
+      var mu = bundle.pooled.effect;
+      var points = bundle.studies.map(function (s) {
+        var se = (s.se != null && isFinite(s.se)) ? s.se : Math.sqrt(s.vi);
+        return { x: s.yi, y: se, name: s.name || 'Study' };
+      }).filter(function (p) { return isFinite(p.x) && isFinite(p.y) && p.y >= 0; });
+      if (!points.length || !isFinite(mu)) return;
+
+      var maxSe = 0;
+      points.forEach(function (p) { if (p.y > maxSe) maxSe = p.y; });
+      maxSe = Math.max(maxSe * 1.12, 0.05);
+      var leftMax = mu - 1.96 * maxSe;
+      var rightMax = mu + 1.96 * maxSe;
+      var xMin = leftMax;
+      var xMax = rightMax;
+      points.forEach(function (p) {
+        if (p.x < xMin) xMin = p.x;
+        if (p.x > xMax) xMax = p.x;
+      });
+      var pad = Math.max((xMax - xMin) * 0.06, 0.04);
+      xMin -= pad;
+      xMax += pad;
+
       Highcharts.chart('funnelPlot', {
         chart: { type: 'scatter', height: 400, backgroundColor: t.bg },
         title: { text: null },
         credits: { enabled: false },
         xAxis: {
           title: { text: 'Effect Size', style: { color: t.muted } },
-          gridLineColor: t.grid, labels: { style: { color: t.muted } },
-          plotLines: [{ value: bundle.pooled.effect, color: t.orange, width: 2 }]
+          min: xMin,
+          max: xMax,
+          gridLineColor: t.grid,
+          labels: {
+            style: { color: t.muted },
+            formatter: function () { return Highcharts.numberFormat(this.value, 3); }
+          },
+          plotLines: [{
+            value: mu,
+            color: t.orange,
+            width: 1.5,
+            dashStyle: 'Dash',
+            zIndex: 4,
+            label: {
+              text: 'Pooled effect',
+              align: 'left',
+              x: 6,
+              y: 14,
+              style: { color: t.orange, fontSize: '11px', fontWeight: '700' }
+            }
+          }]
         },
         yAxis: {
           title: { text: 'Standard Error', style: { color: t.muted } },
-          reversed: true, gridLineColor: t.grid, labels: { style: { color: t.muted } }
+          reversed: true,
+          min: 0,
+          max: maxSe,
+          gridLineColor: t.grid,
+          labels: {
+            style: { color: t.muted },
+            formatter: function () { return Highcharts.numberFormat(this.value, 3); }
+          }
         },
-        legend: { enabled: false },
+        legend: {
+          enabled: true,
+          itemStyle: { color: t.muted, fontWeight: '600', fontSize: '11px' },
+          itemHoverStyle: { color: t.text }
+        },
         tooltip: {
-          backgroundColor: t.bg, borderColor: t.grid, style: { color: t.text },
-          pointFormat: 'Effect: {point.x:.3f}<br/>SE: {point.y:.3f}'
+          backgroundColor: t.bg,
+          borderColor: t.grid,
+          style: { color: t.text },
+          formatter: function () {
+            if (this.series && this.series.options && this.series.options.isFunnelBoundary) {
+              return false;
+            }
+            return '<b>' + escapeHtml(this.point.name || 'Study') + '</b><br/>' +
+              'Effect: ' + Highcharts.numberFormat(this.point.x, 3) + '<br/>' +
+              'SE: ' + Highcharts.numberFormat(this.point.y, 3);
+          }
         },
         series: [{
           name: 'Studies',
-          data: bundle.studies.map(function (s) { return [s.yi, Math.sqrt(s.vi)]; }),
+          type: 'scatter',
+          data: points,
           color: t.accent,
-          marker: { radius: 5 }
+          marker: { radius: 5, symbol: 'circle' },
+          zIndex: 5
+        }, {
+          name: 'Pseudo 95% CI',
+          type: 'line',
+          isFunnelBoundary: true,
+          data: [[leftMax, maxSe], [mu, 0]],
+          color: 'rgba(148,163,184,.85)',
+          lineWidth: 1.5,
+          dashStyle: 'ShortDash',
+          marker: { enabled: false },
+          enableMouseTracking: false,
+          showInLegend: true,
+          zIndex: 2
+        }, {
+          name: 'Pseudo 95% CI ',
+          type: 'line',
+          isFunnelBoundary: true,
+          data: [[rightMax, maxSe], [mu, 0]],
+          color: 'rgba(148,163,184,.85)',
+          lineWidth: 1.5,
+          dashStyle: 'ShortDash',
+          marker: { enabled: false },
+          enableMouseTracking: false,
+          showInLegend: false,
+          zIndex: 2
         }]
       });
     }

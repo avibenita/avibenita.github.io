@@ -531,21 +531,21 @@
                 </label>
               </div>
               <div class="opt-row">
-                <label class="lbl-with-tip">Beneficial outcome direction
-                  <span class="info-icon" tabindex="0">i<span class="tip">Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.</span></span>
+                <label class="lbl-with-tip" id="outcomeBetterTitle">Beneficial outcome direction
+                  <span class="info-icon" tabindex="0">i<span class="tip" id="outcomeBetterTip">Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.</span></span>
                 </label>
                 <div class="opt-radio-col" id="outcomeBetterGroup">
                   <label class="opt-radio" id="dirLowerLabel">
                     <input type="radio" name="outcomeBetter" value="lower" checked />
-                    Lower values are better
+                    <span class="dir-label-text">Lower values are better</span>
                   </label>
                   <label class="opt-radio" id="dirHigherLabel">
                     <input type="radio" name="outcomeBetter" value="higher" />
-                    Higher values are better
+                    <span class="dir-label-text">Higher values are better</span>
                   </label>
                   <label class="opt-radio" id="dirNoneLabel">
                     <input type="radio" name="outcomeBetter" value="none" />
-                    Do not display favour labels
+                    <span class="dir-label-text">Do not display favour labels</span>
                   </label>
                 </div>
               </div>
@@ -885,7 +885,31 @@
       var uncRow = qs('uncertaintyRow');
       if (binRow) binRow.style.display = effectType === 'binary' ? 'flex' : 'none';
       if (uncRow) uncRow.style.display = effectType === 'direct' ? 'flex' : 'none';
+      syncOutcomeBetterLabels();
       syncModelOptionVisibility();
+    }
+
+    function syncOutcomeBetterLabels() {
+      var binary = effectType === 'binary';
+      var title = qs('outcomeBetterTitle');
+      var tip = qs('outcomeBetterTip');
+      if (title) {
+        title.childNodes[0].textContent = binary ? 'Event meaning ' : 'Beneficial outcome direction ';
+      }
+      if (tip) {
+        tip.innerHTML = binary
+          ? 'Does <b>not</b> change calculated effects. For ratios, comparison is <b>Treatment / Control</b>. Coding only sets favour labels.<br/><b>Event is adverse</b> — death, relapse, infection (RR/OR &lt; 1 favours treatment).<br/><b>Event is beneficial</b> — recovery, response (RR/OR &gt; 1 favours treatment).<br/><b>Direction not specified</b> — hide favour labels.'
+          : 'Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.';
+      }
+      var map = binary
+        ? { lower: 'Event is adverse', higher: 'Event is beneficial', none: 'Direction not specified' }
+        : { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display favour labels' };
+      ['lower', 'higher', 'none'].forEach(function (v) {
+        var lab = document.querySelector('label.opt-radio input[name="outcomeBetter"][value="' + v + '"]');
+        if (!lab) return;
+        var span = lab.parentNode.querySelector('.dir-label-text');
+        if (span) span.textContent = map[v];
+      });
     }
 
     function syncModelOptionVisibility() {

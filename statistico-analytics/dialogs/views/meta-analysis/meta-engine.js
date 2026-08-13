@@ -76,8 +76,10 @@ function _metaExtractStudyEffect(row, spec) {
     }
     // Continuity correction for zero cells on ratio measures
     let aa = a, bb = b, cc = c, dd = d;
+    let continuityCorrected = false;
     if (measure !== "rd" && (aa === 0 || bb === 0 || cc === 0 || dd === 0)) {
       aa += 0.5; bb += 0.5; cc += 0.5; dd += 0.5;
+      continuityCorrected = true;
     }
     const n1t = aa + bb, n2t = cc + dd;
     arms = {
@@ -86,7 +88,8 @@ function _metaExtractStudyEffect(row, spec) {
       n2: c + d,
       events1: a,
       events2: c,
-      totalN: a + b + c + d
+      totalN: a + b + c + d,
+      continuityCorrected: continuityCorrected
     };
     if (measure === "rr") {
       const p1 = aa / n1t, p2 = cc / n2t;

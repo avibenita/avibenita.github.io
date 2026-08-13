@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260812-hetguide1"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260813-airound1"></script>
-  <script src="meta-engine.js?v=20260813-studies1"></script>
+  <script src="meta-engine.js?v=20260813-ratio1"></script>
   <style>
     :root {
       /* Deeper page vs lighter panels for clearer separation */
@@ -893,7 +893,7 @@
         <span class="config-sep" aria-hidden="true"></span>
         <span class="cfg-studies">Studies: <strong id="cfgK">—</strong></span>
         <span class="config-sep" aria-hidden="true"></span>
-        <span class="section-title">Benefit</span>
+        <span class="section-title" id="cfgBenefitTitle">Benefit</span>
         <div class="cfg-measure-dd" id="cfgBenefitWrap">
           <button type="button" class="cfg-benefit-btn" id="cfgBenefitBtn" aria-haspopup="listbox" aria-expanded="false">
             <span id="cfgBenefitLabel">Lower values better</span><span class="caret" aria-hidden="true">▾</span>
@@ -966,7 +966,7 @@
             <div class="ci-legend">
               <span><i class="ci-swatch band"></i> 95% CI range</span>
               <span><i class="ci-swatch est"></i> Pooled estimate</span>
-              <span><i class="ci-swatch null"></i> Null (0)</span>
+              <span><i class="ci-swatch null"></i> <span id="ciNullLegend">Null (0)</span></span>
             </div>
           </div>
           <div class="stats-grid">
@@ -1201,11 +1201,17 @@
     };
     var studiesExcluded = {};
     var benefitMenuOpen = false;
-    var BENEFIT_OPTIONS = [
+    var BENEFIT_OPTIONS_CONTINUOUS = [
       { value: 'lower', label: 'Lower values better', full: 'Lower values are better' },
       { value: 'higher', label: 'Higher values better', full: 'Higher values are better' },
-      { value: 'none', label: 'No favour labels', full: 'Do not display favour labels' }
+      { value: 'none', label: 'No favour labels', full: 'Direction not specified' }
     ];
+    var BENEFIT_OPTIONS_BINARY = [
+      { value: 'lower', label: 'Event is adverse', full: 'Event is adverse' },
+      { value: 'higher', label: 'Event is beneficial', full: 'Event is beneficial' },
+      { value: 'none', label: 'Direction not specified', full: 'Direction not specified' }
+    ];
+    var BENEFIT_OPTIONS = BENEFIT_OPTIONS_CONTINUOUS;
     var TITLE_MAP = {
       summary: 'Summary',
       forest: 'Forest Plot',
@@ -1381,50 +1387,95 @@
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
     }
+    function isBinaryOutcome(spec) {
+      return ((spec && spec.effectType) || '') === 'binary';
+    }
+    /** Measures modelled on the log scale but shown to users on the natural scale. */
+    function isLogRatioMeasure(spec) {
+      var t = (spec && spec.effectType) || 'continuous';
+      var m = (spec && spec.effectMeasure) || '';
+      if (t === 'binary') return m === 'rr' || m === 'or' || m === '';
+      if (t === 'continuous') return m === 'rom';
+      if (t === 'direct') return m === 'logrr' || m === 'logor';
+      return false;
+    }
+    function nullEffectValue(spec) {
+      return isLogRatioMeasure(spec) ? 1 : 0;
+    }
+    function toDisplayEffect(yi, spec) {
+      if (yi == null || !isFinite(yi)) return yi;
+      return isLogRatioMeasure(spec) ? Math.exp(yi) : yi;
+    }
+    function fmtDisplay(n, spec, d) {
+      if (n == null || !isFinite(n)) return '—';
+      var digits = d != null ? d : (isLogRatioMeasure(spec) ? 2 : 3);
+      return Number(n).toFixed(digits);
+    }
+    function fmtDisplaySigned(n, spec, d) {
+      var s = fmtDisplay(n, spec, d);
+      return s.charAt(0) === '-' ? ('\u2212' + s.slice(1)) : s;
+    }
     function effectTypeLabel(spec) {
       var t = (spec && spec.effectType) || 'continuous';
       var m = (spec && spec.effectMeasure) || '';
       if (t === 'binary') {
-        if (m === 'rr') return 'Risk ratio (log)';
+        if (m === 'rr') return 'Risk ratio';
         if (m === 'rd') return 'Risk difference';
-        return 'Odds ratio (log)';
+        return 'Odds ratio';
       }
       if (t === 'direct') {
-        if (m === 'logor') return 'Log odds ratio';
-        if (m === 'logrr') return 'Log risk ratio';
+        if (m === 'logor') return 'Odds ratio';
+        if (m === 'logrr') return 'Risk ratio';
         if (m === 'smd') return 'SMD';
         if (m === 'fisherz') return "Fisher's z";
         return 'Precomputed effect';
       }
       if (m === 'md') return 'Mean difference';
-      if (m === 'rom') return 'Ratio of means (log)';
+      if (m === 'rom') return 'Ratio of means';
       if (m === 'cohend') return "Cohen's d";
       return "Hedges' g (SMD)";
     }
-    /** Compact measure name for tooltips (e.g. Hedges' g). */
+    /** Compact measure name for user-facing tables/tooltips. */
     function effectMeasureShort(spec) {
       var m = (spec && spec.effectMeasure) || '';
       var t = (spec && spec.effectType) || 'continuous';
       if (t === 'binary') {
-        if (m === 'rr') return 'log RR';
+        if (m === 'rr') return 'RR';
         if (m === 'rd') return 'RD';
-        return 'log OR';
+        return 'OR';
       }
       if (t === 'direct') {
-        if (m === 'logor') return 'log OR';
-        if (m === 'logrr') return 'log RR';
+        if (m === 'logor') return 'OR';
+        if (m === 'logrr') return 'RR';
         if (m === 'smd') return 'SMD';
         if (m === 'fisherz') return "Fisher's z";
         return 'Effect';
       }
       if (m === 'md') return 'MD';
-      if (m === 'rom') return 'log RoM';
+      if (m === 'rom') return 'RoM';
       if (m === 'cohend') return "Cohen's d";
       return "Hedges' g";
+    }
+    /** Analysis-scale short name (log RR) for technical columns. */
+    function effectMeasureTechShort(spec) {
+      if (!isLogRatioMeasure(spec)) return effectMeasureShort(spec);
+      var m = (spec && spec.effectMeasure) || '';
+      var t = (spec && spec.effectType) || 'continuous';
+      if (t === 'binary' || t === 'direct') {
+        if (m === 'or' || m === 'logor') return 'log OR';
+        return 'log RR';
+      }
+      return 'log RoM';
     }
     function fmtSigned(n, d) {
       var s = fmt(n, d);
       return s.charAt(0) === '-' ? ('\u2212' + s.slice(1)) : s;
+    }
+    function comparisonLabel(spec) {
+      if (isLogRatioMeasure(spec) || (isBinaryOutcome(spec) && (spec.effectMeasure || '') === 'rd')) {
+        return isLogRatioMeasure(spec) ? 'Treatment / Control' : 'Treatment − Control';
+      }
+      return 'Treatment − Control';
     }
 
     function modelLabel(bundle) {
@@ -1456,8 +1507,13 @@
       return effect > 0 ? 'treatment' : 'control';
     }
 
-    function ciExcludesNull(lo, hi) {
-      return isFinite(lo) && isFinite(hi) && (hi < 0 || lo > 0);
+    function ciExcludesNull(lo, hi, spec) {
+      var nullV = nullEffectValue(spec);
+      if (isLogRatioMeasure(spec)) {
+        // lo/hi are on the analysis (log) scale
+        return isFinite(lo) && isFinite(hi) && (hi < 0 || lo > 0);
+      }
+      return isFinite(lo) && isFinite(hi) && (hi < nullV || lo > nullV);
     }
 
     function numberWord(n) {
@@ -1468,25 +1524,27 @@
 
     function buildForestInterpretation(bundle) {
       if (!bundle || !bundle.pooled || !bundle.studies) return '—';
-      var et = effectTypeLabel(bundle.spec);
+      var spec = bundle.spec;
+      var et = effectTypeLabel(spec);
       var better = outcomeBetterOf(bundle);
       var arm = favoredArm(bundle.pooled.effect, better);
-      var g = fmt(bundle.pooled.effect);
-      var lo = fmt(bundle.pooled.ciLower);
-      var hi = fmt(bundle.pooled.ciUpper);
+      var g = fmtDisplay(toDisplayEffect(bundle.pooled.effect, spec), spec);
+      var lo = fmtDisplay(toDisplayEffect(bundle.pooled.ciLower, spec), spec);
+      var hi = fmtDisplay(toDisplayEffect(bundle.pooled.ciUpper, spec), spec);
+      var nullTxt = isLogRatioMeasure(spec) ? '1.00' : 'no effect';
       var k = bundle.studies.length;
       var excluding = [];
       var including = [];
       bundle.studies.forEach(function (s) {
         var ci = studyCi(s);
         var name = s.name || 'Study';
-        if (ciExcludesNull(ci.lo, ci.hi)) excluding.push(name);
+        if (ciExcludesNull(ci.lo, ci.hi, spec)) excluding.push(name);
         else including.push(name);
       });
 
       var lead;
       if (better === 'none') {
-        lead = 'The pooled Treatment − Control effect is <strong>' + et + ' = ' + g +
+        lead = 'The pooled ' + et + ' is <strong>' + g +
           '</strong>, 95% CI [<strong>' + lo + '</strong>, <strong>' + hi + '</strong>]';
       } else if (arm) {
         lead = 'The pooled effect favours <strong>' + arm + '</strong>, <strong>' + et + ' = ' + g +
@@ -1498,20 +1556,20 @@
 
       var detail;
       if (excluding.length === k) {
-        detail = 'All ' + numberWord(k) + ' individual study confidence intervals exclude no effect.';
+        detail = 'All ' + numberWord(k) + ' individual study confidence intervals exclude ' + nullTxt + '.';
       } else if (excluding.length === 0) {
-        detail = 'None of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect.';
+        detail = 'None of the ' + numberWord(k) + ' individual study confidence intervals exclude ' + nullTxt + '.';
       } else if (including.length === 1) {
         detail = numberWord(excluding.length).charAt(0).toUpperCase() + numberWord(excluding.length).slice(1) +
-          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect; <strong>' +
+          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude ' + nullTxt + '; <strong>' +
           escapeHtml(including[0]) + '</strong> is the exception.';
       } else if (including.length <= 3) {
         detail = numberWord(excluding.length).charAt(0).toUpperCase() + numberWord(excluding.length).slice(1) +
-          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect; exceptions: <strong>' +
+          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude ' + nullTxt + '; exceptions: <strong>' +
           including.map(escapeHtml).join('</strong>, <strong>') + '</strong>.';
       } else {
         detail = numberWord(excluding.length).charAt(0).toUpperCase() + numberWord(excluding.length).slice(1) +
-          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude no effect.';
+          ' of the ' + numberWord(k) + ' individual study confidence intervals exclude ' + nullTxt + '.';
       }
 
       return '<span class="interp-lead">Interpretation:</span> ' + lead + '. ' + detail;
@@ -1540,36 +1598,49 @@
     }
 
     function buildInterpretationCard(bundle, et, outcomeBetter) {
+      var spec = bundle.spec || {};
       var k = bundle.k;
       var e = bundle.pooled.effect;
-      var g = fmt(e);
-      var lo = fmt(bundle.pooled.ciLower);
-      var hi = fmt(bundle.pooled.ciUpper);
+      var disp = toDisplayEffect(e, spec);
+      var g = fmtDisplay(disp, spec);
+      var lo = fmtDisplay(toDisplayEffect(bundle.pooled.ciLower, spec), spec);
+      var hi = fmtDisplay(toDisplayEffect(bundle.pooled.ciUpper, spec), spec);
       var i2 = bundle.heterogeneity.I2;
       var tau2 = bundle.heterogeneity.tau2;
-      var excludesNull = bundle.pooled.ciLower > 0 || bundle.pooled.ciUpper < 0;
+      var excludesNull = ciExcludesNull(bundle.pooled.ciLower, bundle.pooled.ciUpper, spec);
       var arm = favoredArm(e, outcomeBetter);
       var mag = magnitudeBand(bundle, et);
-      var betterPhrase = outcomeBetter === 'lower'
-        ? 'lower values are better'
-        : outcomeBetter === 'higher'
-          ? 'higher values are better'
-          : 'favour labels are hidden';
+      var ratio = isLogRatioMeasure(spec);
+      var binary = isBinaryOutcome(spec);
+      var nullLabel = ratio ? '1.00' : 'no effect';
 
       var magLine;
-      if (arm === 'treatment' || arm === 'control') {
+      if (ratio && binary) {
+        if (outcomeBetter === 'lower' && disp > 0 && disp < 1) {
+          magLine = 'Lower event risk with treatment (~' +
+            Math.round((1 - disp) * 100) + '% relative risk reduction)';
+        } else if (outcomeBetter === 'lower' && disp > 1) {
+          magLine = 'Higher event risk with treatment';
+        } else if (outcomeBetter === 'higher' && disp > 1) {
+          magLine = 'Higher event rate with treatment';
+        } else if (outcomeBetter === 'higher' && disp > 0 && disp < 1) {
+          magLine = 'Lower event rate with treatment';
+        } else {
+          magLine = 'Pooled ' + effectMeasureShort(spec) + ' = ' + g;
+        }
+      } else if (arm === 'treatment' || arm === 'control') {
         if (mag.key === 'moderate-large') magLine = 'moderate-to-large effect favoring ' + arm;
         else if (mag.key === 'effect') magLine = 'pooled effect favoring ' + arm;
         else magLine = mag.key + ' effect favoring ' + arm;
       } else if (outcomeBetter === 'none') {
-        magLine = mag.label + ' (Treatment − Control = ' + g + ')';
+        magLine = mag.label + ' (' + comparisonLabel(spec) + ' = ' + g + ')';
       } else {
         magLine = mag.label + ' in the ' + (e < 0 ? 'negative' : e > 0 ? 'positive' : 'null') + ' direction';
       }
 
       var certLine = excludesNull
-        ? '95% CI excludes no effect'
-        : '95% CI includes no effect';
+        ? ('95% CI excludes ' + nullLabel)
+        : ('95% CI includes ' + nullLabel);
 
       var consLine;
       if (i2 < 25) {
@@ -1580,26 +1651,46 @@
         consLine = 'substantial between-study variation (I² = ' + fmt(i2, 1) + '%); interpret the average cautiously';
       }
 
-      // Narrative: interpret, don't just restate numbers; stay causal-cautious
       var narrative;
-      if (arm === 'treatment' || arm === 'control') {
-        narrative = 'Across ' + k + ' studies, Treatment − Control = ' + g +
+      if (ratio && binary) {
+        var eventPhrase = outcomeBetter === 'lower'
+          ? 'indicating an estimated ' + Math.round(Math.abs(1 - disp) * 100) + '% ' +
+            (disp < 1 ? 'lower' : 'higher') + ' event risk in the treatment group than in the control group'
+          : outcomeBetter === 'higher'
+            ? 'on the risk-ratio scale (event coded as beneficial)'
+            : 'on the risk-ratio scale';
+        narrative = 'Across ' + k + ' studies, the pooled ' + et.toLowerCase() + ' was ' + g +
+          ' (95% CI ' + lo + ' to ' + hi + ')' +
+          (outcomeBetter === 'lower' && disp > 0 ? ', ' + eventPhrase : '') + '. ';
+        narrative += excludesNull
+          ? 'The confidence interval excludes ' + nullLabel + ' (<strong>p' +
+            (bundle.pooled.p < 0.001 ? ' &lt; .001' : (' = ' + fmtPProse(bundle.pooled.p))) + '</strong>). '
+          : 'The confidence interval includes ' + nullLabel +
+            ' (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
+      } else if (arm === 'treatment' || arm === 'control') {
+        var betterPhrase = outcomeBetter === 'lower'
+          ? 'lower values are better'
+          : outcomeBetter === 'higher'
+            ? 'higher values are better'
+            : 'favour labels are hidden';
+        narrative = 'Across ' + k + ' studies, ' + comparisonLabel(spec) + ' = ' + g +
           ' (95% CI ' + lo + ' to ' + hi + '). Because ' + betterPhrase +
           ', the pooled effect favored <strong>' + arm + '</strong>' +
           (mag.key === 'effect' ? '' : ', a ' + mag.label) + '. ';
-      } else if (outcomeBetter === 'none') {
-        narrative = 'Across ' + k + ' studies, Treatment − Control = ' + g +
-          ' (95% CI ' + lo + ' to ' + hi + '). Favour labels are hidden; interpret the signed contrast on the analysis scale. ';
+        narrative += excludesNull
+          ? 'The evidence indicates a non-zero average effect (<strong>p ' + fmtP(bundle.pooled.p) + '</strong>). '
+          : 'The average effect is compatible with no difference (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
       } else {
         narrative = 'Across ' + k + ' studies, the pooled effect was ' + g +
-          ' (95% CI ' + lo + ' to ' + hi + '), with ' + betterPhrase + '. ';
+          ' (95% CI ' + lo + ' to ' + hi + '). ';
+        narrative += excludesNull
+          ? 'The evidence indicates a non-zero average effect (<strong>p ' + fmtP(bundle.pooled.p) + '</strong>). '
+          : 'The average effect is compatible with no difference (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
       }
-      narrative += excludesNull
-        ? 'The evidence indicates a non-zero average effect (<strong>p ' + fmtP(bundle.pooled.p) + '</strong>). '
-        : 'The average effect is compatible with no difference (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
       if (i2 < 25) {
         narrative += 'No between-study heterogeneity was detected (I² = ' + fmt(i2, 1) +
-          '%, τ² = ' + fmt(tau2) + '), although this estimate remains uncertain with only ' + k + ' studies.';
+          '%, τ² = ' + fmt(tau2) + '), although heterogeneity is estimated imprecisely with only ' +
+          numberWord(k) + ' studies.';
       } else if (i2 < 50) {
         narrative += 'Between-study variation was moderate (I² = ' + fmt(i2, 1) +
           '%); the random-effects average should be read with that dispersion in mind.';
@@ -1646,6 +1737,10 @@
 
     function syncBenefitControl(bundle) {
       var better = outcomeBetterOf(bundle);
+      var binary = isBinaryOutcome(bundle && bundle.spec);
+      BENEFIT_OPTIONS = binary ? BENEFIT_OPTIONS_BINARY : BENEFIT_OPTIONS_CONTINUOUS;
+      var titleEl = document.getElementById('cfgBenefitTitle');
+      if (titleEl) titleEl.textContent = binary ? 'Event' : 'Benefit';
       var label = document.getElementById('cfgBenefitLabel');
       var menu = document.getElementById('cfgBenefitMenu');
       var tip = document.getElementById('cfgContrastTip');
@@ -1654,18 +1749,37 @@
       var hit = BENEFIT_OPTIONS.find(function (o) { return o.value === better; }) || BENEFIT_OPTIONS[0];
       if (label) label.textContent = hit.label;
       if (menu) {
+        menu.innerHTML = BENEFIT_OPTIONS.map(function (o) {
+          return '<button type="button" class="cfg-measure-opt' + (o.value === better ? ' active' : '') +
+            '" role="option" data-value="' + o.value + '">' + escapeHtml(o.full) + '</button>';
+        }).join('');
         menu.querySelectorAll('.cfg-measure-opt').forEach(function (btn) {
-          btn.classList.toggle('active', btn.getAttribute('data-value') === better);
+          btn.addEventListener('click', function () {
+            var val = btn.getAttribute('data-value');
+            closeBenefitMenu();
+            if (val) changeOutcomeBetter(val);
+          });
         });
       }
-      if (contrastLabel) contrastLabel.textContent = 'Treatment − Control';
-      var tipText =
-        'Contrast is always Treatment − Control (numbers never flip). ' +
-        (better === 'lower'
-          ? 'Lower values are better → negative effects favour treatment.'
-          : better === 'higher'
-            ? 'Higher values are better → positive effects favour treatment.'
-            : 'Favour labels are hidden.');
+      var cmp = comparisonLabel(bundle && bundle.spec);
+      if (contrastLabel) contrastLabel.textContent = cmp;
+      var tipText;
+      if (binary) {
+        tipText = 'Comparison is Treatment / Control for ratios (Treatment − Control for risk difference). ' +
+          (better === 'lower'
+            ? 'Event is adverse → RR or OR below 1 favours treatment.'
+            : better === 'higher'
+              ? 'Event is beneficial → RR or OR above 1 favours treatment.'
+              : 'Direction not specified — favour labels are hidden.');
+      } else {
+        tipText =
+          'Contrast is always Treatment − Control (numbers never flip). ' +
+          (better === 'lower'
+            ? 'Lower values are better → negative effects favour treatment.'
+            : better === 'higher'
+              ? 'Higher values are better → positive effects favour treatment.'
+              : 'Favour labels are hidden.');
+      }
       if (tip) tip.textContent = tipText;
       if (chip) chip.title = tipText;
     }
@@ -1677,22 +1791,38 @@
       var arm = favoredArm(bundle.pooled && bundle.pooled.effect, better);
       var dirEl = document.getElementById('resultDirection');
       var favorEl = document.getElementById('resultFavor');
+      var binary = isBinaryOutcome(bundle.spec);
       if (dirEl) {
-        if (better === 'none') dirEl.textContent = 'Favour labels: hidden';
-        else if (better === 'lower') dirEl.textContent = 'Better outcomes: Lower values';
-        else dirEl.textContent = 'Better outcomes: Higher values';
+        if (better === 'none') {
+          dirEl.textContent = binary ? 'Event meaning: not specified' : 'Favour labels: hidden';
+        } else if (binary) {
+          dirEl.textContent = better === 'lower' ? 'Event is adverse' : 'Event is beneficial';
+        } else if (better === 'lower') {
+          dirEl.textContent = 'Better outcomes: Lower values';
+        } else {
+          dirEl.textContent = 'Better outcomes: Higher values';
+        }
       }
       if (favorEl) {
         if (better === 'none') favorEl.textContent = '';
         else favorEl.textContent = arm ? ('Result favors ' + arm) : 'Result near no difference';
       }
+      var contrastEl = document.getElementById('resultContrast');
+      if (contrastEl) {
+        contrastEl.textContent =
+          (isLogRatioMeasure(bundle.spec) ? 'Comparison: ' : 'Contrast: ') +
+          comparisonLabel(bundle.spec);
+      }
       var et = effectTypeLabel(bundle.spec);
       var interp = buildInterpretationCard(bundle, et, better);
       var nEl = document.getElementById('interpNarrative');
       var mEl = document.getElementById('interpMag');
+      var cEl = document.getElementById('interpCert');
       if (nEl) nEl.innerHTML = interp.narrative;
       if (mEl) mEl.textContent = interp.mag;
+      if (cEl) cEl.textContent = interp.cert;
       syncForestInterpretation(bundle);
+      updateCiBar(bundle);
       if (activeTabName === 'forest') renderForestPlot(bundle);
     }
 
@@ -1718,12 +1848,23 @@
     }
 
     function updateCiBar(bundle) {
-      var lo = bundle.pooled.ciLower;
-      var hi = bundle.pooled.ciUpper;
-      var mid = bundle.pooled.effect;
-      var pad = Math.max(Math.abs(hi - lo) * 0.35, Math.abs(mid) * 0.15, 0.05);
-      var minX = Math.min(lo, mid, 0) - pad;
-      var maxX = Math.max(hi, mid, 0) + pad;
+      var spec = bundle.spec || {};
+      var ratio = isLogRatioMeasure(spec);
+      var loRaw = bundle.pooled.ciLower;
+      var hiRaw = bundle.pooled.ciUpper;
+      var midRaw = bundle.pooled.effect;
+      // Layout on analysis scale so ratios keep log spacing; labels use natural scale.
+      var lo = loRaw;
+      var hi = hiRaw;
+      var mid = midRaw;
+      var nullV = 0;
+      var dispLo = toDisplayEffect(loRaw, spec);
+      var dispHi = toDisplayEffect(hiRaw, spec);
+      var dispMid = toDisplayEffect(midRaw, spec);
+      var nullLabel = ratio ? '1.00' : '0';
+      var pad = Math.max(Math.abs(hi - lo) * 0.35, Math.abs(mid - nullV) * 0.15, 0.05);
+      var minX = Math.min(lo, mid, nullV) - pad;
+      var maxX = Math.max(hi, mid, nullV) + pad;
       if (maxX <= minX) { minX -= 0.1; maxX += 0.1; }
       var toPct = function (x) {
         return Math.max(2, Math.min(98, ((x - minX) / (maxX - minX)) * 100));
@@ -1731,7 +1872,7 @@
       var left = toPct(Math.min(lo, hi));
       var right = toPct(Math.max(lo, hi));
       var midPct = toPct(mid);
-      var nullPct = toPct(0);
+      var nullPct = toPct(nullV);
 
       var band = document.getElementById('ciBand');
       var marker = document.getElementById('ciMarker');
@@ -1740,18 +1881,21 @@
       band.style.width = Math.max(1.5, right - left) + '%';
       marker.style.left = midPct + '%';
       nullEl.style.left = nullPct + '%';
+      var nullTag = nullEl.querySelector('.ci-null-tag');
+      if (nullTag) nullTag.textContent = nullLabel + ' · no effect';
+      var nullLegend = document.getElementById('ciNullLegend');
+      if (nullLegend) nullLegend.textContent = 'Null (' + nullLabel + ')';
 
       var loEl = document.getElementById('ciLo');
       var hiEl = document.getElementById('ciHi');
       var estEl = document.getElementById('ciEst');
-      loEl.textContent = fmt(lo);
-      hiEl.textContent = fmt(hi);
-      estEl.textContent = fmt(mid);
+      loEl.textContent = fmtDisplay(dispLo, spec);
+      hiEl.textContent = fmtDisplay(dispHi, spec);
+      estEl.textContent = fmtDisplay(dispMid, spec);
       loEl.style.left = left + '%';
       hiEl.style.left = right + '%';
       estEl.style.left = midPct + '%';
 
-      // Keep endpoint labels from colliding when the CI is narrow
       if (right - left < 14) {
         loEl.style.transform = 'translateX(-100%)';
         hiEl.style.transform = 'translateX(0)';
@@ -1760,10 +1904,10 @@
         hiEl.style.transform = 'translateX(-50%)';
       }
 
-      var excludes = lo > 0 || hi < 0;
+      var excludes = ciExcludesNull(loRaw, hiRaw, spec);
       document.getElementById('ciCaption').innerHTML =
-        '<strong>[' + fmt(lo) + ', ' + fmt(hi) + ']</strong>' +
-        (excludes ? ' · excludes 0' : ' · includes 0');
+        '<strong>[' + fmtDisplay(dispLo, spec) + ', ' + fmtDisplay(dispHi, spec) + ']</strong>' +
+        (excludes ? (' · excludes ' + nullLabel) : (' · includes ' + nullLabel));
     }
 
     function chartTheme() {
@@ -2139,15 +2283,23 @@
 
       var better = outcomeBetterOf(bundle);
       var arm = favoredArm(bundle.pooled.effect, better);
-      document.getElementById('resultMain').textContent = fmt(bundle.pooled.effect);
+      var spec = bundle.spec || {};
+      var dispE = toDisplayEffect(bundle.pooled.effect, spec);
+      var dispLo = toDisplayEffect(bundle.pooled.ciLower, spec);
+      var dispHi = toDisplayEffect(bundle.pooled.ciUpper, spec);
+      document.getElementById('resultMain').textContent = fmtDisplay(dispE, spec);
       document.getElementById('resultSub').textContent =
-        et + ' = ' + fmt(bundle.pooled.effect) +
-        ' · 95% CI [' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
-      document.getElementById('resultContrast').textContent = 'Contrast: Treatment − Control';
+        et + ' = ' + fmtDisplay(dispE, spec) +
+        ' · 95% CI [' + fmtDisplay(dispLo, spec) + ', ' + fmtDisplay(dispHi, spec) + ']';
+      document.getElementById('resultContrast').textContent =
+        (isLogRatioMeasure(spec) ? 'Comparison: ' : 'Contrast: ') + comparisonLabel(spec);
+      var binary = isBinaryOutcome(spec);
       document.getElementById('resultDirection').textContent =
-        better === 'none' ? 'Favour labels: hidden'
-          : better === 'lower' ? 'Better outcomes: Lower values'
-            : 'Better outcomes: Higher values';
+        better === 'none'
+          ? (binary ? 'Event meaning: not specified' : 'Favour labels: hidden')
+          : binary
+            ? (better === 'lower' ? 'Event is adverse' : 'Event is beneficial')
+            : (better === 'lower' ? 'Better outcomes: Lower values' : 'Better outcomes: Higher values');
       var favorEl = document.getElementById('resultFavor');
       if (favorEl) {
         if (better === 'none') favorEl.textContent = '';
@@ -2157,10 +2309,11 @@
       updateCiBar(bundle);
 
       document.getElementById('tileCI').textContent =
-        '[' + fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
+        '[' + fmtDisplay(dispLo, spec) + ', ' + fmtDisplay(dispHi, spec) + ']';
       if (bundle.pooled.piLower != null && bundle.pooled.piUpper != null) {
         document.getElementById('tilePI').textContent =
-          '[' + fmt(bundle.pooled.piLower) + ', ' + fmt(bundle.pooled.piUpper) + ']';
+          '[' + fmtDisplay(toDisplayEffect(bundle.pooled.piLower, spec), spec) + ', ' +
+          fmtDisplay(toDisplayEffect(bundle.pooled.piUpper, spec), spec) + ']';
       } else {
         document.getElementById('tilePI').textContent = 'n/a';
       }
@@ -2261,6 +2414,11 @@
         if (s.mean2 == null && arm.mean2 != null) s.mean2 = arm.mean2;
         if (s.sd2 == null && arm.sd2 != null) s.sd2 = arm.sd2;
         if (s.totalN == null && arm.totalN != null) s.totalN = arm.totalN;
+        if (s.events1 == null && arm.events1 != null) s.events1 = arm.events1;
+        if (s.events2 == null && arm.events2 != null) s.events2 = arm.events2;
+        if (s.continuityCorrected == null && arm.continuityCorrected != null) {
+          s.continuityCorrected = arm.continuityCorrected;
+        }
         if (!s.sourceKind && arm.sourceKind) s.sourceKind = arm.sourceKind;
       });
     }
@@ -2277,6 +2435,11 @@
     function hasContinuousSource(studies) {
       return (studies || []).some(function (s) {
         return s.sourceKind === 'continuous' && s.mean1 != null && isFinite(s.mean1);
+      });
+    }
+    function hasBinarySource(studies) {
+      return (studies || []).some(function (s) {
+        return s.sourceKind === 'binary' && s.events1 != null && isFinite(s.events1);
       });
     }
 
@@ -2389,22 +2552,33 @@
         return;
       }
 
-      var measure = effectMeasureShort(primary.spec);
-      var showN = hasArmNs(primary.studies);
+      var spec = primary.spec || {};
+      var measure = effectMeasureShort(spec);
+      var techMeasure = effectMeasureTechShort(spec);
+      var ratio = isLogRatioMeasure(spec);
+      var showBinary = hasBinarySource(primary.studies);
+      var showN = !showBinary && hasArmNs(primary.studies);
       var tech = !!studiesView.tech;
       var cols = [];
       cols.push({ key: 'include', label: '', html: true });
       cols.push({ key: 'study', label: 'Study', sort: 'study' });
-      if (showN) {
+      if (showBinary) {
+        cols.push({ key: 'e1', label: 'Treatment events' });
+        cols.push({ key: 'n1', label: 'Treatment total' });
+        cols.push({ key: 'e2', label: 'Control events' });
+        cols.push({ key: 'n2', label: 'Control total' });
+      } else if (showN) {
         cols.push({ key: 'n1', label: 'Treatment n' });
         cols.push({ key: 'n2', label: 'Control n' });
       }
       cols.push({ key: 'effect', label: measure, sort: 'effect' });
-      if (tech) cols.push({ key: 'se', label: 'SE' });
       cols.push({ key: 'ci', label: '95% CI' });
       if (tech) {
+        if (ratio) cols.push({ key: 'logy', label: techMeasure });
+        cols.push({ key: 'se', label: ratio ? 'SE of ' + techMeasure : 'SE' });
         cols.push({ key: 'vi', label: 'Sampling variance' });
         cols.push({ key: 'wraw', label: 'IV weight' });
+        if (showBinary) cols.push({ key: 'cc', label: 'Continuity correction' });
       }
       cols.push({ key: 'weight', label: 'Weight', sort: 'weight' });
 
@@ -2420,13 +2594,17 @@
       }).join('') + '</tr>';
 
       var rows = sortedPrimaryStudies();
-      var dec = tech ? 5 : 3;
+      var dispDec = ratio ? 2 : (tech ? 5 : 3);
+      var techDec = tech ? 5 : 3;
       var viDec = tech ? 6 : 4;
       body.innerHTML = rows.map(function (s) {
         var excluded = !!studiesExcluded[s.name];
         var w = weightLookup(s.name);
         var ci = studyCi(s);
         var se = (s.se != null && isFinite(s.se)) ? s.se : Math.sqrt(s.vi);
+        var yiDisp = toDisplayEffect(s.yi, spec);
+        var loDisp = toDisplayEffect(ci.lo, spec);
+        var hiDisp = toDisplayEffect(ci.hi, spec);
         var cls = [];
         if (excluded) cls.push('is-excluded');
         if (studiesView.highlight && studiesView.highlight === s.name) cls.push('is-highlight');
@@ -2435,16 +2613,24 @@
           escapeHtml(s.name) + '"' + (excluded ? '' : ' checked') +
           ' title="Include in analysis" aria-label="Include ' + escapeHtml(s.name) + '"/></td>');
         cells.push('<td>' + escapeHtml(s.name) + '</td>');
-        if (showN) {
+        if (showBinary) {
+          cells.push('<td>' + (s.events1 != null ? String(Math.round(s.events1)) : '—') + '</td>');
+          cells.push('<td>' + (s.n1 != null ? String(Math.round(s.n1)) : '—') + '</td>');
+          cells.push('<td>' + (s.events2 != null ? String(Math.round(s.events2)) : '—') + '</td>');
+          cells.push('<td>' + (s.n2 != null ? String(Math.round(s.n2)) : '—') + '</td>');
+        } else if (showN) {
           cells.push('<td>' + (s.n1 != null && isFinite(s.n1) ? String(Math.round(s.n1)) : '—') + '</td>');
           cells.push('<td>' + (s.n2 != null && isFinite(s.n2) ? String(Math.round(s.n2)) : '—') + '</td>');
         }
-        cells.push('<td>' + fmtSigned(s.yi, dec) + '</td>');
-        if (tech) cells.push('<td>' + fmt(se, dec) + '</td>');
-        cells.push('<td>[' + fmtSigned(ci.lo, dec) + ', ' + fmtSigned(ci.hi, dec) + ']</td>');
+        cells.push('<td>' + fmtDisplaySigned(yiDisp, spec, dispDec) + '</td>');
+        cells.push('<td>[' + fmtDisplaySigned(loDisp, spec, dispDec) + ', ' +
+          fmtDisplaySigned(hiDisp, spec, dispDec) + ']</td>');
         if (tech) {
+          if (ratio) cells.push('<td>' + fmtSigned(s.yi, techDec) + '</td>');
+          cells.push('<td>' + fmt(se, techDec) + '</td>');
           cells.push('<td>' + fmt(s.vi, viDec) + '</td>');
-          cells.push('<td>' + (excluded || w.weight == null ? '—' : fmt(w.weight, tech ? 4 : 2)) + '</td>');
+          cells.push('<td>' + (excluded || w.weight == null ? '—' : fmt(w.weight, 4)) + '</td>');
+          if (showBinary) cells.push('<td>' + (s.continuityCorrected ? 'Yes (+0.5)' : 'No') + '</td>');
         }
         cells.push('<td>' + (excluded || w.weightPct == null ? '—' : (fmt(w.weightPct, 1) + '%')) + '</td>');
         return '<tr class="' + cls.join(' ') + '" data-study="' + escapeHtml(s.name) + '">' +
@@ -2454,10 +2640,11 @@
       var pooled = metaBundle && metaBundle.pooled;
       var modelTxt = modelLabel(metaBundle || primary);
       var gTxt = pooled
-        ? (measure + '=' + fmtSigned(pooled.effect, 3) +
-          ' [' + fmtSigned(pooled.ciLower, 3) + ', ' + fmtSigned(pooled.ciUpper, 3) + ']')
+        ? (measure + '=' + fmtDisplaySigned(toDisplayEffect(pooled.effect, spec), spec, ratio ? 2 : 3) +
+          ' [' + fmtDisplaySigned(toDisplayEffect(pooled.ciLower, spec), spec, ratio ? 2 : 3) + ', ' +
+          fmtDisplaySigned(toDisplayEffect(pooled.ciUpper, spec), spec, ratio ? 2 : 3) + ']')
         : '—';
-      var spanLead = 2 + (showN ? 2 : 0); // include + study (+ n cols)
+      var spanLead = 2 + (showBinary ? 4 : (showN ? 2 : 0));
       var midCols = Math.max(1, cols.length - spanLead - 1);
       foot.innerHTML =
         '<tr><td colspan="' + spanLead + '">' + escapeHtml(modelTxt) + '</td>' +
@@ -2472,6 +2659,23 @@
       var panel = document.getElementById('studiesSourcePanel');
       var body = document.getElementById('studiesSourceBody');
       if (!panel || !body) return;
+      if (hasBinarySource(bundle.studies)) {
+        panel.hidden = false;
+        body.innerHTML =
+          '<table class="studies-source-table"><thead><tr>' +
+          '<th>Study</th><th>Treatment events</th><th>Treatment n</th>' +
+          '<th>Control events</th><th>Control n</th><th>Total N</th>' +
+          '</tr></thead><tbody>' +
+          (bundle.studies || []).map(function (s) {
+            if (s.events1 == null) return '';
+            return '<tr><td>' + escapeHtml(s.name) + '</td>' +
+              '<td>' + Math.round(s.events1) + '</td><td>' + Math.round(s.n1) + '</td>' +
+              '<td>' + Math.round(s.events2) + '</td><td>' + Math.round(s.n2) + '</td>' +
+              '<td>' + Math.round(s.totalN != null ? s.totalN : (s.n1 + s.n2)) + '</td></tr>';
+          }).join('') +
+          '</tbody></table>';
+        return;
+      }
       if (!hasContinuousSource(bundle.studies)) {
         panel.hidden = true;
         body.innerHTML = '';
@@ -2550,7 +2754,7 @@
     }
 
     function forestFavorLabels(bundle) {
-      // Contrast is Treatment − Control. Labels follow outcome coding only.
+      // Labels follow outcome / event coding only (analysis scale never flips).
       var better = outcomeBetterOf(bundle);
       if (better === 'none') return null;
       if (better === 'lower') {
@@ -2697,30 +2901,40 @@
       var pooledLabel = bundle.model === 'fixed' ? 'Fixed-effect model' : 'Random-effects model';
       var categories = studies.map(function (s) { return s.name || 'Study'; }).concat([pooledLabel]);
       if (bundle.model === 'fixed') modelTxt = 'Fixed-effect';
+      var spec = bundle.spec || {};
+      var ratio = isLogRatioMeasure(spec);
+      var nullV = nullEffectValue(spec);
 
       var rows = studies.map(function (s, i) {
         var ci = studyCi(s);
         return {
           i: i,
           name: s.name || ('Study ' + (i + 1)),
-          yi: s.yi,
-          lo: ci.lo,
-          hi: ci.hi,
+          yi: toDisplayEffect(s.yi, spec),
+          lo: toDisplayEffect(ci.lo, spec),
+          hi: toDisplayEffect(ci.hi, spec),
+          yiLog: s.yi,
           weightPct: s.weightPct != null ? s.weightPct : 0
         };
       });
       var maxW = rows.reduce(function (m, r) { return Math.max(m, r.weightPct); }, 0);
 
-      var xVals = [0, bundle.pooled.effect, bundle.pooled.ciLower, bundle.pooled.ciUpper];
+      var xVals = [nullV, toDisplayEffect(bundle.pooled.effect, spec),
+        toDisplayEffect(bundle.pooled.ciLower, spec), toDisplayEffect(bundle.pooled.ciUpper, spec)];
       rows.forEach(function (r) { xVals.push(r.lo, r.hi, r.yi); });
-      var finite = xVals.filter(isFinite);
+      var finite = xVals.filter(function (v) { return isFinite(v) && (!ratio || v > 0); });
       var xMin = Math.min.apply(null, finite);
       var xMax = Math.max.apply(null, finite);
-      if (!isFinite(xMin) || !isFinite(xMax)) { xMin = -1; xMax = 1; }
-      if (xMin === xMax) { xMin -= 0.5; xMax += 0.5; }
-      var pad = (xMax - xMin) * 0.12;
-      xMin -= pad;
-      xMax += pad;
+      if (!isFinite(xMin) || !isFinite(xMax)) { xMin = ratio ? 0.5 : -1; xMax = ratio ? 2 : 1; }
+      if (xMin === xMax) { xMin = ratio ? xMin / 1.5 : xMin - 0.5; xMax = ratio ? xMax * 1.5 : xMax + 0.5; }
+      if (ratio) {
+        xMin = Math.max(1e-6, xMin / 1.15);
+        xMax = xMax * 1.15;
+      } else {
+        var pad = (xMax - xMin) * 0.12;
+        xMin -= pad;
+        xMax += pad;
+      }
 
       var scatterData = rows.map(function (r) {
         return {
@@ -2752,10 +2966,13 @@
         maxW: maxW,
         xMin: xMin,
         xMax: xMax,
-        xDecimals: forestXLabelDecimals(xMin, xMax),
+        xType: ratio ? 'logarithmic' : 'linear',
+        nullValue: nullV,
+        ratio: ratio,
+        xDecimals: ratio ? 2 : forestXLabelDecimals(xMin, xMax),
         scatterData: scatterData,
         pooledPoint: [{
-          x: bundle.pooled.effect,
+          x: toDisplayEffect(bundle.pooled.effect, spec),
           y: pooledY,
           isPooled: true,
           marker: { enabled: false }
@@ -2843,7 +3060,9 @@
 
       rows.forEach(function (r) {
         var y = yPx(r.i) + 4;
-        var effectTxt = fmt(r.yi) + ' [' + fmt(r.lo) + ', ' + fmt(r.hi) + ']';
+        var effectTxt = fmtDisplay(r.yi, ctx.bundle && ctx.bundle.spec, ctx.xDecimals) +
+          ' [' + fmtDisplay(r.lo, ctx.bundle && ctx.bundle.spec, ctx.xDecimals) + ', ' +
+          fmtDisplay(r.hi, ctx.bundle && ctx.bundle.spec, ctx.xDecimals) + ']';
         chart.renderer.text(effectTxt, effectX, y)
           .css({ color: ctx.labelBright, fontSize: '12.5px', fontWeight: '700' })
           .attr({ zIndex: 8 }).add(g);
@@ -2879,16 +3098,18 @@
       var light = document.documentElement.getAttribute('data-theme') === 'light';
       var nullLine = light ? '#334155' : '#f1f5f9';
       var nullLabel = light ? '#0f172a' : '#ffffff';
+      var nullV = vm.nullValue != null ? vm.nullValue : 0;
+      var pooledX = toDisplayEffect(bundle.pooled.effect, bundle.spec);
       return [
         {
           id: 'null-effect',
-          value: 0,
+          value: nullV,
           color: nullLine,
           width: 2.25,
           dashStyle: 'ShortDash',
           zIndex: 5,
           label: {
-            text: 'No effect',
+            text: vm.ratio ? ('No effect (' + fmtDisplay(nullV, bundle.spec) + ')') : 'No effect',
             // Horizontal at top — vertical sideways text was hard to read
             align: 'center',
             verticalAlign: 'top',
@@ -2905,7 +3126,7 @@
         },
         {
           id: 'pooled-ref',
-          value: bundle.pooled.effect,
+          value: pooledX,
           color: t.orange,
           width: 1,
           dashStyle: 'Dot',
@@ -2961,6 +3182,7 @@
             animation: anim
           },
           xAxis: {
+            type: vm.xType || 'linear',
             min: vm.xMin,
             max: vm.xMax,
             tickPixelInterval: 100,
@@ -3023,6 +3245,7 @@
         title: { text: null },
         credits: { enabled: false },
         xAxis: {
+          type: vm.xType || 'linear',
           min: vm.xMin,
           max: vm.xMax,
           startOnTick: false,
@@ -3073,17 +3296,20 @@
           formatter: function () {
             var ctx = forestDrawCtx;
             if (!ctx) return false;
+            var spec = ctx.bundle && ctx.bundle.spec;
+            var mShort = effectMeasureShort(spec);
             if (this.point && this.point.isPooled) {
               return '<b>' + ctx.modelTxt + '</b><br/>' +
-                'Pooled: ' + fmt(ctx.bundle.pooled.effect) +
-                '<br/>95% CI: [' + fmt(ctx.bundle.pooled.ciLower) + ', ' +
-                fmt(ctx.bundle.pooled.ciUpper) + ']';
+                mShort + '=' + fmtDisplay(toDisplayEffect(ctx.bundle.pooled.effect, spec), spec, ctx.xDecimals) +
+                '<br/>95% CI: [' + fmtDisplay(toDisplayEffect(ctx.bundle.pooled.ciLower, spec), spec, ctx.xDecimals) +
+                ', ' + fmtDisplay(toDisplayEffect(ctx.bundle.pooled.ciUpper, spec), spec, ctx.xDecimals) + ']';
             }
             var r = this.point && this.point.row;
             if (!r) return false;
             return '<b>' + r.name + '</b><br/>' +
-              'Effect: ' + fmt(r.yi) +
-              '<br/>95% CI: [' + fmt(r.lo) + ', ' + fmt(r.hi) + ']' +
+              mShort + '=' + fmtDisplay(r.yi, spec, ctx.xDecimals) +
+              '<br/>95% CI: [' + fmtDisplay(r.lo, spec, ctx.xDecimals) + ', ' +
+              fmtDisplay(r.hi, spec, ctx.xDecimals) + ']' +
               '<br/>Weight: ' + fmt(r.weightPct, 1) + '%';
           }
         },

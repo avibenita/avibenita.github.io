@@ -6604,7 +6604,9 @@ const StatisticoHeader = {
       .slice(0, 18);
     let payload = null;
     if (typeof window.buildAIPayload === 'function') {
-      try { payload = window.buildAIPayload(); } catch (_) { payload = null; }
+      try {
+        payload = this._roundAiPayload(window.buildAIPayload(), 4);
+      } catch (_) { payload = null; }
     }
     return {
       visibleText,
@@ -8289,6 +8291,48 @@ PATTERNS: [Pattern description → what it means analytically] | [next pattern] 
 READING: [1–2 sentences — what the current data state in this view specifically shows, using exact numbers where available]`;
   },
 
+  // ── AI number formatting ─────────────────────────────────────────────────
+
+  /** Round nested numbers for AI JSON (keeps integers; default 4 decimals). */
+  _roundAiPayload(value, decimals = 4) {
+    if (Array.isArray(value)) {
+      return value.map((v) => this._roundAiPayload(v, decimals));
+    }
+    if (value && typeof value === 'object') {
+      const out = {};
+      Object.keys(value).forEach((k) => {
+        out[k] = this._roundAiPayload(value[k], decimals);
+      });
+      return out;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (Number.isInteger(value)) return value;
+      const d = Math.max(0, Math.min(8, decimals | 0));
+      return Number(value.toFixed(d));
+    }
+    return value;
+  },
+
+  /**
+   * Collapse over-precise floats in AI prose (e.g. -0.41696856796333339 → -0.417).
+   * Leaves short decimals and integers alone; uses 3 dp for effects / most stats,
+   * and p < .001 style for very small p-values when the token looks like a p-value.
+   */
+  _formatAiProseNumbers(text) {
+    if (typeof text !== 'string' || !text) return text;
+    return text.replace(/([Pp]\s*(?:[=≈~]|value\s*[=≈~])\s*)(-?\d+\.\d+)/g, (full, lead, num) => {
+      const n = Number(num);
+      if (!Number.isFinite(n)) return full;
+      if (Math.abs(n) > 0 && Math.abs(n) < 0.001) return `${lead}< .001`;
+      return `${lead}${n.toFixed(3)}`;
+    }).replace(/(-?\d+\.\d{5,})(e[-+]?\d+)?/gi, (m, coeff, exp) => {
+      const n = Number(m);
+      if (!Number.isFinite(n)) return m;
+      if (exp) return Number(n.toPrecision(4)).toString();
+      return n.toFixed(3);
+    });
+  },
+
   // ── AI API call ──────────────────────────────────────────────────────────
 
   async _callAiForSidebar(prompt) {
@@ -8314,6 +8358,7 @@ CRITICAL RULES (strictly enforced):
 - Do NOT repeat the same idea across sections
 - Do NOT give UI instructions or mention charts, sliders, or interface elements unless the user prompt explicitly asks for CONTROLS / PATTERNS guidance
 - "What to Check Next" must use conditional reasoning ("If X, then run Y") — not a plain test list
+- NUMBER FORMAT: report effects, SEs, CIs, Q, τ², and intercepts to 3 decimal places; I² to 1 decimal with %; p-values to 3 decimals (use p < .001 when smaller). Never paste long floating-point tails from JSON.
 
 Always follow the exact output format requested.` },
               { role: 'user',   content: prompt }
@@ -8326,7 +8371,7 @@ Always follow the exact output format requested.` },
         const d = await r.json();
         const text = d?.choices?.[0]?.message?.content?.trim();
         if (!text) { lastErr = new Error('Empty response'); continue; }
-        return text;
+        return this._formatAiProseNumbers(text);
       } catch (err) { lastErr = err; if (err.message?.includes('not found')) continue; throw err; }
     }
     throw lastErr || new Error('No AI model available');
@@ -8340,6 +8385,7 @@ Always follow the exact output format requested.` },
    */
   _parseAiStructured(raw) {
     if (!raw) return null;
+    raw = this._formatAiProseNumbers(raw);
     // Full-view keys + per-view keys (union)
     const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION',
                          'INSIGHT', 'MEANS', 'NEXT', 'STRENGTH',
@@ -8351,9 +8397,9 @@ Always follow the exact output format requested.` },
 
     const flush = () => {
       if (!current) return;
-      const joined = buf.join(' ').trim();
+      const joined = this._formatAiProseNumbers(buf.join(' ').trim());
       if (['EVIDENCE', 'IMPLICATIONS', 'ACTION', 'NEXT', 'CONTROLS', 'PATTERNS'].includes(current)) {
-        result[current] = joined.split('|').map((s) => s.trim()).filter(Boolean);
+        result[current] = joined.split('|').map((s) => this._formatAiProseNumbers(s.trim())).filter(Boolean);
       } else {
         result[current] = joined;
       }

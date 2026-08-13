@@ -10,7 +10,7 @@
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260812-hetguide1"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260813-funnel1"></script>
+  <script src="../shared-header.js?v=20260813-airound1"></script>
   <script src="meta-engine.js?v=20260813-studies1"></script>
   <style>
     :root {
@@ -1792,29 +1792,65 @@
       }
     }
 
+    function roundAiNum(n, d) {
+      if (n == null || !isFinite(n)) return n;
+      if (Number.isInteger(n)) return n;
+      return Number(Number(n).toFixed(d == null ? 4 : d));
+    }
+
     window.buildAIPayload = function () {
       if (!metaBundle) return null;
       var b = metaBundle;
       var bias = b.bias || {};
-      return {
+      var pooled = b.pooled || {};
+      var het = b.heterogeneity || {};
+      var payload = {
         model: b.model,
         effectType: effectTypeLabel(b.spec),
         k: b.k,
-        pooled: b.pooled,
-        heterogeneity: b.heterogeneity,
+        pooled: {
+          effect: roundAiNum(pooled.effect, 4),
+          se: roundAiNum(pooled.se, 4),
+          ciLower: roundAiNum(pooled.ciLower, 4),
+          ciUpper: roundAiNum(pooled.ciUpper, 4),
+          piLower: roundAiNum(pooled.piLower, 4),
+          piUpper: roundAiNum(pooled.piUpper, 4),
+          z: roundAiNum(pooled.z, 4),
+          p: roundAiNum(pooled.p, 4),
+          df: pooled.df,
+          method: pooled.method
+        },
+        heterogeneity: {
+          Q: roundAiNum(het.Q, 4),
+          df: het.df,
+          pQ: roundAiNum(het.pQ != null ? het.pQ : heteroPQ(het), 4),
+          I2: roundAiNum(het.I2, 2),
+          tau2: roundAiNum(het.tau2, 4),
+          tau: roundAiNum(het.tau, 4),
+          tauEstimator: het.tauEstimator
+        },
         bias: bias.available ? {
           available: true,
-          intercept: bias.intercept,
-          se: bias.se,
-          t: bias.t,
+          intercept: roundAiNum(bias.intercept, 4),
+          se: roundAiNum(bias.se, 4),
+          t: roundAiNum(bias.t, 4),
           df: bias.df != null ? bias.df : (bias.n != null ? bias.n - 2 : null),
-          p: bias.p,
+          p: roundAiNum(bias.p, 4),
           n: bias.n
         } : { available: false, reason: bias.reason || null },
         studies: (b.studies || []).slice(0, 40).map(function (s) {
-          return { name: s.name, yi: s.yi, vi: s.vi, weightPct: s.weightPct };
+          return {
+            name: s.name,
+            yi: roundAiNum(s.yi, 4),
+            vi: roundAiNum(s.vi, 5),
+            weightPct: roundAiNum(s.weightPct, 2)
+          };
         })
       };
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._roundAiPayload === 'function') {
+        return StatisticoHeader._roundAiPayload(payload, 4);
+      }
+      return payload;
     };
 
     window.requestMetaModuleAI = async function () {
@@ -1842,7 +1878,8 @@
 'You are interpreting a meta-analysis computed by Statistico.\n' +
 'Do NOT recompute any statistic. Use only the values in the JSON below.\n' +
 'Use cautious language ("suggests", "indicates") unless evidence is clear.\n' +
-'If a field is null or missing, do not mention it.\n\n' +
+'If a field is null or missing, do not mention it.\n' +
+'NUMBER FORMAT: effects/CIs/Q/τ²/intercepts to 3 decimals; I² to 1 decimal with %; p to 3 decimals (p < .001 if smaller). Never copy long float tails.\n\n' +
 'JSON:\n' + JSON.stringify(payload, null, 2) + '\n\n' +
 'Reply ONLY in this exact format (no extra lines, no markdown):\n' +
 'CONCLUSION: [One decisive sentence — the single most important finding about the pooled effect]\n' +

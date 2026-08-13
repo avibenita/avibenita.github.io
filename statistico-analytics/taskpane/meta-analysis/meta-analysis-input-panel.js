@@ -146,6 +146,7 @@ function _metaExtractStudyEffect(row, spec) {
   const effectType = spec.effectType || "continuous";
   const measure = spec.effectMeasure || (effectType === "binary" ? "rr" : effectType === "direct" ? "generic" : "smd");
   let yi = null, vi = null;
+  let arms = { sourceKind: effectType };
 
   if (effectType === "continuous") {
     const mean1 = _metaNum(row[spec.mean1Col]);
@@ -157,6 +158,16 @@ function _metaExtractStudyEffect(row, spec) {
     if (![mean1, sd1, n1, mean2, sd2, n2].every(isFinite) || n1 < 2 || n2 < 2 || sd1 < 0 || sd2 < 0) {
       return null;
     }
+    arms = {
+      sourceKind: "continuous",
+      n1: n1,
+      n2: n2,
+      mean1: mean1,
+      sd1: sd1,
+      mean2: mean2,
+      sd2: sd2,
+      totalN: n1 + n2
+    };
     if (measure === "md") {
       yi = mean1 - mean2;
       vi = (sd1 * sd1) / n1 + (sd2 * sd2) / n2;
@@ -165,6 +176,7 @@ function _metaExtractStudyEffect(row, spec) {
       yi = Math.log(mean1 / mean2);
       vi = (sd1 * sd1) / (n1 * mean1 * mean1) + (sd2 * sd2) / (n2 * mean2 * mean2);
     } else if (measure === "cohend") {
+      // Cohen's d (uncorrected)
       const pooledSD = Math.sqrt(((n1 - 1) * sd1 * sd1 + (n2 - 1) * sd2 * sd2) / (n1 + n2 - 2));
       if (!(pooledSD > 0)) return null;
       yi = (mean1 - mean2) / pooledSD;
@@ -204,6 +216,14 @@ function _metaExtractStudyEffect(row, spec) {
       aa += 0.5; bb += 0.5; cc += 0.5; dd += 0.5;
     }
     const n1t = aa + bb, n2t = cc + dd;
+    arms = {
+      sourceKind: "binary",
+      n1: a + b,
+      n2: c + d,
+      events1: a,
+      events2: c,
+      totalN: a + b + c + d
+    };
     if (measure === "rr") {
       const p1 = aa / n1t, p2 = cc / n2t;
       if (!(p1 > 0 && p2 > 0)) return null;
@@ -236,13 +256,14 @@ function _metaExtractStudyEffect(row, spec) {
       vi = se * se;
     }
     if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
+    arms = { sourceKind: "direct" };
   } else {
     return null;
   }
 
   // outcomeBetter / legacy effectDirection affect interpretation labels only — never flip yi.
   if (!(isFinite(yi) && isFinite(vi) && vi > 0)) return null;
-  return { yi: yi, vi: vi, se: Math.sqrt(vi) };
+  return Object.assign({ yi: yi, vi: vi, se: Math.sqrt(vi) }, arms);
 }
 
 function _metaTau2DL(yi, vi) {
@@ -310,12 +331,13 @@ function buildMetaBundle(headers, rows, spec) {
       const studyName = row[studyCol] || ("Study " + (idx + 1));
       const extracted = _metaExtractStudyEffect(row, spec);
       if (!extracted) return;
-      studies.push({
+      studies.push(Object.assign({
         name: String(studyName),
+        rowIndex: idx,
         yi: extracted.yi,
         vi: extracted.vi,
         se: extracted.se
-      });
+      }, extracted));
     });
 
     if (studies.length < 2) {

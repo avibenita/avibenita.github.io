@@ -6480,7 +6480,7 @@ const StatisticoHeader = {
       'meta-bias':
         'This combines Egger\'s regression test (intercept, SE of intercept, t(df), p, n) with a funnel plot of effect vs SE, including the pooled-effect line and Pseudo-95% limits (μ̂ ± 1.96×SE; expected funnel limits, not a CI for the pooled effect). Describe whether points sit inside the funnel and whether Egger suggests small-study effects. Stress that asymmetry is not only publication bias, and with k < 10 power is limited. Do not re-walk the full pooled-effect narrative from Summary.',
       'meta-studies':
-        'Read the study table (study id, effect, variance, weight, weight %). Use this view to identify influential or heavily weighted studies and to verify the inputs feeding the pooled estimate — not to restate I² or Egger results.',
+        'Read the study audit table (study, arm n, effect, 95% CI, weight %; optional Technical columns for SE, sampling variance, IV weight). Note the pooled footer row and any sensitivity banner if studies were unchecked. Use Source data for continuous means/SDs. Identify influential or heavily weighted studies — do not restate I² or Egger results.',
       'factor-suitability':
         'Read the evidence-driven verdict banner, KMO, Bartlett, determinant, correlation heatmap (Avg |r|), MSA summary bars, suggested refinement panel, and optional Optimize Variables path. Explain whether factor analysis is appropriate and which variables to remove — use exact MSA and KMO values.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',

@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <title>Contingency Tables Results</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260813ct1"/>
+  <script src="../shared-brand-logo.js?v=20260716cover"></script>
+  <script src="../shared-header.js?v=20260813ct1"></script>
+  <script src="contingency-engine.js?v=20260813ct1"></script>
+  <script src="contingency-sample-data.js?v=20260813ct1"></script>
+  <style>
+    :root {
+      --surface-0:#070b14; --surface-1:#1e2638; --surface-2:#2a3348; --border:#4b556e;
+      --accent-1:rgb(255,176,140); --accent-2:rgb(140,210,255); --accent-ct:#c4b5fd;
+      --text-primary:#fff; --text-secondary:rgba(255,255,255,.95); --text-muted:rgba(226,232,240,.88);
+      --neg:#60a5fa; --pos:#fb923c; --warn:#fbbf24;
+    }
+    :root[data-theme="light"] {
+      --surface-0:#e2e8f0; --surface-1:#fff; --surface-2:#f8fafc; --border:#94a3b8;
+      --accent-1:#c2410c; --accent-2:#1d4ed8; --accent-ct:#6d28d9;
+      --text-primary:#0f172a; --text-secondary:#1e293b; --text-muted:#334155;
+      --neg:#2563eb; --pos:#ea580c; --warn:#b45309;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body { height:100%; overflow:hidden; }
+    body { background:var(--surface-0); color:var(--text-primary); font-family:'Segoe UI', system-ui, sans-serif; display:flex; flex-direction:column; }
+    .sb-nav { --sb-accent:#a78bfa; --sb-accent-soft:rgba(167,139,250,.16); }
+    .sb-layout { display:flex; flex-direction:row; flex:1; min-height:0; overflow:hidden; width:100%; }
+    .right-col { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    #header-container { flex:0 0 auto !important; display:block !important; min-height:64px; position:relative; z-index:20; }
+    #sidebarNav { height:100%; min-height:0; }
+    #sbNavFooter { margin-top:auto; flex-shrink:0; }
+    .ct-context-bar {
+      flex:0 0 48px; height:48px; display:flex; align-items:center; padding:0 12px;
+      border-bottom:1px solid var(--border); background:var(--surface-1); gap:10px; overflow:hidden;
+    }
+    .ct-kv { font-size:13px; color:var(--text-secondary); white-space:nowrap; }
+    .ct-kv strong { color:var(--accent-1); }
+    .config-sep { width:1px; height:16px; background:var(--border); flex-shrink:0; }
+    .results-container { flex:1; min-height:0; overflow-y:auto; padding:10px; display:flex; flex-direction:column; }
+    .tab-panel { display:none; flex:1; min-height:0; flex-direction:column; gap:10px; }
+    .tab-panel.active { display:flex; }
+    .card { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+    .card-title { font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
+    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; }
+    .kpi { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px; }
+    .kpi-k { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--text-muted); }
+    .kpi-v { font-size:18px; font-weight:700; color:var(--accent-ct); margin-top:2px; }
+    .interp { font-size:13.5px; line-height:1.55; color:var(--text-secondary); }
+    .interp p { margin:0 0 8px; }
+    .warn-banner { display:none; padding:10px 12px; border-radius:8px; background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); color:#fde68a; font-size:13px; }
+    .warn-banner.show { display:block; }
+    .ws-mode-tabbar { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+    .ws-mode-tab {
+      border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary);
+      border-radius:999px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer;
+    }
+    .ws-mode-tab.active { background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:#fff; border-color:transparent; }
+    .tbl-wrap { overflow:auto; max-height:min(58vh, 520px); border:1px solid var(--border); border-radius:8px; }
+    table.ct { width:100%; border-collapse:collapse; font-size:12.5px; }
+    table.ct th, table.ct td { border-bottom:1px solid var(--border); padding:6px 8px; text-align:right; white-space:nowrap; }
+    table.ct th { background:var(--surface-2); font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--text-muted); }
+    table.ct td.stub, table.ct th.stub { text-align:left; font-weight:700; color:var(--text-primary); }
+    table.ct td.total, table.ct th.total { font-weight:700; background:rgba(167,139,250,.08); }
+    table.ct td.band-moderate { font-weight:700; }
+    table.ct td.band-strong { font-weight:800; }
+    .tbl-actions { display:flex; gap:6px; margin-top:8px; }
+    .mini-btn { border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); border-radius:7px; padding:5px 9px; font-size:11px; cursor:pointer; }
+    .tests-table td:first-child { text-align:left; font-weight:600; }
+    .heat-grid { display:grid; gap:3px; }
+    .heat-cell { min-height:54px; border-radius:6px; padding:6px; display:flex; flex-direction:column; justify-content:center; align-items:center; font-size:11px; cursor:default; border:1px solid transparent; }
+    .heat-cell .hv { font-size:15px; font-weight:800; }
+    .heat-lab { font-size:11px; font-weight:700; color:var(--text-muted); display:flex; align-items:center; justify-content:flex-end; padding-right:6px; }
+    .legend { display:flex; gap:10px; align-items:center; font-size:11px; color:var(--text-muted); margin-top:8px; }
+    .sw { width:14px; height:14px; border-radius:3px; display:inline-block; }
+    .error-card { padding:18px; font-size:14px; color:#fecaca; }
+    .loading-state { flex:1; display:flex; align-items:center; justify-content:center; color:var(--text-muted); gap:10px; }
+    .layout-note { font-size:12px; color:var(--text-muted); margin-bottom:8px; }
+    select.ct-sel { background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border); border-radius:7px; padding:5px 8px; font-size:12px; }
+    .muted { color:var(--text-muted); font-size:12.5px; }
+  </style>
+</head>
+<body>
+  <div class="sb-layout">
+    <nav class="sb-nav" id="sidebarNav">
+      <div class="sb-logo"><div class="sb-logo-icon" data-statistico-brand-logo></div></div>
+      <div class="sb-header">
+        <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+        <span class="sb-menu-title">Menu</span>
+        <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+      </div>
+      <div class="sb-body">
+        <div class="sb-group">
+          <div class="sb-group-title">Results</div>
+          <div class="sb-items-rail">
+            <button class="sb-item active" onclick="switchTab('overview')" data-tab="overview">
+              <i class="fa-solid fa-chart-bar sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Overview</span><span class="sb-item-description">N, χ², p, and Cramér’s V.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('table')" data-tab="table">
+              <i class="fa-solid fa-table sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Contingency Table</span><span class="sb-item-description">Counts, percents, residuals.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('tests')" data-tab="tests">
+              <i class="fa-solid fa-flask sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Tests &amp; Association</span><span class="sb-item-description">χ², Fisher, φ, V, C.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('diagnostics')" data-tab="diagnostics">
+              <i class="fa-solid fa-stethoscope sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Diagnostics</span><span class="sb-item-description">Expected counts and residuals.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('twobytwo')" data-tab="twobytwo" id="tab2x2Btn">
+              <i class="fa-solid fa-border-all sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">2×2 Measures</span><span class="sb-item-description">Odds ratio, risk ratio, RD.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('viz')" data-tab="viz">
+              <i class="fa-solid fa-grip sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Visualization</span><span class="sb-item-description">Standardized residual heat map.</span></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="right-col">
+      <div id="header-container"></div>
+      <div class="ct-context-bar" id="ctContext">
+        <span class="ct-kv">Rows: <strong id="ctxRow">—</strong></span>
+        <span class="config-sep"></span>
+        <span class="ct-kv">Columns: <strong id="ctxCol">—</strong></span>
+        <span class="config-sep"></span>
+        <span class="ct-kv">N = <strong id="ctxN">—</strong></span>
+        <span class="config-sep"></span>
+        <span class="ct-kv" id="ctxWeightWrap" style="display:none;">Weight: <strong id="ctxWeight">—</strong></span>
+      </div>
+      <div class="results-container">
+        <div id="loadingState" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading contingency results…</div>
+        <div id="errorState" class="tab-panel"><div class="card error-card" id="errorText"></div></div>
+        <div id="tab-overview" class="tab-panel">
+          <div class="kpi-row" id="overviewKpis"></div>
+          <div class="card"><div class="card-title">Interpretation</div><div class="interp" id="overviewInterp"></div></div>
+        </div>
+        <div id="tab-table" class="tab-panel">
+          <div class="card">
+            <div class="card-title">Display</div>
+            <div class="ws-mode-tabbar" id="measureBar"></div>
+            <div class="tbl-wrap" id="tableWrap"></div>
+            <div class="tbl-actions">
+              <button class="mini-btn" type="button" onclick="copyCurrentTable()"><i class="fa-solid fa-copy"></i> Copy table</button>
+              <button class="mini-btn" type="button" onclick="exportCurrentCsv()"><i class="fa-solid fa-download"></i> Export CSV</button>
+            </div>
+          </div>
+        </div>
+        <div id="tab-tests" class="tab-panel">
+          <div class="card">
+            <div class="card-title">Tests and association measures</div>
+            <div class="tbl-wrap" id="testsWrap"></div>
+            <p class="muted" style="margin-top:8px;">p-values below 0.001 are shown as &lt; .001. Effect-size labels are not applied automatically because they depend on context and table dimensions.</p>
+          </div>
+        </div>
+        <div id="tab-diagnostics" class="tab-panel">
+          <div class="warn-banner" id="diagWarn"></div>
+          <div class="kpi-row" id="diagKpis"></div>
+          <div class="card">
+            <div class="card-title">Standardized residuals</div>
+            <p class="muted" style="margin-bottom:8px;">Adjusted residuals: |r| &lt; 2 neutral · 2–3 moderate · ≥ 3 strong. Blue = fewer than expected; orange = more than expected.</p>
+            <div class="tbl-wrap" id="residWrap"></div>
+          </div>
+        </div>
+        <div id="tab-twobytwo" class="tab-panel">
+          <div class="card">
+            <div class="card-title">Category mapping</div>
+            <p class="layout-note">Measures compare the index row with the reference row for the selected event column. Changing the mapping recalculates odds and risk immediately — it does not silently reverse the effect.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+              <label class="muted">Index row <select class="ct-sel" id="selRowIndex"></select></label>
+              <label class="muted">Event column <select class="ct-sel" id="selColEvent"></select></label>
+            </div>
+            <p class="muted" id="mapCaption" style="margin-top:8px;"></p>
+          </div>
+          <div class="kpi-row" id="rrKpis"></div>
+          <div class="card" id="rrNotes"></div>
+        </div>
+        <div id="tab-viz" class="tab-panel">
+          <div class="card">
+            <div class="card-title">Association heat map (standardized residuals)</div>
+            <div id="heatWrap"></div>
+            <div class="legend">
+              <span class="sw" style="background:#2563eb;"></span> Fewer than expected
+              <span class="sw" style="background:#64748b;"></span> Near expected
+              <span class="sw" style="background:#ea580c;"></span> More than expected
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    var bundle = null;
+    var activeTab = 'overview';
+    var measure = 'observed';
+    var TITLE_MAP = {
+      overview: 'Overview',
+      table: 'Contingency Table',
+      tests: 'Tests & Association',
+      diagnostics: 'Diagnostics',
+      twobytwo: '2×2 Measures',
+      viz: 'Visualization'
+    };
+    var MEASURES = [
+      { id: 'observed', label: 'Observed counts' },
+      { id: 'expected', label: 'Expected counts' },
+      { id: 'rowPct', label: 'Row %' },
+      { id: 'colPct', label: 'Column %' },
+      { id: 'totPct', label: 'Total %' },
+      { id: 'stdResiduals', label: 'Standardized residuals' }
+    ];
+
+    function fmtP(p) {
+      if (!(p >= 0) || !isFinite(p)) return '—';
+      if (p < 0.001) return '< .001';
+      if (p < 0.01) return p.toFixed(3);
+      return p.toFixed(3);
+    }
+    function fmtN(x, d) {
+      if (!isFinite(x)) return '—';
+      d = d == null ? 2 : d;
+      if (Math.abs(x - Math.round(x)) < 1e-9 && d <= 2) return String(Math.round(x));
+      return Number(x).toFixed(d);
+    }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function cellValue(r, i, j) {
+      if (measure === 'observed') return fmtN(r.observed[i][j], 2);
+      if (measure === 'expected') return fmtN(r.expected[i][j], 2);
+      if (measure === 'rowPct') return fmtN(r.rowPct[i][j], 1) + '%';
+      if (measure === 'colPct') return fmtN(r.colPct[i][j], 1) + '%';
+      if (measure === 'totPct') return fmtN(r.totPct[i][j], 1) + '%';
+      return fmtN(r.stdResiduals[i][j], 2);
+    }
+    function residColor(sr) {
+      if (!isFinite(sr)) return 'transparent';
+      var t = Math.max(-1, Math.min(1, sr / 3));
+      if (t >= 0) {
+        var a = 0.12 + 0.55 * t;
+        return 'rgba(234,88,12,' + a + ')';
+      }
+      var b = 0.12 + 0.55 * (-t);
+      return 'rgba(37,99,235,' + b + ')';
+    }
+    function bandClass(sr) {
+      var a = Math.abs(sr);
+      if (a >= 3) return 'band-strong';
+      if (a >= 2) return 'band-moderate';
+      return '';
+    }
+
+    function switchTab(name) {
+      if (name === 'twobytwo' && !(bundle && bundle.nRows === 2 && bundle.nCols === 2)) name = 'overview';
+      activeTab = name;
+      document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      var el = document.getElementById('tab-' + name);
+      if (el) el.classList.add('active');
+      document.querySelectorAll('.sb-item[data-tab]').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === name);
+      });
+      if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
+        StatisticoHeader.updateTitle(TITLE_MAP[name] || 'Contingency Tables');
+      }
+      if (name === 'viz') renderHeat();
+    }
+
+    function renderOverview() {
+      var r = bundle;
+      var p = r.tests.pearson;
+      qsHtml('overviewKpis', [
+        kpi('Table', r.nRows + ' × ' + r.nCols),
+        kpi('Total N', fmtN(r.N, 0)),
+        kpi('Pearson χ²', fmtN(p.stat, 2)),
+        kpi('df', String(p.df)),
+        kpi('p-value', fmtP(p.p)),
+        kpi("Cramér’s V", fmtN(r.tests.cramersV, 3))
+      ].join(''));
+      var interp = r.interpretation || {};
+      var html = '<p>' + esc(interp.summary || '') + '</p>';
+      (interp.details || []).forEach(function (d) { html += '<p>' + esc(d) + '</p>'; });
+      (r.warnings || []).forEach(function (w) { html += '<p>' + esc(w) + '</p>'; });
+      qsHtml('overviewInterp', html);
+    }
+
+    function kpi(k, v) { return '<div class="kpi"><div class="kpi-k">' + esc(k) + '</div><div class="kpi-v">' + esc(v) + '</div></div>'; }
+
+    function renderMeasureBar() {
+      qsHtml('measureBar', MEASURES.map(function (m) {
+        return '<button type="button" class="ws-mode-tab' + (measure === m.id ? ' active' : '') + '" data-m="' + m.id + '">' + esc(m.label) + '</button>';
+      }).join(''));
+      document.querySelectorAll('#measureBar .ws-mode-tab').forEach(function (btn) {
+        btn.onclick = function () { measure = btn.getAttribute('data-m'); renderMeasureBar(); renderTable(); };
+      });
+    }
+
+    function renderTable() {
+      var r = bundle;
+      var showTot = measure === 'observed' || measure === 'expected' || measure === 'totPct';
+      var html = '<table class="ct"><thead><tr><th class="stub">' + esc(r.rowVar) + ' \\ ' + esc(r.colVar) + '</th>';
+      r.colLabels.forEach(function (c) { html += '<th>' + esc(c) + '</th>'; });
+      if (showTot) html += '<th class="total">Total</th>';
+      html += '</tr></thead><tbody>';
+      for (var i = 0; i < r.nRows; i++) {
+        html += '<tr><th class="stub">' + esc(r.rowLabels[i]) + '</th>';
+        for (var j = 0; j < r.nCols; j++) {
+          var sr = r.stdResiduals[i][j];
+          var style = measure === 'stdResiduals' ? ' style="background:' + residColor(sr) + '"' : '';
+          html += '<td class="' + bandClass(sr) + '"' + style + ' title="' + tip(r, i, j) + '">' + cellValue(r, i, j) + '</td>';
+        }
+        if (showTot) {
+          var tot = measure === 'observed' ? r.rowTotals[i] : measure === 'expected' ? r.rowTotals[i] : 100 * r.rowTotals[i] / r.N;
+          html += '<td class="total">' + (measure === 'totPct' ? fmtN(tot, 1) + '%' : fmtN(tot, 2)) + '</td>';
+        }
+        html += '</tr>';
+      }
+      if (showTot) {
+        html += '<tr><th class="stub total">Total</th>';
+        for (var j2 = 0; j2 < r.nCols; j2++) {
+          var ct = measure === 'observed' ? r.colTotals[j2] : measure === 'expected' ? r.colTotals[j2] : 100 * r.colTotals[j2] / r.N;
+          html += '<td class="total">' + (measure === 'totPct' ? fmtN(ct, 1) + '%' : fmtN(ct, 2)) + '</td>';
+        }
+        html += '<td class="total">' + (measure === 'totPct' ? '100%' : fmtN(r.N, 2)) + '</td></tr>';
+      }
+      html += '</tbody></table>';
+      qsHtml('tableWrap', html);
+    }
+
+    function tip(r, i, j) {
+      return r.rowLabels[i] + ' × ' + r.colLabels[j] +
+        ' | Observed ' + fmtN(r.observed[i][j], 2) +
+        ' | Expected ' + fmtN(r.expected[i][j], 2) +
+        ' | Row ' + fmtN(r.rowPct[i][j], 1) + '%' +
+        ' | Col ' + fmtN(r.colPct[i][j], 1) + '%' +
+        ' | Total ' + fmtN(r.totPct[i][j], 1) + '%' +
+        ' | Residual ' + fmtN(r.stdResiduals[i][j], 2);
+    }
+
+    function renderTests() {
+      var t = bundle.tests;
+      var rows = [
+        ['Pearson chi-square', fmtN(t.pearson.stat, 3), t.pearson.df, fmtP(t.pearson.p), fmtN(t.cramersV, 3) + ' (V)'],
+        ['Likelihood-ratio chi-square', fmtN(t.likelihoodRatio.stat, 3), t.likelihoodRatio.df, fmtP(t.likelihoodRatio.p), '—']
+      ];
+      if (t.fisher && t.fisher.available) {
+        rows.push(["Fisher's exact test (2×2)", '—', '—', fmtP(t.fisher.p), '—']);
+      } else if (bundle.nRows === 2 && bundle.nCols === 2 && t.fisher && t.fisher.reason) {
+        rows.push(["Fisher's exact test", t.fisher.reason, '—', '—', '—']);
+      }
+      if (bundle.nRows === 2 && bundle.nCols === 2 && t.phi != null) {
+        rows.push(['Phi coefficient', fmtN(t.phi, 3), '—', '—', fmtN(t.phi, 3)]);
+      }
+      rows.push(["Cramér’s V", fmtN(t.cramersV, 3), '—', '—', fmtN(t.cramersV, 3)]);
+      rows.push(['Contingency coefficient C', fmtN(t.contingencyC, 3), '—', '—', fmtN(t.contingencyC, 3)]);
+      var html = '<table class="ct tests-table"><thead><tr><th class="stub">Measure</th><th>Statistic</th><th>df</th><th>p-value</th><th>Effect size</th></tr></thead><tbody>';
+      rows.forEach(function (row) {
+        html += '<tr><td class="stub">' + esc(row[0]) + '</td><td>' + esc(row[1]) + '</td><td>' + esc(row[2]) + '</td><td>' + esc(row[3]) + '</td><td>' + esc(row[4]) + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      qsHtml('testsWrap', html);
+    }
+
+    function renderDiagnostics() {
+      var d = bundle.diagnostics;
+      qsHtml('diagKpis', [
+        kpi('Cells E < 5', d.nExpectedBelow5 + ' (' + fmtN(d.pctExpectedBelow5, 1) + '%)'),
+        kpi('Minimum E', fmtN(d.minExpected, 3)),
+        kpi('Cells E < 1', String(d.nExpectedBelow1))
+      ].join(''));
+      var w = document.getElementById('diagWarn');
+      if (d.assumptionWarning) { w.textContent = d.assumptionWarning; w.classList.add('show'); }
+      else { w.textContent = ''; w.classList.remove('show'); }
+      var r = bundle;
+      var html = '<table class="ct"><thead><tr><th class="stub"></th>';
+      r.colLabels.forEach(function (c) { html += '<th>' + esc(c) + '</th>'; });
+      html += '</tr></thead><tbody>';
+      for (var i = 0; i < r.nRows; i++) {
+        html += '<tr><th class="stub">' + esc(r.rowLabels[i]) + '</th>';
+        for (var j = 0; j < r.nCols; j++) {
+          var sr = r.stdResiduals[i][j];
+          html += '<td class="' + bandClass(sr) + '" style="background:' + residColor(sr) + '" title="' + tip(r, i, j) + '">' + fmtN(sr, 2) + '</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      qsHtml('residWrap', html);
+    }
+
+    function render2x2() {
+      var r = bundle;
+      if (!(r.nRows === 2 && r.nCols === 2)) return;
+      var selR = document.getElementById('selRowIndex');
+      var selC = document.getElementById('selColEvent');
+      if (!selR.options.length) {
+        r.rowLabels.forEach(function (lab) { selR.appendChild(new Option(lab, lab)); });
+        r.colLabels.forEach(function (lab) { selC.appendChild(new Option(lab, lab)); });
+        selR.value = r.rowLabels[0];
+        selC.value = r.colLabels[0];
+        selR.onchange = selC.onchange = function () {
+          bundle = StatisticoContingency.remap2x2(bundle, selR.value, selC.value);
+          renderAll();
+          switchTab('twobytwo');
+        };
+      }
+      var m = r.measures2x2;
+      var lay = m.layout;
+      document.getElementById('mapCaption').textContent =
+        'Index row: ' + lay.rowIndex + '  ·  Reference row: ' + lay.rowReference +
+        '  ·  Event: ' + lay.colEvent + '  ·  Non-event: ' + lay.colReference +
+        '  ·  a=' + fmtN(lay.cells.a, 2) + ', b=' + fmtN(lay.cells.b, 2) +
+        ', c=' + fmtN(lay.cells.c, 2) + ', d=' + fmtN(lay.cells.d, 2);
+      function measKpi(title, obj, isDiff) {
+        if (!obj || !obj.available) return kpi(title, obj && obj.reason ? obj.reason : 'Not estimable');
+        var ci = isDiff
+          ? fmtN(obj.ciLower, 3) + ' to ' + fmtN(obj.ciUpper, 3)
+          : fmtN(obj.ciLower, 3) + ' to ' + fmtN(obj.ciUpper, 3);
+        return kpi(title, fmtN(obj.value, 3) + '  (' + Math.round(r.confidence * 100) + '% CI ' + ci + ')');
+      }
+      qsHtml('rrKpis', measKpi('Odds ratio', m.oddsRatio) + measKpi('Risk ratio', m.riskRatio) + measKpi('Risk difference', m.riskDifference, true));
+      var notes = [];
+      if (m.oddsRatio && m.oddsRatio.available && m.oddsRatio.continuityCorrection) {
+        notes.push('Odds ratio uses a 0.5 continuity correction because at least one cell is zero.');
+      }
+      if (m.oddsRatio && m.oddsRatio.formula) notes.push(m.oddsRatio.formula);
+      if (m.riskRatio && m.riskRatio.formula) notes.push(m.riskRatio.formula);
+      if (m.riskDifference && m.riskDifference.formula) notes.push(m.riskDifference.formula);
+      qsHtml('rrNotes', '<div class="card-title">Notes</div><div class="interp">' + notes.map(function (n) { return '<p>' + esc(n) + '</p>'; }).join('') + '</div>');
+    }
+
+    function renderHeat() {
+      var r = bundle;
+      var cols = r.nCols + 1;
+      var html = '<div class="heat-grid" style="grid-template-columns:minmax(90px,1.1fr) repeat(' + r.nCols + ', minmax(70px,1fr));">';
+      html += '<div></div>';
+      r.colLabels.forEach(function (c) { html += '<div class="heat-lab" style="justify-content:center;">' + esc(c) + '</div>'; });
+      for (var i = 0; i < r.nRows; i++) {
+        html += '<div class="heat-lab">' + esc(r.rowLabels[i]) + '</div>';
+        for (var j = 0; j < r.nCols; j++) {
+          var sr = r.stdResiduals[i][j];
+          html += '<div class="heat-cell" style="background:' + residColor(sr) + '" title="' + tip(r, i, j) + '">' +
+            '<div class="hv">' + fmtN(sr, 2) + '</div><div>' + fmtN(r.observed[i][j], 1) + ' / ' + fmtN(r.expected[i][j], 1) + '</div></div>';
+        }
+      }
+      html += '</div>';
+      qsHtml('heatWrap', html);
+    }
+
+    function qsHtml(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
+
+    function tableToTsv() {
+      var r = bundle;
+      var lines = [[r.rowVar + ' / ' + r.colVar].concat(r.colLabels).concat(['Total'])];
+      for (var i = 0; i < r.nRows; i++) {
+        var row = [r.rowLabels[i]];
+        for (var j = 0; j < r.nCols; j++) row.push(String(r.observed[i][j]));
+        row.push(String(r.rowTotals[i]));
+        lines.push(row);
+      }
+      lines.push(['Total'].concat(r.colTotals.map(String)).concat([String(r.N)]));
+      return lines.map(function (row) { return row.join('\t'); }).join('\n');
+    }
+
+    function copyCurrentTable() {
+      var tsv = tableToTsv();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tsv);
+      else window.prompt('Copy table', tsv);
+    }
+    function exportCurrentCsv() {
+      var csv = tableToTsv().replace(/\t/g, ',');
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'contingency-table.csv';
+      a.click();
+    }
+
+    function renderAll() {
+      if (!bundle || !bundle.analyzable) return;
+      document.getElementById('ctxRow').textContent = bundle.rowVar || '—';
+      document.getElementById('ctxCol').textContent = bundle.colVar || '—';
+      document.getElementById('ctxN').textContent = fmtN(bundle.N, 0);
+      var ww = document.getElementById('ctxWeightWrap');
+      if (bundle.weightVar) { ww.style.display = ''; document.getElementById('ctxWeight').textContent = bundle.weightVar; }
+      else ww.style.display = 'none';
+      document.getElementById('tab2x2Btn').style.display = (bundle.nRows === 2 && bundle.nCols === 2) ? '' : 'none';
+      renderOverview();
+      renderMeasureBar();
+      renderTable();
+      renderTests();
+      renderDiagnostics();
+      render2x2();
+      renderHeat();
+      if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
+        StatisticoHeader.updateVariable((bundle.rowVar || '') + ' × ' + (bundle.colVar || ''), bundle.N);
+      }
+    }
+
+    function showBundle(b) {
+      document.getElementById('loadingState').style.display = 'none';
+      bundle = b;
+      if (!b || b.error || b.analyzable === false) {
+        document.getElementById('errorState').classList.add('active');
+        document.getElementById('errorText').textContent = (b && (b.error || 'This table cannot be analyzed.')) || 'No results.';
+        document.querySelectorAll('.tab-panel').forEach(function (p) {
+          if (p.id !== 'errorState') p.classList.remove('active');
+        });
+        return;
+      }
+      document.getElementById('errorState').classList.remove('active');
+      renderAll();
+      switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
+    }
+
+    function ctActions() {
+      return {
+        getData: function () {
+          if (!bundle) return null;
+          return { headers: bundle.colLabels, rows: bundle.observed, usedRows: bundle.N };
+        },
+        exportHtml: function () { copyCurrentTable(); },
+        exportJson: function () {
+          if (!bundle) return;
+          var blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'contingency-results.json';
+          a.click();
+        }
+      };
+    }
+
+    function bootHeader() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      StatisticoHeader.init('contingency', '', 0, 'contingency');
+      StatisticoHeader.registerActions(ctActions());
+      StatisticoHeader.initSidebarPage();
+      StatisticoHeader.updateTitle('Overview');
+      if (StatisticoHeader._mountSidebarUtilities) StatisticoHeader._mountSidebarUtilities();
+    }
+
+    function send(action, data) {
+      try {
+        if (Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+          Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null, payload: data || null }));
+        }
+      } catch (_e) {}
+    }
+
+    function startBridge() {
+      var q = (location.search || '').toLowerCase();
+      if (q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0) {
+        var stored = null;
+        try { stored = JSON.parse(sessionStorage.getItem('contingencyBundle') || 'null'); } catch (_e) {}
+        if (stored && (stored.analyzable || stored.error)) {
+          showBundle(stored);
+          return;
+        }
+        var ex = StatisticoContingencySamples.defaultPayload();
+        showBundle(StatisticoContingency.analyze(ex.headers, ex.rows, { rowVar: ex.headers[0], colVar: ex.headers[1], confidence: 0.95 }));
+        return;
+      }
+      if (typeof Office === 'undefined' || !Office.onReady) {
+        setTimeout(startBridge, 120);
+        return;
+      }
+      Office.onReady(function () {
+        try {
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if (msg.type === 'CONTINGENCY_BUNDLE' && msg.payload) showBundle(msg.payload);
+            } catch (_e) {}
+          });
+          send('ready');
+          send('requestData');
+        } catch (_e2) {}
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      bootHeader();
+      startBridge();
+    });
+  </script>
+</body>
+</html>

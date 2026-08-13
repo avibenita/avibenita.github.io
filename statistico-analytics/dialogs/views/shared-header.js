@@ -416,7 +416,8 @@ const StatisticoHeader = {
       'anova': 'ANOVA',
       'power': 'Power & Sample Size',
       'mixed-model': 'Linear Mixed Model',
-      'meta-analysis': 'Meta-Analysis'
+      'meta-analysis': 'Meta-Analysis',
+      'contingency': 'Contingency Tables'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -519,7 +520,8 @@ const StatisticoHeader = {
       'advanced': 'Advanced',
       'model-structure': 'Model Structure',
       // Meta-analysis
-      'meta-analysis': 'Meta-Analysis'
+      'meta-analysis': 'Meta-Analysis',
+      'contingency': 'Contingency Tables'
     };
 
     const moduleNames = {
@@ -535,7 +537,8 @@ const StatisticoHeader = {
       'anova': 'ANOVA',
       'power': 'Power & Sample Size',
       'mixed-model': 'Linear Mixed Model',
-      'meta-analysis': 'Meta-Analysis'
+      'meta-analysis': 'Meta-Analysis',
+      'contingency': 'Contingency Tables'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -544,7 +547,7 @@ const StatisticoHeader = {
     const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency');
 
     const topHeader = `
       <div class="statistico-header">
@@ -3144,7 +3147,7 @@ const StatisticoHeader = {
   },
 
   _isHeaderRowFilterSuppressed() {
-    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis';
+    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis' || this.module === 'contingency';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -6336,6 +6339,12 @@ const StatisticoHeader = {
       'meta-heterogeneity': 'Heterogeneity',
       'meta-bias': 'Small-study Effects',
       'meta-studies': 'Study Details',
+      'contingency-overview': 'Overview',
+      'contingency-table': 'Contingency Table',
+      'contingency-tests': 'Tests & Association',
+      'contingency-diagnostics': 'Diagnostics',
+      'contingency-twobytwo': '2×2 Measures',
+      'contingency-viz': 'Visualization',
       'dependent-explore': 'Descriptives',
       'dependent-trajectories': 'Trajectories',
       'dependent-assumptions': 'Assumptions',

@@ -53,6 +53,26 @@ const HUB_CATEGORY_TILES = [
     ]
   },
   {
+    id: "categorical-data",
+    title: "Categorical Data",
+    icon: "fa-table-cells",
+    color: "#8b5cf6",
+    colorDark: "#6d28d9",
+    subtitle: "Frequencies, association, and binary models",
+    desc: "Describe categorical variables, test association in two-way tables, and model binary outcomes.",
+    info: [
+      "Frequency Tables: one-way counts and publication-oriented summaries (coming soon)",
+      "Contingency Tables: two-way association, χ², residuals, and 2×2 risk measures",
+      "Logistic: binary outcome modeling with odds ratios and fit diagnostics",
+      "Works from your Active Range in Excel"
+    ],
+    modules: [
+      { id: "frequency-tables", label: "Frequency Tables", comingSoon: true, tip: "One-way frequency tables for categorical variables. Coming soon — a separate module, not a replacement for Contingency Tables." },
+      { id: "contingency", label: "Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." },
+      { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
+    ]
+  },
+  {
     id: "analyze-groups",
     title: "Compare Groups",
     icon: "fa-scale-balanced",
@@ -97,17 +117,16 @@ const HUB_CATEGORY_TILES = [
     color: "#0ea5e9",
     colorDark: "#0369a1",
     tabStyle: "soft",
-    subtitle: "Regression and logistic prediction",
-    desc: "Predict continuous or binary outcomes from one or more predictors, with coefficients and fit diagnostics.",
+    subtitle: "Regression for continuous outcomes",
+    desc: "Predict a continuous outcome from one or more predictors, with coefficients and fit diagnostics.",
     info: [
       "Regression: continuous outcomes, coefficients, and diagnostics",
-      "Logistic: binary outcomes with odds ratios and classification",
       "Model fit, residual checks, and interpretation aids",
+      "Logistic regression lives under Categorical Data",
       "Built for publication-ready reporting from Excel data"
     ],
     modules: [
-      { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
-      { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
+      { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." }
     ]
   },
   {
@@ -605,9 +624,11 @@ function renderCategoryGroups(category, scopePrefix) {
 function renderCategoryModuleBtn(m, tabStyle, scopePrefix) {
   var tip = m.tip || m.label;
   var styleClass = tabStyle === "soft" ? " category-module-btn--soft" : "";
+  if (m.comingSoon) styleClass += " category-module-btn--soon";
   var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
   HUB_ACTIONS[actionKey] = m;
-  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')">' + escapeHtml(m.label) + "</button>";
+  var soonMark = m.comingSoon ? ' <span class="soon-badge">Soon</span>' : "";
+  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')">' + escapeHtml(m.label) + soonMark + "</button>";
 }
 
 var GROUP_COLORS = {
@@ -1709,6 +1730,35 @@ function openMixedConfigFromHub() {
   });
 }
 
+function openContingencyConfigFromHub() {
+  try { sessionStorage.removeItem("contingencyModelSpec"); } catch (e) {}
+  return openBuilderDialogFromHub({
+    moduleId: "contingency",
+    dialogPath: "contingency/contingency-input.html",
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
+    dataType: "CONTINGENCY_DATA",
+    payloadBuilder: function (gr) {
+      return {
+        headers: gr.values[0] || [],
+        rows: gr.values.slice(1),
+        address: gr.address || "",
+        savedSpec: null
+      };
+    },
+    modelActions: ["contingencyModel"],
+    onModel: function (msg) {
+      var data = msg.payload || msg.data || {};
+      var spec = (data && data.spec) ? data.spec : data;
+      sessionStorage.setItem("contingencyModelSpec", JSON.stringify(spec || {}));
+    },
+    hubResultsKey: "contingency",
+    nextDelayMs: 450,
+    initialDelayMs: 400,
+    retryDelayMs: 1200,
+    closeActions: ["close", "cancel"]
+  });
+}
+
 function openMetaConfigFromHub() {
   try { sessionStorage.removeItem("metaModelSpec"); } catch (e) {}
   return openBuilderDialogFromHub({
@@ -1853,6 +1903,13 @@ function navigateToModuleCore(id) {
   }
   if (id === "logistic") {
     if (openLogisticConfigFromHub()) return;
+  }
+  if (id === "contingency") {
+    if (openContingencyConfigFromHub()) return;
+  }
+  if (id === "frequency-tables") {
+    window.alert("Frequency Tables is coming soon. Use Contingency Tables for two-way association, or Publication Tables for frequency distributions.");
+    return;
   }
   if (id === "pca") {
     if (openPcaConfigFromHub()) return;

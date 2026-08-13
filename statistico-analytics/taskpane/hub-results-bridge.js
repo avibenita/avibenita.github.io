@@ -13,6 +13,7 @@
     factor: ['factor/factor-input-panel.js'],
     pca: ['pca/pca-input-panel.js'],
     logistic: ['logistic/logistic-input-panel.js'],
+    contingency: ['contingency/contingency-input-panel.js'],
     'meta-analysis': ['meta-analysis/meta-analysis-input-panel.js'],
     cluster: ['cluster/cluster-config.js', 'cluster/cluster-input-panel.js'],
     kmeans: ['cluster/cluster-config.js', 'cluster/cluster-input-panel.js'],

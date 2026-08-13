@@ -121,7 +121,7 @@
       moduleId: "logistic",
       label: "Logistic",
       titleFull: "Logistic Regression",
-      category: "Build Models",
+      category: "Categorical Data",
       difficulty: "Medium",
       duration: "≈ 3 min",
       reason: "Your outcome is yes/no (or binary) and you want odds ratios for predictors.",
@@ -129,6 +129,20 @@
         assumptions: ["Binary outcome", "Independent observations", "Linear relationship on the log-odds scale"],
         variables: ["One binary outcome (Y)", "One or more predictor columns"],
         outputs: ["Odds ratios", "Model fit statistics", "Classification diagnostics"]
+      }
+    },
+    contingency: {
+      moduleId: "contingency",
+      label: "Contingency Tables",
+      titleFull: "Contingency Tables",
+      category: "Categorical Data",
+      difficulty: "Easy",
+      duration: "≈ 1 min",
+      reason: "You want to test whether two categorical variables are associated.",
+      learnWhy: {
+        assumptions: ["Two categorical variables", "Independent observations", "Expected cell counts not too small for chi-square"],
+        variables: ["One row variable", "One column variable", "Optional frequency/weight"],
+        outputs: ["Contingency table", "Chi-square tests", "Cramér’s V", "Standardized residuals"]
       }
     },
     pca: {
@@ -191,13 +205,14 @@
 
   var ALT_KEYS = {
     univariate: ["correlations"],
-    correlations: ["regression", "univariate"],
+    correlations: ["regression", "univariate", "contingency"],
     independent: ["regression", "dependent"],
     dependent: ["independent"],
     anova: ["mixed", "independent"],
     mixed: ["anova"],
     regression: ["correlations", "logistic"],
-    logistic: ["regression"],
+    logistic: ["regression", "contingency"],
+    contingency: ["logistic", "correlations"],
     pca: ["factor", "correlations"],
     factor: ["pca"],
     kmeans: ["hierarchical"],
@@ -255,7 +270,8 @@
         stepLabel: "Question 2 of 3",
         subtitle: "Association vs explaining an outcome with predictors",
         options: [
-          { id: "pairwise", icon: "fa-table-cells", label: "Pairwise associations", desc: "How variables correlate together" },
+          { id: "pairwise", icon: "fa-table-cells", label: "Pairwise numeric associations", desc: "How numeric variables correlate together" },
+          { id: "categorical", icon: "fa-border-all", label: "Two categorical variables", desc: "Contingency table / chi-square association" },
           { id: "explain_continuous", icon: "fa-chart-line", label: "Explain a numeric outcome", desc: "Predictors linked to a continuous Y" },
           { id: "explain_binary", icon: "fa-toggle-on", label: "Explain a yes/no outcome", desc: "Predictors linked to a binary Y" }
         ]
@@ -349,6 +365,7 @@
       var r = state.answers.relationship_type;
       if (r === "explain_continuous") return "regression";
       if (r === "explain_binary") return "logistic";
+      if (r === "categorical") return "contingency";
       if (state.answers.relationship_depth === "regression") return "regression";
       return "correlations";
     }
@@ -394,6 +411,9 @@
     }
     if (key === "logistic") {
       return "Based on your answers, your outcome is binary, so Logistic Regression with odds ratios is the right procedure.";
+    }
+    if (key === "contingency") {
+      return "Based on your answers, you want to test association between two categorical variables, so Contingency Tables is the right procedure.";
     }
     if (key === "pca") {
       return "Based on your answers, you have many numeric variables and want a compact representation, so PCA is the best starting point.";

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contingency Tables Configuration</title>
+  <script>
+    (function () {
+      var q = (location.search || '').toLowerCase();
+      window.__CT_WEB_DEMO__ = q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0;
+      if (window.__CT_WEB_DEMO__) {
+        document.documentElement.setAttribute('data-hub-embed', '1');
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260813ct1"/>
+  <script src="../shared-config.js?v=20260813ct1"></script>
+  <script src="contingency-sample-data.js?v=20260813ct1"></script>
+  <script src="contingency-engine.js?v=20260813ct1"></script>
+  <style>
+    :root { --ct-acc: #8b5cf6; --ct-row: #38bdf8; --ct-col: #a78bfa; --ct-w: #34d399; }
+    [data-theme="light"] { --ct-acc: #6d28d9; --ct-row: #0369a1; --ct-col: #6d28d9; --ct-w: #047857; }
+    body.cfg-embed .cfg-header { display: none; }
+    .reg-layout { display:flex; gap:10px; flex:1 1 0; min-height:0; padding:8px 10px; overflow:hidden; }
+    .reg-vars-col { flex:0 0 220px; display:flex; flex-direction:column; gap:6px; min-height:0; overflow:hidden; }
+    .reg-model-col { flex:1 1 0; display:flex; flex-direction:column; gap:8px; min-height:0; overflow-y:auto; padding-right:4px; }
+    .reg-vars-header { display:flex; align-items:center; gap:8px; padding:0 2px 6px; border-bottom:1px solid var(--cfg-border); }
+    .reg-vars-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.55px; color:var(--cfg-text); }
+    .reg-vars-box { flex:1 1 0; min-height:0; overflow-y:auto; border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); }
+    .reg-var-row { display:flex; align-items:center; gap:6px; padding:5px 8px; cursor:grab; border-bottom:1px solid var(--cfg-border); user-select:none; }
+    .reg-var-row:hover:not(.used) { background:var(--cfg-tbl-hover); }
+    .reg-var-row.used { opacity:.38; cursor:not-allowed; pointer-events:none; }
+    .reg-var-row.selected { outline:1px solid var(--ct-acc); background:rgba(139,92,246,.12); }
+    .reg-var-icon { width:16px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; flex-shrink:0; }
+    .reg-var-icon.num { background:rgba(56,189,248,.2); color:var(--ct-row); }
+    .reg-var-icon.cat { background:rgba(167,139,250,.2); color:var(--ct-col); }
+    .reg-var-name { font-size:12px; font-weight:600; color:var(--cfg-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .reg-var-stats { font-size:9.5px; color:var(--cfg-text3); }
+    .reg-model-title { display:flex; align-items:center; gap:10px; padding:0 2px 6px; border-bottom:1px solid var(--cfg-border); }
+    .reg-model-title > span:first-child { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
+    .reg-model-meta { font-size:10px; color:var(--cfg-text3); margin-left:auto; }
+    .reg-equation-strip { font-size:11.5px; color:var(--cfg-text3); padding:5px 8px; background:var(--cfg-surface); border:1px dashed var(--cfg-border); border-radius:6px; }
+    .reg-equation-strip strong { color:var(--ct-acc); }
+    .zones { display:flex; flex-direction:column; gap:8px; }
+    .reg-zone-card { border-radius:8px; overflow:hidden; border:1px solid var(--cfg-border); }
+    .reg-zone-card.zone-row { border-color:rgba(56,189,248,.35); }
+    .reg-zone-card.zone-col { border-color:rgba(167,139,250,.35); }
+    .reg-zone-card.zone-w { border-color:rgba(52,211,153,.35); }
+    .reg-zone-head { display:flex; align-items:center; gap:7px; padding:6px 8px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--cfg-border); }
+    .reg-zone-card.zone-row .reg-zone-head { background:rgba(56,189,248,.08); color:var(--ct-row); }
+    .reg-zone-card.zone-col .reg-zone-head { background:rgba(167,139,250,.08); color:var(--ct-col); }
+    .reg-zone-card.zone-w .reg-zone-head { background:rgba(52,211,153,.08); color:var(--ct-w); }
+    .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .zone-row .dot { background:var(--ct-row); }
+    .zone-col .dot { background:var(--ct-col); }
+    .zone-w .dot { background:var(--ct-w); }
+    .zone-req { color:#dc2626; margin-left:2px; }
+    .reg-zone-body { padding:4px 6px; min-height:36px; display:flex; align-items:center; gap:4px; }
+    .reg-zone-card.zone-empty { opacity:.92; }
+    .reg-zone-body.drag-over { filter:brightness(1.08); outline:1px dashed var(--ct-acc); }
+    .reg-zone-placeholder { width:100%; text-align:center; font-size:10.5px; font-style:italic; color:var(--cfg-text3); }
+    .reg-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 6px 2px 8px; border-radius:20px; font-size:11px; font-weight:600; border:1px solid; }
+    .reg-chip.row { background:rgba(56,189,248,.15); border-color:rgba(56,189,248,.4); color:var(--ct-row); }
+    .reg-chip.col { background:rgba(167,139,250,.15); border-color:rgba(167,139,250,.4); color:var(--ct-col); }
+    .reg-chip.w { background:rgba(52,211,153,.15); border-color:rgba(52,211,153,.4); color:var(--ct-w); }
+    .reg-chip-x { background:none; border:none; cursor:pointer; color:inherit; }
+    .opt-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .opt-card { border:1px solid var(--cfg-border); border-radius:8px; padding:8px; background:var(--cfg-surface); }
+    .opt-card h4 { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--cfg-text3); margin:0 0 6px; }
+    .seg { display:flex; gap:3px; padding:3px; border-radius:8px; background:var(--cfg-surface2,#1c2333); border:1px solid var(--cfg-border); }
+    .seg button { flex:1; border:none; background:transparent; cursor:pointer; padding:7px 6px; border-radius:6px; font-size:11px; font-weight:700; color:#cbd5e1; }
+    .seg button.active { background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:#fff; }
+    [data-theme="light"] .seg { background:#f5f3ff; border-color:#ddd6fe; }
+    [data-theme="light"] .seg button { color:#334155; }
+    [data-theme="light"] .seg button.active { color:#fff; }
+    .warn { font-size:11px; color:#fbbf24; display:none; padding:6px 8px; border:1px solid rgba(251,191,36,.35); border-radius:8px; background:rgba(251,191,36,.08); }
+    .warn.show { display:block; }
+    .run-hint { font-size:10.5px; color:var(--cfg-text3); margin-right:auto; padding:0 6px; }
+    .cfg-btn.run:not(:disabled) { background:linear-gradient(135deg,#8b5cf6,#6d28d9); border-color:transparent; color:#fff; font-weight:700; }
+    .demo-row { display:flex; flex-wrap:wrap; gap:6px; }
+    .demo-row button { font-size:10.5px; padding:5px 8px; border-radius:6px; border:1px solid var(--cfg-border); background:var(--cfg-surface); color:var(--cfg-text2); cursor:pointer; }
+    .info-icon { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:rgba(139,92,246,.18); border:1px solid rgba(139,92,246,.4); color:#ddd6fe; font-size:9px; font-weight:800; cursor:help; margin-left:5px; position:relative; }
+    .info-icon .tip { display:none; position:absolute; left:18px; top:-4px; width:230px; background:rgba(10,15,30,.97); border:1px solid rgba(139,92,246,.4); border-radius:8px; padding:8px 11px; font-size:11px; font-weight:400; color:#dbeafe; z-index:50; text-transform:none; letter-spacing:0; }
+    .info-icon:hover .tip { display:block; }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-table-cells"></i></div>
+      <span class="cfg-header-title">Contingency Tables</span>
+      <span class="cfg-meta-badge" id="ctBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme"><span class="cfg-toggle-icon">&#x1F319;</span><div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div><span class="cfg-toggle-label">Dark</span></button>
+    </header>
+    <div id="loadingSpinner" class="cfg-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;</div>
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
+      <div class="reg-layout">
+        <div class="reg-vars-col">
+          <div class="reg-vars-header"><span class="reg-vars-title">Available Columns</span></div>
+          <div class="reg-vars-box" id="variablesListBox"></div>
+        </div>
+        <div class="reg-model-col">
+          <div class="reg-model-title">
+            <span>Assign Roles</span>
+            <span class="reg-model-meta" id="tbRange">—</span>
+          </div>
+          <div class="reg-equation-strip" id="modelSummary">Drag a categorical row variable and a column variable</div>
+          <div class="zones">
+            <div class="reg-zone-card zone-row zone-empty" data-zone="row">
+              <div class="reg-zone-head"><span class="dot"></span> Row variable<span class="zone-req">*</span>
+                <span class="info-icon">i<span class="tip">Categories become table rows. Numeric columns are allowed when they have a limited number of distinct values.</span></span>
+              </div>
+              <div class="reg-zone-body" id="zone-row"></div>
+            </div>
+            <div class="reg-zone-card zone-col zone-empty" data-zone="col">
+              <div class="reg-zone-head"><span class="dot"></span> Column variable<span class="zone-req">*</span>
+                <span class="info-icon">i<span class="tip">Categories become table columns. Must differ from the row variable.</span></span>
+              </div>
+              <div class="reg-zone-body" id="zone-col"></div>
+            </div>
+            <div class="reg-zone-card zone-w zone-empty" data-zone="weight">
+              <div class="reg-zone-head"><span class="dot"></span> Frequency / weight
+                <span class="info-icon">i<span class="tip">Optional. Use when each row is already a count. Non-positive or missing weights are dropped.</span></span>
+              </div>
+              <div class="reg-zone-body" id="zone-weight"></div>
+            </div>
+          </div>
+          <div class="opt-grid">
+            <div class="opt-card">
+              <h4>Missing values</h4>
+              <div class="seg" id="missingSeg">
+                <button type="button" data-val="exclude" class="active">Exclude</button>
+                <button type="button" data-val="category">As category</button>
+              </div>
+            </div>
+            <div class="opt-card">
+              <h4>Confidence level</h4>
+              <div class="seg" id="ciSeg">
+                <button type="button" data-val="0.90">90%</button>
+                <button type="button" data-val="0.95" class="active">95%</button>
+                <button type="button" data-val="0.99">99%</button>
+              </div>
+            </div>
+          </div>
+          <div class="warn" id="levelWarn"></div>
+          <div class="demo-row" id="demoRow" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <span class="run-hint" id="runHint">Assign row and column variables</span>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" disabled><i class="fa-solid fa-clock-rotate-left"></i> Configs</button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" disabled><i class="fa-solid fa-floppy-disk"></i> Save</button>
+      <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-play"></i> Run Analysis</button>
+    </div>
+  </div>
+  <script>
+    var STORAGE_KEY = 'contingency-config';
+    window.STORAGE_KEY = STORAGE_KEY;
+    var _headers = [], _rows = [], _address = '';
+    var profiles = [];
+    var assign = { row: null, col: null, weight: null };
+    var missingMode = 'exclude';
+    var confidence = 0.95;
+    var selectedVar = null;
+    var dragged = null;
+
+    function qs(id) { return document.getElementById(id); }
+    function send(action, data) {
+      try {
+        if (typeof Office !== 'undefined' && Office.context && Office.context.ui &&
+            typeof Office.context.ui.messageParent === 'function') {
+          Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null, payload: data || null }));
+        }
+      } catch (_e) {}
+      try {
+        if (window.__CT_WEB_DEMO__ && window.parent && window.parent !== window) {
+          window.parent.postMessage({ action: action, data: data || null, source: 'contingency' }, '*');
+        }
+      } catch (_e2) {}
+    }
+
+    function usedNames() {
+      return [assign.row, assign.col, assign.weight].filter(Boolean);
+    }
+
+    function renderVariables() {
+      var box = qs('variablesListBox');
+      box.innerHTML = '';
+      profiles.forEach(function (p) {
+        var used = usedNames().indexOf(p.name) >= 0;
+        var row = document.createElement('div');
+        row.className = 'reg-var-row' + (used ? ' used' : '') + (selectedVar === p.name ? ' selected' : '');
+        row.draggable = !used;
+        row.dataset.name = p.name;
+        row.innerHTML = '<div class="reg-var-icon ' + (p.numeric ? 'num' : 'cat') + '">' + (p.numeric ? 'n' : 'c') + '</div>' +
+          '<div class="reg-var-body"><div class="reg-var-name"></div><div class="reg-var-stats"></div></div>';
+        row.querySelector('.reg-var-name').textContent = p.name;
+        row.querySelector('.reg-var-stats').textContent = p.nLevels + ' levels · n=' + p.n + (p.missing ? ' · miss ' + p.missing : '');
+        if (!used) {
+          row.addEventListener('dragstart', function () { dragged = p.name; row.classList.add('dragging'); });
+          row.addEventListener('dragend', function () { dragged = null; row.classList.remove('dragging'); });
+          row.addEventListener('click', function () {
+            selectedVar = selectedVar === p.name ? null : p.name;
+            renderVariables();
+          });
+        }
+        box.appendChild(row);
+      });
+    }
+
+    function chipHtml(name, kind) {
+      return '<span class="reg-chip ' + kind + '"><span></span><button type="button" class="reg-chip-x" data-clear="' + kind + '">×</button></span>';
+    }
+
+    function renderZone(zone, kind, placeholder) {
+      var el = qs('zone-' + zone);
+      var card = el.closest('.reg-zone-card');
+      var name = assign[zone];
+      if (!name) {
+        el.innerHTML = '<div class="reg-zone-placeholder">' + placeholder + '</div>';
+        card.classList.add('zone-empty');
+        card.classList.remove('zone-filled');
+        return;
+      }
+      el.innerHTML = chipHtml(name, kind);
+      el.querySelector('span').textContent = name;
+      card.classList.remove('zone-empty');
+      card.classList.add('zone-filled');
+    }
+
+    function setAssign(zone, name) {
+      if (!name) { assign[zone] = null; refresh(); return; }
+      if (usedNames().indexOf(name) >= 0 && assign[zone] !== name) return;
+      if ((zone === 'row' || zone === 'col') && assign.row === name || assign.col === name) {
+        if (zone === 'row' && assign.col === name) assign.col = null;
+        if (zone === 'col' && assign.row === name) assign.row = null;
+      }
+      Object.keys(assign).forEach(function (k) { if (k !== zone && assign[k] === name) assign[k] = null; });
+      assign[zone] = name;
+      selectedVar = null;
+      refresh();
+    }
+
+    function refresh() {
+      renderVariables();
+      renderZone('row', 'row', 'Drop the row (categorical) variable');
+      renderZone('col', 'col', 'Drop the column (categorical) variable');
+      renderZone('weight', 'w', 'Optional frequency / weight');
+      var ok = !!(assign.row && assign.col && assign.row !== assign.col);
+      qs('btnRun').disabled = !ok;
+      qs('btnSaveConfig').disabled = !ok;
+      qs('modelSummary').innerHTML = ok
+        ? '<strong>' + assign.row + '</strong> × <strong>' + assign.col + '</strong>' + (assign.weight ? ' (weighted by ' + assign.weight + ')' : '')
+        : 'Drag a categorical row variable and a column variable';
+      qs('runHint').textContent = ok ? 'Ready to analyze the association' : 'Assign row and column variables';
+      var warn = [];
+      profiles.forEach(function (p) {
+        if ((p.name === assign.row || p.name === assign.col) && p.nLevels > 20) {
+          warn.push(p.name + ' has ' + p.nLevels + ' distinct values.');
+        }
+        if ((p.name === assign.row || p.name === assign.col) && p.nLevels < 2) {
+          warn.push(p.name + ' needs at least two categories.');
+        }
+      });
+      var w = qs('levelWarn');
+      w.textContent = warn.join(' ');
+      w.classList.toggle('show', warn.length > 0);
+      qs('ctBadge').textContent = _rows.length ? (_rows.length + ' rows') : '—';
+      if (typeof CfgSave !== 'undefined') CfgSave.syncConfigButtons(STORAGE_KEY);
+    }
+
+    function buildSpec() {
+      return {
+        rowVar: assign.row,
+        colVar: assign.col,
+        weightVar: assign.weight || null,
+        missing: missingMode,
+        confidence: confidence
+      };
+    }
+
+    function runAnalysis() {
+      if (qs('btnRun').disabled) return;
+      var spec = buildSpec();
+      var btn = qs('btnRun');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running…';
+      send('contingencyModel', spec);
+      if (window.__CT_WEB_DEMO__ && window.StatisticoContingency) {
+        var bundle = StatisticoContingency.analyze(_headers, _rows, spec);
+        try { sessionStorage.setItem('contingencyBundle', JSON.stringify(bundle)); } catch (_e) {}
+        if (!window.parent || window.parent === window) {
+          window.location.href = 'contingency-results.html?demo=1';
+          return;
+        }
+      }
+      setTimeout(function () {
+        if (!document.body.contains(btn)) return;
+        refresh();
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Analysis';
+      }, 2500);
+    }
+
+    function applyPayload(p) {
+      if (!p || !p.headers) return;
+      _headers = p.headers || [];
+      _rows = p.rows || [];
+      _address = p.address || '';
+      profiles = (window.StatisticoContingency && StatisticoContingency.profileData)
+        ? StatisticoContingency.profileData(_headers, _rows)
+        : _headers.map(function (h, i) { return { name: String(h), index: i, nLevels: 2, n: _rows.length, missing: 0, numeric: false }; });
+      qs('loadingSpinner').style.display = 'none';
+      qs('mainContent').style.display = 'flex';
+      qs('tbRange').textContent = _address || (_rows.length + ' rows');
+      var saved = p.savedSpec || p.savedModelSpec;
+      if (saved) {
+        assign.row = saved.rowVar || null;
+        assign.col = saved.colVar || null;
+        assign.weight = saved.weightVar || null;
+        missingMode = saved.missing === 'category' ? 'category' : 'exclude';
+        confidence = saved.confidence || 0.95;
+        syncSegs();
+      } else if (window.__CT_WEB_DEMO__ && !assign.row && profiles.length >= 2) {
+        assign.row = profiles[0].name;
+        assign.col = profiles[1].name;
+        var freq = profiles.find(function (x) { return /^(freq|frequency|weight|n|count)$/i.test(x.name); });
+        if (freq && freq.name !== assign.row && freq.name !== assign.col) assign.weight = freq.name;
+      }
+      refresh();
+    }
+
+    function syncSegs() {
+      document.querySelectorAll('#missingSeg button').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.val === missingMode);
+      });
+      document.querySelectorAll('#ciSeg button').forEach(function (b) {
+        b.classList.toggle('active', Number(b.dataset.val) === confidence);
+      });
+    }
+
+    function bindZones() {
+      document.querySelectorAll('.reg-zone-card').forEach(function (card) {
+        var zone = card.getAttribute('data-zone');
+        var body = card.querySelector('.reg-zone-body');
+        body.addEventListener('dragover', function (e) { e.preventDefault(); body.classList.add('drag-over'); });
+        body.addEventListener('dragleave', function () { body.classList.remove('drag-over'); });
+        body.addEventListener('drop', function (e) {
+          e.preventDefault();
+          body.classList.remove('drag-over');
+          if (dragged) setAssign(zone, dragged);
+        });
+        card.addEventListener('click', function (e) {
+          if (e.target && e.target.dataset && e.target.dataset.clear) {
+            var map = { row: 'row', col: 'col', w: 'weight' };
+            setAssign(map[e.target.dataset.clear] || zone, null);
+            return;
+          }
+          if (selectedVar) setAssign(zone, selectedVar);
+        });
+      });
+    }
+
+    function startOfficeDialogBridge() {
+      if (typeof Office === 'undefined' || !Office.onReady) {
+        var tries = 0, t = setInterval(function () {
+          tries++;
+          if (typeof Office !== 'undefined' && Office.onReady) { clearInterval(t); startOfficeDialogBridge(); }
+          else if (tries >= 40) {
+            clearInterval(t);
+            if (window.__CT_WEB_DEMO__ && window.StatisticoContingencySamples) applyPayload(StatisticoContingencySamples.defaultPayload());
+            else if (qs('loadingSpinner')) qs('loadingSpinner').innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Waiting for Excel data…';
+          }
+        }, 100);
+        return;
+      }
+      Office.onReady(function () {
+        try {
+          var canDialog = Office.context && Office.context.ui &&
+            typeof Office.context.ui.addHandlerAsync === 'function' &&
+            typeof Office.context.ui.messageParent === 'function';
+          if (!canDialog) {
+            if (window.__CT_WEB_DEMO__ && window.StatisticoContingencySamples) applyPayload(StatisticoContingencySamples.defaultPayload());
+            return;
+          }
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if ((msg.type === 'CONTINGENCY_DATA' || msg.action === 'CONTINGENCY_DATA') && msg.payload) applyPayload(msg.payload);
+            } catch (_e) {}
+          });
+          send('ready', null);
+          send('requestData', null);
+          setInterval(function () { if (!_headers.length) send('requestData', null); }, 500);
+        } catch (_err) {
+          if (window.__CT_WEB_DEMO__ && window.StatisticoContingencySamples) applyPayload(StatisticoContingencySamples.defaultPayload());
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      qs('btnCancel').addEventListener('click', function () { send('close', null); });
+      qs('btnRun').addEventListener('click', runAnalysis);
+      qs('btnSaveConfig').addEventListener('click', function () {
+        if (typeof CfgSave === 'undefined') return;
+        var name = window.prompt('Name this configuration', assign.row + ' × ' + assign.col);
+        if (!name) return;
+        CfgSave.saveCfgEntry(STORAGE_KEY, name, buildSpec(), function () { refresh(); });
+      });
+      qs('btnLoadPrev').addEventListener('click', function () {
+        if (typeof CfgSave === 'undefined') return;
+        CfgSave.showSavedList(STORAGE_KEY, function (item) {
+          var s = item && item.spec;
+          if (!s) return;
+          assign.row = s.rowVar || null;
+          assign.col = s.colVar || null;
+          assign.weight = s.weightVar || null;
+          missingMode = s.missing === 'category' ? 'category' : 'exclude';
+          confidence = s.confidence || 0.95;
+          syncSegs();
+          refresh();
+        });
+      });
+      document.querySelectorAll('#missingSeg button').forEach(function (b) {
+        b.addEventListener('click', function () { missingMode = b.dataset.val; syncSegs(); refresh(); });
+      });
+      document.querySelectorAll('#ciSeg button').forEach(function (b) {
+        b.addEventListener('click', function () { confidence = Number(b.dataset.val); syncSegs(); refresh(); });
+      });
+      bindZones();
+      if (window.__CT_WEB_DEMO__ && window.StatisticoContingencySamples) {
+        document.body.classList.add('cfg-embed');
+        var row = qs('demoRow');
+        row.style.display = 'flex';
+        Object.keys(StatisticoContingencySamples.EXAMPLES).forEach(function (id) {
+          var ex = StatisticoContingencySamples.EXAMPLES[id];
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = ex.title;
+          btn.addEventListener('click', function () {
+            applyPayload(StatisticoContingencySamples.toPayload(ex));
+          });
+          row.appendChild(btn);
+        });
+        applyPayload(StatisticoContingencySamples.defaultPayload());
+        return;
+      }
+      startOfficeDialogBridge();
+    });
+  </script>
+</body>
+</html>

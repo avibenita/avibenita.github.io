@@ -15,7 +15,7 @@
 
   // ── Per-panel state ────────────────────────────────────────────────────────
   const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
-  let _activeModel = 'llama-3.1-8b-instant';
+  let _activeModel = 'openai/gpt-oss-20b';
 
   // ── Tiny helpers ───────────────────────────────────────────────────────────
   function safeNum(v, fb) { return Number.isFinite(v) ? v : (fb !== undefined ? fb : 0); }
@@ -63,7 +63,7 @@
   async function callWorker(prompt, licenseKey) {
     // DEV_MODE: call Groq directly so no Worker deployment is needed for testing
     if (DEV_MODE) {
-      const models = ['llama-3.1-8b-instant', 'llama3-8b-8192', 'llama-3.3-70b-versatile'];
+      const models = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
       const key = atob('Z3NrX0xmVHdFRUFTYjVoY3l4Z2JteTF4V0dkeWIzRlk5WmRyYlNvZmJLTXNja2d4NUNTUzFnTlY=');
       let lastErr = null;
       for (const model of models) {

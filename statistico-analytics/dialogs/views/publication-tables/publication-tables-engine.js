@@ -2214,6 +2214,7 @@
      uses Promise.race with a hard deadline and a local fallback. */
 
   var AI_PROXY_URL = "https://statistico-ai.statistico.workers.dev/";
+  var GROQ_MODELS = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"];
   var AI_HARD_TIMEOUT_MS = 10000;
   var aiSession = {
     action: null, payload: null, busy: false,
@@ -2267,35 +2268,47 @@
     aiSession.abort = controller;
     clearAiTimeoutHandle();
 
-    var fetchPromise = fetch(AI_PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: "You are a senior biostatistics editor helping researchers build publication-ready tables inside Statistico. Propose recommendations only. Never claim clinical importance from p-values alone. Reply with STRICT JSON only — no markdown fences, no commentary outside JSON. Keep replies short."
-          },
-          { role: "user", content: prompt }
-        ],
-        max_tokens: maxTokens || 500,
-        temperature: 0.2
-      }),
-      signal: controller ? controller.signal : undefined
-    }).then(function (r) {
-      if (!r.ok) {
-        return r.json().catch(function () { return {}; }).then(function (e) {
-          throw new Error((e && e.error && (e.error.message || e.error)) || ("HTTP " + r.status));
+    function fetchWithModel(model) {
+      return fetch(AI_PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: "system",
+              content: "You are a senior biostatistics editor helping researchers build publication-ready tables inside Statistico. Propose recommendations only. Never claim clinical importance from p-values alone. Reply with STRICT JSON only — no markdown fences, no commentary outside JSON. Keep replies short."
+            },
+            { role: "user", content: prompt }
+          ],
+          max_tokens: maxTokens || 500,
+          temperature: 0.2
+        }),
+        signal: controller ? controller.signal : undefined
+      }).then(function (r) {
+        if (!r.ok) {
+          return r.json().catch(function () { return {}; }).then(function (e) {
+            throw new Error((e && e.error && (e.error.message || e.error)) || ("HTTP " + r.status));
+          });
+        }
+        return r.json().then(function (d) {
+          var text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+          text = text && String(text).trim();
+          if (!text) throw new Error("Empty AI response");
+          return text;
         });
-      }
-      return r.json().then(function (d) {
-        var text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
-        text = text && String(text).trim();
-        if (!text) throw new Error("Empty AI response");
-        return text;
       });
-    });
+    }
+
+    function fetchWithFallback(index) {
+      return fetchWithModel(GROQ_MODELS[index]).catch(function (err) {
+        if (err && err.name === "AbortError") throw err;
+        if (index + 1 < GROQ_MODELS.length) return fetchWithFallback(index + 1);
+        throw err;
+      });
+    }
+
+    var fetchPromise = fetchWithFallback(0);
 
     var timeoutPromise = new Promise(function (_resolve, reject) {
       aiSession.timeoutHandle = setTimeout(function () {

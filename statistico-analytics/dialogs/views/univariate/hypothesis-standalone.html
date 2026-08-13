@@ -3217,7 +3217,7 @@
     // AI Configuration
     const AI_CONFIG = {
       endpoint: window.AI_PROXY_URL || '',
-      model: 'llama-3.3-70b-versatile',
+      models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
       temperature: 0.7,
       maxTokens: 500,
       timeout: 30000
@@ -3234,30 +3234,44 @@
         
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AI_CONFIG.timeout);
+        let lastErr = null;
 
         try {
-          const response = await fetch(AI_CONFIG.endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: AI_CONFIG.model,
-              messages: [{ role: 'user', content: prompt }],
-              temperature: AI_CONFIG.temperature,
-              max_tokens: AI_CONFIG.maxTokens
-            }),
-            signal: controller.signal
-          });
+          for (const model of AI_CONFIG.models) {
+            try {
+              const response = await fetch(AI_CONFIG.endpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  model,
+                  messages: [{ role: 'user', content: prompt }],
+                  temperature: AI_CONFIG.temperature,
+                  max_tokens: AI_CONFIG.maxTokens
+                }),
+                signal: controller.signal
+              });
 
+              if (!response.ok) {
+                lastErr = new Error(`API Error: ${response.status}`);
+                continue;
+              }
+
+              const data = await response.json();
+              const text = data && data.choices && data.choices[0] && data.choices[0].message
+                ? data.choices[0].message.content
+                : '';
+              if (!text) { lastErr = new Error('Empty AI response'); continue; }
+              return text;
+            } catch (error) {
+              if (error.name === 'AbortError') throw new Error('Request timeout');
+              lastErr = error;
+            }
+          }
+          throw lastErr || new Error('No AI model available');
+        } finally {
           clearTimeout(timeoutId);
-          if (!response.ok) throw new Error(`API Error: ${response.status}`);
-          
-          const data = await response.json();
-          return data.choices[0].message.content;
-        } catch (error) {
-          if (error.name === 'AbortError') throw new Error('Request timeout');
-          throw error;
         }
       },
 

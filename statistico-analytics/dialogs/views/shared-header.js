@@ -8339,7 +8339,7 @@ READING: [1–2 sentences — what the current data state in this view specifica
     const PROXY_URL = 'https://statistico-ai.statistico.workers.dev/';
 
     let lastErr = null;
-    for (const model of ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama3-8b-8192']) {
+    for (const model of ['openai/gpt-oss-120b', 'openai/gpt-oss-20b']) {
       try {
         const r = await fetch(PROXY_URL, {
           method: 'POST',

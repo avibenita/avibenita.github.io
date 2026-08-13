@@ -1562,30 +1562,41 @@
         const userPrompt = `Summarize this 2-group comparison analysis:\n\n${JSON.stringify(payload, null, 2)}\n\nProvide a brief, clear summary highlighting: 1) group descriptives, 2) assumption tests, 3) primary test result, 4) effect size, 5) interpretation.`;
         
         console.log('Calling Groq API...');
-        const response = await fetch(window.AI_PROXY_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.3,
-            max_tokens: 1000
-          })
-        });
-        
-        console.log('Response status:', response.status);
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('API error:', errorText);
-          throw new Error(`API error ${response.status}: ${errorText}`);
+        const models = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+        let summary = '';
+        let lastErr = null;
+        for (let i = 0; i < models.length; i++) {
+          const response = await fetch(window.AI_PROXY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: models[i],
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              temperature: 0.3,
+              max_tokens: 1000
+            })
+          });
+
+          console.log('Response status:', response.status);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API error:', errorText);
+            lastErr = new Error(`API error ${response.status}: ${errorText}`);
+            continue;
+          }
+
+          const data = await response.json();
+          summary = data && data.choices && data.choices[0] && data.choices[0].message
+            ? data.choices[0].message.content
+            : '';
+          if (summary) break;
+          lastErr = new Error('Empty AI response');
         }
-        
-        const data = await response.json();
+        if (!summary) throw lastErr || new Error('No AI model available');
         console.log('API response received');
-        const summary = data.choices[0].message.content;
         
         // Display in modal
         showAISummary(summary);

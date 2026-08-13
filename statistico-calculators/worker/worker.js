@@ -2,7 +2,7 @@
  * Statistico AI Worker
  * Cloudflare Worker that:
  *  1. Validates a Statistico license key (stored in KV)
- *  2. Proxies the prompt to Groq / Llama
+ *  2. Proxies the prompt to Groq
  *  3. Returns the text response — Groq API key never reaches the browser
  *
  * Environment variables (set in Cloudflare dashboard → Workers → Settings → Variables):
@@ -14,9 +14,8 @@
  */
 
 const MODELS = [
-  'llama-3.1-8b-instant',
-  'llama3-8b-8192',
-  'llama-3.3-70b-versatile',
+  'openai/gpt-oss-20b',
+  'openai/gpt-oss-120b',
 ];
 
 const CORS_HEADERS = {
@@ -92,7 +91,9 @@ export default {
         if (!resp.ok) {
           let msg = `HTTP ${resp.status}`;
           try { const e = await resp.json(); msg = e?.error?.message || msg; } catch {}
-          if (resp.status === 404 || msg.toLowerCase().includes('not found')) {
+          if (resp.status === 404 || resp.status === 400 ||
+              msg.toLowerCase().includes('not found') ||
+              msg.toLowerCase().includes('decommissioned')) {
             lastErr = new Error(msg); continue;
           }
           return json({ error: msg }, resp.status);

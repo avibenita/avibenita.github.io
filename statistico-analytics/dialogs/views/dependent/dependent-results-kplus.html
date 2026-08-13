@@ -1529,8 +1529,8 @@
                 <label style="font-size:13px;color:#93c5fd;white-space:nowrap;"><i class="fa-solid fa-robot"></i> Model:</label>
                 <select id="aiModelSelect" onchange="saveModelPreference()" 
                         style="flex:1;padding:7px 12px;background:#1e293b;color:white;border:1px solid #3b82f6;border-radius:4px;font-size:13px;cursor:pointer;">
-                  <option value="mixtral-8x7b-32768">Mixtral-8x7b (Best quality, ~$0.0004/call)</option>
-                  <option value="gpt-oss-20b">GPT OSS 20B (Faster, 2x cheaper, ~$0.0002/call)</option>
+                  <option value="gpt-oss-20b">GPT OSS 20B (Fast)</option>
+                  <option value="gpt-oss-120b">GPT OSS 120B (Higher quality)</option>
                 </select>
               </div>
               <div style="margin-top:8px;font-size:13px;color:#93c5fd;">
@@ -6397,9 +6397,12 @@
     }
     
     function loadModelPreference() {
-      const savedModel = localStorage.getItem('AI_MODEL_PREFERENCE') || 'mixtral-8x7b-32768';
+      let savedModel = localStorage.getItem('AI_MODEL_PREFERENCE') || 'gpt-oss-20b';
+      if (savedModel === 'mixtral-8x7b-32768') savedModel = 'gpt-oss-120b';
       const modelSelect = document.getElementById('aiModelSelect');
       if (modelSelect) {
+        const known = Array.prototype.some.call(modelSelect.options, function (o) { return o.value === savedModel; });
+        if (!known) savedModel = 'gpt-oss-20b';
         modelSelect.value = savedModel;
       }
       return savedModel;
@@ -6728,13 +6731,13 @@
         }
         
         // Get selected model
-        const selectedModel = document.getElementById('aiModelSelect')?.value || 'mixtral-8x7b-32768';
+        const selectedModel = document.getElementById('aiModelSelect')?.value || 'gpt-oss-20b';
         console.log('Using model:', selectedModel);
         
         // Map model identifiers to Groq API model names
         const modelMapping = {
-          'mixtral-8x7b-32768': 'mixtral-8x7b-32768',
-          'gpt-oss-20b': 'openai/gpt-oss-20b'  // Groq's actual model name format
+          'gpt-oss-20b': 'openai/gpt-oss-20b',
+          'gpt-oss-120b': 'openai/gpt-oss-120b'
         };
         const apiModelName = modelMapping[selectedModel] || selectedModel;
         
@@ -6812,12 +6815,12 @@ TONE: Professional, precise, but accessible to researchers in applied fields.`
         content.innerHTML = `
           <div style="background:#1e1b4b;padding:20px;border-radius:6px;border-left:4px solid #7c3aed;">
             <div style="font-size:12px;color:#a78bfa;margin-bottom:12px;font-weight:600;display:flex;align-items:center;gap:6px;">
-              <i class="fa-solid fa-sparkles"></i> AI-Generated Interpretation (${selectedModel === 'gpt-oss-20b' ? 'GPT OSS 20B' : 'Mixtral-8x7b'})
+              <i class="fa-solid fa-sparkles"></i> AI-Generated Interpretation (${selectedModel === 'gpt-oss-120b' ? 'GPT OSS 120B' : 'GPT OSS 20B'})
             </div>
             <div style="line-height:1.8;color:#e5e7eb;white-space:pre-wrap;font-size:13.5px;">${interpretation}</div>
           </div>
           <div style="margin-top:12px;padding:10px 12px;background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.3);border-radius:4px;font-size:11px;color:#c4b5fd;line-height:1.5;">
-            <i class="fa-solid fa-info-circle"></i> This interpretation was generated using AI (${selectedModel === 'gpt-oss-20b' ? 'GPT OSS 20B' : 'Mixtral-8x7b'}) and should be reviewed by a qualified researcher before publication. Verify all statistical values against your raw results.
+            <i class="fa-solid fa-info-circle"></i> This interpretation was generated using AI (${selectedModel === 'gpt-oss-120b' ? 'GPT OSS 120B' : 'GPT OSS 20B'}) and should be reviewed by a qualified researcher before publication. Verify all statistical values against your raw results.
           </div>
         `;
         

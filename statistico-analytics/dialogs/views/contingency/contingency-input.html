@@ -30,10 +30,11 @@
     .reg-vars-header { display:flex; align-items:center; gap:8px; padding:0 2px 6px; border-bottom:1px solid var(--cfg-border); }
     .reg-vars-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.55px; color:var(--cfg-text); }
     .reg-vars-box { flex:1 1 0; min-height:0; overflow-y:auto; border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); }
-    .reg-var-row { display:flex; align-items:center; gap:6px; padding:5px 8px; cursor:grab; border-bottom:1px solid var(--cfg-border); user-select:none; }
+    .reg-var-row { display:flex; align-items:center; gap:6px; padding:5px 8px; cursor:grab; border-bottom:1px solid var(--cfg-border); user-select:none; -webkit-user-drag:element; }
     .reg-var-row:hover:not(.used) { background:var(--cfg-tbl-hover); }
     .reg-var-row.used { opacity:.38; cursor:not-allowed; pointer-events:none; }
     .reg-var-row.selected { outline:1px solid var(--ct-acc); background:rgba(139,92,246,.12); }
+    .reg-zone-card.await-click { outline:1px dashed var(--ct-acc); }
     .reg-var-icon { width:16px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; flex-shrink:0; }
     .reg-var-icon.num { background:rgba(56,189,248,.2); color:var(--ct-row); }
     .reg-var-icon.cat { background:rgba(167,139,250,.2); color:var(--ct-col); }
@@ -202,11 +203,21 @@
         row.querySelector('.reg-var-name').textContent = p.name;
         row.querySelector('.reg-var-stats').textContent = p.nLevels + ' levels · n=' + p.n + (p.missing ? ' · miss ' + p.missing : '');
         if (!used) {
-          row.addEventListener('dragstart', function () { dragged = p.name; row.classList.add('dragging'); });
-          row.addEventListener('dragend', function () { dragged = null; row.classList.remove('dragging'); });
+          row.addEventListener('dragstart', function (e) {
+            dragged = p.name;
+            row.classList.add('dragging');
+            try {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', p.name);
+            } catch (_e) {}
+          });
+          row.addEventListener('dragend', function () {
+            row.classList.remove('dragging');
+            setTimeout(function () { if (dragged === p.name) dragged = null; }, 50);
+          });
           row.addEventListener('click', function () {
             selectedVar = selectedVar === p.name ? null : p.name;
-            renderVariables();
+            refresh();
           });
         }
         box.appendChild(row);
@@ -248,16 +259,22 @@
 
     function refresh() {
       renderVariables();
-      renderZone('row', 'row', 'Drop the row (categorical) variable');
-      renderZone('col', 'col', 'Drop the column (categorical) variable');
-      renderZone('weight', 'w', 'Optional frequency / weight');
+      var pickHint = selectedVar
+        ? 'Click a role to assign “' + selectedVar + '”'
+        : 'Drag a column onto a role, or click a column then click a role';
+      renderZone('row', 'row', selectedVar ? 'Click to use as row' : 'Drop or click the row variable');
+      renderZone('col', 'col', selectedVar ? 'Click to use as column' : 'Drop or click the column variable');
+      renderZone('weight', 'w', selectedVar ? 'Click to use as weight' : 'Optional frequency / weight');
+      document.querySelectorAll('.reg-zone-card').forEach(function (card) {
+        card.classList.toggle('await-click', !!selectedVar);
+      });
       var ok = !!(assign.row && assign.col && assign.row !== assign.col);
       qs('btnRun').disabled = !ok;
       qs('btnSaveConfig').disabled = !ok;
       qs('modelSummary').innerHTML = ok
         ? '<strong>' + assign.row + '</strong> × <strong>' + assign.col + '</strong>' + (assign.weight ? ' (weighted by ' + assign.weight + ')' : '')
-        : 'Drag a categorical row variable and a column variable';
-      qs('runHint').textContent = ok ? 'Ready to analyze the association' : 'Assign row and column variables';
+        : pickHint;
+      qs('runHint').textContent = ok ? 'Ready to analyze the association' : (selectedVar ? 'Now click Row or Column' : 'Assign row and column variables');
       var warn = [];
       profiles.forEach(function (p) {
         if ((p.name === assign.row || p.name === assign.col) && p.nLevels > 20) {
@@ -347,13 +364,28 @@
       document.querySelectorAll('.reg-zone-card').forEach(function (card) {
         var zone = card.getAttribute('data-zone');
         var body = card.querySelector('.reg-zone-body');
-        body.addEventListener('dragover', function (e) { e.preventDefault(); body.classList.add('drag-over'); });
-        body.addEventListener('dragleave', function () { body.classList.remove('drag-over'); });
-        body.addEventListener('drop', function (e) {
+        function onOver(e) {
           e.preventDefault();
+          try { e.dataTransfer.dropEffect = 'move'; } catch (_e) {}
+          body.classList.add('drag-over');
+        }
+        function onLeave(e) {
+          if (e.relatedTarget && card.contains(e.relatedTarget)) return;
           body.classList.remove('drag-over');
-          if (dragged) setAssign(zone, dragged);
-        });
+        }
+        function onDrop(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          body.classList.remove('drag-over');
+          var name = dragged;
+          try { name = e.dataTransfer.getData('text/plain') || dragged; } catch (_e2) {}
+          if (name) setAssign(zone, name);
+          dragged = null;
+        }
+        card.addEventListener('dragover', onOver);
+        card.addEventListener('dragenter', onOver);
+        card.addEventListener('dragleave', onLeave);
+        card.addEventListener('drop', onDrop);
         card.addEventListener('click', function (e) {
           if (e.target && e.target.dataset && e.target.dataset.clear) {
             var map = { row: 'row', col: 'col', w: 'weight' };

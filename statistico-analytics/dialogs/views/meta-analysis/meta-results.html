@@ -446,9 +446,19 @@
       text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px;
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
     }
+    /* Keep statistical capitalization (df, p for Q, Studies (k)) on Heterogeneity */
+    #tab-heterogeneity .stat-box .label {
+      text-transform: none;
+      letter-spacing: .15px;
+      font-size: 11.5px;
+    }
     :root[data-theme="light"] .stat-box .label { color: var(--text-muted); }
     .stat-box .value {
       font-size: 20px; font-weight: 700; color: var(--text-primary);
+    }
+    .het-status-badge {
+      font-size: 12.5px; font-weight: 800; color: var(--accent-meta);
+      margin-bottom: 8px; letter-spacing: .2px;
     }
 
     /* Dark info tooltips on metric labels */
@@ -961,7 +971,7 @@
               <div class="value" id="hetK">—</div>
             </div>
             <div class="stat-box">
-              <div class="label">τ² · τ
+              <div class="label">Between-study variability
                 <span class="info-icon" tabindex="0">i<span class="tip"><b>τ²</b> is between-study variance; <b>τ</b> = √τ² is the between-study SD on the effect scale. Both are 0 under a fixed-effect model.</span></span>
               </div>
               <div class="value" id="tauPair" style="font-size:15px;line-height:1.35;">—</div>
@@ -1074,6 +1084,13 @@
       if (p == null || !isFinite(p)) return '—';
       return p < 0.001 ? '< 0.001' : p.toFixed(3);
     }
+    /** Prose p-values: p=.897 (leading zero omitted when 0 < p < 1). */
+    function fmtPProse(p) {
+      if (p == null || !isFinite(p)) return '—';
+      if (p < 0.001) return '<.001';
+      var s = p.toFixed(3);
+      return (p > 0 && p < 1 && s.charAt(0) === '0') ? s.slice(1) : s;
+    }
 
     /** Upper-tail χ² p-value (Wilson–Hilferty). Corrects stale bundles with the old step-table pQ. */
     function chiSquareUpperP(chiSq, df) {
@@ -1098,6 +1115,15 @@
       return h.pQ;
     }
 
+    function hetStatusBadge(i2, k) {
+      var band = i2 < 25
+        ? 'Low detected heterogeneity'
+        : i2 < 50
+          ? 'Moderate detected heterogeneity'
+          : 'Substantial detected heterogeneity';
+      return band + ((k != null && k < 20) ? ' · Limited precision' : '');
+    }
+
     function buildHetInterpretation(bundle) {
       var h = bundle.heterogeneity || {};
       var i2 = h.I2;
@@ -1106,30 +1132,31 @@
       var pQ = heteroPQ(h);
       var tau2 = h.tau2;
       var k = bundle.k;
+      var kWord = numberWord(k);
       var h2 = (q != null && df > 0) ? (q / df) : h.H2;
+      var stats =
+        'I² = ' + fmt(i2, 1) + '%, τ² = ' + fmt(tau2) +
+        ', Q(' + df + ') = ' + fmt(q, 2) + ', p = ' + fmtPProse(pQ);
+      var kLead = (k != null && k < 20)
+        ? ('With only ' + kWord + ' studies, heterogeneity is estimated imprecisely; ')
+        : ('With ' + kWord + ' studies, ');
       var base =
-        'Little excess between-study variation was detected: I² = ' + fmt(i2, 1) +
-        '%, τ² = ' + fmt(tau2) + ', Q(' + df + ') = ' + fmt(q, 2) +
-        ', p = ' + fmtP(pQ) + '. With only ' + k +
-        ' studies, these estimates are imprecise and do not establish that the true effects are homogeneous.';
+        'Little excess between-study variation was detected: ' + stats + '. ' + kLead +
+        'these results do not demonstrate that the true effects are identical.';
       if (i2 >= 25 && i2 < 50) {
         base =
-          'Moderate between-study variation was estimated: I² = ' + fmt(i2, 1) +
-          '%, τ² = ' + fmt(tau2) + ', Q(' + df + ') = ' + fmt(q, 2) +
-          ', p = ' + fmtP(pQ) + '. With k = ' + k +
-          ', interpret the random-effects average with that dispersion in mind.';
+          'Moderate between-study variation was estimated: ' + stats + '. ' + kLead +
+          'interpret the random-effects average with that dispersion in mind.';
       } else if (i2 >= 50) {
         base =
-          'Substantial between-study variation was estimated: I² = ' + fmt(i2, 1) +
-          '%, τ² = ' + fmt(tau2) + ', Q(' + df + ') = ' + fmt(q, 2) +
-          ', p = ' + fmtP(pQ) + '. With k = ' + k +
-          ', the pooled average may not describe every study well; consider moderators or subgroups.';
+          'Substantial between-study variation was estimated: ' + stats + '. ' + kLead +
+          'the pooled average may not describe every study well.';
       }
       if (h2 != null && isFinite(h2) && h2 < 1) {
         base += ' <span class="info-icon" tabindex="0" style="margin-left:4px;">i<span class="tip"><b>Technical:</b> unconstrained H² = Q/df = ' +
           fmt(h2, 2) + ' (&lt; 1 means Q was smaller than its df). This is shown for completeness and is not used as a main result.</span></span>';
       }
-      return base;
+      return '<div class="het-status-badge">' + hetStatusBadge(i2, k) + '</div>' + base;
     }
 
     function buildMetaHeterogeneityInsightGuide() {

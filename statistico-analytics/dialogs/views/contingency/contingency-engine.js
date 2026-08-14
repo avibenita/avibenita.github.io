@@ -580,6 +580,15 @@
     var missingMode = spec.missing === 'category' || spec.missingMode === 'category' ? 'category' : 'exclude';
     var confidence = spec.confidence != null ? spec.confidence : 0.95;
 
+    function toAllow(list) {
+      if (!list || !list.length) return null;
+      var o = Object.create(null);
+      for (var i = 0; i < list.length; i++) o[String(list[i])] = true;
+      return o;
+    }
+    var rowAllow = toAllow(spec.rowLevels);
+    var colAllow = toAllow(spec.colLevels);
+
     if (!rowName || !colName) {
       return { error: 'Select both a row variable and a column variable.', analyzable: false };
     }
@@ -614,6 +623,7 @@
     var colOrder = [];
     var droppedMissing = 0;
     var droppedWeight = 0;
+    var droppedLevel = 0;
     var used = 0;
     var sourceN = rows.length;
 
@@ -630,6 +640,8 @@
       }
       var rl = catLabel(rv);
       var cl = catLabel(cv);
+      if (rowAllow && !rowAllow[rl]) { droppedLevel++; continue; }
+      if (colAllow && !colAllow[cl]) { droppedLevel++; continue; }
       var w = 1;
       if (wi >= 0) {
         w = toWeight(row[wi]);
@@ -648,6 +660,9 @@
     if (missingMode === 'exclude' && droppedMissing) {
       warnings.push(droppedMissing + ' row' + (droppedMissing === 1 ? '' : 's') + ' dropped because the row or column value was missing.');
     }
+    if (droppedLevel) {
+      warnings.push(droppedLevel + ' row' + (droppedLevel === 1 ? '' : 's') + ' dropped because a category was not selected.');
+    }
 
     var observed = rowOrder.map(function (rl) {
       return colOrder.map(function (cl) {
@@ -660,7 +675,9 @@
     result.colVar = colProf.name;
     result.weightVar = wi >= 0 ? String(headers[wi]) : null;
     result.missingMode = missingMode;
-    result.dropped = { missing: droppedMissing, weight: droppedWeight };
+    result.dropped = { missing: droppedMissing, weight: droppedWeight, level: droppedLevel };
+    result.rowLevels = rowOrder.slice();
+    result.colLevels = colOrder.slice();
     result.usedRows = used;
     result.sourceN = sourceN;
     result.warnings = warnings;
@@ -681,6 +698,7 @@
     residualBand: residualBand,
     chiSquareUpperP: chiSquareUpperP,
     zCrit: zCrit,
-    isMissing: isMissing
+    isMissing: isMissing,
+    catLabel: catLabel
   };
 });

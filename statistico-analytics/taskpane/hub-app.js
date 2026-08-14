@@ -41,15 +41,12 @@ const HUB_CATEGORY_TILES = [
     info: [
       "Univariate: distribution summaries, normality, and outliers",
       "Correlation: pairwise associations and matrices",
-      "Multivariable Explorer: bubble & quadrant charts (X, Y, size, color)",
       "Works from your Active Range in Excel",
       "Useful first pass before regression or group comparisons"
     ],
     modules: [
       { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
-      { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." },
-      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Uses a built-in country sample if no range is selected." },
-      { id: "multivariable-sample", label: "Load bubble sample…", tip: "Write a 26-country bubble dataset to an Excel sheet named “MV Sample”, set it as the Active Range, and open Multivariable Explorer." }
+      { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." }
     ]
   },
   {
@@ -70,6 +67,25 @@ const HUB_CATEGORY_TILES = [
       { id: "frequency-tables", label: "Frequency Tables", comingSoon: true, tip: "One-way frequency tables for categorical variables. Coming soon — a separate module, not a replacement for Contingency Tables." },
       { id: "contingency", label: "Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." },
       { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
+    ]
+  },
+  {
+    id: "applications",
+    title: "Applications",
+    icon: "fa-briefcase",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Bubble charts and Excel-to-Office publishing",
+    desc: "Applied workflows that sit alongside core statistics — visual multivariable charts and batch report automation.",
+    info: [
+      "Multivariable Explorer: bubble & quadrant charts (X, Y, size, color)",
+      "Load bubble sample: write a 26-country demo sheet and open the explorer",
+      "EzPaste: batch-export Excel charts and tables to PowerPoint, Word, PDF, and HTML"
+    ],
+    modules: [
+      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Uses a built-in country sample if no range is selected." },
+      { id: "multivariable-sample", label: "Load bubble sample…", tip: "Write a 26-country bubble dataset to an Excel sheet named “MV Sample”, set it as the Active Range, and open Multivariable Explorer." },
+      { id: "ezpaste-open", label: "EzPaste", tip: "Open EzPaste — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.", dialogUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html" }
     ]
   },
   {
@@ -241,31 +257,6 @@ const TOOLS_CATEGORY_TILES = [
         id: "meta-analysis",
         label: "Run Meta-Analysis",
         tip: "Pool study effect sizes with fixed/random effects, forest plot, and heterogeneity diagnostics."
-      }
-    ]
-  },
-  {
-    id: "ezpaste",
-    title: "EzPaste",
-    icon: "fa-bullseye",
-    accent: "#eab308",
-    accentDark: "#a16207",
-    color: "#14b8a6",
-    colorDark: "#0f766e",
-    subtitle: "Batch-export Excel charts and ranges to PowerPoint, Word, and more",
-    desc: "Automate exporting Excel charts and tables into PowerPoint, Word, PDF, and HTML — instead of copying one object at a time.",
-    info: [
-      "Batch-export charts and ranges",
-      "Targets PowerPoint, Word, PDF, and HTML",
-      "Keeps layout and formatting consistent",
-      "Opens the EzPaste workflow from the hub"
-    ],
-    modules: [
-      {
-        id: "ezpaste-open",
-        label: "Open EzPaste",
-        tip: "Open EzPaste — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.",
-        dialogUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
       }
     ]
   },

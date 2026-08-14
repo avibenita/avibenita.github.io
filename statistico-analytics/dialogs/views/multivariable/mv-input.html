@@ -99,6 +99,24 @@
     }
     .mv-hint i { color: #38bdf8; margin-top: 1px; flex-shrink: 0; }
     .mv-hint strong { color: #38bdf8; font-weight: 700; }
+    .mv-range-bar {
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      padding: 7px 8px; border: 1px solid var(--cfg-border); border-radius: 8px;
+      background: var(--cfg-surface); border-left: 3px solid #34d399;
+    }
+    .mv-range-bar.is-error { border-left-color: #f97316; }
+    .mv-range-label {
+      font-size: 10px; font-weight: 800; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--cfg-text3); flex-shrink: 0;
+    }
+    .mv-range-addr {
+      flex: 1; min-width: 0; font-size: 11.5px; font-weight: 650;
+      color: var(--cfg-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mv-range-addr.is-empty { color: var(--cfg-text3); font-weight: 500; font-style: italic; }
+    .mv-range-bar .cfg-btn-small {
+      flex-shrink: 0; height: 26px; padding: 0 8px; font-size: 10.5px;
+    }
   </style>
 </head>
 <body>
@@ -120,6 +138,12 @@
           <div class="reg-vars-box" id="variablesListBox"></div>
         </div>
         <div class="reg-model-col">
+          <div class="mv-range-bar" id="mvRangeBar">
+            <span class="mv-range-label">Range</span>
+            <span class="mv-range-addr is-empty" id="mvRangeAddr" title="">No range selected</span>
+            <button type="button" class="cfg-btn-small" id="btnUseSelection" title="Read the cells currently selected in Excel"><i class="fa-solid fa-hand-pointer"></i> Use selection</button>
+            <button type="button" class="cfg-btn-small" id="btnPickRange" title="Pick a range on the worksheet"><i class="fa-solid fa-crosshairs"></i> Select range</button>
+          </div>
           <div class="reg-model-title">
             <span>Assign Roles</span>
             <span class="reg-model-meta" id="tbRange">—</span>
@@ -457,21 +481,43 @@
       if (colorPick) assignments.color = colorPick.name;
     }
 
+    function setRangeStatus(text, isEmpty, isError) {
+      var addrEl = qs('mvRangeAddr');
+      var bar = qs('mvRangeBar');
+      if (addrEl) {
+        addrEl.textContent = text || 'No range selected';
+        addrEl.title = text || '';
+        addrEl.classList.toggle('is-empty', !!isEmpty);
+      }
+      if (bar) bar.classList.toggle('is-error', !!isError);
+    }
+
     function applyPayload(p) {
-      if (!p || !p.headers) return;
+      if (!p) return;
       _headers = p.headers || [];
       _rows = p.rows || [];
       _address = p.address || '';
       _saved = p.savedModelSpec || null;
       qs('loadingSpinner').style.display = 'none';
       qs('mainContent').style.display = 'flex';
-      qs('tbRange').textContent = (_address ? _address + ' · ' : '') + _rows.length + ' rows';
-      qs('metaBadge').textContent = (_rows.length + ' rows · ' + _headers.length + ' cols') + (p.isSample ? ' · sample' : '');
+      var rangeText = _address
+        ? (_address + ' · ' + _rows.length + ' rows')
+        : (_rows.length ? (_rows.length + ' rows') : 'No range selected');
+      setRangeStatus(rangeText, !_address && !_rows.length, false);
+      if (qs('tbRange')) qs('tbRange').textContent = _address || (_rows.length ? (_rows.length + ' rows') : '—');
+      qs('metaBadge').textContent = _rows.length
+        ? ((_rows.length + ' rows · ' + _headers.length + ' cols') + (p.isSample ? ' · sample' : ''))
+        : 'Select a range';
       buildColumnStats();
       assignments = { x: null, y: null, size: null, color: null, label: null };
       if (_saved) applySpec(_saved);
-      if (!assignments.x) autoDetect();
+      if (!assignments.x && columnStats.length) autoDetect();
       renderVariables(); renderAssignments(); syncModeSeg(); validateModel();
+    }
+
+    function requestRange(action) {
+      setRangeStatus(action === 'useSelection' ? 'Reading selection…' : 'Select a range in Excel…', true, false);
+      send(action, null);
     }
 
     function loadSampleData() {
@@ -484,6 +530,8 @@
       qs('btnCancel').addEventListener('click', function() { send('close', null); });
       qs('btnRun').addEventListener('click', runAnalysis);
       if (qs('btnLoadSample')) qs('btnLoadSample').addEventListener('click', loadSampleData);
+      if (qs('btnUseSelection')) qs('btnUseSelection').addEventListener('click', function() { requestRange('useSelection'); });
+      if (qs('btnPickRange')) qs('btnPickRange').addEventListener('click', function() { requestRange('pickRange'); });
       document.querySelectorAll('#modeSeg button').forEach(function(btn) {
         btn.addEventListener('click', function() {
           chartMode = btn.dataset.mode;
@@ -500,6 +548,9 @@
           try {
             var msg = JSON.parse(arg.message || '{}');
             if (msg.type === 'MV_DATA' && msg.payload) applyPayload(msg.payload);
+            if (msg.type === 'MV_RANGE_ERROR' || msg.type === 'RANGE_ERROR') {
+              setRangeStatus(msg.message || 'Could not read that range', true, true);
+            }
           } catch (_e) {}
         });
         send('ready', null);
@@ -510,8 +561,13 @@
           }
         }, 500);
         setTimeout(function() {
-          if (!_headers.length && window.MvSampleData) loadSampleData();
-        }, 1800);
+          qs('loadingSpinner').style.display = 'none';
+          qs('mainContent').style.display = 'flex';
+          if (!_headers.length) {
+            setRangeStatus('No range selected — use selection or pick a range', true, false);
+            renderVariables();
+          }
+        }, 1600);
       });
     });
   </script>

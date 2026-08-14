@@ -351,6 +351,75 @@
     }
   }
 
+  /**
+   * Read a worksheet range for a module dialog (no hub Active Range bar).
+   * mode: "prompt" (Excel Select Data) or "selection" (current Excel selection).
+   */
+  function captureRangeForDialog(mode) {
+    if (mode === "selection") {
+      return Excel.run(function (ctx) {
+        var rng = ctx.workbook.getSelectedRange();
+        rng.load(["values", "address"]);
+        return ctx.sync().then(function () {
+          if (!rng.values || rng.values.length < 2) {
+            return { error: "Selection too small — needs a header row plus data." };
+          }
+          rangeMode = "selection";
+          applyRangeData(rng.values, rng.address);
+          return { values: rng.values, address: rng.address };
+        });
+      }).catch(function (e) {
+        return { error: (e && e.message) || "Could not read the current selection." };
+      });
+    }
+
+    return new Promise(function (resolve) {
+      if (!Office.context.document || !Office.context.document.bindings) {
+        resolve({ error: "Range picker unavailable in this host." });
+        return;
+      }
+      if (lastPromptBindingId) {
+        releasePromptBinding(lastPromptBindingId);
+        lastPromptBindingId = null;
+      }
+      var bindingId = "statisticoDlgRange_" + Date.now();
+      Office.context.document.bindings.addFromPromptAsync(
+        Office.BindingType.Matrix,
+        {
+          id: bindingId,
+          promptText: "Select the data range (header row + data)."
+        },
+        function (result) {
+          if (result.status !== Office.AsyncResultStatus.Succeeded) {
+            resolve({
+              error: (result.error && result.error.message) || "Range selection cancelled."
+            });
+            return;
+          }
+          var id = (result.value && result.value.id) || bindingId;
+          lastPromptBindingId = id;
+          Excel.run(function (ctx) {
+            var binding = ctx.workbook.bindings.getItem(id);
+            var rng = binding.getRange();
+            rng.load(["values", "address"]);
+            return ctx.sync().then(function () {
+              rangeMode = "prompt";
+              applyRangeData(rng.values, rng.address);
+              resolve({ values: rng.values, address: rng.address });
+            });
+          })
+            .catch(function () {
+              resolve({ error: "Could not read the prompted range." });
+            })
+            .then(function () {
+              releasePromptBinding(id);
+              if (lastPromptBindingId === id) lastPromptBindingId = null;
+            });
+        }
+      );
+    });
+  }
+
   function showRangeState(text, isError) {
     var addrEl = document.getElementById("hubRangeBadgeText");
     var okIcon = document.getElementById("hubRangeOkIcon");
@@ -429,6 +498,7 @@
   window.hubLoadFromNamedRange = loadFromNamedRange;
   window.hubToggleRangePicker = toggleRangePicker;
   window.hubToggleRangeInfo = toggleRangeInfo;
+  window.hubCaptureRange = captureRangeForDialog;
 
   document.addEventListener("click", function (ev) {
     var pop = document.getElementById("hubRangePopover");

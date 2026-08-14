@@ -367,11 +367,11 @@ const TOOLS_CATEGORY_TILES = [
     desc: "Map X, Y, size, color, labels, and groups on a multivariable bubble or quadrant chart.",
     info: [
       "Multivariable Explorer: bubble & quadrant charts (X, Y, size, color)",
-      "Works from your Active Range in Excel",
-      "Uses a built-in country sample if no range is selected"
+      "Select the Excel range from the input panel",
+      "Uses a built-in country sample if you click Load sample"
     ],
     modules: [
-      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Uses a built-in country sample if no range is selected." }
+      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Pick the Excel range in the input panel, or load the built-in country sample." }
     ]
   },
   {
@@ -427,8 +427,8 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
-/* Active Range is shown on Specialized Tools for Applications and Utilities.
-   Calculators & Planning does not use a worksheet range. */
+/* Active Range is shown on Specialized Tools for Applications only.
+   Calculators and Utilities pick their own inputs. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
@@ -460,7 +460,7 @@ var TOOLS_SECTION_META = {
   }
 };
 var TOOLS_SECTION_ORDER = ["applications", "calculators", "utilities"];
-var TOOLS_RANGE_SECTIONS = ["applications", "utilities"];
+var TOOLS_RANGE_SECTIONS = ["applications"];
 let HUB_ACTIONS = {};
 
 /** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
@@ -1540,10 +1540,6 @@ function openMultivariableFromHub() {
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "MV_DATA",
     payloadBuilder: function (gr) {
-      var hasData = gr && gr.values && gr.values.length >= 2 && (gr.values[0] || []).length >= 3;
-      if (!hasData && window.MvSampleData) {
-        return MvSampleData.getConfigPayload("MV Sample (built-in)");
-      }
       return {
         headers: (gr && gr.values && gr.values[0]) || [],
         rows: (gr && gr.values && gr.values.slice(1)) || [],
@@ -1647,6 +1643,32 @@ function openBuilderDialogFromHub(options) {
           var msg = JSON.parse(arg.message || "{}");
           if (msg.action === "ready" || msg.action === "requestData") {
             sendPayload();
+            return;
+          }
+          if (msg.action === "pickRange" || msg.action === "useSelection") {
+            var mode = msg.action === "useSelection" ? "selection" : "prompt";
+            var capture = window.hubCaptureRange;
+            if (typeof capture !== "function") return;
+            Promise.resolve(capture(mode)).then(function (result) {
+              if (!result || !result.values || result.values.length < 2) {
+                if (dlg) {
+                  dlg.messageChild(JSON.stringify({
+                    type: "MV_RANGE_ERROR",
+                    message: (result && result.error) || "Could not read that range. Select a header row plus data."
+                  }));
+                }
+                return;
+              }
+              gr = { values: result.values, address: result.address || "", mode: mode };
+              sendPayload();
+            }, function (err) {
+              if (dlg) {
+                dlg.messageChild(JSON.stringify({
+                  type: "MV_RANGE_ERROR",
+                  message: (err && err.message) || "Could not read that range."
+                }));
+              }
+            });
             return;
           }
           var modelActions = options.modelActions || [];

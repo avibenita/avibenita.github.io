@@ -16,10 +16,20 @@
 
   function isMissing(v) {
     if (v === null || v === undefined) return true;
+    if (typeof v === 'object') {
+      if (v.error != null) return isMissing(v.error);
+      if (typeof v.toString === 'function' && v.toString !== Object.prototype.toString) {
+        v = v.toString();
+      } else {
+        return false;
+      }
+    }
     var s = String(v).trim();
     if (!s) return true;
     var u = s.toUpperCase();
-    return u === 'NA' || u === 'N/A' || u === 'NULL' || u === '.' || u === 'NAN';
+    if (u === 'NA' || u === 'N/A' || u === '#N/A' || u === '#NA' || u === 'NULL' || u === '.' || u === 'NAN') return true;
+    if (u.charAt(0) === '#' && (u === '#NULL!' || u === '#VALUE!' || u === '#REF!' || u === '#DIV/0!' || u === '#NAME?' || u === '#NUM!')) return true;
+    return false;
   }
 
   function catLabel(v) {
@@ -316,82 +326,26 @@
   }
 
   function buildInterpretation(result) {
-    var lines = [];
     var tests = result.tests || {};
     var pearson = tests.pearson || {};
     var v = tests.cramersV;
-    var diag = result.diagnostics || {};
     var alpha = 1 - (result.confidence || 0.95);
     var assoc = isFinite(pearson.p) && pearson.p < alpha;
+    if (result.error) return { summary: result.error, details: [], associated: false };
 
-    if (result.error) {
-      return { summary: result.error, details: [] };
-    }
-
+    var pTxt = !isFinite(pearson.p) ? '' : (pearson.p < 0.001 ? 'p < .001' : 'p = ' + pearson.p.toFixed(3));
+    var vTxt = isFinite(v) ? ', V = ' + v.toFixed(3) : '';
+    var summary;
     if (assoc) {
-      lines.push(
-        'There is statistical evidence of an association between ' +
-        result.rowVar + ' and ' + result.colVar +
-        ' (Pearson χ² = ' + pearson.stat.toFixed(2) + ', df = ' + pearson.df +
-        ', p ' + (pearson.p < 0.001 ? '< .001' : '= ' + pearson.p.toFixed(3)) + ').'
-      );
-      lines.push('This does not establish a causal relationship, and statistical detection is not the same as a practically meaningful effect.');
+      summary = 'Association detected between ' + result.rowVar + ' and ' + result.colVar +
+        ' (χ² = ' + pearson.stat.toFixed(2) + ', df = ' + pearson.df + ', ' + pTxt + vTxt + ').';
     } else if (isFinite(pearson.p)) {
-      lines.push(
-        'There is not statistical evidence of an association between ' +
-        result.rowVar + ' and ' + result.colVar +
-        ' at the ' + Math.round((result.confidence || 0.95) * 100) +
-        '% confidence level (Pearson χ² = ' + pearson.stat.toFixed(2) +
-        ', df = ' + pearson.df + ', p = ' + (pearson.p < 0.001 ? '< .001' : pearson.p.toFixed(3)) + ').'
-      );
+      summary = 'No association detected between ' + result.rowVar + ' and ' + result.colVar +
+        ' (χ² = ' + pearson.stat.toFixed(2) + ', df = ' + pearson.df + ', ' + pTxt + vTxt + ').';
+    } else {
+      summary = 'The table was analyzed.';
     }
-
-    if (isFinite(v)) {
-      var dimNote = 'Cramér’s V depends on table size (here ' + result.nRows + '×' + result.nCols +
-        '); conventional “small / medium / large” labels are not universal.';
-      var strength = v < 0.1 ? 'near zero' : v < 0.3 ? 'modest in many social-science settings' : v < 0.5 ? 'noticeable' : 'relatively strong in many settings';
-      lines.push('Cramér’s V = ' + v.toFixed(3) + ' (' + strength + '). ' + dimNote);
-    }
-
-    if (diag.assumptionWarning) {
-      lines.push(diag.assumptionWarning);
-    }
-
-    var cells = result.cells || [];
-    var notable = cells.filter(function (c) { return Math.abs(c.stdResidual) >= 2; })
-      .sort(function (a, b) { return Math.abs(b.stdResidual) - Math.abs(a.stdResidual); });
-    if (notable.length) {
-      var top = notable.slice(0, 4).map(function (c) {
-        var dir = c.stdResidual > 0 ? 'more' : 'fewer';
-        return c.row + ' × ' + c.col + ' (' + dir + ' than expected, residual ' +
-          (c.stdResidual >= 0 ? '+' : '') + c.stdResidual.toFixed(2) + ')';
-      });
-      lines.push('Cells contributing most to the association: ' + top.join('; ') + '.');
-    } else if (assoc) {
-      lines.push('No individual cell has |standardized residual| ≥ 2; the association is spread across the table rather than concentrated in a few cells.');
-    }
-
-    var m = result.measures2x2;
-    if (m && m.available && m.oddsRatio && m.oddsRatio.available) {
-      var lay = m.layout;
-      var or = m.oddsRatio.value;
-      var dir = or > 1
-        ? lay.rowIndex + ' has higher odds of ' + lay.colEvent + ' than ' + lay.rowReference
-        : or < 1
-          ? lay.rowIndex + ' has lower odds of ' + lay.colEvent + ' than ' + lay.rowReference
-          : 'odds of ' + lay.colEvent + ' are similar in both rows';
-      lines.push(
-        'In this 2×2 layout, the event is “' + lay.colEvent + '” and the index row is “' +
-        lay.rowIndex + '” (reference row “' + lay.rowReference + '”). Odds ratio = ' +
-        or.toFixed(3) + ' — ' + dir + '.'
-      );
-    }
-
-    return {
-      summary: lines[0] || 'The table was analyzed.',
-      details: lines.slice(1),
-      associated: !!assoc
-    };
+    return { summary: summary, details: [], associated: !!assoc };
   }
 
   function analyzeCounts(observed, rowLabels, colLabels, options) {

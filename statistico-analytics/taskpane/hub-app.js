@@ -1533,7 +1533,7 @@ function openParetoFromHub() {
   });
 }
 
-function openMultivariableFromHub() {
+function openMultivariableDialogFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "multivariable",
     dialogPath: "multivariable/mv-input.html",
@@ -1556,6 +1556,24 @@ function openMultivariableFromHub() {
   });
 }
 
+function openMultivariableFromHub() {
+  setSelectedModuleCard("multivariable", true);
+  var capture = window.hubCaptureRange;
+  if (typeof capture !== "function") {
+    return openMultivariableDialogFromHub();
+  }
+  Promise.resolve(capture("prompt", "Select the table you want to chart (include a header row).")).then(function (result) {
+    if (!result || !result.values || result.values.length < 2) {
+      setSelectedModuleCard("multivariable", false);
+      return;
+    }
+    openMultivariableDialogFromHub();
+  }, function () {
+    setSelectedModuleCard("multivariable", false);
+  });
+  return true;
+}
+
 function openMultivariableSampleFromHub() {
   setSelectedModuleCard("multivariable-sample", true);
   var finish = function () { setSelectedModuleCard("multivariable-sample", false); };
@@ -1567,11 +1585,11 @@ function openMultivariableSampleFromHub() {
           "\n\nOpening Multivariable Explorer with built-in sample data instead.");
       } catch (e) {}
       finish();
-      openMultivariableFromHub();
+      openMultivariableDialogFromHub();
       return;
     }
     finish();
-    openMultivariableFromHub();
+    openMultivariableDialogFromHub();
   }
 
   // Panel script may not be loaded yet — load bridge then insert.

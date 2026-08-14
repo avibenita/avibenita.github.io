@@ -355,7 +355,7 @@
    * Read a worksheet range for a module dialog (no hub Active Range bar).
    * mode: "prompt" (Excel Select Data) or "selection" (current Excel selection).
    */
-  function captureRangeForDialog(mode) {
+  function captureRangeForDialog(mode, promptText) {
     if (mode === "selection") {
       return Excel.run(function (ctx) {
         var rng = ctx.workbook.getSelectedRange();
@@ -387,7 +387,7 @@
         Office.BindingType.Matrix,
         {
           id: bindingId,
-          promptText: "Select the data range (header row + data)."
+          promptText: promptText || "Select the table to chart (header row + data)."
         },
         function (result) {
           if (result.status !== Office.AsyncResultStatus.Succeeded) {

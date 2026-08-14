@@ -772,6 +772,113 @@
       switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
     }
 
+    function exportContingencyHtml() {
+      if (!bundle || !bundle.analyzable) {
+        alert('Run the analysis first.');
+        return;
+      }
+      var sections = [
+        { id: 'overview', label: 'Overview' },
+        { id: 'table', label: 'Contingency Table' },
+        { id: 'diagnostics', label: 'Diagnostics & Visualization' }
+      ];
+      if (bundle.nRows === 2 && bundle.nCols === 2) {
+        sections.push({ id: 'twobytwo', label: '2×2 Measures' });
+      }
+      var subject = (bundle.rowVar || '') + ' × ' + (bundle.colVar || '');
+      var picker = (typeof StatisticoHeader !== 'undefined' && StatisticoHeader._pickReportSections)
+        ? function (cb) {
+            StatisticoHeader._pickReportSections(sections, cb, {
+              defaultIds: [activeTab || 'overview'],
+              coverDefaults: {
+                title: 'Contingency Tables Report',
+                subtitle: 'Statistico Interactive',
+                subject: subject,
+                description: (bundle.interpretation && bundle.interpretation.summary) || ''
+              }
+            });
+          }
+        : function (cb) {
+            StatisticoHeader.pickReportSections(sections, function (ids) { cb(ids, null); });
+          };
+      picker(function (selectedIds, cover) {
+        buildContingencyReport(sections.filter(function (s) { return selectedIds.indexOf(s.id) >= 0; }), cover);
+      });
+    }
+
+    function snapshotTabHtml(id) {
+      var el = document.getElementById('tab-' + id);
+      if (!el) return '';
+      var clone = el.cloneNode(true);
+      clone.classList.add('active');
+      clone.style.display = 'flex';
+      clone.querySelectorAll('.tbl-actions, .loading-state').forEach(function (n) { n.remove(); });
+      return clone.outerHTML;
+    }
+
+    function buildContingencyReport(selected, cover) {
+      if (!selected.length) return;
+      var escR = function (s) {
+        return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      };
+      var finish = function (coverHtml, coverCss) {
+        var pageCss = Array.from(document.querySelectorAll('style')).map(function (s) { return s.textContent; }).join('\n');
+        var toc = selected.map(function (s, i) {
+          return '<li><a href="#sec_' + (i + 1) + '">' + escR(s.label) + '</a></li>';
+        }).join('');
+        var body = selected.map(function (s, i) {
+          return '<section id="sec_' + (i + 1) + '" style="page-break-inside:avoid;margin-top:28px;padding-top:14px;border-top:1px solid #e2e8f0;">' +
+            '<h2>' + (i + 1) + '. ' + escR(s.label) + '</h2>' +
+            snapshotTabHtml(s.id) + '</section>';
+        }).join('');
+        var intro = (cover && cover.enabled)
+          ? '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>'
+          : '<h1>Contingency Tables Report</h1>' +
+            '<p class="meta"><strong>' + escR(bundle.rowVar) + ' × ' + escR(bundle.colVar) +
+            '</strong> &nbsp;·&nbsp; N = ' + escR(fmtN(bundle.N, 0)) +
+            ' &nbsp;·&nbsp; ' + escR(new Date().toLocaleString()) + '</p>' +
+            '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>';
+        var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>' +
+          '<title>Contingency Tables Report</title>' +
+          '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>' +
+          '<style>' +
+          'body{font-family:"Segoe UI",Arial,sans-serif;padding:24px;max-width:1200px;margin:auto;color:#0f172a;background:#fff}' +
+          'h1{margin-bottom:4px}h2{margin:0 0 12px;font-size:18px}' +
+          'nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:18px 0}' +
+          '.meta{color:#475569;font-size:13px}a{color:#0ea5e9;text-decoration:none}' +
+          '.tab-panel{display:flex !important;flex-direction:column;gap:10px;height:auto}' +
+          '.tbl-wrap{max-height:none !important;overflow:visible !important}' +
+          '#tableWrap table.ct th.stub,#tableWrap table.ct td.stub,#tableWrap table.ct thead th.total,#tableWrap table.ct td.total{position:static !important;box-shadow:none !important}' +
+          pageCss + (coverCss || '') +
+          '</style></head><body>' + (coverHtml || '') + intro + body + '</body></html>';
+        var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        var stamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, '');
+        a.download = 'Contingency_Report_' + stamp + '.html';
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      };
+      var applyCover = function (logo) {
+        var coverHtml = (typeof StatisticoHeader._buildExportCoverPageHtml === 'function')
+          ? StatisticoHeader._buildExportCoverPageHtml(cover, logo || '', escR)
+          : '';
+        var coverCss = (typeof StatisticoHeader._getExportCoverCss === 'function')
+          ? StatisticoHeader._getExportCoverCss()
+          : '';
+        finish(coverHtml, coverCss);
+      };
+      if (cover && cover.enabled) {
+        if (typeof StatisticoHeader._resolveExportLogoDataUrl === 'function') {
+          StatisticoHeader._resolveExportLogoDataUrl(cover).then(applyCover).catch(function () { applyCover(''); });
+        } else {
+          applyCover('');
+        }
+      } else {
+        finish('', '');
+      }
+    }
+
     function ctActions() {
       return {
         getData: function () {
@@ -791,7 +898,7 @@
             notice: noticeParts.length ? ('Dropped: ' + noticeParts.join(', ') + '.') : null
           };
         },
-        exportHtml: function () { copyCurrentTable(); },
+        exportHtml: exportContingencyHtml,
         exportJson: function () {
           if (!bundle) return;
           var blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });

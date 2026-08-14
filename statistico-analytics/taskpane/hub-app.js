@@ -70,25 +70,6 @@ const HUB_CATEGORY_TILES = [
     ]
   },
   {
-    id: "applications",
-    title: "Applications",
-    icon: "fa-briefcase",
-    color: "#14b8a6",
-    colorDark: "#0f766e",
-    subtitle: "Bubble charts and Excel-to-Office publishing",
-    desc: "Applied workflows that sit alongside core statistics — visual multivariable charts and batch report automation.",
-    info: [
-      "Multivariable Explorer: bubble & quadrant charts (X, Y, size, color)",
-      "Load bubble sample: write a 26-country demo sheet and open the explorer",
-      "EzPaste: batch-export Excel charts and tables to PowerPoint, Word, PDF, and HTML"
-    ],
-    modules: [
-      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Uses a built-in country sample if no range is selected." },
-      { id: "multivariable-sample", label: "Load bubble sample…", tip: "Write a 26-country bubble dataset to an Excel sheet named “MV Sample”, set it as the Active Range, and open Multivariable Explorer." },
-      { id: "ezpaste-open", label: "EzPaste", tip: "Open EzPaste — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.", dialogUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html" }
-    ]
-  },
-  {
     id: "analyze-groups",
     title: "Compare Groups",
     icon: "fa-scale-balanced",
@@ -186,6 +167,55 @@ const HUB_CATEGORY_TILES = [
   }
 ];
 const TOOLS_CATEGORY_TILES = [
+  /* ── Cluster 0: Applications ──────────────────────────────────────────
+     Applied visual and publishing workflows. */
+  {
+    id: "applications-bubble",
+    section: "Applications",
+    sectionSubtitle: "Visual exploration and Excel-to-Office publishing",
+    title: "Bubble Chart",
+    icon: "fa-chart-scatter",
+    accent: "#eab308",
+    accentDark: "#a16207",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Interactive bubble and quadrant charts from your Excel range",
+    desc: "Map X, Y, size, color, labels, and groups — or load a built-in 26-country sample and open the explorer.",
+    info: [
+      "Multivariable Explorer: bubble & quadrant charts (X, Y, size, color)",
+      "Load bubble sample: write a 26-country demo sheet named “MV Sample”",
+      "Works from your Active Range in Excel"
+    ],
+    modules: [
+      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Uses a built-in country sample if no range is selected." },
+      { id: "multivariable-sample", label: "Load bubble sample…", tip: "Write a 26-country bubble dataset to an Excel sheet named “MV Sample”, set it as the Active Range, and open Multivariable Explorer." }
+    ]
+  },
+  {
+    id: "ezpaste",
+    title: "EzPaste",
+    icon: "fa-bullseye",
+    accent: "#eab308",
+    accentDark: "#a16207",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Batch-export Excel charts and ranges to PowerPoint, Word, and more",
+    desc: "Automate exporting Excel charts and tables into PowerPoint, Word, PDF, and HTML — instead of copying one object at a time.",
+    info: [
+      "Batch-export charts and ranges",
+      "Targets PowerPoint, Word, PDF, and HTML",
+      "Keeps layout and formatting consistent",
+      "Opens the EzPaste workflow from the hub"
+    ],
+    modules: [
+      {
+        id: "ezpaste-open",
+        label: "EzPaste",
+        tip: "Open EzPaste — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.",
+        dialogUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
+      }
+    ]
+  },
   /* ── Cluster 1: Data-Driven Tools ─────────────────────────────────────
      Specialized modules that work on the Excel range/selection itself. */
   {
@@ -398,9 +428,9 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
-/* Active Range is shown on Specialized Tools parked under the Data-Driven
-   Tools section header (immediately above Report Tables). Calculators &
-   Planning, after the next divider, doesn't use it. */
+/* Active Range is shown on Specialized Tools parked under the Applications
+   section header (immediately above Bubble Chart). Calculators & Planning,
+   after the later divider, doesn't use it. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
@@ -481,8 +511,8 @@ function renderModules(list) {
   if (noResults) noResults.style.display = list.length ? "none" : "block";
 }
 
-/* Park the Active Range bar under the Data-Driven Tools section header
-   (immediately above Report Tables) on the Specialized Tools tab; restore it
+/* Park the Active Range bar under the Applications section header
+   (immediately above Bubble Chart) on the Specialized Tools tab; restore it
    above the tile list on Statistical Analysis. Must run after every tile
    re-render, and before wiping #categoryTiles (or the node is destroyed). */
 function placeHubRangeSection() {

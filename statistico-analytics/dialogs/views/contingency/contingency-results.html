@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260814ct2"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260814ct2"></script>
-  <script src="contingency-engine.js?v=20260814ct4"></script>
-  <script src="contingency-sample-data.js?v=20260814ct4"></script>
+  <script src="contingency-engine.js?v=20260814ct6"></script>
+  <script src="contingency-sample-data.js?v=20260814ct6"></script>
   <style>
     :root {
       --surface-0:#070b14; --surface-1:#1e2638; --surface-2:#2a3348; --border:#4b556e;
@@ -776,7 +776,20 @@
       return {
         getData: function () {
           if (!bundle) return null;
-          return { headers: bundle.colLabels, rows: bundle.observed, usedRows: bundle.N };
+          var headers = bundle.viewHeaders || [bundle.rowVar, bundle.colVar].filter(Boolean);
+          var allRows = bundle.allViewRows || [];
+          var usedRows = bundle.usedViewRows || allRows;
+          var noticeParts = [];
+          if (bundle.dropped && bundle.dropped.missing) noticeParts.push(bundle.dropped.missing + ' missing');
+          if (bundle.dropped && bundle.dropped.level) noticeParts.push(bundle.dropped.level + ' excluded by category filter');
+          if (bundle.dropped && bundle.dropped.weight) noticeParts.push(bundle.dropped.weight + ' invalid weight');
+          return {
+            headers: headers,
+            allRows: allRows,
+            usedRows: usedRows,
+            columnRoles: headers.map(function (_, i) { return i === 0 ? 'xc' : (i === 1 ? 'xn' : null); }),
+            notice: noticeParts.length ? ('Dropped: ' + noticeParts.join(', ') + '.') : null
+          };
         },
         exportHtml: function () { copyCurrentTable(); },
         exportJson: function () {

@@ -565,6 +565,10 @@
     next.dropped = result.dropped;
     next.warnings = result.warnings;
     next.sourceN = result.sourceN;
+    next.usedRows = result.usedRows;
+    next.viewHeaders = result.viewHeaders;
+    next.allViewRows = result.allViewRows;
+    next.usedViewRows = result.usedViewRows;
     next.interpretation = buildInterpretation(next);
     return next;
   }
@@ -626,11 +630,18 @@
     var droppedLevel = 0;
     var used = 0;
     var sourceN = rows.length;
+    var viewHeaders = [rowProf.name, colProf.name];
+    if (wi >= 0) viewHeaders.push(String(headers[wi]));
+    var allViewRows = [];
+    var usedViewRows = [];
 
     for (var r = 0; r < rows.length; r++) {
       var row = rows[r] || [];
       var rv = row[ri];
       var cv = row[ci];
+      var viewRow = [rv, cv];
+      if (wi >= 0) viewRow.push(row[wi]);
+      allViewRows.push(viewRow);
       var rowMiss = isMissing(rv);
       var colMiss = isMissing(cv);
       if (rowMiss || colMiss) {
@@ -652,6 +663,7 @@
       var key = rl + '\u0000' + cl;
       map[key] = (map[key] || 0) + w;
       used++;
+      usedViewRows.push(viewRow);
     }
 
     if (wi >= 0 && droppedWeight) {
@@ -678,6 +690,9 @@
     result.dropped = { missing: droppedMissing, weight: droppedWeight, level: droppedLevel };
     result.rowLevels = rowOrder.slice();
     result.colLevels = colOrder.slice();
+    result.viewHeaders = viewHeaders;
+    result.allViewRows = allViewRows;
+    result.usedViewRows = usedViewRows;
     result.usedRows = used;
     result.sourceN = sourceN;
     result.warnings = warnings;

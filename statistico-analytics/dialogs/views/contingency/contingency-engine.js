@@ -47,6 +47,21 @@
     return isFinite(n) ? n : NaN;
   }
 
+  function viewCell(v) {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'number' || typeof v === 'boolean') return v;
+    if (typeof v === 'string') return v;
+    if (typeof v === 'object') {
+      if (v.error != null) return viewCell(v.error);
+      if (typeof v.valueOf === 'function') {
+        var n = v.valueOf();
+        if (typeof n === 'number' && isFinite(n)) return n;
+      }
+      if (typeof v.toString === 'function' && v.toString !== Object.prototype.toString) return String(v);
+    }
+    return String(v);
+  }
+
   function colIndex(headers, name) {
     if (name == null || name === '') return -1;
     var i = headers.indexOf(name);
@@ -639,8 +654,8 @@
       var row = rows[r] || [];
       var rv = row[ri];
       var cv = row[ci];
-      var viewRow = [rv, cv];
-      if (wi >= 0) viewRow.push(row[wi]);
+      var viewRow = [viewCell(rv), viewCell(cv)];
+      if (wi >= 0) viewRow.push(viewCell(row[wi]));
       allViewRows.push(viewRow);
       var rowMiss = isMissing(rv);
       var colMiss = isMissing(cv);

@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260814ct2"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260814ct2"></script>
-  <script src="contingency-engine.js?v=20260814ct6"></script>
-  <script src="contingency-sample-data.js?v=20260814ct6"></script>
+  <script src="contingency-engine.js?v=20260814ct7"></script>
+  <script src="contingency-sample-data.js?v=20260814ct7"></script>
   <style>
     :root {
       --surface-0:#070b14; --surface-1:#1e2638; --surface-2:#2a3348; --border:#4b556e;
@@ -756,9 +756,15 @@
       }
     }
 
+    var pendingViewData = null;
+
     function showBundle(b) {
       document.getElementById('loadingState').style.display = 'none';
       bundle = b;
+      if (pendingViewData) {
+        applyViewData(pendingViewData);
+        pendingViewData = null;
+      }
       if (!b || b.error || b.analyzable === false) {
         document.getElementById('errorState').classList.add('active');
         document.getElementById('errorText').textContent = (b && (b.error || 'This table cannot be analyzed.')) || 'No results.';
@@ -879,24 +885,86 @@
       }
     }
 
+    function applyViewData(vd) {
+      if (!vd || !bundle) return;
+      if (Array.isArray(vd.headers) && vd.headers.length) bundle.viewHeaders = vd.headers;
+      if (Array.isArray(vd.allRows)) bundle.allViewRows = vd.allRows;
+      if (Array.isArray(vd.usedRows)) bundle.usedViewRows = vd.usedRows;
+      if (document.getElementById('hdpModal') && typeof StatisticoHeader !== 'undefined' && StatisticoHeader._populateDataModal) {
+        var live = ctViewData();
+        StatisticoHeader._lastDataResult = live;
+        StatisticoHeader._populateDataModal(live, StatisticoHeader._viewDataMode || 'used');
+      }
+    }
+
+    function matrixRows(b) {
+      var out = [];
+      var rLabs = b.rowLabels || [];
+      var cLabs = b.colLabels || [];
+      var obs = b.observed || [];
+      var weighted = !!b.weightVar;
+      for (var i = 0; i < rLabs.length; i++) {
+        for (var j = 0; j < cLabs.length; j++) {
+          var n = Number(obs[i] && obs[i][j]) || 0;
+          if (!(n > 0)) continue;
+          if (weighted) {
+            out.push([rLabs[i], cLabs[j], n]);
+          } else {
+            var reps = Math.max(1, Math.round(n));
+            for (var t = 0; t < reps && out.length < 5000; t++) out.push([rLabs[i], cLabs[j]]);
+          }
+        }
+      }
+      return out;
+    }
+
+    function asRowList(x) {
+      return (Array.isArray(x) && x.length && Array.isArray(x[0])) ? x : null;
+    }
+
+    function ctViewData() {
+      if (!bundle) return null;
+      var headers = (bundle.viewHeaders && bundle.viewHeaders.length)
+        ? bundle.viewHeaders.slice()
+        : [bundle.rowVar, bundle.colVar].filter(Boolean);
+      if (bundle.weightVar && headers.indexOf(bundle.weightVar) < 0) headers.push(bundle.weightVar);
+      var allRows = asRowList(bundle.allViewRows);
+      var usedRows = asRowList(bundle.usedViewRows);
+      if ((!allRows || !usedRows) && bundle.source && bundle.source.headers && bundle.source.rows && window.StatisticoContingency) {
+        try {
+          var rebuilt = StatisticoContingency.analyze(bundle.source.headers, bundle.source.rows, {
+            rowVar: bundle.rowVar,
+            colVar: bundle.colVar,
+            weightVar: bundle.weightVar,
+            missing: bundle.missingMode,
+            rowLevels: bundle.rowLevels,
+            colLevels: bundle.colLevels,
+            confidence: bundle.confidence
+          });
+          if (!headers.length) headers = rebuilt.viewHeaders || headers;
+          if (!allRows) allRows = asRowList(rebuilt.allViewRows);
+          if (!usedRows) usedRows = asRowList(rebuilt.usedViewRows);
+        } catch (_e) {}
+      }
+      if (!usedRows) usedRows = matrixRows(bundle);
+      if (!allRows) allRows = usedRows;
+      var noticeParts = [];
+      if (bundle.dropped && bundle.dropped.missing) noticeParts.push(bundle.dropped.missing + ' missing');
+      if (bundle.dropped && bundle.dropped.level) noticeParts.push(bundle.dropped.level + ' excluded by category filter');
+      if (bundle.dropped && bundle.dropped.weight) noticeParts.push(bundle.dropped.weight + ' invalid weight');
+      return {
+        headers: headers,
+        allRows: allRows || [],
+        usedRows: usedRows || [],
+        columnRoles: headers.map(function () { return 'xc'; }),
+        notice: noticeParts.length ? ('Dropped: ' + noticeParts.join(', ') + '.') : null
+      };
+    }
+
     function ctActions() {
       return {
         getData: function () {
-          if (!bundle) return null;
-          var headers = bundle.viewHeaders || [bundle.rowVar, bundle.colVar].filter(Boolean);
-          var allRows = bundle.allViewRows || [];
-          var usedRows = bundle.usedViewRows || allRows;
-          var noticeParts = [];
-          if (bundle.dropped && bundle.dropped.missing) noticeParts.push(bundle.dropped.missing + ' missing');
-          if (bundle.dropped && bundle.dropped.level) noticeParts.push(bundle.dropped.level + ' excluded by category filter');
-          if (bundle.dropped && bundle.dropped.weight) noticeParts.push(bundle.dropped.weight + ' invalid weight');
-          return {
-            headers: headers,
-            allRows: allRows,
-            usedRows: usedRows,
-            columnRoles: headers.map(function (_, i) { return i === 0 ? 'xc' : (i === 1 ? 'xn' : null); }),
-            notice: noticeParts.length ? ('Dropped: ' + noticeParts.join(', ') + '.') : null
-          };
+          return ctViewData();
         },
         exportHtml: exportContingencyHtml,
         exportJson: function () {
@@ -950,6 +1018,10 @@
             try {
               var msg = JSON.parse(arg.message || '{}');
               if (msg.type === 'CONTINGENCY_BUNDLE' && msg.payload) showBundle(msg.payload);
+              if (msg.type === 'CONTINGENCY_VIEW_DATA' && msg.payload) {
+                if (bundle) applyViewData(msg.payload);
+                else pendingViewData = msg.payload;
+              }
             } catch (_e) {}
           });
           send('ready');

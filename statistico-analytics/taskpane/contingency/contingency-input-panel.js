@@ -128,13 +128,48 @@ function openContingencyResultsDialog(bundle) {
   });
 }
 
+function slimContingencyBundle(bundle) {
+  if (!bundle || typeof bundle !== 'object') return bundle;
+  var slim = Object.assign({}, bundle);
+  delete slim.source;
+  return slim;
+}
+
+function contingencyViewPayload(bundle) {
+  if (!bundle || typeof bundle !== 'object') return null;
+  var headers = bundle.viewHeaders || [bundle.rowVar, bundle.colVar].filter(Boolean);
+  if (bundle.weightVar && headers.indexOf(bundle.weightVar) < 0) headers = headers.concat([bundle.weightVar]);
+  return {
+    headers: headers,
+    allRows: Array.isArray(bundle.allViewRows) ? bundle.allViewRows : [],
+    usedRows: Array.isArray(bundle.usedViewRows) ? bundle.usedViewRows : []
+  };
+}
+
 function sendContingencyBundle() {
   if (!contingencyResultsDialog) return;
   var bundleStr = sessionStorage.getItem('contingencyBundle');
   if (!bundleStr) return;
   var payload = null;
   try { payload = JSON.parse(bundleStr); } catch (_e) { return; }
-  contingencyResultsDialog.messageChild(JSON.stringify({ type: 'CONTINGENCY_BUNDLE', payload: payload }));
+  var viewData = contingencyViewPayload(payload);
+  try {
+    contingencyResultsDialog.messageChild(JSON.stringify({
+      type: 'CONTINGENCY_BUNDLE',
+      payload: slimContingencyBundle(payload)
+    }));
+  } catch (_e2) {}
+  if (viewData) {
+    setTimeout(function () {
+      if (!contingencyResultsDialog) return;
+      try {
+        contingencyResultsDialog.messageChild(JSON.stringify({
+          type: 'CONTINGENCY_VIEW_DATA',
+          payload: viewData
+        }));
+      } catch (_e3) {}
+    }, 300);
+  }
 }
 
 (function (hubKey, fn) {

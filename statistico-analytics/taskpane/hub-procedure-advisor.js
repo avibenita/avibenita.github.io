@@ -121,7 +121,7 @@
       moduleId: "logistic",
       label: "Logistic",
       titleFull: "Logistic Regression",
-      category: "Categorical Data",
+      category: "Build Models",
       difficulty: "Medium",
       duration: "≈ 3 min",
       reason: "Your outcome is yes/no (or binary) and you want odds ratios for predictors.",

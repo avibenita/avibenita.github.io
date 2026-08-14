@@ -55,18 +55,14 @@ const HUB_CATEGORY_TILES = [
     icon: "fa-table-cells",
     color: "#8b5cf6",
     colorDark: "#6d28d9",
-    subtitle: "Frequencies, association, and binary models",
-    desc: "Describe categorical variables, test association in two-way tables, and model binary outcomes.",
+    subtitle: "Association in two-way tables",
+    desc: "Test whether two categorical variables are associated, with χ², residuals, and 2×2 risk measures.",
     info: [
-      "Frequency Tables: one-way counts and publication-oriented summaries (coming soon)",
       "Contingency Tables: two-way association, χ², residuals, and 2×2 risk measures",
-      "Logistic: binary outcome modeling with odds ratios and fit diagnostics",
       "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "frequency-tables", label: "Frequency Tables", comingSoon: true, tip: "One-way frequency tables for categorical variables. Coming soon — a separate module, not a replacement for Contingency Tables." },
-      { id: "contingency", label: "Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." },
-      { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
+      { id: "contingency", label: "Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." }
     ]
   },
   {
@@ -114,16 +110,17 @@ const HUB_CATEGORY_TILES = [
     color: "#0ea5e9",
     colorDark: "#0369a1",
     tabStyle: "soft",
-    subtitle: "Regression for continuous outcomes",
-    desc: "Predict a continuous outcome from one or more predictors, with coefficients and fit diagnostics.",
+    subtitle: "Regression and logistic prediction",
+    desc: "Predict continuous or binary outcomes from one or more predictors, with coefficients and fit diagnostics.",
     info: [
       "Regression: continuous outcomes, coefficients, and diagnostics",
+      "Logistic: binary outcomes with odds ratios and classification",
       "Model fit, residual checks, and interpretation aids",
-      "Logistic regression lives under Categorical Data",
       "Built for publication-ready reporting from Excel data"
     ],
     modules: [
-      { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." }
+      { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
+      { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
     ]
   },
   {

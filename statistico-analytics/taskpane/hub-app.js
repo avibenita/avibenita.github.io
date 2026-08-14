@@ -302,6 +302,7 @@ const TOOLS_CATEGORY_TILES = [
   },
   {
     id: "effect-size-family",
+    hidden: true, // temporarily hidden from the hub
     title: "Effect size converter",
     icon: "fa-right-left",
     accent: "#38bdf8",
@@ -577,7 +578,9 @@ function renderCategoryTiles(query) {
     holder.parentElement.insertBefore(range, holder);
   }
   HUB_ACTIONS = {};
-  var allSource = HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || [];
+  var allSource = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
+    return !c.hidden;
+  });
   var source = allSource;
   if (ACTIVE_CLUSTER === "tools") {
     source = allSource.filter(function (c) {

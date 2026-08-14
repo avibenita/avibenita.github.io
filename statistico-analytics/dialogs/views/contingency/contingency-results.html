@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260814ct2"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260814ct2"></script>
-  <script src="contingency-engine.js?v=20260814ct3"></script>
-  <script src="contingency-sample-data.js?v=20260814ct3"></script>
+  <script src="contingency-engine.js?v=20260814ct4"></script>
+  <script src="contingency-sample-data.js?v=20260814ct4"></script>
   <style>
     :root {
       --surface-0:#070b14; --surface-1:#1e2638; --surface-2:#2a3348; --border:#4b556e;
@@ -62,15 +62,62 @@
     }
     .ws-mode-tab.active { background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:#fff; border-color:transparent; }
     .ws-mode-hint { font-size:11px; color:var(--text-muted); margin-left:4px; }
+    .cell-legend {
+      display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
+      font-size:11px; color:var(--text-muted); margin:0 0 8px;
+    }
+    .cell-legend .lg-item { display:inline-flex; align-items:baseline; gap:5px; }
+    .cell-legend .lg-hero { font-size:13px; font-weight:800; color:var(--text-primary); }
+    .cell-legend .lg-sub { font-size:11px; font-weight:600; color:var(--text-muted); }
+    .heat-key { display:inline-flex; align-items:center; gap:6px; margin-left:auto; }
+    .heat-ramp {
+      width:72px; height:8px; border-radius:99px;
+      background:linear-gradient(90deg, rgba(139,92,246,.08), rgba(139,92,246,.55));
+    }
+    .heat-ramp.resid {
+      background:linear-gradient(90deg, #2563eb, #64748b, #ea580c);
+    }
     .tbl-wrap { overflow:auto; max-height:min(68vh, 640px); border:1px solid var(--border); border-radius:8px; height:auto; }
     table.ct { width:100%; border-collapse:collapse; font-size:12.5px; }
     table.ct th, table.ct td { border-bottom:1px solid var(--border); padding:6px 8px; text-align:right; white-space:nowrap; vertical-align:top; }
-    table.ct td.stacked, table.ct td.stacked.total { white-space:normal; }
     table.ct th { background:var(--surface-2); font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--text-muted); }
     table.ct td.stub, table.ct th.stub { text-align:left; font-weight:700; color:var(--text-primary); }
     table.ct td.total, table.ct th.total { font-weight:700; background:rgba(167,139,250,.08); }
     table.ct td.band-moderate { font-weight:700; }
     table.ct td.band-strong { font-weight:800; }
+    #tableWrap table.ct {
+      width:max-content; min-width:100%; border-collapse:separate; border-spacing:0;
+      font-variant-numeric:tabular-nums;
+    }
+    #tableWrap table.ct th, #tableWrap table.ct td {
+      border-bottom:1px solid var(--border);
+      border-right:1px solid rgba(75,85,110,.45);
+      padding:8px 10px; text-align:center; vertical-align:middle;
+    }
+    #tableWrap table.ct thead th {
+      position:sticky; top:0; z-index:2;
+      background:var(--surface-2); text-transform:none; letter-spacing:0;
+      font-size:11.5px; font-weight:700; color:var(--text-secondary);
+    }
+    #tableWrap table.ct th.stub, #tableWrap table.ct td.stub {
+      position:sticky; left:0; z-index:3; text-align:left;
+      background:var(--surface-1); min-width:88px; box-shadow:4px 0 10px rgba(0,0,0,.18);
+    }
+    #tableWrap table.ct thead th.stub { z-index:4; background:var(--surface-2); }
+    #tableWrap table.ct tbody th.stub.total { right:auto; background:rgba(30,38,56,.96); }
+    :root[data-theme="light"] #tableWrap table.ct tbody th.stub.total { background:#f1f5f9; }
+    #tableWrap table.ct thead th.total,
+    #tableWrap table.ct td.total {
+      position:sticky; right:0; z-index:3;
+      background:rgba(30,38,56,.96); font-weight:700;
+      box-shadow:-4px 0 10px rgba(0,0,0,.16);
+    }
+    :root[data-theme="light"] #tableWrap table.ct thead th.total,
+    :root[data-theme="light"] #tableWrap table.ct td.total { background:#f1f5f9; }
+    #tableWrap table.ct thead th.total { z-index:4; background:var(--surface-2); }
+    :root[data-theme="light"] #tableWrap table.ct thead th.total { background:var(--surface-2); }
+    #tableWrap table.ct td { min-width:72px; }
+    #tableWrap table.ct td.heat { color:var(--text-primary); }
     .tbl-actions { display:flex; gap:6px; margin-top:8px; }
     .mini-btn { border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); border-radius:7px; padding:5px 9px; font-size:11px; cursor:pointer; }
     .tests-table td:first-child { text-align:left; font-weight:600; }
@@ -85,11 +132,10 @@
     .layout-note { font-size:12px; color:var(--text-muted); margin-bottom:8px; }
     select.ct-sel { background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border); border-radius:7px; padding:5px 8px; font-size:12px; }
     .muted { color:var(--text-muted); font-size:12.5px; }
-    .cell-stack { display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
-    .cell-line { display:flex; gap:6px; align-items:baseline; line-height:1.25; }
-    .cell-k { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.2px; }
-    .cell-v { font-size:12.5px; font-weight:700; color:var(--text-primary); }
-    .cell-v.resid { font-variant-numeric:tabular-nums; }
+    .cell-stack { display:flex; flex-direction:column; align-items:center; gap:1px; line-height:1.15; }
+    .cell-v { font-size:13.5px; font-weight:800; color:var(--text-primary); letter-spacing:.01em; }
+    .cell-v.sub { font-size:11px; font-weight:600; color:var(--text-muted); }
+    .cell-v.resid { font-variant-numeric:tabular-nums; font-weight:800; }
   </style>
 </head>
 <body>
@@ -153,6 +199,7 @@
         <div id="tab-table" class="tab-panel">
           <div class="card">
             <div class="ws-mode-tabbar" id="measureBar"></div>
+            <div class="cell-legend" id="cellLegend"></div>
             <div class="tbl-wrap" id="tableWrap"></div>
             <div class="tbl-actions">
               <button class="mini-btn" type="button" onclick="copyCurrentTable()"><i class="fa-solid fa-copy"></i> Copy table</button>
@@ -277,17 +324,52 @@
       return fmtN(r.N, 2);
     }
     function stackHtml(lines) {
-      var multi = measureList().length > 1;
       var html = '<div class="cell-stack">';
-      lines.forEach(function (ln) {
+      lines.forEach(function (ln, idx) {
         if (!ln.value && ln.value !== 0) return;
-        html += '<div class="cell-line">';
-        if (multi) html += '<span class="cell-k">' + esc(ln.short) + '</span>';
-        html += '<span class="cell-v' + (ln.id === 'stdResiduals' ? ' resid' : '') + '"' +
-          (ln.color ? ' style="color:' + ln.color + '"' : '') + '>' + esc(ln.value) + '</span></div>';
+        var cls = 'cell-v';
+        if (idx > 0) cls += ' sub';
+        if (ln.id === 'stdResiduals') cls += ' resid';
+        html += '<div class="' + cls + '"' + (ln.color ? ' style="color:' + ln.color + '"' : '') + '>' + esc(ln.value) + '</div>';
       });
       html += '</div>';
       return html;
+    }
+    function heatMode() {
+      if (hasMeasure('stdResiduals')) return 'residual';
+      if (hasMeasure('observed')) return 'observed';
+      if (hasMeasure('totPct')) return 'totPct';
+      if (hasMeasure('colPct')) return 'colPct';
+      if (hasMeasure('rowPct')) return 'rowPct';
+      return 'expected';
+    }
+    function heatMax(r, mode) {
+      if (mode === 'residual' || mode === 'rowPct' || mode === 'colPct' || mode === 'totPct') return 1;
+      var m = 0, i, j;
+      var src = mode === 'expected' ? r.expected : r.observed;
+      for (i = 0; i < r.nRows; i++) {
+        for (j = 0; j < r.nCols; j++) if (src[i][j] > m) m = src[i][j];
+      }
+      return m || 1;
+    }
+    function cellHeat(r, i, j, mode, maxV) {
+      if (mode === 'residual') return residColor(r.stdResiduals[i][j]);
+      var v = 0;
+      if (mode === 'observed') v = r.observed[i][j] / maxV;
+      else if (mode === 'expected') v = r.expected[i][j] / maxV;
+      else if (mode === 'totPct') v = r.totPct[i][j] / 100;
+      else if (mode === 'colPct') v = r.colPct[i][j] / 100;
+      else v = r.rowPct[i][j] / 100;
+      v = Math.max(0, Math.min(1, v));
+      return 'rgba(139,92,246,' + (0.05 + 0.42 * v) + ')';
+    }
+    function heatCaption(mode) {
+      if (mode === 'residual') return 'Color = adjusted residual';
+      if (mode === 'observed') return 'Darker = larger count';
+      if (mode === 'expected') return 'Darker = larger expected';
+      if (mode === 'totPct') return 'Darker = larger total %';
+      if (mode === 'colPct') return 'Darker = larger column %';
+      return 'Darker = larger row %';
     }
     function cellLines(r, i, j) {
       var sr = r.stdResiduals[i][j];
@@ -371,19 +453,34 @@
         return '<button type="button" class="ws-mode-tab' + (hasMeasure(m.id) ? ' active' : '') + '" data-m="' + m.id + '">' + esc(m.label) + '</button>';
       }).join('');
       html += '<button type="button" class="ws-mode-tab' + (allOn ? ' active' : '') + '" data-m="all">All</button>';
-      html += '<span class="ws-mode-hint">Select one or more</span>';
       qsHtml('measureBar', html);
       document.querySelectorAll('#measureBar .ws-mode-tab').forEach(function (btn) {
         btn.onclick = function () { toggleMeasure(btn.getAttribute('data-m')); renderMeasureBar(); renderTable(); };
       });
     }
 
+    function renderCellLegend() {
+      var list = measureList();
+      var mode = heatMode();
+      var items = list.map(function (m, idx) {
+        return '<span class="lg-item"><span class="' + (idx === 0 ? 'lg-hero' : 'lg-sub') + '">' + esc(m.short) + '</span></span>';
+      }).join('<span class="lg-sub">·</span>');
+      var rampCls = mode === 'residual' ? 'heat-ramp resid' : 'heat-ramp';
+      qsHtml('cellLegend',
+        (list.length > 1 ? '<span>In each cell</span>' + items : '') +
+        '<span class="heat-key"><span class="' + rampCls + '"></span>' + esc(heatCaption(mode)) + '</span>'
+      );
+    }
+
     function renderTable() {
       var r = bundle;
       var list = measureList();
       var stacked = list.length > 1;
+      var mode = heatMode();
+      var maxV = heatMax(r, mode);
       var showRowTot = hasMeasure('observed') || hasMeasure('expected') || hasMeasure('totPct') || hasMeasure('rowPct');
       var showColTot = hasMeasure('observed') || hasMeasure('expected') || hasMeasure('totPct') || hasMeasure('colPct');
+      renderCellLegend();
       var html = '<table class="ct"><thead><tr><th class="stub">' + esc(r.rowVar) + ' \\ ' + esc(r.colVar) + '</th>';
       r.colLabels.forEach(function (c) { html += '<th>' + esc(c) + '</th>'; });
       if (showRowTot) html += '<th class="total">Total</th>';
@@ -392,10 +489,8 @@
         html += '<tr><th class="stub">' + esc(r.rowLabels[i]) + '</th>';
         for (var j = 0; j < r.nCols; j++) {
           var sr = r.stdResiduals[i][j];
-          var onlyResid = list.length === 1 && hasMeasure('stdResiduals');
-          var cls = (stacked ? 'stacked ' : '') + (onlyResid ? bandClass(sr) : '');
-          var style = onlyResid ? ' style="background:' + residColor(sr) + '"' : '';
-          html += '<td class="' + cls + '"' + style + ' title="' + tip(r, i, j) + '">' + stackHtml(cellLines(r, i, j)) + '</td>';
+          var cls = 'heat' + (stacked ? ' stacked' : '') + (hasMeasure('stdResiduals') ? ' ' + bandClass(sr) : '');
+          html += '<td class="' + cls + '" style="background:' + cellHeat(r, i, j, mode, maxV) + '" title="' + tip(r, i, j) + '">' + stackHtml(cellLines(r, i, j)) + '</td>';
         }
         if (showRowTot) {
           html += '<td class="total' + (stacked ? ' stacked' : '') + '">' + stackHtml(marginLines(r, 'row', i)) + '</td>';

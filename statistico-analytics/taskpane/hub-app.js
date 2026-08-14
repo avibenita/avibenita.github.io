@@ -164,11 +164,12 @@ const HUB_CATEGORY_TILES = [
   }
 ];
 const TOOLS_CATEGORY_TILES = [
-  /* ── Cluster 1: Data-Driven Tools ─────────────────────────────────────
+  /* ── Cluster 1: Applications ──────────────────────────────────────────
      Specialized modules that work on the Excel range/selection itself. */
   {
     id: "report-tables",
-    section: "Data-Driven Tools",
+    section: "Applications",
+    sectionId: "applications",
     sectionSubtitle: "Specialized modules using your selected Excel data",
     title: "Publication Tables",
     icon: "fa-graduation-cap",
@@ -243,11 +244,12 @@ const TOOLS_CATEGORY_TILES = [
   {
     id: "distribution-tools",
     section: "Calculators & Planning",
+    sectionId: "calculators",
     sectionSubtitle: "Standalone calculations, study design, and simulation tools",
     title: "Distribution calculators",
     icon: "fa-chart-area",
-    accent: "#eab308",
-    accentDark: "#a16207",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
     color: "#2563eb",
     colorDark: "#1d4ed8",
     subtitle: "Probability, quantiles, and tails for common distributions",
@@ -271,8 +273,8 @@ const TOOLS_CATEGORY_TILES = [
     id: "sample-planning",
     title: "Sample planning",
     icon: "fa-ruler-combined",
-    accent: "#eab308",
-    accentDark: "#a16207",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
     color: "#0ea5e9",
     colorDark: "#0369a1",
     subtitle: "Precision and power oriented sample size tools",
@@ -302,8 +304,8 @@ const TOOLS_CATEGORY_TILES = [
     id: "effect-size-family",
     title: "Effect size converter",
     icon: "fa-right-left",
-    accent: "#eab308",
-    accentDark: "#a16207",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
     color: "#a855f7",
     colorDark: "#7e22ce",
     subtitle: "Translate effect metrics across test families",
@@ -327,8 +329,8 @@ const TOOLS_CATEGORY_TILES = [
     id: "erlang-family",
     title: "Call center staffing",
     icon: "fa-headset",
-    accent: "#eab308",
-    accentDark: "#a16207",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
     color: "#f59e0b",
     colorDark: "#b45309",
     subtitle: "Erlang C and operational staffing design",
@@ -353,11 +355,12 @@ const TOOLS_CATEGORY_TILES = [
   {
     id: "utilities-bubble",
     section: "Utilities",
+    sectionId: "utilities",
     sectionSubtitle: "Visual exploration and Excel-to-Office publishing",
     title: "Bubble Chart",
     icon: "fa-chart-scatter",
-    accent: "#eab308",
-    accentDark: "#a16207",
+    accent: "#34d399",
+    accentDark: "#059669",
     color: "#14b8a6",
     colorDark: "#0f766e",
     subtitle: "Interactive bubble and quadrant charts from your Excel range",
@@ -375,8 +378,8 @@ const TOOLS_CATEGORY_TILES = [
     id: "ezpaste",
     title: "EzPaste",
     icon: "fa-bullseye",
-    accent: "#eab308",
-    accentDark: "#a16207",
+    accent: "#34d399",
+    accentDark: "#059669",
     color: "#14b8a6",
     colorDark: "#0f766e",
     subtitle: "Batch-export Excel charts and ranges to PowerPoint, Word, and more",
@@ -424,12 +427,40 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
-/* Active Range is shown on Specialized Tools parked under the Data-Driven
-   Tools section header (immediately above Report Tables). Calculators &
-   Planning, after the next divider, doesn't use it. */
+/* Active Range is shown on Specialized Tools for Applications and Utilities.
+   Calculators & Planning does not use a worksheet range. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
+let ACTIVE_TOOLS_SECTION = "applications";
+var TOOLS_SECTION_META = {
+  applications: {
+    id: "applications",
+    label: "Applications",
+    subtitle: "Specialized modules using your selected Excel data",
+    icon: "fa-table",
+    color: "#eab308",
+    colorDark: "#a16207"
+  },
+  calculators: {
+    id: "calculators",
+    label: "Calculators & Planning",
+    subtitle: "Standalone calculations, study design, and simulation tools",
+    icon: "fa-calculator",
+    color: "#38bdf8",
+    colorDark: "#0284c7"
+  },
+  utilities: {
+    id: "utilities",
+    label: "Utilities",
+    subtitle: "Visual exploration and Excel-to-Office publishing",
+    icon: "fa-wrench",
+    color: "#34d399",
+    colorDark: "#059669"
+  }
+};
+var TOOLS_SECTION_ORDER = ["applications", "calculators", "utilities"];
+var TOOLS_RANGE_SECTIONS = ["applications", "utilities"];
 let HUB_ACTIONS = {};
 
 /** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
@@ -507,7 +538,7 @@ function renderModules(list) {
   if (noResults) noResults.style.display = list.length ? "none" : "block";
 }
 
-/* Park the Active Range bar under the Data-Driven Tools section header
+/* Park the Active Range bar under the Applications section header
    (immediately above Report Tables) on the Specialized Tools tab; restore it
    above the tile list on Statistical Analysis. Must run after every tile
    re-render, and before wiping #categoryTiles (or the node is destroyed). */
@@ -525,6 +556,16 @@ function placeHubRangeSection() {
   holder.parentElement.insertBefore(range, holder);
 }
 
+function getToolsTileSectionId(tile, tiles) {
+  var list = tiles || TOOLS_CATEGORY_TILES;
+  if (tile && tile.sectionId) return tile.sectionId;
+  var idx = list.indexOf(tile);
+  for (var i = idx; i >= 0; i--) {
+    if (list[i] && list[i].sectionId) return list[i].sectionId;
+  }
+  return "applications";
+}
+
 function renderCategoryTiles(query) {
   var holder = document.getElementById("categoryTiles");
   var noResults = document.getElementById("noResults");
@@ -536,7 +577,13 @@ function renderCategoryTiles(query) {
     holder.parentElement.insertBefore(range, holder);
   }
   HUB_ACTIONS = {};
-  var source = HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || [];
+  var allSource = HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || [];
+  var source = allSource;
+  if (ACTIVE_CLUSTER === "tools") {
+    source = allSource.filter(function (c) {
+      return getToolsTileSectionId(c, allSource) === ACTIVE_TOOLS_SECTION;
+    });
+  }
   var clusterMeta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
   var clusterColor = clusterMeta.color || "#1f6fff";
   var clusterColorDark = clusterMeta.colorDark || clusterColor;
@@ -559,8 +606,11 @@ function renderCategoryTiles(query) {
       : '<i class="fa-solid ' + escapeHtml(icon) + '"></i>';
     var sectionHtml = "";
     if (c.section) {
+      var sectionMeta = TOOLS_SECTION_META[c.sectionId] || null;
+      var sectionColor = sectionMeta ? sectionMeta.color : color;
       sectionHtml =
-        '<div class="category-section-header' + (idx > 0 ? " with-divider" : "") + '">' +
+        '<div class="category-section-header' + (idx > 0 ? " with-divider" : "") + '"' +
+        ' style="--section-color:' + escapeHtml(sectionColor) + ';">' +
         '<div class="category-section-title">' + escapeHtml(c.section) + "</div>" +
         (c.sectionSubtitle ? '<div class="category-section-subtitle">' + escapeHtml(c.sectionSubtitle) + "</div>" : "") +
         "</div>";
@@ -822,16 +872,87 @@ function syncClusterHeader() {
   var range = document.getElementById("hubRangeSection");
   var advisor = document.getElementById("advisorStrip");
   var showRange = HUB_RANGE_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
+  if (ACTIVE_CLUSTER === "tools") {
+    showRange = TOOLS_RANGE_SECTIONS.indexOf(ACTIVE_TOOLS_SECTION) >= 0;
+  }
   var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
   if (range) range.style.display = showRange ? "" : "none";
   if (advisor) advisor.style.display = showAdvisor ? "" : "none";
+  syncHubToolsMenuSelection();
   // Range placement is handled by renderCategoryTiles (called via filterModules
   // after every cluster switch) so the node isn't parked against stale tiles.
+}
+
+function isHubToolsMenuOpen() {
+  var menu = document.getElementById("hubToolsMenu");
+  return !!(menu && menu.classList.contains("open"));
+}
+
+function openHubToolsMenu() {
+  var menu = document.getElementById("hubToolsMenu");
+  var btn = document.querySelector('.hub-nav-tab[data-cluster="tools"]');
+  if (!menu) return;
+  menu.classList.add("open");
+  menu.setAttribute("aria-hidden", "false");
+  if (btn) {
+    btn.setAttribute("aria-expanded", "true");
+    btn.classList.add("menu-open");
+  }
+  syncHubToolsMenuSelection();
+}
+
+function closeHubToolsMenu() {
+  var menu = document.getElementById("hubToolsMenu");
+  var btn = document.querySelector('.hub-nav-tab[data-cluster="tools"]');
+  if (!menu) return;
+  menu.classList.remove("open");
+  menu.setAttribute("aria-hidden", "true");
+  if (btn) {
+    btn.setAttribute("aria-expanded", "false");
+    btn.classList.remove("menu-open");
+  }
+}
+
+function syncHubToolsMenuSelection() {
+  var menu = document.getElementById("hubToolsMenu");
+  if (!menu) return;
+  menu.querySelectorAll("[data-tools-section]").forEach(function (item) {
+    var on = item.getAttribute("data-tools-section") === ACTIVE_TOOLS_SECTION;
+    item.classList.toggle("active", on);
+    if (on) item.setAttribute("aria-current", "true");
+    else item.removeAttribute("aria-current");
+  });
+}
+
+function toggleHubToolsMenu(ev) {
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  var wasOpen = isHubToolsMenuOpen();
+  if (ACTIVE_CLUSTER !== "tools") {
+    setHubCluster("tools");
+    openHubToolsMenu();
+    return;
+  }
+  if (wasOpen) closeHubToolsMenu();
+  else openHubToolsMenu();
+}
+
+function setHubToolsSection(sectionId) {
+  if (!TOOLS_SECTION_META[sectionId]) return;
+  ACTIVE_TOOLS_SECTION = sectionId;
+  ACTIVE_CLUSTER = "tools";
+  closeHubToolsMenu();
+  syncClusterHeader();
+  closePopup();
+  filterModules("");
 }
 
 function setHubCluster(clusterId) {
   if (!HUB_CLUSTER_TILES[clusterId]) return;
   ACTIVE_CLUSTER = clusterId;
+  if (clusterId !== "tools") closeHubToolsMenu();
   syncClusterHeader();
   closePopup();
   filterModules("");
@@ -2006,8 +2127,19 @@ window.navigateToModule = navigateToModule;
 window.filterModules = filterModules;
 window.showAdvisor = showAdvisor;
 window.setHubCluster = setHubCluster;
+window.setHubToolsSection = setHubToolsSection;
+window.toggleHubToolsMenu = toggleHubToolsMenu;
 window.runHubModuleAction = runHubModuleAction;
 window.setSelectedModuleCard = setSelectedModuleCard;
+
+document.addEventListener("click", function (e) {
+  var wrap = document.getElementById("hubNavToolsWrap");
+  if (!wrap || !isHubToolsMenuOpen()) return;
+  if (!wrap.contains(e.target)) closeHubToolsMenu();
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") closeHubToolsMenu();
+});
 
 Office.onReady(function(info) {
   if (info.host !== Office.HostType.Excel) {

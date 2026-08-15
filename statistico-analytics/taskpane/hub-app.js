@@ -983,16 +983,27 @@ function escapeHtml(s) {
 
 const popup = document.getElementById("infoPopup");
 const popupScrim = document.getElementById("infoPopupScrim");
+const popupClose = document.getElementById("popupClose");
 const ptitle = document.getElementById("popupTitle");
 const plist = document.getElementById("popupList");
 let _activeBtn = null;
+let _activePopupKey = null;
+
+function popupKeyFor(btn) {
+  if (!btn || !btn.getAttribute) return null;
+  return btn.getAttribute("data-tile-info") || btn.getAttribute("data-module-id") || null;
+}
 
 function showPopup(m, btn) {
-  if (_activeBtn === btn && popup && popup.classList.contains("open")) {
+  var key = popupKeyFor(btn);
+  var alreadyOpen = popup && popup.classList.contains("open");
+  var sameTarget = (key && key === _activePopupKey) || (!key && _activeBtn === btn);
+  if (alreadyOpen && sameTarget) {
     closePopup();
     return;
   }
   _activeBtn = btn;
+  _activePopupKey = key;
   if (ptitle) {
     ptitle.innerHTML =
       '<i class="fa-solid ' + m.icon + '" style="color:var(--accent-1);font-size:11px;"></i> ' + escapeHtml(m.name);
@@ -1005,13 +1016,19 @@ function showPopup(m, btn) {
   if (popup && btn) {
     const r = btn.getBoundingClientRect();
     const vw = window.innerWidth;
+    const vh = window.innerHeight;
     const W = 260;
     let left = r.right - W;
     if (left < 6) left = 6;
     if (left + W > vw - 6) left = vw - W - 6;
     popup.style.left = left + "px";
-    popup.style.top = r.bottom + 5 + "px";
+    popup.style.top = (r.bottom + 5) + "px";
     popup.classList.add("open");
+    var popupH = popup.offsetHeight || 0;
+    if (r.bottom + 5 + popupH > vh - 8) {
+      var above = r.top - popupH - 5;
+      popup.style.top = Math.max(8, above) + "px";
+    }
     if (popupScrim) {
       popupScrim.classList.add("open");
       popupScrim.setAttribute("aria-hidden", "false");
@@ -1026,6 +1043,7 @@ function closePopup() {
     popupScrim.setAttribute("aria-hidden", "true");
   }
   _activeBtn = null;
+  _activePopupKey = null;
 }
 
 document.addEventListener("click", function(e) {
@@ -1038,6 +1056,13 @@ document.addEventListener("click", function(e) {
 });
 if (popupScrim) {
   popupScrim.addEventListener("click", function () { closePopup(); });
+}
+if (popupClose) {
+  popupClose.addEventListener("click", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    closePopup();
+  });
 }
 
 function filterModules(q) {
@@ -2512,6 +2537,7 @@ document.addEventListener("click", function (e) {
 });
 document.addEventListener("keydown", function (e) {
   if (e.key === "Escape") {
+    closePopup();
     closeHubToolsMenu();
     closeHubAnalyticsMenu();
   }

@@ -103,10 +103,19 @@
       color: var(--cfg-text3); padding-bottom: 4px;
     }
     .zone-result {
-      width: 100%; font-size: 11.5px; font-weight: 650; color: var(--cfg-text2);
+      width: 100%; font-size: 11.5px; font-weight: 650; color: var(--cfg-text);
       padding: 2px 2px 0; line-height: 1.35;
     }
-    .zone-result-sub { width: 100%; font-size: 10.5px; font-weight: 500; color: var(--cfg-text3); }
+    .zone-result-sub { width: 100%; font-size: 10.5px; font-weight: 500; color: var(--cfg-text2); }
+    .zone-color-swatches { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; padding: 4px 2px 0; }
+    .zone-swatch {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10.5px; font-weight: 700; color: var(--cfg-text);
+    }
+    .zone-swatch i {
+      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+      box-shadow: 0 0 0 1px rgba(15,23,42,.2);
+    }
     .reg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 8px; border-radius: 20px; font-size: 12px; font-weight: 650; border: 1px solid; white-space: nowrap; }
     .reg-chip.num { background: rgba(14,165,233,.18); border-color: rgba(14,165,233,.45); color: #7dd3fc; }
     .reg-chip.cat { background: rgba(139,92,246,.18); border-color: rgba(139,92,246,.45); color: #ddd6fe; }
@@ -260,6 +269,7 @@
     var assignments = { x: null, y: null, size: null, color: null, label: null };
     var chartMode = 'bubble';
     var draggedElement = null;
+    var COLOR_PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#000000', '#F0E442'];
     var ZONE_META = {
       x: { el: 'zoneX', kind: 'num', req: true, accept: 'num' },
       y: { el: 'zoneY', kind: 'num', req: true, accept: 'num' },
@@ -402,23 +412,70 @@
       return '<div class="reg-zone-placeholder">Drop a numeric column</div>';
     }
 
+    function listUniques(name) {
+      var idx = _headers.indexOf(name);
+      if (idx < 0) return [];
+      var order = [];
+      var seen = {};
+      _rows.forEach(function(row) {
+        var v = row[idx];
+        var k = (v === null || v === undefined || v === '') ? '(blank)' : String(v);
+        if (!seen[k]) { seen[k] = 1; order.push(k); }
+      });
+      return order;
+    }
+
+    function nameLooksLikeId(name) {
+      var s = String(name || '');
+      return /(?:^|[_\s-])id$/i.test(s) || /^ids?$/i.test(s) || /identifier/i.test(s);
+    }
+
     function zoneAssignedExtra(zone, name) {
-      var extra = document.createElement('div');
-      extra.className = 'zone-result';
+      var wrap = document.createElement('div');
+      wrap.style.width = '100%';
       if (zone === 'color') {
         var stat = getStat(name);
-        extra.textContent = (stat && stat.isNumeric)
-          ? (name + ' → continuous color scale')
-          : (name + ' → ' + countUniques(name) + ' colored groups');
-        return extra;
+        var line = document.createElement('div');
+        line.className = 'zone-result';
+        if (stat && stat.isNumeric) {
+          line.textContent = 'Numeric → continuous color scale';
+          wrap.appendChild(line);
+          return wrap;
+        }
+        var vals = listUniques(name);
+        var u = vals.length;
+        line.textContent = u + (u === 1 ? ' category → 1 color' : ' categories → ' + u + ' colors');
+        wrap.appendChild(line);
+        var sw = document.createElement('div');
+        sw.className = 'zone-color-swatches';
+        vals.slice(0, 8).forEach(function(v, i) {
+          var chip = document.createElement('span');
+          chip.className = 'zone-swatch';
+          var dot = document.createElement('i');
+          dot.style.background = COLOR_PALETTE[i % COLOR_PALETTE.length];
+          chip.appendChild(dot);
+          chip.appendChild(document.createTextNode(v));
+          sw.appendChild(chip);
+        });
+        wrap.appendChild(sw);
+        if (nameLooksLikeId(name) && u < Math.max(3, _rows.length * 0.85)) {
+          var note = document.createElement('div');
+          note.className = 'zone-result-sub';
+          note.textContent = name + ' repeats across rows, so it is a grouping variable — not a unique ID. A name such as Study_Type, Design, or Group would be clearer.';
+          wrap.appendChild(note);
+        }
+        return wrap;
       }
       if (zone === 'label') {
+        var extra = document.createElement('div');
+        extra.className = 'zone-result';
         extra.textContent = name + ' → identifies each bubble';
         var sub = document.createElement('div');
         sub.className = 'zone-result-sub';
         sub.textContent = countUniques(name) + ' bubble names';
         extra.appendChild(sub);
-        return extra;
+        wrap.appendChild(extra);
+        return wrap;
       }
       return null;
     }

@@ -156,6 +156,25 @@
     .role-row, .ctrl-row {
       display: grid; grid-template-columns: 92px 1fr; gap: 8px; align-items: center; margin-bottom: 7px;
     }
+    .role-row.role-row-stack { align-items: start; }
+    .role-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    .role-hint { font-size: 11px; font-weight: 650; color: var(--text-secondary); line-height: 1.35; }
+    .role-hint-note { font-size: 10.5px; font-weight: 500; color: var(--text-muted); line-height: 1.35; }
+    .role-swatches { display: flex; flex-wrap: wrap; gap: 7px; }
+    .role-swatch {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 700; color: var(--text-primary);
+    }
+    .role-swatch i {
+      width: 11px; height: 11px; border-radius: 50%; display: inline-block;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.28);
+    }
+    .color-legend { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .color-legend-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; font-weight: 700; color: var(--text-primary); }
+    .color-legend-dot {
+      width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(255,255,255,.3);
+    }
     .role-row:last-child, .ctrl-row:last-child { margin-bottom: 0; }
     .role-label, .ctrl-row label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
     .role-label .req { color: #fb7185; }
@@ -209,7 +228,7 @@
     .color-scale-ends {
       display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted);
     }
-    .chart-row { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 112px; gap: 10px; }
+    .chart-row { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 132px; gap: 10px; }
     .chart-wrap {
       min-height: 360px; border: 1px solid var(--border); border-radius: 12px;
       background: #111827; position: relative; overflow: hidden;
@@ -234,8 +253,8 @@
     }
     .size-legend-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
     .size-dot {
-      border-radius: 50%; background: rgba(56,189,248,.35);
-      border: 1px solid rgba(56,189,248,.8); flex-shrink: 0;
+      border-radius: 50%; background: #0072B2;
+      border: 1px solid rgba(255,255,255,.45); flex-shrink: 0;
     }
     .waiting {
       flex: 1; display: flex; align-items: center; justify-content: center;
@@ -546,7 +565,7 @@
     }
   };
 
-  var PALETTE = ["#38bdf8", "#a78bfa", "#34d399", "#fbbf24", "#fb7185", "#94a3b8"];
+  var PALETTE = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#000000", "#F0E442"];
   var MISSING_GROUP = "Not specified";
   var MISSING_COLOR = "#64748b";
   var ROLES = [
@@ -596,7 +615,8 @@
     chart: null,
     lastCuts: { x: null, y: null },
     lastColorRange: { min: null, max: null },
-    lastSeriesNames: []
+    lastSeriesNames: [],
+    lastSeriesLegend: []
   };
 
   function send(action, data) {
@@ -727,8 +747,20 @@
         }
         render();
       });
-      row.appendChild(lab);
-      row.appendChild(sel);
+      if (role.id === "color") {
+        row.className = "role-row role-row-stack";
+        var field = document.createElement("div");
+        field.className = "role-field";
+        field.appendChild(sel);
+        var hint = document.createElement("div");
+        hint.id = "colorByHint";
+        field.appendChild(hint);
+        row.appendChild(lab);
+        row.appendChild(field);
+      } else {
+        row.appendChild(lab);
+        row.appendChild(sel);
+      }
       host.appendChild(row);
     });
   }
@@ -824,6 +856,50 @@
       counts[k]++;
     });
     return { keys: order, counts: counts, n: order.length };
+  }
+
+  function nameLooksLikeId(name) {
+    var s = String(name || "");
+    return /(?:^|[_\s-])id$/i.test(s) || /^ids?$/i.test(s) || /identifier/i.test(s);
+  }
+
+  function updateColorByHint() {
+    var el = document.getElementById("colorByHint");
+    if (!el) return;
+    el.innerHTML = "";
+    var key = state.map.color;
+    if (!key) {
+      el.innerHTML = '<div class="role-hint">Optional. Use a grouping column with a few repeating values.</div>';
+      return;
+    }
+    if (colorModeForField(key) === "num") {
+      el.innerHTML = '<div class="role-hint">Numeric → continuous color scale</div>';
+      return;
+    }
+    var info = uniqueGroupInfo(key);
+    var u = info.n;
+    var line = document.createElement("div");
+    line.className = "role-hint";
+    line.textContent = u + (u === 1 ? " category → 1 color" : " categories → " + u + " colors");
+    el.appendChild(line);
+    var sw = document.createElement("div");
+    sw.className = "role-swatches";
+    info.keys.slice(0, 8).forEach(function (k, i) {
+      var chip = document.createElement("span");
+      chip.className = "role-swatch";
+      var dot = document.createElement("i");
+      dot.style.background = seriesColorForKey(k, i);
+      chip.appendChild(dot);
+      chip.appendChild(document.createTextNode(k));
+      sw.appendChild(chip);
+    });
+    el.appendChild(sw);
+    if (nameLooksLikeId(key) && u < Math.max(3, records.length * 0.85)) {
+      var note = document.createElement("div");
+      note.className = "role-hint-note";
+      note.textContent = key + " repeats across rows, so it is a grouping variable — not a unique ID. A name such as Study_Type, Design, or Group would be clearer.";
+      el.appendChild(note);
+    }
   }
 
   function colorModeForField(key) {
@@ -1056,6 +1132,9 @@
     });
 
     state.lastSeriesNames = seriesOrder.slice();
+    state.lastSeriesLegend = seriesOrder.map(function (g) {
+      return { name: g, color: seriesColors[g] || PALETTE[0] };
+    });
 
     return seriesOrder.filter(function (g) {
       return grouped[g] && grouped[g].length;
@@ -1146,6 +1225,26 @@
         '<div class="color-scale-ends"><span>' + formatNumber(state.lastColorRange.min, "compact") +
         "</span><span>" + formatNumber(state.lastColorRange.max, "compact") + "</span></div>";
       el.appendChild(box);
+    }
+    if (state.colorMode === "cat" && state.map.color && (state.lastSeriesLegend || []).length) {
+      var catBox = document.createElement("div");
+      catBox.className = "color-legend";
+      var catField = fieldMeta(state.map.color);
+      catBox.innerHTML = "<strong>Color by<br/>" + (catField ? catField.label : "category") + "</strong>";
+      state.lastSeriesLegend.forEach(function (item) {
+        var row = document.createElement("div");
+        row.className = "color-legend-row";
+        var dot = document.createElement("span");
+        dot.className = "color-legend-dot";
+        dot.style.background = item.color;
+        var lab = document.createElement("span");
+        lab.textContent = item.name;
+        if (state.seriesHidden[item.name]) lab.style.opacity = "0.45";
+        row.appendChild(dot);
+        row.appendChild(lab);
+        catBox.appendChild(row);
+      });
+      el.appendChild(catBox);
     }
   }
 
@@ -1550,9 +1649,19 @@
         navigation: { buttonOptions: { enabled: false } },
         legend: {
           enabled: state.colorMode === "cat",
-          itemStyle: { color: "#cbd5e1" },
+          align: "center",
+          verticalAlign: "bottom",
+          itemDistance: 18,
+          symbolHeight: 12,
+          symbolWidth: 12,
+          symbolRadius: 6,
+          itemStyle: { color: "#f8fafc", fontSize: "12px", fontWeight: "700" },
           itemHoverStyle: { color: "#fff" },
-          itemHiddenStyle: { color: "#64748b" }
+          itemHiddenStyle: { color: "#64748b" },
+          title: state.map.color ? {
+            text: "Color by " + state.map.color,
+            style: { color: "#e2e8f0", fontSize: "11px", fontWeight: "800" }
+          } : undefined
         },
         xAxis: {
           type: true3d ? "linear" : state.xScale,
@@ -1751,6 +1860,7 @@
     var visibleSeries = series.filter(function (s) { return s.visible !== false; }).length;
     updateStatus(sizeVals.length, visibleSeries, cuts);
     updateSizeLegend(sizeVals);
+    updateColorByHint();
 
     var xField = fieldMeta(state.map.x);
     var yField = fieldMeta(state.map.y);

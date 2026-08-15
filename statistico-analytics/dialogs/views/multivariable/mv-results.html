@@ -156,19 +156,6 @@
     .role-row, .ctrl-row {
       display: grid; grid-template-columns: 92px 1fr; gap: 8px; align-items: center; margin-bottom: 7px;
     }
-    .role-row.role-row-stack { align-items: start; }
-    .role-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-    .role-hint { font-size: 11px; font-weight: 650; color: var(--text-secondary); line-height: 1.35; }
-    .role-hint-note { font-size: 10.5px; font-weight: 500; color: var(--text-muted); line-height: 1.35; }
-    .role-swatches { display: flex; flex-wrap: wrap; gap: 7px; }
-    .role-swatch {
-      display: inline-flex; align-items: center; gap: 5px;
-      font-size: 11px; font-weight: 700; color: var(--text-primary);
-    }
-    .role-swatch i {
-      width: 11px; height: 11px; border-radius: 50%; display: inline-block;
-      box-shadow: 0 0 0 1px rgba(255,255,255,.28);
-    }
     .color-legend { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
     .color-legend-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; font-weight: 700; color: var(--text-primary); }
     .color-legend-dot {
@@ -747,20 +734,8 @@
         }
         render();
       });
-      if (role.id === "color") {
-        row.className = "role-row role-row-stack";
-        var field = document.createElement("div");
-        field.className = "role-field";
-        field.appendChild(sel);
-        var hint = document.createElement("div");
-        hint.id = "colorByHint";
-        field.appendChild(hint);
-        row.appendChild(lab);
-        row.appendChild(field);
-      } else {
-        row.appendChild(lab);
-        row.appendChild(sel);
-      }
+      row.appendChild(lab);
+      row.appendChild(sel);
       host.appendChild(row);
     });
   }
@@ -856,50 +831,6 @@
       counts[k]++;
     });
     return { keys: order, counts: counts, n: order.length };
-  }
-
-  function nameLooksLikeId(name) {
-    var s = String(name || "");
-    return /(?:^|[_\s-])id$/i.test(s) || /^ids?$/i.test(s) || /identifier/i.test(s);
-  }
-
-  function updateColorByHint() {
-    var el = document.getElementById("colorByHint");
-    if (!el) return;
-    el.innerHTML = "";
-    var key = state.map.color;
-    if (!key) {
-      el.innerHTML = '<div class="role-hint">Optional. Use a grouping column with a few repeating values.</div>';
-      return;
-    }
-    if (colorModeForField(key) === "num") {
-      el.innerHTML = '<div class="role-hint">Numeric → continuous color scale</div>';
-      return;
-    }
-    var info = uniqueGroupInfo(key);
-    var u = info.n;
-    var line = document.createElement("div");
-    line.className = "role-hint";
-    line.textContent = u + (u === 1 ? " category → 1 color" : " categories → " + u + " colors");
-    el.appendChild(line);
-    var sw = document.createElement("div");
-    sw.className = "role-swatches";
-    info.keys.slice(0, 8).forEach(function (k, i) {
-      var chip = document.createElement("span");
-      chip.className = "role-swatch";
-      var dot = document.createElement("i");
-      dot.style.background = seriesColorForKey(k, i);
-      chip.appendChild(dot);
-      chip.appendChild(document.createTextNode(k));
-      sw.appendChild(chip);
-    });
-    el.appendChild(sw);
-    if (nameLooksLikeId(key) && u < Math.max(3, records.length * 0.85)) {
-      var note = document.createElement("div");
-      note.className = "role-hint-note";
-      note.textContent = key + " repeats across rows, so it is a grouping variable — not a unique ID. A name such as Study_Type, Design, or Group would be clearer.";
-      el.appendChild(note);
-    }
   }
 
   function colorModeForField(key) {
@@ -1860,7 +1791,6 @@
     var visibleSeries = series.filter(function (s) { return s.visible !== false; }).length;
     updateStatus(sizeVals.length, visibleSeries, cuts);
     updateSizeLegend(sizeVals);
-    updateColorByHint();
 
     var xField = fieldMeta(state.map.x);
     var yField = fieldMeta(state.map.y);

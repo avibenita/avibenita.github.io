@@ -30,29 +30,57 @@ let hubPublicationTablesFlowActive = false;
 let hubPublicationTablesResultsDialog = null;
 // Dialog dimensions are defined in dialog-sizes.js (DIALOG_SIZES)
 const HUB_CATEGORY_TILES = [
+  /* ── Explore & Summarize ─────────────────────────────────────────── */
   {
-    id: "explore-data",
-    title: "Explore Data",
+    id: "explore-univariate",
+    section: "Explore & Summarize",
+    sectionId: "explore",
+    sectionSubtitle: "Understand variables before formal modelling",
+    title: "Univariate Analysis",
     icon: "fa-chart-bar",
+    accent: "#f97316",
+    accentDark: "#c2410c",
     color: "#f97316",
     colorDark: "#c2410c",
-    subtitle: "Distributions, correlations, and patterns",
-    desc: "Start here when you need to understand individual variables or how they relate — before modeling or group tests.",
+    subtitle: "Distributions, percentiles, normality, and outliers",
+    desc: "Start here when you need to understand individual variables — descriptive summaries, plots, and assumption checks — before modeling or group tests.",
     info: [
-      "Univariate: distribution summaries, normality, and outliers",
-      "Correlation: pairwise associations and matrices",
+      "Descriptive statistics, box plots, density plots, and percentiles",
+      "Normality checks with QQ/PP plots",
       "Works from your Active Range in Excel",
       "Useful first pass before regression or group comparisons"
     ],
     modules: [
-      { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." },
+      { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." }
+    ]
+  },
+  {
+    id: "explore-correlations",
+    sectionId: "explore",
+    title: "Correlations",
+    icon: "fa-grip",
+    accent: "#f97316",
+    accentDark: "#c2410c",
+    color: "#f97316",
+    colorDark: "#c2410c",
+    subtitle: "Pairwise associations and correlation matrices",
+    desc: "Measure how numeric variables move together — pairwise associations and a full correlation matrix from your Active Range.",
+    info: [
+      "Pairwise associations and correlation matrices",
+      "Works from your Active Range in Excel",
+      "Useful first pass before regression or group comparisons"
+    ],
+    modules: [
       { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." }
     ]
   },
   {
-    id: "categorical-data",
-    title: "Categorical Data",
+    id: "explore-contingency",
+    sectionId: "explore",
+    title: "Frequency & Contingency Tables",
     icon: "fa-table-cells",
+    accent: "#f97316",
+    accentDark: "#c2410c",
     color: "#8b5cf6",
     colorDark: "#6d28d9",
     subtitle: "Association in two-way tables",
@@ -65,72 +93,110 @@ const HUB_CATEGORY_TILES = [
       { id: "contingency", label: "Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." }
     ]
   },
+  /* ── Compare Groups ──────────────────────────────────────────────── */
   {
-    id: "analyze-groups",
-    title: "Compare Groups",
-    icon: "fa-scale-balanced",
-    color: "#10b981",
-    colorDark: "#0f766e",
-    subtitle: "ANOVA and mixed models for group comparisons",
-    desc: "Test whether outcomes differ across groups, including designs with nesting or repeated structure.",
+    id: "compare-two-groups",
+    section: "Compare Groups",
+    sectionId: "compare",
+    sectionSubtitle: "Compare outcomes across independent, paired or repeated observations",
+    title: "Two Independent Groups",
+    icon: "fa-arrows-left-right",
+    accent: "#10b981",
+    accentDark: "#0f766e",
+    color: "#06b6d4",
+    colorDark: "#0e7490",
+    subtitle: "Two-group mean comparison",
+    desc: "Compare a numeric outcome across two independent groups. The module recommends parametric or nonparametric methods from your design.",
     info: [
-      "ANOVA: compare means across 3+ groups with post-hoc options",
-      "Mixed models: fixed effects plus random subject variation",
-      "Supports factorial and longitudinal-style setups",
-      "Effect sizes and model diagnostics included"
+      "Student/Welch t and Mann–Whitney alternatives",
+      "Effect sizes and assumption checks",
+      "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." },
-      { id: "mixed", label: "Mixed", tip: "Mixed-effects models for grouped or repeated-measures style data." }
+      { id: "independent", label: "Independent", tip: "Compare two independent groups on a numeric outcome." }
     ]
   },
   {
-    id: "compare-means",
-    title: "Compare Means",
-    icon: "fa-arrows-left-right",
+    id: "compare-paired",
+    sectionId: "compare",
+    title: "Paired & Repeated Measures",
+    icon: "fa-rotate",
+    accent: "#10b981",
+    accentDark: "#0f766e",
     color: "#06b6d4",
     colorDark: "#0e7490",
-    subtitle: "Independent, paired, and repeated measures",
-    desc: "Compare means for two independent groups, or for the same cases measured more than once.",
+    subtitle: "Same cases measured more than once",
+    desc: "Compare paired or repeated measurements for the same cases. Parametric and nonparametric alternatives are available inside the module.",
     info: [
-      "Independent: two-group mean comparison",
-      "Repeated: paired / within-subject designs",
-      "Parametric and non-parametric alternatives",
-      "Effect sizes and assumption checks"
+      "Paired t, Wilcoxon, and related alternatives",
+      "Effect sizes and assumption checks",
+      "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "independent", label: "Independent", tip: "Compare two independent groups on a numeric outcome." },
       { id: "dependent", label: "Repeated", tip: "Compare paired or repeated measurements for the same cases." }
     ]
   },
   {
+    id: "compare-k-groups",
+    sectionId: "compare",
+    title: "Three or More Groups",
+    icon: "fa-scale-balanced",
+    accent: "#10b981",
+    accentDark: "#0f766e",
+    color: "#10b981",
+    colorDark: "#0f766e",
+    subtitle: "ANOVA with post-hoc comparisons",
+    desc: "Test whether means differ across three or more groups, with post-hoc options and effect sizes.",
+    info: [
+      "ANOVA / Welch and Kruskal–Wallis alternatives",
+      "Post-hoc comparisons and effect sizes",
+      "Works from your Active Range in Excel"
+    ],
+    modules: [
+      { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." }
+    ]
+  },
+  /* ── Model & Predict ─────────────────────────────────────────────── */
+  {
     id: "model-relationships",
-    title: "Build Models",
+    section: "Model & Predict",
+    sectionId: "model",
+    sectionSubtitle: "Explain outcomes, estimate effects, and produce predictions",
+    title: "Regression Models",
     icon: "fa-chart-line",
+    accent: "#0ea5e9",
+    accentDark: "#0369a1",
     color: "#0ea5e9",
     colorDark: "#0369a1",
     tabStyle: "soft",
-    subtitle: "Regression and logistic prediction",
-    desc: "Predict continuous or binary outcomes from one or more predictors, with coefficients and fit diagnostics.",
+    subtitle: "Linear, logistic, and mixed-effects models",
+    desc: "Predict continuous or binary outcomes, or model grouped/repeated structure with mixed effects — with coefficients and fit diagnostics.",
     info: [
-      "Regression: continuous outcomes, coefficients, and diagnostics",
+      "Linear regression: continuous outcomes, coefficients, and diagnostics",
       "Logistic: binary outcomes with odds ratios and classification",
-      "Model fit, residual checks, and interpretation aids",
-      "Built for publication-ready reporting from Excel data"
+      "Mixed models: fixed effects plus random subject variation",
+      "Diagnostics stay inside each model rather than as separate modules"
     ],
     modules: [
-      { id: "regression", label: "Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
-      { id: "logistic", label: "Logistic", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
+      { id: "regression", label: "Linear Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
+      { id: "logistic", label: "Logistic Regression", tip: "Binary outcome modeling with odds ratios and model fit metrics." },
+      { id: "mixed", label: "Mixed Models", tip: "Mixed-effects models for grouped or repeated-measures style data." }
     ]
   },
+  /* ── Discover Structure ──────────────────────────────────────────── */
   {
     id: "reduce-dimensions",
-    title: "Discover Structure",
+    section: "Discover Structure",
+    sectionId: "structure",
+    sectionSubtitle: "Uncover latent dimensions, relationships, or groups",
+    title: "Latent Structure",
     icon: "fa-layer-group",
+    accent: "#ec4899",
+    accentDark: "#be185d",
     color: "#ec4899",
     colorDark: "#be185d",
     tabStyle: "soft",
-    subtitle: "PCA and factor analysis for latent structure",
+    subtitle: "PCA and factor analysis",
     desc: "Reduce many correlated variables into fewer components or latent factors that capture shared structure.",
     info: [
       "Factor analysis: latent constructs and rotations",
@@ -139,14 +205,17 @@ const HUB_CATEGORY_TILES = [
       "Useful for scale development and data compression"
     ],
     modules: [
-      { id: "factor", label: "Factor", tip: "Latent factor extraction and rotation for construct discovery." },
+      { id: "factor", label: "Factor Analysis", tip: "Latent factor extraction and rotation for construct discovery." },
       { id: "pca", label: "PCA", tip: "Principal component reduction for compact feature representation." }
     ]
   },
   {
     id: "segment-data",
-    title: "Find Segments",
+    sectionId: "structure",
+    title: "Segmentation",
     icon: "fa-object-group",
+    accent: "#ec4899",
+    accentDark: "#be185d",
     color: "#14b8a6",
     colorDark: "#0f766e",
     subtitle: "K-means and hierarchical clustering",
@@ -160,6 +229,34 @@ const HUB_CATEGORY_TILES = [
     modules: [
       { id: "kmeans", label: "K-Means", tip: "Partition cases into k groups around centroids." },
       { id: "hierarchical", label: "Hierarchical", tip: "Agglomerative merge tree with dendrogram; cut at k." }
+    ]
+  },
+  /* ── Synthesize & Evaluate ───────────────────────────────────────── */
+  {
+    id: "meta-analysis-tools",
+    section: "Synthesize & Evaluate",
+    sectionId: "synthesize",
+    sectionSubtitle: "Evidence synthesis and method evaluation",
+    title: "Meta-Analysis",
+    icon: "fa-layer-group",
+    accent: "#818cf8",
+    accentDark: "#4f46e5",
+    color: "#6366f1",
+    colorDark: "#4338ca",
+    subtitle: "Pool study-level effect sizes into an overall estimate",
+    desc: "Combine continuous, binary, or precomputed study effects with fixed or random-effects models — including forest plots, heterogeneity, and publication-bias checks.",
+    info: [
+      "Continuous (Hedges' g), binary (log OR), or direct effect + SE",
+      "Fixed-effects and DerSimonian–Laird random-effects models",
+      "Forest plot, I² / Q heterogeneity, and funnel / Egger bias checks",
+      "Works from study-level rows in your Active Range"
+    ],
+    modules: [
+      {
+        id: "meta-analysis",
+        label: "Run Meta-Analysis",
+        tip: "Pool study effect sizes with fixed/random effects, forest plot, and heterogeneity diagnostics."
+      }
     ]
   }
 ];
@@ -212,30 +309,6 @@ const TOOLS_CATEGORY_TILES = [
         id: "pareto2080",
         label: "Pareto 80/20",
         tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
-      }
-    ]
-  },
-  {
-    id: "meta-analysis-tools",
-    title: "Meta-Analysis",
-    icon: "fa-layer-group",
-    accent: "#eab308",
-    accentDark: "#a16207",
-    color: "#6366f1",
-    colorDark: "#4338ca",
-    subtitle: "Pool study-level effect sizes into an overall estimate",
-    desc: "Combine continuous, binary, or precomputed study effects with fixed or random-effects models — including forest plots, heterogeneity, and publication-bias checks.",
-    info: [
-      "Continuous (Hedges' g), binary (log OR), or direct effect + SE",
-      "Fixed-effects and DerSimonian–Laird random-effects models",
-      "Forest plot, I² / Q heterogeneity, and funnel / Egger bias checks",
-      "Works from study-level rows in your Active Range"
-    ],
-    modules: [
-      {
-        id: "meta-analysis",
-        label: "Run Meta-Analysis",
-        tip: "Pool study effect sizes with fixed/random effects, forest plot, and heterogeneity diagnostics."
       }
     ]
   },
@@ -462,6 +535,51 @@ var TOOLS_SECTION_META = {
 };
 var TOOLS_SECTION_ORDER = ["applications", "calculators", "utilities"];
 var TOOLS_RANGE_SECTIONS = ["applications"];
+var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
+var ANALYTICS_SECTION_META = {
+  explore: {
+    id: "explore",
+    label: "Explore & Summarize",
+    subtitle: "Understand variables before formal modelling",
+    icon: "fa-chart-bar",
+    color: "#f97316",
+    colorDark: "#c2410c"
+  },
+  compare: {
+    id: "compare",
+    label: "Compare Groups",
+    subtitle: "Compare outcomes across independent, paired or repeated observations",
+    icon: "fa-scale-balanced",
+    color: "#10b981",
+    colorDark: "#0f766e"
+  },
+  model: {
+    id: "model",
+    label: "Model & Predict",
+    subtitle: "Explain outcomes, estimate effects, and produce predictions",
+    icon: "fa-chart-line",
+    color: "#0ea5e9",
+    colorDark: "#0369a1"
+  },
+  structure: {
+    id: "structure",
+    label: "Discover Structure",
+    subtitle: "Uncover latent dimensions, relationships, or groups",
+    icon: "fa-circle-nodes",
+    color: "#ec4899",
+    colorDark: "#be185d"
+  },
+  synthesize: {
+    id: "synthesize",
+    label: "Synthesize & Evaluate",
+    subtitle: "Evidence synthesis and method evaluation",
+    icon: "fa-flask",
+    color: "#818cf8",
+    colorDark: "#4f46e5"
+  }
+};
+var ANALYTICS_FAMILY_ORDER = ["explore", "compare", "model", "structure", "synthesize"];
+var ACTIVE_ANALYTICS_SECTION = "explore";
 let HUB_ACTIONS = {};
 
 /** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
@@ -554,17 +672,12 @@ function placeHubRangeSection() {
       return;
     }
   }
-  holder.parentElement.insertBefore(range, holder);
-}
-
-function getToolsTileSectionId(tile, tiles) {
-  var list = tiles || TOOLS_CATEGORY_TILES;
-  if (tile && tile.sectionId) return tile.sectionId;
-  var idx = list.indexOf(tile);
-  for (var i = idx; i >= 0; i--) {
-    if (list[i] && list[i].sectionId) return list[i].sectionId;
+  var allBar = document.getElementById("hubAnalyticsAllBar");
+  if (allBar && allBar.classList.contains("is-active")) {
+    holder.parentElement.insertBefore(range, allBar);
+    return;
   }
-  return "applications";
+  holder.parentElement.insertBefore(range, holder);
 }
 
 function renderCategoryTiles(query) {
@@ -586,6 +699,10 @@ function renderCategoryTiles(query) {
     source = allSource.filter(function (c) {
       return getToolsTileSectionId(c, allSource) === ACTIVE_TOOLS_SECTION;
     });
+  } else if (ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION !== "all") {
+    source = allSource.filter(function (c) {
+      return getAnalyticsTileSectionId(c, allSource) === ACTIVE_ANALYTICS_SECTION;
+    });
   }
   var clusterMeta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
   var clusterColor = clusterMeta.color || "#1f6fff";
@@ -595,45 +712,150 @@ function renderCategoryTiles(query) {
     var mods = getCategoryModules(c);
     if (!q) return true;
     if (c.title.toLowerCase().indexOf(q) >= 0) return true;
+    if ((c.subtitle || "").toLowerCase().indexOf(q) >= 0) return true;
+    if ((c.section || "").toLowerCase().indexOf(q) >= 0) return true;
+    var familyMeta = ANALYTICS_SECTION_META[getAnalyticsTileSectionId(c, allSource)];
+    if (familyMeta && familyMeta.label.toLowerCase().indexOf(q) >= 0) return true;
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
-  holder.innerHTML = list.map(function (c, idx) {
-    // Most clusters use one flat accent for every card. A tile may opt out
-    // with its own accent/accentDark (e.g. yellow accents throughout the
-    // Specialized Tools tab).
-    var color = c.accent || clusterColor;
-    var colorDark = c.accentDark || clusterColorDark;
-    var icon = c.icon || "fa-table-cells-large";
-    var iconContent = c.iconSvg
-      ? c.iconSvg
-      : '<i class="fa-solid ' + escapeHtml(icon) + '"></i>';
-    var sectionHtml = "";
-    if (c.section) {
-      var sectionMeta = TOOLS_SECTION_META[c.sectionId] || null;
-      var sectionColor = sectionMeta ? sectionMeta.color : color;
-      sectionHtml =
-        '<div class="category-section-header' + (idx > 0 ? " with-divider" : "") + '"' +
-        ' style="--section-color:' + escapeHtml(sectionColor) + ';">' +
-        '<div class="category-section-title">' + escapeHtml(c.section) + "</div>" +
-        (c.sectionSubtitle ? '<div class="category-section-subtitle">' + escapeHtml(c.sectionSubtitle) + "</div>" : "") +
-        "</div>";
-    }
-    return (
-      sectionHtml +
-      '<div class="category-tile" data-tile-id="' + escapeHtml(c.id) + '" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +
-      '<div class="category-title-row">' +
-      '<div class="category-icon">' + iconContent + '</div>' +
-      '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
-      '<button type="button" class="category-info-btn" data-tile-info="' + escapeHtml(c.id) + '" title="About this module" aria-label="About ' + escapeHtml(c.title) + '">!</button>' +
-      "</div>" +
-      '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
-      renderCategoryGroups(c, ACTIVE_CLUSTER + ":" + c.id) +
-      "</div>"
-    );
-  }).join("");
+  var html = "";
+  if (ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION === "all") {
+    var emitted = 0;
+    ANALYTICS_FAMILY_ORDER.forEach(function (sectionId) {
+      var familyTiles = list.filter(function (c) {
+        return getAnalyticsTileSectionId(c, allSource) === sectionId;
+      });
+      if (!familyTiles.length) return;
+      html += renderAnalyticsSectionHeader(sectionId, emitted > 0);
+      html += familyTiles.map(function (c) {
+        return renderCategoryTileHtml(c, clusterColor, clusterColorDark);
+      }).join("");
+      emitted += familyTiles.length;
+    });
+  } else {
+    html = list.map(function (c, idx) {
+      var sectionHtml = "";
+      if (ACTIVE_CLUSTER === "tools" && c.section) {
+        var sectionMeta = TOOLS_SECTION_META[c.sectionId] || null;
+        var sectionColor = sectionMeta ? sectionMeta.color : (c.accent || clusterColor);
+        sectionHtml =
+          '<div class="category-section-header' + (idx > 0 ? " with-divider" : "") + '"' +
+          ' style="--section-color:' + escapeHtml(sectionColor) + ';">' +
+          '<div class="category-section-title">' + escapeHtml(c.section) + "</div>" +
+          (c.sectionSubtitle ? '<div class="category-section-subtitle">' + escapeHtml(c.sectionSubtitle) + "</div>" : "") +
+          "</div>";
+      } else if (ACTIVE_CLUSTER === "analytics" && idx === 0) {
+        var familyId = getAnalyticsTileSectionId(c, allSource);
+        sectionHtml = renderAnalyticsSectionHeader(familyId, false);
+      }
+      return sectionHtml + renderCategoryTileHtml(c, clusterColor, clusterColorDark);
+    }).join("");
+  }
+  holder.innerHTML = html;
   if (noResults) noResults.style.display = list.length ? "none" : "block";
+  syncAnalyticsAllBar(q);
   placeHubRangeSection();
   bindCategoryInfoButtons(list);
+}
+
+function getToolsTileSectionId(tile, tiles) {
+  var list = tiles || TOOLS_CATEGORY_TILES;
+  if (tile && tile.sectionId) return tile.sectionId;
+  var idx = list.indexOf(tile);
+  for (var i = idx; i >= 0; i--) {
+    if (list[i] && list[i].sectionId) return list[i].sectionId;
+  }
+  return "applications";
+}
+
+function getAnalyticsTileSectionId(tile, tiles) {
+  var list = tiles || HUB_CATEGORY_TILES;
+  if (tile && tile.sectionId) return tile.sectionId;
+  var idx = list.indexOf(tile);
+  for (var i = idx; i >= 0; i--) {
+    if (list[i] && list[i].sectionId) return list[i].sectionId;
+  }
+  return "explore";
+}
+
+function loadStoredAnalyticsSection() {
+  try {
+    var stored = window.localStorage && window.localStorage.getItem(ANALYTICS_SECTION_STORAGE_KEY);
+    if (stored === "all" || ANALYTICS_SECTION_META[stored]) return stored;
+  } catch (_e) {}
+  return "explore";
+}
+
+function persistAnalyticsSection(sectionId) {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(ANALYTICS_SECTION_STORAGE_KEY, sectionId);
+    }
+  } catch (_e) {}
+}
+
+function getAvailableAnalyticsSections() {
+  var tiles = (HUB_CLUSTER_TILES.analytics || HUB_CATEGORY_TILES || []).filter(function (c) {
+    return !c.hidden;
+  });
+  var present = {};
+  tiles.forEach(function (tile) {
+    present[getAnalyticsTileSectionId(tile, tiles)] = true;
+  });
+  return ANALYTICS_FAMILY_ORDER.filter(function (id) { return present[id]; });
+}
+
+function isAnalyticsAllView() {
+  return ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION === "all";
+}
+
+function syncAnalyticsAllBar(query) {
+  var bar = document.getElementById("hubAnalyticsAllBar");
+  var input = document.getElementById("hubSearch");
+  var show = isAnalyticsAllView();
+  if (bar) {
+    bar.classList.toggle("is-active", show);
+    bar.hidden = !show;
+  }
+  if (input) {
+    if (show) {
+      if (typeof query === "string") input.value = query;
+    } else if (ACTIVE_CLUSTER !== "analytics" || ACTIVE_ANALYTICS_SECTION !== "all") {
+      input.value = "";
+    }
+  }
+}
+
+function renderAnalyticsSectionHeader(sectionId, withDivider) {
+  var meta = ANALYTICS_SECTION_META[sectionId];
+  if (!meta) return "";
+  return (
+    '<div class="category-section-header' + (withDivider ? " with-divider" : "") + '"' +
+    ' style="--section-color:' + escapeHtml(meta.color) + ';">' +
+    '<div class="category-section-title">' + escapeHtml(meta.label) + "</div>" +
+    (meta.subtitle ? '<div class="category-section-subtitle">' + escapeHtml(meta.subtitle) + "</div>" : "") +
+    "</div>"
+  );
+}
+
+function renderCategoryTileHtml(c, clusterColor, clusterColorDark) {
+  var color = c.accent || clusterColor;
+  var colorDark = c.accentDark || clusterColorDark;
+  var icon = c.icon || "fa-table-cells-large";
+  var iconContent = c.iconSvg
+    ? c.iconSvg
+    : '<i class="fa-solid ' + escapeHtml(icon) + '"></i>';
+  return (
+    '<div class="category-tile" data-tile-id="' + escapeHtml(c.id) + '" style="--cat-color:' + escapeHtml(color) + ";--cat-color-dark:" + escapeHtml(colorDark) + ';">' +
+    '<div class="category-title-row">' +
+    '<div class="category-icon">' + iconContent + '</div>' +
+    '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
+    '<button type="button" class="category-info-btn" data-tile-info="' + escapeHtml(c.id) + '" title="About this module" aria-label="About ' + escapeHtml(c.title) + '">!</button>' +
+    "</div>" +
+    '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
+    renderCategoryGroups(c, ACTIVE_CLUSTER + ":" + c.id) +
+    "</div>"
+  );
 }
 
 function findHubCategoryTile(tileId) {
@@ -836,10 +1058,16 @@ function applyHubScopeConfig(scopeCfg) {
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
     var clusterId = btn.getAttribute("data-cluster");
     var visible = HUB_VISIBLE_CLUSTERS.indexOf(clusterId) >= 0;
-    btn.style.display = visible ? "" : "none";
+    var wrap = btn.closest ? btn.closest(".hub-nav-tools-wrap") : null;
+    if (wrap) wrap.style.display = visible ? "" : "none";
+    else btn.style.display = visible ? "" : "none";
   });
   if (HUB_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) < 0) {
     ACTIVE_CLUSTER = HUB_VISIBLE_CLUSTERS[0] || "analytics";
+  }
+  var available = getAvailableAnalyticsSections();
+  if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
+    ACTIVE_ANALYTICS_SECTION = available[0] || "explore";
   }
 }
 
@@ -882,6 +1110,8 @@ function syncClusterHeader() {
   if (range) range.style.display = showRange ? "" : "none";
   if (advisor) advisor.style.display = showAdvisor ? "" : "none";
   syncHubToolsMenuSelection();
+  syncHubAnalyticsMenuSelection();
+  syncAnalyticsAllBar();
   // Range placement is handled by renderCategoryTiles (called via filterModules
   // after every cluster switch) so the node isn't parked against stale tiles.
 }
@@ -932,6 +1162,7 @@ function toggleHubToolsMenu(ev) {
     ev.preventDefault();
     ev.stopPropagation();
   }
+  closeHubAnalyticsMenu();
   var wasOpen = isHubToolsMenuOpen();
   if (ACTIVE_CLUSTER !== "tools") {
     setHubCluster("tools");
@@ -947,6 +1178,83 @@ function setHubToolsSection(sectionId) {
   ACTIVE_TOOLS_SECTION = sectionId;
   ACTIVE_CLUSTER = "tools";
   closeHubToolsMenu();
+  closeHubAnalyticsMenu();
+  syncClusterHeader();
+  closePopup();
+  filterModules("");
+}
+
+function isHubAnalyticsMenuOpen() {
+  var menu = document.getElementById("hubAnalyticsMenu");
+  return !!(menu && menu.classList.contains("open"));
+}
+
+function openHubAnalyticsMenu() {
+  var menu = document.getElementById("hubAnalyticsMenu");
+  var btn = document.querySelector('.hub-nav-tab[data-cluster="analytics"]');
+  if (!menu) return;
+  menu.classList.add("open");
+  menu.setAttribute("aria-hidden", "false");
+  if (btn) {
+    btn.setAttribute("aria-expanded", "true");
+    btn.classList.add("menu-open");
+  }
+  syncHubAnalyticsMenuSelection();
+}
+
+function closeHubAnalyticsMenu() {
+  var menu = document.getElementById("hubAnalyticsMenu");
+  var btn = document.querySelector('.hub-nav-tab[data-cluster="analytics"]');
+  if (!menu) return;
+  menu.classList.remove("open");
+  menu.setAttribute("aria-hidden", "true");
+  if (btn) {
+    btn.setAttribute("aria-expanded", "false");
+    btn.classList.remove("menu-open");
+  }
+}
+
+function syncHubAnalyticsMenuSelection() {
+  var menu = document.getElementById("hubAnalyticsMenu");
+  if (!menu) return;
+  var available = getAvailableAnalyticsSections();
+  menu.querySelectorAll("[data-analytics-section]").forEach(function (item) {
+    var id = item.getAttribute("data-analytics-section");
+    var on = id === ACTIVE_ANALYTICS_SECTION;
+    item.classList.toggle("active", on);
+    if (on) item.setAttribute("aria-current", "true");
+    else item.removeAttribute("aria-current");
+    if (id === "all") {
+      item.style.display = "";
+      return;
+    }
+    item.style.display = available.indexOf(id) >= 0 ? "" : "none";
+  });
+}
+
+function toggleHubAnalyticsMenu(ev) {
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  closeHubToolsMenu();
+  var wasOpen = isHubAnalyticsMenuOpen();
+  if (ACTIVE_CLUSTER !== "analytics") {
+    setHubCluster("analytics");
+    openHubAnalyticsMenu();
+    return;
+  }
+  if (wasOpen) closeHubAnalyticsMenu();
+  else openHubAnalyticsMenu();
+}
+
+function setHubAnalyticsSection(sectionId) {
+  if (sectionId !== "all" && !ANALYTICS_SECTION_META[sectionId]) return;
+  ACTIVE_ANALYTICS_SECTION = sectionId;
+  ACTIVE_CLUSTER = "analytics";
+  persistAnalyticsSection(sectionId);
+  closeHubAnalyticsMenu();
+  closeHubToolsMenu();
   syncClusterHeader();
   closePopup();
   filterModules("");
@@ -956,6 +1264,7 @@ function setHubCluster(clusterId) {
   if (!HUB_CLUSTER_TILES[clusterId]) return;
   ACTIVE_CLUSTER = clusterId;
   if (clusterId !== "tools") closeHubToolsMenu();
+  if (clusterId !== "analytics") closeHubAnalyticsMenu();
   syncClusterHeader();
   closePopup();
   filterModules("");
@@ -2172,16 +2481,22 @@ window.showAdvisor = showAdvisor;
 window.setHubCluster = setHubCluster;
 window.setHubToolsSection = setHubToolsSection;
 window.toggleHubToolsMenu = toggleHubToolsMenu;
+window.setHubAnalyticsSection = setHubAnalyticsSection;
+window.toggleHubAnalyticsMenu = toggleHubAnalyticsMenu;
 window.runHubModuleAction = runHubModuleAction;
 window.setSelectedModuleCard = setSelectedModuleCard;
 
 document.addEventListener("click", function (e) {
-  var wrap = document.getElementById("hubNavToolsWrap");
-  if (!wrap || !isHubToolsMenuOpen()) return;
-  if (!wrap.contains(e.target)) closeHubToolsMenu();
+  var toolsWrap = document.getElementById("hubNavToolsWrap");
+  if (toolsWrap && isHubToolsMenuOpen() && !toolsWrap.contains(e.target)) closeHubToolsMenu();
+  var analyticsWrap = document.getElementById("hubNavAnalyticsWrap");
+  if (analyticsWrap && isHubAnalyticsMenuOpen() && !analyticsWrap.contains(e.target)) closeHubAnalyticsMenu();
 });
 document.addEventListener("keydown", function (e) {
-  if (e.key === "Escape") closeHubToolsMenu();
+  if (e.key === "Escape") {
+    closeHubToolsMenu();
+    closeHubAnalyticsMenu();
+  }
 });
 
 Office.onReady(function(info) {
@@ -2190,6 +2505,11 @@ Office.onReady(function(info) {
     return;
   }
   loadHubScopeConfigIfAny().then(function () {
+    ACTIVE_ANALYTICS_SECTION = loadStoredAnalyticsSection();
+    var available = getAvailableAnalyticsSections();
+    if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
+      ACTIVE_ANALYTICS_SECTION = available[0] || "explore";
+    }
     syncClusterHeader();
     renderCategoryTiles("");
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.init === "function") {

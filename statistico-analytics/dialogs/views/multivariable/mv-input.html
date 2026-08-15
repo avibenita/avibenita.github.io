@@ -224,7 +224,7 @@
                   <span class="pv-dot" style="background:#a78bfa"></span>
                   <span class="pv-dot" style="background:#34d399"></span>
                 </div>
-                <div class="zone-head-main"><div>Color By</div><div class="zone-hint">Use color to compare categories or values</div></div>
+                <div class="zone-head-main"><div>Color By</div><div class="zone-hint">A few groups — not one name per row</div></div>
               </div>
               <div class="reg-zone-body drop-zone" data-zone="color" id="zoneColor"></div>
             </div>
@@ -359,14 +359,45 @@
       return chip;
     }
 
+    function escText(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function suggestColorExample() {
+      var n = Math.max(1, _rows.length);
+      var best = null;
+      var bestU = Infinity;
+      columnStats.forEach(function(s) {
+        if (s.isNumeric) return;
+        var u = countUniques(s.name);
+        if (u >= 2 && u <= 12 && u / n < 0.85 && u < bestU) {
+          best = s;
+          bestU = u;
+        }
+      });
+      return best ? best.name : 'Region';
+    }
+
+    function suggestLabelExample() {
+      var n = Math.max(1, _rows.length);
+      var pick = null;
+      columnStats.forEach(function(s) {
+        if (s.isNumeric) return;
+        var u = countUniques(s.name);
+        if (u >= 2 && (u >= n || u / n >= 0.85)) pick = pick || s;
+      });
+      return pick ? pick.name : (columnStats[0] ? columnStats[0].name : 'Country');
+    }
+
     function zoneEmptyHtml(zone) {
       if (zone === 'color') {
         return '<div class="reg-zone-placeholder">Drop a category or numeric column</div>' +
-          '<div class="zone-example">Example: Region</div>';
+          '<div class="zone-example">Example: ' + escText(suggestColorExample()) + '</div>';
       }
       if (zone === 'label') {
         return '<div class="reg-zone-placeholder">Drop a name or ID column</div>' +
-          '<div class="zone-example">Example: Country</div>';
+          '<div class="zone-example">Example: ' + escText(suggestLabelExample()) + '</div>';
       }
       return '<div class="reg-zone-placeholder">Drop a numeric column</div>';
     }

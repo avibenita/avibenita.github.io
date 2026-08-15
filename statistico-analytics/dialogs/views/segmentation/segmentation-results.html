@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <title>Survey Segmentation Matrix</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260815seg2"/>
+  <script src="../shared-brand-logo.js?v=20260716cover"></script>
+  <script src="../shared-header.js?v=20260815seg2"></script>
+  <script src="../shared/vendor/highcharts/highcharts.js"></script>
+  <script src="../shared/vendor/highcharts/modules/exporting.js"></script>
+  <script src="segmentation-engine.js?v=20260815seg2"></script>
+  <script src="segmentation-split-index.js?v=20260815seg2"></script>
+  <script src="segmentation-sample-data.js?v=20260815seg2"></script>
+  <style>
+    :root {
+      --surface-0:#070b14; --surface-1:#1e2638; --surface-2:#2a3348; --border:#4b556e;
+      --accent:#5eead4; --text-primary:#fff; --text-secondary:rgba(255,255,255,.95); --text-muted:rgba(226,232,240,.88);
+    }
+    :root[data-theme="light"] {
+      --surface-0:#e2e8f0; --surface-1:#fff; --surface-2:#f8fafc; --border:#94a3b8;
+      --accent:#0f766e; --text-primary:#0f172a; --text-secondary:#1e293b; --text-muted:#334155;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html, body { height:100%; overflow:hidden; }
+    body { background:var(--surface-0); color:var(--text-primary); font-family:'Segoe UI', system-ui, sans-serif; display:flex; flex-direction:column; }
+    .sb-nav { --sb-accent:#2dd4bf; --sb-accent-soft:rgba(45,212,191,.16); }
+    .sb-layout { display:flex; flex-direction:row; flex:1; min-height:0; overflow:hidden; width:100%; }
+    .right-col { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    #header-container { flex:0 0 auto !important; display:block !important; min-height:64px; position:relative; z-index:20; }
+    .seg-context {
+      flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px;
+      padding:8px 12px; border-bottom:1px solid var(--border); background:var(--surface-1);
+    }
+    .seg-kv { font-size:13px; color:var(--text-secondary); }
+    .seg-kv strong { color:var(--accent); }
+    .config-sep { width:1px; height:16px; background:var(--border); }
+    .filter-banner {
+      display:none; align-items:center; gap:8px; flex-wrap:wrap;
+      padding:6px 12px; background:rgba(45,212,191,.08); border-bottom:1px solid var(--border);
+      font-size:12px; color:var(--text-secondary);
+    }
+    .filter-banner.show { display:flex; }
+    .filter-banner button { border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); border-radius:6px; padding:3px 8px; cursor:pointer; font-size:11px; }
+    .results-container { flex:1; min-height:0; overflow-y:auto; padding:10px; }
+    .tab-panel { display:none; flex-direction:column; gap:10px; }
+    .tab-panel.active { display:flex; }
+    .card { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+    .card-title { font-size:12px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+    .mini-btn, select.seg-sel, input.seg-num {
+      border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary);
+      border-radius:7px; padding:5px 9px; font-size:11px;
+    }
+    .mini-btn { cursor:pointer; }
+    .mini-btn:focus, select.seg-sel:focus, input.seg-num:focus, .quad:focus { outline:2px solid var(--accent); outline-offset:2px; }
+    .warn-banner { display:none; padding:10px 12px; border-radius:8px; background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.35); color:#fde68a; font-size:13px; }
+    .warn-banner.show { display:block; }
+    :root[data-theme="light"] .warn-banner { color:#92400e; }
+    .loading-state { flex:1; display:flex; align-items:center; justify-content:center; color:var(--text-muted); gap:10px; }
+    .error-card { padding:18px; font-size:14px; color:#fecaca; }
+    .matrix-wrap { display:grid; grid-template-columns:56px 28px 1fr 1fr; grid-template-rows:auto 1fr 1fr auto; gap:8px; min-width:0; }
+    .mx-x-title { grid-column:3 / 5; text-align:center; font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); }
+    .mx-y-title {
+      grid-row:2 / 4; writing-mode:vertical-rl; transform:rotate(180deg);
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted);
+    }
+    .mx-y-high, .mx-y-low { display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:var(--text-muted); writing-mode:vertical-rl; transform:rotate(180deg); }
+    .mx-x-low, .mx-x-high { text-align:center; font-size:11px; font-weight:700; color:var(--text-muted); }
+    .quad {
+      min-height:132px; border-radius:12px; padding:12px 14px; cursor:pointer; border:2px solid transparent;
+      display:flex; flex-direction:column; justify-content:center; gap:2px;
+    }
+    .quad.selected { border-color:var(--text-primary); box-shadow:0 0 0 2px rgba(94,234,212,.35); }
+    .quad-label { font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .quad-pct { font-size:28px; font-weight:800; line-height:1.1; }
+    .quad-n, .quad-delta { font-size:12px; opacity:.9; }
+    .details { display:none; margin-top:8px; padding:10px 12px; border-radius:8px; background:var(--surface-2); border:1px solid var(--border); }
+    .details.show { display:block; }
+    .adv-toggle { cursor:pointer; user-select:none; }
+    .adv-body { display:none; padding-top:8px; }
+    .open .adv-body { display:block; }
+    .label-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; }
+    .label-row { display:flex; gap:6px; align-items:center; }
+    .label-row input[type="text"] { flex:1; min-width:0; }
+    .label-row input[type="color"] { width:36px; height:28px; border:none; background:transparent; cursor:pointer; }
+    #groupChart, #changeChart, #driversChart { width:100%; min-height:360px; }
+    #driversChart { min-height:420px; }
+    .chart-scroll { overflow-x:auto; overflow-y:hidden; }
+    .info-icon { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:rgba(45,212,191,.18); border:1px solid rgba(45,212,191,.4); color:var(--accent); font-size:9px; font-weight:800; cursor:help; margin-left:5px; position:relative; }
+    .info-icon .tip { display:none; position:absolute; left:18px; top:-4px; width:260px; background:var(--surface-1); border:1px solid var(--border); border-radius:8px; padding:8px 11px; font-size:11px; font-weight:400; color:var(--text-secondary); z-index:50; text-transform:none; letter-spacing:0; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    .info-icon:hover .tip { display:block; }
+    .si-lead { font-size:13px; color:var(--text-secondary); line-height:1.45; max-width:920px; }
+    .si-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .si-table th, .si-table td { padding:6px 8px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; }
+    .si-table th:first-child, .si-table td:first-child { text-align:left; white-space:normal; }
+    .si-table th { color:var(--text-muted); font-weight:700; }
+    .table-scroll { overflow:auto; max-height:420px; }
+    .si-pattern { border-left:4px solid var(--accent); padding:8px 10px; margin-bottom:6px; background:var(--surface-2); border-radius:0 8px 8px 0; }
+    .si-pattern .si-pat-lab { font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+    .si-pattern .si-pat-desc { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .si-modal { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:80; display:flex; align-items:center; justify-content:center; }
+    .si-modal[hidden] { display:none !important; }
+    .si-modal-card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:16px; max-width:480px; width:92%; max-height:80vh; overflow:auto; }
+    .si-factor-list { display:flex; flex-direction:column; gap:4px; max-height:50vh; overflow:auto; margin:8px 0; }
+    .si-factor-list label { font-size:13px; display:flex; gap:8px; align-items:center; color:var(--text-secondary); }
+    .empty-drivers { display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:18px; }
+    .muted { color:var(--text-muted); font-size:13px; }
+    .change-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; }
+    .chg { padding:12px; border-radius:10px; border:1px solid var(--border); background:var(--surface-2); }
+    .chg-lab { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .chg-vals { font-size:18px; font-weight:700; margin:4px 0; }
+    .chg-pp { font-size:13px; }
+    .small-note { font-size:11px; color:var(--text-muted); }
+    .export-bar { display:flex; flex-wrap:wrap; gap:6px; }
+    .hc-tooltip { font-size:12px; }
+    @media (max-width: 900px) {
+      .quad { min-height:120px; }
+      .quad-pct { font-size:22px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sb-layout">
+    <nav class="sb-nav" id="sidebarNav">
+      <div class="sb-logo"><div class="sb-logo-icon" data-statistico-brand-logo></div></div>
+      <div class="sb-header">
+        <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
+        <span class="sb-menu-title">Menu</span>
+        <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+      </div>
+      <div class="sb-body">
+        <div class="sb-group">
+          <div class="sb-group-title">Results</div>
+          <div class="sb-items-rail">
+            <button class="sb-item active" onclick="switchTab('overview')" data-tab="overview">
+              <i class="fa-solid fa-border-all sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Overview</span><span class="sb-item-description">Four-quadrant segment matrix.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('groups')" data-tab="groups">
+              <i class="fa-solid fa-chart-column sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Group Comparison</span><span class="sb-item-description">100% stacked composition by group.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('change')" data-tab="change" id="tabChangeBtn" disabled>
+              <i class="fa-solid fa-arrow-right-arrow-left sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Change</span><span class="sb-item-description">Current vs previous survey wave.</span></span>
+            </button>
+            <button class="sb-item" onclick="switchTab('drivers')" data-tab="drivers">
+              <i class="fa-solid fa-chart-line sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Drivers</span><span class="sb-item-description">Split Index — factors that differentiate groups.</span></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="right-col">
+      <div id="header-container"></div>
+      <div class="seg-context" id="segContext">
+        <span class="seg-kv" id="ctxX">Satisfaction ≥ 4.00</span>
+        <span class="config-sep"></span>
+        <span class="seg-kv" id="ctxY">Intention to stay ≥ 4.00</span>
+        <span class="config-sep"></span>
+        <span class="seg-kv">Valid respondents: <strong id="ctxN">—</strong></span>
+      </div>
+      <div class="filter-banner" id="filterBanner">
+        <span id="filterText">Active filters:</span>
+        <button type="button" id="btnClearFilters">Clear all filters</button>
+      </div>
+      <div class="results-container" id="exportRoot">
+        <div id="loadingState" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading segmentation results…</div>
+        <div id="errorState" class="tab-panel"><div class="card error-card" id="errorText"></div></div>
+        <div id="tab-overview" class="tab-panel">
+          <div class="warn-banner" id="overviewWarn"></div>
+          <div class="card" id="matrixCard">
+            <div class="card-title">Segment matrix</div>
+            <div class="matrix-wrap" id="matrixWrap"></div>
+            <div class="details" id="detailsPanel"></div>
+          </div>
+          <div class="card adv-wrap" id="labelWrap">
+            <div class="card-title adv-toggle" id="labelToggle" role="button" tabindex="0">Segment labels and colors</div>
+            <div class="adv-body" id="labelBody"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Live settings</div>
+            <div class="toolbar">
+              <label class="muted">Min valid items
+                <select class="seg-sel" id="minValidLive">
+                  <option value="0.5">At least 50%</option>
+                  <option value="0.75">At least 75%</option>
+                  <option value="1">All selected items</option>
+                </select>
+              </label>
+              <label class="muted">X threshold <input class="seg-num" id="xThreshLive" type="number" step="0.1" style="width:72px"></label>
+              <label class="muted">Y threshold <input class="seg-num" id="yThreshLive" type="number" step="0.1" style="width:72px"></label>
+              <label class="muted">Flag groups &lt; <input class="seg-num" id="smallBaseLive" type="number" min="1" step="1" value="30" style="width:64px"> respondents</label>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Export</div>
+            <div class="export-bar">
+              <button class="mini-btn" type="button" onclick="copyChart()"><i class="fa-solid fa-copy"></i> Copy chart</button>
+              <button class="mini-btn" type="button" onclick="downloadPng()"><i class="fa-solid fa-image"></i> Download PNG</button>
+              <button class="mini-btn" type="button" onclick="exportTable()"><i class="fa-solid fa-table"></i> Export results table</button>
+              <button class="mini-btn" type="button" onclick="copySummary()"><i class="fa-solid fa-align-left"></i> Copy interpretation-ready summary</button>
+            </div>
+          </div>
+        </div>
+        <div id="tab-groups" class="tab-panel">
+          <div class="card">
+            <div class="toolbar">
+              <label class="muted">Sort by
+                <select class="seg-sel" id="sortBy">
+                  <option value="highXHighY">Truly Loyal</option>
+                  <option value="highXLowY">Accessible</option>
+                  <option value="lowXHighY">Trapped</option>
+                  <option value="lowXLowY">High Risk</option>
+                  <option value="combinedRisk">Combined risk</option>
+                  <option value="name">Group name</option>
+                  <option value="n">Sample size</option>
+                </select>
+              </label>
+              <label class="muted">Focus segment
+                <select class="seg-sel" id="focusSeg">
+                  <option value="">All segments (stacked)</option>
+                </select>
+              </label>
+              <label class="muted"><input type="checkbox" id="showBenchmark"> Show overall benchmark</label>
+            </div>
+            <p class="small-note">Combined risk is Trapped % + High Risk % and is only a sorting aid — not a validated loyalty index.</p>
+            <div class="chart-scroll"><div id="groupChart"></div></div>
+          </div>
+        </div>
+        <div id="tab-change" class="tab-panel">
+          <div class="card">
+            <div class="card-title">Overall changes</div>
+            <p class="small-note">Direction of change is descriptive. It is not automatically statistically significant.</p>
+            <div class="change-cards" id="changeCards"></div>
+          </div>
+          <div class="card">
+            <div class="toolbar">
+              <label class="muted">Change in
+                <select class="seg-sel" id="changeSeg"></select>
+              </label>
+            </div>
+            <div class="chart-scroll"><div id="changeChart"></div></div>
+          </div>
+        </div>
+        <div id="tab-drivers" class="tab-panel">
+          <div class="card">
+            <p class="si-lead">Split Index measures how strongly each survey factor differentiates the two selected respondent groups. Larger values indicate greater separation and potentially greater managerial relevance.
+              <span class="info-icon">i<span class="tip">A large Split Index indicates an association with group membership. It does not, by itself, establish that the factor causes the outcome.</span></span>
+            </p>
+          </div>
+          <div class="card empty-drivers" id="driversEmpty">
+            <p>Select survey factors to calculate the Split Index.</p>
+            <button class="mini-btn" type="button" id="btnSelectFactors">Select factors</button>
+          </div>
+          <div id="driversBody" style="display:none">
+            <div class="card">
+              <div class="card-title">Compare groups</div>
+              <div class="toolbar">
+                <label class="muted">Comparison
+                  <select class="seg-sel" id="siMode">
+                    <option value="stay">Tending to stay vs Not tending to stay</option>
+                    <option value="satisfaction">Satisfied vs Not satisfied</option>
+                    <option value="segments">Two segments</option>
+                    <option value="segmentVsOthers">Selected segment vs all others</option>
+                  </select>
+                </label>
+                <span id="siSegPickers" style="display:none">
+                  <label class="muted">Group 1 <select class="seg-sel" id="siGroup1"></select></label>
+                  <label class="muted">Group 2 <select class="seg-sel" id="siGroup2"></select></label>
+                </span>
+                <span id="siFocusPicker" style="display:none">
+                  <label class="muted">Segment <select class="seg-sel" id="siFocusSeg"></select></label>
+                </span>
+                <span id="siGroupNs" class="muted"></span>
+              </div>
+              <div class="toolbar">
+                <span class="muted">Split Index:</span>
+                <label class="muted"><input type="radio" name="siIndex" value="raw" checked> Raw mean difference</label>
+                <label class="muted"><input type="radio" name="siIndex" value="standardized"> Standardized mean difference</label>
+                <span class="small-note" id="siIndexHelp">Best when all factors use the same response scale.</span>
+              </div>
+              <div class="toolbar">
+                <label class="muted">Factor order
+                  <select class="seg-sel" id="siSort">
+                    <option value="splitDesc">Split Index — descending</option>
+                    <option value="splitAsc">Split Index — ascending</option>
+                    <option value="order">Questionnaire order</option>
+                    <option value="group1">Group 1 mean</option>
+                    <option value="group2">Group 2 mean</option>
+                    <option value="name">Factor name</option>
+                  </select>
+                </label>
+                <label class="muted">Show top factors only
+                  <select class="seg-sel" id="siTopN">
+                    <option value="0">All</option>
+                    <option value="5">Top 5</option>
+                    <option value="10">Top 10</option>
+                    <option value="15">Top 15</option>
+                  </select>
+                </label>
+                <label class="muted"><input type="checkbox" id="siEvidence"> Show statistical evidence</label>
+                <label class="muted">Missing-data handling
+                  <select class="seg-sel" id="siMissing">
+                    <option value="available">Available cases by factor</option>
+                    <option value="complete">Complete cases across selected factors</option>
+                  </select>
+                </label>
+                <label class="muted" id="siWaveWrap">Analyze wave
+                  <select class="seg-sel" id="siWave">
+                    <option value="current">Current</option>
+                    <option value="previous">Previous</option>
+                  </select>
+                </label>
+                <button class="mini-btn" type="button" id="btnSelectFactors2">Select factors</button>
+              </div>
+            </div>
+            <div class="warn-banner" id="driversWarn"></div>
+            <div class="card">
+              <div class="chart-scroll"><div id="driversChart"></div></div>
+            </div>
+            <div class="card">
+              <div class="card-title">Interpretation patterns</div>
+              <p class="small-note">These labels are descriptive patterns based on group means and Split Index rank. They are not a validated priority score.</p>
+              <div id="siPatterns"></div>
+            </div>
+            <div class="card adv-wrap" id="siStatsWrap">
+              <div class="card-title adv-toggle" id="siStatsToggle" role="button" tabindex="0">Statistical details</div>
+              <div class="adv-body">
+                <p class="small-note">Statistical significance depends on both the size of the difference and the available sample. Use the Split Index to assess separation and the confidence interval to assess precision.</p>
+                <div class="toolbar">
+                  <label class="muted">Multiple-comparison adjustment
+                    <select class="seg-sel" id="siPAdjust">
+                      <option value="none">None</option>
+                      <option value="bh" selected>Benjamini–Hochberg FDR</option>
+                      <option value="holm">Holm</option>
+                      <option value="bonferroni">Bonferroni</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="table-scroll"><table class="si-table" id="siStatsTable"></table></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">Export</div>
+              <div class="export-bar">
+                <button class="mini-btn" type="button" onclick="copyChart()"><i class="fa-solid fa-copy"></i> Copy chart</button>
+                <button class="mini-btn" type="button" onclick="downloadPng()"><i class="fa-solid fa-image"></i> Download PNG</button>
+                <button class="mini-btn" type="button" onclick="exportTable()"><i class="fa-solid fa-table"></i> Export results table</button>
+              </div>
+            </div>
+          </div>
+          <div id="siFactorModal" class="si-modal" hidden>
+            <div class="si-modal-card">
+              <div class="card-title">Select factors</div>
+              <p class="small-note">Choose numeric survey columns to compare across the two groups. Dimension items may be included.</p>
+              <div id="siFactorList" class="si-factor-list"></div>
+              <div class="toolbar">
+                <button class="mini-btn" type="button" id="siFactorApply">Apply</button>
+                <button class="mini-btn" type="button" id="siFactorCancel">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var bundle = null;
+    var source = { headers: [], rows: [], allRows: [] };
+    var spec = null;
+    var selectedKey = null;
+    var activeTab = 'overview';
+    var groupChart = null;
+    var changeChart = null;
+    var driversChart = null;
+    var splitResult = null;
+    var extraFilters = {};
+    var headerReady = false;
+    var TAB_TITLES = { overview: 'Overview', groups: 'Group Comparison', change: 'Change', drivers: 'Drivers' };
+
+    function qs(id) { return document.getElementById(id); }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c];
+      });
+    }
+    function fmtPp(v) {
+      if (v == null || !isFinite(v)) return '';
+      var sign = v > 0 ? '+' : '';
+      return sign + v.toFixed(1) + ' pp';
+    }
+    function send(action, data) {
+      try {
+        if (Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+          Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null, payload: data || null }));
+        }
+      } catch (_e) {}
+    }
+
+    function switchTab(id) {
+      if (id === 'change' && !(bundle && bundle.waves && bundle.waves.enabled)) return;
+      activeTab = id;
+      document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      document.querySelectorAll('.sb-item').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tab') === id); });
+      var panel = qs('tab-' + id);
+      if (panel) panel.classList.add('active');
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateTitle(TAB_TITLES[id] || 'Overview');
+        if (StatisticoHeader.currentView !== undefined) StatisticoHeader.currentView = 'segmentation-' + id;
+      }
+      if (id === 'groups') renderGroupChart();
+      if (id === 'change') renderChange();
+      if (id === 'drivers') renderDrivers();
+    }
+
+    function currentSpec() {
+      var s = JSON.parse(JSON.stringify(spec || StatisticoSegmentation.defaultConfig()));
+      s.minimumValidItems = Number(qs('minValidLive').value);
+      s.xDimension.thresholdMethod = 'custom';
+      s.yDimension.thresholdMethod = 'custom';
+      s.xDimension.threshold = Number(qs('xThreshLive').value);
+      s.yDimension.threshold = Number(qs('yThreshLive').value);
+      s.smallBaseThreshold = Number(qs('smallBaseLive').value) || 30;
+      s.filters = Object.assign({}, extraFilters);
+      s.factorColumns = (spec && spec.factorColumns) ? spec.factorColumns.slice() : [];
+      return s;
+    }
+
+    function recompute() {
+      if (!source.headers.length) return;
+      spec = currentSpec();
+      bundle = StatisticoSegmentation.analyze(source.headers, source.rows, spec);
+      renderAll({ keepTab: true });
+    }
+
+    function applyLabelsFromUi() {
+      if (!bundle || !bundle.analyzable) return;
+      var segs = {};
+      StatisticoSegmentation.SEGMENT_KEYS.forEach(function (k) {
+        var lab = qs('lab-' + k);
+        var col = qs('col-' + k);
+        segs[k] = {
+          label: lab ? lab.value : bundle.config.segments[k].label,
+          color: col ? col.value : bundle.config.segments[k].color
+        };
+      });
+      spec.segments = Object.assign({}, spec.segments, segs);
+      bundle = StatisticoSegmentation.relabel(bundle, segs);
+      renderViews();
+    }
+
+    function renderContext() {
+      if (!bundle || !bundle.analyzable) return;
+      qs('ctxX').innerHTML = esc(bundle.thresholds.xRule);
+      qs('ctxY').innerHTML = esc(bundle.thresholds.yRule);
+      qs('ctxN').textContent = bundle.totals.nValid + ' of ' + bundle.totals.nRows;
+      var fb = qs('filterBanner');
+      if (bundle.filtersActive && bundle.filtersActive.length) {
+        qs('filterText').textContent = 'Active filters: ' + bundle.filtersActive.join(' · ');
+        fb.classList.add('show');
+      } else fb.classList.remove('show');
+      var chg = qs('tabChangeBtn');
+      chg.disabled = !(bundle.waves && bundle.waves.enabled);
+      chg.style.opacity = chg.disabled ? .45 : 1;
+    }
+
+    function renderWarnings() {
+      var el = qs('overviewWarn');
+      if (!bundle) return;
+      var msgs = (bundle.warnings || []).slice();
+      if (!bundle.analyzable && bundle.error) msgs.unshift(bundle.error);
+      if (!msgs.length) { el.classList.remove('show'); el.textContent = ''; return; }
+      el.innerHTML = msgs.map(esc).join('<br>');
+      el.classList.add('show');
+    }
+
+    function renderMatrix() {
+      if (!bundle || !bundle.analyzable) return;
+      var segs = bundle.overall.segments;
+      var xLab = bundle.config.xDimension.label;
+      var yLab = bundle.config.yDimension.label;
+      function cell(key) {
+        var s = segs[key];
+        var delta = '';
+        if (s.ppChange != null) {
+          var arrow = s.ppChange > 0 ? '▲' : (s.ppChange < 0 ? '▼' : '■');
+          var title = 'Previous survey: ' + s.prevPct.toFixed(1) + '%&#10;Current survey: ' + s.pct.toFixed(1) + '%&#10;Change: ' + fmtPp(s.ppChange);
+          delta = '<div class="quad-delta" title="' + title + '">' + arrow + ' ' + fmtPp(s.ppChange) + ' vs previous</div>';
+        }
+        var sel = selectedKey === key ? ' selected' : '';
+        return '<button type="button" class="quad' + sel + '" data-key="' + key + '" style="background:' + s.color + ';color:' + s.textColor + '" aria-pressed="' + (selectedKey === key) + '">' +
+          '<div class="quad-label">' + esc(s.label) + '</div>' +
+          '<div class="quad-pct">' + s.pct.toFixed(1) + '%</div>' +
+          '<div class="quad-n">n = ' + s.n + '</div>' + delta +
+          '</button>';
+      }
+      qs('matrixWrap').innerHTML =
+        '<div class="mx-x-title">' + esc(xLab) + '</div>' +
+        '<div class="mx-y-title">' + esc(yLab) + '</div>' +
+        '<div class="mx-y-high">High</div>' +
+        cell('lowXHighY') + cell('highXHighY') +
+        '<div class="mx-y-low">Low</div>' +
+        cell('lowXLowY') + cell('highXLowY') +
+        '<div></div><div></div><div class="mx-x-low">' + esc(bundle.config.xDimension.lowLabel) + '</div><div class="mx-x-high">' + esc(bundle.config.xDimension.highLabel) + '</div>';
+      qs('matrixWrap').querySelectorAll('.quad').forEach(function (btn) {
+        btn.addEventListener('click', function () { selectSegment(btn.getAttribute('data-key')); });
+      });
+      renderDetails();
+    }
+
+    function selectSegment(key) {
+      selectedKey = selectedKey === key ? null : key;
+      renderMatrix();
+      renderGroupChart();
+    }
+
+    function renderDetails() {
+      var el = qs('detailsPanel');
+      if (!selectedKey || !bundle) { el.classList.remove('show'); el.innerHTML = ''; return; }
+      var s = bundle.overall.segments[selectedKey];
+      var html = '<strong>' + esc(s.label) + '</strong> — ' + s.pct.toFixed(1) + '% (n = ' + s.n + ')';
+      if (s.prevPct != null) html += '<div class="muted">Previous: ' + s.prevPct.toFixed(1) + '% · Change: ' + fmtPp(s.ppChange) + '</div>';
+      html += '<div style="margin-top:6px;"><button class="mini-btn" type="button" id="btnClearSel">Clear selection</button></div>';
+      el.innerHTML = html;
+      el.classList.add('show');
+      qs('btnClearSel').onclick = function () { selectedKey = null; renderMatrix(); renderGroupChart(); };
+    }
+
+    function renderLabelEditor() {
+      if (!bundle || !bundle.analyzable) return;
+      var html = '<div class="label-grid">';
+      StatisticoSegmentation.SEGMENT_KEYS.forEach(function (k) {
+        var s = bundle.overall.segments[k];
+        html += '<div class="label-row"><input type="color" id="col-' + k + '" value="' + s.color + '"><input type="text" class="seg-sel" id="lab-' + k + '" value="' + esc(s.label) + '"></div>';
+      });
+      html += '</div>';
+      qs('labelBody').innerHTML = html;
+      StatisticoSegmentation.SEGMENT_KEYS.forEach(function (k) {
+        qs('lab-' + k).addEventListener('input', applyLabelsFromUi);
+        qs('col-' + k).addEventListener('input', applyLabelsFromUi);
+      });
+      var sort = qs('sortBy');
+      var focus = qs('focusSeg');
+      var chg = qs('changeSeg');
+      var labels = StatisticoSegmentation.SEGMENT_KEYS.map(function (k) {
+        return { k: k, lab: bundle.overall.segments[k].label };
+      });
+      ['highXHighY','highXLowY','lowXHighY','lowXLowY'].forEach(function (k, i) {
+        if (sort.options[i]) sort.options[i].text = labels[i].lab;
+      });
+      var focusVal = focus.value;
+      focus.innerHTML = '<option value="">All segments (stacked)</option>' + labels.map(function (x) {
+        return '<option value="' + x.k + '">' + esc(x.lab) + '</option>';
+      }).join('');
+      focus.value = focusVal;
+      var chgVal = chg.value || 'highXHighY';
+      chg.innerHTML = labels.map(function (x) {
+        return '<option value="' + x.k + '">' + esc(x.lab) + '</option>';
+      }).join('');
+      chg.value = chgVal;
+    }
+
+    function hcTheme() {
+      var light = document.documentElement.getAttribute('data-theme') === 'light';
+      return {
+        background: light ? '#ffffff' : '#1e2638',
+        text: light ? '#0f172a' : '#e2e8f0',
+        muted: light ? '#334155' : '#94a3b8',
+        grid: light ? '#e2e8f0' : '#334155'
+      };
+    }
+
+    function sortedGroups() {
+      if (!bundle) return [];
+      return StatisticoSegmentation.sortGroups(bundle.groups || [], qs('sortBy').value, selectedKey);
+    }
+
+    function renderGroupChart() {
+      if (!bundle || !bundle.analyzable) return;
+      var host = qs('groupChart');
+      if (!bundle.groups.length) {
+        host.innerHTML = '<p class="muted">Assign a group variable to compare segments across organizational groups.</p>';
+        return;
+      }
+      var groups = sortedGroups();
+      var theme = hcTheme();
+      var focus = qs('focusSeg').value;
+      var wide = groups.length > StatisticoSegmentation.MAX_GROUPS_COMPACT;
+      host.style.width = wide ? Math.max(640, groups.length * 56) + 'px' : '100%';
+      var cats = groups.map(function (g) { return g.name; });
+      var bench = qs('showBenchmark').checked;
+      var key = focus || selectedKey || 'highXHighY';
+
+      if (groupChart) { groupChart.destroy(); groupChart = null; }
+
+      if (focus) {
+        var focusMeta = bundle.overall.segments[focus];
+        var data = groups.map(function (g) {
+            var s = g.segments[focus];
+            var col = focusMeta.color;
+            try { if (g.smallBase && Highcharts.color) col = Highcharts.color(focusMeta.color).brighten(0.15).get(); } catch (_e) {}
+            return {
+              y: s.pct,
+              color: col,
+              custom: g
+            };
+        }).sort(function (a, b) { return b.y - a.y; });
+        cats = data.map(function (d) { return d.custom.name; });
+        groupChart = Highcharts.chart('groupChart', {
+          chart: { type: 'bar', backgroundColor: theme.background, height: Math.max(360, groups.length * 28) },
+          title: { text: 'Focus segment: ' + focusMeta.label, style: { color: theme.text, fontSize: '14px' } },
+          xAxis: { categories: cats, labels: { style: { color: theme.text, fontSize: '11px' }, useHTML: true, formatter: function () {
+            var g = groups.filter(function (x) { return x.name === this.value; })[0];
+            var warn = g && g.smallBase ? ' <span title="Small base: interpret this percentage cautiously.">⚠</span>' : '';
+            return esc(this.value) + warn + '<br><span style="font-size:10px;color:' + theme.muted + '">n = ' + (g ? g.n : '') + '</span>';
+          } } },
+          yAxis: { min: 0, max: 100, title: { text: '%', style: { color: theme.muted } }, gridLineColor: theme.grid, labels: { style: { color: theme.muted } },
+            plotLines: bench ? [{ value: focusMeta.pct, color: theme.text, width: 1, dashStyle: 'Dash', label: { text: 'Overall ' + focusMeta.pct.toFixed(1) + '%', style: { color: theme.muted, fontSize: '10px' } } }] : []
+          },
+          legend: { enabled: false },
+          tooltip: { useHTML: true, formatter: function () { return groupTooltip(this.point.custom, focus); } },
+          series: [{ name: focusMeta.label, data: data, color: focusMeta.color, dataLabels: { enabled: true, format: '{y:.1f}', filter: { property: 'y', operator: '>', value: 6 }, style: { textOutline: 'none', fontSize: '10px' } } }],
+          exporting: { enabled: false },
+          credits: { enabled: false }
+        });
+        return;
+      }
+
+      var series = StatisticoSegmentation.STACK_ORDER.map(function (k) {
+        var meta = bundle.overall.segments[k];
+        return {
+          name: meta.label,
+          key: k,
+          color: meta.color,
+          data: groups.map(function (g) {
+            return { y: g.segments[k].pct, custom: g };
+          })
+        };
+      });
+      groupChart = Highcharts.chart('groupChart', {
+        chart: { type: 'column', backgroundColor: theme.background, height: 420 },
+        title: { text: null },
+        xAxis: { categories: cats, labels: { useHTML: true, style: { color: theme.text, fontSize: '11px' }, formatter: function () {
+          var g = groups.filter(function (x) { return x.name === this.value; })[0];
+          var warn = g && g.smallBase ? ' <span title="Small base: interpret this percentage cautiously.">⚠</span>' : '';
+          var extra = '';
+          if (g && g.comparability === 'new') extra = '<br><span style="font-size:9px;color:' + theme.muted + '">New group</span>';
+          if (g && g.comparability === 'missingCurrent') extra = '<br><span style="font-size:9px;color:' + theme.muted + '">Not in current wave</span>';
+          return esc(this.value) + warn + '<br><span style="font-size:10px;color:' + theme.muted + '">n = ' + (g ? g.n : '') + '</span>' + extra;
+        } } },
+        yAxis: { min: 0, max: 100, title: { text: '% of group', style: { color: theme.muted } }, gridLineColor: theme.grid, labels: { style: { color: theme.muted } },
+          plotLines: (bench && selectedKey) ? [{ value: bundle.overall.segments[selectedKey].pct, color: bundle.overall.segments[selectedKey].color, width: 1.5, dashStyle: 'Dash',
+            label: { text: bundle.overall.segments[selectedKey].label + ' overall ' + bundle.overall.segments[selectedKey].pct.toFixed(1) + '%', style: { color: theme.muted, fontSize: '10px' } } }] : []
+        },
+        legend: { itemStyle: { color: theme.text }, itemHoverStyle: { color: theme.accent || theme.text } },
+        plotOptions: {
+          column: {
+            stacking: 'percent',
+            borderWidth: 0,
+            dataLabels: {
+              enabled: true,
+              formatter: function () { return this.percentage >= 8 ? Highcharts.numberFormat(this.percentage, 1) : ''; },
+              style: { textOutline: 'none', fontSize: '10px', color: '#0f172a' },
+              allowOverlap: false
+            },
+            point: { events: { click: function () { selectSegment(this.series.options.key); } } }
+          }
+        },
+        tooltip: { useHTML: true, shared: false, formatter: function () {
+          return groupTooltip(this.point.custom, this.series.options.key);
+        } },
+        series: series,
+        exporting: { enabled: false },
+        credits: { enabled: false }
+      });
+    }
+
+    function groupTooltip(g, key) {
+      if (!g) return '';
+      var s = g.segments[key];
+      var overall = bundle.overall.segments[key];
+      var diff = s.pct - overall.pct;
+      var html = '<div class="hc-tooltip"><b>' + esc(g.name) + '</b><br>' + esc(s.label) + '<br>' +
+        s.pct.toFixed(1) + '%<br>n = ' + s.n + '<br>Overall: ' + overall.pct.toFixed(1) + '%<br>Difference from overall: ' + fmtPp(diff);
+      if (bundle.weighted) html += '<br>Weighted % shown; unweighted n = ' + s.n;
+      if (g.smallBase) html += '<br><i>Small base: interpret this percentage cautiously.</i>';
+      if (g.comparability === 'new') html += '<br>New group';
+      if (g.comparability === 'missingCurrent') html += '<br>Not available in current wave';
+      if (g.comparability === 'missingPrevious') html += '<br>Not available in previous wave';
+      return html + '</div>';
+    }
+
+    function renderChange() {
+      if (!bundle || !bundle.waves || !bundle.waves.enabled) return;
+      var cards = StatisticoSegmentation.SEGMENT_KEYS.map(function (k) {
+        var s = bundle.overall.segments[k];
+        var arrow = s.ppChange > 0 ? '▲' : (s.ppChange < 0 ? '▼' : '■');
+        return '<div class="chg" style="border-left:4px solid ' + s.color + '"><div class="chg-lab">' + esc(s.label) + '</div>' +
+          '<div class="chg-vals">' + s.prevPct.toFixed(1) + '% → ' + s.pct.toFixed(1) + '%</div>' +
+          '<div class="chg-pp">' + arrow + ' ' + fmtPp(s.ppChange) + '</div></div>';
+      }).join('');
+      qs('changeCards').innerHTML = cards;
+      var key = qs('changeSeg').value || 'highXHighY';
+      var meta = bundle.overall.segments[key];
+      var groups = (bundle.groups || []).filter(function (g) { return g.inCurrent || g.inPrevious; });
+      groups.sort(function (a, b) {
+        var av = a.segments[key].ppChange; var bv = b.segments[key].ppChange;
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return bv - av;
+      });
+      var theme = hcTheme();
+      var host = qs('changeChart');
+      host.style.width = groups.length > 20 ? Math.max(640, groups.length * 28) + 'px' : '100%';
+      if (changeChart) { changeChart.destroy(); changeChart = null; }
+      changeChart = Highcharts.chart('changeChart', {
+        chart: { type: 'bar', backgroundColor: theme.background, height: Math.max(360, groups.length * 26) },
+        title: { text: 'Change in ' + meta.label + ' since previous survey', style: { color: theme.text, fontSize: '14px' } },
+        xAxis: { categories: groups.map(function (g) { return g.name; }), labels: { style: { color: theme.text, fontSize: '11px' }, useHTML: true, formatter: function () {
+          var g = groups.filter(function (x) { return x.name === this.value; })[0];
+          var tag = '';
+          if (g && g.comparability === 'new') tag = ' <span style="font-size:9px">(new)</span>';
+          if (g && g.comparability === 'missingCurrent') tag = ' <span style="font-size:9px">(not in current)</span>';
+          return esc(this.value) + tag;
+        } } },
+        yAxis: { title: { text: 'Percentage-point change', style: { color: theme.muted } }, gridLineColor: theme.grid, labels: { style: { color: theme.muted } },
+          plotLines: [{ value: 0, color: theme.text, width: 1 }] },
+        legend: { enabled: false },
+        tooltip: { formatter: function () {
+          var g = this.point.custom;
+          var s = g.segments[key];
+          var html = '<b>' + g.name + '</b><br>' + meta.label + '<br>';
+          if (s.prevPct == null) html += 'Not available in previous wave';
+          else if (!g.inCurrent) html += 'Not available in current wave<br>Previous: ' + s.prevPct.toFixed(1) + '%';
+          else html += 'Previous: ' + s.prevPct.toFixed(1) + '%<br>Current: ' + s.pct.toFixed(1) + '%<br>Change: ' + fmtPp(s.ppChange);
+          return html;
+        } },
+        series: [{
+          name: meta.label,
+          data: groups.map(function (g) {
+            var v = g.segments[key].ppChange;
+            return { y: v == null ? 0 : v, color: (v || 0) >= 0 ? meta.color : '#94a3b8', custom: g };
+          })
+        }],
+        exporting: { enabled: false },
+        credits: { enabled: false }
+      });
+    }
+
+    function fmtNum(v, d) {
+      if (v == null || !isFinite(v)) return '—';
+      return Number(v).toFixed(d == null ? 2 : d);
+    }
+
+    function numericSourceHeaders() {
+      var out = [];
+      (source.headers || []).forEach(function (h, i) {
+        var n = 0, tot = 0;
+        var rows = source.rows || [];
+        for (var r = 0; r < Math.min(rows.length, 80); r++) {
+          var v = rows[r][i];
+          if (v === '' || v == null) continue;
+          tot += 1;
+          if (isFinite(Number(v))) n += 1;
+        }
+        if (tot && n / tot >= 0.6) out.push(String(h));
+      });
+      return out;
+    }
+
+    function currentFactorColumns() {
+      return (spec && spec.factorColumns && spec.factorColumns.length)
+        ? spec.factorColumns.slice()
+        : [];
+    }
+
+    function fillSiSegmentSelects() {
+      if (!bundle || !bundle.analyzable) return;
+      var labels = StatisticoSegmentation.SEGMENT_KEYS.map(function (k) {
+        return { k: k, lab: bundle.overall.segments[k].label };
+      });
+      function fill(sel, fallback) {
+        var prev = sel.value || fallback;
+        sel.innerHTML = labels.map(function (x) {
+          return '<option value="' + x.k + '">' + esc(x.lab) + '</option>';
+        }).join('');
+        sel.value = labels.some(function (x) { return x.k === prev; }) ? prev : fallback;
+      }
+      fill(qs('siGroup1'), 'highXHighY');
+      fill(qs('siGroup2'), 'lowXLowY');
+      fill(qs('siFocusSeg'), 'highXHighY');
+      if (qs('siGroup1').value === qs('siGroup2').value) {
+        var other = StatisticoSegmentation.SEGMENT_KEYS.filter(function (k) { return k !== qs('siGroup1').value; })[0];
+        if (other) qs('siGroup2').value = other;
+      }
+      var yHigh = bundle.config.yDimension.highLabel || 'Tending to stay';
+      var yLow = bundle.config.yDimension.lowLabel || 'Not tending to stay';
+      var xHigh = bundle.config.xDimension.highLabel || 'Satisfied';
+      var xLow = bundle.config.xDimension.lowLabel || 'Not satisfied';
+      qs('siMode').options[0].text = yHigh + ' vs ' + yLow;
+      qs('siMode').options[1].text = xHigh + ' vs ' + xLow;
+    }
+
+    function driversOptions() {
+      var mode = qs('siMode').value;
+      var indexEl = document.querySelector('input[name="siIndex"]:checked');
+      var topN = Number(qs('siTopN').value) || 0;
+      return {
+        mode: mode,
+        group1Key: qs('siGroup1').value,
+        group2Key: qs('siGroup2').value,
+        segmentKey: qs('siFocusSeg').value,
+        indexType: indexEl ? indexEl.value : 'raw',
+        sortBy: qs('siSort').value,
+        topN: topN > 0 ? topN : 0,
+        missing: qs('siMissing').value,
+        wave: qs('siWave').value,
+        pAdjust: qs('siPAdjust').value
+      };
+    }
+
+    function openFactorPicker() {
+      var list = qs('siFactorList');
+      var selected = currentFactorColumns();
+      var nums = numericSourceHeaders();
+      list.innerHTML = nums.map(function (name) {
+        var checked = selected.indexOf(name) >= 0 ? ' checked' : '';
+        return '<label><input type="checkbox" value="' + esc(name) + '"' + checked + '> ' + esc(name) + '</label>';
+      }).join('') || '<p class="muted">No numeric columns found.</p>';
+      qs('siFactorModal').hidden = false;
+    }
+
+    function applyFactorPicker() {
+      var chosen = [];
+      qs('siFactorList').querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+        chosen.push(cb.value);
+      });
+      if (!spec) spec = StatisticoSegmentation.defaultConfig();
+      spec.factorColumns = chosen;
+      qs('siFactorModal').hidden = true;
+      renderDrivers();
+    }
+
+    function siTooltipHtml(f, evidence) {
+      var html = '<div class="hc-tooltip"><b>' + esc(f.factorLabel) + '</b><br><br>';
+      function block(g) {
+        var meanLab = splitResult && splitResult.weighted ? 'Weighted mean' : 'Mean';
+        html += '<b>' + esc(g.label) + '</b><br>' + meanLab + ': ' + fmtNum(g.mean) +
+          '<br>Valid n: ' + g.validN + '<br>SD: ' + fmtNum(g.sd) + '<br><br>';
+      }
+      block(f.group1);
+      block(f.group2);
+      html += 'Raw Split Index: ' + fmtNum(f.rawSplitIndex);
+      if (f.standardizedSplitIndex == null) {
+        html += '<br>Standardized Split Index: —<br><i>No within-group variation</i>';
+      } else {
+        html += '<br>Standardized mean difference: ' + fmtNum(f.standardizedSplitIndex);
+      }
+      var signed = f.signedDifference;
+      html += '<br>Signed difference: ' + (isFinite(signed) && signed > 0 ? '+' : '') + fmtNum(signed);
+      if (evidence && f.confidenceInterval && isFinite(f.confidenceInterval.lower)) {
+        html += '<br>95% CI for difference: [' + fmtNum(f.confidenceInterval.lower) + ', ' + fmtNum(f.confidenceInterval.upper) + ']';
+        html += '<br>Welch p-value: ' + (f.welchTest && isFinite(f.welchTest.pValue) ? Number(f.welchTest.pValue).toPrecision(3) : '—');
+      }
+      return html + '</div>';
+    }
+
+    function renderDriversChart(result) {
+      var host = qs('driversChart');
+      var factors = result.factors || [];
+      if (!factors.length) {
+        host.innerHTML = '<p class="muted">No factor statistics could be calculated for the selected groups.</p>';
+        return;
+      }
+      var theme = hcTheme();
+      var evidence = qs('siEvidence').checked;
+      var cats = factors.map(function (f) { return f.factorLabel; });
+      var wide = factors.length > 8;
+      host.style.width = wide ? Math.max(640, factors.length * 92) + 'px' : '100%';
+      var rotate = factors.some(function (f) { return String(f.factorLabel).length > 18; }) || factors.length > 6;
+      var g1 = result.group1.label, g2 = result.group2.label;
+      var siName = result.indexType === 'standardized' ? 'Standardized mean difference' : 'Split Index';
+      var means = [];
+      factors.forEach(function (f) {
+        if (isFinite(f.group1.mean)) means.push(f.group1.mean);
+        if (isFinite(f.group2.mean)) means.push(f.group2.mean);
+      });
+      var yMin = means.length ? Math.min.apply(null, means.concat([1])) : 1;
+      var yMax = means.length ? Math.max.apply(null, means.concat([5])) : 5;
+      if (yMin > 1) yMin = Math.max(1, Math.floor(yMin) - 0.2);
+      if (driversChart) { driversChart.destroy(); driversChart = null; }
+      /* Split Index chart: Highcharts type 'line' only — no spline or smoothing. */
+      driversChart = Highcharts.chart('driversChart', {
+        chart: { backgroundColor: theme.background, height: 440, type: 'line' },
+        title: {
+          text: result.title + '  ·  ' + g1 + ' (n = ' + result.group1.n + ') vs ' + g2 + ' (n = ' + result.group2.n + ')',
+          style: { color: theme.text, fontSize: '13px', fontWeight: '700' }
+        },
+        subtitle: result.waveLabel ? { text: 'Wave: ' + result.waveLabel, style: { color: theme.muted, fontSize: '11px' } } : undefined,
+        xAxis: {
+          categories: cats,
+          labels: {
+            rotation: rotate ? -40 : 0,
+            style: { color: theme.text, fontSize: '11px' },
+            formatter: function () {
+              var lab = String(this.value);
+              var shown = lab.length > 22 ? lab.slice(0, 20) + '…' : lab;
+              return '<span title="' + esc(lab) + '">' + esc(shown) + '</span>';
+            },
+            useHTML: true
+          }
+        },
+        yAxis: [
+          { title: { text: 'Group mean', style: { color: theme.muted } }, min: yMin, max: yMax, gridLineColor: theme.grid, labels: { style: { color: theme.muted } } },
+          { title: { text: siName, style: { color: theme.muted } }, opposite: true, min: 0, gridLineWidth: 0, labels: { style: { color: theme.muted } } }
+        ],
+        legend: { itemStyle: { color: theme.text } },
+        tooltip: { useHTML: true, shared: false, formatter: function () {
+          var f = factors[this.point.index];
+          return f ? siTooltipHtml(f, evidence) : esc(this.x);
+        } },
+        plotOptions: {
+          line: { marker: { enabled: true, symbol: 'circle', radius: 5 }, lineWidth: 2 },
+          column: { borderWidth: 0, pointPadding: 0.4, groupPadding: 0.15, maxPointWidth: 14 }
+        },
+        series: [
+          {
+            type: 'line',
+            name: g1,
+            color: '#2dd4bf',
+            data: factors.map(function (f) { return isFinite(f.group1.mean) ? Number(f.group1.mean.toFixed(2)) : null; }),
+            dataLabels: { enabled: true, format: '{y:.2f}', style: { fontSize: '10px', textOutline: 'none', color: theme.text }, allowOverlap: false }
+          },
+          {
+            type: 'line',
+            name: g2,
+            color: '#f59e0b',
+            data: factors.map(function (f) { return isFinite(f.group2.mean) ? Number(f.group2.mean.toFixed(2)) : null; }),
+            dataLabels: { enabled: true, format: '{y:.2f}', style: { fontSize: '10px', textOutline: 'none', color: theme.text }, allowOverlap: false }
+          },
+          {
+            type: 'column',
+            name: siName,
+            yAxis: 1,
+            color: '#94a3b8',
+            data: factors.map(function (f) {
+              var v = result.indexType === 'standardized' ? f.standardizedSplitIndex : f.rawSplitIndex;
+              return isFinite(v) ? Number(v.toFixed(2)) : null;
+            }),
+            dataLabels: { enabled: true, format: '{y:.2f}', style: { fontSize: '10px', textOutline: 'none', color: theme.muted }, allowOverlap: false }
+          }
+        ],
+        exporting: { enabled: false },
+        credits: { enabled: false }
+      });
+    }
+
+    function renderSiPatterns(result) {
+      var host = qs('siPatterns');
+      var html = (result.factors || []).map(function (f) {
+        var p = f.pattern || {};
+        return '<div class="si-pattern"><div class="si-pat-lab">' + esc(p.label || 'Pattern') + ' — ' + esc(f.factorLabel) + '</div>' +
+          '<div class="si-pat-desc">' + esc(p.description || '') + '</div></div>';
+      }).join('');
+      host.innerHTML = html || '<p class="muted">No patterns to display.</p>';
+    }
+
+    function renderSiStatsTable(result) {
+      var rows = result.factors || [];
+      var head = ['Factor','G1 mean','G1 SD','G1 n','G2 mean','G2 SD','G2 n','Signed','Raw SI','Std. SI','95% CI','Welch t','df','p','Adj. p','Pattern'];
+      var body = rows.map(function (f) {
+        var ci = (f.confidenceInterval && isFinite(f.confidenceInterval.lower))
+          ? '[' + fmtNum(f.confidenceInterval.lower) + ', ' + fmtNum(f.confidenceInterval.upper) + ']'
+          : '—';
+        var std = f.standardizedSplitIndex == null ? '—' : fmtNum(f.standardizedSplitIndex);
+        function pfmt(p) { return isFinite(p) ? (p < 0.001 ? '<0.001' : Number(p).toPrecision(3)) : '—'; }
+        return '<tr><td title="' + esc(f.factorLabel) + '">' + esc(f.factorLabel) + '</td>' +
+          '<td>' + fmtNum(f.group1.mean) + '</td><td>' + fmtNum(f.group1.sd) + '</td><td>' + f.group1.validN + '</td>' +
+          '<td>' + fmtNum(f.group2.mean) + '</td><td>' + fmtNum(f.group2.sd) + '</td><td>' + f.group2.validN + '</td>' +
+          '<td>' + fmtNum(f.signedDifference) + '</td><td>' + fmtNum(f.rawSplitIndex) + '</td><td>' + std + '</td>' +
+          '<td>' + ci + '</td><td>' + fmtNum(f.welchTest.statistic) + '</td><td>' + fmtNum(f.welchTest.degreesOfFreedom) + '</td>' +
+          '<td>' + pfmt(f.welchTest.pValue) + '</td><td>' + pfmt(f.welchTest.adjustedPValue) + '</td>' +
+          '<td>' + esc(f.pattern && f.pattern.label) + '</td></tr>';
+      }).join('');
+      qs('siStatsTable').innerHTML = '<thead><tr>' + head.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' + body + '</tbody>';
+    }
+
+    function renderDrivers() {
+      if (!bundle || !bundle.analyzable) return;
+      fillSiSegmentSelects();
+      var mode = qs('siMode').value;
+      qs('siSegPickers').style.display = mode === 'segments' ? '' : 'none';
+      qs('siFocusPicker').style.display = mode === 'segmentVsOthers' ? '' : 'none';
+      qs('siWaveWrap').style.display = (bundle.waves && bundle.waves.configured) ? '' : 'none';
+      var raw = !document.querySelector('input[name="siIndex"]:checked') || document.querySelector('input[name="siIndex"]:checked').value === 'raw';
+      qs('siIndexHelp').textContent = raw
+        ? 'Best when all factors use the same response scale.'
+        : 'Accounts for factor variability and supports comparison across different scales.';
+      var cols = currentFactorColumns();
+      if (!cols.length) {
+        qs('driversEmpty').style.display = 'flex';
+        qs('driversBody').style.display = 'none';
+        splitResult = null;
+        return;
+      }
+      qs('driversEmpty').style.display = 'none';
+      qs('driversBody').style.display = 'block';
+      if (typeof StatisticoSegmentation.analyzeSplitIndex !== 'function') {
+        qs('driversWarn').classList.add('show');
+        qs('driversWarn').textContent = 'Split Index engine is not loaded.';
+        return;
+      }
+      var s = currentSpec();
+      s.factorColumns = cols;
+      splitResult = StatisticoSegmentation.analyzeSplitIndex(source.headers, source.rows, s, driversOptions());
+      var warn = qs('driversWarn');
+      var msgs = [];
+      if (!splitResult.analyzable && splitResult.error) msgs.push(splitResult.error);
+      (splitResult.warnings || []).forEach(function (w) { msgs.push(w); });
+      if (msgs.length) { warn.classList.add('show'); warn.innerHTML = msgs.map(esc).join('<br>'); }
+      else { warn.classList.remove('show'); warn.textContent = ''; }
+      if (splitResult.group1 && splitResult.group2) {
+        qs('siGroupNs').textContent = splitResult.group1.label + ' (n = ' + splitResult.group1.n + ')  ·  ' +
+          splitResult.group2.label + ' (n = ' + splitResult.group2.n + ')';
+      } else qs('siGroupNs').textContent = '';
+      if (!splitResult.analyzable) {
+        qs('driversChart').innerHTML = '<p class="muted">' + esc(splitResult.error || 'Split Index could not be calculated.') + '</p>';
+        qs('siPatterns').innerHTML = '';
+        qs('siStatsTable').innerHTML = '';
+        return;
+      }
+      renderDriversChart(splitResult);
+      renderSiPatterns(splitResult);
+      renderSiStatsTable(splitResult);
+    }
+
+    function renderViews() {
+      renderContext();
+      renderWarnings();
+      renderMatrix();
+      renderLabelEditor();
+      if (activeTab === 'groups') renderGroupChart();
+      if (activeTab === 'change') renderChange();
+      if (activeTab === 'drivers') renderDrivers();
+    }
+
+    function renderAll(opts) {
+      opts = opts || {};
+      qs('loadingState').style.display = 'none';
+      if (!bundle || !bundle.analyzable) {
+        qs('errorState').classList.add('active');
+        qs('errorText').textContent = (bundle && bundle.error) || 'No results.';
+        renderWarnings();
+        return;
+      }
+      qs('errorState').classList.remove('active');
+      if (!opts.keepTab) {
+        document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+        qs('tab-overview').classList.add('active');
+        activeTab = 'overview';
+      }
+      qs('minValidLive').value = String(bundle.config.minimumValidItems);
+      qs('xThreshLive').value = bundle.thresholds.x;
+      qs('yThreshLive').value = bundle.thresholds.y;
+      qs('smallBaseLive').value = bundle.config.smallBaseThreshold;
+      renderViews();
+      if (!headerReady) { bootHeader(); headerReady = true; }
+    }
+
+    function tsvTable() {
+      if (activeTab === 'drivers' && splitResult && typeof StatisticoSegmentation.buildSplitIndexExportTable === 'function') {
+        var siRows = StatisticoSegmentation.buildSplitIndexExportTable(splitResult);
+        if (!siRows.length) return '';
+        var siCols = ['Factor','FactorOrder','Group1Label','Group1Mean','Group1SD','Group1ValidN','Group2Label','Group2Mean','Group2SD','Group2ValidN','SignedDifference','RawSplitIndex','StandardizedSplitIndex','LowerCL','UpperCL','WelchStatistic','DegreesOfFreedom','UnadjustedP','AdjustedP','Pattern'];
+        var siLines = [siCols.join('\t')];
+        siRows.forEach(function (r) {
+          siLines.push(siCols.map(function (c) { return r[c] == null ? '' : r[c]; }).join('\t'));
+        });
+        return siLines.join('\n');
+      }
+      if (!bundle || !bundle.exportTable) return '';
+      var cols = ['Group','Segment','UnweightedN','WeightedN','Percentage','PreviousPercentage','PercentagePointChange','SmallBase'];
+      var lines = [cols.join('\t')];
+      bundle.exportTable.forEach(function (r) {
+        lines.push(cols.map(function (c) { return r[c] == null ? '' : r[c]; }).join('\t'));
+      });
+      return lines.join('\n');
+    }
+
+    function exportTable() {
+      var blob = new Blob([tsvTable()], { type: 'text/tab-separated-values' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = activeTab === 'drivers' ? 'survey-split-index.tsv' : 'survey-segmentation-matrix.tsv';
+      a.click();
+    }
+    function copySummary() {
+      var text = bundle ? bundle.summary : '';
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
+      else window.prompt('Copy summary', text);
+    }
+
+    function exportCaption() {
+      if (activeTab === 'drivers' && splitResult) {
+        var parts = [splitResult.title || 'Factor Differentiation — Split Index'];
+        if (splitResult.group1 && splitResult.group2) {
+          parts.push(splitResult.group1.label + ' (n = ' + splitResult.group1.n + ') vs ' + splitResult.group2.label + ' (n = ' + splitResult.group2.n + ')');
+        }
+        parts.push(splitResult.indexType === 'standardized' ? 'Standardized mean difference' : 'Raw mean difference');
+        if (splitResult.waveLabel) parts.push('Wave: ' + splitResult.waveLabel);
+        if (splitResult.filtersActive && splitResult.filtersActive.length) parts.push('Active filters: ' + splitResult.filtersActive.join(' · '));
+        return parts.join('  |  ');
+      }
+      if (!bundle) return '';
+      var parts = ['Survey Segmentation Matrix', bundle.thresholds.xRule, bundle.thresholds.yRule, 'Valid respondents: ' + bundle.totals.nValid + ' of ' + bundle.totals.nRows];
+      if (bundle.filtersActive && bundle.filtersActive.length) parts.push('Active filters: ' + bundle.filtersActive.join(' · '));
+      if (bundle.waves && bundle.waves.enabled) parts.push('Waves: ' + bundle.waves.previous + ' → ' + bundle.waves.current);
+      return parts.join('  |  ');
+    }
+
+    function canvasFromView(cb) {
+      var w = 1200, h = 720;
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      var ctx = c.getContext('2d');
+      var light = document.documentElement.getAttribute('data-theme') === 'light';
+      ctx.fillStyle = light ? '#ffffff' : '#0f172a';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = light ? '#0f172a' : '#e2e8f0';
+      ctx.font = '700 22px Segoe UI';
+      ctx.fillText(activeTab === 'drivers' && splitResult ? (splitResult.title || 'Split Index') : 'Survey Segmentation Matrix', 32, 40);
+      ctx.font = '12px Segoe UI';
+      ctx.fillStyle = light ? '#334155' : '#94a3b8';
+      wrapFill(ctx, exportCaption(), 32, 64, w - 64, 16);
+      if (activeTab === 'overview' && bundle && bundle.analyzable) {
+        drawMatrixCanvas(ctx, 80, 120, 1040, 520);
+        cb(c); return;
+      }
+      var chart = activeTab === 'change' ? changeChart : (activeTab === 'drivers' ? driversChart : groupChart);
+      if (chart && chart.getSVG) {
+        var svg = chart.getSVG({ chart: { backgroundColor: light ? '#ffffff' : '#0f172a', width: 1100, height: 520 } });
+        var img = new Image();
+        img.onload = function () { ctx.drawImage(img, 40, 110, 1120, 540); cb(c); };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        return;
+      }
+      cb(c);
+    }
+    function wrapFill(ctx, text, x, y, maxW, lh) {
+      var words = text.split(' ');
+      var line = '';
+      words.forEach(function (word) {
+        var test = line + word + ' ';
+        if (ctx.measureText(test).width > maxW) { ctx.fillText(line, x, y); line = word + ' '; y += lh; }
+        else line = test;
+      });
+      ctx.fillText(line, x, y);
+    }
+    function drawMatrixCanvas(ctx, x, y, w, h) {
+      var keys = [['lowXHighY','highXHighY'],['lowXLowY','highXLowY']];
+      var cw = (w - 8) / 2, ch = (h - 8) / 2;
+      keys.forEach(function (row, ri) {
+        row.forEach(function (k, ci) {
+          var s = bundle.overall.segments[k];
+          var px = x + ci * (cw + 8), py = y + ri * (ch + 8);
+          ctx.fillStyle = s.color;
+          roundRect(ctx, px, py, cw, ch, 12);
+          ctx.fill();
+          ctx.fillStyle = s.textColor;
+          ctx.font = '700 14px Segoe UI';
+          ctx.fillText(s.label.toUpperCase(), px + 18, py + 36);
+          ctx.font = '800 36px Segoe UI';
+          ctx.fillText(s.pct.toFixed(1) + '%', px + 18, py + 80);
+          ctx.font = '13px Segoe UI';
+          ctx.fillText('n = ' + s.n, px + 18, py + 108);
+          if (s.ppChange != null) ctx.fillText(fmtPp(s.ppChange) + ' vs previous', px + 18, py + 128);
+        });
+      });
+      ctx.fillStyle = document.documentElement.getAttribute('data-theme') === 'light' ? '#334155' : '#94a3b8';
+      ctx.font = '700 12px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText(bundle.config.xDimension.label, x + w / 2, y - 12);
+      ctx.textAlign = 'left';
+    }
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    function downloadPng() {
+      canvasFromView(function (c) {
+        var a = document.createElement('a');
+        a.href = c.toDataURL('image/png');
+        a.download = activeTab === 'drivers' ? 'survey-split-index.png' : 'survey-segmentation-matrix.png';
+        a.click();
+      });
+    }
+    function copyChart() {
+      canvasFromView(function (c) {
+        c.toBlob(function (blob) {
+          if (navigator.clipboard && window.ClipboardItem) {
+            navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          } else downloadPng();
+        });
+      });
+    }
+
+    function segViewData() {
+      return {
+        headers: source.headers,
+        allRows: source.allRows && source.allRows.length ? source.allRows : source.rows,
+        usedRows: source.rows,
+        notice: bundle && bundle.totals ? (bundle.totals.nExcluded ? (bundle.totals.nExcluded + ' respondents excluded by missing-item or weight rules.') : null) : null
+      };
+    }
+
+    function bootHeader() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      StatisticoHeader.init('overview', '', bundle && bundle.totals ? bundle.totals.nValid : 0, 'segmentation');
+      StatisticoHeader.registerActions({
+        getData: segViewData,
+        onFilterRows: function (rows) {
+          source.rows = (rows && rows.length) ? rows : (source.allRows || source.rows);
+          recompute();
+        },
+        exportHtml: function () { copySummary(); },
+        exportJson: function () {
+          var blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'survey-segmentation-matrix.json';
+          a.click();
+        },
+        moduleName: 'Survey Segmentation Matrix'
+      });
+      StatisticoHeader.initSidebarPage();
+      StatisticoHeader.updateTitle('Overview');
+      if (StatisticoHeader._mountSidebarUtilities) StatisticoHeader._mountSidebarUtilities();
+    }
+
+    function showBundle(next, src) {
+      bundle = next;
+      if (src) {
+        var rows = src.rows || [];
+        source = {
+          headers: src.headers || [],
+          rows: rows.slice(),
+          allRows: (src.allRows || rows).slice()
+        };
+      }
+      spec = (next && next.config) ? JSON.parse(JSON.stringify(next.config)) : StatisticoSegmentation.defaultConfig();
+      renderAll();
+    }
+
+    function startBridge() {
+      var q = (location.search || '').toLowerCase();
+      if (q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0) {
+        var stored = null;
+        try { stored = JSON.parse(sessionStorage.getItem('segmentationBundle') || 'null'); } catch (_e) {}
+        if (stored && stored.analyzable) {
+          showBundle(stored, stored.source);
+          if (q.indexOf('view=groups') >= 0) switchTab('groups');
+          if (q.indexOf('view=change') >= 0) switchTab('change');
+          if (q.indexOf('view=drivers') >= 0) switchTab('drivers');
+          return;
+        }
+        var ex = StatisticoSegmentationSample.defaultPayload();
+        var analyzed = StatisticoSegmentation.analyze(ex.headers, ex.rows, ex.spec);
+        analyzed.source = { headers: ex.headers, rows: ex.rows };
+        showBundle(analyzed, analyzed.source);
+        if (q.indexOf('view=groups') >= 0) setTimeout(function () { switchTab('groups'); }, 80);
+        if (q.indexOf('view=change') >= 0) setTimeout(function () { switchTab('change'); }, 80);
+        if (q.indexOf('view=drivers') >= 0) setTimeout(function () { switchTab('drivers'); }, 80);
+        return;
+      }
+      if (typeof Office === 'undefined' || !Office.onReady) { setTimeout(startBridge, 120); return; }
+      Office.onReady(function () {
+        try {
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if (msg.type === 'SEGMENTATION_BUNDLE' && msg.payload) {
+                showBundle(msg.payload, msg.payload.source);
+              }
+            } catch (_e) {}
+          });
+          send('ready');
+        } catch (_err) {}
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      qs('labelToggle').addEventListener('click', function () { qs('labelWrap').classList.toggle('open'); });
+      ['minValidLive','xThreshLive','yThreshLive','smallBaseLive'].forEach(function (id) {
+        qs(id).addEventListener('change', recompute);
+      });
+      qs('sortBy').addEventListener('change', renderGroupChart);
+      qs('focusSeg').addEventListener('change', renderGroupChart);
+      qs('showBenchmark').addEventListener('change', renderGroupChart);
+      qs('changeSeg').addEventListener('change', renderChange);
+      qs('siMode').addEventListener('change', renderDrivers);
+      qs('siGroup1').addEventListener('change', function () {
+        if (qs('siGroup1').value === qs('siGroup2').value) {
+          var other = StatisticoSegmentation.SEGMENT_KEYS.filter(function (k) { return k !== qs('siGroup1').value; })[0];
+          if (other) qs('siGroup2').value = other;
+        }
+        renderDrivers();
+      });
+      qs('siGroup2').addEventListener('change', function () {
+        if (qs('siGroup1').value === qs('siGroup2').value) {
+          var other = StatisticoSegmentation.SEGMENT_KEYS.filter(function (k) { return k !== qs('siGroup2').value; })[0];
+          if (other) qs('siGroup1').value = other;
+        }
+        renderDrivers();
+      });
+      qs('siFocusSeg').addEventListener('change', renderDrivers);
+      document.querySelectorAll('input[name="siIndex"]').forEach(function (el) {
+        el.addEventListener('change', renderDrivers);
+      });
+      qs('siSort').addEventListener('change', renderDrivers);
+      qs('siTopN').addEventListener('change', renderDrivers);
+      qs('siEvidence').addEventListener('change', renderDrivers);
+      qs('siMissing').addEventListener('change', renderDrivers);
+      qs('siWave').addEventListener('change', renderDrivers);
+      qs('siPAdjust').addEventListener('change', renderDrivers);
+      qs('siStatsToggle').addEventListener('click', function () { qs('siStatsWrap').classList.toggle('open'); });
+      qs('btnSelectFactors').addEventListener('click', openFactorPicker);
+      qs('btnSelectFactors2').addEventListener('click', openFactorPicker);
+      qs('siFactorApply').addEventListener('click', applyFactorPicker);
+      qs('siFactorCancel').addEventListener('click', function () { qs('siFactorModal').hidden = true; });
+      qs('btnClearFilters').addEventListener('click', function () {
+        extraFilters = {};
+        source.rows = (source.allRows || source.rows).slice();
+        if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.clearActiveRowFilter) StatisticoHeader.clearActiveRowFilter();
+        recompute();
+      });
+      document.addEventListener('statistico-uni-filter-changed', function (ev) {
+        var rows = ev.detail && ev.detail.usedRows;
+        if (rows) { source.rows = rows; recompute(); }
+      });
+      document.addEventListener('statistico-row-filter-cleared', function () {
+        extraFilters = {};
+      });
+      startBridge();
+    });
+  </script>
+</body>
+</html>

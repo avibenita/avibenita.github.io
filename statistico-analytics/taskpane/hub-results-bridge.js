@@ -21,7 +21,9 @@
     mixed: ['mixed/mixed-hub-results.js'],
     pareto2080: ['pareto/pareto-input-panel.js'],
     pareto: ['pareto/pareto-input-panel.js'],
-    multivariable: ['multivariable/mv-sample-data.js', 'multivariable/mv-input-panel.js']
+    multivariable: ['multivariable/mv-sample-data.js', 'multivariable/mv-input-panel.js'],
+    segmentation: ['segmentation/segmentation-input-panel.js'],
+    'survey-segmentation': ['segmentation/segmentation-input-panel.js']
   };
 
   /* Timestamp buster: Office webviews cache ?v= URLs too aggressively across deploys. */

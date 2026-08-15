@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Survey Segmentation Matrix</title>
+  <script>
+    (function () {
+      var q = (location.search || '').toLowerCase();
+      window.__SEG_WEB_DEMO__ = q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0;
+      if (window.__SEG_WEB_DEMO__) {
+        document.documentElement.setAttribute('data-hub-embed', '1');
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260815seg1"/>
+  <script src="../shared-config.js?v=20260815seg1"></script>
+  <script src="../ds-guide.js?v=20260815seg2"></script>
+  <script src="segmentation-sample-data.js?v=20260815seg2"></script>
+  <script src="segmentation-engine.js?v=20260815seg2"></script>
+  <script src="segmentation-split-index.js?v=20260815seg2"></script>
+  <style>
+    :root { --seg-acc:#0d9488; --seg-x:#38bdf8; --seg-y:#34d399; --seg-g:#fbbf24; --seg-w:#a78bfa; }
+    [data-theme="light"] { --seg-acc:#0f766e; --seg-x:#0369a1; --seg-y:#047857; --seg-g:#b45309; --seg-w:#6d28d9; }
+    body.cfg-embed .cfg-header { display: none; }
+    .reg-layout { display:flex; gap:10px; flex:1 1 0; min-height:0; padding:8px 10px; overflow:hidden; }
+    .reg-vars-col { flex:0 0 200px; display:flex; flex-direction:column; gap:6px; min-height:0; overflow:hidden; }
+    .reg-model-col { flex:1 1 0; display:flex; flex-direction:column; gap:8px; min-height:0; overflow-y:auto; padding-right:4px; }
+    .reg-vars-header { display:flex; align-items:center; gap:8px; padding:0 2px 6px; border-bottom:1px solid var(--cfg-border); }
+    .reg-vars-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.55px; color:var(--cfg-text); }
+    .reg-vars-box { flex:1 1 0; min-height:0; overflow-y:auto; border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); }
+    .reg-var-row { display:flex; align-items:center; gap:6px; padding:5px 8px; cursor:grab; border-bottom:1px solid var(--cfg-border); user-select:none; }
+    .reg-var-row:hover:not(.used) { background:var(--cfg-tbl-hover); }
+    .reg-var-row.used { opacity:.38; cursor:not-allowed; pointer-events:none; }
+    .reg-var-row.selected { outline:1px solid var(--seg-acc); background:rgba(13,148,136,.12); }
+    .reg-var-icon { width:16px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; flex-shrink:0; }
+    .reg-var-icon.num { background:rgba(56,189,248,.2); color:var(--seg-x); }
+    .reg-var-icon.cat { background:rgba(251,191,36,.2); color:var(--seg-g); }
+    .reg-var-name { font-size:12px; font-weight:600; color:var(--cfg-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .reg-var-stats { font-size:9.5px; color:var(--cfg-text3); }
+    .reg-model-title { display:flex; align-items:center; gap:10px; padding:0 2px 6px; border-bottom:1px solid var(--cfg-border); }
+    .reg-model-title > span:first-child { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
+    .reg-model-meta { font-size:10px; color:var(--cfg-text3); margin-left:auto; }
+    .reg-equation-strip { font-size:11.5px; color:var(--cfg-text3); padding:5px 8px; background:var(--cfg-surface); border:1px dashed var(--cfg-border); border-radius:6px; }
+    .reg-equation-strip strong { color:var(--seg-acc); }
+    .zones { display:flex; flex-direction:column; gap:7px; }
+    .reg-zone-card { border-radius:8px; overflow:hidden; border:1px solid var(--cfg-border); }
+    .reg-zone-card.zone-x { border-color:rgba(56,189,248,.35); }
+    .reg-zone-card.zone-y { border-color:rgba(52,211,153,.35); }
+    .reg-zone-card.zone-g { border-color:rgba(251,191,36,.35); }
+    .reg-zone-card.zone-wave { border-color:rgba(167,139,250,.35); }
+    .reg-zone-head { display:flex; align-items:center; gap:7px; padding:6px 8px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--cfg-border); }
+    .zone-x .reg-zone-head { background:rgba(56,189,248,.08); color:var(--seg-x); }
+    .zone-y .reg-zone-head { background:rgba(52,211,153,.08); color:var(--seg-y); }
+    .zone-g .reg-zone-head { background:rgba(251,191,36,.08); color:var(--seg-g); }
+    .zone-wave .reg-zone-head { background:rgba(167,139,250,.08); color:var(--seg-w); }
+    .zone-id .reg-zone-head, .zone-wt .reg-zone-head { background:rgba(148,163,184,.08); color:var(--cfg-text2); }
+    .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .zone-x .dot { background:var(--seg-x); }
+    .zone-y .dot { background:var(--seg-y); }
+    .zone-g .dot { background:var(--seg-g); }
+    .zone-wave .dot { background:var(--seg-w); }
+    .reg-zone-card.zone-f { border-color:rgba(244,114,182,.35); }
+    .zone-f .reg-zone-head { background:rgba(244,114,182,.08); color:#f9a8d4; }
+    .zone-f .dot { background:#f472b6; }
+    .reg-chip.f { background:rgba(244,114,182,.15); border-color:rgba(244,114,182,.4); color:#f9a8d4; }
+    .zone-req { color:#dc2626; margin-left:2px; }
+    .zone-hint { font-size:9.5px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--cfg-text3); margin-left:auto; }
+    .reg-zone-body { padding:4px 6px; min-height:36px; display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+    .reg-zone-body.drag-over { outline:1px dashed var(--seg-acc); }
+    .reg-zone-placeholder { width:100%; text-align:center; font-size:10.5px; font-style:italic; color:var(--cfg-text3); }
+    .reg-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 6px 2px 8px; border-radius:20px; font-size:11px; font-weight:600; border:1px solid; }
+    .reg-chip.x { background:rgba(56,189,248,.15); border-color:rgba(56,189,248,.4); color:var(--seg-x); }
+    .reg-chip.y { background:rgba(52,211,153,.15); border-color:rgba(52,211,153,.4); color:var(--seg-y); }
+    .reg-chip.g { background:rgba(251,191,36,.15); border-color:rgba(251,191,36,.4); color:var(--seg-g); }
+    .reg-chip.wave { background:rgba(167,139,250,.15); border-color:rgba(167,139,250,.4); color:var(--seg-w); }
+    .reg-chip.id, .reg-chip.wt { background:rgba(148,163,184,.15); border-color:rgba(148,163,184,.4); color:var(--cfg-text2); }
+    .reg-chip-x { background:none; border:none; cursor:pointer; color:inherit; }
+    .opt-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .opt-card { border:1px solid var(--cfg-border); border-radius:8px; padding:8px; background:var(--cfg-surface); }
+    .opt-card h4 { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--cfg-text3); margin:0 0 6px; }
+    .seg { display:flex; gap:3px; padding:3px; border-radius:8px; background:var(--cfg-surface2,#1c2333); border:1px solid var(--cfg-border); }
+    .seg button { flex:1; border:none; background:transparent; cursor:pointer; padding:6px 4px; border-radius:6px; font-size:10.5px; font-weight:700; color:#cbd5e1; }
+    .seg button.active { background:linear-gradient(135deg,#0d9488,#0f766e); color:#fff; }
+    [data-theme="light"] .seg { background:#f0fdfa; border-color:#99f6e4; }
+    [data-theme="light"] .seg button { color:#334155; }
+    .cfg-select, .cfg-num { width:100%; min-height:30px; border-radius:6px; border:1px solid var(--cfg-border); background:var(--cfg-input-bg); color:var(--cfg-input-text); font-size:12px; padding:4px 8px; }
+    .wave-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .warn { font-size:11px; color:#fbbf24; display:none; padding:6px 8px; border:1px solid rgba(251,191,36,.35); border-radius:8px; background:rgba(251,191,36,.08); }
+    .warn.show { display:block; }
+    .run-hint { font-size:10.5px; color:var(--cfg-text3); margin-right:auto; padding:0 6px; }
+    .cfg-btn.run:not(:disabled) { background:linear-gradient(135deg,#0d9488,#0f766e); border-color:transparent; color:#fff; font-weight:700; }
+    .demo-row { display:flex; flex-wrap:wrap; gap:6px; }
+    .demo-row button { font-size:10.5px; padding:5px 8px; border-radius:6px; border:1px solid var(--cfg-border); background:var(--cfg-surface); color:var(--cfg-text2); cursor:pointer; }
+    .info-icon { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:rgba(13,148,136,.18); border:1px solid rgba(13,148,136,.4); color:#99f6e4; font-size:9px; font-weight:800; cursor:help; margin-left:5px; position:relative; }
+    .info-icon .tip { display:none; position:absolute; left:18px; top:-4px; width:230px; background:rgba(10,15,30,.97); border:1px solid rgba(13,148,136,.4); border-radius:8px; padding:8px 11px; font-size:11px; font-weight:400; color:#dbeafe; z-index:50; text-transform:none; letter-spacing:0; }
+    .info-icon:hover .tip { display:block; }
+    .adv-toggle { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:11px; font-weight:700; color:var(--cfg-text2); }
+    .adv-body { display:none; padding-top:8px; }
+    .adv-wrap.open .adv-body { display:block; }
+    .opt-row { display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+    .opt-row label { font-size:10.5px; font-weight:700; color:var(--cfg-text3); text-transform:uppercase; letter-spacing:.04em; }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-border-all"></i></div>
+      <span class="cfg-header-title">Survey Segmentation Matrix</span>
+      <span class="cfg-meta-badge" id="segBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme"><span class="cfg-toggle-icon">&#x1F319;</span><div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div><span class="cfg-toggle-label">Dark</span></button>
+    </header>
+    <div id="loadingSpinner" class="cfg-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;</div>
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
+      <div class="reg-layout">
+        <div class="reg-vars-col">
+          <div class="reg-vars-header"><span class="reg-vars-title">Available Columns</span></div>
+          <div class="reg-vars-box" id="variablesListBox"></div>
+        </div>
+        <div class="reg-model-col">
+          <div class="reg-model-title">
+            <span>Assign roles</span>
+            <span class="reg-model-meta" id="tbRange">—</span>
+          </div>
+          <div class="reg-equation-strip" id="modelSummary">Select one item or several items for each survey dimension.</div>
+          <div class="zones">
+            <div class="reg-zone-card zone-x" data-zone="x">
+              <div class="reg-zone-head"><span class="dot"></span> Satisfaction dimension<span class="zone-req">*</span>
+                <span class="info-icon">i<span class="tip">Select one numeric survey item or several items. Multiple items are averaged into a composite score.</span></span>
+                <span class="zone-hint">one item or a composite</span>
+              </div>
+              <div class="reg-zone-body" id="zone-x"><div class="reg-zone-placeholder">Drop numeric items here</div></div>
+            </div>
+            <div class="reg-zone-card zone-y" data-zone="y">
+              <div class="reg-zone-head"><span class="dot"></span> Intention to stay<span class="zone-req">*</span>
+                <span class="info-icon">i<span class="tip">Select one numeric survey item or several items to combine into a score.</span></span>
+                <span class="zone-hint">one item or a composite</span>
+              </div>
+              <div class="reg-zone-body" id="zone-y"><div class="reg-zone-placeholder">Drop numeric items here</div></div>
+            </div>
+            <div class="reg-zone-card zone-g" data-zone="group">
+              <div class="reg-zone-head"><span class="dot"></span> Compare by group
+                <span class="zone-hint">division, tenure, level…</span>
+              </div>
+              <div class="reg-zone-body" id="zone-group"><div class="reg-zone-placeholder">Optional categorical column</div></div>
+            </div>
+            <div class="reg-zone-card zone-wave" data-zone="wave">
+              <div class="reg-zone-head"><span class="dot"></span> Survey wave</div>
+              <div class="reg-zone-body" id="zone-wave"><div class="reg-zone-placeholder">Optional wave column</div></div>
+            </div>
+            <div class="wave-row" id="wavePickers" style="display:none;">
+              <div class="opt-row" style="margin:0;"><label for="currentWave">Current wave</label><select id="currentWave" class="cfg-select"></select></div>
+              <div class="opt-row" style="margin:0;"><label for="previousWave">Previous wave</label><select id="previousWave" class="cfg-select"></select></div>
+            </div>
+            <div class="reg-zone-card zone-id" data-zone="id">
+              <div class="reg-zone-head"><span class="dot"></span> Respondent ID</div>
+              <div class="reg-zone-body" id="zone-id"><div class="reg-zone-placeholder">Optional — preserved for later transition views</div></div>
+            </div>
+            <div class="reg-zone-card zone-wt" data-zone="weight">
+              <div class="reg-zone-head"><span class="dot"></span> Weight</div>
+              <div class="reg-zone-body" id="zone-weight"><div class="reg-zone-placeholder">Optional numeric survey weight</div></div>
+            </div>
+            <div class="reg-zone-card zone-f" data-zone="factors">
+              <div class="reg-zone-head"><span class="dot"></span> Factors to compare
+                <span class="info-icon">i<span class="tip">Select survey factors or items to compare across the two outcome groups. Optional — Overview and Group Comparison do not require them. Dimension items may also be used as factors.</span></span>
+                <span class="zone-hint">for the Drivers tab</span>
+              </div>
+              <div class="reg-zone-body" id="zone-factors"><div class="reg-zone-placeholder">Select survey factors or items to compare across the two outcome groups.</div></div>
+              <button type="button" class="cfg-btn-small" id="btnAddNumericFactors" style="margin:6px 8px 8px;">Add remaining numeric columns</button>
+            </div>
+          </div>
+          <div class="opt-grid">
+            <div class="opt-card">
+              <h4>Minimum valid items</h4>
+              <div class="seg" id="minValidSeg">
+                <button type="button" data-val="0.5" class="active">At least 50%</button>
+                <button type="button" data-val="0.75">At least 75%</button>
+                <button type="button" data-val="1">All items</button>
+              </div>
+            </div>
+            <div class="opt-card">
+              <h4>Thresholds</h4>
+              <div class="opt-row" style="margin:0 0 6px;">
+                <label for="xMethod">Satisfaction</label>
+                <select id="xMethod" class="cfg-select">
+                  <option value="custom" selected>Custom</option>
+                  <option value="midpoint">Scale midpoint</option>
+                  <option value="median">Median</option>
+                  <option value="favorable">Favorable response</option>
+                </select>
+              </div>
+              <input id="xThresh" class="cfg-num" type="number" step="0.1" value="4" />
+              <div class="opt-row" style="margin:8px 0 6px;">
+                <label for="yMethod">Intention to stay</label>
+                <select id="yMethod" class="cfg-select">
+                  <option value="custom" selected>Custom</option>
+                  <option value="midpoint">Scale midpoint</option>
+                  <option value="median">Median</option>
+                  <option value="favorable">Favorable response</option>
+                </select>
+              </div>
+              <input id="yThresh" class="cfg-num" type="number" step="0.1" value="4" />
+            </div>
+          </div>
+          <div class="adv-wrap" id="guideWrap">
+            <div class="adv-toggle" id="guideToggle" role="button" tabindex="0"><i class="fa-solid fa-circle-info" style="color:var(--seg-acc);"></i> Data format guide</div>
+            <div class="adv-body"><div id="dsGuideContainer"></div></div>
+          </div>
+          <div class="warn" id="levelWarn"></div>
+          <div class="demo-row" id="demoRow" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <span class="run-hint" id="runHint">Assign both survey dimensions</span>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" disabled><i class="fa-solid fa-clock-rotate-left"></i> Configs</button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" disabled><i class="fa-solid fa-floppy-disk"></i> Save</button>
+      <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-play"></i> Run analysis</button>
+    </div>
+  </div>
+
+  <script>
+    var STORAGE_KEY = 'segmentation-config';
+    window.STORAGE_KEY = STORAGE_KEY;
+    var _headers = [], _rows = [], _address = '';
+    var profiles = [];
+    var assign = { x: [], y: [], group: null, wave: null, id: null, weight: null, factors: [] };
+    var minValid = 0.5;
+    var selectedVar = null;
+    var dragged = null;
+
+    function qs(id) { return document.getElementById(id); }
+    function send(action, data) {
+      try {
+        if (typeof Office !== 'undefined' && Office.context && Office.context.ui &&
+            typeof Office.context.ui.messageParent === 'function') {
+          Office.context.ui.messageParent(JSON.stringify({ action: action, data: data || null, payload: data || null }));
+        }
+      } catch (_e) {}
+      try {
+        if (window.__SEG_WEB_DEMO__ && window.parent && window.parent !== window) {
+          window.parent.postMessage({ action: action, data: data || null, source: 'segmentation' }, '*');
+        }
+      } catch (_e2) {}
+    }
+
+    function usedNames() {
+      return assign.x.concat(assign.y).concat([assign.group, assign.wave, assign.id, assign.weight]).filter(Boolean);
+    }
+
+    function isExclusiveUsed(name) {
+      return usedNames().indexOf(name) >= 0;
+    }
+
+    function profileOf(name) {
+      for (var i = 0; i < profiles.length; i++) if (profiles[i].name === name) return profiles[i];
+      return null;
+    }
+
+    function uniqueWaveLabels() {
+      var p = profileOf(assign.wave);
+      if (!p) return [];
+      var seen = {}, out = [];
+      _rows.forEach(function (row) {
+        var v = String(row[p.index] == null ? '' : row[p.index]).trim();
+        if (!v || seen[v]) return;
+        seen[v] = true;
+        out.push(v);
+      });
+      return out;
+    }
+
+    function inferLikertThreshold(colNames) {
+      var vals = [];
+      colNames.forEach(function (name) {
+        var p = profileOf(name);
+        if (!p) return;
+        _rows.forEach(function (row) {
+          var n = Number(row[p.index]);
+          if (isFinite(n)) vals.push(n);
+        });
+      });
+      if (!vals.length) return 4;
+      var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+      if (lo >= 1 && hi <= 5) return 4;
+      if (lo >= 1 && hi <= 7) return 6;
+      return hi - 1;
+    }
+
+    function buildSpec() {
+      var spec = StatisticoSegmentation.defaultConfig();
+      spec.xDimension.columns = assign.x.slice();
+      spec.yDimension.columns = assign.y.slice();
+      spec.xDimension.thresholdMethod = qs('xMethod').value;
+      spec.yDimension.thresholdMethod = qs('yMethod').value;
+      spec.xDimension.threshold = Number(qs('xThresh').value);
+      spec.yDimension.threshold = Number(qs('yThresh').value);
+      spec.groupColumn = assign.group;
+      spec.waveColumn = assign.wave;
+      spec.currentWave = assign.wave ? qs('currentWave').value || null : null;
+      spec.previousWave = assign.wave ? qs('previousWave').value || null : null;
+      spec.respondentIdColumn = assign.id;
+      spec.weightColumn = assign.weight;
+      spec.minimumValidItems = minValid;
+      spec.factorColumns = assign.factors.slice();
+      return spec;
+    }
+
+    function applySpec(s) {
+      if (!s) return;
+      assign.x = (s.xDimension && s.xDimension.columns) ? s.xDimension.columns.slice() : [];
+      assign.y = (s.yDimension && s.yDimension.columns) ? s.yDimension.columns.slice() : [];
+      assign.group = s.groupColumn || null;
+      assign.wave = s.waveColumn || null;
+      assign.id = s.respondentIdColumn || null;
+      assign.weight = s.weightColumn || null;
+      assign.factors = (s.factorColumns && s.factorColumns.slice) ? s.factorColumns.slice() : [];
+      minValid = s.minimumValidItems == null ? 0.5 : Number(s.minimumValidItems);
+      if (s.xDimension) {
+        qs('xMethod').value = s.xDimension.thresholdMethod || 'custom';
+        qs('xThresh').value = s.xDimension.threshold == null ? 4 : s.xDimension.threshold;
+      }
+      if (s.yDimension) {
+        qs('yMethod').value = s.yDimension.thresholdMethod || 'custom';
+        qs('yThresh').value = s.yDimension.threshold == null ? 4 : s.yDimension.threshold;
+      }
+      document.querySelectorAll('#minValidSeg button').forEach(function (b) {
+        b.classList.toggle('active', Number(b.dataset.val) === minValid);
+      });
+      refresh();
+      if (assign.wave) {
+        if (s.currentWave) qs('currentWave').value = s.currentWave;
+        if (s.previousWave) qs('previousWave').value = s.previousWave;
+      }
+    }
+
+    function renderChip(name, kind) {
+      return '<span class="reg-chip ' + kind + '"><span class="chip-name"></span><button type="button" class="reg-chip-x" data-clear="' + kind + '" data-name="' + encodeURIComponent(name) + '">×</button></span>';
+    }
+
+    function fillChips(el, names, kind) {
+      el.innerHTML = '';
+      if (!names || !names.length) {
+        el.innerHTML = '<div class="reg-zone-placeholder">' + (kind === 'x' || kind === 'y' ? 'Drop numeric items here' : kind === 'f' ? 'Select survey factors or items to compare across the two outcome groups.' : 'Optional') + '</div>';
+        return;
+      }
+      names.forEach(function (name) {
+        var wrap = document.createElement('div');
+        wrap.innerHTML = renderChip(name, kind);
+        wrap.querySelector('.chip-name').textContent = name;
+        el.appendChild(wrap.firstChild);
+      });
+    }
+
+    function renderVariables() {
+      var box = qs('variablesListBox');
+      box.innerHTML = '';
+      profiles.forEach(function (p) {
+        var used = isExclusiveUsed(p.name);
+        var row = document.createElement('div');
+        row.className = 'reg-var-row' + (used ? ' used' : '') + (selectedVar === p.name ? ' selected' : '');
+        row.draggable = true;
+        row.dataset.name = p.name;
+        row.innerHTML = '<div class="reg-var-icon ' + (p.numeric ? 'num' : 'cat') + '">' + (p.numeric ? 'n' : 'c') + '</div>' +
+          '<div><div class="reg-var-name"></div><div class="reg-var-stats"></div></div>';
+        row.querySelector('.reg-var-name').textContent = p.name;
+        row.querySelector('.reg-var-stats').textContent = (p.numeric ? 'numeric' : p.nLevels + ' levels') + ' · n=' + p.n;
+        row.addEventListener('dragstart', function (e) {
+          dragged = p.name;
+          try { e.dataTransfer.setData('text/plain', p.name); } catch (_e) {}
+        });
+        row.addEventListener('click', function () {
+          selectedVar = selectedVar === p.name ? null : p.name;
+          refresh();
+        });
+        box.appendChild(row);
+      });
+    }
+
+    function requestAssign(zone, name) {
+      if (!name) return;
+      var p = profileOf(name);
+      if (!p) return;
+      if (zone === 'x' || zone === 'y') {
+        if (!p.numeric) { showWarn('Dimension items must be numeric.'); return; }
+        var other = zone === 'x' ? 'y' : 'x';
+        if (assign[other].indexOf(name) >= 0) { showWarn('A column cannot be on both dimensions.'); return; }
+        if (assign[zone].indexOf(name) < 0) assign[zone].push(name);
+        if (zone === 'x' && qs('xMethod').value === 'custom' && assign.x.length === 1) qs('xThresh').value = inferLikertThreshold(assign.x);
+        if (zone === 'y' && qs('yMethod').value === 'custom' && assign.y.length === 1) qs('yThresh').value = inferLikertThreshold(assign.y);
+      } else if (zone === 'factors') {
+        if (!p.numeric) { showWarn('Explanatory factors must be numeric.'); return; }
+        if (assign.factors.indexOf(name) < 0) assign.factors.push(name);
+      } else if (zone === 'group' || zone === 'wave' || zone === 'id' || zone === 'weight') {
+        if (isExclusiveUsed(name) && assign.x.indexOf(name) < 0 && assign.y.indexOf(name) < 0) {
+          /* already in another exclusive slot — still allow replace onto this zone */
+        }
+        assign[zone === 'id' ? 'id' : zone === 'weight' ? 'weight' : zone] = name;
+      }
+      selectedVar = null;
+      dragged = null;
+      refresh();
+    }
+
+    function addRemainingNumericFactors() {
+      profiles.forEach(function (p) {
+        if (!p.numeric) return;
+        if (p.name === assign.id || p.name === assign.weight) return;
+        if (assign.factors.indexOf(p.name) < 0) assign.factors.push(p.name);
+      });
+      refresh();
+    }
+
+    function clearChip(kind, name) {
+      if (kind === 'x' || kind === 'y') {
+        assign[kind] = assign[kind].filter(function (n) { return n !== name; });
+      } else if (kind === 'f') assign.factors = assign.factors.filter(function (n) { return n !== name; });
+      else if (kind === 'g') assign.group = null;
+      else if (kind === 'wave') assign.wave = null;
+      else if (kind === 'id') assign.id = null;
+      else if (kind === 'wt') assign.weight = null;
+      refresh();
+    }
+
+    function showWarn(msg) {
+      var el = qs('levelWarn');
+      if (!msg) { el.classList.remove('show'); el.textContent = ''; return; }
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    function refreshWavePickers() {
+      var wrap = qs('wavePickers');
+      if (!assign.wave) { wrap.style.display = 'none'; return; }
+      wrap.style.display = 'grid';
+      var labels = uniqueWaveLabels();
+      function fill(sel, preferLast) {
+        var prev = sel.value;
+        sel.innerHTML = '<option value="">—</option>' + labels.map(function (l) {
+          return '<option value="' + l.replace(/"/g, '&quot;') + '">' + l + '</option>';
+        }).join('');
+        if (prev && labels.indexOf(prev) >= 0) sel.value = prev;
+        else if (labels.length) sel.value = preferLast ? labels[labels.length - 1] : (labels[0] || '');
+      }
+      fill(qs('currentWave'), true);
+      fill(qs('previousWave'), false);
+      if (qs('currentWave').value && qs('previousWave').value === qs('currentWave').value && labels.length > 1) {
+        qs('previousWave').value = labels[0] === qs('currentWave').value ? labels[1] : labels[0];
+      }
+    }
+
+    function refresh() {
+      renderVariables();
+      fillChips(qs('zone-x'), assign.x, 'x');
+      fillChips(qs('zone-y'), assign.y, 'y');
+      fillChips(qs('zone-group'), assign.group ? [assign.group] : [], 'g');
+      fillChips(qs('zone-wave'), assign.wave ? [assign.wave] : [], 'wave');
+      fillChips(qs('zone-id'), assign.id ? [assign.id] : [], 'id');
+      fillChips(qs('zone-weight'), assign.weight ? [assign.weight] : [], 'wt');
+      fillChips(qs('zone-factors'), assign.factors, 'f');
+      refreshWavePickers();
+      var ok = assign.x.length && assign.y.length;
+      qs('btnRun').disabled = !ok;
+      qs('btnSaveConfig').disabled = !ok;
+      qs('runHint').textContent = ok ? 'Ready to classify respondents' : 'Assign both survey dimensions';
+      qs('modelSummary').innerHTML = ok
+        ? '<strong>Satisfaction</strong> from ' + assign.x.join(', ') + ' · <strong>Stay</strong> from ' + assign.y.join(', ')
+        : 'Select one survey item or several items to combine into a score.';
+      qs('xThresh').disabled = qs('xMethod').value !== 'custom';
+      qs('yThresh').disabled = qs('yMethod').value !== 'custom';
+      showWarn('');
+      if (typeof CfgSave !== 'undefined') CfgSave.syncConfigButtons(STORAGE_KEY);
+    }
+
+    function applyPayload(payload) {
+      _headers = payload.headers || [];
+      _rows = payload.rows || [];
+      _address = payload.address || '';
+      qs('tbRange').textContent = _address || (_rows.length + ' rows');
+      qs('segBadge').textContent = _rows.length + ' rows';
+      profiles = _headers.map(function (name, index) {
+        var numeric = 0, missing = 0, levels = {};
+        _rows.forEach(function (row) {
+          var v = row[index];
+          if (v === null || v === undefined || v === '') { missing++; return; }
+          var n = parseFloat(String(v).replace(',', '.'));
+          if (isFinite(n) && String(v).trim() !== '') numeric++;
+          levels[String(v)] = true;
+        });
+        return {
+          name: String(name || ('Col ' + (index + 1))),
+          index: index,
+          numeric: numeric > (_rows.length - missing) * 0.6,
+          n: _rows.length - missing,
+          missing: missing,
+          nLevels: Object.keys(levels).length
+        };
+      });
+      qs('loadingSpinner').style.display = 'none';
+      qs('mainContent').style.display = 'flex';
+      if (payload.savedSpec || payload.spec) applySpec(payload.savedSpec || payload.spec);
+      else refresh();
+    }
+
+    function runAnalysis() {
+      if (!assign.x.length || !assign.y.length) return;
+      send('segmentationModel', { spec: buildSpec() });
+    }
+
+    function bindZones() {
+      document.querySelectorAll('[data-zone]').forEach(function (card) {
+        var zone = card.getAttribute('data-zone');
+        var body = card.querySelector('.reg-zone-body');
+        card.addEventListener('dragover', function (e) { e.preventDefault(); body.classList.add('drag-over'); });
+        card.addEventListener('dragleave', function () { body.classList.remove('drag-over'); });
+        card.addEventListener('drop', function (e) {
+          e.preventDefault();
+          body.classList.remove('drag-over');
+          var name = dragged || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+          requestAssign(zone, name);
+        });
+        card.addEventListener('click', function (e) {
+          var btn = e.target.closest('[data-clear]');
+          if (btn) {
+            clearChip(btn.getAttribute('data-clear'), decodeURIComponent(btn.getAttribute('data-name') || ''));
+            return;
+          }
+          if (selectedVar) requestAssign(zone, selectedVar);
+        });
+      });
+    }
+
+    function startOfficeDialogBridge() {
+      if (typeof Office === 'undefined' || !Office.onReady) {
+        var tries = 0, t = setInterval(function () {
+          tries++;
+          if (typeof Office !== 'undefined' && Office.onReady) { clearInterval(t); startOfficeDialogBridge(); }
+          else if (tries >= 40) {
+            clearInterval(t);
+            if (window.__SEG_WEB_DEMO__ && window.StatisticoSegmentationSample) applyPayload(StatisticoSegmentationSample.defaultPayload());
+          }
+        }, 100);
+        return;
+      }
+      Office.onReady(function () {
+        try {
+          var canDialog = Office.context && Office.context.ui &&
+            typeof Office.context.ui.addHandlerAsync === 'function' &&
+            typeof Office.context.ui.messageParent === 'function';
+          if (!canDialog) {
+            if (window.__SEG_WEB_DEMO__ && window.StatisticoSegmentationSample) applyPayload(StatisticoSegmentationSample.defaultPayload());
+            return;
+          }
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if ((msg.type === 'SEGMENTATION_DATA' || msg.action === 'SEGMENTATION_DATA') && msg.payload) applyPayload(msg.payload);
+            } catch (_e) {}
+          });
+          send('ready', null);
+          send('requestData', null);
+          setInterval(function () { if (!_headers.length) send('requestData', null); }, 500);
+        } catch (_err) {
+          if (window.__SEG_WEB_DEMO__ && window.StatisticoSegmentationSample) applyPayload(StatisticoSegmentationSample.defaultPayload());
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      qs('btnCancel').addEventListener('click', function () { send('close', null); });
+      qs('btnRun').addEventListener('click', runAnalysis);
+      qs('btnSaveConfig').addEventListener('click', function () {
+        if (typeof CfgSave === 'undefined') return;
+        var name = window.prompt('Name this configuration', 'Loyalty matrix');
+        if (!name) return;
+        CfgSave.saveCfgEntry(STORAGE_KEY, name, buildSpec(), function () { refresh(); });
+      });
+      qs('btnLoadPrev').addEventListener('click', function () {
+        if (typeof CfgSave === 'undefined') return;
+        CfgSave.showSavedList(STORAGE_KEY, function (item) { applySpec(item && item.spec); });
+      });
+      document.querySelectorAll('#minValidSeg button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          minValid = Number(b.dataset.val);
+          document.querySelectorAll('#minValidSeg button').forEach(function (x) { x.classList.toggle('active', x === b); });
+        });
+      });
+      qs('xMethod').addEventListener('change', refresh);
+      qs('yMethod').addEventListener('change', refresh);
+      qs('guideToggle').addEventListener('click', function () {
+        qs('guideWrap').classList.toggle('open');
+        if (typeof DsGuide !== 'undefined') DsGuide.render('segmentation', 'dsGuideContainer', { collapsed: false });
+      });
+      bindZones();
+      qs('btnAddNumericFactors').addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        addRemainingNumericFactors();
+      });
+      if (window.__SEG_WEB_DEMO__ && window.StatisticoSegmentationSample) {
+        document.body.classList.add('cfg-embed');
+        qs('demoRow').style.display = 'flex';
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Employee loyalty sample';
+        btn.addEventListener('click', function () { applyPayload(StatisticoSegmentationSample.defaultPayload()); });
+        qs('demoRow').appendChild(btn);
+        applyPayload(StatisticoSegmentationSample.defaultPayload());
+        return;
+      }
+      startOfficeDialogBridge();
+    });
+  </script>
+</body>
+</html>

@@ -417,7 +417,8 @@ const StatisticoHeader = {
       'power': 'Power & Sample Size',
       'mixed-model': 'Linear Mixed Model',
       'meta-analysis': 'Meta-Analysis',
-      'contingency': 'Contingency Tables'
+      'contingency': 'Contingency Tables',
+      'segmentation': 'Survey Segmentation Matrix'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -538,7 +539,8 @@ const StatisticoHeader = {
       'power': 'Power & Sample Size',
       'mixed-model': 'Linear Mixed Model',
       'meta-analysis': 'Meta-Analysis',
-      'contingency': 'Contingency Tables'
+      'contingency': 'Contingency Tables',
+      'segmentation': 'Survey Segmentation Matrix'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -547,7 +549,7 @@ const StatisticoHeader = {
     const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation');
 
     const topHeader = `
       <div class="statistico-header">
@@ -5096,7 +5098,8 @@ const StatisticoHeader = {
       factor: ['factorData', 'factorResults'],
       cluster: ['clusterData', 'clusterResults'],
       pareto: ['paretoData', 'paretoResults'],
-      power: ['powerData', 'powerResults']
+      power: ['powerData', 'powerResults'],
+      segmentation: ['segmentationBundle', 'segmentationSource']
     };
     (keysByModule[moduleName] || []).forEach((key) => {
       try {
@@ -6343,6 +6346,10 @@ const StatisticoHeader = {
       'contingency-table': 'Contingency Table',
       'contingency-diagnostics': 'Diagnostics & Visualization',
       'contingency-twobytwo': '2×2 Measures',
+      'segmentation-overview': 'Overview',
+      'segmentation-groups': 'Group Comparison',
+      'segmentation-change': 'Change',
+      'segmentation-drivers': 'Drivers',
       'dependent-explore': 'Descriptives',
       'dependent-trajectories': 'Trajectories',
       'dependent-assumptions': 'Assumptions',

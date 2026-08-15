@@ -330,6 +330,30 @@ const TOOLS_CATEGORY_TILES = [
       }
     ]
   },
+  {
+    id: "survey-tools",
+    title: "Survey Segmentation Matrix",
+    icon: "fa-border-all",
+    accent: "#eab308",
+    accentDark: "#a16207",
+    color: "#0d9488",
+    colorDark: "#0f766e",
+    subtitle: "Transform two survey dimensions into actionable respondent segments.",
+    desc: "Classify respondents into four segments from two survey dimensions, then compare the mix across groups and survey waves.",
+    info: [
+      "Employee-loyalty template: Satisfaction × Intention to stay",
+      "Truly Loyal, Accessible, Trapped, and High Risk segments",
+      "Group comparison with 100% stacked composition",
+      "Optional current vs previous wave change"
+    ],
+    modules: [
+      {
+        id: "segmentation",
+        label: "Survey Segmentation Matrix",
+        tip: "Classify survey respondents into four segments using two dimensions, then compare groups and waves."
+      }
+    ]
+  },
   /* ── Cluster 2: Calculators & Planning ────────────────────────────────
      Standalone tools driven by entered parameters, not a worksheet range. */
   {
@@ -2263,6 +2287,35 @@ function openMixedConfigFromHub() {
   });
 }
 
+function openSegmentationFromHub() {
+  try { sessionStorage.removeItem("segmentationModelSpec"); } catch (e) {}
+  return openBuilderDialogFromHub({
+    moduleId: "segmentation",
+    dialogPath: "segmentation/segmentation-input.html",
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
+    dataType: "SEGMENTATION_DATA",
+    payloadBuilder: function (gr) {
+      return {
+        headers: gr.values[0] || [],
+        rows: gr.values.slice(1),
+        address: gr.address || "",
+        savedSpec: null
+      };
+    },
+    modelActions: ["segmentationModel"],
+    onModel: function (msg) {
+      var data = msg.payload || msg.data || {};
+      var spec = (data && data.spec) ? data.spec : data;
+      sessionStorage.setItem("segmentationModelSpec", JSON.stringify(spec || {}));
+    },
+    hubResultsKey: "segmentation",
+    nextDelayMs: 450,
+    initialDelayMs: 400,
+    retryDelayMs: 1200,
+    closeActions: ["close", "cancel"]
+  });
+}
+
 function openContingencyConfigFromHub() {
   try { sessionStorage.removeItem("contingencyModelSpec"); } catch (e) {}
   return openBuilderDialogFromHub({
@@ -2461,6 +2514,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "pareto2080") {
     if (openParetoFromHub()) return;
+  }
+  if (id === "segmentation" || id === "survey-segmentation") {
+    if (openSegmentationFromHub()) return;
   }
   if (id === "multivariable") {
     if (openMultivariableFromHub()) return;

@@ -201,6 +201,24 @@
       ]
     },
 
+    segmentation: {
+      badge: 'Wide format  one row per respondent',
+      rule:  'Each row is a respondent. Numeric item columns form the two dimensions; optional group, wave, ID, and weight columns sit beside them.',
+      note:  'Multiple items on a dimension are averaged. Missing items are not treated as zero. A wave column enables current vs previous comparison. Optional numeric factor columns power the Drivers / Split Index tab.',
+      cols: [
+        { label: 'Sat_1', role: 'meas', roleLabel: 'X item' },
+        { label: 'Sat_2', role: 'meas', roleLabel: 'X item' },
+        { label: 'Stay', role: 'outcome', roleLabel: 'Y item' },
+        { label: 'Division', role: 'cat', roleLabel: 'Group' },
+        { label: 'Wave', role: 'cat', roleLabel: 'Wave' }
+      ],
+      rows: [
+        ['5', '4', '5', 'Sales', '2026'],
+        ['3', '2', '2', 'Ops', '2026'],
+        ['4', '4', '3', 'Sales', '2025']
+      ]
+    },
+
     meta: {
       badge: 'Study-level  one row per study',
       rule:  'Each row is a study. Map a study label plus treatment/control means (or events + totals), or a precomputed effect with SE/variance/CI.',

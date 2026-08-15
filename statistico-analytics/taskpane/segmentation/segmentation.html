@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta charset="utf-8" />
+  <title>Survey Segmentation Matrix — Launcher</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="../dialog-sizes.js?v=20260609j"></script>
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: #0b1320;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      color: #94a3b8; font-size: 13px;
+    }
+    .msg { text-align: center; }
+    .msg .icon { font-size: 28px; margin-bottom: 10px; }
+    .msg.err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="msg" id="status">
+    <div class="icon">⏳</div>
+    <div>Opening Survey Segmentation Matrix…</div>
+  </div>
+  <script>
+    function getDialogsBaseUrl() {
+      var href = window.location.href;
+      if (href.includes('/taskpane/')) return href.split('/taskpane/')[0] + '/dialogs/views/';
+      return window.location.origin + '/dialogs/views/';
+    }
+    function showError(msg) {
+      var el = document.getElementById('status');
+      el.className = 'msg err';
+      el.innerHTML = '<div class="icon">⚠️</div><div>' + msg + '</div>';
+    }
+    Office.onReady(function () {
+      var raw = null;
+      try { raw = sessionStorage.getItem('segmentationBundle'); } catch (e) {}
+      if (!raw) {
+        showError('No segmentation configuration found.<br>Please return to the hub and re-run.');
+        return;
+      }
+      var resultsUrl = getDialogsBaseUrl() + 'segmentation/segmentation-results.html?v=' + Date.now();
+      Office.context.ui.displayDialogAsync(resultsUrl, DIALOG_SIZES.RESULTS, function (res) {
+        if (res.status === Office.AsyncResultStatus.Failed) {
+          showError('Could not open results dialog (code ' + (res.error && res.error.code) + ').');
+          return;
+        }
+        var dialog = res.value;
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+          try {
+            var msg = JSON.parse(arg.message || '{}');
+            if (msg.action === 'ready' || msg.action === 'requestData') {
+              dialog.messageChild(JSON.stringify({ type: 'SEGMENTATION_BUNDLE', payload: JSON.parse(raw) }));
+            }
+          } catch (e) {}
+        });
+      });
+    });
+  </script>
+</body>
+</html>

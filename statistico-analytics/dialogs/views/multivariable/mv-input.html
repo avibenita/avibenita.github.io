@@ -127,18 +127,6 @@
     .mv-id-warn-msg { font-size: 13px; font-weight: 650; color: var(--cfg-text); margin: 0 0 8px; line-height: 1.4; }
     .mv-id-warn-sub { font-size: 12.5px; font-weight: 500; color: var(--cfg-text2); margin: 0 0 4px; line-height: 1.4; }
     .cfg-prompt-title .fa-triangle-exclamation { color: #f59e0b; }
-    .mode-row {
-      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-      padding: 6px 8px; border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface);
-    }
-    .mode-row > span { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--cfg-text); }
-    .mode-seg { display: inline-flex; border: 1px solid var(--cfg-border); border-radius: 7px; overflow: hidden; margin-left: auto; }
-    .mode-seg button {
-      border: 0; background: transparent; color: var(--cfg-text2);
-      font-size: 11.5px; font-weight: 700; padding: 5px 10px; cursor: pointer;
-    }
-    .mode-seg button.active { background: rgba(14,165,233,.22); color: var(--cfg-text); }
-    [data-theme="light"] .mode-seg button.active { color: #0369a1; }
     .mv-hint {
       display: flex; align-items: flex-start; gap: 8px;
       padding: 9px 10px; border-radius: 8px; flex-shrink: 0;
@@ -197,29 +185,22 @@
             <span class="reg-model-meta" id="tbRange">—</span>
           </div>
           <div class="reg-equation-strip" id="modelSummary">Choose X, Y, and bubble size. Optionally add color and point names.</div>
-          <div class="mode-row">
-            <span>Chart</span>
-            <div class="mode-seg" id="modeSeg">
-              <button type="button" data-mode="bubble" class="active">Bubble</button>
-              <button type="button" data-mode="quadrant">Quadrant</button>
-            </div>
-          </div>
           <div class="zones-required">
             <div class="reg-zone-card zone-num">
               <div class="reg-zone-head">
-                <div class="zone-head-main"><div>X position<span class="zone-req">*</span></div><div class="zone-hint">Numeric</div></div>
+                <div class="zone-head-main"><div>X position</div><div class="zone-hint">Numeric</div></div>
               </div>
               <div class="reg-zone-body drop-zone" data-zone="x" id="zoneX"><div class="reg-zone-placeholder">Drop a numeric column</div></div>
             </div>
             <div class="reg-zone-card zone-num">
               <div class="reg-zone-head">
-                <div class="zone-head-main"><div>Y position<span class="zone-req">*</span></div><div class="zone-hint">Numeric</div></div>
+                <div class="zone-head-main"><div>Y position</div><div class="zone-hint">Numeric</div></div>
               </div>
               <div class="reg-zone-body drop-zone" data-zone="y" id="zoneY"><div class="reg-zone-placeholder">Drop a numeric column</div></div>
             </div>
             <div class="reg-zone-card zone-num">
               <div class="reg-zone-head">
-                <div class="zone-head-main"><div>Bubble size<span class="zone-req">*</span></div><div class="zone-hint">Larger value → larger bubble</div></div>
+                <div class="zone-head-main"><div>Bubble size</div><div class="zone-hint">Larger value → larger bubble</div></div>
               </div>
               <div class="reg-zone-body drop-zone" data-zone="size" id="zoneSize"><div class="reg-zone-placeholder">Drop a numeric column</div></div>
             </div>
@@ -267,7 +248,7 @@
     var _headers = [], _rows = [], _address = '', _saved = null;
     var columnStats = [];
     var assignments = { x: null, y: null, size: null, color: null, label: null };
-    var chartMode = 'bubble';
+    var chartMode = 'quadrant';
     var draggedElement = null;
     var COLOR_PALETTE = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#E69F00', '#56B4E9', '#000000', '#F0E442'];
     var ZONE_META = {
@@ -501,7 +482,7 @@
       ];
       if (assignments.color) bits.push('color by <strong>' + assignments.color + '</strong>');
       if (assignments.label) bits.push('point labels <strong>' + assignments.label + '</strong>');
-      el.innerHTML = (chartMode === 'quadrant' ? 'Quadrant: ' : 'Bubble: ') + bits.join(' · ');
+      el.innerHTML = 'Quadrant: ' + bits.join(' · ');
     }
 
     function validateModel() {
@@ -598,7 +579,7 @@
 
     function buildModelSpec() {
       return {
-        chartMode: chartMode,
+        chartMode: 'quadrant',
         xColName: assignments.x,
         yColName: assignments.y,
         sizeColName: assignments.size,
@@ -618,7 +599,7 @@
     function applySpec(spec) {
       if (!spec) return;
       assignments = { x: null, y: null, size: null, color: null, label: null };
-      chartMode = spec.chartMode === 'quadrant' ? 'quadrant' : 'bubble';
+      chartMode = 'quadrant';
       function pick(nameKey, idxKey, requireNum) {
         if (spec[nameKey] && getStat(spec[nameKey]) && (!requireNum || getStat(spec[nameKey]).isNumeric)) return spec[nameKey];
         if (spec[idxKey] != null && spec[idxKey] >= 0 && _headers[spec[idxKey]]) {
@@ -639,13 +620,6 @@
       if (assignments.color && assignments.label && assignments.color === assignments.label) {
         assignments.color = null;
       }
-      syncModeSeg();
-    }
-
-    function syncModeSeg() {
-      document.querySelectorAll('#modeSeg button').forEach(function(btn) {
-        btn.classList.toggle('active', btn.dataset.mode === chartMode);
-      });
     }
 
     function saveModelSpec() {
@@ -736,7 +710,7 @@
         : 'Select a range';
       buildColumnStats();
       assignments = { x: null, y: null, size: null, color: null, label: null };
-      renderVariables(); renderAssignments(); syncModeSeg(); validateModel();
+      renderVariables(); renderAssignments(); validateModel();
     }
 
     function requestRange(action) {
@@ -757,13 +731,6 @@
       if (qs('btnLoadSample')) qs('btnLoadSample').addEventListener('click', loadSampleData);
       if (qs('btnUseSelection')) qs('btnUseSelection').addEventListener('click', function() { requestRange('useSelection'); });
       if (qs('btnPickRange')) qs('btnPickRange').addEventListener('click', function() { requestRange('pickRange'); });
-      document.querySelectorAll('#modeSeg button').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          chartMode = btn.dataset.mode;
-          syncModeSeg();
-          updateSummary();
-        });
-      });
       var wantDemo = /[?&]demo=1/.test(window.location.search || '');
       if (wantDemo && window.MvSampleData) {
         loadSampleData();

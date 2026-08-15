@@ -37,18 +37,16 @@
   ];
 
   var DEFAULT_SPEC = {
-    chartMode: "bubble",
+    chartMode: "quadrant",
     xColName: "GDP",
     yColName: "LifeExp",
     sizeColName: "Population",
-    zColName: "CO2",
     colorColName: "Region",
     labelColName: "Country",
     groupColName: null,
     xColIndex: 2,
     yColIndex: 3,
     sizeColIndex: 4,
-    zColIndex: 5,
     colorColIndex: 1,
     labelColIndex: 0,
     groupColIndex: null,

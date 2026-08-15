@@ -168,18 +168,36 @@ const HUB_CATEGORY_TILES = [
     accentDark: "#0369a1",
     color: "#0ea5e9",
     colorDark: "#0369a1",
-    tabStyle: "soft",
-    subtitle: "Linear, logistic, and mixed-effects models",
-    desc: "Predict continuous or binary outcomes, or model grouped/repeated structure with mixed effects — with coefficients and fit diagnostics.",
+    subtitle: "Model continuous or binary outcomes using fixed predictors.",
+    desc: "Explain and predict continuous or binary outcomes from one or more predictors, with coefficients and fit diagnostics.",
     info: [
       "Linear regression: continuous outcomes, coefficients, and diagnostics",
       "Logistic: binary outcomes with odds ratios and classification",
-      "Mixed models: fixed effects plus random subject variation",
       "Diagnostics stay inside each model rather than as separate modules"
     ],
     modules: [
       { id: "regression", label: "Linear Regression", tip: "Linear regression with coefficients, intervals, and diagnostics." },
-      { id: "logistic", label: "Logistic Regression", tip: "Binary outcome modeling with odds ratios and model fit metrics." },
+      { id: "logistic", label: "Logistic Regression", tip: "Binary outcome modeling with odds ratios and model fit metrics." }
+    ]
+  },
+  {
+    id: "model-mixed",
+    sectionId: "model",
+    title: "Mixed & Multilevel Models",
+    icon: "fa-layer-group",
+    accent: "#0ea5e9",
+    accentDark: "#0369a1",
+    color: "#0ea5e9",
+    colorDark: "#0369a1",
+    subtitle: "Analyse clustered or repeated observations with fixed and random effects.",
+    desc: "Model grouped, nested, or repeated-measures data using fixed predictors plus random subject variation.",
+    info: [
+      "Linear mixed models for clustered or repeated observations",
+      "Fixed effects plus random subject variation",
+      "Useful when ANOVA-style comparisons are not enough",
+      "Diagnostics stay inside the module"
+    ],
+    modules: [
       { id: "mixed", label: "Mixed Models", tip: "Mixed-effects models for grouped or repeated-measures style data." }
     ]
   },
@@ -579,7 +597,7 @@ var ANALYTICS_SECTION_META = {
   }
 };
 var ANALYTICS_FAMILY_ORDER = ["explore", "compare", "model", "structure", "synthesize"];
-var ACTIVE_ANALYTICS_SECTION = "explore";
+var ACTIVE_ANALYTICS_SECTION = "all";
 let HUB_ACTIONS = {};
 
 /** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
@@ -783,7 +801,7 @@ function loadStoredAnalyticsSection() {
     var stored = window.localStorage && window.localStorage.getItem(ANALYTICS_SECTION_STORAGE_KEY);
     if (stored === "all" || ANALYTICS_SECTION_META[stored]) return stored;
   } catch (_e) {}
-  return "explore";
+  return "all";
 }
 
 function persistAnalyticsSection(sectionId) {
@@ -850,7 +868,7 @@ function renderCategoryTileHtml(c, clusterColor, clusterColorDark) {
     '<div class="category-title-row">' +
     '<div class="category-icon">' + iconContent + '</div>' +
     '<div class="category-title">' + escapeHtml(c.title) + "</div>" +
-    '<button type="button" class="category-info-btn" data-tile-info="' + escapeHtml(c.id) + '" title="About this module" aria-label="About ' + escapeHtml(c.title) + '">!</button>' +
+    '<button type="button" class="category-info-btn" data-tile-info="' + escapeHtml(c.id) + '" title="About this module" aria-label="About ' + escapeHtml(c.title) + '">i</button>' +
     "</div>" +
     '<div class="category-subtitle">' + escapeHtml(c.subtitle) + "</div>" +
     renderCategoryGroups(c, ACTIVE_CLUSTER + ":" + c.id) +
@@ -1067,7 +1085,7 @@ function applyHubScopeConfig(scopeCfg) {
   }
   var available = getAvailableAnalyticsSections();
   if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
-    ACTIVE_ANALYTICS_SECTION = available[0] || "explore";
+    ACTIVE_ANALYTICS_SECTION = available[0] || "all";
   }
 }
 
@@ -2508,7 +2526,7 @@ Office.onReady(function(info) {
     ACTIVE_ANALYTICS_SECTION = loadStoredAnalyticsSection();
     var available = getAvailableAnalyticsSections();
     if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
-      ACTIVE_ANALYTICS_SECTION = available[0] || "explore";
+      ACTIVE_ANALYTICS_SECTION = available[0] || "all";
     }
     syncClusterHeader();
     renderCategoryTiles("");

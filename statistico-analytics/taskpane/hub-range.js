@@ -32,13 +32,7 @@
 
   function updateSourceLabel() {
     var el = document.getElementById("hubRangeSourceLabel");
-    if (!el) return;
-    if (rangeMode === "named") {
-      var sel = document.getElementById("hubNamedRangeSelect");
-      el.textContent = sel && sel.value ? sel.value : MODE_LABELS.named;
-    } else {
-      el.textContent = MODE_LABELS[rangeMode] || "";
-    }
+    if (el) el.textContent = "Active";
   }
 
   function setRangeMode(mode) {
@@ -424,16 +418,20 @@
     var addrEl = document.getElementById("hubRangeBadgeText");
     var okIcon = document.getElementById("hubRangeOkIcon");
     var bar = document.getElementById("hubWdataBar");
+    var sourceEl = document.getElementById("hubRangeSourceLabel");
+    var pending = /loading|detecting|select a range/i.test(text || "");
     if (addrEl) {
       addrEl.textContent = text;
       addrEl.title = text;
     }
     if (okIcon) {
-      var pending = /loading|detecting|select a range/i.test(text);
       okIcon.style.display = isError || pending ? "none" : "";
     }
-    if (bar) bar.classList.toggle("is-error", !!isError);
-    updateSourceLabel();
+    if (sourceEl) sourceEl.textContent = "Active";
+    if (bar) {
+      bar.classList.toggle("is-error", !!isError);
+      bar.classList.toggle("is-ready", !isError && !pending);
+    }
     if (isError && window.StatisticoGlobalRange) {
       StatisticoGlobalRange.clear();
     }

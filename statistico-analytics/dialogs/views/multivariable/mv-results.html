@@ -39,7 +39,7 @@
       display: flex; align-items: center; gap: 12px;
       background: linear-gradient(180deg, #171f35 0%, #1b2540 100%);
       border-bottom: 1px solid rgba(56,189,248,.22);
-      padding: 0 16px; height: 56px; flex-shrink: 0;
+      padding: 8px 16px; min-height: 56px; flex-shrink: 0;
     }
     .mv-module-frame {
       display: flex; flex-direction: column; gap: 1px;
@@ -50,7 +50,13 @@
     }
     .mv-module-kicker { font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: rgba(125,211,252,.85); }
     .mv-module-name { font-size: 12px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: #e0f2fe; }
-    .mv-topbar-title { flex: 1; text-align: center; font-size: 16px; font-weight: 800; }
+    .mv-topbar-title {
+      flex: 1; text-align: center; min-width: 0; padding: 0 8px;
+      display: flex; flex-direction: column; gap: 1px;
+    }
+    .mv-chart-title { font-size: 15px; font-weight: 800; line-height: 1.2; }
+    .mv-chart-sub { font-size: 11.5px; font-weight: 650; color: var(--text-secondary); line-height: 1.25; }
+    .mv-chart-detail { font-size: 10.5px; font-weight: 500; color: var(--text-muted); line-height: 1.25; }
     .mode-tabs { display: flex; gap: 4px; }
     .mode-tab {
       border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
@@ -238,7 +244,11 @@
       <div class="mv-module-kicker">Statistico</div>
       <div class="mv-module-name">Multivariable Explorer</div>
     </div>
-    <div class="mv-topbar-title" id="chartTitle">Bubble chart</div>
+    <div class="mv-topbar-title" id="chartTitleBlock">
+      <div class="mv-chart-title" id="chartTitle">Bubble chart</div>
+      <div class="mv-chart-sub" id="chartSubtitle"></div>
+      <div class="mv-chart-detail" id="chartDetail"></div>
+    </div>
     <div class="mode-tabs">
       <button class="mode-tab active" data-mode="bubble" type="button">Bubble</button>
       <button class="mode-tab" data-mode="quadrant" type="button">Quadrant</button>
@@ -298,12 +308,21 @@
               <button type="button" data-on="0">Off</button>
             </div>
           </div>
-          <div class="hint-mini">Tints each zone a different color. Off = lines only.</div>
+          <div class="hint-mini">Light tints only. Bubbles and divider lines stay in front.</div>
+          <div class="ctrl-row">
+            <label>Names</label>
+            <div class="seg" id="qNamePreset">
+              <button type="button" data-preset="neutral" class="active">Neutral</button>
+              <button type="button" data-preset="business">Business portfolio</button>
+              <button type="button" data-preset="custom">Custom</button>
+            </div>
+          </div>
+          <div class="hint-mini">Neutral describes position. Business portfolio uses Leaders / Opportunities.</div>
           <div class="q-grid">
-            <div><label>High X / High Y</label><input type="text" id="qNE" value="Leaders" /></div>
-            <div><label>Low X / High Y</label><input type="text" id="qNW" value="Opportunities" /></div>
-            <div><label>High X / Low Y</label><input type="text" id="qSE" value="Monitor" /></div>
-            <div><label>Low X / Low Y</label><input type="text" id="qSW" value="Low priority" /></div>
+            <div><label>High X / High Y</label><input type="text" id="qNE" value="High X / High Y" /></div>
+            <div><label>Low X / High Y</label><input type="text" id="qNW" value="Low X / High Y" /></div>
+            <div><label>High X / Low Y</label><input type="text" id="qSE" value="High X / Low Y" /></div>
+            <div><label>Low X / Low Y</label><input type="text" id="qSW" value="Low X / Low Y" /></div>
           </div>
         </div>
       </div>
@@ -456,6 +475,11 @@
     }
   };
 
+  var Q_NAME_PRESETS = {
+    neutral: { NE: "High X / High Y", NW: "Low X / High Y", SE: "High X / Low Y", SW: "Low X / Low Y" },
+    business: { NE: "Leaders", NW: "Opportunities", SE: "Monitor", SW: "Low priority" }
+  };
+
   var PALETTE = ["#38bdf8", "#a78bfa", "#34d399", "#fbbf24", "#fb7185", "#94a3b8"];
   var MISSING_GROUP = "Not specified";
   var MISSING_COLOR = "#64748b";
@@ -499,7 +523,8 @@
     yCutCustom: null,
     showCuts: true,
     quadShade: true,
-    qNames: { NE: "Leaders", NW: "Opportunities", SE: "Monitor", SW: "Low priority" },
+    qNames: { NE: "High X / High Y", NW: "Low X / High Y", SE: "High X / Low Y", SW: "Low X / Low Y" },
+    qNamePreset: "neutral",
     chart: null,
     lastCuts: { x: null, y: null },
     lastColorRange: { min: null, max: null },
@@ -1077,6 +1102,83 @@
     }
   }
 
+  function axisDisplayName(which) {
+    var custom = which === "x" ? (state.xTitle || "").trim() : (state.yTitle || "").trim();
+    if (custom) return custom;
+    var key = which === "x" ? state.map.x : state.map.y;
+    var meta = fieldMeta(key);
+    return (meta && meta.label) || key || which.toUpperCase();
+  }
+
+  function sizeDisplayName() {
+    var meta = fieldMeta(state.map.size);
+    return (meta && meta.label) || state.map.size || "size";
+  }
+
+  function dividerPhrase() {
+    function word(mode) {
+      return mode === "mean" ? "means" : mode === "custom" ? "custom values" : "medians";
+    }
+    if (state.xCutMode === state.yCutMode) return word(state.xCutMode);
+    return word(state.xCutMode) + " / " + word(state.yCutMode);
+  }
+
+  function chartHeading() {
+    var title = isTrue3d() ? "3D scatter chart" : (state.mode === "quadrant" ? "Quadrant chart" : "Bubble chart");
+    var xName = axisDisplayName("x");
+    var yName = axisDisplayName("y");
+    var sizeName = sizeDisplayName();
+    var sizeBy = state.sizeBy === "width" ? "width" : "area";
+    var friendly = !!(state.xTitle || "").trim() || !!(state.yTitle || "").trim();
+    var subtitle = xName + " vs. " + yName;
+    var detail;
+    if (friendly) {
+      detail = "Bubble " + sizeBy + " represents " + sizeName;
+    } else {
+      detail = "Size: " + sizeName;
+      if (state.mode === "quadrant" && !isTrue3d()) detail += " · Divider: " + dividerPhrase();
+    }
+    return { title: title, subtitle: subtitle, detail: detail };
+  }
+
+  function matchQNamePreset() {
+    var keys = ["NE", "NW", "SE", "SW"];
+    var names = Object.keys(Q_NAME_PRESETS);
+    for (var i = 0; i < names.length; i++) {
+      var preset = Q_NAME_PRESETS[names[i]];
+      var ok = keys.every(function (k) { return state.qNames[k] === preset[k]; });
+      if (ok) return names[i];
+    }
+    return "custom";
+  }
+
+  function syncQNameInputs() {
+    ["NE", "NW", "SE", "SW"].forEach(function (k) {
+      var el = document.getElementById("q" + k);
+      if (el) el.value = state.qNames[k];
+    });
+    var presetRoot = document.getElementById("qNamePreset");
+    if (presetRoot) setSegActive(presetRoot, "data-preset", state.qNamePreset);
+  }
+
+  function applyQNamePreset(name) {
+    var preset = Q_NAME_PRESETS[name];
+    state.qNamePreset = name;
+    if (preset) {
+      state.qNames = { NE: preset.NE, NW: preset.NW, SE: preset.SE, SW: preset.SW };
+    }
+    syncQNameInputs();
+  }
+
+  function pointPhrase(n) {
+    return n + (n === 1 ? " point" : " points");
+  }
+
+  function escHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
   function updateStatus(nPoints, nSeries, cuts) {
     var sizeLabel = (fieldMeta(state.map.size) || {}).label || "size";
     var zLabel = state.map.z ? ((fieldMeta(state.map.z) || {}).label || "Z") : null;
@@ -1105,8 +1207,13 @@
         ? (nSel ? '<span class="sel">' + nSel + " selected</span> | " : "") + "drag to rotate | click point to select"
         : (nSel ? '<span class="sel">' + nSel + " selected</span> | click point to select | Ctrl+click multi" : "click a bubble to select (not the whole group)")) +
       (state.colorMode === "cat" ? " | legend: click focus ? Ctrl+click hide ? double-click only" : "") + "</div>";
-    document.getElementById("chartTitle").textContent =
-      isTrue3d() ? "3D scatter chart" : (state.mode === "quadrant" ? "Quadrant chart" : "Bubble chart");
+    var heading = chartHeading();
+    var titleEl = document.getElementById("chartTitle");
+    var subEl = document.getElementById("chartSubtitle");
+    var detailEl = document.getElementById("chartDetail");
+    if (titleEl) titleEl.textContent = heading.title;
+    if (subEl) subEl.textContent = heading.subtitle;
+    if (detailEl) detailEl.textContent = heading.detail;
     var restoreEl = document.getElementById("restoreGroups");
     if (restoreEl) {
       restoreEl.onclick = function (e) {
@@ -1172,16 +1279,64 @@
     var ren = chart.renderer;
     // Distinct tint per zone (NW / NE / SW / SE)
     var zones = [
-      { x: left, y: top, w: midX - left, h: midY - top, fill: "rgba(56,189,248,0.14)", key: "NW" },
-      { x: midX, y: top, w: right - midX, h: midY - top, fill: "rgba(52,211,153,0.14)", key: "NE" },
-      { x: left, y: midY, w: midX - left, h: bottom - midY, fill: "rgba(148,163,184,0.12)", key: "SW" },
-      { x: midX, y: midY, w: right - midX, h: bottom - midY, fill: "rgba(251,191,36,0.13)", key: "SE" }
+      { x: left, y: top, w: midX - left, h: midY - top, fill: "rgba(56,189,248,0.07)", key: "NW" },
+      { x: midX, y: top, w: right - midX, h: midY - top, fill: "rgba(52,211,153,0.07)", key: "NE" },
+      { x: left, y: midY, w: midX - left, h: bottom - midY, fill: "rgba(148,163,184,0.05)", key: "SW" },
+      { x: midX, y: midY, w: right - midX, h: bottom - midY, fill: "rgba(251,191,36,0.06)", key: "SE" }
     ];
     zones.forEach(function (z) {
       if (z.w <= 0 || z.h <= 0) return;
       ren.rect(z.x, z.y, z.w, z.h, 0)
         .attr({ fill: z.fill, zIndex: 0, "pointer-events": "none", class: "mv-quad-shade mv-quad-" + z.key })
         .add();
+    });
+  }
+
+  function drawQuadrantLabels(chart, cuts, counts) {
+    if (!chart || cuts.x == null) return;
+    var xAxis = chart.xAxis[0];
+    var yAxis = chart.yAxis[0];
+    var xExt = xAxis.getExtremes();
+    var yExt = yAxis.getExtremes();
+    var left = xAxis.toPixels(xExt.min);
+    var right = xAxis.toPixels(xExt.max);
+    var top = yAxis.toPixels(yExt.max);
+    var bottom = yAxis.toPixels(yExt.min);
+    var pad = 8;
+    var total = Math.max(1, counts.NE + counts.NW + counts.SE + counts.SW);
+    var placements = [
+      { key: "NW", x: left + pad, y: top + pad, hAlign: "left", vAlign: "top" },
+      { key: "NE", x: right - pad, y: top + pad, hAlign: "right", vAlign: "top" },
+      { key: "SW", x: left + pad, y: bottom - pad, hAlign: "left", vAlign: "bottom" },
+      { key: "SE", x: right - pad, y: bottom - pad, hAlign: "right", vAlign: "bottom" }
+    ];
+    var ren = chart.renderer;
+    placements.forEach(function (pt) {
+      var n = counts[pt.key];
+      var pct = Math.round(100 * n / total);
+      var empty = n === 0;
+      var html = escHtml(state.qNames[pt.key]) + "<br/>" + pointPhrase(n) + " · " + pct + "%";
+      var lbl = ren.label(html, pt.x, pt.y, null, 0, 0, true)
+        .attr({
+          fill: "none",
+          stroke: "none",
+          padding: 0,
+          zIndex: 3,
+          opacity: empty ? 0.4 : 0.78,
+          "pointer-events": "none"
+        })
+        .css({
+          color: empty ? "rgba(203,213,225,.55)" : "rgba(226,232,240,.72)",
+          fontSize: "10px",
+          fontWeight: "600",
+          textAlign: pt.hAlign,
+          lineHeight: "1.3"
+        })
+        .add();
+      var box = lbl.getBBox();
+      var nx = pt.hAlign === "right" ? pt.x - box.width : pt.x;
+      var ny = pt.vAlign === "bottom" ? pt.y - box.height : pt.y;
+      lbl.attr({ x: nx, y: ny });
     });
   }
 
@@ -1298,7 +1453,26 @@
           animation: false
         },
         title: { text: null },
+        subtitle: { text: null },
         credits: { enabled: false },
+        exporting: {
+          enabled: true,
+          chartOptions: (function () {
+            var h = chartHeading();
+            return {
+              chart: { backgroundColor: "#111827" },
+              title: {
+                text: h.title,
+                style: { color: "#e2e8f0", fontSize: "16px", fontWeight: "800" }
+              },
+              subtitle: {
+                text: escHtml(h.subtitle) + "<br/>" + escHtml(h.detail),
+                useHTML: true,
+                style: { color: "#94a3b8", fontSize: "11px" }
+              }
+            };
+          })()
+        },
         legend: {
           enabled: state.colorMode === "cat",
           itemStyle: { color: "#cbd5e1" },
@@ -1459,14 +1633,6 @@
       if (!true3d && state.mode === "quadrant" && cuts.x != null && state.chart) {
         drawQuadrantShading(state.chart, cuts);
 
-        var xExt = state.chart.xAxis[0].getExtremes();
-        var yExt = state.chart.yAxis[0].getExtremes();
-        var corners = [
-          { key: "NE", x: (cuts.x + xExt.max) / 2, y: (cuts.y + yExt.max) / 2 },
-          { key: "NW", x: (xExt.min + cuts.x) / 2, y: (cuts.y + yExt.max) / 2 },
-          { key: "SE", x: (cuts.x + xExt.max) / 2, y: (yExt.min + cuts.y) / 2 },
-          { key: "SW", x: (xExt.min + cuts.x) / 2, y: (yExt.min + cuts.y) / 2 }
-        ];
         var counts = { NE: 0, NW: 0, SE: 0, SW: 0 };
         series.forEach(function (s) {
           s.data.forEach(function (p) {
@@ -1477,17 +1643,7 @@
             else counts.SW++;
           });
         });
-        var total = Math.max(1, counts.NE + counts.NW + counts.SE + counts.SW);
-        var ren = state.chart.renderer;
-        corners.forEach(function (pt) {
-          var pct = Math.round(100 * counts[pt.key] / total);
-          var xy = state.chart.xAxis[0].toPixels(pt.x);
-          var yy = state.chart.yAxis[0].toPixels(pt.y);
-          ren.label(state.qNames[pt.key] + "<br/>" + counts[pt.key] + " (" + pct + "%)", xy - 36, yy - 18, "rect", 0, 0, true)
-            .attr({ fill: "rgba(15,23,42,.55)", stroke: "rgba(148,163,184,.25)", "stroke-width": 1, r: 6, padding: 5, zIndex: 6 })
-            .css({ color: "rgba(226,232,240,.85)", fontSize: "10px", fontWeight: "700" })
-            .add();
-        });
+        drawQuadrantLabels(state.chart, cuts, counts);
       }
 
       setTimeout(function () {
@@ -1689,11 +1845,26 @@
       });
     });
 
-    ["qNE", "qNW", "qSE", "qSW"].forEach(function (id) {
-      document.getElementById(id).addEventListener("change", function (e) {
-        var map = { qNE: "NE", qNW: "NW", qSE: "SE", qSW: "SW" };
-        state.qNames[map[id]] = e.target.value || state.qNames[map[id]];
+    document.querySelectorAll("#qNamePreset button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        applyQNamePreset(btn.dataset.preset);
         render();
+      });
+    });
+    ["qNE", "qNW", "qSE", "qSW"].forEach(function (id) {
+      var el = document.getElementById(id);
+      var map = { qNE: "NE", qNW: "NW", qSE: "SE", qSW: "SW" };
+      el.addEventListener("input", function (e) {
+        var next = (e.target.value || "").trim();
+        if (!next) return;
+        state.qNames[map[id]] = next;
+        state.qNamePreset = matchQNamePreset();
+        var presetRoot = document.getElementById("qNamePreset");
+        if (presetRoot) setSegActive(presetRoot, "data-preset", state.qNamePreset);
+        render();
+      });
+      el.addEventListener("blur", function () {
+        el.value = state.qNames[map[id]];
       });
     });
 

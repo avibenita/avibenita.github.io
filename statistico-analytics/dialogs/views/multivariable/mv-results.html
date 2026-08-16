@@ -257,6 +257,12 @@
     }
     #chartError.is-visible { display: flex; }
     .highcharts-exporting-group, .highcharts-contextmenu { display: none !important; }
+    .highcharts-data-label,
+    .highcharts-data-label text,
+    .highcharts-data-label span {
+      pointer-events: auto !important;
+      cursor: move;
+    }
     .size-legend {
       border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1);
       padding: 10px; font-size: 11px; color: var(--text-secondary);
@@ -501,7 +507,7 @@
         <button class="acc-h" type="button" data-acc="accLabels">Labels <i class="fa-solid fa-chevron-down chev"></i></button>
         <div class="acc-b">
           <div class="ctrl-row">
-            <label>Show</label>
+            <label>Show <span class="info-tip" data-tip="Drag a visible label to move it. Double-click a label to put it back." aria-label="Drag a visible label to move it. Double-click a label to put it back." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
             <div class="seg" id="labelMode">
               <button type="button" data-labels="none">None</button>
               <button type="button" data-labels="hover">Hover</button>
@@ -642,6 +648,7 @@
     axisFontSize: 11,
     labels: "auto",
     labelFontSize: 10,
+    labelOffsets: {},
     search: "",
     selected: {},
     seriesFocus: null,
@@ -686,6 +693,7 @@
       axisFontSize: s.axisFontSize,
       labels: s.labels,
       labelFontSize: s.labelFontSize,
+      labelOffsets: s.labelOffsets || {},
       search: "",
       selected: {},
       seriesFocus: null,
@@ -724,6 +732,7 @@
       axisFontSize: 11,
       labels: "auto",
       labelFontSize: 10,
+      labelOffsets: {},
       xCutMode: "median",
       yCutMode: "median",
       xCutCustom: null,
@@ -1237,8 +1246,29 @@
       color: "#e2e8f0",
       textOutline: "none",
       fontSize: (state.labelFontSize || 10) + "px",
-      fontWeight: "600"
+      fontWeight: "600",
+      cursor: "move"
     };
+  }
+
+  function dataLabelOpts(p, extra) {
+    var key = p.custom && p.custom.key;
+    var off = (key && state.labelOffsets && state.labelOffsets[key]) || null;
+    var o = {
+      enabled: true,
+      format: "{point.name}",
+      style: pointLabelCss(),
+      crop: false,
+      overflow: "allow",
+      allowOverlap: !!(off || (extra && extra.allowOverlap)),
+      x: off ? off.x : 0,
+      y: off ? off.y : 0
+    };
+    if (extra) {
+      Object.keys(extra).forEach(function (k) { o[k] = extra[k]; });
+      if (off) o.allowOverlap = true;
+    }
+    return o;
   }
 
   function applyLabelPolicy(series) {
@@ -1250,10 +1280,10 @@
     flat.forEach(function (p) { p.dataLabels = { enabled: false }; });
 
     if (mode === "all") {
-      flat.forEach(function (p) { p.dataLabels = { enabled: true, format: "{point.name}", style: style }; });
+      flat.forEach(function (p) { p.dataLabels = dataLabelOpts(p, { allowOverlap: true }); });
     } else if (mode === "selected") {
       flat.forEach(function (p) {
-        if (p.custom && p.custom.selected) p.dataLabels = { enabled: true, format: "{point.name}", style: style };
+        if (p.custom && p.custom.selected) p.dataLabels = dataLabelOpts(p, { allowOverlap: true });
       });
     } else if (mode === "auto") {
       // Prefer extremes and selected / search hits; cap to keep readable.
@@ -1264,19 +1294,23 @@
       });
       var keep = Math.min(10, ranked.length);
       for (var i = 0; i < keep; i++) {
-        ranked[i].dataLabels = {
-          enabled: true,
-          format: "{point.name}",
-          style: style,
-          allowOverlap: false
-        };
+        ranked[i].dataLabels = dataLabelOpts(ranked[i], { allowOverlap: false });
       }
+      // Keep any labels the user already dragged, even if they fell out of Auto's top 10.
+      flat.forEach(function (p) {
+        var key = p.custom && p.custom.key;
+        if (key && state.labelOffsets[key] && !(p.dataLabels && p.dataLabels.enabled)) {
+          p.dataLabels = dataLabelOpts(p, { allowOverlap: true });
+        }
+      });
     }
 
     series.forEach(function (s) {
       s.dataLabels = {
         style: style,
-        allowOverlap: mode === "all"
+        allowOverlap: mode === "all",
+        crop: false,
+        overflow: "allow"
       };
     });
   }
@@ -1505,6 +1539,10 @@
       try { state.chart._mvUnbindDrag(); } catch (e) {}
       state.chart._mvUnbindDrag = null;
     }
+    if (state.chart && state.chart._mvUnbindLabelDrag) {
+      try { state.chart._mvUnbindLabelDrag(); } catch (e) {}
+      state.chart._mvUnbindLabelDrag = null;
+    }
     if (state.chart && typeof state.chart.destroy === "function") {
       try { state.chart.destroy(); } catch (e) {}
     }
@@ -1624,6 +1662,7 @@
   }
 
   function pointClickHandler(e) {
+    if (state._labelDrag) return;
     var key = this.custom && this.custom.key;
     if (!key) return;
     var multi = e && (e.ctrlKey || e.metaKey);
@@ -1639,10 +1678,103 @@
     render();
   }
 
+  function isLabelTarget(el) {
+    while (el && el !== document && el !== document.body) {
+      var cls = (el.getAttribute && el.getAttribute("class")) || el.className || "";
+      if (String(cls).indexOf("highcharts-data-label") >= 0) return true;
+      el = el.parentNode;
+    }
+    return false;
+  }
+
+  function bindLabelDrag(chart) {
+    if (!chart || !Highcharts.addEvent || state.labels === "none" || state.labels === "hover") return;
+    var drag = null;
+    var unbinds = [];
+
+    function eventXY(e) {
+      var ev = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]) || e;
+      return { x: ev.clientX, y: ev.clientY };
+    }
+
+    chart.series.forEach(function (s) {
+      (s.points || []).forEach(function (p) {
+        var dl = p.dataLabel;
+        if (!dl || !dl.element) return;
+        dl.css({ cursor: "move" });
+        unbinds.push(Highcharts.addEvent(dl.element, "mousedown", function (e) {
+          var key = p.custom && p.custom.key;
+          if (!key) return;
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopPropagation) e.stopPropagation();
+          if (chart.pointer) {
+            chart.pointer.reset();
+            chart.mouseIsDown = false;
+          }
+          var xy = eventXY(e);
+          var off = state.labelOffsets[key] || { x: 0, y: 0 };
+          drag = {
+            key: key,
+            point: p,
+            startX: xy.x,
+            startY: xy.y,
+            origX: off.x,
+            origY: off.y,
+            dx: 0,
+            dy: 0,
+            moved: false
+          };
+          state._labelDrag = true;
+        }));
+        unbinds.push(Highcharts.addEvent(dl.element, "dblclick", function (e) {
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopPropagation) e.stopPropagation();
+          var key = p.custom && p.custom.key;
+          if (!key || !state.labelOffsets[key]) return;
+          delete state.labelOffsets[key];
+          render();
+        }));
+      });
+    });
+
+    unbinds.push(Highcharts.addEvent(document, "mousemove", function (e) {
+      if (!drag) return;
+      var xy = eventXY(e);
+      drag.dx = xy.x - drag.startX;
+      drag.dy = xy.y - drag.startY;
+      if (Math.abs(drag.dx) > 2 || Math.abs(drag.dy) > 2) drag.moved = true;
+      var dl = drag.point.dataLabel;
+      if (dl && dl.element) {
+        dl.element.style.transform = "translate(" + drag.dx + "px," + drag.dy + "px)";
+      }
+    }));
+    unbinds.push(Highcharts.addEvent(document, "mouseup", function () {
+      if (!drag) return;
+      var moved = drag.moved;
+      var key = drag.key;
+      var next = { x: drag.origX + drag.dx, y: drag.origY + drag.dy };
+      var dl = drag.point.dataLabel;
+      if (dl && dl.element) dl.element.style.transform = "";
+      drag = null;
+      if (moved) {
+        if (!state.labelOffsets) state.labelOffsets = {};
+        state.labelOffsets[key] = next;
+        render();
+      }
+      setTimeout(function () { state._labelDrag = false; }, 0);
+    }));
+
+    chart._mvUnbindLabelDrag = function () {
+      unbinds.forEach(function (u) { if (u) u(); });
+      unbinds.length = 0;
+    };
+  }
+
   function bindChartDragRotate(chart) {
     if (!chart || !Highcharts.addEvent) return;
     var unbindDown = Highcharts.addEvent(chart.container, "mousedown", function (eStart) {
       if (!chart.options.chart.options3d || !chart.options.chart.options3d.enabled) return;
+      if (isLabelTarget(eStart.target || eStart.srcElement)) return;
       eStart = chart.pointer.normalize(eStart);
       var posX = eStart.chartX;
       var posY = eStart.chartY;
@@ -1902,6 +2034,7 @@
       }
 
       state.chart = Highcharts.chart("chart", opts);
+      bindLabelDrag(state.chart);
 
       if (true3d) bindChartDragRotate(state.chart);
 

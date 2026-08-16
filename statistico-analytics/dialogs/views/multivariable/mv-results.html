@@ -301,8 +301,9 @@
       <div class="mv-chart-detail" id="chartDetail"></div>
     </div>
     <div class="mode-tabs">
-      <button class="mode-tab" data-mode="bubble" type="button">Bubble</button>
       <button class="mode-tab active" data-mode="quadrant" type="button">Quadrant</button>
+      <button class="mode-tab" data-mode="bubble" type="button">Bubble</button>
+      <button class="mode-tab" data-mode="true3d" type="button">3D scatter</button>
     </div>
     <div class="top-actions">
       <button class="top-btn" id="btnReset" type="button" title="Restore the chart to how it looked when it first loaded">Reset</button>
@@ -469,30 +470,28 @@
         </div>
       </div>
 
+      <div class="acc hidden-mode" id="acc3d">
+        <button class="acc-h" type="button" data-acc="acc3d">3D scatter <i class="fa-solid fa-chevron-down chev"></i></button>
+        <div class="acc-b">
+          <div class="hint-quiet">Perspective XYZ chart. Drag the plot to rotate. Point size still comes from Bubble size. Set Z in Variables.</div>
+          <div class="ctrl-row">
+            <label>Tilt (alpha) <span class="info-tip" data-tip="Pitch of the 3D box. You can also drag the chart to rotate." aria-label="Pitch of the 3D box. You can also drag the chart to rotate." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
+            <input id="viewAlpha" type="range" min="0" max="45" step="1" value="12" />
+          </div>
+          <div class="ctrl-row">
+            <label>Turn (beta)</label>
+            <input id="viewBeta" type="range" min="-60" max="60" step="1" value="22" />
+          </div>
+          <div class="ctrl-row">
+            <label>Depth <span class="info-tip" data-tip="How deep the 3D box is drawn. Does not change the Z data range — only the visual length of the Z axis." aria-label="How deep the 3D box is drawn. Does not change the Z data range — only the visual length of the Z axis." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
+            <input id="viewDepth" type="range" min="80" max="500" step="10" value="280" />
+          </div>
+        </div>
+      </div>
+
       <div class="acc" id="accBubbles">
         <button class="acc-h" type="button" data-acc="accBubbles">Bubbles <i class="fa-solid fa-chevron-down chev"></i></button>
         <div class="acc-b">
-          <div class="ctrl-row">
-            <label>Look <span class="info-tip" id="lookHint" data-tip="Flat = solid discs. True 3D = rotatable XYZ space (Highcharts perspective 3D)." aria-label="Flat = solid discs. True 3D = rotatable XYZ space (Highcharts perspective 3D)." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
-            <div class="seg" id="bubbleStyle">
-              <button type="button" data-style="flat" class="active">Flat</button>
-              <button type="button" data-style="true3d">True 3D</button>
-            </div>
-          </div>
-          <div id="true3dControls" style="display:none;">
-            <div class="ctrl-row">
-              <label>Tilt (alpha) <span class="info-tip" data-tip="Perspective 3D scatter with X / Y / Z axes. Drag the chart to rotate. Bubble size still comes from the size variable." aria-label="Perspective 3D scatter with X / Y / Z axes. Drag the chart to rotate. Bubble size still comes from the size variable." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
-              <input id="viewAlpha" type="range" min="0" max="45" step="1" value="12" />
-            </div>
-            <div class="ctrl-row">
-              <label>Turn (beta)</label>
-              <input id="viewBeta" type="range" min="-60" max="60" step="1" value="22" />
-            </div>
-            <div class="ctrl-row">
-              <label>Depth <span class="info-tip" data-tip="How deep the 3D box is drawn. Does not change the Z data range — only the visual length of the Z axis." aria-label="How deep the 3D box is drawn. Does not change the Z data range — only the visual length of the Z axis." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
-              <input id="viewDepth" type="range" min="80" max="500" step="10" value="280" />
-            </div>
-          </div>
           <div class="ctrl-row">
             <label>Size by <span class="info-tip" data-tip="Area (default) matches Excel Area of bubbles. Width matches Excel Width of bubbles and exaggerates large values." aria-label="Area (default) matches Excel Area of bubbles. Width matches Excel Width of bubbles and exaggerates large values." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
             <div class="seg" id="sizeBy">
@@ -832,7 +831,7 @@
       state.map.color = null;
     }
     applyDefaultView();
-    state.mode = spec.chartMode === "bubble" ? "bubble" : "quadrant";
+    state.mode = spec.chartMode === "bubble" ? "bubble" : spec.chartMode === "true3d" ? "true3d" : "quadrant";
     captureLoadState();
     syncTrue3dUi();
 
@@ -862,6 +861,7 @@
     if (!host) return;
     host.innerHTML = "";
     ROLES.forEach(function (role) {
+      if (role.id === "z" && !isTrue3d()) return;
       var row = document.createElement("div");
       row.className = "role-row";
       var lab = document.createElement("div");
@@ -964,7 +964,7 @@
   }
 
   function isTrue3d() {
-    return state.bubbleStyle === "true3d";
+    return state.mode === "true3d";
   }
 
   function pickNumericForZ() {
@@ -987,21 +987,11 @@
   }
 
   function syncTrue3dUi() {
-    var box = document.getElementById("true3dControls");
-    if (box) box.style.display = isTrue3d() ? "block" : "none";
-    var hint = document.getElementById("lookHint");
-    if (hint) {
-      var text = isTrue3d()
-        ? "True 3D uses perspective XYZ axes (drag to rotate). Not photorealistic WebGL — Highcharts 3D projection."
-        : "Flat = solid discs. True 3D = rotatable XYZ space (Highcharts perspective 3D).";
-      hint.setAttribute("data-tip", text);
-      hint.setAttribute("aria-label", text);
-    }
-    // Quadrant overlays are 2D-only
-    var quad = document.getElementById("accQuad");
-    if (quad && isTrue3d()) {
-      // keep available but note in status; still allow viewing without overlays
-    }
+    var el = document.getElementById("acc3d");
+    if (!el) return;
+    el.classList.toggle("hidden-mode", !isTrue3d());
+    if (isTrue3d()) el.classList.add("open");
+    layoutPanels();
   }
 
   function groupKeyFromValue(v) {
@@ -1496,7 +1486,7 @@
     var sizeLabel = (fieldMeta(state.map.size) || {}).label || "size";
     var zLabel = state.map.z ? ((fieldMeta(state.map.z) || {}).label || "Z") : null;
     var nSel = Object.keys(state.selected).length;
-    var modeTxt = isTrue3d() ? "True 3D" : (state.mode === "quadrant" ? "Quadrant" : "Bubble");
+    var modeTxt = isTrue3d() ? "3D scatter" : (state.mode === "quadrant" ? "Quadrant" : "Bubble");
     var cutTxt = "";
     if (!isTrue3d() && state.mode === "quadrant" && cuts && cuts.x != null) {
       cutTxt = " | X=" + formatNumber(cuts.x, state.xFormat) + ", Y=" + formatNumber(cuts.y, state.yFormat);
@@ -2177,7 +2167,6 @@
     setVal("qLabelPos", state.qLabelPos);
     setVal("qFontSize", state.qFontSize || 11);
     setVal("labelFontSize", state.labelFontSize || 10);
-    setSegActive(document.getElementById("bubbleStyle"), "data-style", state.bubbleStyle);
     setSegActive(document.getElementById("sizeBy"), "data-sizeby", state.sizeBy);
     setSegActive(document.getElementById("labelMode"), "data-labels", state.labels);
     setSegActive(document.getElementById("xCutMode"), "data-cut", state.xCutMode);
@@ -2236,15 +2225,6 @@
     });
     document.getElementById("bubbleOpacity").addEventListener("input", function (e) {
       state.bubbleOpacity = +e.target.value; render();
-    });
-    document.querySelectorAll("#bubbleStyle button").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        setSegActive(document.getElementById("bubbleStyle"), "data-style", btn.dataset.style);
-        state.bubbleStyle = btn.dataset.style;
-        if (ensureZForTrue3d()) buildRoleMap();
-        syncTrue3dUi();
-        render();
-      });
     });
     var alphaEl = document.getElementById("viewAlpha");
     var betaEl = document.getElementById("viewBeta");
@@ -2315,7 +2295,10 @@
     document.querySelectorAll(".mode-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         state.mode = tab.dataset.mode;
+        if (ensureZForTrue3d()) buildRoleMap();
+        else if (!isTrue3d()) buildRoleMap();
         syncModeTabs();
+        syncTrue3dUi();
         syncQuadVisibility();
         render();
       });

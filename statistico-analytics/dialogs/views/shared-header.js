@@ -6141,9 +6141,9 @@ const StatisticoHeader = {
       <button class="sb-bottom-btn sb-bottom-btn--tpl"
               id="sbTemplateLibBtn"
               onclick="StatisticoHeader.openTemplateLibrary()"
-              title="Apply a color and texture skin to the live preview">
+              title="Change the live chart colors and texture">
         <i class="fa-solid fa-swatchbook"></i>
-        <span class="sb-item-label">Template Library</span>
+        <span class="sb-item-label">Change style</span>
       </button>
       <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
               id="sbExportJsonBtn"
@@ -6370,7 +6370,7 @@ const StatisticoHeader = {
           <div class="st-tpl-head">
             <div class="st-tpl-head-copy">
               <i class="fa-solid fa-swatchbook"></i>
-              <span id="stTplTitle">Template Library</span>
+              <span id="stTplTitle">Change style</span>
             </div>
             <button type="button" class="st-tpl-close" id="stTplClose" aria-label="Close">&times;</button>
           </div>

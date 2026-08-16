@@ -11,10 +11,10 @@
   <script src="../shared/vendor/highcharts/highcharts-more.js"></script>
   <script src="../shared/vendor/highcharts/highcharts-3d.js"></script>
   <script src="../shared/vendor/highcharts/modules/exporting.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260816mv1" />
-  <script src="../shared-brand-logo.js?v=20260816mv1"></script>
-  <script src="../shared-header.js?v=20260816mv1"></script>
-  <script src="mv-sample-data.js?v=20260816mv1"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260816mv2" />
+  <script src="../shared-brand-logo.js?v=20260816mv2"></script>
+  <script src="../shared-header.js?v=20260816mv2"></script>
+  <script src="mv-sample-data.js?v=20260816mv2"></script>
   <style>
     :root {
       --surface-0: #0c1624;
@@ -310,6 +310,8 @@
       padding: 10px 10px 12px;
       display: flex; flex-direction: column; gap: 6px;
       background: #141b2b;
+      position: relative;
+      z-index: 8;
     }
     .mv-utils-h {
       display: flex; align-items: center; gap: 8px;
@@ -332,6 +334,16 @@
       border-color: rgba(6, 182, 212, 0.72);
       color: #fff;
     }
+    .mv-utils .sb-bottom-btn--html {
+      background: rgba(249, 115, 22, 0.12);
+      border: 1px solid rgba(249, 115, 22, 0.55);
+      color: #ffedd5;
+    }
+    .mv-utils .sb-bottom-btn--html:hover {
+      background: rgba(249, 115, 22, 0.2);
+      border-color: rgba(249, 115, 22, 0.75);
+      color: #fff;
+    }
     .mv-utils .sb-bottom-btn--tpl {
       background: rgba(139, 92, 246, 0.12);
       border: 1px solid rgba(167, 139, 250, 0.55);
@@ -342,6 +354,47 @@
       border-color: rgba(167, 139, 250, 0.75);
       color: #fff;
     }
+    .mv-style-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(8, 12, 22, .62);
+      align-items: center; justify-content: center;
+      padding: 18px;
+    }
+    .mv-style-overlay.is-open { display: flex; }
+    .mv-style-dialog {
+      width: min(720px, 96vw); max-height: 90vh; overflow: auto;
+      background: #121826; border: 1px solid rgba(148,163,184,.28);
+      border-radius: 14px; box-shadow: 0 18px 48px rgba(0,0,0,.45);
+      padding: 16px 16px 18px;
+    }
+    .mv-style-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px;
+    }
+    .mv-style-head-copy {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 15px; font-weight: 800; color: #f8fafc;
+    }
+    .mv-style-head-copy i { color: #a78bfa; }
+    .mv-style-close {
+      border: 0; background: transparent; color: #94a3b8;
+      font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px;
+    }
+    .mv-style-close:hover { color: #fff; }
+    .mv-style-lead { margin: 0 0 12px; font-size: 12px; color: #94a3b8; line-height: 1.4; }
+    .mv-style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+    .mv-style-card {
+      display: flex; flex-direction: column; gap: 6px; text-align: left;
+      border: 1px solid rgba(148,163,184,.28); background: rgba(255,255,255,.03);
+      color: #e2e8f0; border-radius: 10px; padding: 8px; cursor: pointer;
+    }
+    .mv-style-card:hover { border-color: rgba(167,139,250,.7); }
+    .mv-style-card.is-active { border-color: #a78bfa; box-shadow: 0 0 0 1px rgba(167,139,250,.45); }
+    .mv-style-swatch {
+      display: block; height: 64px; border-radius: 8px; border: 1px solid rgba(148,163,184,.25);
+    }
+    .mv-style-name { font-size: 12px; font-weight: 800; }
+    .mv-style-desc { font-size: 10px; color: #94a3b8; line-height: 1.3; }
   </style>
 </head>
 <body>
@@ -608,13 +661,17 @@
       </div>
       <div class="mv-utils" id="mvUtils">
         <div class="mv-utils-h"><i class="fa-solid fa-wand-magic-sparkles"></i> Utilities</div>
+        <button class="sb-bottom-btn sb-bottom-btn--tpl" id="btnTemplates" type="button" title="Change the live chart colors and texture">
+          <i class="fa-solid fa-swatchbook"></i>
+          <span class="sb-item-label">Change style</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--html" id="btnSaveHtml" type="button" title="Save a standalone HTML file of this chart">
+          <i class="fa-solid fa-file-code"></i>
+          <span class="sb-item-label">Save as HTML</span>
+        </button>
         <button class="sb-bottom-btn sb-bottom-btn--png" id="btnSavePng" type="button" title="Save the on-screen chart preview as a PNG image">
           <i class="fa-solid fa-image"></i>
           <span class="sb-item-label">Save as PNG</span>
-        </button>
-        <button class="sb-bottom-btn sb-bottom-btn--tpl" id="btnTemplates" type="button" title="Apply a color and texture skin to the live preview">
-          <i class="fa-solid fa-swatchbook"></i>
-          <span class="sb-item-label">Template Library</span>
         </button>
       </div>
     </aside>
@@ -632,6 +689,19 @@
     </main>
   </div>
   <div class="waiting" id="waiting"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for data...</div>
+  <div class="mv-style-overlay" id="mvStyleOverlay">
+    <div class="mv-style-dialog" role="dialog" aria-labelledby="mvStyleTitle">
+      <div class="mv-style-head">
+        <div class="mv-style-head-copy">
+          <i class="fa-solid fa-swatchbook"></i>
+          <span id="mvStyleTitle">Change style</span>
+        </div>
+        <button type="button" class="mv-style-close" id="mvStyleClose" aria-label="Close">&times;</button>
+      </div>
+      <p class="mv-style-lead">Applies colors and textures to the live chart preview.</p>
+      <div class="mv-style-grid" id="mvStyleGrid"></div>
+    </div>
+  </div>
 
   <script>
 (function () {
@@ -914,9 +984,7 @@
     applyDefaultView();
     state.mode = spec.chartMode === "bubble" ? "bubble" : spec.chartMode === "true3d" ? "true3d" : "quadrant";
     captureLoadState();
-    if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === "function") {
-      StatisticoHeader.applyPreviewTemplate(state.templateId || "night", { skipCharts: true, silent: true });
-    }
+    MvUtils.applyCss(MvUtils.template(state.templateId));
     syncTrue3dUi();
 
     document.getElementById("waiting").style.display = "none";
@@ -1347,22 +1415,370 @@
   }
 
   function currentTpl() {
-    var id = state.templateId || "night";
-    if (window.StatisticoHeader && typeof StatisticoHeader.getPreviewTemplate === "function") {
-      return StatisticoHeader.getPreviewTemplate(id);
-    }
-    return { id: "night", light: false, wrapBg: "#111827", pngBg: "#111827", chartBg: "transparent",
-      axis: "#94a3b8", grid: "rgba(148,163,184,.15)", grid3d: "rgba(186,198,214,.38)",
-      minorGrid: "rgba(148,163,184,.18)", line: "#334155",
-      legend: "#f8fafc", legendTitle: "#e2e8f0", legendHidden: "#64748b", label: "#e2e8f0",
-      tooltipBg: "rgba(15,23,42,.95)", tooltipBorder: "#334155", tooltipText: "#e2e8f0",
-      cut: "rgba(251,191,36,.8)", cutLabel: "#fbbf24",
-      shades: { NW: "rgba(56,189,248,0.07)", NE: "rgba(52,211,153,0.07)", SW: "rgba(148,163,184,0.05)", SE: "rgba(251,191,36,0.06)" },
-      qFill: "rgba(15,23,42,.7)", qFillEmpty: "rgba(15,23,42,.42)", qStroke: "rgba(226,232,240,.22)",
-      qText: "#f8fafc", qTextEmpty: "#e2e8f0", qOutline: "2px rgba(12,22,36,.9)",
-      frameBottom: "rgba(148,163,184,.35)", frameWall: "rgba(148,163,184,.22)",
-      markerLine: "rgba(255,255,255,.28)" };
+    return MvUtils.template(state.templateId);
   }
+
+  var MvUtils = {
+    TEMPLATES: {
+      night: {
+        id: "night", name: "Night ink", desc: "Default dark canvas", light: false,
+        wrapBg: "#111827", pngBg: "#111827", chartBg: "transparent", textureKind: "none",
+        cssTexture: "none", texSize: "24px 24px", texOpacity: "0",
+        axis: "#94a3b8", grid: "rgba(148,163,184,.15)", grid3d: "rgba(186,198,214,.38)",
+        minorGrid: "rgba(148,163,184,.18)", line: "#334155",
+        legend: "#f8fafc", legendTitle: "#e2e8f0", legendHidden: "#64748b", label: "#e2e8f0",
+        tooltipBg: "rgba(15,23,42,.95)", tooltipBorder: "#334155", tooltipText: "#e2e8f0",
+        cut: "rgba(251,191,36,.8)", cutLabel: "#fbbf24",
+        shades: { NW: "rgba(56,189,248,0.07)", NE: "rgba(52,211,153,0.07)", SW: "rgba(148,163,184,0.05)", SE: "rgba(251,191,36,0.06)" },
+        qFill: "rgba(15,23,42,.7)", qFillEmpty: "rgba(15,23,42,.42)", qStroke: "rgba(226,232,240,.22)",
+        qText: "#f8fafc", qTextEmpty: "#e2e8f0", qOutline: "2px rgba(12,22,36,.9)",
+        frameBottom: "rgba(148,163,184,.35)", frameWall: "rgba(148,163,184,.22)",
+        markerLine: "rgba(255,255,255,.28)", swatch: "#111827"
+      },
+      paper: {
+        id: "paper", name: "Paper light", desc: "Warm off-white sheet", light: true,
+        wrapBg: "#f6f1e7", pngBg: "#f6f1e7", chartBg: "transparent", textureKind: "paper",
+        cssTexture: "repeating-linear-gradient(0deg, rgba(120,90,50,.07) 0 1px, transparent 1px 22px), repeating-linear-gradient(90deg, rgba(120,90,50,.05) 0 1px, transparent 1px 22px)",
+        texSize: "22px 22px", texOpacity: "1",
+        axis: "#57534e", grid: "rgba(120,113,108,.2)", grid3d: "rgba(120,113,108,.28)",
+        minorGrid: "rgba(120,113,108,.12)", line: "#a8a29e",
+        legend: "#1c1917", legendTitle: "#44403c", legendHidden: "#a8a29e", label: "#1c1917",
+        tooltipBg: "rgba(255,252,247,.96)", tooltipBorder: "#d6d3d1", tooltipText: "#1c1917",
+        cut: "rgba(180,83,9,.85)", cutLabel: "#b45309",
+        shades: { NW: "rgba(14,165,233,0.1)", NE: "rgba(16,185,129,0.1)", SW: "rgba(120,113,108,0.08)", SE: "rgba(245,158,11,0.1)" },
+        qFill: "rgba(255,252,247,.86)", qFillEmpty: "rgba(255,252,247,.55)", qStroke: "rgba(120,113,108,.35)",
+        qText: "#1c1917", qTextEmpty: "#57534e", qOutline: "2px rgba(255,255,255,.9)",
+        frameBottom: "rgba(120,113,108,.35)", frameWall: "rgba(120,113,108,.22)",
+        markerLine: "rgba(28,25,23,.28)", swatch: "#f6f1e7"
+      },
+      slate: {
+        id: "slate", name: "Slate dots", desc: "Cool dotted slate", light: false,
+        wrapBg: "#1e293b", pngBg: "#1e293b", chartBg: "transparent", textureKind: "dots",
+        cssTexture: "radial-gradient(rgba(148,163,184,.32) 1px, transparent 1.6px)",
+        texSize: "14px 14px", texOpacity: "1",
+        axis: "#cbd5e1", grid: "rgba(148,163,184,.18)", grid3d: "rgba(186,198,214,.4)",
+        minorGrid: "rgba(148,163,184,.16)", line: "#475569",
+        legend: "#f8fafc", legendTitle: "#e2e8f0", legendHidden: "#64748b", label: "#e2e8f0",
+        tooltipBg: "rgba(15,23,42,.95)", tooltipBorder: "#475569", tooltipText: "#e2e8f0",
+        cut: "rgba(251,191,36,.85)", cutLabel: "#fbbf24",
+        shades: { NW: "rgba(56,189,248,0.09)", NE: "rgba(52,211,153,0.09)", SW: "rgba(148,163,184,0.07)", SE: "rgba(251,191,36,0.08)" },
+        qFill: "rgba(15,23,42,.72)", qFillEmpty: "rgba(15,23,42,.45)", qStroke: "rgba(226,232,240,.22)",
+        qText: "#f8fafc", qTextEmpty: "#e2e8f0", qOutline: "2px rgba(15,23,42,.9)",
+        frameBottom: "rgba(148,163,184,.4)", frameWall: "rgba(148,163,184,.25)",
+        markerLine: "rgba(255,255,255,.3)", swatch: "#1e293b"
+      },
+      parchment: {
+        id: "parchment", name: "Parchment", desc: "Aged paper texture", light: true,
+        wrapBg: "#ead9b2", pngBg: "#ead9b2", chartBg: "transparent", textureKind: "linen",
+        cssTexture: "repeating-linear-gradient(115deg, rgba(146,107,56,.16) 0 2px, transparent 2px 8px), repeating-linear-gradient(0deg, rgba(120,80,30,.08) 0 1px, transparent 1px 16px)",
+        texSize: "16px 16px", texOpacity: "1",
+        axis: "#5c4030", grid: "rgba(120,80,30,.22)", grid3d: "rgba(120,80,30,.3)",
+        minorGrid: "rgba(120,80,30,.12)", line: "#b08968",
+        legend: "#3b2416", legendTitle: "#5c4030", legendHidden: "#a07858", label: "#3b2416",
+        tooltipBg: "rgba(255,248,230,.96)", tooltipBorder: "#c4a574", tooltipText: "#3b2416",
+        cut: "rgba(146,64,14,.9)", cutLabel: "#9a3412",
+        shades: { NW: "rgba(14,116,144,0.1)", NE: "rgba(21,128,61,0.1)", SW: "rgba(120,80,30,0.08)", SE: "rgba(180,83,9,0.12)" },
+        qFill: "rgba(255,248,230,.84)", qFillEmpty: "rgba(255,248,230,.5)", qStroke: "rgba(146,107,56,.4)",
+        qText: "#3b2416", qTextEmpty: "#5c4030", qOutline: "2px rgba(255,248,230,.9)",
+        frameBottom: "rgba(146,107,56,.4)", frameWall: "rgba(146,107,56,.25)",
+        markerLine: "rgba(59,36,22,.3)", swatch: "#ead9b2"
+      },
+      carbon: {
+        id: "carbon", name: "Carbon", desc: "Diagonal carbon weave", light: false,
+        wrapBg: "#0b1220", pngBg: "#0b1220", chartBg: "transparent", textureKind: "carbon",
+        cssTexture: "repeating-linear-gradient(135deg, rgba(255,255,255,.045) 0 2px, transparent 2px 7px), repeating-linear-gradient(45deg, rgba(0,0,0,.28) 0 3px, transparent 3px 8px)",
+        texSize: "10px 10px", texOpacity: "1",
+        axis: "#94a3b8", grid: "rgba(148,163,184,.14)", grid3d: "rgba(186,198,214,.36)",
+        minorGrid: "rgba(148,163,184,.14)", line: "#334155",
+        legend: "#f8fafc", legendTitle: "#e2e8f0", legendHidden: "#64748b", label: "#e2e8f0",
+        tooltipBg: "rgba(8,12,22,.96)", tooltipBorder: "#334155", tooltipText: "#e2e8f0",
+        cut: "rgba(251,191,36,.8)", cutLabel: "#fbbf24",
+        shades: { NW: "rgba(56,189,248,0.08)", NE: "rgba(52,211,153,0.08)", SW: "rgba(148,163,184,0.06)", SE: "rgba(251,191,36,0.07)" },
+        qFill: "rgba(8,12,22,.78)", qFillEmpty: "rgba(8,12,22,.48)", qStroke: "rgba(226,232,240,.2)",
+        qText: "#f8fafc", qTextEmpty: "#e2e8f0", qOutline: "2px rgba(8,12,22,.95)",
+        frameBottom: "rgba(148,163,184,.38)", frameWall: "rgba(148,163,184,.22)",
+        markerLine: "rgba(255,255,255,.28)", swatch: "#0b1220"
+      },
+      board: {
+        id: "board", name: "Presentation", desc: "Clean white for slides", light: true,
+        wrapBg: "#ffffff", pngBg: "#ffffff", chartBg: "transparent", textureKind: "none",
+        cssTexture: "none", texSize: "24px 24px", texOpacity: "0",
+        axis: "#475569", grid: "rgba(148,163,184,.28)", grid3d: "rgba(100,116,139,.32)",
+        minorGrid: "rgba(148,163,184,.16)", line: "#cbd5e1",
+        legend: "#0f172a", legendTitle: "#334155", legendHidden: "#94a3b8", label: "#0f172a",
+        tooltipBg: "rgba(255,255,255,.97)", tooltipBorder: "#cbd5e1", tooltipText: "#0f172a",
+        cut: "rgba(217,119,6,.9)", cutLabel: "#b45309",
+        shades: { NW: "rgba(14,165,233,0.08)", NE: "rgba(16,185,129,0.08)", SW: "rgba(148,163,184,0.07)", SE: "rgba(245,158,11,0.09)" },
+        qFill: "rgba(248,250,252,.9)", qFillEmpty: "rgba(248,250,252,.6)", qStroke: "rgba(148,163,184,.4)",
+        qText: "#0f172a", qTextEmpty: "#475569", qOutline: "2px rgba(255,255,255,.95)",
+        frameBottom: "rgba(148,163,184,.4)", frameWall: "rgba(148,163,184,.25)",
+        markerLine: "rgba(15,23,42,.28)", swatch: "#ffffff"
+      },
+      navy: {
+        id: "navy", name: "Navy grid", desc: "Blueprint grid on navy", light: false,
+        wrapBg: "#071526", pngBg: "#071526", chartBg: "transparent", textureKind: "grid",
+        cssTexture: "linear-gradient(rgba(56,189,248,.13) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,.13) 1px, transparent 1px)",
+        texSize: "28px 28px", texOpacity: "1",
+        axis: "#7dd3fc", grid: "rgba(56,189,248,.16)", grid3d: "rgba(125,211,252,.32)",
+        minorGrid: "rgba(56,189,248,.1)", line: "#1e3a5f",
+        legend: "#e0f2fe", legendTitle: "#bae6fd", legendHidden: "#64748b", label: "#e0f2fe",
+        tooltipBg: "rgba(7,21,38,.96)", tooltipBorder: "#1e3a5f", tooltipText: "#e0f2fe",
+        cut: "rgba(251,191,36,.85)", cutLabel: "#fde68a",
+        shades: { NW: "rgba(56,189,248,0.1)", NE: "rgba(52,211,153,0.09)", SW: "rgba(30,58,95,0.18)", SE: "rgba(251,191,36,0.08)" },
+        qFill: "rgba(7,21,38,.78)", qFillEmpty: "rgba(7,21,38,.48)", qStroke: "rgba(125,211,252,.25)",
+        qText: "#e0f2fe", qTextEmpty: "#bae6fd", qOutline: "2px rgba(7,21,38,.95)",
+        frameBottom: "rgba(56,189,248,.28)", frameWall: "rgba(56,189,248,.16)",
+        markerLine: "rgba(186,230,253,.35)", swatch: "#071526"
+      },
+      sage: {
+        id: "sage", name: "Sage linen", desc: "Soft green linen weave", light: true,
+        wrapBg: "#e7eee6", pngBg: "#e7eee6", chartBg: "transparent", textureKind: "linen",
+        cssTexture: "repeating-linear-gradient(90deg, rgba(64,92,64,.09) 0 1px, transparent 1px 15px), repeating-linear-gradient(0deg, rgba(64,92,64,.06) 0 1px, transparent 1px 15px)",
+        texSize: "15px 15px", texOpacity: "1",
+        axis: "#3f4f3f", grid: "rgba(64,92,64,.18)", grid3d: "rgba(64,92,64,.26)",
+        minorGrid: "rgba(64,92,64,.1)", line: "#93a393",
+        legend: "#1f2a1f", legendTitle: "#3f4f3f", legendHidden: "#8aa08a", label: "#1f2a1f",
+        tooltipBg: "rgba(247,252,246,.96)", tooltipBorder: "#b7c6b7", tooltipText: "#1f2a1f",
+        cut: "rgba(146,64,14,.88)", cutLabel: "#9a3412",
+        shades: { NW: "rgba(14,116,144,0.1)", NE: "rgba(21,128,61,0.12)", SW: "rgba(64,92,64,0.08)", SE: "rgba(180,83,9,0.1)" },
+        qFill: "rgba(247,252,246,.86)", qFillEmpty: "rgba(247,252,246,.55)", qStroke: "rgba(64,92,64,.3)",
+        qText: "#1f2a1f", qTextEmpty: "#3f4f3f", qOutline: "2px rgba(247,252,246,.95)",
+        frameBottom: "rgba(64,92,64,.35)", frameWall: "rgba(64,92,64,.22)",
+        markerLine: "rgba(31,42,31,.28)", swatch: "#e7eee6"
+      }
+    },
+
+    template: function (id) {
+      var cat = this.TEMPLATES;
+      if (window.StatisticoHeader && StatisticoHeader.PREVIEW_TEMPLATES) cat = StatisticoHeader.PREVIEW_TEMPLATES;
+      return cat[id || "night"] || cat.night || this.TEMPLATES.night;
+    },
+
+    applyCss: function (tpl) {
+      var root = document.documentElement;
+      root.setAttribute("data-preview-tpl", tpl.id);
+      root.style.setProperty("--preview-bg", tpl.wrapBg);
+      root.style.setProperty("--preview-tex", tpl.cssTexture === "none" ? "none" : tpl.cssTexture);
+      root.style.setProperty("--preview-tex-size", tpl.texSize || "24px 24px");
+      root.style.setProperty("--preview-tex-opacity", tpl.texOpacity == null ? "1" : String(tpl.texOpacity));
+    },
+
+    applyStyle: function (id) {
+      state.templateId = id || "night";
+      var tpl = this.template(state.templateId);
+      this.applyCss(tpl);
+      if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === "function") {
+        StatisticoHeader.applyPreviewTemplate(tpl.id, { skipCharts: true, silent: true });
+      }
+      this.markActiveCard();
+      render();
+    },
+
+    markActiveCard: function () {
+      var grid = document.getElementById("mvStyleGrid");
+      if (!grid) return;
+      var id = state.templateId || "night";
+      var cards = grid.querySelectorAll(".mv-style-card");
+      for (var i = 0; i < cards.length; i++) {
+        cards[i].className = "mv-style-card" + (cards[i].getAttribute("data-tpl") === id ? " is-active" : "");
+      }
+    },
+
+    changeStyle: function () {
+      var overlay = document.getElementById("mvStyleOverlay");
+      var grid = document.getElementById("mvStyleGrid");
+      if (!overlay || !grid) return;
+      var cat = this.TEMPLATES;
+      if (window.StatisticoHeader && StatisticoHeader.PREVIEW_TEMPLATES) cat = StatisticoHeader.PREVIEW_TEMPLATES;
+      var html = "";
+      var keys = Object.keys(cat);
+      var current = state.templateId || "night";
+      for (var i = 0; i < keys.length; i++) {
+        var t = cat[keys[i]];
+        var tex = t.cssTexture === "none" ? "none" : t.cssTexture;
+        html += '<button type="button" class="mv-style-card' + (t.id === current ? " is-active" : "") + '" data-tpl="' + t.id + '">' +
+          '<span class="mv-style-swatch" style="background-color:' + t.swatch + ";background-image:" + tex + ";background-size:" + (t.texSize || "24px 24px") + ';"></span>' +
+          '<span class="mv-style-name">' + t.name + "</span>" +
+          '<span class="mv-style-desc">' + t.desc + "</span></button>";
+      }
+      grid.innerHTML = html;
+      var cards = grid.querySelectorAll(".mv-style-card");
+      for (var c = 0; c < cards.length; c++) {
+        cards[c].onclick = function () {
+          MvUtils.applyStyle(this.getAttribute("data-tpl"));
+        };
+      }
+      overlay.className = "mv-style-overlay is-open";
+    },
+
+    closeStyle: function () {
+      var overlay = document.getElementById("mvStyleOverlay");
+      if (overlay) overlay.className = "mv-style-overlay";
+    },
+
+    filename: function (ext) {
+      var title = ((document.getElementById("chartTitle") || {}).textContent || "chart").replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "chart";
+      var ts = new Date().toISOString().replace(/[:.TZ]/g, "").replace(/-/g, "").slice(0, 14);
+      return title + "_" + ts + "." + ext;
+    },
+
+    downloadBlob: function (blob, filename) {
+      if (window.navigator && navigator.msSaveOrOpenBlob) {
+        navigator.msSaveOrOpenBlob(blob, filename);
+        return;
+      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () {
+        URL.revokeObjectURL(url);
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 800);
+    },
+
+    chartSvg: function () {
+      var chart = state.chart;
+      if (!chart || typeof chart.getSVG !== "function") return "";
+      var w = Math.max(320, chart.chartWidth || 800);
+      var h = Math.max(240, chart.chartHeight || 500);
+      var svg = chart.getSVG({ chart: { width: w, height: h, backgroundColor: "transparent" } });
+      if (svg.indexOf("xmlns") === -1) svg = svg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+      return svg;
+    },
+
+    paintTexture: function (ctx, w, h, tpl, scale) {
+      ctx.fillStyle = tpl.pngBg || "#111827";
+      ctx.fillRect(0, 0, w, h);
+      var kind = tpl.textureKind || "none";
+      if (kind === "none") return;
+      var s = scale || 1;
+      if (kind === "dots") {
+        ctx.fillStyle = tpl.light ? "rgba(80,70,60,.22)" : "rgba(148,163,184,.32)";
+        var step = 14 * s;
+        for (var y = 0; y < h; y += step) {
+          for (var x = 0; x < w; x += step) {
+            ctx.beginPath();
+            ctx.arc(x + 2 * s, y + 2 * s, 1.2 * s, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        return;
+      }
+      ctx.strokeStyle = kind === "grid" ? "rgba(56,189,248,.18)" : (tpl.light ? "rgba(120,80,30,.14)" : "rgba(255,255,255,.06)");
+      ctx.lineWidth = Math.max(1, kind === "grid" ? s * 0.7 : s);
+      var gap = (kind === "grid" ? 28 : kind === "paper" ? 22 : kind === "carbon" ? 7 : 8) * s;
+      ctx.beginPath();
+      if (kind === "grid" || kind === "paper") {
+        for (var gx = 0; gx <= w; gx += gap) { ctx.moveTo(gx, 0); ctx.lineTo(gx, h); }
+        for (var gy = 0; gy <= h; gy += gap) { ctx.moveTo(0, gy); ctx.lineTo(w, gy); }
+      } else {
+        for (var i = -h; i < w + h; i += gap) { ctx.moveTo(i, 0); ctx.lineTo(i + h, h); }
+      }
+      ctx.stroke();
+    },
+
+    savePng: function () {
+      var chart = state.chart;
+      if (!chart || typeof chart.getSVG !== "function") {
+        alert("The chart is not ready to save as PNG yet.");
+        return;
+      }
+      var tpl = this.template(state.templateId);
+      var w = Math.max(320, chart.chartWidth || 800);
+      var h = Math.max(240, chart.chartHeight || 500);
+      var svg = this.chartSvg();
+      var scale = 2;
+      var img = new Image();
+      var self = this;
+      img.onload = function () {
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.round(w * scale);
+        canvas.height = Math.round(h * scale);
+        var ctx = canvas.getContext("2d");
+        self.paintTexture(ctx, canvas.width, canvas.height, tpl, scale);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var name = self.filename("png");
+        if (canvas.toBlob) {
+          canvas.toBlob(function (b) {
+            if (b) self.downloadBlob(b, name);
+            else self.downloadDataUrl(canvas.toDataURL("image/png"), name);
+          }, "image/png");
+        } else {
+          self.downloadDataUrl(canvas.toDataURL("image/png"), name);
+        }
+      };
+      img.onerror = function () {
+        alert("Could not export the chart as PNG.");
+      };
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    },
+
+    downloadDataUrl: function (href, filename) {
+      var a = document.createElement("a");
+      a.href = href;
+      a.download = filename;
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { if (a.parentNode) a.parentNode.removeChild(a); }, 400);
+    },
+
+    saveHtml: function () {
+      var chart = state.chart;
+      if (!chart || typeof chart.getSVG !== "function") {
+        alert("The chart is not ready to save as HTML yet.");
+        return;
+      }
+      var tpl = this.template(state.templateId);
+      var title = ((document.getElementById("chartTitle") || {}).textContent || "Multivariable chart").replace(/</g, "");
+      var sub = ((document.getElementById("chartSubtitle") || {}).textContent || "").replace(/</g, "");
+      var detail = ((document.getElementById("chartDetail") || {}).textContent || "").replace(/</g, "");
+      var svg = this.chartSvg();
+      var tex = tpl.cssTexture === "none" ? "none" : tpl.cssTexture;
+      var html = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\" />" +
+        "<title>" + title + "</title>" +
+        "<style>" +
+        "html,body{margin:0;padding:0;background:" + tpl.pngBg + ";color:" + (tpl.light ? "#1c1917" : "#e2e8f0") + ";font-family:'Segoe UI',system-ui,sans-serif;}" +
+        ".page{max-width:1100px;margin:0 auto;padding:28px 24px 40px;}" +
+        "h1{margin:0 0 6px;font-size:28px;} .sub{opacity:.8;margin:0 0 4px;font-size:14px;} .detail{opacity:.6;margin:0 0 18px;font-size:12px;}" +
+        ".canvas{position:relative;border-radius:12px;overflow:hidden;background:" + tpl.pngBg + ";border:1px solid rgba(148,163,184,.28);}" +
+        ".canvas::before{content:'';position:absolute;inset:0;background-image:" + tex + ";background-size:" + (tpl.texSize || "24px 24px") + ";opacity:" + (tpl.texOpacity || 1) + ";pointer-events:none;}" +
+        ".canvas svg{position:relative;display:block;width:100%;height:auto;}" +
+        ".foot{margin-top:14px;font-size:11px;opacity:.55;}" +
+        "</style></head><body><div class=\"page\">" +
+        "<h1>" + title + "</h1>" +
+        (sub ? "<p class=\"sub\">" + sub + "</p>" : "") +
+        (detail ? "<p class=\"detail\">" + detail + "</p>" : "") +
+        "<div class=\"canvas\">" + svg + "</div>" +
+        "<p class=\"foot\">Exported from Statistico Multivariable Explorer · " + tpl.name + "</p>" +
+        "</div></body></html>";
+      this.downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), this.filename("html"));
+    },
+
+    bind: function () {
+      var self = this;
+      var png = document.getElementById("btnSavePng");
+      var html = document.getElementById("btnSaveHtml");
+      var style = document.getElementById("btnTemplates");
+      var overlay = document.getElementById("mvStyleOverlay");
+      var close = document.getElementById("mvStyleClose");
+      if (png) png.onclick = function () { self.savePng(); };
+      if (html) html.onclick = function () { self.saveHtml(); };
+      if (style) style.onclick = function () { self.changeStyle(); };
+      if (close) close.onclick = function () { self.closeStyle(); };
+      if (overlay) {
+        overlay.onclick = function (e) {
+          if (e.target === overlay) self.closeStyle();
+        };
+      }
+      this.applyCss(this.template(state.templateId));
+    }
+  };
+  window.MvUtils = MvUtils;
 
   function pointLabelCss() {
     var tpl = currentTpl();
@@ -2332,9 +2748,7 @@
   }
 
   function bindControls() {
-    if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === "function") {
-      StatisticoHeader.applyPreviewTemplate(state.templateId || "night", { skipCharts: true, silent: true });
-    }
+    MvUtils.bind();
     document.querySelectorAll(".acc-h").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = btn.getAttribute("data-acc");
@@ -2401,33 +2815,9 @@
     });
     document.getElementById("btnReset").addEventListener("click", function () {
       restoreLoadState();
-      if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === "function") {
-        StatisticoHeader.applyPreviewTemplate(state.templateId || "night", { skipCharts: true, silent: true });
-      }
+      MvUtils.applyCss(MvUtils.template(state.templateId));
       destroyChart();
       syncUiFromState();
-      render();
-    });
-    var btnPng = document.getElementById("btnSavePng");
-    if (btnPng) {
-      btnPng.addEventListener("click", function () {
-        if (window.StatisticoHeader && typeof StatisticoHeader.exportPreviewPng === "function") {
-          StatisticoHeader.exportPreviewPng();
-        }
-      });
-    }
-    var btnTpl = document.getElementById("btnTemplates");
-    if (btnTpl) {
-      btnTpl.addEventListener("click", function () {
-        if (window.StatisticoHeader && typeof StatisticoHeader.openTemplateLibrary === "function") {
-          StatisticoHeader.openTemplateLibrary();
-        }
-      });
-    }
-    window.addEventListener("statistico:preview-template", function (e) {
-      var id = e && e.detail && e.detail.id;
-      if (!id) return;
-      state.templateId = id;
       render();
     });
 

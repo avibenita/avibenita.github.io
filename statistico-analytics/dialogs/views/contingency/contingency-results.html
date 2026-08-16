@@ -170,6 +170,16 @@
       width:max-content; min-width:100%; border-collapse:separate; border-spacing:0;
       font-variant-numeric:tabular-nums;
     }
+    #tableWrap table.ct th.col-drag,
+    #tableWrap table.ct th.row-drag {
+      cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none;
+    }
+    #tableWrap table.ct th.col-drag.dragging,
+    #tableWrap table.ct th.row-drag.dragging { cursor: grabbing; opacity: .45; }
+    #tableWrap table.ct th.col-drag.drop-before { box-shadow: inset 3px 0 0 var(--accent-ct); }
+    #tableWrap table.ct th.col-drag.drop-after { box-shadow: inset -3px 0 0 var(--accent-ct); }
+    #tableWrap table.ct th.row-drag.drop-before { box-shadow: inset 0 3px 0 var(--accent-ct); }
+    #tableWrap table.ct th.row-drag.drop-after { box-shadow: inset 0 -3px 0 var(--accent-ct); }
     #tableWrap table.ct th, #tableWrap table.ct td {
       border-bottom:1px solid var(--border);
       border-right:1px solid rgba(75,85,110,.45);
@@ -412,6 +422,9 @@
     var activeTab = 'overview';
     var selectedMeasures = { observed: true };
     var diagMode = 'heat';
+    var rowOrderLabels = [];
+    var colOrderLabels = [];
+    var tableDrag = null;
     var TITLE_MAP = {
       overview: 'Overview',
       table: 'Contingency Table',
@@ -647,8 +660,34 @@
       var rampCls = mode === 'residual' ? 'heat-ramp resid' : 'heat-ramp';
       qsHtml('cellLegend',
         (list.length > 1 ? '<span>In each cell</span>' + items : '') +
-        '<span class="heat-key"><span class="' + rampCls + '"></span>' + esc(heatCaption(mode)) + '</span>'
+        '<span class="heat-key"><span class="' + rampCls + '"></span>' + esc(heatCaption(mode)) + '</span>' +
+        '<span class="lg-sub">Drag a row or column name to move it.</span>'
       );
+    }
+
+    function orderedIdxs(labels, saved) {
+      var list = labels || [];
+      var used = {};
+      var out = [];
+      (saved || []).forEach(function (lab) {
+        var k = list.indexOf(lab);
+        if (k >= 0 && !used[k]) { used[k] = true; out.push(k); }
+      });
+      list.forEach(function (_, i) { if (!used[i]) out.push(i); });
+      return out;
+    }
+    function rowIdxs(r) { return orderedIdxs(r.rowLabels, rowOrderLabels); }
+    function colIdxs(r) { return orderedIdxs(r.colLabels, colOrderLabels); }
+    function moveOrder(saved, labels, fromPos, insertAt) {
+      var idxs = orderedIdxs(labels, saved);
+      if (fromPos < 0 || fromPos >= idxs.length) return saved;
+      if (insertAt > fromPos) insertAt--;
+      if (insertAt < 0) insertAt = 0;
+      if (insertAt > idxs.length - 1) insertAt = idxs.length - 1;
+      if (insertAt === fromPos) return idxs.map(function (i) { return labels[i]; });
+      var item = idxs.splice(fromPos, 1)[0];
+      idxs.splice(insertAt, 0, item);
+      return idxs.map(function (i) { return labels[i]; });
     }
 
     function renderTable() {
@@ -659,28 +698,32 @@
       var maxV = heatMax(r, mode);
       var showRowTot = hasMeasure('observed') || hasMeasure('expected') || hasMeasure('totPct') || hasMeasure('rowPct');
       var showColTot = hasMeasure('observed') || hasMeasure('expected') || hasMeasure('totPct') || hasMeasure('colPct');
+      var rows = rowIdxs(r);
+      var cols = colIdxs(r);
       renderCellLegend();
       var html = '<table class="ct"><thead><tr><th class="stub">' + esc(r.rowVar) + ' \\ ' + esc(r.colVar) + '</th>';
-      r.colLabels.forEach(function (c) { html += '<th>' + esc(c) + '</th>'; });
+      cols.forEach(function (j, pos) {
+        html += '<th class="col-drag" data-pos="' + pos + '" title="Drag to reorder columns">' + esc(r.colLabels[j]) + '</th>';
+      });
       if (showRowTot) html += '<th class="total">Total</th>';
       html += '</tr></thead><tbody>';
-      for (var i = 0; i < r.nRows; i++) {
-        html += '<tr><th class="stub">' + esc(r.rowLabels[i]) + '</th>';
-        for (var j = 0; j < r.nCols; j++) {
+      rows.forEach(function (i, rpos) {
+        html += '<tr><th class="stub row-drag" data-pos="' + rpos + '" title="Drag to reorder rows">' + esc(r.rowLabels[i]) + '</th>';
+        cols.forEach(function (j) {
           var sr = r.stdResiduals[i][j];
           var cls = 'heat' + (stacked ? ' stacked' : '') + (hasMeasure('stdResiduals') ? ' ' + bandClass(sr) : '');
           html += '<td class="' + cls + '" style="background:' + cellHeat(r, i, j, mode, maxV) + '" title="' + tip(r, i, j) + '">' + stackHtml(cellLines(r, i, j)) + '</td>';
-        }
+        });
         if (showRowTot) {
           html += '<td class="total' + (stacked ? ' stacked' : '') + '">' + stackHtml(marginLines(r, 'row', i)) + '</td>';
         }
         html += '</tr>';
-      }
+      });
       if (showColTot) {
         html += '<tr class="total-row"><th class="stub total">Total</th>';
-        for (var j2 = 0; j2 < r.nCols; j2++) {
+        cols.forEach(function (j2) {
           html += '<td class="total' + (stacked ? ' stacked' : '') + '">' + stackHtml(marginLines(r, 'col', j2)) + '</td>';
-        }
+        });
         if (showRowTot) {
           html += '<td class="total' + (stacked ? ' stacked' : '') + '">' + stackHtml(marginLines(r, 'grand', 0)) + '</td>';
         }
@@ -688,6 +731,73 @@
       }
       html += '</tbody></table>';
       qsHtml('tableWrap', html);
+      bindTableDrag();
+    }
+
+    function bindTableDrag() {
+      var wrap = document.getElementById('tableWrap');
+      if (!wrap || !bundle) return;
+      function clearMarks() {
+        wrap.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(function (el) {
+          el.classList.remove('drop-before', 'drop-after', 'dragging');
+        });
+      }
+      function onMove(e) {
+        if (!tableDrag) return;
+        var sel = tableDrag.kind === 'col' ? 'th.col-drag' : 'th.row-drag';
+        wrap.querySelectorAll('.drop-before,.drop-after').forEach(function (el) {
+          el.classList.remove('drop-before', 'drop-after');
+        });
+        var el = document.elementFromPoint(e.clientX, e.clientY);
+        var target = el && el.closest ? el.closest(sel) : null;
+        if (!target || !wrap.contains(target)) return;
+        var rect = target.getBoundingClientRect();
+        var after = tableDrag.kind === 'col'
+          ? e.clientX >= rect.left + rect.width / 2
+          : e.clientY >= rect.top + rect.height / 2;
+        target.classList.add(after ? 'drop-after' : 'drop-before');
+        tableDrag.toEl = target;
+        tableDrag.after = after;
+      }
+      function onUp() {
+        if (!tableDrag) return;
+        var from = tableDrag.from;
+        var kind = tableDrag.kind;
+        var toEl = tableDrag.toEl;
+        var after = tableDrag.after;
+        var th = tableDrag.th;
+        var pid = tableDrag.pointerId;
+        tableDrag = null;
+        try { if (th && th.releasePointerCapture && pid != null) th.releasePointerCapture(pid); } catch (_e) {}
+        clearMarks();
+        if (!toEl) return;
+        var insertAt = Number(toEl.getAttribute('data-pos'));
+        if (after) insertAt += 1;
+        if (kind === 'col') colOrderLabels = moveOrder(colOrderLabels, bundle.colLabels, from, insertAt);
+        else rowOrderLabels = moveOrder(rowOrderLabels, bundle.rowLabels, from, insertAt);
+        renderTable();
+        renderHeat();
+        renderResidValues();
+      }
+      wrap.querySelectorAll('th.col-drag, th.row-drag').forEach(function (th) {
+        th.addEventListener('pointerdown', function (e) {
+          if (e.button !== 0) return;
+          tableDrag = {
+            kind: th.classList.contains('col-drag') ? 'col' : 'row',
+            from: Number(th.getAttribute('data-pos')),
+            th: th,
+            pointerId: e.pointerId,
+            toEl: null,
+            after: false
+          };
+          th.classList.add('dragging');
+          try { th.setPointerCapture(e.pointerId); } catch (_e2) {}
+          e.preventDefault();
+        });
+        th.addEventListener('pointermove', onMove);
+        th.addEventListener('pointerup', onUp);
+        th.addEventListener('pointercancel', onUp);
+      });
     }
 
     function tip(r, i, j) {
@@ -754,17 +864,20 @@
 
     function renderResidValues() {
       var r = bundle;
+      if (!r) return;
+      var rows = rowIdxs(r);
+      var cols = colIdxs(r);
       var html = '<table class="ct"><thead><tr><th class="stub"></th>';
-      r.colLabels.forEach(function (c) { html += '<th>' + esc(c) + '</th>'; });
+      cols.forEach(function (j) { html += '<th>' + esc(r.colLabels[j]) + '</th>'; });
       html += '</tr></thead><tbody>';
-      for (var i = 0; i < r.nRows; i++) {
+      rows.forEach(function (i) {
         html += '<tr><th class="stub">' + esc(r.rowLabels[i]) + '</th>';
-        for (var j = 0; j < r.nCols; j++) {
+        cols.forEach(function (j) {
           var sr = r.stdResiduals[i][j];
           html += '<td class="' + bandClass(sr) + '" style="background:' + residColor(sr) + '" title="' + tip(r, i, j) + '">' + fmtN(sr, 2) + '</td>';
-        }
+        });
         html += '</tr>';
-      }
+      });
       html += '</tbody></table>';
       qsHtml('residWrap', html);
     }
@@ -814,18 +927,20 @@
 
     function renderHeat() {
       var r = bundle;
-      var cols = r.nCols + 1;
-      var html = '<div class="heat-grid" style="grid-template-columns:minmax(90px,1.1fr) repeat(' + r.nCols + ', minmax(70px,1fr));">';
+      if (!r) return;
+      var rows = rowIdxs(r);
+      var cols = colIdxs(r);
+      var html = '<div class="heat-grid" style="grid-template-columns:minmax(90px,1.1fr) repeat(' + cols.length + ', minmax(70px,1fr));">';
       html += '<div></div>';
-      r.colLabels.forEach(function (c) { html += '<div class="heat-lab" style="justify-content:center;">' + esc(c) + '</div>'; });
-      for (var i = 0; i < r.nRows; i++) {
+      cols.forEach(function (j) { html += '<div class="heat-lab" style="justify-content:center;">' + esc(r.colLabels[j]) + '</div>'; });
+      rows.forEach(function (i) {
         html += '<div class="heat-lab">' + esc(r.rowLabels[i]) + '</div>';
-        for (var j = 0; j < r.nCols; j++) {
+        cols.forEach(function (j) {
           var sr = r.stdResiduals[i][j];
           html += '<div class="heat-cell" style="background:' + residColor(sr) + '" title="' + tip(r, i, j) + '">' +
             '<div class="hv">' + fmtN(sr, 2) + '</div><div>' + fmtN(r.observed[i][j], 1) + ' / ' + fmtN(r.expected[i][j], 1) + '</div></div>';
-        }
-      }
+        });
+      });
       html += '</div>';
       qsHtml('heatWrap', html);
     }
@@ -836,23 +951,25 @@
       var r = bundle;
       var list = measureList();
       var multi = list.length > 1;
+      var rows = rowIdxs(r);
+      var cols = colIdxs(r);
       var header = [r.rowVar + ' / ' + r.colVar];
       if (multi) header.push('Measure');
-      header = header.concat(r.colLabels).concat(['Total']);
+      header = header.concat(cols.map(function (j) { return r.colLabels[j]; })).concat(['Total']);
       var lines = [header];
-      for (var i = 0; i < r.nRows; i++) {
+      rows.forEach(function (i) {
         list.forEach(function (m) {
           var row = [r.rowLabels[i]];
           if (multi) row.push(m.label);
-          for (var j = 0; j < r.nCols; j++) row.push(cellValue(r, i, j, m.id));
+          cols.forEach(function (j) { row.push(cellValue(r, i, j, m.id)); });
           row.push(marginValue(r, m.id, 'row', i));
           lines.push(row);
         });
-      }
+      });
       list.forEach(function (m) {
         var row = ['Total'];
         if (multi) row.push(m.label);
-        for (var j2 = 0; j2 < r.nCols; j2++) row.push(marginValue(r, m.id, 'col', j2));
+        cols.forEach(function (j2) { row.push(marginValue(r, m.id, 'col', j2)); });
         row.push(marginValue(r, m.id, 'grand', 0));
         lines.push(row);
       });
@@ -910,6 +1027,8 @@
         return;
       }
       document.getElementById('errorState').classList.remove('active');
+      rowOrderLabels = (b.rowLabels || []).slice();
+      colOrderLabels = (b.colLabels || []).slice();
       renderAll();
       switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
     }

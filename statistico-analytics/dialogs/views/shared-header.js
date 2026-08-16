@@ -131,6 +131,7 @@ const StatisticoHeader = {
   variableName: 'Variable',
   sampleSize: 0,
   module: 'univariate', // 'univariate' | 'correlations' | 'regression'
+  previewTemplateId: 'night',
 
   /* ── Theme helpers ──────────────────────────────────────────── */
   /**
@@ -6021,6 +6022,20 @@ const StatisticoHeader = {
         <i class="fa-solid fa-file-export"></i>
         <span class="sb-item-label">Export Report</span>
       </button>
+      <button class="sb-bottom-btn sb-bottom-btn--png"
+              id="sbSavePngBtn"
+              onclick="StatisticoHeader.exportPreviewPng()"
+              title="Save the on-screen chart preview as a PNG image">
+        <i class="fa-solid fa-image"></i>
+        <span class="sb-item-label">Save as PNG</span>
+      </button>
+      <button class="sb-bottom-btn sb-bottom-btn--tpl"
+              id="sbTemplateLibBtn"
+              onclick="StatisticoHeader.openTemplateLibrary()"
+              title="Apply a color and texture skin to the live preview">
+        <i class="fa-solid fa-swatchbook"></i>
+        <span class="sb-item-label">Template Library</span>
+      </button>
       <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
               id="sbExportJsonBtn"
               ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
@@ -6034,6 +6049,365 @@ const StatisticoHeader = {
 
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
+    }
+  },
+
+  PREVIEW_TEMPLATES: {
+    night: {
+      id: 'night', name: 'Night ink', desc: 'Default dark canvas',
+      light: false, wrapBg: '#111827', pngBg: '#111827', chartBg: 'transparent',
+      textureKind: 'none', cssTexture: 'none', texSize: '24px 24px', texOpacity: '0',
+      axis: '#94a3b8', grid: 'rgba(148,163,184,.15)', grid3d: 'rgba(186,198,214,.38)',
+      minorGrid: 'rgba(148,163,184,.18)', line: '#334155',
+      legend: '#f8fafc', legendTitle: '#e2e8f0', legendHidden: '#64748b', label: '#e2e8f0',
+      tooltipBg: 'rgba(15,23,42,.95)', tooltipBorder: '#334155', tooltipText: '#e2e8f0',
+      cut: 'rgba(251,191,36,.8)', cutLabel: '#fbbf24',
+      shades: { NW: 'rgba(56,189,248,0.07)', NE: 'rgba(52,211,153,0.07)', SW: 'rgba(148,163,184,0.05)', SE: 'rgba(251,191,36,0.06)' },
+      qFill: 'rgba(15,23,42,.7)', qFillEmpty: 'rgba(15,23,42,.42)', qStroke: 'rgba(226,232,240,.22)',
+      qText: '#f8fafc', qTextEmpty: '#e2e8f0', qOutline: '2px rgba(12,22,36,.9)',
+      frameBottom: 'rgba(148,163,184,.35)', frameWall: 'rgba(148,163,184,.22)',
+      markerLine: 'rgba(255,255,255,.28)', swatch: '#111827'
+    },
+    paper: {
+      id: 'paper', name: 'Paper light', desc: 'Warm off-white sheet',
+      light: true, wrapBg: '#f6f1e7', pngBg: '#f6f1e7', chartBg: 'transparent',
+      textureKind: 'paper',
+      cssTexture: 'repeating-linear-gradient(0deg, rgba(120,90,50,.07) 0 1px, transparent 1px 22px), repeating-linear-gradient(90deg, rgba(120,90,50,.05) 0 1px, transparent 1px 22px)',
+      texSize: '22px 22px', texOpacity: '1',
+      axis: '#57534e', grid: 'rgba(120,113,108,.2)', grid3d: 'rgba(120,113,108,.28)',
+      minorGrid: 'rgba(120,113,108,.12)', line: '#a8a29e',
+      legend: '#1c1917', legendTitle: '#44403c', legendHidden: '#a8a29e', label: '#1c1917',
+      tooltipBg: 'rgba(255,252,247,.96)', tooltipBorder: '#d6d3d1', tooltipText: '#1c1917',
+      cut: 'rgba(180,83,9,.85)', cutLabel: '#b45309',
+      shades: { NW: 'rgba(14,165,233,0.1)', NE: 'rgba(16,185,129,0.1)', SW: 'rgba(120,113,108,0.08)', SE: 'rgba(245,158,11,0.1)' },
+      qFill: 'rgba(255,252,247,.86)', qFillEmpty: 'rgba(255,252,247,.55)', qStroke: 'rgba(120,113,108,.35)',
+      qText: '#1c1917', qTextEmpty: '#57534e', qOutline: '2px rgba(255,255,255,.9)',
+      frameBottom: 'rgba(120,113,108,.35)', frameWall: 'rgba(120,113,108,.22)',
+      markerLine: 'rgba(28,25,23,.28)', swatch: '#f6f1e7'
+    },
+    slate: {
+      id: 'slate', name: 'Slate dots', desc: 'Cool dotted slate',
+      light: false, wrapBg: '#1e293b', pngBg: '#1e293b', chartBg: 'transparent',
+      textureKind: 'dots',
+      cssTexture: 'radial-gradient(rgba(148,163,184,.32) 1px, transparent 1.6px)',
+      texSize: '14px 14px', texOpacity: '1',
+      axis: '#cbd5e1', grid: 'rgba(148,163,184,.18)', grid3d: 'rgba(186,198,214,.4)',
+      minorGrid: 'rgba(148,163,184,.16)', line: '#475569',
+      legend: '#f8fafc', legendTitle: '#e2e8f0', legendHidden: '#64748b', label: '#e2e8f0',
+      tooltipBg: 'rgba(15,23,42,.95)', tooltipBorder: '#475569', tooltipText: '#e2e8f0',
+      cut: 'rgba(251,191,36,.85)', cutLabel: '#fbbf24',
+      shades: { NW: 'rgba(56,189,248,0.09)', NE: 'rgba(52,211,153,0.09)', SW: 'rgba(148,163,184,0.07)', SE: 'rgba(251,191,36,0.08)' },
+      qFill: 'rgba(15,23,42,.72)', qFillEmpty: 'rgba(15,23,42,.45)', qStroke: 'rgba(226,232,240,.22)',
+      qText: '#f8fafc', qTextEmpty: '#e2e8f0', qOutline: '2px rgba(15,23,42,.9)',
+      frameBottom: 'rgba(148,163,184,.4)', frameWall: 'rgba(148,163,184,.25)',
+      markerLine: 'rgba(255,255,255,.3)', swatch: '#1e293b'
+    },
+    parchment: {
+      id: 'parchment', name: 'Parchment', desc: 'Aged paper texture',
+      light: true, wrapBg: '#ead9b2', pngBg: '#ead9b2', chartBg: 'transparent',
+      textureKind: 'linen',
+      cssTexture: 'repeating-linear-gradient(115deg, rgba(146,107,56,.16) 0 2px, transparent 2px 8px), repeating-linear-gradient(0deg, rgba(120,80,30,.08) 0 1px, transparent 1px 16px)',
+      texSize: '16px 16px', texOpacity: '1',
+      axis: '#5c4030', grid: 'rgba(120,80,30,.22)', grid3d: 'rgba(120,80,30,.3)',
+      minorGrid: 'rgba(120,80,30,.12)', line: '#b08968',
+      legend: '#3b2416', legendTitle: '#5c4030', legendHidden: '#a07858', label: '#3b2416',
+      tooltipBg: 'rgba(255,248,230,.96)', tooltipBorder: '#c4a574', tooltipText: '#3b2416',
+      cut: 'rgba(146,64,14,.9)', cutLabel: '#9a3412',
+      shades: { NW: 'rgba(14,116,144,0.1)', NE: 'rgba(21,128,61,0.1)', SW: 'rgba(120,80,30,0.08)', SE: 'rgba(180,83,9,0.12)' },
+      qFill: 'rgba(255,248,230,.84)', qFillEmpty: 'rgba(255,248,230,.5)', qStroke: 'rgba(146,107,56,.4)',
+      qText: '#3b2416', qTextEmpty: '#5c4030', qOutline: '2px rgba(255,248,230,.9)',
+      frameBottom: 'rgba(146,107,56,.4)', frameWall: 'rgba(146,107,56,.25)',
+      markerLine: 'rgba(59,36,22,.3)', swatch: '#ead9b2'
+    },
+    carbon: {
+      id: 'carbon', name: 'Carbon', desc: 'Diagonal carbon weave',
+      light: false, wrapBg: '#0b1220', pngBg: '#0b1220', chartBg: 'transparent',
+      textureKind: 'carbon',
+      cssTexture: 'repeating-linear-gradient(135deg, rgba(255,255,255,.045) 0 2px, transparent 2px 7px), repeating-linear-gradient(45deg, rgba(0,0,0,.28) 0 3px, transparent 3px 8px)',
+      texSize: '10px 10px', texOpacity: '1',
+      axis: '#94a3b8', grid: 'rgba(148,163,184,.14)', grid3d: 'rgba(186,198,214,.36)',
+      minorGrid: 'rgba(148,163,184,.14)', line: '#334155',
+      legend: '#f8fafc', legendTitle: '#e2e8f0', legendHidden: '#64748b', label: '#e2e8f0',
+      tooltipBg: 'rgba(8,12,22,.96)', tooltipBorder: '#334155', tooltipText: '#e2e8f0',
+      cut: 'rgba(251,191,36,.8)', cutLabel: '#fbbf24',
+      shades: { NW: 'rgba(56,189,248,0.08)', NE: 'rgba(52,211,153,0.08)', SW: 'rgba(148,163,184,0.06)', SE: 'rgba(251,191,36,0.07)' },
+      qFill: 'rgba(8,12,22,.78)', qFillEmpty: 'rgba(8,12,22,.48)', qStroke: 'rgba(226,232,240,.2)',
+      qText: '#f8fafc', qTextEmpty: '#e2e8f0', qOutline: '2px rgba(8,12,22,.95)',
+      frameBottom: 'rgba(148,163,184,.38)', frameWall: 'rgba(148,163,184,.22)',
+      markerLine: 'rgba(255,255,255,.28)', swatch: '#0b1220'
+    },
+    board: {
+      id: 'board', name: 'Presentation', desc: 'Clean white for slides',
+      light: true, wrapBg: '#ffffff', pngBg: '#ffffff', chartBg: 'transparent',
+      textureKind: 'none', cssTexture: 'none', texSize: '24px 24px', texOpacity: '0',
+      axis: '#475569', grid: 'rgba(148,163,184,.28)', grid3d: 'rgba(100,116,139,.32)',
+      minorGrid: 'rgba(148,163,184,.16)', line: '#cbd5e1',
+      legend: '#0f172a', legendTitle: '#334155', legendHidden: '#94a3b8', label: '#0f172a',
+      tooltipBg: 'rgba(255,255,255,.97)', tooltipBorder: '#cbd5e1', tooltipText: '#0f172a',
+      cut: 'rgba(217,119,6,.9)', cutLabel: '#b45309',
+      shades: { NW: 'rgba(14,165,233,0.08)', NE: 'rgba(16,185,129,0.08)', SW: 'rgba(148,163,184,0.07)', SE: 'rgba(245,158,11,0.09)' },
+      qFill: 'rgba(248,250,252,.9)', qFillEmpty: 'rgba(248,250,252,.6)', qStroke: 'rgba(148,163,184,.4)',
+      qText: '#0f172a', qTextEmpty: '#475569', qOutline: '2px rgba(255,255,255,.95)',
+      frameBottom: 'rgba(148,163,184,.4)', frameWall: 'rgba(148,163,184,.25)',
+      markerLine: 'rgba(15,23,42,.28)', swatch: '#ffffff'
+    },
+    navy: {
+      id: 'navy', name: 'Navy grid', desc: 'Blueprint grid on navy',
+      light: false, wrapBg: '#071526', pngBg: '#071526', chartBg: 'transparent',
+      textureKind: 'grid',
+      cssTexture: 'linear-gradient(rgba(56,189,248,.13) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,.13) 1px, transparent 1px)',
+      texSize: '28px 28px', texOpacity: '1',
+      axis: '#7dd3fc', grid: 'rgba(56,189,248,.16)', grid3d: 'rgba(125,211,252,.32)',
+      minorGrid: 'rgba(56,189,248,.1)', line: '#1e3a5f',
+      legend: '#e0f2fe', legendTitle: '#bae6fd', legendHidden: '#64748b', label: '#e0f2fe',
+      tooltipBg: 'rgba(7,21,38,.96)', tooltipBorder: '#1e3a5f', tooltipText: '#e0f2fe',
+      cut: 'rgba(251,191,36,.85)', cutLabel: '#fde68a',
+      shades: { NW: 'rgba(56,189,248,0.1)', NE: 'rgba(52,211,153,0.09)', SW: 'rgba(30,58,95,0.18)', SE: 'rgba(251,191,36,0.08)' },
+      qFill: 'rgba(7,21,38,.78)', qFillEmpty: 'rgba(7,21,38,.48)', qStroke: 'rgba(125,211,252,.25)',
+      qText: '#e0f2fe', qTextEmpty: '#bae6fd', qOutline: '2px rgba(7,21,38,.95)',
+      frameBottom: 'rgba(56,189,248,.28)', frameWall: 'rgba(56,189,248,.16)',
+      markerLine: 'rgba(186,230,253,.35)', swatch: '#071526'
+    },
+    sage: {
+      id: 'sage', name: 'Sage linen', desc: 'Soft green linen weave',
+      light: true, wrapBg: '#e7eee6', pngBg: '#e7eee6', chartBg: 'transparent',
+      textureKind: 'linen',
+      cssTexture: 'repeating-linear-gradient(90deg, rgba(64,92,64,.09) 0 1px, transparent 1px 15px), repeating-linear-gradient(0deg, rgba(64,92,64,.06) 0 1px, transparent 1px 15px)',
+      texSize: '15px 15px', texOpacity: '1',
+      axis: '#3f4f3f', grid: 'rgba(64,92,64,.18)', grid3d: 'rgba(64,92,64,.26)',
+      minorGrid: 'rgba(64,92,64,.1)', line: '#93a393',
+      legend: '#1f2a1f', legendTitle: '#3f4f3f', legendHidden: '#8aa08a', label: '#1f2a1f',
+      tooltipBg: 'rgba(247,252,246,.96)', tooltipBorder: '#b7c6b7', tooltipText: '#1f2a1f',
+      cut: 'rgba(146,64,14,.88)', cutLabel: '#9a3412',
+      shades: { NW: 'rgba(14,116,144,0.1)', NE: 'rgba(21,128,61,0.12)', SW: 'rgba(64,92,64,0.08)', SE: 'rgba(180,83,9,0.1)' },
+      qFill: 'rgba(247,252,246,.86)', qFillEmpty: 'rgba(247,252,246,.55)', qStroke: 'rgba(64,92,64,.3)',
+      qText: '#1f2a1f', qTextEmpty: '#3f4f3f', qOutline: '2px rgba(247,252,246,.95)',
+      frameBottom: 'rgba(64,92,64,.35)', frameWall: 'rgba(64,92,64,.22)',
+      markerLine: 'rgba(31,42,31,.28)', swatch: '#e7eee6'
+    }
+  },
+
+  getPreviewTemplate(id) {
+    const key = id || this.previewTemplateId || 'night';
+    return this.PREVIEW_TEMPLATES[key] || this.PREVIEW_TEMPLATES.night;
+  },
+
+  applyPreviewTemplate(id, opts) {
+    const tpl = this.getPreviewTemplate(id);
+    this.previewTemplateId = tpl.id;
+    const root = document.documentElement;
+    root.setAttribute('data-preview-tpl', tpl.id);
+    root.style.setProperty('--preview-bg', tpl.wrapBg);
+    root.style.setProperty('--preview-tex', tpl.cssTexture === 'none' ? 'none' : tpl.cssTexture);
+    root.style.setProperty('--preview-tex-size', tpl.texSize || '24px 24px');
+    root.style.setProperty('--preview-tex-opacity', tpl.texOpacity == null ? '1' : String(tpl.texOpacity));
+    root.classList.toggle('preview-tpl-light', !!tpl.light);
+    if (!(opts && opts.skipCharts)) this._restyleHighchartsForPreview(tpl);
+    if (!(opts && opts.silent)) {
+      try {
+        window.dispatchEvent(new CustomEvent('statistico:preview-template', { detail: { id: tpl.id, template: tpl } }));
+      } catch (e) {}
+    }
+    const grid = document.getElementById('stTplGrid');
+    if (grid) {
+      grid.querySelectorAll('.st-tpl-card').forEach((card) => {
+        card.classList.toggle('is-active', card.getAttribute('data-tpl') === tpl.id);
+      });
+    }
+    return tpl;
+  },
+
+  _restyleHighchartsForPreview(tpl) {
+    const charts = (window.Highcharts && Highcharts.charts) || [];
+    const axisPatch = {
+      title: { style: { color: tpl.axis } },
+      labels: { style: { color: tpl.axis } },
+      gridLineColor: tpl.grid,
+      minorGridLineColor: tpl.minorGrid,
+      lineColor: tpl.line,
+      tickColor: tpl.line
+    };
+    charts.forEach((chart) => {
+      if (!chart || typeof chart.update !== 'function') return;
+      try {
+        chart.update({
+          chart: { backgroundColor: tpl.chartBg },
+          legend: {
+            itemStyle: { color: tpl.legend },
+            itemHoverStyle: { color: tpl.light ? '#0f172a' : '#fff' },
+            itemHiddenStyle: { color: tpl.legendHidden },
+            title: { style: { color: tpl.legendTitle } }
+          },
+          tooltip: {
+            backgroundColor: tpl.tooltipBg,
+            borderColor: tpl.tooltipBorder,
+            style: { color: tpl.tooltipText }
+          },
+          xAxis: axisPatch,
+          yAxis: axisPatch
+        }, true, false, false);
+      } catch (e) {}
+    });
+  },
+
+  openTemplateLibrary() {
+    let overlay = document.getElementById('stTplOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'stTplOverlay';
+      overlay.className = 'st-tpl-overlay';
+      overlay.innerHTML = `
+        <div class="st-tpl-dialog" role="dialog" aria-labelledby="stTplTitle">
+          <div class="st-tpl-head">
+            <div class="st-tpl-head-copy">
+              <i class="fa-solid fa-swatchbook"></i>
+              <span id="stTplTitle">Template Library</span>
+            </div>
+            <button type="button" class="st-tpl-close" id="stTplClose" aria-label="Close">&times;</button>
+          </div>
+          <p class="st-tpl-lead">Skins the live chart preview — colors and textures on the canvas itself, not only the export cover.</p>
+          <div class="st-tpl-grid" id="stTplGrid"></div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('is-open');
+      });
+      overlay.querySelector('#stTplClose').addEventListener('click', () => overlay.classList.remove('is-open'));
+    }
+    const grid = overlay.querySelector('#stTplGrid');
+    const current = this.previewTemplateId || 'night';
+    grid.innerHTML = Object.keys(this.PREVIEW_TEMPLATES).map((key) => {
+      const t = this.PREVIEW_TEMPLATES[key];
+      const tex = t.cssTexture === 'none' ? 'none' : t.cssTexture;
+      return `<button type="button" class="st-tpl-card${t.id === current ? ' is-active' : ''}" data-tpl="${t.id}">
+        <span class="st-tpl-swatch" style="background-color:${t.swatch};background-image:${tex};background-size:${t.texSize};"></span>
+        <span class="st-tpl-name">${t.name}</span>
+        <span class="st-tpl-desc">${t.desc}</span>
+      </button>`;
+    }).join('');
+    grid.querySelectorAll('.st-tpl-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        this.applyPreviewTemplate(card.getAttribute('data-tpl'));
+      });
+    });
+    overlay.classList.add('is-open');
+  },
+
+  exportPreviewPng() {
+    const charts = ((window.Highcharts && Highcharts.charts) || []).filter(Boolean);
+    let chart = null;
+    let area = 0;
+    charts.forEach((c) => {
+      const a = (c.chartWidth || 0) * (c.chartHeight || 0);
+      if (a > area) { area = a; chart = c; }
+    });
+    if (!chart || typeof chart.getSVG !== 'function') {
+      alert('No chart is available to save as PNG yet.');
+      return;
+    }
+    this._rasterizeHighchartsPng(chart);
+  },
+
+  _rasterizeHighchartsPng(chart) {
+    const tpl = this.getPreviewTemplate();
+    const w = Math.max(320, chart.chartWidth || 800);
+    const h = Math.max(240, chart.chartHeight || 500);
+    let svg = chart.getSVG({
+      chart: { width: w, height: h, backgroundColor: 'transparent' }
+    });
+    if (svg.indexOf('xmlns') === -1) {
+      svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    const scale = 2;
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      const ctx = canvas.getContext('2d');
+      this._paintPreviewTexture(ctx, canvas.width, canvas.height, tpl, scale);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      const title = (document.getElementById('chartTitle') || {}).textContent || this.currentView || 'chart';
+      const ts = new Date().toISOString().replace(/[:.TZ]/g, '').replace(/-/g, '').slice(0, 14);
+      const safe = String(title).replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'chart';
+      const done = (href) => {
+        const a = document.createElement('a');
+        a.href = href;
+        a.download = `${safe}_${ts}.png`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 400);
+      };
+      if (canvas.toBlob) {
+        canvas.toBlob((b) => {
+          if (!b) { done(canvas.toDataURL('image/png')); return; }
+          const pngUrl = URL.createObjectURL(b);
+          done(pngUrl);
+          setTimeout(() => URL.revokeObjectURL(pngUrl), 1500);
+        }, 'image/png');
+      } else {
+        done(canvas.toDataURL('image/png'));
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('Could not export the chart as PNG.');
+    };
+    img.src = url;
+  },
+
+  _paintPreviewTexture(ctx, w, h, tpl, scale) {
+    ctx.fillStyle = tpl.pngBg || '#111827';
+    ctx.fillRect(0, 0, w, h);
+    const kind = tpl.textureKind || 'none';
+    if (kind === 'none') return;
+    const s = scale || 1;
+    if (kind === 'dots') {
+      ctx.fillStyle = tpl.light ? 'rgba(80,70,60,.22)' : 'rgba(148,163,184,.32)';
+      const step = 14 * s;
+      for (let y = 0; y < h; y += step) {
+        for (let x = 0; x < w; x += step) {
+          ctx.beginPath();
+          ctx.arc(x + 2 * s, y + 2 * s, 1.2 * s, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      return;
+    }
+    if (kind === 'grid') {
+      ctx.strokeStyle = 'rgba(56,189,248,.18)';
+      ctx.lineWidth = Math.max(1, s * 0.7);
+      const step = 28 * s;
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = 0; y <= h; y += step) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+      return;
+    }
+    if (kind === 'paper') {
+      ctx.strokeStyle = 'rgba(120,90,50,.1)';
+      ctx.lineWidth = 1;
+      const step = 22 * s;
+      ctx.beginPath();
+      for (let y = 0; y <= h; y += step) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      for (let x = 0; x <= w; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      ctx.stroke();
+      return;
+    }
+    if (kind === 'linen' || kind === 'carbon') {
+      ctx.strokeStyle = tpl.light ? 'rgba(120,80,30,.14)' : 'rgba(255,255,255,.06)';
+      ctx.lineWidth = Math.max(1, s);
+      const step = (kind === 'carbon' ? 7 : 8) * s;
+      ctx.beginPath();
+      for (let i = -h; i < w + h; i += step) {
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i + h, h);
+      }
+      ctx.stroke();
     }
   },
 

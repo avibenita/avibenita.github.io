@@ -11,10 +11,10 @@
   <script src="../shared/vendor/highcharts/highcharts-more.js"></script>
   <script src="../shared/vendor/highcharts/highcharts-3d.js"></script>
   <script src="../shared/vendor/highcharts/modules/exporting.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260812mv3" />
-  <script src="../shared-brand-logo.js?v=20260812mv3"></script>
-  <script src="../shared-header.js?v=20260812mv3"></script>
-  <script src="mv-sample-data.js?v=20260812mv3"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20260816mv1" />
+  <script src="../shared-brand-logo.js?v=20260816mv1"></script>
+  <script src="../shared-header.js?v=20260816mv1"></script>
+  <script src="mv-sample-data.js?v=20260816mv1"></script>
   <style>
     :root {
       --surface-0: #0c1624;
@@ -93,6 +93,12 @@
     .panel {
       min-height: 0; height: 100%; max-height: 100%;
       border-right: 1px solid var(--border); background: var(--surface-1);
+      overflow: hidden;
+      padding: 0;
+      display: flex; flex-direction: column;
+    }
+    .panel-body {
+      min-height: 0; flex: 1;
       overflow-x: hidden; overflow-y: auto;
       padding: 10px;
       display: flex; flex-direction: column; gap: 8px;
@@ -100,8 +106,8 @@
       scrollbar-width: thin;
       scrollbar-color: rgba(56,189,248,.45) rgba(15,23,42,.35);
     }
-    .panel::-webkit-scrollbar { width: 8px; }
-    .panel::-webkit-scrollbar-thumb {
+    .panel-body::-webkit-scrollbar { width: 8px; }
+    .panel-body::-webkit-scrollbar-thumb {
       background: rgba(56,189,248,.4); border-radius: 999px;
     }
     .acc {
@@ -256,9 +262,9 @@
     .chart-row { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 132px; gap: 10px; }
     .chart-wrap {
       min-height: 360px; border: 1px solid var(--border); border-radius: 12px;
-      background: #111827; position: relative; overflow: hidden;
+      background: var(--preview-bg, #111827); position: relative; overflow: hidden;
     }
-    #chart { position: absolute; inset: 0; width: 100%; height: 100%; }
+    #chart { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
     #chartError {
       display: none; position: absolute; inset: 0; z-index: 3;
       align-items: center; justify-content: center; text-align: center;
@@ -297,6 +303,45 @@
     }
     .q-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
     .q-grid label { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 3px; }
+
+    .mv-utils {
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+      padding: 10px 10px 12px;
+      display: flex; flex-direction: column; gap: 6px;
+      background: #141b2b;
+    }
+    .mv-utils-h {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; font-weight: 800; color: #fff; letter-spacing: .02em;
+    }
+    .mv-utils-h i { color: rgba(255,255,255,.55); font-size: 12px; width: 14px; text-align: center; }
+    .mv-utils .sb-bottom-btn {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: 8px 10px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    .mv-utils .sb-bottom-btn--png {
+      background: rgba(6, 182, 212, 0.1);
+      border: 1px solid rgba(6, 182, 212, 0.55);
+      color: #e0f2fe;
+    }
+    .mv-utils .sb-bottom-btn--png:hover {
+      background: rgba(6, 182, 212, 0.18);
+      border-color: rgba(6, 182, 212, 0.72);
+      color: #fff;
+    }
+    .mv-utils .sb-bottom-btn--tpl {
+      background: rgba(139, 92, 246, 0.12);
+      border: 1px solid rgba(167, 139, 250, 0.55);
+      color: #ede9fe;
+    }
+    .mv-utils .sb-bottom-btn--tpl:hover {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: rgba(167, 139, 250, 0.75);
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -322,6 +367,7 @@
 
   <div class="shell" id="appShell" style="display:none;">
     <aside class="panel">
+      <div class="panel-body">
       <div class="acc open" id="accVars">
         <button class="acc-h" type="button" data-acc="accVars">Variables <i class="fa-solid fa-chevron-down chev"></i></button>
         <div class="acc-b">
@@ -559,13 +605,25 @@
           <div class="hint-quiet">Drag a label to nudge it beside its bubble. Double-click to restore.</div>
         </div>
       </div>
+      </div>
+      <div class="mv-utils" id="mvUtils">
+        <div class="mv-utils-h"><i class="fa-solid fa-wand-magic-sparkles"></i> Utilities</div>
+        <button class="sb-bottom-btn sb-bottom-btn--png" id="btnSavePng" type="button" title="Save the on-screen chart preview as a PNG image">
+          <i class="fa-solid fa-image"></i>
+          <span class="sb-item-label">Save as PNG</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--tpl" id="btnTemplates" type="button" title="Apply a color and texture skin to the live preview">
+          <i class="fa-solid fa-swatchbook"></i>
+          <span class="sb-item-label">Template Library</span>
+        </button>
+      </div>
     </aside>
 
     <main class="main">
       <div class="status-line" id="statusStrip"></div>
       <div class="map-warn" id="mapWarn" role="status"></div>
       <div class="chart-row">
-        <div class="chart-wrap">
+        <div class="chart-wrap" data-preview-canvas>
           <div id="chart"></div>
           <div id="chartError"></div>
         </div>
@@ -693,6 +751,7 @@
     qLabelStyle: "pill",
     qLabelPos: "corners",
     qFontSize: 11,
+    templateId: "night",
     chart: null,
     lastCuts: { x: null, y: null },
     lastColorRange: { min: null, max: null },
@@ -738,7 +797,8 @@
       qNamePreset: s.qNamePreset,
       qLabelStyle: s.qLabelStyle,
       qLabelPos: s.qLabelPos,
-      qFontSize: s.qFontSize
+      qFontSize: s.qFontSize,
+      templateId: s.templateId || "night"
     };
   }
 
@@ -774,7 +834,8 @@
       qNamePreset: "neutral",
       qLabelStyle: "pill",
       qLabelPos: "corners",
-      qFontSize: 11
+      qFontSize: 11,
+      templateId: "night"
     });
     Object.keys(d).forEach(function (k) {
       if (k === "map") return;
@@ -853,6 +914,9 @@
     applyDefaultView();
     state.mode = spec.chartMode === "bubble" ? "bubble" : spec.chartMode === "true3d" ? "true3d" : "quadrant";
     captureLoadState();
+    if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === "function") {
+      StatisticoHeader.applyPreviewTemplate(state.templateId || "night", { skipCharts: true, silent: true });
+    }
     syncTrue3dUi();
 
     document.getElementById("waiting").style.display = "none";
@@ -1282,9 +1346,28 @@
     });
   }
 
+  function currentTpl() {
+    var id = state.templateId || "night";
+    if (window.StatisticoHeader && typeof StatisticoHeader.getPreviewTemplate === "function") {
+      return StatisticoHeader.getPreviewTemplate(id);
+    }
+    return { id: "night", light: false, wrapBg: "#111827", pngBg: "#111827", chartBg: "transparent",
+      axis: "#94a3b8", grid: "rgba(148,163,184,.15)", grid3d: "rgba(186,198,214,.38)",
+      minorGrid: "rgba(148,163,184,.18)", line: "#334155",
+      legend: "#f8fafc", legendTitle: "#e2e8f0", legendHidden: "#64748b", label: "#e2e8f0",
+      tooltipBg: "rgba(15,23,42,.95)", tooltipBorder: "#334155", tooltipText: "#e2e8f0",
+      cut: "rgba(251,191,36,.8)", cutLabel: "#fbbf24",
+      shades: { NW: "rgba(56,189,248,0.07)", NE: "rgba(52,211,153,0.07)", SW: "rgba(148,163,184,0.05)", SE: "rgba(251,191,36,0.06)" },
+      qFill: "rgba(15,23,42,.7)", qFillEmpty: "rgba(15,23,42,.42)", qStroke: "rgba(226,232,240,.22)",
+      qText: "#f8fafc", qTextEmpty: "#e2e8f0", qOutline: "2px rgba(12,22,36,.9)",
+      frameBottom: "rgba(148,163,184,.35)", frameWall: "rgba(148,163,184,.22)",
+      markerLine: "rgba(255,255,255,.28)" };
+  }
+
   function pointLabelCss() {
+    var tpl = currentTpl();
     return {
-      color: "#e2e8f0",
+      color: tpl.label || "#e2e8f0",
       textOutline: "none",
       fontSize: (state.labelFontSize || 10) + "px",
       fontWeight: "600",
@@ -1604,12 +1687,12 @@
     var midY = yAxis.toPixels(cuts.y);
     var bottom = yAxis.toPixels(yExt.min);
     var ren = chart.renderer;
-    // Distinct tint per zone (NW / NE / SW / SE)
+    var tpl = currentTpl();
     var zones = [
-      { x: left, y: top, w: midX - left, h: midY - top, fill: "rgba(56,189,248,0.07)", key: "NW" },
-      { x: midX, y: top, w: right - midX, h: midY - top, fill: "rgba(52,211,153,0.07)", key: "NE" },
-      { x: left, y: midY, w: midX - left, h: bottom - midY, fill: "rgba(148,163,184,0.05)", key: "SW" },
-      { x: midX, y: midY, w: right - midX, h: bottom - midY, fill: "rgba(251,191,36,0.06)", key: "SE" }
+      { x: left, y: top, w: midX - left, h: midY - top, fill: tpl.shades.NW, key: "NW" },
+      { x: midX, y: top, w: right - midX, h: midY - top, fill: tpl.shades.NE, key: "NE" },
+      { x: left, y: midY, w: midX - left, h: bottom - midY, fill: tpl.shades.SW, key: "SW" },
+      { x: midX, y: midY, w: right - midX, h: bottom - midY, fill: tpl.shades.SE, key: "SE" }
     ];
     zones.forEach(function (z) {
       if (z.w <= 0 || z.h <= 0) return;
@@ -1652,6 +1735,7 @@
       ];
     }
     var ren = chart.renderer;
+    var tpl = currentTpl();
     placements.forEach(function (pt) {
       var n = counts[pt.key];
       var pct = Math.round(100 * n / total);
@@ -1662,13 +1746,13 @@
       var padding = 1;
       var radius = 0;
       if (style === "panel") {
-        fill = empty ? "rgba(15,23,42,.55)" : "rgba(15,23,42,.78)";
-        stroke = "rgba(226,232,240,.35)";
+        fill = empty ? tpl.qFillEmpty : tpl.qFill;
+        stroke = tpl.qStroke;
         padding = 6;
         radius = 6;
       } else if (style === "pill") {
-        fill = empty ? "rgba(15,23,42,.42)" : "rgba(15,23,42,.7)";
-        stroke = "rgba(226,232,240,.22)";
+        fill = empty ? tpl.qFillEmpty : tpl.qFill;
+        stroke = tpl.qStroke;
         padding = 5;
         radius = 10;
       }
@@ -1684,12 +1768,12 @@
           "pointer-events": "none"
         })
         .css({
-          color: empty ? "#e2e8f0" : "#f8fafc",
+          color: empty ? tpl.qTextEmpty : tpl.qText,
           fontSize: (state.qFontSize || 11) + "px",
           fontWeight: "700",
           textAlign: pt.hAlign === "center" ? "center" : pt.hAlign,
           lineHeight: "1.3",
-          textOutline: style === "plain" ? "2px rgba(12,22,36,.9)" : "none"
+          textOutline: style === "plain" ? tpl.qOutline : "none"
         })
         .add();
       var box = lbl.getBBox();
@@ -1893,6 +1977,7 @@
     destroyChart();
 
     var axisPx = (state.axisFontSize || 11) + "px";
+    var tpl = currentTpl();
     var xPlot = [], yPlot = [];
     if (!true3d && state.mode === "quadrant" && state.showCuts && cuts.x != null) {
       var xLab = (state.xCutMode === "mean" ? "Mean" : state.xCutMode === "custom" ? "Custom" : "Median") +
@@ -1900,12 +1985,12 @@
       var yLab = (state.yCutMode === "mean" ? "Mean" : state.yCutMode === "custom" ? "Custom" : "Median") +
         " Y = " + formatNumber(cuts.y, state.yFormat);
       xPlot = [{
-        value: cuts.x, color: "rgba(251,191,36,.8)", width: 1.5, dashStyle: "Dash", zIndex: 5,
-        label: { text: xLab, style: { color: "#fbbf24", fontSize: axisPx }, rotation: 270, align: "right", x: -4, y: 12 }
+        value: cuts.x, color: tpl.cut, width: 1.5, dashStyle: "Dash", zIndex: 5,
+        label: { text: xLab, style: { color: tpl.cutLabel, fontSize: axisPx }, rotation: 270, align: "right", x: -4, y: 12 }
       }];
       yPlot = [{
-        value: cuts.y, color: "rgba(251,191,36,.8)", width: 1.5, dashStyle: "Dash", zIndex: 5,
-        label: { text: yLab, style: { color: "#fbbf24", fontSize: axisPx }, align: "left", x: 6, y: -4 }
+        value: cuts.y, color: tpl.cut, width: 1.5, dashStyle: "Dash", zIndex: 5,
+        label: { text: yLab, style: { color: tpl.cutLabel, fontSize: axisPx }, align: "left", x: 6, y: -4 }
       }];
     }
 
@@ -1919,7 +2004,7 @@
       var opts = {
         chart: {
           type: true3d ? "scatter" : "bubble",
-          backgroundColor: "transparent",
+          backgroundColor: tpl.chartBg || "transparent",
           zoomType: true3d ? undefined : "xy",
           height: height,
           reflow: true,
@@ -1939,49 +2024,49 @@
           symbolHeight: 12,
           symbolWidth: 12,
           symbolRadius: 6,
-          itemStyle: { color: "#f8fafc", fontSize: "12px", fontWeight: "700" },
-          itemHoverStyle: { color: "#fff" },
-          itemHiddenStyle: { color: "#64748b" },
+          itemStyle: { color: tpl.legend, fontSize: "12px", fontWeight: "700" },
+          itemHoverStyle: { color: tpl.light ? "#0f172a" : "#fff" },
+          itemHiddenStyle: { color: tpl.legendHidden },
           title: state.map.color ? {
             text: "Color by " + state.map.color,
-            style: { color: "#e2e8f0", fontSize: "11px", fontWeight: "800" }
+            style: { color: tpl.legendTitle, fontSize: "11px", fontWeight: "800" }
           } : undefined
         },
         xAxis: {
           type: true3d ? "linear" : state.xScale,
-          title: { text: xTitle, style: { color: "#94a3b8", fontSize: axisPx } },
+          title: { text: xTitle, style: { color: tpl.axis, fontSize: axisPx } },
           gridLineWidth: 1,
-          gridLineColor: true3d ? "rgba(186,198,214,.38)" : "rgba(148,163,184,.15)",
+          gridLineColor: true3d ? tpl.grid3d : tpl.grid,
           minorGridLineWidth: true3d && state.grid3d ? 1 : 0,
-          minorGridLineColor: "rgba(148,163,184,.18)",
+          minorGridLineColor: tpl.minorGrid,
           minorTickInterval: true3d && state.grid3d ? "auto" : null,
-          lineColor: "#334155", tickColor: "#334155",
+          lineColor: tpl.line, tickColor: tpl.line,
           labels: {
-            style: { color: "#94a3b8", fontSize: axisPx },
+            style: { color: tpl.axis, fontSize: axisPx },
             formatter: function () { return formatNumber(this.value, state.xFormat); }
           },
           plotLines: xPlot
         },
         yAxis: {
           type: true3d ? "linear" : state.yScale,
-          title: { text: yTitle, style: { color: "#94a3b8", fontSize: axisPx } },
+          title: { text: yTitle, style: { color: tpl.axis, fontSize: axisPx } },
           gridLineWidth: 1,
-          gridLineColor: true3d ? "rgba(186,198,214,.38)" : "rgba(148,163,184,.15)",
+          gridLineColor: true3d ? tpl.grid3d : tpl.grid,
           minorGridLineWidth: true3d && state.grid3d ? 1 : 0,
-          minorGridLineColor: "rgba(148,163,184,.18)",
+          minorGridLineColor: tpl.minorGrid,
           minorTickInterval: true3d && state.grid3d ? "auto" : null,
-          lineColor: "#334155", tickColor: "#334155",
+          lineColor: tpl.line, tickColor: tpl.line,
           labels: {
-            style: { color: "#94a3b8", fontSize: axisPx },
+            style: { color: tpl.axis, fontSize: axisPx },
             formatter: function () { return formatNumber(this.value, state.yFormat); }
           },
           plotLines: yPlot
         },
         tooltip: {
           useHTML: true,
-          backgroundColor: "rgba(15,23,42,.95)",
-          borderColor: "#334155",
-          style: { color: "#e2e8f0" },
+          backgroundColor: tpl.tooltipBg,
+          borderColor: tpl.tooltipBorder,
+          style: { color: tpl.tooltipText },
           pointFormatter: function () {
             var r = this.custom.row;
             var sizeVal = this.custom.sizeVal != null ? this.custom.sizeVal : this.z;
@@ -2061,24 +2146,24 @@
           viewDistance: 5,
           fitToPlot: true,
           frame: {
-            bottom: { size: 1, visible: true, color: "rgba(148,163,184,.35)" },
-            back: { size: 1, visible: true, color: "rgba(148,163,184,.22)" },
-            side: { size: 1, visible: true, color: "rgba(148,163,184,.22)" }
+            bottom: { size: 1, visible: true, color: tpl.frameBottom },
+            back: { size: 1, visible: true, color: tpl.frameWall },
+            side: { size: 1, visible: true, color: tpl.frameWall }
           }
         };
         opts.zAxis = {
           minPadding: 0.05,
           maxPadding: 0.05,
-          title: { text: zTitle, style: { color: "#94a3b8", fontSize: axisPx } },
+          title: { text: zTitle, style: { color: tpl.axis, fontSize: axisPx } },
           gridLineWidth: 1,
-          gridLineColor: "rgba(186,198,214,.38)",
+          gridLineColor: tpl.grid3d,
           minorGridLineWidth: state.grid3d ? 1 : 0,
-          minorGridLineColor: "rgba(148,163,184,.18)",
+          minorGridLineColor: tpl.minorGrid,
           minorTickInterval: state.grid3d ? "auto" : null,
-          lineColor: "#334155",
-          tickColor: "#334155",
+          lineColor: tpl.line,
+          tickColor: tpl.line,
           labels: {
-            style: { color: "#94a3b8", fontSize: axisPx },
+            style: { color: tpl.axis, fontSize: axisPx },
             formatter: function () { return formatNumber(this.value, "compact"); }
           }
         };
@@ -2089,7 +2174,7 @@
             symbol: "circle",
             fillOpacity: state.bubbleOpacity,
             lineWidth: 1,
-            lineColor: "rgba(255,255,255,.28)"
+            lineColor: tpl.markerLine
           },
           point: { events: { click: pointClickHandler } }
         };
@@ -2226,7 +2311,7 @@
   }
 
   function layoutPanels() {
-    var panel = document.querySelector(".panel");
+    var panel = document.querySelector(".panel-body") || document.querySelector(".panel");
     if (!panel) return;
     var open = Array.prototype.slice.call(panel.querySelectorAll(".acc.open:not(.hidden-mode)"));
     var closed = Array.prototype.slice.call(panel.querySelectorAll(".acc:not(.open):not(.hidden-mode)"));
@@ -2247,6 +2332,9 @@
   }
 
   function bindControls() {
+    if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === "function") {
+      StatisticoHeader.applyPreviewTemplate(state.templateId || "night", { skipCharts: true, silent: true });
+    }
     document.querySelectorAll(".acc-h").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = btn.getAttribute("data-acc");
@@ -2313,8 +2401,33 @@
     });
     document.getElementById("btnReset").addEventListener("click", function () {
       restoreLoadState();
+      if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === "function") {
+        StatisticoHeader.applyPreviewTemplate(state.templateId || "night", { skipCharts: true, silent: true });
+      }
       destroyChart();
       syncUiFromState();
+      render();
+    });
+    var btnPng = document.getElementById("btnSavePng");
+    if (btnPng) {
+      btnPng.addEventListener("click", function () {
+        if (window.StatisticoHeader && typeof StatisticoHeader.exportPreviewPng === "function") {
+          StatisticoHeader.exportPreviewPng();
+        }
+      });
+    }
+    var btnTpl = document.getElementById("btnTemplates");
+    if (btnTpl) {
+      btnTpl.addEventListener("click", function () {
+        if (window.StatisticoHeader && typeof StatisticoHeader.openTemplateLibrary === "function") {
+          StatisticoHeader.openTemplateLibrary();
+        }
+      });
+    }
+    window.addEventListener("statistico:preview-template", function (e) {
+      var id = e && e.detail && e.detail.id;
+      if (!id) return;
+      state.templateId = id;
       render();
     });
 

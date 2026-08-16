@@ -32,13 +32,26 @@
     return false;
   }
 
+  function stripMarkup(v) {
+    var s = String(v == null ? '' : v);
+    if (s.indexOf('<') < 0 && s.indexOf('&') < 0) return s;
+    s = s.replace(/<[^>]*>/g, ' ');
+    s = s.replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+    return s.replace(/\s+/g, ' ').trim();
+  }
+
   function catLabel(v) {
     if (typeof v === 'number' && isFinite(v)) {
       if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
       var t = String(v);
       return t.length > 12 ? v.toPrecision(6) : t;
     }
-    return String(v).trim();
+    return stripMarkup(v).trim();
   }
 
   function toWeight(v) {
@@ -50,7 +63,7 @@
   function viewCell(v) {
     if (v === null || v === undefined) return '';
     if (typeof v === 'number' || typeof v === 'boolean') return v;
-    if (typeof v === 'string') return v;
+    if (typeof v === 'string') return stripMarkup(v);
     if (typeof v === 'object') {
       if (v.error != null) return viewCell(v.error);
       if (typeof v.valueOf === 'function') {

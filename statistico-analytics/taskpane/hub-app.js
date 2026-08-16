@@ -332,6 +332,7 @@ const TOOLS_CATEGORY_TILES = [
   },
   {
     id: "survey-tools",
+    hidden: true, // temporarily hidden from the hub
     title: "Survey Segmentation Matrix",
     icon: "fa-border-all",
     accent: "#eab308",

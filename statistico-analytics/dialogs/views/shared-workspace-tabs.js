@@ -157,7 +157,8 @@
       if (!labelSpan) return;
       var key = getTabKey(btn);
       var titleAttr = btn.getAttribute('title') || '';
-      var sub = subtitles[key] || titleAttr;
+      var skipSub = !!(btn.closest && btn.closest('.uni-view-tabs'));
+      var sub = skipSub ? '' : (subtitles[key] || titleAttr);
       if (sub.length > 42) sub = sub.split('.')[0];
       var text = document.createElement('span');
       text.className = 'ws-tab-text';

@@ -1584,7 +1584,7 @@ const StatisticoHeader = {
         defaultFile: 'univariate/histogram-standalone-v2.html',
         tabs: [
           { view: 'histogram', tabKey: 'histogram', label: 'Histogram', icon: 'fa-chart-column', file: 'univariate/histogram-standalone-v2.html' },
-          { view: 'cdf', tabKey: 'cdf', label: 'CDF', icon: 'fa-chart-line', file: 'univariate/cumulative-distribution.html' },
+          { view: 'cdf', tabKey: 'cdf', label: 'Cumulative', icon: 'fa-chart-line', file: 'univariate/cumulative-distribution.html' },
           { view: 'percentile', tabKey: 'percentile', label: 'Percentiles', icon: 'fa-percent', file: 'univariate/percentile-standalone.html' },
           { view: 'boxplot', tabKey: 'boxplot', label: 'Box plot & outliers', icon: 'fa-chart-gantt', file: 'univariate/boxplot-standalone.html' },
           { view: 'kernel', tabKey: 'kernel', label: 'Kernel', icon: 'fa-bezier-curve', file: 'univariate/kernel-standalone.html' }
@@ -1630,24 +1630,37 @@ const StatisticoHeader = {
     return sections[0];
   },
 
-  _getUniTabSubtitle(tabKey) {
-    const subs = {
-      histogram: 'Frequency & shape',
-      cdf: 'Cumulative curve',
-      percentile: 'Cut points & lookup',
-      boxplot: 'Quartiles & outliers',
-      'boxplot-main': 'Full range & IQR view',
-      'boxplot-outliers': 'Detection methods & table',
-      kernel: 'Smoothed density',
-      normality: 'Formal test battery',
-      qqplot: 'Probability plots',
-      confidence: 'Mean & median CIs',
-      hypothesis: 'Reference value test',
-      'by-group-stats': 'Descriptive stats & histograms',
-      'by-group-boxplot': 'Compare spread by group',
-      'by-group-normality': 'Six tests & NSI by group'
+  _getUniViewCaption(tabKey) {
+    const captions = {
+      histogram: 'Explore frequency, shape, and possible departures from normality.',
+      cdf: 'See how probability accumulates across the value range.',
+      percentile: 'Look up cut points and rank-based values.',
+      boxplot: 'Compare quartiles, fences, and extreme observations.',
+      'boxplot-main': 'Inspect the full range and IQR fence in one view.',
+      'boxplot-outliers': 'Review flagged points by detection method.',
+      kernel: 'Inspect the smoothed density of the distribution.',
+      normality: 'Review the formal normality test battery.',
+      qqplot: 'Compare sample quantiles against a reference distribution.',
+      confidence: 'Interval estimates for the mean or median.',
+      hypothesis: 'Test the sample against a reference value.',
+      'by-group-stats': 'Compare descriptive stats and histograms by group.',
+      'by-group-boxplot': 'Compare spread and location across groups.',
+      'by-group-normality': 'Review tests and NSI by group.'
     };
-    return subs[tabKey] || '';
+    return captions[tabKey] || '';
+  },
+
+  _buildUniViewCaptionHtml(tab) {
+    if (!tab) return '';
+    const text = this._getUniViewCaption(tab.tabKey);
+    if (!text) return '';
+    const name = String(tab.label || '').replace(/</g, '&lt;');
+    const body = text.replace(/</g, '&lt;');
+    return '<p class="uni-view-caption" id="uniViewCaption">'
+      + `<span class="uni-view-caption-name">${name}</span>`
+      + '<span class="uni-view-caption-sep" aria-hidden="true">·</span>'
+      + `<span class="uni-view-caption-text">${body}</span>`
+      + '</p>';
   },
 
   _buildUniWsTabBtn(opts) {
@@ -1665,14 +1678,12 @@ const StatisticoHeader = {
       onclick = ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"`;
     }
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
-    const sub = this._getUniTabSubtitle(opts.tabKey);
     return `<button type="button" class="ws-mode-tab${active}" role="tab"`
       + ` aria-selected="${opts.active ? 'true' : 'false'}"`
       + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
       + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
       + `<span class="ws-tab-text">`
       + `<span class="ws-tab-label">${opts.label}</span>`
-      + (sub ? `<span class="ws-tab-sub">${sub}</span>` : '')
       + `</span></button>`;
   },
 
@@ -1692,7 +1703,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260716export2',
+  _TAB_ASSET_VER: '20260816rail1',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2228,27 +2239,27 @@ const StatisticoHeader = {
       '}',
       '',
       '/* Connected workspace tabs — dark inactive, white active panel bridge */',
-      '.ws-mode-bar--connected {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) {',
       '  --ws-connected-tab-active-h: 56px;',
       '  --ws-connected-tab-inactive-h: calc(var(--ws-connected-tab-active-h) * 0.9);',
       '}',
-      '.ws-mode-bar--connected.ws-mode-bar--attached {',
+      '.ws-mode-bar--connected.ws-mode-bar--attached:not(.uni-view-tabs) {',
       '  align-items: flex-end !important;',
       '  padding: 10px 16px 0 !important;',
       '  border-bottom: 3px solid #8b5cf6 !important;',
       '  background: var(--surface-1, #1a1f2e) !important;',
       '}',
-      '.ws-shell:has(.ws-mode-bar--connected) {',
+      '.ws-shell:has(.ws-mode-bar--connected:not(.uni-view-tabs)) {',
       '  border: none !important;',
       '  border-radius: 0 !important;',
       '}',
-      '.ws-shell:has(.ws-mode-bar--connected) > .ws-body {',
+      '.ws-shell:has(.ws-mode-bar--connected:not(.uni-view-tabs)) > .ws-body {',
       '  background: var(--surface-1, #1a1f2e) !important;',
       '  border: none !important;',
       '  border-radius: 0 !important;',
       '  margin-top: 0 !important;',
       '}',
-      '.ws-mode-bar--connected .ws-tab-cluster {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-tab-cluster {',
       '  align-items: flex-end !important;',
       '  background: transparent !important;',
       '  border: none !important;',
@@ -2256,7 +2267,7 @@ const StatisticoHeader = {
       '  padding: 0 !important;',
       '  gap: 10px !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) {',
       '  box-sizing: border-box !important;',
       '  height: var(--ws-connected-tab-inactive-h) !important;',
       '  min-height: var(--ws-connected-tab-inactive-h) !important;',
@@ -2270,19 +2281,19 @@ const StatisticoHeader = {
       '  margin-bottom: 0 !important;',
       '  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) .ws-tab-label {',
       '  color: rgba(226, 232, 240, 0.92) !important;',
       '  font-size: 12px !important;',
       '  font-weight: 600 !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-sub {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) .ws-tab-sub {',
       '  color: rgba(148, 163, 184, 0.88) !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) > i {',
       '  color: #a78bfa !important;',
       '  opacity: 0.85 !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active {',
       '  position: relative !important;',
       '  box-sizing: border-box !important;',
       '  background: #ffffff !important;',
@@ -2299,23 +2310,127 @@ const StatisticoHeader = {
       '  color: #0f172a !important;',
       '  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-text {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active .ws-tab-text {',
       '  gap: 3px !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active .ws-tab-label {',
       '  color: #0f172a !important;',
       '  font-size: 14.5px !important;',
       '  font-weight: 800 !important;',
       '  line-height: 1.15 !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-sub {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active .ws-tab-sub {',
       '  color: #475569 !important;',
       '  line-height: 1.15 !important;',
       '  margin-bottom: 0 !important;',
       '}',
-      '.ws-mode-bar--connected .ws-mode-tab.active > i {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active > i {',
       '  color: #7c3aed !important;',
       '  opacity: 1 !important;',
+      '}',
+      '',
+      '/* Univariate compact dark rail — lock against leftover connected chrome */',
+      '.uni-view-tabs.ws-mode-bar--connected.ws-mode-bar--attached {',
+      '  align-items: center !important;',
+      '  padding: 8px 16px 0 !important;',
+      '  border-bottom: 1px solid rgba(148, 163, 184, 0.16) !important;',
+      '  background: transparent !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster {',
+      '  align-items: stretch !important;',
+      '  height: 48px !important;',
+      '  max-height: 48px !important;',
+      '  padding: 4px !important;',
+      '  gap: 2px !important;',
+      '  border-radius: 10px !important;',
+      '  background: rgba(15, 18, 28, 0.55) !important;',
+      '  border: 1px solid rgba(148, 163, 184, 0.18) !important;',
+      '  box-shadow: none !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab {',
+      '  height: 40px !important;',
+      '  min-height: 40px !important;',
+      '  max-height: 40px !important;',
+      '  min-width: 0 !important;',
+      '  margin: 0 !important;',
+      '  padding: 0 14px !important;',
+      '  border: none !important;',
+      '  border-radius: 7px !important;',
+      '  transform: none !important;',
+      '  box-shadow: none !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
+      '  background: transparent !important;',
+      '  background-image: none !important;',
+      '  color: #94a3b8 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
+      '  color: #94a3b8 !important;',
+      '  font-size: 13px !important;',
+      '  font-weight: 500 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
+      '  color: rgba(148, 163, 184, 0.72) !important;',
+      '  opacity: 1 !important;',
+      '  font-size: 12px !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active):hover {',
+      '  background: rgba(148, 163, 184, 0.08) !important;',
+      '  background-image: none !important;',
+      '  color: #cbd5e1 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active {',
+      '  background: rgba(124, 92, 255, 0.14) !important;',
+      '  background-image: none !important;',
+      '  color: #f1f5f9 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
+      '  color: #f1f5f9 !important;',
+      '  font-size: 13px !important;',
+      '  font-weight: 600 !important;',
+      '  line-height: 1 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active > i {',
+      '  color: #7c5cff !important;',
+      '  opacity: 1 !important;',
+      '  font-size: 12px !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active::after,',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active:not(:last-child)::after {',
+      '  display: block !important;',
+      '  content: "" !important;',
+      '  position: absolute !important;',
+      '  left: 12px !important;',
+      '  right: 12px !important;',
+      '  bottom: 3px !important;',
+      '  height: 2px !important;',
+      '  border-radius: 2px !important;',
+      '  background: #7c5cff !important;',
+      '  pointer-events: none !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab .ws-tab-sub {',
+      '  display: none !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster {',
+      '  background: rgba(255, 255, 255, 0.72) !important;',
+      '  border-color: rgba(148, 163, 184, 0.28) !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected.ws-mode-bar--attached {',
+      '  border-bottom-color: rgba(148, 163, 184, 0.28) !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active),',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
+      '  color: #64748b !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
+      '  color: rgba(100, 116, 139, 0.72) !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active {',
+      '  background: rgba(124, 92, 255, 0.12) !important;',
+      '  color: #1e293b !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
+      '  color: #1e293b !important;',
       '}',
       '',
       '/* Generic chip tabs (non-connected) */',
@@ -2478,20 +2593,6 @@ const StatisticoHeader = {
       ? (globalThis.__boxplotActiveTab || 'main')
       : (globalThis.__byGroupActiveTab || 'stats');
 
-    const tabTitles = {
-      histogram: 'Frequency distribution and shape',
-      cdf: 'Cumulative distribution curve',
-      percentile: 'Cut points and percentile lookup',
-      normality: 'Formal normality test battery',
-      qqplot: 'PP and QQ probability plots',
-      confidence: 'Interval estimates for mean or median',
-      'boxplot-main': 'Both box plots: full range and IQR fence',
-      'boxplot-outliers': 'IQR, Z-Score, Grubbs, and MAD detection',
-      'by-group-stats': 'Descriptive stats & histograms',
-      'by-group-boxplot': 'Compare spread by group',
-      'by-group-normality': 'Verdicts, tests & mini histograms'
-    };
-
     const tabsHtml = viewTabs.map((t) => this._buildUniWsTabBtn({
       tabKey: t.tabKey,
       label: t.label,
@@ -2500,8 +2601,13 @@ const StatisticoHeader = {
       file: t.file,
       inPage: t.inPage,
       panel: t.panel,
-      title: tabTitles[t.tabKey] || tabTitles[t.view] || ''
+      title: this._getUniViewCaption(t.tabKey)
     })).join('');
+
+    const activeTab = viewTabs.find((t) => (
+      t.inPage ? t.panel === activeInPageTab : t.view === this.currentView
+    )) || viewTabs[0];
+    const captionHtml = this._buildUniViewCaptionHtml(activeTab);
 
     const ariaLabel = activeSection.id === 'advanced'
       ? 'Normality and inference views'
@@ -2510,13 +2616,16 @@ const StatisticoHeader = {
         : (this.currentView === 'boxplot')
           ? 'Box plot views'
           : 'Distribution views';
+    const describedBy = captionHtml ? ' aria-describedby="uniViewCaption"' : '';
 
     stack.innerHTML =
       '<div class="ws-shell ws-shell--view-tabs">'
       + '<div class="ws-chrome ws-chrome--attached">'
-      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected uni-view-tabs" role="tablist" aria-label="' + ariaLabel + '">'
+      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected uni-view-tabs" role="tablist" aria-label="' + ariaLabel + '"' + describedBy + '>'
       + tabsHtml
-      + '</nav></div></div>';
+      + '</nav>'
+      + captionHtml
+      + '</div></div>';
 
     if (globalThis.StatisticoWorkspaceTabs) {
       try { globalThis.StatisticoWorkspaceTabs.init(); } catch (_e) {}

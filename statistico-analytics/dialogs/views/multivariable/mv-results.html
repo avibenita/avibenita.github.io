@@ -484,7 +484,14 @@
           </div>
           <div class="ctrl-row">
             <label>Depth <span class="info-tip" data-tip="How deep the 3D box is drawn. Does not change the Z data range — only the visual length of the Z axis." aria-label="How deep the 3D box is drawn. Does not change the Z data range — only the visual length of the Z axis." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
-            <input id="viewDepth" type="range" min="80" max="500" step="10" value="280" />
+            <input id="viewDepth" type="range" min="80" max="1200" step="20" value="280" />
+          </div>
+          <div class="ctrl-row">
+            <label>3D grid <span class="info-tip" data-tip="Draws tick grids on the floor, back, and side walls of the 3D box. Highcharts cannot fill the volume with a full lattice." aria-label="Draws tick grids on the floor, back, and side walls of the 3D box." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
+            <div class="seg" id="grid3d">
+              <button type="button" data-on="1" class="active">On</button>
+              <button type="button" data-on="0">Off</button>
+            </div>
           </div>
         </div>
       </div>
@@ -648,6 +655,7 @@
     viewAlpha: 12,
     viewBeta: 22,
     viewDepth: 280,
+    grid3d: true,
     xScale: "linear",
     yScale: "linear",
     xFormat: "auto",
@@ -694,6 +702,7 @@
       viewAlpha: s.viewAlpha,
       viewBeta: s.viewBeta,
       viewDepth: s.viewDepth,
+      grid3d: s.grid3d !== false,
       xScale: s.xScale,
       yScale: s.yScale,
       xFormat: s.xFormat,
@@ -734,6 +743,7 @@
       viewAlpha: 12,
       viewBeta: 22,
       viewDepth: 280,
+      grid3d: true,
       xScale: "linear",
       yScale: "linear",
       xFormat: "auto",
@@ -1930,7 +1940,9 @@
         xAxis: {
           type: true3d ? "linear" : state.xScale,
           title: { text: xTitle, style: { color: "#94a3b8", fontSize: axisPx } },
-          gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
+          gridLineWidth: true3d ? (state.grid3d !== false ? 1 : 0) : 1,
+          gridLineColor: true3d && state.grid3d !== false ? "rgba(186,198,214,.42)" : "rgba(148,163,184,.15)",
+          lineColor: "#334155", tickColor: "#334155",
           labels: {
             style: { color: "#94a3b8", fontSize: axisPx },
             formatter: function () { return formatNumber(this.value, state.xFormat); }
@@ -1940,7 +1952,9 @@
         yAxis: {
           type: true3d ? "linear" : state.yScale,
           title: { text: yTitle, style: { color: "#94a3b8", fontSize: axisPx } },
-          gridLineColor: "rgba(148,163,184,.15)", lineColor: "#334155", tickColor: "#334155",
+          gridLineWidth: true3d ? (state.grid3d !== false ? 1 : 0) : 1,
+          gridLineColor: true3d && state.grid3d !== false ? "rgba(186,198,214,.42)" : "rgba(148,163,184,.15)",
+          lineColor: "#334155", tickColor: "#334155",
           labels: {
             style: { color: "#94a3b8", fontSize: axisPx },
             formatter: function () { return formatNumber(this.value, state.yFormat); }
@@ -2031,15 +2045,19 @@
           viewDistance: 5,
           fitToPlot: true,
           frame: {
-            bottom: { size: 1, color: "rgba(148,163,184,.35)" },
-            back: { size: 1, color: "rgba(148,163,184,.22)" },
-            side: { size: 1, color: "rgba(148,163,184,.18)" }
+            bottom: { size: 1, visible: true, color: "rgba(148,163,184,.35)" },
+            back: { size: 1, visible: true, color: "rgba(148,163,184,.22)" },
+            side: { size: 1, visible: true, color: "rgba(148,163,184,.22)" }
           }
         };
         opts.zAxis = {
           minPadding: 0.05,
           maxPadding: 0.05,
           title: { text: zTitle, style: { color: "#94a3b8", fontSize: axisPx } },
+          gridLineWidth: state.grid3d !== false ? 1 : 0,
+          gridLineColor: state.grid3d !== false ? "rgba(186,198,214,.42)" : "rgba(148,163,184,.12)",
+          lineColor: "#334155",
+          tickColor: "#334155",
           labels: {
             style: { color: "#94a3b8", fontSize: axisPx },
             formatter: function () { return formatNumber(this.value, "compact"); }
@@ -2155,6 +2173,7 @@
     setVal("viewAlpha", state.viewAlpha);
     setVal("viewBeta", state.viewBeta);
     setVal("viewDepth", state.viewDepth || 280);
+    setSegActive(document.getElementById("grid3d"), "data-on", state.grid3d !== false ? "1" : "0");
     setVal("searchBox", state.search || "");
     setVal("xFormat", state.xFormat);
     setVal("yFormat", state.yFormat);
@@ -2256,6 +2275,13 @@
         } else if (isTrue3d()) render();
       });
     }
+    document.querySelectorAll("#grid3d button").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setSegActive(document.getElementById("grid3d"), "data-on", btn.dataset.on);
+        state.grid3d = btn.dataset.on === "1";
+        render();
+      });
+    });
     document.querySelectorAll("#sizeBy button").forEach(function (btn) {
       btn.addEventListener("click", function () {
         setSegActive(document.getElementById("sizeBy"), "data-sizeby", btn.dataset.sizeby);

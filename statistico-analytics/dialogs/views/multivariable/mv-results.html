@@ -967,6 +967,25 @@
     return state.bubbleStyle === "true3d";
   }
 
+  function pickNumericForZ() {
+    var used = {};
+    used[state.map.x] = 1;
+    used[state.map.y] = 1;
+    used[state.map.size] = 1;
+    var unused = fields.find(function (f) { return f.kind === "num" && !used[f.key]; });
+    if (unused) return unused.key;
+    var any = fields.find(function (f) { return f.kind === "num"; });
+    return any ? any.key : null;
+  }
+
+  function ensureZForTrue3d() {
+    if (!isTrue3d() || state.map.z) return false;
+    var z = pickNumericForZ();
+    if (!z) return false;
+    state.map.z = z;
+    return true;
+  }
+
   function syncTrue3dUi() {
     var box = document.getElementById("true3dControls");
     if (box) box.style.display = isTrue3d() ? "block" : "none";
@@ -1848,12 +1867,8 @@
     }
     var true3d = isTrue3d();
     if (true3d) {
-      if (!Highcharts.seriesTypes || !Highcharts.seriesTypes.scatter3d) {
+      if (!Highcharts.seriesTypes || (!Highcharts.seriesTypes.scatter && !Highcharts.seriesTypes.scatter3d)) {
         showChartError("3D scatter unavailable.<br/>Check that <code>highcharts-3d.js</code> loaded.");
-        return;
-      }
-      if (!state.map.z) {
-        showChartError("True 3D needs a Z field.<br/>Map a numeric column to <strong>Z position</strong> in Data mapping.");
         return;
       }
     } else if (!Highcharts.seriesTypes || !Highcharts.seriesTypes.bubble) {
@@ -2097,6 +2112,7 @@
 
   function render() {
     if (!state.map.x || !state.map.y || !state.map.size) return;
+    if (ensureZForTrue3d()) buildRoleMap();
     updateMapWarn(assessColorField());
     var maxSize = Math.round(48 * state.sizeScale);
     var minSize = Math.max(4, Math.round(6 * state.sizeScale));
@@ -2225,6 +2241,7 @@
       btn.addEventListener("click", function () {
         setSegActive(document.getElementById("bubbleStyle"), "data-style", btn.dataset.style);
         state.bubbleStyle = btn.dataset.style;
+        if (ensureZForTrue3d()) buildRoleMap();
         syncTrue3dUi();
         render();
       });

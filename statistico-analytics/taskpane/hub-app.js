@@ -474,21 +474,21 @@ const TOOLS_CATEGORY_TILES = [
     section: "Utilities",
     sectionId: "utilities",
     sectionSubtitle: "Visual exploration and Excel-to-Office publishing",
-    title: "Bubble Chart",
+    title: "Multivariable Explorer",
     icon: "fa-chart-scatter",
     accent: "#34d399",
     accentDark: "#059669",
     color: "#14b8a6",
     colorDark: "#0f766e",
-    subtitle: "Interactive bubble and quadrant charts from your Excel range",
-    desc: "Map X, Y, size, color, labels, and groups on a multivariable bubble or quadrant chart.",
+    subtitle: "Interactive bubble, quadrant, and 3D scatter charts from your Excel data",
+    desc: "Map X, Y, size, color, and labels on a multivariable bubble, quadrant, or 3D scatter chart.",
     info: [
-      "Multivariable Explorer: bubble & quadrant charts (X, Y, size, color)",
+      "Multivariable Explorer: bubble, quadrant, and 3D scatter (X, Y, size, color)",
       "Select the Excel range from the input panel",
       "Uses a built-in country sample if you click Load sample"
     ],
     modules: [
-      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble and quadrant charts — map X, Y, size, color, labels, and groups. Pick the Excel range in the input panel, or load the built-in country sample." }
+      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
     ]
   },
   {

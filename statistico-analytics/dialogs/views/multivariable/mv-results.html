@@ -263,6 +263,10 @@
       pointer-events: auto !important;
       cursor: move;
     }
+    .hint-quiet {
+      font-size: 10px; color: var(--text-muted); line-height: 1.35;
+      margin-top: 7px; font-weight: 500;
+    }
     .size-legend {
       border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1);
       padding: 10px; font-size: 11px; color: var(--text-secondary);
@@ -507,7 +511,7 @@
         <button class="acc-h" type="button" data-acc="accLabels">Labels <i class="fa-solid fa-chevron-down chev"></i></button>
         <div class="acc-b">
           <div class="ctrl-row">
-            <label>Show <span class="info-tip" data-tip="Drag a visible label to move it. Double-click a label to put it back." aria-label="Drag a visible label to move it. Double-click a label to put it back." tabindex="0"><i class="fa-solid fa-info" aria-hidden="true"></i></span></label>
+            <label>Show</label>
             <div class="seg" id="labelMode">
               <button type="button" data-labels="none">None</button>
               <button type="button" data-labels="hover">Hover</button>
@@ -532,6 +536,7 @@
             <label for="searchBox">Find</label>
             <input id="searchBox" type="search" placeholder="Label / ID..." />
           </div>
+          <div class="hint-quiet">Drag a label to nudge it beside its bubble. Double-click to restore.</div>
         </div>
       </div>
     </aside>
@@ -1254,6 +1259,7 @@
   function dataLabelOpts(p, extra) {
     var key = p.custom && p.custom.key;
     var off = (key && state.labelOffsets && state.labelOffsets[key]) || null;
+    if (off) off = clampLabelOffset(off.x || 0, off.y || 0, LABEL_DRAG_MAX);
     var o = {
       enabled: true,
       format: "{point.name}",
@@ -1687,6 +1693,24 @@
     return false;
   }
 
+  var LABEL_DRAG_MAX = 32;
+
+  function clampLabelOffset(x, y, maxR) {
+    var cap = maxR == null ? LABEL_DRAG_MAX : maxR;
+    var d = Math.sqrt(x * x + y * y);
+    if (!(cap > 0) || !(d > cap)) return { x: x, y: y };
+    var s = cap / d;
+    return { x: x * s, y: y * s };
+  }
+
+  function pointLabelMax(point) {
+    var r = 10;
+    if (point && point.marker && isFinite(point.marker.radius)) r = point.marker.radius;
+    else if (point && point.graphic && isFinite(point.graphic.radius)) r = point.graphic.radius;
+    else if (point && point.graphic && isFinite(point.graphic.r)) r = point.graphic.r;
+    return Math.round(Math.max(22, Math.min(36, r * 0.45 + 18)));
+  }
+
   function bindLabelDrag(chart) {
     if (!chart || !Highcharts.addEvent || state.labels === "none" || state.labels === "hover") return;
     var drag = null;
@@ -1712,10 +1736,11 @@
             chart.mouseIsDown = false;
           }
           var xy = eventXY(e);
-          var off = state.labelOffsets[key] || { x: 0, y: 0 };
+          var off = clampLabelOffset((state.labelOffsets[key] || {}).x || 0, (state.labelOffsets[key] || {}).y || 0, pointLabelMax(p));
           drag = {
             key: key,
             point: p,
+            maxR: pointLabelMax(p),
             startX: xy.x,
             startY: xy.y,
             origX: off.x,
@@ -1740,8 +1765,9 @@
     unbinds.push(Highcharts.addEvent(document, "mousemove", function (e) {
       if (!drag) return;
       var xy = eventXY(e);
-      drag.dx = xy.x - drag.startX;
-      drag.dy = xy.y - drag.startY;
+      var raw = clampLabelOffset(drag.origX + (xy.x - drag.startX), drag.origY + (xy.y - drag.startY), drag.maxR);
+      drag.dx = raw.x - drag.origX;
+      drag.dy = raw.y - drag.origY;
       if (Math.abs(drag.dx) > 2 || Math.abs(drag.dy) > 2) drag.moved = true;
       var dl = drag.point.dataLabel;
       if (dl && dl.element) {
@@ -1752,7 +1778,7 @@
       if (!drag) return;
       var moved = drag.moved;
       var key = drag.key;
-      var next = { x: drag.origX + drag.dx, y: drag.origY + drag.dy };
+      var next = clampLabelOffset(drag.origX + drag.dx, drag.origY + drag.dy, drag.maxR);
       var dl = drag.point.dataLabel;
       if (dl && dl.element) dl.element.style.transform = "";
       drag = null;

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260715b"></script>
-  <script src="prepare-engine.js?v=20260817prep5"></script>
+  <script src="prepare-engine.js?v=20260817prep6"></script>
   <style>
     :root { --prep-acc: #14b8a6; }
     [data-theme="light"] { --prep-acc: #0f766e; }
@@ -17,22 +17,32 @@
     .prep-tab.active { color:var(--prep-acc); border-bottom-color:var(--prep-acc); }
     .prep-pane { display:none; flex:1; min-height:0; overflow:hidden; }
     .prep-pane.active { display:flex; }
-    .prep-layout { display:flex; gap:8px; padding:8px 10px; flex:1; min-height:0; overflow:hidden; }
-    .prep-vars { flex:0 0 168px; display:flex; flex-direction:column; min-height:0; }
-    .prep-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:7px; overflow:auto; }
-    .prep-varbox { flex:1; overflow:auto; border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); }
-    .prep-var { display:flex; gap:6px; align-items:flex-start; padding:5px 7px; font-size:11px; cursor:pointer; border-bottom:1px solid var(--cfg-border); }
+    .prep-layout { display:flex; flex-direction:column; gap:8px; padding:8px 10px 10px; flex:1; min-height:0; overflow:auto; }
+    .prep-vars { display:flex; flex-direction:column; min-height:0; }
+    .prep-varbox { max-height:168px; overflow:auto; border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); }
+    .prep-var { display:grid; grid-template-columns:16px minmax(0,1fr) auto; gap:8px; align-items:center; padding:6px 8px; font-size:11px; cursor:pointer; border-bottom:1px solid var(--cfg-border); }
+    .prep-var:last-child { border-bottom:none; }
     .prep-var:hover { background:var(--cfg-tbl-hover); }
     .prep-var.sel { background:rgba(20,184,166,.1); }
-    .prep-var input { margin-top:2px; }
+    .prep-var.dim { opacity:.72; cursor:default; }
+    .prep-var input { margin:0; }
+    .prep-var-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; color:var(--cfg-text); }
+    .prep-var-role { font-size:10px; font-weight:700; white-space:nowrap; }
+    .role-id { color:#60a5fa; }
+    .role-stack { color:var(--prep-acc); }
+    .role-drop { color:#f87171; }
+    .role-apply { color:var(--prep-acc); }
+    .role-keep, .role-skip { color:var(--cfg-text3); font-weight:600; }
+    [data-theme="light"] .role-id { color:#2563eb; }
+    [data-theme="light"] .role-drop { color:#dc2626; }
     .lbl { font-size:10px; font-weight:700; color:var(--cfg-text3); text-transform:uppercase; letter-spacing:.04em; }
     .fld, select.fld, textarea.fld { width:100%; box-sizing:border-box; background:var(--cfg-input-bg); color:var(--cfg-input-text); border:1px solid var(--cfg-border); border-radius:6px; padding:5px 7px; font-size:11px; }
     textarea.fld { min-height:58px; font-family:ui-monospace,Consolas,monospace; }
     .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
     .help { font-size:10.5px; color:var(--cfg-text3); line-height:1.35; }
     .count { font-size:11px; color:var(--prep-acc); font-weight:700; }
-    .op-sec { display: none; }
-    .op-sec.on { display: block; }
+    .op-sec { display:none; }
+    .op-sec.on { display:block; }
     .chip-row { display:flex; flex-wrap:wrap; gap:4px; }
     .chip { border:1px solid var(--cfg-border); background:var(--cfg-surface2); color:var(--cfg-text2); border-radius:999px; font-size:10px; padding:3px 7px; cursor:pointer; }
     .recipe-item { border:1px solid var(--cfg-border); border-radius:8px; padding:7px 8px; background:var(--cfg-surface); margin-bottom:6px; }
@@ -47,6 +57,19 @@
     .empty-state { color:var(--cfg-text3); font-size:12px; padding:20px 10px; text-align:center; }
     .warn { font-size:11px; color:#fbbf24; }
     .cond-row { display:grid; grid-template-columns:1fr 90px 1fr; gap:4px; margin-bottom:4px; }
+    .flow-note { font-size:10.5px; color:var(--cfg-text3); padding:6px 10px 0; }
+    .prep-steps { margin:4px 0 0; padding-left:18px; font-size:11px; color:var(--cfg-text2); line-height:1.45; }
+    .prep-steps li { margin-bottom:2px; }
+    .impact { border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); padding:8px 10px; }
+    .impact-row { display:grid; grid-template-columns:108px minmax(0,1fr); gap:6px; font-size:11px; margin-top:4px; }
+    .impact-k { color:var(--cfg-text3); }
+    .impact-v { color:var(--cfg-text); font-weight:600; overflow-wrap:anywhere; }
+    .impact-v.warnish { color:#fbbf24; }
+    .draft-err { font-size:11px; color:#f97316; font-weight:600; margin-top:6px; }
+    .var-actions { display:flex; gap:8px; margin-top:4px; }
+    .var-actions button { background:none; border:none; color:var(--prep-acc); font-size:10.5px; font-weight:700; cursor:pointer; padding:0; }
+    .op-lead { display:none; }
+    .op-lead.on { display:block; }
   </style>
 </head>
 <body>
@@ -67,28 +90,38 @@
       <button type="button" class="prep-tab" data-tab="preview">Preview</button>
       <button type="button" class="prep-tab" data-tab="recipe">Recipe</button>
     </div>
+    <div class="flow-note" id="flowNote" style="display:none;">Set up one step → Preview the new table → Create a new worksheet. The original sheet is not overwritten.</div>
     <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column;">
       <div class="prep-pane active" id="pane-configure">
         <div class="prep-layout">
-          <div class="prep-vars">
-            <div class="lbl" style="margin-bottom:4px;">Variables</div>
-            <div class="prep-varbox" id="varList"></div>
-          </div>
-          <div class="prep-main">
-            <div class="help">Range <strong id="tbRange">—</strong> · Sheet <strong id="tbSheet">—</strong> · <span id="tbDims">0 × 0</span></div>
-            <p class="cfg-analysis-scope-note" style="margin-top:0;">Creates a new worksheet. The original Excel range is not overwritten.</p>
-            <label class="lbl">Operation</label>
-            <select id="opSelect" class="fld"></select>
-            <div class="help" id="opHelp"></div>
-            <div id="affectedLine" class="count"></div>
+          <div class="help">Source <strong id="tbRange">—</strong> on <strong id="tbSheet">—</strong> · <span id="tbDims">0 × 0</span> (rows × columns)</div>
+          <p class="cfg-analysis-scope-note" style="margin-top:0;">Creates a new worksheet. Nothing on the original Excel range is changed.</p>
 
+          <label class="lbl">1. What do you want to do?</label>
+          <select id="opSelect" class="fld"></select>
+          <ol class="prep-steps" id="opSteps"></ol>
+
+          <div id="wideIdBlock" class="op-lead">
+            <label class="lbl">2. Subject / ID column</label>
+            <select class="fld" id="wideId"></select>
+            <div class="help" style="margin-top:4px;">Pick the column that identifies each person or case. It is copied onto every long row and is not stacked.</div>
+          </div>
+
+          <div class="prep-vars" id="prepVars">
+            <div class="lbl" id="varTitle">Columns</div>
+            <div class="help" id="varHint" style="margin:3px 0 5px;"></div>
+            <div class="prep-varbox" id="varList"></div>
+            <div class="var-actions" id="varActions"></div>
+          </div>
+
+          <div id="opOptions">
             <div class="op-sec" id="sec-defineMissing">
-              <div class="lbl">Codes to treat as missing</div>
+              <div class="lbl">3. Missing-value codes</div>
               <input class="fld" id="missCodes" placeholder="99, -1, NA" />
-              <div class="help">Applied in the prepared output only. Source values stay on the original sheet.</div>
+              <div class="help">In the prepared sheet only, these codes become blank/missing in the ticked columns. Unticked columns are unchanged.</div>
             </div>
             <div class="op-sec" id="sec-dropVariables">
-              <div class="help">Tick the columns to omit, such as empty columns flagged by Data Quality. At least one variable must remain.</div>
+              <div class="help">Ticked columns are left out of the new sheet. Unticked columns are kept. At least one column must remain.</div>
             </div>
             <div class="op-sec" id="sec-recode">
               <label class="lbl">New variable name</label>
@@ -102,6 +135,7 @@
                 <option value="keep">Keep original</option>
                 <option value="missing">Output as missing</option>
               </select>
+              <div class="help">A new column is added. The source column is kept unless you later drop it.</div>
             </div>
             <div class="op-sec" id="sec-compute">
               <label class="lbl">New variable name</label>
@@ -110,9 +144,10 @@
               <textarea class="fld" id="computeFormula" placeholder="mean(Q1, Q2, Q3)"></textarea>
               <div class="chip-row" id="fnChips"></div>
               <div class="help" id="formulaMsg"></div>
+              <div class="help">All current columns are kept. The new column is added on the right.</div>
             </div>
             <div class="op-sec" id="sec-reverseScore">
-              <div class="help">reversed = minimum + maximum − original</div>
+              <div class="help">For each ticked item, a new column is added: reversed = scale minimum + scale maximum − original. Unticked items are left as they are.</div>
               <div class="row2">
                 <div><label class="lbl">Scale min</label><input class="fld" id="revMin" type="number" value="1" /></div>
                 <div><label class="lbl">Scale max</label><input class="fld" id="revMax" type="number" value="5" /></div>
@@ -133,16 +168,18 @@
                   <input class="fld" id="compMin" type="number" min="1" value="1" />
                 </div>
               </div>
+              <div class="help">Only ticked items go into the score. A new column is added; the original items are kept.</div>
             </div>
             <div class="op-sec" id="sec-harmonize">
               <button type="button" class="cfg-btn save-config" id="btnDetectHarm" style="padding:5px 10px;font-size:11px;">Detect safe label variants</button>
-              <div id="harmList" class="help" style="margin-top:6px;">Select a categorical variable, then detect capitalization and spacing variants. Nothing is merged until you add it to the recipe.</div>
+              <div id="harmList" class="help" style="margin-top:6px;">Select one categorical column, then detect capitalization and spacing variants such as Male / male. Nothing is merged until you add the step to the recipe.</div>
             </div>
             <div class="op-sec" id="sec-filter">
+              <div class="help">No columns are removed. Rows that fail the condition are excluded from the new sheet.</div>
               <div class="row2">
                 <div>
-                  <label class="lbl">Logic</label>
-                  <select class="fld" id="filtLogic"><option value="and">AND</option><option value="or">OR</option></select>
+                  <label class="lbl">Keep a row if</label>
+                  <select class="fld" id="filtLogic"><option value="and">all conditions match (AND)</option><option value="or">any condition matches (OR)</option></select>
                 </div>
                 <div style="display:flex;align-items:flex-end;">
                   <button type="button" class="cfg-btn save-config" id="btnAddCond" style="padding:5px 10px;font-size:11px;">Add condition</button>
@@ -154,22 +191,29 @@
             <div class="op-sec" id="sec-flagDuplicates">
               <label class="lbl">Flag variable name</label>
               <input class="fld" id="dupName" value="duplicate_flag" />
-              <div class="help">Later identical rows are flagged 1. Rows are not deleted.</div>
+              <div class="help">Every column is compared. The first copy of a row gets 0; later identical rows get 1. Nothing is deleted.</div>
             </div>
             <div class="op-sec" id="sec-wideToLong">
-              <label class="lbl">Subject / ID variable</label>
-              <select class="fld" id="wideId"></select>
-              <div class="help">Tick the repeated-measure columns in the variable list.</div>
+              <div class="lbl">4. Names for the new stacked columns</div>
               <div class="row2">
-                <div><label class="lbl">Occasion variable</label><input class="fld" id="wideTime" value="Occasion" /></div>
-                <div><label class="lbl">Measurement variable</label><input class="fld" id="wideValue" value="Value" /></div>
+                <div><label class="lbl">Occasion (column names go here)</label><input class="fld" id="wideTime" value="Occasion" /></div>
+                <div><label class="lbl">Value (cell values go here)</label><input class="fld" id="wideValue" value="Value" /></div>
               </div>
+              <div class="help">Example: columns Pre and Post become two rows, with Occasion = Pre/Post and Value = the score.</div>
             </div>
           </div>
+
+          <div class="impact" id="impactBox">
+            <div class="lbl">This step will</div>
+            <div id="impactBody"></div>
+            <div class="count" id="affectedLine"></div>
+            <div class="draft-err" id="draftError"></div>
+          </div>
+          <div class="help">Need several operations? Add this step to the recipe, then configure the next one. Preview before you create the sheet.</div>
         </div>
       </div>
       <div class="prep-pane" id="pane-preview" style="padding:8px 10px;overflow:auto;flex-direction:column;gap:8px;">
-        <div id="previewEmpty" class="empty-state">Configure a valid operation or recipe, then preview.</div>
+        <div id="previewEmpty" class="empty-state">Finish the required choices on Configure, or add a recipe step, then preview the new table here.</div>
         <div id="previewBody" style="display:none;">
           <label style="font-size:11px;color:var(--cfg-text2);"><input type="checkbox" id="changedOnly" checked /> Changed rows only</label>
           <div class="help" id="previewSummary"></div>
@@ -178,16 +222,16 @@
         </div>
       </div>
       <div class="prep-pane" id="pane-recipe" style="padding:8px 10px;overflow:auto;flex-direction:column;">
-        <div id="recipeEmpty" class="empty-state">No preparation steps yet. Configure an operation and add it to the recipe.</div>
+        <div id="recipeEmpty" class="empty-state">No steps yet. On Configure, set an operation and click Add to recipe if you want more than one step before creating the sheet.</div>
         <div id="recipeList"></div>
         <button type="button" class="cfg-btn cancel" id="btnClearRecipe" style="margin-top:8px;align-self:flex-start;">Clear recipe</button>
       </div>
     </div>
     <div class="cfg-footer">
       <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
-      <button class="cfg-btn save-config" id="btnAddStep" onclick="addDraftToRecipe()" disabled>Add to recipe</button>
+      <button class="cfg-btn save-config" id="btnAddStep" onclick="addDraftToRecipe()" disabled title="Save this operation, then configure another">Add to recipe</button>
       <button class="cfg-btn load-prev" id="btnPreview" onclick="showPreview()" disabled>Preview</button>
-      <button class="cfg-btn run" id="btnCreate" onclick="createSheet()" disabled>Create prepared worksheet</button>
+      <button class="cfg-btn run" id="btnCreate" onclick="createSheet()" disabled title="Write a new worksheet after you preview">Create prepared worksheet</button>
     </div>
   </div>
   <script>
@@ -195,26 +239,117 @@
       headers: [], rows: [], address: '', sheetName: '', sheetNames: [],
       recipe: [], selected: {}, mapping: null, conditions: [], preview: null, tab: 'configure'
     };
-    var HELPS = {
-      defineMissing: 'Treat listed codes as missing for the selected variables in the prepared worksheet.',
-      dropVariables: 'Checked variables are omitted from the prepared worksheet. The source sheet is not changed.',
-      recode: 'Default is a new variable. Unmatched values keep the original unless you choose missing.',
-      compute: 'Build a new variable with +, −, ×, ÷, mean, sum, min, max, abs, round, and if().',
-      reverseScore: 'Use for Likert items that run in the opposite direction of the scale.',
-      composite: 'Mean or sum of selected items. Cases below the minimum valid items are missing.',
-      harmonize: 'Only capitalization and spacing variants are proposed. Approve the mapping before applying.',
-      filter: 'Keep cases that match the condition. Shows retained and excluded counts before you apply.',
-      flagDuplicates: 'Flags later copies of identical rows. Nothing is deleted automatically.',
-      wideToLong: 'Stack repeated-measure columns into occasion and measurement variables.'
+    var OP_META = {
+      defineMissing: {
+        usesVars: 'multi',
+        varTitle: '2. Columns that receive the missing codes',
+        varHint: 'Tick every column where these codes should become missing. Unticked columns are unchanged.',
+        steps: [
+          'Tick the columns that use codes such as 99, −1, or NA.',
+          'Type those codes, separated by commas.',
+          'Preview, then create a new worksheet.'
+        ]
+      },
+      dropVariables: {
+        usesVars: 'multi',
+        varTitle: '2. Columns to leave out of the new sheet',
+        varHint: 'Tick columns to omit (for example an empty column). Unticked columns are kept. At least one column must remain.',
+        steps: [
+          'Tick each column you do not want on the prepared worksheet.',
+          'Check the summary: dropped vs kept.',
+          'Preview, then create. The source sheet still has every column.'
+        ]
+      },
+      recode: {
+        usesVars: 'one',
+        varTitle: '2. Source column to recode',
+        varHint: 'Choose one column. A new column is created; this source column stays unless you drop it later.',
+        steps: [
+          'Select the column whose values you want to recode.',
+          'Name the new column and enter old=new rules (and optional numeric ranges).',
+          'Decide what happens to values that do not match a rule.'
+        ]
+      },
+      compute: {
+        usesVars: 'none',
+        steps: [
+          'Name the new column.',
+          'Write a formula with existing column names, for example mean(Q1, Q2) or if(Age < 18, 1, 0).',
+          'All current columns are kept. The new column is added on the right.'
+        ]
+      },
+      reverseScore: {
+        usesVars: 'multi',
+        varTitle: '2. Items to reverse-score',
+        varHint: 'Tick Likert items that run in the opposite direction. Each ticked item gets a new reversed column.',
+        steps: [
+          'Tick the items that should be reversed.',
+          'Enter the scale minimum and maximum (for example 1 and 5).',
+          'A new column is added for each ticked item. Originals are kept.'
+        ]
+      },
+      composite: {
+        usesVars: 'multi',
+        varTitle: '2. Items to combine into the score',
+        varHint: 'Tick the items that belong in the mean or sum. Unticked columns are not included in the score.',
+        steps: [
+          'Tick the items that make up the scale.',
+          'Name the score and choose mean or sum.',
+          'Set how many items must be valid. A new score column is added; items are kept.'
+        ]
+      },
+      harmonize: {
+        usesVars: 'one',
+        varTitle: '2. Categorical column to tidy',
+        varHint: 'Choose one column. Only capitalization and spacing variants are proposed, for example Male / male.',
+        steps: [
+          'Select the categorical column.',
+          'Detect safe label variants and review the mapping.',
+          'Add the step to the recipe. Labels are not merged until then.'
+        ]
+      },
+      filter: {
+        usesVars: 'none',
+        steps: [
+          'Add conditions that decide which rows to keep.',
+          'Use AND if every condition must match, or OR if any condition is enough.',
+          'No columns are removed. Excluded rows are left off the new sheet.'
+        ]
+      },
+      flagDuplicates: {
+        usesVars: 'none',
+        steps: [
+          'Name the flag column (default: duplicate_flag).',
+          'Every column is compared across rows.',
+          'Later identical rows are flagged 1. Nothing is deleted.'
+        ]
+      },
+      wideToLong: {
+        usesVars: 'multi',
+        varTitle: '3. Repeated-measure columns to stack',
+        varHint: 'Tick each occasion or item that should become its own row. Unticked columns (except the ID) are copied onto every long row.',
+        steps: [
+          'Choose the subject ID — one column that identifies each person or case.',
+          'Tick the repeated-measure columns to stack. Leave a column unticked if it should stay as a normal column.',
+          'Name the new Occasion and Value columns, then preview the long table.'
+        ]
+      }
     };
     var FNS = ['+', '-', '*', '/', 'mean()', 'sum()', 'min()', 'max()', 'abs()', 'round()', 'if(,,)'];
 
     function qs(id) { return document.getElementById(id); }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
+    function joinNames(arr) {
+      return (arr || []).filter(Boolean).join(', ') || '—';
+    }
     function send(action, payload) {
       var s = JSON.stringify({ action: action, payload: payload || {} });
       if (typeof Office !== 'undefined' && Office.context && Office.context.ui) Office.context.ui.messageParent(s);
     }
     function cancel() { send('close'); }
+    function currentOp() { return qs('opSelect').value; }
     function selectedVars() {
       return STATE.headers.filter(function (h) { return STATE.selected[h]; });
     }
@@ -241,7 +376,7 @@
     }
 
     function currentDraft() {
-      var type = qs('opSelect').value;
+      var type = currentOp();
       var vars = selectedVars();
       var step = { type: type, enabled: true, variables: vars };
       if (type === 'defineMissing') step.codes = parseCodes(qs('missCodes').value);
@@ -275,6 +410,7 @@
       if (type === 'wideToLong') {
         step.idVar = qs('wideId').value;
         step.measureVars = vars.filter(function (v) { return v !== step.idVar; });
+        step.variables = step.measureVars.slice();
         step.timeName = (qs('wideTime').value || 'Occasion').trim();
         step.valueName = (qs('wideValue').value || 'Value').trim();
       }
@@ -301,48 +437,182 @@
       qs('btnCreate').disabled = !(STATE.preview && !STATE.preview.emptyResult);
     }
 
-    function updateAffected() {
-      var type = qs('opSelect').value;
+    function columnRole(type, name, idVar) {
+      var on = !!STATE.selected[name];
+      if (type === 'wideToLong') {
+        if (name === idVar) return { checked: false, disabled: true, role: 'Subject ID · kept on every row', cls: 'role-id' };
+        if (on) return { checked: true, disabled: false, role: 'Stacked into rows', cls: 'role-stack' };
+        return { checked: false, disabled: false, role: 'Copied to every long row', cls: 'role-keep' };
+      }
+      if (type === 'dropVariables') {
+        return on
+          ? { checked: true, disabled: false, role: 'Dropped from new sheet', cls: 'role-drop' }
+          : { checked: false, disabled: false, role: 'Kept', cls: 'role-keep' };
+      }
+      if (type === 'defineMissing') {
+        return on
+          ? { checked: true, disabled: false, role: 'Codes applied here', cls: 'role-apply' }
+          : { checked: false, disabled: false, role: 'Unchanged', cls: 'role-skip' };
+      }
+      if (type === 'recode' || type === 'harmonize') {
+        return on
+          ? { checked: true, disabled: false, role: 'Source column', cls: 'role-apply' }
+          : { checked: false, disabled: false, role: 'Unchanged', cls: 'role-skip' };
+      }
+      if (type === 'reverseScore' || type === 'composite') {
+        return on
+          ? { checked: true, disabled: false, role: type === 'composite' ? 'In the score' : 'Reversed (new column)', cls: 'role-apply' }
+          : { checked: false, disabled: false, role: 'Not included', cls: 'role-skip' };
+      }
+      return { checked: on, disabled: false, role: '', cls: 'role-skip' };
+    }
+
+    function impactRow(label, value, warn) {
+      return '<div class="impact-row"><div class="impact-k">' + esc(label) + '</div><div class="impact-v' + (warn ? ' warnish' : '') + '">' + esc(value) + '</div></div>';
+    }
+
+    function renderImpact() {
+      var type = currentOp();
       var vars = selectedVars();
+      var headers = STATE.headers;
+      var html = '';
       var msg = '';
-      if (type === 'defineMissing' && vars.length) {
-        var n = StatisticoPrepare.countAffectedCells(STATE.headers, STATE.rows, vars, parseCodes(qs('missCodes').value));
-        msg = n + ' cells match these codes.';
+      if (type === 'wideToLong') {
+        var id = qs('wideId').value;
+        var stack = vars.filter(function (v) { return v !== id; });
+        var keep = headers.filter(function (h) { return h !== id && stack.indexOf(h) < 0; });
+        var timeName = (qs('wideTime').value || 'Occasion').trim() || 'Occasion';
+        var valueName = (qs('wideValue').value || 'Value').trim() || 'Value';
+        html += impactRow('Subject ID', id || '—', !id);
+        html += impactRow('Stacked into rows', joinNames(stack), !stack.length);
+        html += impactRow('Copied to every row', joinNames(keep), false);
+        html += impactRow('New columns', timeName + ', ' + valueName, false);
+        if (stack.length) {
+          html += impactRow('New shape', STATE.rows.length + ' rows × ' + stack.length + ' measures → ' + (STATE.rows.length * stack.length) + ' long rows', false);
+        }
+      } else if (type === 'dropVariables') {
+        var kept = headers.filter(function (h) { return !STATE.selected[h]; });
+        html += impactRow('Dropped', joinNames(vars), !vars.length);
+        html += impactRow('Kept', joinNames(kept), !kept.length);
+      } else if (type === 'defineMissing') {
+        html += impactRow('Codes applied to', joinNames(vars), !vars.length);
+        html += impactRow('Unchanged', joinNames(headers.filter(function (h) { return !STATE.selected[h]; })), false);
+        if (vars.length) {
+          var n = StatisticoPrepare.countAffectedCells(headers, STATE.rows, vars, parseCodes(qs('missCodes').value));
+          msg = n + ' cell' + (n === 1 ? '' : 's') + ' currently match these codes.';
+        }
+      } else if (type === 'recode') {
+        html += impactRow('Source', vars[0] || '— choose one', !vars[0]);
+        html += impactRow('New column', (qs('recodeName').value || '').trim() || '— name it', !(qs('recodeName').value || '').trim());
+        html += impactRow('Other columns', 'Unchanged', false);
+      } else if (type === 'compute') {
+        html += impactRow('New column', (qs('computeName').value || '').trim() || '— name it', !(qs('computeName').value || '').trim());
+        html += impactRow('Existing columns', 'All kept', false);
+      } else if (type === 'reverseScore') {
+        html += impactRow('Reversed', joinNames(vars), !vars.length);
+        html += impactRow('Not reversed', joinNames(headers.filter(function (h) { return !STATE.selected[h]; })), false);
+        html += impactRow('Added columns', vars.length ? vars.map(function (v) { return String(qs('revPattern').value || '{name}_r').replace('{name}', v); }).join(', ') : '—', false);
+      } else if (type === 'composite') {
+        html += impactRow('In the score', joinNames(vars), !vars.length);
+        html += impactRow('New column', (qs('compName').value || '').trim() || '— name it', !(qs('compName').value || '').trim());
+        html += impactRow('Original items', 'Kept', false);
+      } else if (type === 'harmonize') {
+        html += impactRow('Labels tidied in', vars[0] || '— choose one', !vars[0]);
+        html += impactRow('Other columns', 'Unchanged', false);
+      } else if (type === 'filter') {
+        if (STATE.conditions.length) {
+          var imp = StatisticoPrepare.filterImpact(headers, STATE.rows, currentDraft());
+          html += impactRow('Rows kept', imp.retained + ' of ' + STATE.rows.length + ' (' + Math.round(imp.pctRetained) + '%)', imp.retained === 0);
+          html += impactRow('Rows excluded', String(imp.excluded), false);
+          html += impactRow('Columns', 'All kept', false);
+          msg = imp.retained + ' retained · ' + imp.excluded + ' excluded';
+        } else {
+          html += impactRow('Rows', 'Add at least one condition', true);
+        }
+      } else if (type === 'flagDuplicates') {
+        html += impactRow('Compared', 'All columns', false);
+        html += impactRow('New column', (qs('dupName').value || 'duplicate_flag').trim(), false);
+        html += impactRow('Rows', 'None deleted', false);
       }
-      if (type === 'dropVariables' && vars.length) {
-        msg = vars.length + ' variable' + (vars.length === 1 ? '' : 's') + ' will be omitted from the prepared worksheet.';
-      }
-      if (type === 'filter' && STATE.conditions.length) {
-        var imp = StatisticoPrepare.filterImpact(STATE.headers, STATE.rows, currentDraft());
-        msg = imp.retained + ' retained · ' + imp.excluded + ' excluded · ' + Math.round(imp.pctRetained) + '% kept';
-      }
-      if (type === 'compute') {
+      qs('impactBody').innerHTML = html;
+      qs('affectedLine').textContent = msg;
+      var valid = StatisticoPrepare.validateStep(currentDraft(), liveHeaders());
+      qs('draftError').textContent = valid.ok ? '' : (valid.error || '');
+    }
+
+    function updateAffected() {
+      if (currentOp() === 'compute') {
         var vf = StatisticoPrepare.validateFormula(qs('computeFormula').value, STATE.headers);
         qs('formulaMsg').textContent = vf.ok ? 'Formula is valid.' : (vf.error || '');
         qs('formulaMsg').style.color = vf.ok ? 'var(--prep-acc)' : '#f97316';
       }
-      qs('affectedLine').textContent = msg;
+      renderImpact();
       STATE.preview = null;
       updateButtons();
     }
 
-    function showOp() {
-      var type = qs('opSelect').value;
-      document.querySelectorAll('.op-sec').forEach(function (el) { el.classList.remove('on'); });
-      var sec = qs('sec-' + type);
-      if (sec) sec.classList.add('on');
-      qs('opHelp').textContent = HELPS[type] || '';
-      updateAffected();
+    function fillWideId() {
+      var sel = qs('wideId');
+      var current = sel.value;
+      sel.innerHTML = STATE.headers.map(function (h) {
+        return '<option value="' + esc(h) + '">' + esc(h) + '</option>';
+      }).join('');
+      if (current && STATE.headers.indexOf(current) >= 0) sel.value = current;
     }
 
     function renderVars() {
-      var box = qs('varList');
-      box.innerHTML = STATE.headers.map(function (h) {
-        var on = STATE.selected[h] ? ' checked' : '';
-        return '<label class="prep-var' + (STATE.selected[h] ? ' sel' : '') + '"><input type="checkbox" data-var="' + h.replace(/"/g, '&quot;') + '"' + on + '/><span>' + h + '</span></label>';
-      }).join('') || '<div class="empty-state">No variables.</div>';
-      var idSel = qs('wideId');
-      idSel.innerHTML = STATE.headers.map(function (h) { return '<option value="' + h.replace(/"/g, '&quot;') + '">' + h + '</option>'; }).join('');
+      var type = currentOp();
+      var meta = OP_META[type] || { usesVars: 'none' };
+      var pane = qs('prepVars');
+      if (meta.usesVars === 'none') {
+        pane.style.display = 'none';
+        qs('varActions').innerHTML = '';
+        return;
+      }
+      pane.style.display = '';
+      qs('varTitle').textContent = meta.varTitle || 'Columns';
+      qs('varHint').textContent = meta.varHint || '';
+      var idVar = type === 'wideToLong' ? qs('wideId').value : '';
+      var inputType = meta.usesVars === 'one' ? 'radio' : 'checkbox';
+      qs('varList').innerHTML = STATE.headers.map(function (h) {
+        var st = columnRole(type, h, idVar);
+        return '<label class="prep-var' + (st.checked ? ' sel' : '') + (st.disabled ? ' dim' : '') + '">' +
+          '<input type="' + inputType + '" name="prepVar" data-var="' + esc(h) + '"' + (st.checked ? ' checked' : '') + (st.disabled ? ' disabled' : '') + '/>' +
+          '<span class="prep-var-name">' + esc(h) + '</span>' +
+          '<span class="prep-var-role ' + st.cls + '">' + esc(st.role) + '</span></label>';
+      }).join('') || '<div class="empty-state">No variables in the selected range.</div>';
+      if (meta.usesVars === 'multi') {
+        qs('varActions').innerHTML = '<button type="button" id="btnVarAll">Select all</button><button type="button" id="btnVarNone">Clear</button>';
+      } else {
+        qs('varActions').innerHTML = '';
+      }
+    }
+
+    function showOp() {
+      var type = currentOp();
+      var meta = OP_META[type] || { steps: [], usesVars: 'none' };
+      document.querySelectorAll('.op-sec').forEach(function (el) { el.classList.remove('on'); });
+      var sec = qs('sec-' + type);
+      if (sec) sec.classList.add('on');
+      qs('wideIdBlock').classList.toggle('on', type === 'wideToLong');
+      qs('opSteps').innerHTML = (meta.steps || []).map(function (s) { return '<li>' + s + '</li>'; }).join('');
+      if (type === 'wideToLong') {
+        fillWideId();
+        var id = qs('wideId').value;
+        var anyMeasure = STATE.headers.some(function (h) { return h !== id && STATE.selected[h]; });
+        if (!anyMeasure) {
+          STATE.headers.forEach(function (h) { STATE.selected[h] = h !== id; });
+        } else {
+          STATE.selected[id] = false;
+        }
+      }
+      if (meta.usesVars === 'one') {
+        var first = selectedVars()[0];
+        STATE.selected = {};
+        if (first) STATE.selected[first] = true;
+      }
+      renderVars();
+      updateAffected();
     }
 
     function addCondition() {
@@ -354,8 +624,8 @@
       qs('condList').innerHTML = STATE.conditions.map(function (c, i) {
         var ops = ['equals','not_equals','gt','lt','between','contains','is_missing','is_not_missing']
           .map(function (op) { return '<option value="' + op + '"' + (c.op === op ? ' selected' : '') + '>' + op.replace(/_/g, ' ') + '</option>'; }).join('');
-        var vars = STATE.headers.map(function (h) { return '<option' + (c.variable === h ? ' selected' : '') + '>' + h + '</option>'; }).join('');
-        return '<div class="cond-row" data-i="' + i + '"><select class="fld cond-var">' + vars + '</select><select class="fld cond-op">' + ops + '</select><input class="fld cond-val" value="' + String(c.value || '').replace(/"/g, '&quot;') + '"/></div>';
+        var vars = STATE.headers.map(function (h) { return '<option' + (c.variable === h ? ' selected' : '') + '>' + esc(h) + '</option>'; }).join('');
+        return '<div class="cond-row" data-i="' + i + '"><select class="fld cond-var">' + vars + '</select><select class="fld cond-op">' + ops + '</select><input class="fld cond-val" value="' + esc(c.value) + '"/></div>';
       }).join('');
     }
 
@@ -384,19 +654,24 @@
       send('saveRecipe', { steps: STATE.recipe });
     }
 
+    function opLabel(type) {
+      var found = StatisticoPrepare.AVAILABLE_OPERATIONS.filter(function (op) { return op.id === type; })[0];
+      return found ? found.label : type;
+    }
+
     function renderRecipe() {
       var empty = !STATE.recipe.length;
       qs('recipeEmpty').style.display = empty ? '' : 'none';
       qs('recipeList').innerHTML = STATE.recipe.map(function (step, i) {
         var rec = StatisticoPrepare.describeStep(step);
         return '<div class="recipe-item' + (step.enabled === false ? ' off' : '') + '">' +
-          '<div class="recipe-top"><strong>' + (i + 1) + '.</strong> <span>' + step.type + '</span>' +
+          '<div class="recipe-top"><strong>' + (i + 1) + '.</strong> <span>' + esc(opLabel(step.type)) + '</span>' +
           '<span style="margin-left:auto;"></span>' +
           '<button class="icon-btn" data-up="' + i + '" title="Move up">↑</button>' +
           '<button class="icon-btn" data-down="' + i + '" title="Move down">↓</button>' +
           '<button class="icon-btn" data-toggle="' + i + '">' + (step.enabled === false ? 'Enable' : 'Disable') + '</button>' +
           '<button class="icon-btn" data-del="' + i + '">Delete</button></div>' +
-          '<div class="recipe-desc">' + rec + (step.variables && step.variables.length ? ' · ' + step.variables.join(', ') : '') + '</div></div>';
+          '<div class="recipe-desc">' + esc(rec) + '</div></div>';
       }).join('');
     }
 
@@ -419,17 +694,17 @@
       qs('previewWarn').textContent = (preview.warnings || []).join(' ');
       var tbl = qs('previewTable');
       if (preview.structural) {
-        tbl.innerHTML = '<thead><tr>' + preview.headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        tbl.innerHTML = '<thead><tr>' + preview.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
           preview.diffs.map(function (d) {
-            return '<tr>' + (d.proposed || []).map(function (v) { return '<td class="new">' + (v == null ? '' : v) + '</td>'; }).join('') + '</tr>';
+            return '<tr>' + (d.proposed || []).map(function (v) { return '<td class="new">' + esc(v) + '</td>'; }).join('') + '</tr>';
           }).join('') + '</tbody>';
       } else {
-        tbl.innerHTML = '<thead><tr><th>Row</th><th>Status</th>' + preview.headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        tbl.innerHTML = '<thead><tr><th>Row</th><th>Status</th>' + preview.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
           preview.diffs.map(function (d) {
             return '<tr><td>' + d.row + '</td><td>' + d.status + '</td>' + (d.cells || []).map(function (c) {
               var cls = c.isNew ? 'new' : (c.changed ? 'chg' : '');
               var txt = c.changed ? (c.original == null || c.original === '' ? '' : c.original) + ' → ' + (c.proposed == null ? '' : c.proposed) : (c.proposed == null ? '' : c.proposed);
-              return '<td class="' + cls + '">' + txt + '</td>';
+              return '<td class="' + cls + '">' + esc(txt) + '</td>';
             }).join('') + '</tr>';
           }).join('') + '</tbody>';
       }
@@ -466,8 +741,9 @@
       qs('metaBadge').textContent = STATE.rows.length ? (STATE.rows.length + ' × ' + STATE.headers.length) : '-';
       qs('loadingSpinner').style.display = 'none';
       qs('tabBar').style.display = 'flex';
+      qs('flowNote').style.display = '';
       qs('mainContent').style.display = 'flex';
-      renderVars();
+      fillWideId();
       showOp();
       renderRecipe();
       renderConds();
@@ -476,7 +752,7 @@
 
     (function initOps() {
       var sel = qs('opSelect');
-      var groups = { variables: 'Variables', cases: 'Cases', structure: 'Structure' };
+      var groups = { variables: 'Columns', cases: 'Rows', structure: 'Table shape' };
       var last = '';
       StatisticoPrepare.AVAILABLE_OPERATIONS.forEach(function (op) {
         if (op.category !== last) {
@@ -493,15 +769,48 @@
       qs('fnChips').innerHTML = FNS.map(function (fn) { return '<button type="button" class="chip" data-fn="' + fn + '">' + fn + '</button>'; }).join('');
     })();
 
-    qs('opSelect').addEventListener('change', showOp);
+    qs('opSelect').addEventListener('change', function () {
+      STATE.selected = {};
+      STATE.mapping = null;
+      showOp();
+    });
+    qs('prepVars').addEventListener('click', function (e) {
+      if (e.target.id === 'btnVarAll' || e.target.id === 'btnVarNone') {
+        var all = e.target.id === 'btnVarAll';
+        var type = currentOp();
+        var idVar = type === 'wideToLong' ? qs('wideId').value : '';
+        STATE.headers.forEach(function (h) {
+          STATE.selected[h] = all && h !== idVar;
+        });
+        renderVars();
+        updateAffected();
+      }
+    });
     qs('varList').addEventListener('change', function (e) {
       var cb = e.target.closest('input[data-var]');
-      if (!cb) return;
-      STATE.selected[cb.getAttribute('data-var')] = cb.checked;
+      if (!cb || cb.disabled) return;
+      var name = cb.getAttribute('data-var');
+      var meta = OP_META[currentOp()] || {};
+      if (meta.usesVars === 'one' || cb.type === 'radio') {
+        STATE.selected = {};
+        STATE.selected[name] = true;
+      } else {
+        STATE.selected[name] = cb.checked;
+      }
       renderVars();
       updateAffected();
     });
-    ['missCodes','recodeName','recodeMap','recodeRanges','recodeOtherwise','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideId','wideTime','wideValue','filtLogic'].forEach(function (id) {
+    qs('wideId').addEventListener('change', function () {
+      var id = qs('wideId').value;
+      STATE.selected[id] = false;
+      var anyMeasure = STATE.headers.some(function (h) { return h !== id && STATE.selected[h]; });
+      if (!anyMeasure) {
+        STATE.headers.forEach(function (h) { STATE.selected[h] = h !== id; });
+      }
+      renderVars();
+      updateAffected();
+    });
+    ['missCodes','recodeName','recodeMap','recodeRanges','recodeOtherwise','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideTime','wideValue','filtLogic'].forEach(function (id) {
       var el = qs(id);
       if (el) el.addEventListener('input', updateAffected);
       if (el) el.addEventListener('change', updateAffected);

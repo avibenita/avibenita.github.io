@@ -7,9 +7,9 @@
   <title>Contingency Tables Results</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <link rel="stylesheet" href="../shared-header.css?v=20260816ct1"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260817ct1"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260816ct1"></script>
+  <script src="../shared-header.js?v=20260817ct1"></script>
   <script src="contingency-engine.js?v=20260814ct8"></script>
   <script src="contingency-sample-data.js?v=20260814ct8"></script>
   <style>
@@ -18,12 +18,24 @@
       --accent-1:rgb(255,176,140); --accent-2:rgb(140,210,255); --accent-ct:#c4b5fd;
       --text-primary:#fff; --text-secondary:rgba(255,255,255,.95); --text-muted:rgba(226,232,240,.88);
       --neg:#60a5fa; --pos:#fb923c; --warn:#fbbf24;
+      --ct-ink:#f8fafc; --ct-ink-soft:#e2e8f0; --ct-head-bg:#243044; --ct-stub-bg:#1e2638;
     }
     :root[data-theme="light"] {
       --surface-0:#e2e8f0; --surface-1:#fff; --surface-2:#f8fafc; --border:#94a3b8;
       --accent-1:#c2410c; --accent-2:#1d4ed8; --accent-ct:#6d28d9;
       --text-primary:#0f172a; --text-secondary:#1e293b; --text-muted:#334155;
       --neg:#2563eb; --pos:#ea580c; --warn:#b45309;
+      --ct-ink:#0f172a; --ct-ink-soft:#1e293b; --ct-head-bg:#e2e8f0; --ct-stub-bg:#f8fafc;
+    }
+    html[data-preview-tpl]:not(.preview-tpl-light) {
+      --ct-ink:#f8fafc; --ct-ink-soft:#e2e8f0;
+      --ct-head-bg:color-mix(in srgb, var(--preview-bg, #111827) 42%, #0b1220);
+      --ct-stub-bg:color-mix(in srgb, var(--preview-bg, #111827) 55%, #0b1220);
+    }
+    html.preview-tpl-light {
+      --ct-ink:#1c1917; --ct-ink-soft:#3f2a1c;
+      --ct-head-bg:color-mix(in srgb, var(--preview-bg, #ead9b2) 78%, #fff);
+      --ct-stub-bg:color-mix(in srgb, var(--preview-bg, #ead9b2) 88%, #fff);
     }
     * { box-sizing:border-box; margin:0; padding:0; }
     html, body { height:100%; overflow:hidden; }
@@ -143,12 +155,17 @@
     .ws-mode-hint { font-size:11px; color:var(--text-muted); margin-left:4px; }
     .cell-legend {
       display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
-      font-size:11px; color:var(--text-muted); margin:0 0 8px;
+      font-size:11px; color:var(--ct-ink-soft); margin:0 0 8px;
     }
     .cell-legend .lg-item { display:inline-flex; align-items:baseline; gap:5px; }
-    .cell-legend .lg-hero { font-size:13px; font-weight:800; color:var(--text-primary); }
-    .cell-legend .lg-sub { font-size:11px; font-weight:600; color:var(--text-muted); }
-    .heat-key { display:inline-flex; align-items:center; gap:6px; margin-left:auto; }
+    .cell-legend .lg-hero { font-size:13px; font-weight:800; color:var(--ct-ink); }
+    .cell-legend .lg-sub { font-size:11px; font-weight:600; color:var(--ct-ink-soft); }
+    .heat-key { display:inline-flex; align-items:center; gap:8px; margin-left:auto; }
+    .color-by { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--ct-ink); }
+    .color-by select.ct-sel {
+      min-width:168px; font-weight:700; color:var(--ct-ink);
+      background:var(--ct-head-bg); border-color:var(--border);
+    }
     .heat-ramp {
       width:72px; height:8px; border-radius:99px;
       background:linear-gradient(90deg, rgba(139,92,246,.08), rgba(139,92,246,.55));
@@ -187,14 +204,22 @@
     }
     #tableWrap table.ct thead th {
       position:sticky; top:0; z-index:2;
-      background:var(--surface-2); text-transform:none; letter-spacing:0;
-      font-size:11.5px; font-weight:700; color:var(--text-secondary);
+      background:var(--ct-head-bg); text-transform:none; letter-spacing:0;
+      font-size:13px; font-weight:800; color:var(--ct-ink);
     }
     #tableWrap table.ct th.stub, #tableWrap table.ct td.stub {
       position:sticky; left:0; z-index:3; text-align:left;
-      background:var(--surface-1); min-width:88px; box-shadow:4px 0 10px rgba(0,0,0,.18);
+      background:var(--ct-stub-bg); min-width:108px; box-shadow:4px 0 10px rgba(0,0,0,.18);
+      color:var(--ct-ink); font-size:13.5px; font-weight:800;
     }
-    #tableWrap table.ct thead th.stub { z-index:4; background:var(--surface-2); }
+    #tableWrap table.ct thead th.stub { z-index:4; background:var(--ct-head-bg); }
+    .row-sort-btn {
+      display:inline-flex; align-items:center; justify-content:space-between; gap:8px;
+      width:100%; background:none; border:0; padding:0; margin:0;
+      color:inherit; font:inherit; font-weight:800; cursor:pointer; text-align:left;
+    }
+    .row-sort-btn i { color:var(--accent-ct); font-size:12px; }
+    .row-sort-btn:hover { text-decoration:underline; }
     #tableWrap table.ct tbody th.stub.total { right:auto; background:rgba(30,38,56,.96); }
     :root[data-theme="light"] #tableWrap table.ct tbody th.stub.total { background:#f1f5f9; }
     #tableWrap table.ct thead th.total,
@@ -215,14 +240,16 @@
       background-clip:padding-box;
     }
     #tableWrap table.ct td { min-width:72px; }
-    #tableWrap table.ct td.heat { color:var(--text-primary); }
+    #tableWrap table.ct td.heat { color:var(--ct-ink); }
+    #tableWrap table.ct td.heat .cell-v { color:inherit; }
+    #tableWrap table.ct td.heat .cell-v.sub { color:inherit; opacity:.88; }
     .tbl-actions { display:flex; gap:6px; margin-top:8px; }
     .mini-btn { border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary); border-radius:7px; padding:5px 9px; font-size:11px; cursor:pointer; }
     .tests-table td:first-child { text-align:left; font-weight:600; }
     .heat-grid { display:grid; gap:3px; }
     .heat-cell { min-height:54px; border-radius:6px; padding:6px; display:flex; flex-direction:column; justify-content:center; align-items:center; font-size:11px; cursor:default; border:1px solid transparent; }
     .heat-cell .hv { font-size:15px; font-weight:800; }
-    .heat-lab { font-size:11px; font-weight:700; color:var(--text-muted); display:flex; align-items:center; justify-content:flex-end; padding-right:6px; }
+    .heat-lab { font-size:11px; font-weight:700; color:var(--ct-ink-soft); display:flex; align-items:center; justify-content:flex-end; padding-right:6px; }
     .legend { display:flex; gap:10px; align-items:center; font-size:11px; color:var(--text-muted); margin-top:8px; }
     .sw { width:14px; height:14px; border-radius:3px; display:inline-block; }
     .error-card { padding:18px; font-size:14px; color:#fecaca; }
@@ -231,8 +258,8 @@
     select.ct-sel { background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border); border-radius:7px; padding:5px 8px; font-size:12px; }
     .muted { color:var(--text-muted); font-size:14px; }
     .cell-stack { display:flex; flex-direction:column; align-items:center; gap:1px; line-height:1.15; }
-    .cell-v { font-size:13.5px; font-weight:800; color:var(--text-primary); letter-spacing:.01em; }
-    .cell-v.sub { font-size:11px; font-weight:600; color:var(--text-muted); }
+    .cell-v { font-size:13.5px; font-weight:800; color:var(--ct-ink); letter-spacing:.01em; }
+    .cell-v.sub { font-size:11px; font-weight:700; color:var(--ct-ink-soft); }
     .cell-v.resid { font-variant-numeric:tabular-nums; font-weight:800; }
 
     /* Change style: let --preview-bg / texture show through opaque cards */
@@ -243,10 +270,14 @@
       border-color: color-mix(in srgb, var(--border) 50%, var(--preview-bg));
     }
     html[data-preview-tpl] #tableWrap table.ct thead th,
-    html[data-preview-tpl] #tableWrap table.ct thead th.stub,
+    html[data-preview-tpl] #tableWrap table.ct thead th.stub {
+      background: var(--ct-head-bg);
+      color: var(--ct-ink);
+    }
     html[data-preview-tpl] #tableWrap table.ct th.stub,
     html[data-preview-tpl] #tableWrap table.ct td.stub {
-      background: var(--preview-bg);
+      background: var(--ct-stub-bg);
+      color: var(--ct-ink);
     }
     html[data-preview-tpl] #tableWrap table.ct tbody th.stub.total,
     html[data-preview-tpl] #tableWrap table.ct thead th.total,
@@ -266,13 +297,12 @@
     html.preview-tpl-light .legend,
     html.preview-tpl-light .layout-note { color: #3b2416; }
     html.preview-tpl-light .card-title,
-    html.preview-tpl-light .kpi-k,
-    html.preview-tpl-light .cell-v.sub { color: #5c4030; }
+    html.preview-tpl-light .kpi-k { color: #5c4030; }
     html.preview-tpl-light .cell-v,
     html.preview-tpl-light #tableWrap table.ct td.heat,
     html.preview-tpl-light #tableWrap table.ct th.stub,
     html.preview-tpl-light #tableWrap table.ct td.stub,
-    html.preview-tpl-light #tableWrap table.ct thead th { color: #1c1917; }
+    html.preview-tpl-light #tableWrap table.ct thead th { color: var(--ct-ink); }
     html.preview-tpl-light .kpi {
       background: color-mix(in srgb, var(--preview-bg) 72%, #fff);
       border-color: rgba(92, 64, 48, .28);
@@ -353,8 +383,9 @@
               <div class="ws-mode-tabbar" id="measureBar"></div>
               <span class="info-icon" aria-label="About this table">i<span class="tip">
                 Check the tiles to choose which statistics appear in each cell. The first selected value is shown largest; the others sit underneath.<br><br>
+                <b>Color by</b> sets the heat-map independently of which numbers are shown: observed n, expected, row %, column %, total %, or adjusted residuals.<br><br>
                 <b>Adjusted residual</b> measures how far a cell is from independence. |r| &lt; 2 is typical, 2–3 is notable, and ≥ 3 is strong. Blue = fewer than expected; orange = more than expected.<br><br>
-                Cell shading follows the lead statistic (count, percent, or residual). Hover a cell for the full breakdown.
+                Click the row-names header (first column) to sort A→Z / Z→A. Drag a row or column name to reorder by hand. Hover a cell for the full breakdown.
               </span></span>
             </div>
             <div class="cell-legend" id="cellLegend"></div>
@@ -475,7 +506,10 @@
     var activeTab = 'overview';
     var selectedMeasures = { observed: true };
     var diagMode = 'heat';
+    var colorMetric = 'observed';
+    var rowSortDir = 0;
     var rowOrderLabels = [];
+    var rowOrderOriginal = [];
     var colOrderLabels = [];
     var tableDrag = null;
     var TITLE_MAP = {
@@ -491,6 +525,14 @@
       { id: 'colPct', label: 'Column %', short: 'Col %' },
       { id: 'totPct', label: 'Total %', short: 'Tot %' },
       { id: 'stdResiduals', label: 'Adjusted residuals', short: 'Adj. r' }
+    ];
+    var COLOR_METRICS = [
+      { id: 'observed', label: 'Observed counts (n)' },
+      { id: 'expected', label: 'Expected counts' },
+      { id: 'rowPct', label: 'Row %' },
+      { id: 'colPct', label: 'Column %' },
+      { id: 'totPct', label: 'Total %' },
+      { id: 'stdResiduals', label: 'Adjusted residuals' }
     ];
     function measureList() {
       return MEASURES.filter(function (m) { return selectedMeasures[m.id]; });
@@ -570,12 +612,19 @@
       return html;
     }
     function heatMode() {
-      if (hasMeasure('stdResiduals')) return 'residual';
-      if (hasMeasure('observed')) return 'observed';
-      if (hasMeasure('totPct')) return 'totPct';
-      if (hasMeasure('colPct')) return 'colPct';
-      if (hasMeasure('rowPct')) return 'rowPct';
-      return 'expected';
+      if (colorMetric === 'stdResiduals') return 'residual';
+      return colorMetric || 'observed';
+    }
+    function isLightCanvas() {
+      var root = document.documentElement;
+      return root.classList.contains('preview-tpl-light') || root.getAttribute('data-theme') === 'light';
+    }
+    function cellInk(bg) {
+      var a = 0;
+      var m = /,\s*([0-9.]+)\s*\)/.exec(bg || '');
+      if (m) a = Number(m[1]);
+      if (a >= 0.34) return '#ffffff';
+      return isLightCanvas() ? '#0f172a' : '#f8fafc';
     }
     function heatMax(r, mode) {
       if (mode === 'residual' || mode === 'rowPct' || mode === 'colPct' || mode === 'totPct') return 1;
@@ -711,11 +760,24 @@
         return '<span class="lg-item"><span class="' + (idx === 0 ? 'lg-hero' : 'lg-sub') + '">' + esc(m.short) + '</span></span>';
       }).join('<span class="lg-sub">·</span>');
       var rampCls = mode === 'residual' ? 'heat-ramp resid' : 'heat-ramp';
+      var opts = COLOR_METRICS.map(function (m) {
+        return '<option value="' + m.id + '"' + (colorMetric === m.id ? ' selected' : '') + '>' + esc(m.label) + '</option>';
+      }).join('');
       qsHtml('cellLegend',
         (list.length > 1 ? '<span>In each cell</span>' + items : '') +
-        '<span class="heat-key"><span class="' + rampCls + '"></span>' + esc(heatCaption(mode)) + '</span>' +
-        '<span class="lg-sub">Drag a row or column name to move it.</span>'
+        '<span class="heat-key">' +
+          '<label class="color-by">Color by <select class="ct-sel" id="colorMetricSel">' + opts + '</select></label>' +
+          '<span class="' + rampCls + '"></span>' +
+        '</span>' +
+        '<span class="lg-sub">Click the first column header to sort. Drag a row or column name to move it.</span>'
       );
+      var sel = document.getElementById('colorMetricSel');
+      if (sel) {
+        sel.onchange = function () {
+          colorMetric = sel.value;
+          renderTable();
+        };
+      }
     }
 
     function orderedIdxs(labels, saved) {
@@ -743,6 +805,24 @@
       return idxs.map(function (i) { return labels[i]; });
     }
 
+    function naturalCompare(a, b) {
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+    }
+    function cycleRowSort() {
+      if (!bundle) return;
+      rowSortDir = rowSortDir === 0 ? 1 : rowSortDir === 1 ? -1 : 0;
+      if (rowSortDir === 0) {
+        rowOrderLabels = rowOrderOriginal.slice();
+      } else {
+        rowOrderLabels = (bundle.rowLabels || []).slice().sort(function (a, b) {
+          return naturalCompare(a, b) * rowSortDir;
+        });
+      }
+      renderTable();
+      renderHeat();
+      renderResidValues();
+    }
+
     function renderTable() {
       var r = bundle;
       var list = measureList();
@@ -754,7 +834,11 @@
       var rows = rowIdxs(r);
       var cols = colIdxs(r);
       renderCellLegend();
-      var html = '<table class="ct"><thead><tr><th class="stub">' + esc(r.rowVar) + ' \\ ' + esc(r.colVar) + '</th>';
+      var sortIcon = rowSortDir > 0 ? 'fa-sort-up' : rowSortDir < 0 ? 'fa-sort-down' : 'fa-sort';
+      var html = '<table class="ct"><thead><tr><th class="stub stub-sort">' +
+        '<button type="button" class="row-sort-btn' + (rowSortDir ? ' is-active' : '') + '" id="rowSortBtn" title="Sort by ' + esc(r.rowVar) + '">' +
+        '<span>' + esc(r.rowVar) + ' \\ ' + esc(r.colVar) + '</span>' +
+        '<i class="fa-solid ' + sortIcon + '"></i></button></th>';
       cols.forEach(function (j, pos) {
         html += '<th class="col-drag" data-pos="' + pos + '" title="Drag to reorder columns">' + esc(r.colLabels[j]) + '</th>';
       });
@@ -765,7 +849,8 @@
         cols.forEach(function (j) {
           var sr = r.stdResiduals[i][j];
           var cls = 'heat' + (stacked ? ' stacked' : '') + (hasMeasure('stdResiduals') ? ' ' + bandClass(sr) : '');
-          html += '<td class="' + cls + '" style="background:' + cellHeat(r, i, j, mode, maxV) + '" title="' + tip(r, i, j) + '">' + stackHtml(cellLines(r, i, j)) + '</td>';
+          var bg = cellHeat(r, i, j, mode, maxV);
+          html += '<td class="' + cls + '" style="background:' + bg + ';color:' + cellInk(bg) + '" title="' + tip(r, i, j) + '">' + stackHtml(cellLines(r, i, j)) + '</td>';
         });
         if (showRowTot) {
           html += '<td class="total' + (stacked ? ' stacked' : '') + '">' + stackHtml(marginLines(r, 'row', i)) + '</td>';
@@ -785,6 +870,14 @@
       html += '</tbody></table>';
       qsHtml('tableWrap', html);
       bindTableDrag();
+      var sortBtn = document.getElementById('rowSortBtn');
+      if (sortBtn) {
+        sortBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          cycleRowSort();
+        });
+      }
     }
 
     function bindTableDrag() {
@@ -827,7 +920,10 @@
         var insertAt = Number(toEl.getAttribute('data-pos'));
         if (after) insertAt += 1;
         if (kind === 'col') colOrderLabels = moveOrder(colOrderLabels, bundle.colLabels, from, insertAt);
-        else rowOrderLabels = moveOrder(rowOrderLabels, bundle.rowLabels, from, insertAt);
+        else {
+          rowOrderLabels = moveOrder(rowOrderLabels, bundle.rowLabels, from, insertAt);
+          rowSortDir = 0;
+        }
         renderTable();
         renderHeat();
         renderResidValues();
@@ -927,7 +1023,8 @@
         html += '<tr><th class="stub">' + esc(r.rowLabels[i]) + '</th>';
         cols.forEach(function (j) {
           var sr = r.stdResiduals[i][j];
-          html += '<td class="' + bandClass(sr) + '" style="background:' + residColor(sr) + '" title="' + tip(r, i, j) + '">' + fmtN(sr, 2) + '</td>';
+          var bg = residColor(sr);
+          html += '<td class="' + bandClass(sr) + '" style="background:' + bg + ';color:' + cellInk(bg) + '" title="' + tip(r, i, j) + '">' + fmtN(sr, 2) + '</td>';
         });
         html += '</tr>';
       });
@@ -990,7 +1087,8 @@
         html += '<div class="heat-lab">' + esc(r.rowLabels[i]) + '</div>';
         cols.forEach(function (j) {
           var sr = r.stdResiduals[i][j];
-          html += '<div class="heat-cell" style="background:' + residColor(sr) + '" title="' + tip(r, i, j) + '">' +
+          var bg = residColor(sr);
+          html += '<div class="heat-cell" style="background:' + bg + ';color:' + cellInk(bg) + '" title="' + tip(r, i, j) + '">' +
             '<div class="hv">' + fmtN(sr, 2) + '</div><div>' + fmtN(r.observed[i][j], 1) + ' / ' + fmtN(r.expected[i][j], 1) + '</div></div>';
         });
       });
@@ -1081,6 +1179,8 @@
       }
       document.getElementById('errorState').classList.remove('active');
       rowOrderLabels = (b.rowLabels || []).slice();
+      rowOrderOriginal = rowOrderLabels.slice();
+      rowSortDir = 0;
       colOrderLabels = (b.colLabels || []).slice();
       renderAll();
       switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
@@ -1352,6 +1452,23 @@
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') closeHelp();
       });
+      var paintTimer = null;
+      function schedulePaint() {
+        clearTimeout(paintTimer);
+        paintTimer = setTimeout(function () {
+          if (bundle && bundle.analyzable) {
+            renderTable();
+            if (activeTab === 'diagnostics') renderDiagView();
+          }
+        }, 40);
+      }
+      window.addEventListener('statistico:preview-template', schedulePaint);
+      try {
+        new MutationObserver(schedulePaint).observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ['data-theme', 'class']
+        });
+      } catch (_obs) {}
     });
   </script>
 </body>

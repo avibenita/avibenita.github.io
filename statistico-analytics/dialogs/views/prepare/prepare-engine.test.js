@@ -59,6 +59,32 @@ describe('Statistico Prepare Data engine', () => {
     expect(scan.issues.some((i) => i.kind === 'empty_cols')).toBe(true);
   });
 
+  test('drop selected variables omits them from the prepared worksheet only', () => {
+    const headers = ['A', 'Comments', 'B'];
+    const data = [[1, '', 2], [3, '', 4]];
+    const snapshot = JSON.parse(JSON.stringify(data));
+    const out = Prep.applyRecipe(headers, data, [{
+      type: 'dropVariables',
+      variables: ['Comments'],
+      enabled: true
+    }]);
+    expect(data).toEqual(snapshot);
+    expect(out.headers).toEqual(['A', 'B']);
+    expect(out.rows).toEqual([[1, 2], [3, 4]]);
+    expect(out.steps[0].status).toBe('applied');
+  });
+
+  test('empty-column quality issue can drop those variables', () => {
+    const scan = Prep.scanQuality(['A', 'Comments'], [[1, ''], [2, '']]);
+    const issue = scan.issues.find((i) => i.kind === 'empty_cols');
+    expect(issue.recipeType).toBe('dropVariables');
+    const step = Prep.issueToRecipeStep(issue);
+    expect(step.type).toBe('dropVariables');
+    expect(step.variables).toContain('Comments');
+    const blocked = Prep.validateStep({ type: 'dropVariables', variables: ['A'] }, ['A']);
+    expect(blocked.ok).toBe(false);
+  });
+
   test('define missing-value codes in the prepared output only', () => {
     const source = rows();
     const snapshot = JSON.parse(JSON.stringify(source));

@@ -276,8 +276,10 @@
         issue: 'Empty columns',
         affected: frame.emptyCols.length,
         severity: 'information',
-        suggested: 'Blank columns in the selected range are ignored by analysis modules.',
+        suggested: 'Drop these columns from the prepared worksheet. The source sheet is not changed.',
         kind: 'empty_cols',
+        recipeType: 'dropVariables',
+        variables: frame.emptyCols.slice(),
         inspect: frame.emptyCols.map(function (name) { return { row: '', value: name }; })
       });
     }
@@ -523,6 +525,12 @@
     if (issue.recipeType === 'defineMissing') {
       return { type: 'defineMissing', variables: [issue.variable], codes: [], enabled: true };
     }
+    if (issue.recipeType === 'dropVariables') {
+      var dropNames = issue.variables && issue.variables.length
+        ? issue.variables.slice()
+        : String(issue.variable || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      return { type: 'dropVariables', variables: dropNames, enabled: true };
+    }
     if (issue.recipeType === 'filter' && issue.kind === 'empty_rows') {
       return {
         type: 'filter',
@@ -568,6 +576,8 @@
         return 'Flagged duplicate rows as ' + (step.flagName || 'duplicate_flag');
       case 'wideToLong':
         return 'Reshaped ' + (step.measureVars || []).join(', ') + ' into long format';
+      case 'dropVariables':
+        return 'Dropped ' + (vars || 'selected variables') + ' from the prepared worksheet';
       default:
         return step.type || 'Preparation step';
     }
@@ -1076,6 +1086,29 @@
     return { casesAffected: newRows.length, outputRows: newRows.length, inputRows: nOld };
   }
 
+  function applyDropVariables(ds, step) {
+    var drop = {};
+    (step.variables || []).forEach(function (v) {
+      var i = headerIndex(ds.headers, v);
+      if (i >= 0) drop[i] = true;
+    });
+    var keepIdx = [];
+    ds.headers.forEach(function (_h, i) {
+      if (!drop[i]) keepIdx.push(i);
+    });
+    if (!keepIdx.length) return { error: 'At least one variable must remain.', casesAffected: 0 };
+    if (keepIdx.length === ds.headers.length) {
+      return { error: 'None of the selected variables were found.', casesAffected: 0 };
+    }
+    var dropped = ds.headers.length - keepIdx.length;
+    ds.headers = keepIdx.map(function (i) { return ds.headers[i]; });
+    ds.rows = ds.rows.map(function (row) {
+      return keepIdx.map(function (i) { return row ? row[i] : MISSING; });
+    });
+    ds.structural = true;
+    return { casesAffected: dropped, variablesDropped: dropped };
+  }
+
   var OPERATORS = {
     defineMissing: applyDefineMissing,
     recode: applyRecode,
@@ -1085,7 +1118,8 @@
     harmonize: applyHarmonize,
     filter: applyFilter,
     flagDuplicates: applyFlagDuplicates,
-    wideToLong: applyWideToLong
+    wideToLong: applyWideToLong,
+    dropVariables: applyDropVariables
   };
 
   function validateStep(step, headers) {
@@ -1133,6 +1167,17 @@
     if (step.type === 'wideToLong') {
       if (!(step.measureVars || []).length) return { ok: false, error: 'Select repeated-measure columns.' };
       if (!step.timeName || !step.valueName) return { ok: false, error: 'Name the new occasion and measurement variables.' };
+    }
+    if (step.type === 'dropVariables') {
+      if (!(step.variables || []).length) return { ok: false, error: 'Select at least one variable to drop.' };
+      var dropIdx = {};
+      (step.variables || []).forEach(function (v) {
+        var i = headerIndex(headers, v);
+        if (i >= 0) dropIdx[i] = true;
+      });
+      var nDrop = Object.keys(dropIdx).length;
+      if (!nDrop) return { ok: false, error: 'Select at least one variable that is in the dataset.' };
+      if (nDrop >= (headers || []).length) return { ok: false, error: 'At least one variable must remain.' };
     }
     return { ok: true };
   }
@@ -1309,6 +1354,7 @@
     },
     AVAILABLE_OPERATIONS: [
       { id: 'defineMissing', category: 'variables', label: 'Define missing-value codes' },
+      { id: 'dropVariables', category: 'variables', label: 'Drop selected variables' },
       { id: 'recode', category: 'variables', label: 'Recode values' },
       { id: 'compute', category: 'variables', label: 'Compute a new variable' },
       { id: 'reverseScore', category: 'variables', label: 'Reverse-score items' },

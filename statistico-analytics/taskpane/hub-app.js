@@ -764,6 +764,10 @@ function placeHubRangeSection() {
   if (!range || !holder || !holder.parentElement) return;
   if (ACTIVE_CLUSTER === "tools") {
     var firstTile = holder.querySelector(".category-tile");
+    if (ACTIVE_TOOLS_SECTION === "all") {
+      holder.parentElement.insertBefore(range, holder);
+      return;
+    }
     if (firstTile) {
       holder.insertBefore(range, firstTile);
       return;
@@ -792,7 +796,7 @@ function renderCategoryTiles(query) {
     return !c.hidden;
   });
   var source = allSource;
-  if (ACTIVE_CLUSTER === "tools") {
+  if (ACTIVE_CLUSTER === "tools" && ACTIVE_TOOLS_SECTION !== "all") {
     source = allSource.filter(function (c) {
       return getToolsTileSectionId(c, allSource) === ACTIVE_TOOLS_SECTION;
     });
@@ -816,7 +820,20 @@ function renderCategoryTiles(query) {
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
   var html = "";
-  if (ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION === "all") {
+  if (ACTIVE_CLUSTER === "tools" && ACTIVE_TOOLS_SECTION === "all") {
+    var toolsEmitted = 0;
+    TOOLS_SECTION_ORDER.forEach(function (sectionId) {
+      var familyTiles = list.filter(function (c) {
+        return getToolsTileSectionId(c, allSource) === sectionId;
+      });
+      if (!familyTiles.length) return;
+      html += renderToolsSectionHeader(sectionId, toolsEmitted > 0);
+      html += familyTiles.map(function (c) {
+        return renderCategoryTileHtml(c, clusterColor, clusterColorDark);
+      }).join("");
+      toolsEmitted += familyTiles.length;
+    });
+  } else if (ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION === "all") {
     var emitted = 0;
     ANALYTICS_FAMILY_ORDER.forEach(function (sectionId) {
       var familyTiles = list.filter(function (c) {
@@ -925,6 +942,18 @@ function syncAnalyticsAllBar(query) {
 
 function renderAnalyticsSectionHeader(sectionId, withDivider) {
   var meta = ANALYTICS_SECTION_META[sectionId];
+  if (!meta) return "";
+  return (
+    '<div class="category-section-header' + (withDivider ? " with-divider" : "") + '"' +
+    ' style="--section-color:' + escapeHtml(meta.color) + ';">' +
+    '<div class="category-section-title">' + escapeHtml(meta.label) + "</div>" +
+    (meta.subtitle ? '<div class="category-section-subtitle">' + escapeHtml(meta.subtitle) + "</div>" : "") +
+    "</div>"
+  );
+}
+
+function renderToolsSectionHeader(sectionId, withDivider) {
+  var meta = TOOLS_SECTION_META[sectionId];
   if (!meta) return "";
   return (
     '<div class="category-section-header' + (withDivider ? " with-divider" : "") + '"' +
@@ -1226,7 +1255,7 @@ function syncClusterHeader() {
   var advisor = document.getElementById("advisorStrip");
   var showRange = HUB_RANGE_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
   if (ACTIVE_CLUSTER === "tools") {
-    showRange = TOOLS_RANGE_SECTIONS.indexOf(ACTIVE_TOOLS_SECTION) >= 0;
+    showRange = ACTIVE_TOOLS_SECTION === "all" || TOOLS_RANGE_SECTIONS.indexOf(ACTIVE_TOOLS_SECTION) >= 0;
   }
   var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
   if (range) range.style.display = showRange ? "" : "none";
@@ -1296,7 +1325,7 @@ function toggleHubToolsMenu(ev) {
 }
 
 function setHubToolsSection(sectionId) {
-  if (!TOOLS_SECTION_META[sectionId]) return;
+  if (sectionId !== "all" && !TOOLS_SECTION_META[sectionId]) return;
   ACTIVE_TOOLS_SECTION = sectionId;
   ACTIVE_CLUSTER = "tools";
   closeHubToolsMenu();

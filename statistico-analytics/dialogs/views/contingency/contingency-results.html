@@ -7,9 +7,10 @@
   <title>Contingency Tables Results</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <link rel="stylesheet" href="../shared-header.css?v=20260817ct1"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260817ct2"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260817ct1"></script>
+  <script src="../shared-header.js?v=20260817ct2"></script>
+  <script src="../shared/vendor/highcharts/highcharts.js"></script>
   <script src="contingency-engine.js?v=20260814ct8"></script>
   <script src="contingency-sample-data.js?v=20260814ct8"></script>
   <style>
@@ -321,6 +322,31 @@
       color: #3b2416;
       border-color: rgba(92, 64, 48, .28);
     }
+    .viz-controls {
+      display:flex; flex-wrap:wrap; gap:10px 16px; align-items:flex-end; margin-bottom:10px;
+    }
+    .viz-controls label {
+      display:flex; flex-direction:column; gap:4px;
+      font-size:10.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+      color:var(--text-muted);
+    }
+    .viz-controls select.ct-sel { min-width:148px; text-transform:none; letter-spacing:0; font-weight:700; }
+    .viz-seg {
+      display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2);
+    }
+    .viz-seg button {
+      border:0; background:transparent; color:var(--text-secondary); cursor:pointer;
+      padding:6px 11px; font-size:11.5px; font-weight:700;
+    }
+    .viz-seg button.active { background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:#fff; }
+    .viz-check {
+      flex-direction:row !important; align-items:center; gap:8px !important;
+      text-transform:none; letter-spacing:0; font-size:12px !important; color:var(--text-secondary) !important;
+      padding-bottom:6px;
+    }
+    .viz-check input { accent-color:#8b5cf6; }
+    #vizChartWrap.chart-wrap { width:100%; height:440px; border-radius:10px; overflow:hidden; }
+    #vizChart { width:100%; height:100%; }
   </style>
 </head>
 <body>
@@ -346,9 +372,13 @@
               <i class="fa-solid fa-table sb-item-icon"></i>
               <span class="sb-item-copy"><span class="sb-item-label">Contingency Table</span><span class="sb-item-description">Counts, percents, adjusted residuals.</span></span>
             </button>
+            <button class="sb-item" onclick="switchTab('visualization')" data-tab="visualization">
+              <i class="fa-solid fa-chart-column sb-item-icon"></i>
+              <span class="sb-item-copy"><span class="sb-item-label">Visualization</span><span class="sb-item-description">Chart columns by n, %, or residual.</span></span>
+            </button>
             <button class="sb-item" onclick="switchTab('diagnostics')" data-tab="diagnostics">
               <i class="fa-solid fa-stethoscope sb-item-icon"></i>
-              <span class="sb-item-copy"><span class="sb-item-label">Diagnostics &amp; Visualization</span><span class="sb-item-description">Expected-count checks and residual heat map.</span></span>
+              <span class="sb-item-copy"><span class="sb-item-label">Diagnostics</span><span class="sb-item-description">Expected-count checks and residual heat map.</span></span>
             </button>
             <button class="sb-item" onclick="switchTab('twobytwo')" data-tab="twobytwo" id="tab2x2Btn">
               <i class="fa-solid fa-border-all sb-item-icon"></i>
@@ -397,6 +427,32 @@
             <div class="tbl-actions">
               <button class="mini-btn" type="button" onclick="copyCurrentTable()"><i class="fa-solid fa-copy"></i> Copy table</button>
               <button class="mini-btn" type="button" onclick="exportCurrentCsv()"><i class="fa-solid fa-download"></i> Export CSV</button>
+            </div>
+          </div>
+        </div>
+        <div id="tab-visualization" class="tab-panel">
+          <div class="card">
+            <div class="viz-controls">
+              <label>Y axis
+                <select class="ct-sel" id="vizMetric"></select>
+              </label>
+              <label>Chart type
+                <select class="ct-sel" id="vizType"></select>
+              </label>
+              <label>Y scale
+                <select class="ct-sel" id="vizScale"></select>
+              </label>
+              <label id="vizWeightLabel">Counts
+                <div class="viz-seg" id="vizWeightSeg">
+                  <button type="button" data-w="1">Weighted</button>
+                  <button type="button" data-w="0">Unweighted</button>
+                </div>
+              </label>
+              <label class="viz-check"><input type="checkbox" id="vizLabels"> Data labels</label>
+            </div>
+            <p class="muted" id="vizCaption" style="margin-bottom:8px;"></p>
+            <div class="chart-wrap" id="vizChartWrap" data-preview-canvas>
+              <div id="vizChart"></div>
             </div>
           </div>
         </div>
@@ -516,10 +572,15 @@
     var rowOrderOriginal = [];
     var colOrderLabels = [];
     var tableDrag = null;
+    var vizChart = null;
+    var vizWeighted = true;
+    var vizUnweightedCache = null;
+    var vizBound = false;
     var TITLE_MAP = {
       overview: 'Overview',
       table: 'Contingency Table',
-      diagnostics: 'Diagnostics & Visualization',
+      visualization: 'Visualization',
+      diagnostics: 'Diagnostics',
       twobytwo: '2×2 Measures'
     };
     var MEASURES = [
@@ -538,6 +599,23 @@
       { id: 'totPct', label: 'Total %' },
       { id: 'stdResiduals', label: 'Adjusted residuals' }
     ];
+    var VIZ_TYPES = [
+      { id: 'column', label: 'Clustered columns' },
+      { id: 'column-stack', label: 'Stacked columns' },
+      { id: 'column-pct', label: '100% stacked columns' },
+      { id: 'bar', label: 'Clustered bars' },
+      { id: 'bar-stack', label: 'Stacked bars' },
+      { id: 'line', label: 'Lines' },
+      { id: 'spline', label: 'Smooth lines' },
+      { id: 'area', label: 'Area' },
+      { id: 'area-stack', label: 'Stacked area' }
+    ];
+    var VIZ_SCALES = [
+      { id: 'linear', label: 'Linear' },
+      { id: 'log', label: 'Logarithmic' },
+      { id: 'pct', label: '0–100%' }
+    ];
+    var VIZ_COLORS = ['#8b5cf6','#22d3ee','#fb923c','#34d399','#f472b6','#60a5fa','#fbbf24','#c084fc','#2dd4bf','#f87171','#a3e635','#38bdf8'];
     function measureList() {
       return MEASURES.filter(function (m) { return selectedMeasures[m.id]; });
     }
@@ -691,8 +769,219 @@
       return '';
     }
 
+    function bindVizControls() {
+      if (vizBound) return;
+      vizBound = true;
+      var mSel = document.getElementById('vizMetric');
+      var tSel = document.getElementById('vizType');
+      var sSel = document.getElementById('vizScale');
+      if (mSel) {
+        mSel.innerHTML = COLOR_METRICS.map(function (m) {
+          return '<option value="' + m.id + '">' + esc(m.label) + '</option>';
+        }).join('');
+        mSel.value = 'observed';
+        mSel.onchange = function () { syncVizScaleOptions(); renderVizChart(); };
+      }
+      if (tSel) {
+        tSel.innerHTML = VIZ_TYPES.map(function (t) {
+          return '<option value="' + t.id + '">' + esc(t.label) + '</option>';
+        }).join('');
+        tSel.value = 'column';
+        tSel.onchange = function () { renderVizChart(); };
+      }
+      if (sSel) sSel.onchange = function () { renderVizChart(); };
+      document.querySelectorAll('#vizWeightSeg button').forEach(function (btn) {
+        btn.onclick = function () {
+          vizWeighted = btn.getAttribute('data-w') === '1';
+          document.querySelectorAll('#vizWeightSeg button').forEach(function (b) {
+            b.classList.toggle('active', b === btn);
+          });
+          renderVizChart();
+        };
+      });
+      var lab = document.getElementById('vizLabels');
+      if (lab) lab.onchange = function () { renderVizChart(); };
+      syncVizScaleOptions();
+    }
+    function syncVizScaleOptions() {
+      var metric = (document.getElementById('vizMetric') || {}).value || 'observed';
+      var sSel = document.getElementById('vizScale');
+      if (!sSel) return;
+      var prev = sSel.value;
+      var isPct = metric === 'rowPct' || metric === 'colPct' || metric === 'totPct';
+      var isResid = metric === 'stdResiduals';
+      var opts = VIZ_SCALES.filter(function (s) {
+        if (s.id === 'log' && isResid) return false;
+        if (s.id === 'pct' && !isPct) return false;
+        return true;
+      });
+      sSel.innerHTML = opts.map(function (s) {
+        return '<option value="' + s.id + '">' + esc(s.label) + '</option>';
+      }).join('');
+      if (opts.some(function (s) { return s.id === prev; })) sSel.value = prev;
+      else sSel.value = isPct ? 'pct' : 'linear';
+    }
+    function vizSourceBundle() {
+      if (!bundle) return null;
+      if (vizWeighted || !bundle.weightVar) return bundle;
+      if (vizUnweightedCache) return vizUnweightedCache;
+      var rows = bundle.usedViewRows || [];
+      if (!rows.length) return bundle;
+      var rowLabs = bundle.rowLabels || [];
+      var colLabs = bundle.colLabels || [];
+      var rMap = {}, cMap = {};
+      rowLabs.forEach(function (l, i) { rMap[String(l)] = i; });
+      colLabs.forEach(function (l, i) { cMap[String(l)] = i; });
+      var obs = rowLabs.map(function () { return colLabs.map(function () { return 0; }); });
+      rows.forEach(function (row) {
+        var ri = rMap[String(row[0])];
+        var ci = cMap[String(row[1])];
+        if (ri == null || ci == null) return;
+        obs[ri][ci] += 1;
+      });
+      if (typeof StatisticoContingency === 'undefined' || !StatisticoContingency.analyzeCounts) return bundle;
+      var next = StatisticoContingency.analyzeCounts(obs, rowLabs, colLabs, { confidence: bundle.confidence || 0.95 });
+      next.rowVar = bundle.rowVar;
+      next.colVar = bundle.colVar;
+      vizUnweightedCache = next;
+      return next;
+    }
+    function vizMatrix(src, metric) {
+      if (metric === 'expected') return src.expected;
+      if (metric === 'rowPct') return src.rowPct;
+      if (metric === 'colPct') return src.colPct;
+      if (metric === 'totPct') return src.totPct;
+      if (metric === 'stdResiduals') return src.stdResiduals;
+      return src.observed;
+    }
+    function vizMetricLabel(id) {
+      var found = null;
+      COLOR_METRICS.forEach(function (m) { if (m.id === id) found = m.label; });
+      return found || id;
+    }
+    function renderVizChart() {
+      if (!bundle || !bundle.analyzable) return;
+      if (typeof Highcharts === 'undefined') return;
+      bindVizControls();
+      var metric = (document.getElementById('vizMetric') || {}).value || 'observed';
+      var typeId = (document.getElementById('vizType') || {}).value || 'column';
+      var scale = (document.getElementById('vizScale') || {}).value || 'linear';
+      var showLabels = !!(document.getElementById('vizLabels') && document.getElementById('vizLabels').checked);
+      var src = vizSourceBundle();
+      var rows = rowIdxs(src);
+      var cols = colIdxs(src);
+      var matrix = vizMatrix(src, metric) || [];
+      var cats = cols.map(function (j) { return src.colLabels[j]; });
+      var stacking = null;
+      var hcType = 'column';
+      if (typeId === 'column-stack') { hcType = 'column'; stacking = 'normal'; }
+      else if (typeId === 'column-pct') { hcType = 'column'; stacking = 'percent'; }
+      else if (typeId === 'bar') hcType = 'bar';
+      else if (typeId === 'bar-stack') { hcType = 'bar'; stacking = 'normal'; }
+      else if (typeId === 'line') hcType = 'line';
+      else if (typeId === 'spline') hcType = 'spline';
+      else if (typeId === 'area') hcType = 'area';
+      else if (typeId === 'area-stack') { hcType = 'area'; stacking = 'normal'; }
+      var isLog = scale === 'log' && metric !== 'stdResiduals';
+      var isPctAxis = scale === 'pct' && stacking !== 'percent';
+      var series = rows.map(function (i, si) {
+        return {
+          name: src.rowLabels[i],
+          color: VIZ_COLORS[si % VIZ_COLORS.length],
+          data: cols.map(function (j) {
+            var v = matrix[i] && matrix[i][j];
+            if (!isFinite(v)) return null;
+            if (isLog && v <= 0) return null;
+            return Math.round(v * 1000) / 1000;
+          })
+        };
+      });
+      var yTitle = vizMetricLabel(metric);
+      if (!vizWeighted && bundle.weightVar) yTitle += ' (unweighted)';
+      var cap = document.getElementById('vizCaption');
+      if (cap) {
+        cap.textContent = (src.rowVar || 'Rows') + ' as series · X = ' + (src.colVar || 'columns') +
+          (bundle.weightVar ? (vizWeighted ? ' · weighted by ' + bundle.weightVar : ' · unweighted (each case = 1)') : '');
+      }
+      var wLabel = document.getElementById('vizWeightLabel');
+      if (wLabel) wLabel.style.display = bundle.weightVar ? '' : 'none';
+      var canUnweight = !!(bundle.weightVar && (bundle.usedViewRows || []).length);
+      document.querySelectorAll('#vizWeightSeg button').forEach(function (b) {
+        var isW = b.getAttribute('data-w') === '1';
+        b.classList.toggle('active', isW === !!vizWeighted);
+        if (!isW) {
+          b.disabled = !canUnweight;
+          b.title = canUnweight ? 'Each case counts as 1, ignoring the weight variable.' : 'Unweighted counts need the source cases.';
+        }
+      });
+      var light = isLightCanvas();
+      var axis = light ? '#3f2a1c' : '#e2e8f0';
+      var grid = light ? 'rgba(92,64,48,.22)' : 'rgba(148,163,184,.18)';
+      var yAxis = {
+        title: { text: yTitle, style: { color: axis } },
+        labels: { style: { color: axis } },
+        gridLineColor: grid,
+        type: isLog ? 'logarithmic' : 'linear'
+      };
+      if (isPctAxis) { yAxis.min = 0; yAxis.max = 100; }
+      if (metric === 'stdResiduals' && !isLog) {
+        yAxis.plotLines = [
+          { value: 0, color: grid, width: 1 },
+          { value: 2, color: 'rgba(234,88,12,.55)', width: 1, dashStyle: 'Dash' },
+          { value: -2, color: 'rgba(37,99,235,.55)', width: 1, dashStyle: 'Dash' }
+        ];
+      }
+      var pctMetric = metric.indexOf('Pct') >= 0;
+      var opts = {
+        chart: { type: hcType, backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI, sans-serif' }, animation: { duration: 280 } },
+        title: { text: '' },
+        credits: { enabled: false },
+        xAxis: {
+          categories: cats,
+          title: { text: src.colVar || '', style: { color: axis } },
+          labels: { style: { color: axis, fontSize: '12px', fontWeight: '700' }, rotation: cats.length > 8 ? -35 : 0 },
+          lineColor: grid
+        },
+        yAxis: yAxis,
+        legend: {
+          itemStyle: { color: axis, fontWeight: '700' },
+          itemHoverStyle: { color: light ? '#0f172a' : '#fff' }
+        },
+        tooltip: {
+          shared: hcType === 'line' || hcType === 'spline' || hcType === 'area',
+          backgroundColor: light ? 'rgba(255,248,230,.96)' : 'rgba(15,23,42,.95)',
+          style: { color: light ? '#1c1917' : '#e2e8f0' },
+          valueDecimals: metric === 'observed' ? 1 : (pctMetric ? 1 : 2),
+          valueSuffix: pctMetric && stacking !== 'percent' ? '%' : ''
+        },
+        plotOptions: {
+          series: {
+            stacking: stacking,
+            dataLabels: {
+              enabled: showLabels,
+              style: { color: axis, fontSize: '10px', fontWeight: '700', textOutline: 'none' },
+              format: pctMetric ? '{y:.1f}%' : '{y:.2f}'
+            },
+            marker: { enabled: hcType === 'line' || hcType === 'spline' }
+          },
+          column: { borderWidth: 0, grouping: !stacking, groupPadding: 0.12, pointPadding: 0.06 },
+          bar: { borderWidth: 0, grouping: !stacking }
+        },
+        series: series
+      };
+      if (vizChart) {
+        try { vizChart.destroy(); } catch (_d) {}
+        vizChart = null;
+      }
+      vizChart = Highcharts.chart('vizChart', opts);
+      if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === 'function') {
+        StatisticoHeader.applyPreviewTemplate(StatisticoHeader.previewTemplateId, { silent: true });
+      }
+    }
+
     function switchTab(name) {
-      if (name === 'tests' || name === 'viz') name = name === 'viz' ? 'diagnostics' : 'overview';
+      if (name === 'tests') name = 'overview';
+      if (name === 'viz') name = 'visualization';
       if (name === 'twobytwo' && !(bundle && bundle.nRows === 2 && bundle.nCols === 2)) name = 'overview';
       activeTab = name;
       document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
@@ -705,6 +994,10 @@
         StatisticoHeader.updateTitle(TITLE_MAP[name] || 'Contingency Tables');
       }
       if (name === 'diagnostics') renderDiagView();
+      if (name === 'visualization') {
+        renderVizChart();
+        setTimeout(function () { if (vizChart && vizChart.reflow) vizChart.reflow(); }, 40);
+      }
     }
 
     function setWarn(id, text) {
@@ -825,9 +1118,8 @@
       renderTable();
       renderHeat();
       renderResidValues();
+      if (activeTab === 'visualization') renderVizChart();
     }
-
-    function renderTable() {
       var r = bundle;
       var list = measureList();
       var stacked = list.length > 1;
@@ -931,6 +1223,7 @@
         renderTable();
         renderHeat();
         renderResidValues();
+        if (activeTab === 'visualization') renderVizChart();
       }
       wrap.querySelectorAll('th.col-drag, th.row-drag').forEach(function (th) {
         th.addEventListener('pointerdown', function (e) {
@@ -1159,6 +1452,8 @@
       renderTable();
       renderDiagView();
       render2x2();
+      bindVizControls();
+      if (activeTab === 'visualization') renderVizChart();
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
         StatisticoHeader.updateVariable((bundle.rowVar || '') + ' × ' + (bundle.colVar || ''), bundle.N);
       }
@@ -1186,6 +1481,8 @@
       rowOrderOriginal = rowOrderLabels.slice();
       rowSortDir = 0;
       colOrderLabels = (b.colLabels || []).slice();
+      vizUnweightedCache = null;
+      vizWeighted = !!b.weightVar;
       renderAll();
       switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
     }
@@ -1198,7 +1495,8 @@
       var sections = [
         { id: 'overview', label: 'Overview' },
         { id: 'table', label: 'Contingency Table' },
-        { id: 'diagnostics', label: 'Diagnostics & Visualization' }
+        { id: 'visualization', label: 'Visualization' },
+        { id: 'diagnostics', label: 'Diagnostics' }
       ];
       if (bundle.nRows === 2 && bundle.nCols === 2) {
         sections.push({ id: 'twobytwo', label: '2×2 Measures' });
@@ -1302,6 +1600,8 @@
       if (Array.isArray(vd.headers) && vd.headers.length) bundle.viewHeaders = vd.headers;
       if (Array.isArray(vd.allRows)) bundle.allViewRows = vd.allRows;
       if (Array.isArray(vd.usedRows)) bundle.usedViewRows = vd.usedRows;
+      vizUnweightedCache = null;
+      if (activeTab === 'visualization') renderVizChart();
       if (document.getElementById('hdpModal') && typeof StatisticoHeader !== 'undefined' && StatisticoHeader._populateDataModal) {
         var live = ctViewData();
         StatisticoHeader._lastDataResult = live;
@@ -1445,6 +1745,7 @@
     document.addEventListener('DOMContentLoaded', function () {
       bootHeader();
       startBridge();
+      bindVizControls();
       var modal = document.getElementById('diagHelpModal');
       var openBtn = document.getElementById('diagHelpBtn');
       var closeBtn = document.getElementById('diagHelpClose');
@@ -1463,6 +1764,7 @@
           if (bundle && bundle.analyzable) {
             renderTable();
             if (activeTab === 'diagnostics') renderDiagView();
+            if (activeTab === 'visualization') renderVizChart();
           }
         }, 40);
       }

@@ -2882,13 +2882,35 @@
       el.style.top = '6px';
       el.style.width = (effectW + weightW) + 'px';
       el.style.gridTemplateColumns = effectW + 'px ' + weightW + 'px';
+      var effectHeader = forestEffectColumnHeader(ctx.bundle && ctx.bundle.spec) + ' ';
       el.innerHTML =
         '<span class="forest-h-effect' + effectActive + '" data-forest-sort="effect" title="Sort by effect size">' +
-          'Effect [95% CI] ' + forestSortIndicator('effect') + '</span>' +
+          escapeHtml(effectHeader) + forestSortIndicator('effect') + '</span>' +
         '<span class="forest-h-weight' + weightActive + '" data-forest-sort="weight" title="Sort by weight">' +
           'Weight ' + forestSortIndicator('weight') +
           '<span class="info-icon" tabindex="0">i<span class="tip"><b>Weight</b> — relative contribution of each study to the pooled estimate under the current model (random-effects weights use 1/(v<sub>i</sub>+τ²)). Larger markers correspond to higher weight. Column totals 100% across studies.</span></span></span>';
       syncForestSortToolbar();
+    }
+
+    function forestEffectColumnHeader(spec) {
+      if (isLogRatioMeasure(spec)) {
+        var m = (spec && spec.effectMeasure) || '';
+        if (m === 'or' || m === 'logor') return 'Odds ratio [95% CI]';
+        if (m === 'rom') return 'Ratio of means [95% CI]';
+        return 'Risk ratio [95% CI]';
+      }
+      return (effectMeasureShort(spec) || 'Effect') + ' [95% CI]';
+    }
+
+    function forestPooledRowLabel(bundle) {
+      if (!bundle || bundle.model === 'fixed') return 'Fixed-effect model';
+      var est = (bundle.heterogeneity && bundle.heterogeneity.tauEstimator) ||
+        (bundle.spec && bundle.spec.tauEstimator) || 'reml';
+      var bits = [est === 'dl' ? 'DL' : 'REML'];
+      if (bundle.hartungKnapp || (bundle.spec && bundle.spec.hartungKnapp !== false)) {
+        bits.push('HK');
+      }
+      return 'Random-effects model (' + bits.join('\u2013') + ')';
     }
 
     function buildForestViewModel(bundle) {
@@ -2898,7 +2920,7 @@
       var k = studies.length;
       var pooledY = k;
       var modelTxt = modelLabel(bundle);
-      var pooledLabel = bundle.model === 'fixed' ? 'Fixed-effect model' : 'Random-effects model';
+      var pooledLabel = forestPooledRowLabel(bundle);
       var categories = studies.map(function (s) { return s.name || 'Study'; }).concat([pooledLabel]);
       if (bundle.model === 'fixed') modelTxt = 'Fixed-effect';
       var spec = bundle.spec || {};
@@ -3037,9 +3059,13 @@
       });
 
       var dY = yPx(pooledY);
-      var dL = xPx(bundle.pooled.ciLower);
-      var dR = xPx(bundle.pooled.ciUpper);
-      var dC = xPx(bundle.pooled.effect);
+      var spec = bundle.spec || {};
+      var pooledDisp = toDisplayEffect(bundle.pooled.effect, spec);
+      var pooledLo = toDisplayEffect(bundle.pooled.ciLower, spec);
+      var pooledHi = toDisplayEffect(bundle.pooled.ciUpper, spec);
+      var dL = xPx(pooledLo);
+      var dR = xPx(pooledHi);
+      var dC = xPx(pooledDisp);
       var dH = Math.min(10, Math.max(7, plotHeight / (k + 3) * 0.35));
       chart.renderer.path([
         'M', dL, dY,
@@ -3060,9 +3086,9 @@
 
       rows.forEach(function (r) {
         var y = yPx(r.i) + 4;
-        var effectTxt = fmtDisplay(r.yi, ctx.bundle && ctx.bundle.spec, ctx.xDecimals) +
-          ' [' + fmtDisplay(r.lo, ctx.bundle && ctx.bundle.spec, ctx.xDecimals) + ', ' +
-          fmtDisplay(r.hi, ctx.bundle && ctx.bundle.spec, ctx.xDecimals) + ']';
+        var effectTxt = fmtDisplay(r.yi, spec, ctx.xDecimals) +
+          ' [' + fmtDisplay(r.lo, spec, ctx.xDecimals) + ', ' +
+          fmtDisplay(r.hi, spec, ctx.xDecimals) + ']';
         chart.renderer.text(effectTxt, effectX, y)
           .css({ color: ctx.labelBright, fontSize: '12.5px', fontWeight: '700' })
           .attr({ zIndex: 8 }).add(g);
@@ -3071,8 +3097,9 @@
           .attr({ zIndex: 8 }).add(g);
       });
 
-      var pooledEffectTxt = fmt(bundle.pooled.effect) + ' [' +
-        fmt(bundle.pooled.ciLower) + ', ' + fmt(bundle.pooled.ciUpper) + ']';
+      var pooledEffectTxt = fmtDisplay(pooledDisp, spec, ctx.xDecimals) + ' [' +
+        fmtDisplay(pooledLo, spec, ctx.xDecimals) + ', ' +
+        fmtDisplay(pooledHi, spec, ctx.xDecimals) + ']';
       chart.renderer.text(pooledEffectTxt, effectX, dY + 4)
         .css({ color: t.orange, fontSize: '12.5px', fontWeight: '800' })
         .attr({ zIndex: 8 }).add(g);
@@ -3132,7 +3159,9 @@
           dashStyle: 'Dot',
           zIndex: 3,
           label: {
-            text: 'Pooled',
+            text: (isLogRatioMeasure(bundle.spec)
+              ? ('Pooled ' + effectMeasureShort(bundle.spec))
+              : 'Pooled'),
             align: 'center',
             verticalAlign: 'top',
             rotation: 0,

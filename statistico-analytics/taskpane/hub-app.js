@@ -517,11 +517,64 @@ const TOOLS_CATEGORY_TILES = [
     ]
   }
 ];
+const PREPARE_CATEGORY_TILES = [
+  {
+    id: "prepare-quality",
+    title: "Data Quality",
+    icon: "fa-magnifying-glass-chart",
+    accent: "#14b8a6",
+    accentDark: "#0f766e",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Find missing values, inconsistent categories, duplicates and structural problems before analysis.",
+    desc: "Scan the Active Range for missing values, inconsistent categories, duplicates, and structural problems that commonly weaken statistical analysis. Suggested corrections are never applied automatically.",
+    info: [
+      "Scan the selected Excel range without changing the source worksheet",
+      "Missing values, mixed types, duplicates, and inconsistent labels",
+      "Suggested actions can be added to a preparation recipe",
+      "Does not replace analysis-level trimming or transformations"
+    ],
+    modules: [
+      { id: "prepare-quality", label: "Scan data quality", tip: "Inspect missing values, duplicates, mixed types, and inconsistent categories." }
+    ]
+  },
+  {
+    id: "prepare-dataset",
+    title: "Prepare Dataset",
+    icon: "fa-table-columns",
+    accent: "#14b8a6",
+    accentDark: "#0f766e",
+    color: "#0d9488",
+    colorDark: "#0f766e",
+    subtitle: "Recode, compute, filter and reshape data while preserving the original worksheet.",
+    desc: "Build a reusable preparation recipe — recode, compute, reverse-score, composite scores, filter, and reshape — then write a new Prepared_Data worksheet. The original range is never overwritten.",
+    info: [
+      "Persistent dataset operations: missing codes, recode, compute, reverse-score, composites",
+      "Filter cases, flag duplicates, and reshape wide data to long",
+      "Preview changes before creating a new worksheet",
+      "Leaves analysis-level transforms (ln, z-score, trim) inside each analysis dialog"
+    ],
+    modules: [
+      { id: "prepare-dataset", label: "Prepare dataset", tip: "Recode, compute, filter, and reshape into a new worksheet." }
+    ]
+  }
+];
 let HUB_CLUSTER_TILES = {
+  prepare: PREPARE_CATEGORY_TILES,
   analytics: HUB_CATEGORY_TILES,
   tools: TOOLS_CATEGORY_TILES
 };
 let HUB_CLUSTER_META = {
+  prepare: {
+    eyebrow: "Before analysis",
+    name: "Prepare Data",
+    tagline: "Resolve data problems that prevent or weaken statistical analysis",
+    color: "#5eead4",
+    colorDark: "#0f766e",
+    icon: "fa-broom",
+    brandFrom: "#5eead4",
+    brandTo: "#14b8a6"
+  },
   analytics: {
     eyebrow: "Statistico flagship",
     name: "Statistical Analysis",
@@ -543,10 +596,10 @@ let HUB_CLUSTER_META = {
     brandTo: "#c97a32"
   }
 };
-let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
+let HUB_VISIBLE_CLUSTERS = ["prepare", "analytics", "tools"];
 /* Active Range is shown on Specialized Tools for Applications only.
    Calculators and Utilities pick their own inputs. */
-let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
+let HUB_RANGE_VISIBLE_CLUSTERS = ["prepare", "analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
 let ACTIVE_TOOLS_SECTION = "applications";
@@ -902,7 +955,7 @@ function renderCategoryTileHtml(c, clusterColor, clusterColorDark) {
 }
 
 function findHubCategoryTile(tileId) {
-  var clusters = [HUB_CATEGORY_TILES, TOOLS_CATEGORY_TILES];
+  var clusters = [PREPARE_CATEGORY_TILES, HUB_CATEGORY_TILES, TOOLS_CATEGORY_TILES];
   for (var i = 0; i < clusters.length; i++) {
     var found = (clusters[i] || []).find(function (c) { return c.id === tileId; });
     if (found) return found;
@@ -2465,8 +2518,30 @@ function dismissAllHubDialogs() {
   return hadOpen;
 }
 
+function openPrepareQualityFromHub() {
+  if (window.HubResultsBridge && typeof HubResultsBridge.open === "function") {
+    HubResultsBridge.open("prepare-quality", 80);
+    return true;
+  }
+  return false;
+}
+
+function openPrepareDatasetFromHub() {
+  if (window.HubResultsBridge && typeof HubResultsBridge.open === "function") {
+    HubResultsBridge.open("prepare-dataset", 80);
+    return true;
+  }
+  return false;
+}
+
 function navigateToModuleCore(id) {
   var gr = getGlobalRangePayload();
+  if (id === "prepare-quality") {
+    if (openPrepareQualityFromHub()) return;
+  }
+  if (id === "prepare-dataset") {
+    if (openPrepareDatasetFromHub()) return;
+  }
   if (id === "univariate") {
     if (openUnivariateConfigFromHub()) return;
   }

@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prepare Dataset</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
+  <script src="../shared-config.js?v=20260715b"></script>
+  <script src="prepare-engine.js?v=20260817prep1"></script>
+  <style>
+    :root { --prep-acc: #14b8a6; }
+    [data-theme="light"] { --prep-acc: #0f766e; }
+    .prep-tabs { display:flex; gap:4px; padding:6px 10px 0; border-bottom:1px solid var(--cfg-border); }
+    .prep-tab { background:transparent; border:none; color:var(--cfg-text3); font-size:11px; font-weight:700; padding:7px 10px; cursor:pointer; border-bottom:2px solid transparent; }
+    .prep-tab.active { color:var(--prep-acc); border-bottom-color:var(--prep-acc); }
+    .prep-pane { display:none; flex:1; min-height:0; overflow:hidden; }
+    .prep-pane.active { display:flex; }
+    .prep-layout { display:flex; gap:8px; padding:8px 10px; flex:1; min-height:0; overflow:hidden; }
+    .prep-vars { flex:0 0 168px; display:flex; flex-direction:column; min-height:0; }
+    .prep-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:7px; overflow:auto; }
+    .prep-varbox { flex:1; overflow:auto; border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); }
+    .prep-var { display:flex; gap:6px; align-items:flex-start; padding:5px 7px; font-size:11px; cursor:pointer; border-bottom:1px solid var(--cfg-border); }
+    .prep-var:hover { background:var(--cfg-tbl-hover); }
+    .prep-var.sel { background:rgba(20,184,166,.1); }
+    .prep-var input { margin-top:2px; }
+    .lbl { font-size:10px; font-weight:700; color:var(--cfg-text3); text-transform:uppercase; letter-spacing:.04em; }
+    .fld, select.fld, textarea.fld { width:100%; box-sizing:border-box; background:var(--cfg-input-bg); color:var(--cfg-input-text); border:1px solid var(--cfg-border); border-radius:6px; padding:5px 7px; font-size:11px; }
+    textarea.fld { min-height:58px; font-family:ui-monospace,Consolas,monospace; }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .help { font-size:10.5px; color:var(--cfg-text3); line-height:1.35; }
+    .count { font-size:11px; color:var(--prep-acc); font-weight:700; }
+    .op-sec { display: none; }
+    .op-sec.on { display: block; }
+    .chip-row { display:flex; flex-wrap:wrap; gap:4px; }
+    .chip { border:1px solid var(--cfg-border); background:var(--cfg-surface2); color:var(--cfg-text2); border-radius:999px; font-size:10px; padding:3px 7px; cursor:pointer; }
+    .recipe-item { border:1px solid var(--cfg-border); border-radius:8px; padding:7px 8px; background:var(--cfg-surface); margin-bottom:6px; }
+    .recipe-item.off { opacity:.45; }
+    .recipe-top { display:flex; gap:6px; align-items:center; font-size:11px; }
+    .recipe-desc { font-size:11px; color:var(--cfg-text2); margin-top:3px; }
+    .icon-btn { background:none; border:none; color:var(--cfg-text3); cursor:pointer; padding:2px 4px; }
+    .preview-table { width:100%; border-collapse:collapse; font-size:10.5px; }
+    .preview-table th,.preview-table td { padding:4px 6px; border-bottom:1px solid var(--cfg-border); text-align:left; }
+    .preview-table .chg { color:#fbbf24; }
+    .preview-table .new { color:#5eead4; }
+    .empty-state { color:var(--cfg-text3); font-size:12px; padding:20px 10px; text-align:center; }
+    .warn { font-size:11px; color:#fbbf24; }
+    .cond-row { display:grid; grid-template-columns:1fr 90px 1fr; gap:4px; margin-bottom:4px; }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-table-columns"></i></div>
+      <span class="cfg-header-title">Prepare Dataset</span>
+      <span class="cfg-meta-badge" id="metaBadge">-</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch to light mode">
+        <span class="cfg-toggle-icon">&#x1F319;</span>
+        <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
+        <span class="cfg-toggle-label">Dark</span>
+      </button>
+    </header>
+    <div id="loadingSpinner" class="cfg-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;</div>
+    <div class="prep-tabs" id="tabBar" style="display:none;">
+      <button type="button" class="prep-tab active" data-tab="configure">Configure</button>
+      <button type="button" class="prep-tab" data-tab="preview">Preview</button>
+      <button type="button" class="prep-tab" data-tab="recipe">Recipe</button>
+    </div>
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column;">
+      <div class="prep-pane active" id="pane-configure">
+        <div class="prep-layout">
+          <div class="prep-vars">
+            <div class="lbl" style="margin-bottom:4px;">Variables</div>
+            <div class="prep-varbox" id="varList"></div>
+          </div>
+          <div class="prep-main">
+            <div class="help">Range <strong id="tbRange">—</strong> · Sheet <strong id="tbSheet">—</strong> · <span id="tbDims">0 × 0</span></div>
+            <p class="cfg-analysis-scope-note" style="margin-top:0;">Creates a new worksheet. The original Excel range is not overwritten.</p>
+            <label class="lbl">Operation</label>
+            <select id="opSelect" class="fld"></select>
+            <div class="help" id="opHelp"></div>
+            <div id="affectedLine" class="count"></div>
+
+            <div class="op-sec" id="sec-defineMissing">
+              <div class="lbl">Codes to treat as missing</div>
+              <input class="fld" id="missCodes" placeholder="99, -1, NA" />
+              <div class="help">Applied in the prepared output only. Source values stay on the original sheet.</div>
+            </div>
+            <div class="op-sec" id="sec-recode">
+              <label class="lbl">New variable name</label>
+              <input class="fld" id="recodeName" placeholder="Sex_recode" />
+              <label class="lbl">Exact mappings (old=new, one per line)</label>
+              <textarea class="fld" id="recodeMap" placeholder="1=Yes&#10;2=No"></textarea>
+              <label class="lbl">Numeric ranges (min-max=new)</label>
+              <textarea class="fld" id="recodeRanges" placeholder="0-17=child"></textarea>
+              <label class="lbl">Unmatched values</label>
+              <select class="fld" id="recodeOtherwise">
+                <option value="keep">Keep original</option>
+                <option value="missing">Output as missing</option>
+              </select>
+            </div>
+            <div class="op-sec" id="sec-compute">
+              <label class="lbl">New variable name</label>
+              <input class="fld" id="computeName" placeholder="BMI" />
+              <label class="lbl">Formula</label>
+              <textarea class="fld" id="computeFormula" placeholder="mean(Q1, Q2, Q3)"></textarea>
+              <div class="chip-row" id="fnChips"></div>
+              <div class="help" id="formulaMsg"></div>
+            </div>
+            <div class="op-sec" id="sec-reverseScore">
+              <div class="help">reversed = minimum + maximum − original</div>
+              <div class="row2">
+                <div><label class="lbl">Scale min</label><input class="fld" id="revMin" type="number" value="1" /></div>
+                <div><label class="lbl">Scale max</label><input class="fld" id="revMax" type="number" value="5" /></div>
+              </div>
+              <label class="lbl">Output name pattern</label>
+              <input class="fld" id="revPattern" value="{name}_r" />
+            </div>
+            <div class="op-sec" id="sec-composite">
+              <label class="lbl">New score name</label>
+              <input class="fld" id="compName" placeholder="Engagement" />
+              <div class="row2">
+                <div>
+                  <label class="lbl">Summary</label>
+                  <select class="fld" id="compMethod"><option value="mean">Mean</option><option value="sum">Sum</option></select>
+                </div>
+                <div>
+                  <label class="lbl">Min valid items</label>
+                  <input class="fld" id="compMin" type="number" min="1" value="1" />
+                </div>
+              </div>
+            </div>
+            <div class="op-sec" id="sec-harmonize">
+              <button type="button" class="cfg-btn save-config" id="btnDetectHarm" style="padding:5px 10px;font-size:11px;">Detect safe label variants</button>
+              <div id="harmList" class="help" style="margin-top:6px;">Select a categorical variable, then detect capitalization and spacing variants. Nothing is merged until you add it to the recipe.</div>
+            </div>
+            <div class="op-sec" id="sec-filter">
+              <div class="row2">
+                <div>
+                  <label class="lbl">Logic</label>
+                  <select class="fld" id="filtLogic"><option value="and">AND</option><option value="or">OR</option></select>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                  <button type="button" class="cfg-btn save-config" id="btnAddCond" style="padding:5px 10px;font-size:11px;">Add condition</button>
+                </div>
+              </div>
+              <div id="condList"></div>
+              <div class="help">For “between”, enter two numbers as min,max.</div>
+            </div>
+            <div class="op-sec" id="sec-flagDuplicates">
+              <label class="lbl">Flag variable name</label>
+              <input class="fld" id="dupName" value="duplicate_flag" />
+              <div class="help">Later identical rows are flagged 1. Rows are not deleted.</div>
+            </div>
+            <div class="op-sec" id="sec-wideToLong">
+              <label class="lbl">Subject / ID variable</label>
+              <select class="fld" id="wideId"></select>
+              <div class="help">Tick the repeated-measure columns in the variable list.</div>
+              <div class="row2">
+                <div><label class="lbl">Occasion variable</label><input class="fld" id="wideTime" value="Occasion" /></div>
+                <div><label class="lbl">Measurement variable</label><input class="fld" id="wideValue" value="Value" /></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="prep-pane" id="pane-preview" style="padding:8px 10px;overflow:auto;flex-direction:column;gap:8px;">
+        <div id="previewEmpty" class="empty-state">Configure a valid operation or recipe, then preview.</div>
+        <div id="previewBody" style="display:none;">
+          <label style="font-size:11px;color:var(--cfg-text2);"><input type="checkbox" id="changedOnly" checked /> Changed rows only</label>
+          <div class="help" id="previewSummary"></div>
+          <div class="warn" id="previewWarn"></div>
+          <div style="overflow:auto;"><table class="preview-table" id="previewTable"></table></div>
+        </div>
+      </div>
+      <div class="prep-pane" id="pane-recipe" style="padding:8px 10px;overflow:auto;flex-direction:column;">
+        <div id="recipeEmpty" class="empty-state">No preparation steps yet. Configure an operation and add it to the recipe.</div>
+        <div id="recipeList"></div>
+        <button type="button" class="cfg-btn cancel" id="btnClearRecipe" style="margin-top:8px;align-self:flex-start;">Clear recipe</button>
+      </div>
+    </div>
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn save-config" id="btnAddStep" onclick="addDraftToRecipe()" disabled>Add to recipe</button>
+      <button class="cfg-btn load-prev" id="btnPreview" onclick="showPreview()" disabled>Preview</button>
+      <button class="cfg-btn run" id="btnCreate" onclick="createSheet()" disabled>Create prepared worksheet</button>
+    </div>
+  </div>
+  <script>
+    var STATE = {
+      headers: [], rows: [], address: '', sheetName: '', sheetNames: [],
+      recipe: [], selected: {}, mapping: null, conditions: [], preview: null, tab: 'configure'
+    };
+    var HELPS = {
+      defineMissing: 'Treat listed codes as missing for the selected variables in the prepared worksheet.',
+      recode: 'Default is a new variable. Unmatched values keep the original unless you choose missing.',
+      compute: 'Build a new variable with +, −, ×, ÷, mean, sum, min, max, abs, round, and if().',
+      reverseScore: 'Use for Likert items that run in the opposite direction of the scale.',
+      composite: 'Mean or sum of selected items. Cases below the minimum valid items are missing.',
+      harmonize: 'Only capitalization and spacing variants are proposed. Approve the mapping before applying.',
+      filter: 'Keep cases that match the condition. Shows retained and excluded counts before you apply.',
+      flagDuplicates: 'Flags later copies of identical rows. Nothing is deleted automatically.',
+      wideToLong: 'Stack repeated-measure columns into occasion and measurement variables.'
+    };
+    var FNS = ['+', '-', '*', '/', 'mean()', 'sum()', 'min()', 'max()', 'abs()', 'round()', 'if(,,)'];
+
+    function qs(id) { return document.getElementById(id); }
+    function send(action, payload) {
+      var s = JSON.stringify({ action: action, payload: payload || {} });
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) Office.context.ui.messageParent(s);
+    }
+    function cancel() { send('close'); }
+    function selectedVars() {
+      return STATE.headers.filter(function (h) { return STATE.selected[h]; });
+    }
+    function parseCodes(raw) {
+      return String(raw || '').split(/[,;]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+    }
+    function parseMap(text) {
+      var map = {};
+      String(text || '').split(/\n/).forEach(function (line) {
+        var i = line.indexOf('=');
+        if (i < 1) return;
+        map[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      });
+      return map;
+    }
+    function parseRanges(text) {
+      var ranges = [];
+      String(text || '').split(/\n/).forEach(function (line) {
+        var m = line.trim().match(/^(-?[\d.]+)\s*-\s*(-?[\d.]+)\s*=\s*(.+)$/);
+        if (!m) return;
+        ranges.push({ min: Number(m[1]), max: Number(m[2]), to: m[3].trim() });
+      });
+      return ranges;
+    }
+
+    function currentDraft() {
+      var type = qs('opSelect').value;
+      var vars = selectedVars();
+      var step = { type: type, enabled: true, variables: vars };
+      if (type === 'defineMissing') step.codes = parseCodes(qs('missCodes').value);
+      if (type === 'recode') {
+        step.source = vars[0];
+        step.outputName = (qs('recodeName').value || '').trim();
+        step.mapping = parseMap(qs('recodeMap').value);
+        step.ranges = parseRanges(qs('recodeRanges').value);
+        step.otherwise = qs('recodeOtherwise').value;
+      }
+      if (type === 'compute') {
+        step.outputName = (qs('computeName').value || '').trim();
+        step.formula = qs('computeFormula').value;
+      }
+      if (type === 'reverseScore') {
+        step.min = qs('revMin').value;
+        step.max = qs('revMax').value;
+        step.pattern = qs('revPattern').value || '{name}_r';
+      }
+      if (type === 'composite') {
+        step.outputName = (qs('compName').value || '').trim();
+        step.method = qs('compMethod').value;
+        step.minValid = Number(qs('compMin').value || 1);
+      }
+      if (type === 'harmonize') step.mapping = STATE.mapping || {};
+      if (type === 'filter') {
+        step.logic = qs('filtLogic').value;
+        step.conditions = STATE.conditions.slice();
+      }
+      if (type === 'flagDuplicates') step.flagName = (qs('dupName').value || 'duplicate_flag').trim();
+      if (type === 'wideToLong') {
+        step.idVar = qs('wideId').value;
+        step.measureVars = vars.filter(function (v) { return v !== step.idVar; });
+        step.timeName = (qs('wideTime').value || 'Occasion').trim();
+        step.valueName = (qs('wideValue').value || 'Value').trim();
+      }
+      return step;
+    }
+
+    function effectiveSteps() {
+      var steps = STATE.recipe.filter(function (s) { return s.enabled !== false; }).map(function (s) { return s; });
+      var draft = currentDraft();
+      var valid = StatisticoPrepare.validateStep(draft, liveHeaders());
+      if (valid.ok) steps.push(draft);
+      return { steps: steps, draft: draft, draftValid: valid };
+    }
+
+    function liveHeaders() {
+      var applied = StatisticoPrepare.applyRecipe(STATE.headers, STATE.rows, STATE.recipe);
+      return applied.headers;
+    }
+
+    function updateButtons() {
+      var info = effectiveSteps();
+      qs('btnAddStep').disabled = !info.draftValid.ok;
+      qs('btnPreview').disabled = !info.draftValid.ok && !STATE.recipe.some(function (s) { return s.enabled !== false; });
+      qs('btnCreate').disabled = !(STATE.preview && !STATE.preview.emptyResult);
+    }
+
+    function updateAffected() {
+      var type = qs('opSelect').value;
+      var vars = selectedVars();
+      var msg = '';
+      if (type === 'defineMissing' && vars.length) {
+        var n = StatisticoPrepare.countAffectedCells(STATE.headers, STATE.rows, vars, parseCodes(qs('missCodes').value));
+        msg = n + ' cells match these codes.';
+      }
+      if (type === 'filter' && STATE.conditions.length) {
+        var imp = StatisticoPrepare.filterImpact(STATE.headers, STATE.rows, currentDraft());
+        msg = imp.retained + ' retained · ' + imp.excluded + ' excluded · ' + Math.round(imp.pctRetained) + '% kept';
+      }
+      if (type === 'compute') {
+        var vf = StatisticoPrepare.validateFormula(qs('computeFormula').value, STATE.headers);
+        qs('formulaMsg').textContent = vf.ok ? 'Formula is valid.' : (vf.error || '');
+        qs('formulaMsg').style.color = vf.ok ? 'var(--prep-acc)' : '#f97316';
+      }
+      qs('affectedLine').textContent = msg;
+      STATE.preview = null;
+      updateButtons();
+    }
+
+    function showOp() {
+      var type = qs('opSelect').value;
+      document.querySelectorAll('.op-sec').forEach(function (el) { el.classList.remove('on'); });
+      var sec = qs('sec-' + type);
+      if (sec) sec.classList.add('on');
+      qs('opHelp').textContent = HELPS[type] || '';
+      updateAffected();
+    }
+
+    function renderVars() {
+      var box = qs('varList');
+      box.innerHTML = STATE.headers.map(function (h) {
+        var on = STATE.selected[h] ? ' checked' : '';
+        return '<label class="prep-var' + (STATE.selected[h] ? ' sel' : '') + '"><input type="checkbox" data-var="' + h.replace(/"/g, '&quot;') + '"' + on + '/><span>' + h + '</span></label>';
+      }).join('') || '<div class="empty-state">No variables.</div>';
+      var idSel = qs('wideId');
+      idSel.innerHTML = STATE.headers.map(function (h) { return '<option value="' + h.replace(/"/g, '&quot;') + '">' + h + '</option>'; }).join('');
+    }
+
+    function addCondition() {
+      STATE.conditions.push({ variable: STATE.headers[0] || '', op: 'equals', value: '' });
+      renderConds();
+      updateAffected();
+    }
+    function renderConds() {
+      qs('condList').innerHTML = STATE.conditions.map(function (c, i) {
+        var ops = ['equals','not_equals','gt','lt','between','contains','is_missing','is_not_missing']
+          .map(function (op) { return '<option value="' + op + '"' + (c.op === op ? ' selected' : '') + '>' + op.replace(/_/g, ' ') + '</option>'; }).join('');
+        var vars = STATE.headers.map(function (h) { return '<option' + (c.variable === h ? ' selected' : '') + '>' + h + '</option>'; }).join('');
+        return '<div class="cond-row" data-i="' + i + '"><select class="fld cond-var">' + vars + '</select><select class="fld cond-op">' + ops + '</select><input class="fld cond-val" value="' + String(c.value || '').replace(/"/g, '&quot;') + '"/></div>';
+      }).join('');
+    }
+
+    function readConds() {
+      document.querySelectorAll('#condList .cond-row').forEach(function (row) {
+        var i = Number(row.getAttribute('data-i'));
+        STATE.conditions[i].variable = row.querySelector('.cond-var').value;
+        STATE.conditions[i].op = row.querySelector('.cond-op').value;
+        STATE.conditions[i].value = row.querySelector('.cond-val').value;
+      });
+    }
+
+    function addDraftToRecipe() {
+      var draft = currentDraft();
+      var valid = StatisticoPrepare.validateStep(draft, liveHeaders());
+      if (!valid.ok) { alert(valid.error); return; }
+      STATE.recipe.push(JSON.parse(JSON.stringify(draft)));
+      STATE.preview = null;
+      persistRecipe();
+      renderRecipe();
+      updateButtons();
+      setTab('recipe');
+    }
+
+    function persistRecipe() {
+      send('saveRecipe', { steps: STATE.recipe });
+    }
+
+    function renderRecipe() {
+      var empty = !STATE.recipe.length;
+      qs('recipeEmpty').style.display = empty ? '' : 'none';
+      qs('recipeList').innerHTML = STATE.recipe.map(function (step, i) {
+        var rec = StatisticoPrepare.describeStep(step);
+        return '<div class="recipe-item' + (step.enabled === false ? ' off' : '') + '">' +
+          '<div class="recipe-top"><strong>' + (i + 1) + '.</strong> <span>' + step.type + '</span>' +
+          '<span style="margin-left:auto;"></span>' +
+          '<button class="icon-btn" data-up="' + i + '" title="Move up">↑</button>' +
+          '<button class="icon-btn" data-down="' + i + '" title="Move down">↓</button>' +
+          '<button class="icon-btn" data-toggle="' + i + '">' + (step.enabled === false ? 'Enable' : 'Disable') + '</button>' +
+          '<button class="icon-btn" data-del="' + i + '">Delete</button></div>' +
+          '<div class="recipe-desc">' + rec + (step.variables && step.variables.length ? ' · ' + step.variables.join(', ') : '') + '</div></div>';
+      }).join('');
+    }
+
+    function setTab(tab) {
+      STATE.tab = tab;
+      document.querySelectorAll('.prep-tab').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tab') === tab); });
+      document.querySelectorAll('.prep-pane').forEach(function (p) { p.classList.toggle('active', p.id === 'pane-' + tab); });
+    }
+
+    function showPreview() {
+      var info = effectiveSteps();
+      if (!info.steps.length) return;
+      var preview = StatisticoPrepare.previewRecipe(STATE.headers, STATE.rows, info.steps, { changedOnly: qs('changedOnly').checked });
+      STATE.preview = preview;
+      qs('previewEmpty').style.display = 'none';
+      qs('previewBody').style.display = '';
+      qs('previewSummary').textContent = preview.totalRows + ' rows · ' + preview.totalVars + ' variables · ' +
+        preview.newVariables.length + ' new variables · ' + preview.excludedCases + ' excluded cases' +
+        (preview.structural ? ' · structure changed' : '');
+      qs('previewWarn').textContent = (preview.warnings || []).join(' ');
+      var tbl = qs('previewTable');
+      if (preview.structural) {
+        tbl.innerHTML = '<thead><tr>' + preview.headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+          preview.diffs.map(function (d) {
+            return '<tr>' + (d.proposed || []).map(function (v) { return '<td class="new">' + (v == null ? '' : v) + '</td>'; }).join('') + '</tr>';
+          }).join('') + '</tbody>';
+      } else {
+        tbl.innerHTML = '<thead><tr><th>Row</th><th>Status</th>' + preview.headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+          preview.diffs.map(function (d) {
+            return '<tr><td>' + d.row + '</td><td>' + d.status + '</td>' + (d.cells || []).map(function (c) {
+              var cls = c.isNew ? 'new' : (c.changed ? 'chg' : '');
+              var txt = c.changed ? (c.original == null || c.original === '' ? '' : c.original) + ' → ' + (c.proposed == null ? '' : c.proposed) : (c.proposed == null ? '' : c.proposed);
+              return '<td class="' + cls + '">' + txt + '</td>';
+            }).join('') + '</tr>';
+          }).join('') + '</tbody>';
+      }
+      setTab('preview');
+      updateButtons();
+    }
+
+    function createSheet() {
+      if (!STATE.preview || STATE.preview.emptyResult || !STATE.preview.values) return;
+      var appliedSteps = STATE.preview.steps || [];
+      send('createPreparedSheet', {
+        values: STATE.preview.values,
+        sheetName: StatisticoPrepare.uniqueSheetName(STATE.sheetNames, 'Prepared_Data'),
+        steps: appliedSteps,
+        stepCount: appliedSteps.filter(function (s) { return s.status === 'applied'; }).length
+      });
+    }
+
+    function applyPayload(p) {
+      p = p || {};
+      STATE.headers = p.headers || [];
+      STATE.rows = p.rows || [];
+      STATE.address = p.address || '';
+      STATE.sheetName = p.worksheetName || '';
+      STATE.sheetNames = p.sheetNames || [];
+      STATE.recipe = (p.recipe && p.recipe.steps) ? p.recipe.steps.slice() : STATE.recipe;
+      if (p.intent && p.intent.prefill && p.intent.prefill.type) {
+        qs('opSelect').value = p.intent.prefill.type;
+        (p.intent.variables || []).forEach(function (v) { STATE.selected[v] = true; });
+      }
+      qs('tbRange').textContent = STATE.address || '—';
+      qs('tbSheet').textContent = STATE.sheetName || '—';
+      qs('tbDims').textContent = STATE.rows.length + ' × ' + STATE.headers.length;
+      qs('metaBadge').textContent = STATE.rows.length ? (STATE.rows.length + ' × ' + STATE.headers.length) : '-';
+      qs('loadingSpinner').style.display = 'none';
+      qs('tabBar').style.display = 'flex';
+      qs('mainContent').style.display = 'flex';
+      renderVars();
+      showOp();
+      renderRecipe();
+      renderConds();
+      updateButtons();
+    }
+
+    (function initOps() {
+      var sel = qs('opSelect');
+      var groups = { variables: 'Variables', cases: 'Cases', structure: 'Structure' };
+      var last = '';
+      StatisticoPrepare.AVAILABLE_OPERATIONS.forEach(function (op) {
+        if (op.category !== last) {
+          var og = document.createElement('optgroup');
+          og.label = groups[op.category] || op.category;
+          sel.appendChild(og);
+          last = op.category;
+        }
+        var o = document.createElement('option');
+        o.value = op.id;
+        o.textContent = op.label;
+        sel.lastChild.appendChild(o);
+      });
+      qs('fnChips').innerHTML = FNS.map(function (fn) { return '<button type="button" class="chip" data-fn="' + fn + '">' + fn + '</button>'; }).join('');
+    })();
+
+    qs('opSelect').addEventListener('change', showOp);
+    qs('varList').addEventListener('change', function (e) {
+      var cb = e.target.closest('input[data-var]');
+      if (!cb) return;
+      STATE.selected[cb.getAttribute('data-var')] = cb.checked;
+      renderVars();
+      updateAffected();
+    });
+    ['missCodes','recodeName','recodeMap','recodeRanges','recodeOtherwise','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideId','wideTime','wideValue','filtLogic'].forEach(function (id) {
+      var el = qs(id);
+      if (el) el.addEventListener('input', updateAffected);
+      if (el) el.addEventListener('change', updateAffected);
+    });
+    qs('fnChips').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-fn]');
+      if (!b) return;
+      var ta = qs('computeFormula');
+      ta.value += (ta.value && !/\s$/.test(ta.value) ? ' ' : '') + b.getAttribute('data-fn');
+      updateAffected();
+    });
+    qs('btnAddCond').addEventListener('click', addCondition);
+    qs('condList').addEventListener('input', function () { readConds(); updateAffected(); });
+    qs('condList').addEventListener('change', function () { readConds(); updateAffected(); });
+    qs('btnDetectHarm').addEventListener('click', function () {
+      var v = selectedVars()[0];
+      if (!v) { qs('harmList').textContent = 'Select one variable first.'; return; }
+      var groups = StatisticoPrepare.detectHarmonizeGroups(STATE.headers, STATE.rows, v);
+      if (!groups.length) { qs('harmList').textContent = 'No safe capitalization/spacing variants found.'; STATE.mapping = null; updateAffected(); return; }
+      STATE.mapping = groups.reduce(function (acc, g) { return Object.assign(acc, g.mapping); }, {});
+      qs('harmList').innerHTML = groups.map(function (g) {
+        return 'Map ' + g.variants.map(function (x) { return '“' + x + '”'; }).join(', ') + ' → “' + g.canonical + '”';
+      }).join('<br/>');
+      updateAffected();
+    });
+    qs('changedOnly').addEventListener('change', function () { if (STATE.preview) showPreview(); });
+    qs('tabBar').addEventListener('click', function (e) {
+      var t = e.target.getAttribute('data-tab');
+      if (t === 'preview') { if (!qs('btnPreview').disabled) showPreview(); else setTab('preview'); return; }
+      if (t) setTab(t);
+    });
+    qs('recipeList').addEventListener('click', function (e) {
+      var del = e.target.closest('[data-del]');
+      var tog = e.target.closest('[data-toggle]');
+      var up = e.target.closest('[data-up]');
+      var down = e.target.closest('[data-down]');
+      if (del) STATE.recipe.splice(Number(del.getAttribute('data-del')), 1);
+      if (tog) {
+        var i = Number(tog.getAttribute('data-toggle'));
+        STATE.recipe[i].enabled = STATE.recipe[i].enabled === false;
+      }
+      if (up) {
+        var u = Number(up.getAttribute('data-up'));
+        if (u > 0) { var tmp = STATE.recipe[u - 1]; STATE.recipe[u - 1] = STATE.recipe[u]; STATE.recipe[u] = tmp; }
+      }
+      if (down) {
+        var d = Number(down.getAttribute('data-down'));
+        if (d < STATE.recipe.length - 1) { var tmp2 = STATE.recipe[d + 1]; STATE.recipe[d + 1] = STATE.recipe[d]; STATE.recipe[d] = tmp2; }
+      }
+      STATE.preview = null;
+      persistRecipe();
+      renderRecipe();
+      updateButtons();
+    });
+    qs('btnClearRecipe').addEventListener('click', function () {
+      if (!STATE.recipe.length) return;
+      if (!confirm('Clear the entire preparation recipe?')) return;
+      STATE.recipe = [];
+      STATE.preview = null;
+      persistRecipe();
+      renderRecipe();
+      updateButtons();
+    });
+
+    Office.onReady(function () {
+      if (Office.context && Office.context.ui && Office.EventType && Office.EventType.DialogParentMessageReceived) {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+          try {
+            var msg = JSON.parse(arg.message || '{}');
+            if (msg.type === 'PREPARE_DATASET_DATA' || msg.type === 'PREPARE_DATA' || msg.type === 'PREPARE_QUALITY_DATA') {
+              applyPayload(msg.payload || msg);
+            }
+          } catch (e) {}
+        });
+      }
+      send('ready');
+      var tries = 0;
+      var timer = setInterval(function () {
+        if (STATE.headers.length || ++tries > 12) { clearInterval(timer); return; }
+        send('requestData');
+      }, 500);
+    });
+  </script>
+</body>
+</html>

@@ -1,180 +1,530 @@
-The current version already covers the essential mapping well. I would add customization selectively—the goal should be analytical control, not a chart-design studio.
+Revise the proposed **Prepare Data** implementation so it complements, rather than duplicates, the preparation controls already embedded in Statistico’s analysis dialogs.
 
-Highest-priority additions
-1. Quadrant definition
+## Existing design principle
 
-This is the most important missing customization.
+Statistico currently performs some preparation in the context of a particular analysis.
 
-X divider: Median / Mean / Custom value
-Y divider: Median / Mean / Custom value
-Show/hide divider lines
-Editable quadrant names, for example:
-High X / High Y
-Leaders
-Opportunities
-Monitor
-Low priority
-Optional subtle quadrant background shading
-Optional count and percentage in each quadrant
+For example, the Univariate Analysis input dialog includes:
 
-This should appear only in Quadrant mode.
+* Trimming
+* `ln(x)`
+* `log10(x)`
+* `sqrt(x)`
+* `x²`
+* `1/x`
+* z-score
+* min–max transformation
+* Resulting sample-size feedback
 
-2. Axis controls
+These controls should remain inside the Univariate module.
 
-Add a collapsible Axes section:
+Do not move them into a separate module, and do not create duplicate implementations of the same contextual operations.
 
-Custom X and Y minimum/maximum
-Automatic/manual tick interval
-Editable axis titles
-Number format: decimal, percentage, currency, thousands/millions
-Reverse axis
-Show/hide gridlines
-Reference lines with editable value and label
+## Two levels of preparation
 
-For GDP, formatting such as $45K or $2.1T is much more meaningful than an unexplained 45.
+Formally distinguish between:
 
-3. Bubble-size controls
+### 1. Analysis-level preparation
 
-The existing single size slider is useful but insufficient.
+These transformations:
 
-Minimum bubble diameter
-Maximum bubble diameter
-Size transformation:
-Area proportional
-Square root
-Logarithmic
-Treat negative or zero values
-Bubble opacity
-Border width
-Optional fixed size when no size variable is needed
+* Apply only to the current analysis
+* Do not modify the Excel source data
+* Are saved as part of the analysis configuration
+* Are shown because they are directly relevant to that analysis
+* Can change interactively without creating worksheet columns
 
-Keep area proportional as the default.
+Examples:
 
-4. Label controls
+* Univariate: trimming and transformations
+* Regression: centering, standardization and interactions
+* Logistic regression: event and reference-category definition
+* Factor analysis/PCA: standardization and missing-data treatment
+* Segmentation: scaling and outlier treatment
+* Repeated measures: subject/time validation
+* Meta-analysis: effect direction and reference definition
 
-None / Hover / All should become:
+### 2. Dataset-level preparation
 
-None
-Hover
-Selected
-All
-Automatic—show labels where space permits
+These operations:
 
-Additional options:
+* Are persistent or reusable
+* Affect several possible analyses
+* Create or restructure variables
+* May generate a prepared Excel worksheet
+* Can be recorded as an ordered preparation recipe
 
-Font size
-Label field
-Value appended to label
-Prevent overlap
-Allow dragging labels
-Label only top/bottom N
-Label only a selected group
+Examples:
 
-“Automatic” or “Selected” should probably be the default because All is already crowded in the left side of this chart.
+* Compute a new variable
+* Recode values
+* Define missing-value codes
+* Harmonize category labels
+* Reverse-score questionnaire items
+* Create composite scores
+* Filter cases
+* Detect duplicates and invalid values
+* Reshape wide to long or long to wide
 
-5. Color and grouping
+The new facility should handle only this second category.
 
-At present, Bubble color and Group are both Region, so their roles appear duplicated. I would simplify this concept:
+## First inspect the project
 
-Color by: categorical or continuous variable
-Separate series by: optional categorical variable
+Before implementation:
 
-Then add:
+1. Identify the current module navigation and family structure.
+2. Inspect the Univariate input dialog and document how trimming and transformations are represented internally.
+3. Inspect similar preparation controls in other analysis modules.
+4. Identify the existing Excel range-selection, data-reading and worksheet-writing utilities.
+5. Identify the saved-configuration mechanism.
+6. Identify reusable UI components for variable lists, expandable cards, validation and notifications.
+7. Report the proposed files and architecture before making extensive changes.
 
-Palette selector
-Color-blind-safe palette as default
-Custom category colors
-Continuous color gradient and color scale
-Opacity
-Show/hide legend
-Legend position
+Do not introduce a new framework or replace existing components unnecessarily.
 
-If Color and Series use the same field, Statistico should detect that and avoid redundant behavior.
+## Clarify current analysis dialogs
 
-Very useful interactive features
-Click a bubble to select it
-Ctrl-click for multiple selection
-Selected only / Fade others
-Lasso or rectangle selection
-Filter by clicking legend categories
-Search that zooms to or strongly highlights the result
-Reset view button
-Zoom and pan
-Write selected rows back to Excel
-Exclude selected observations temporarily
+In analysis dialogs containing virtual transformations, add a concise clarification near the transformation controls:
 
-The search field currently says Label / ID?; an explicit ID mapping field may therefore be useful.
+> Applied to this analysis only. Your Excel data will not be changed.
 
-Analytical overlays
+Use a small informational style that does not compete visually with the controls.
 
-Put these in a separate collapsible Analysis section:
+For the Univariate dialog:
 
-Linear or LOESS trend line
-Confidence band
-Correlation and R
-2
-Marginal distributions or rugs
-Mean/median reference lines
-User-defined benchmark lines
-Highlight outliers
-Optional convex hull or ellipse around groups
+* Preserve the current trimming and transformation controls.
+* Preserve the live “Resulting n” feedback.
+* Do not add worksheet-writing controls to the main transformation card.
+* Optionally add a subtle secondary action after configuration:
 
-For the quadrant chart, I would avoid showing regression by default. It should remain an optional layer.
+**Save transformed values as a new Excel variable**
 
-Presentation customization
+This secondary action should only be implemented if it can reuse the shared worksheet-writing mechanism safely. Otherwise leave it for a later phase rather than adding a nonfunctional control.
 
-A compact Appearance popover could contain:
+## Navigation
 
-Chart title and subtitle
-Light/dark background
-Plot background
-Font size
-Bubble opacity
-Gridline strength
-Chart aspect ratio
-Legend position
-Export dimensions
+Add a lightweight top-level **Prepare Data** area, positioned before Analytics.
 
-These are useful, but less important than quadrant, axis, size, and label controls.
+It should initially contain only two cards:
 
-Recommended sidebar structure
+1. **Data Quality**
+2. **Prepare Dataset**
 
-Instead of showing every option simultaneously:
+Do not create four separate preparation modules and do not create cards for individual transformations.
 
-Variables
-Quadrants — only in Quadrant mode
-Axes
-Bubbles
-Labels
-Analysis
-Appearance
-Export
+Suggested card descriptions:
 
-Keep the first two open and the rest collapsed. This preserves the clean interface.
+### Data Quality
 
-Specific corrections visible in the screenshot
-STATISTICO? and area ? GDP appear to contain broken icon characters or encoding errors.
-The label Size represents ? GDP (AREA) has the same issue.
-Bubble color and Group need clearer distinction—or consolidation.
-The size legend overlaps the plot and obscures low-X values; place it outside the plotting area or make it movable.
-The quadrant lines are labeled “Median X/Y,” but users should see the actual values too:
-Median X = 15.4, Median Y = 76.9.
-The quadrants themselves need names or light shading; otherwise it still reads mainly as a bubble chart with two dashed lines.
-The upper badges consume space without offering much action. They could be reduced to a single data summary line.
-Add visible Reset, Export, and Fullscreen controls rather than relying only on the Highcharts hamburger menu.
+> Find missing values, inconsistent categories, duplicates and structural problems before analysis.
 
-For the next iteration, I would prioritize exactly five changes: custom quadrant thresholds and names, automatic labels, axis formatting, stronger selection/highlighting, and moving the bubble-size legend outside the plot. Those would materially improve the module without overloading it.
+### Prepare Dataset
 
----
+> Recode, compute, filter and reshape data while preserving the original worksheet.
 
-Implemented in mv-results.html (2026-08-12 pass)
-  - Collapsible sidebar: Variables / Quadrants / Axes / Bubbles / Labels
-  - Quadrants: median|mean|custom dividers, show/hide lines, shading, editable names, counts/% labels, divider values on lines
-  - Labels: None / Hover / Selected / Auto / All (default Auto)
-  - Axes: number formats (auto/number/compact/currency/percent), editable titles, linear/log
-  - Selection: click select, Ctrl/Cmd multi, fade others, Reset
-  - Size legend moved outside the plot (right rail)
-  - Color by vs Series by wording; encoding-safe labels (no broken ? glyphs)
-  - Compact status line instead of four pills
+## Module 1: Data Quality
 
-Still later: LOESS/regression overlays, lasso, export/fullscreen chrome, continuous color scales.
+Create a guided scan of the selected Excel range.
+
+Detect:
+
+* Empty rows
+* Duplicate rows
+* Missing values by variable
+* User-defined missing-value codes
+* Mixed numeric and text values
+* Constant and nearly constant variables
+* Inconsistent text categories
+* Invalid numeric ranges
+* Invalid dates
+* Very small categories
+* Duplicate subject-time combinations when relevant
+
+For inconsistent categories, initially detect safe candidates based on:
+
+* Capitalization differences
+* Leading or trailing spaces
+* Repeated internal spaces
+
+For example:
+
+* `Male`
+* `male`
+* `Male`
+
+Present these as a proposed mapping requiring user approval. Do not silently merge categories.
+
+### Data Quality layout
+
+Show:
+
+* Overall status
+* Rows and variables scanned
+* Errors
+* Warnings
+* Information items
+
+Issue table columns:
+
+* Variable
+* Issue
+* Affected cases
+* Severity
+* Suggested action
+* Inspect
+
+Severity levels:
+
+* Required correction
+* Recommended
+* Information
+
+Never automatically delete observations or replace questionable values.
+
+Allow selected corrections to be transferred into the preparation recipe.
+
+## Module 2: Prepare Dataset
+
+Build a single workspace containing operation categories rather than separate pages.
+
+Initial operation categories:
+
+### Variables
+
+* Define missing-value codes
+* Compute a new variable
+* Recode values
+* Group a numeric variable into categories
+* Reverse-score items
+* Create a composite score
+* Harmonize category labels
+
+### Cases
+
+* Filter/select cases
+* Sort cases
+* Flag or remove duplicate rows
+* Random sample
+* Train/test split
+
+### Structure
+
+* Wide-to-long conversion
+* Long-to-wide conversion
+* Aggregate cases
+
+Transformations already available temporarily inside analytical modules—such as log, square root, z-score and min–max—should not be presented prominently here in the first version.
+
+They may later become available under an advanced “Materialize an analysis transformation” function, but do not duplicate them now.
+
+## Shared Prepare Dataset layout
+
+Use three main tabs:
+
+1. **Configure**
+2. **Preview**
+3. **Recipe**
+
+### Configure
+
+* Selected Excel range
+* Worksheet name
+* Rows and variables detected
+* Available-variable list
+* Operation selector
+* Controls for the selected operation
+
+### Preview
+
+Show:
+
+* Original value
+* Proposed value
+* Change status
+* First affected rows
+* Total affected cases
+* New variables
+* Excluded cases
+* Structural changes
+* Warnings
+
+Allow:
+
+* Changed rows only
+* All preview rows
+
+### Recipe
+
+Show the ordered list of persistent preparation steps.
+
+Example:
+
+1. Defined `99` as missing for Q1–Q12
+2. Harmonized three versions of `Male`
+3. Reverse-scored Q3, Q7 and Q10
+4. Created `Engagement = mean(Q1:Q6)`
+5. Excluded cases missing the outcome
+6. Reshaped Time1–Time4 into long format
+
+Each step should contain:
+
+* Step number
+* Operation
+* Variables affected
+* Human-readable description
+* Cases affected
+* Status
+
+Support:
+
+* Edit
+* Enable/disable
+* Delete
+* Reorder where logically safe
+* Recalculate downstream steps
+* Clear recipe after confirmation
+
+## Required operations for the first functional release
+
+Prioritize these operations:
+
+1. Define missing-value codes
+2. Recode values into a new variable
+3. Compute a new variable
+4. Reverse-score multiple items
+5. Create a composite mean or sum
+6. Harmonize simple category inconsistencies
+7. Filter cases
+8. Detect and flag duplicates
+9. Wide-to-long conversion
+10. Apply recipe to a new Excel worksheet
+
+If the scope is too large for one safe implementation, implement items 1–6 as the first complete vertical slice. Do not display unfinished operations as if they were available.
+
+## Operation details
+
+### Define missing-value codes
+
+Allow one or more values to be defined as missing for selected variables.
+
+Show:
+
+* Selected variables
+* Codes to treat as missing
+* Number of affected cells
+* Whether the original values will be retained in the source worksheet
+
+Apply the definition within the prepared output, not the original range.
+
+### Recode
+
+Support:
+
+* Exact value mappings
+* Numeric-range mappings
+* Otherwise rule
+* Output as missing
+* New variable name and label
+
+Default to creating a new variable.
+
+### Compute new variable
+
+Provide:
+
+* New variable name
+* Optional label
+* Formula builder
+* Variable list
+* Arithmetic operators
+* Common functions
+* Formula validation
+
+Initially support:
+
+* Addition
+* Subtraction
+* Multiplication
+* Division
+* Mean
+* Sum
+* Minimum
+* Maximum
+* Absolute value
+* Round
+* Conditional expression
+
+### Reverse scoring
+
+Request:
+
+* Selected variables
+* Scale minimum
+* Scale maximum
+* Output naming pattern
+
+Use:
+
+`reversed = minimum + maximum − original`
+
+Display this formula to the user.
+
+### Composite score
+
+Support:
+
+* Multiple selected items
+* Mean or sum
+* Minimum number of valid items
+* Missing-value handling
+* New variable name and label
+
+### Filter cases
+
+Provide a guided condition builder with:
+
+* Equals / does not equal
+* Greater than / less than
+* Between
+* Contains
+* Is missing / is not missing
+* AND / OR
+
+Show before applying:
+
+* Cases retained
+* Cases excluded
+* Percentage retained
+
+### Wide-to-long
+
+Allow selection of:
+
+* Subject/ID variable
+* Repeated-measure columns
+* Name of the new occasion/time variable
+* Name of the new measurement variable
+
+Show a preview before applying.
+
+## Excel safety
+
+The default final action must be:
+
+**Create prepared worksheet**
+
+Requirements:
+
+* Never overwrite the source worksheet by default.
+* Generate a clear worksheet name such as `Prepared_Data`.
+* If that name exists, propose a unique alternative.
+* Add newly computed variables at the end unless reshaping changes the required structure.
+* Report the final worksheet name, number of rows, number of variables and preparation steps applied.
+* Preserve the original selected range and worksheet.
+
+Do not add an “Overwrite source” option in the first version.
+
+## Connections from analysis modules
+
+Create an extensible mechanism that will later allow an analysis dialog to open the preparation workspace with a problem and relevant variables already selected.
+
+Examples:
+
+### Repeated measures
+
+> Your data appear to be in wide format. This analysis requires long format.
+
+Action:
+
+**Prepare wide data for this analysis**
+
+### Factor analysis
+
+> Two selected variables contain text values.
+
+Action:
+
+**Inspect data-quality issues**
+
+### Logistic regression
+
+> The outcome contains more than two categories.
+
+Action:
+
+**Inspect or recode outcome**
+
+These cross-module actions can be implemented after the shared preparation workspace is functional. Architect for them now, but do not add dead buttons.
+
+## Optional bridge from analysis to worksheet
+
+Design, but do not necessarily implement in Phase 1, a shared action:
+
+**Save transformed values as a new Excel variable**
+
+This would allow a temporary module transformation—for example `ln(Income)`—to be materialized safely as a new column.
+
+If implemented:
+
+* Never replace the original variable.
+* Ask for a new variable name.
+* Preview the values.
+* Report invalid values, such as zero or negative inputs for logarithms.
+* Record the operation in the preparation recipe when possible.
+
+## UX requirements
+
+* Follow the existing Statistico visual language.
+* Keep the interface compact.
+* Do not show empty preview or results areas before data are available.
+* Disable Preview until the configuration is valid.
+* Disable Create prepared worksheet until a valid preview exists.
+* Explain what each operation will do to the data.
+* Keep advanced settings collapsed.
+* Show affected-case counts immediately.
+* Clearly distinguish temporary analysis transformations from persistent dataset changes.
+* Ensure compatibility with the current task-pane dimensions and scaling.
+
+## Important conceptual rule
+
+Do not turn Statistico into a generic spreadsheet-cleaning or ETL application.
+
+The new facility exists to resolve preparation problems that commonly prevent or weaken statistical analysis.
+
+Use statistically meaningful descriptions, but do not make automatic analytical decisions for the user.
+
+## Validation
+
+Test at least:
+
+* Existing Univariate transformations still behave exactly as before
+* Source Excel data remain unchanged after an analysis-level transformation
+* Missing-value code definition
+* Recode with unmatched values
+* Invalid computed-variable formula
+* Reverse scoring
+* Composite score with partial missing values
+* Category harmonization
+* Filter retaining zero cases
+* Duplicate detection
+* Wide-to-long conversion
+* Existing `Prepared_Data` sheet
+* Recipe step editing and deletion
+* Recalculation after an earlier step changes
+* Creation of a new prepared worksheet
+* Blank rows and columns in the selected range
+
+Run the existing lint, type-check, build and test commands.
+
+## Delivery report
+
+Report:
+
+* Existing preparation controls found in each analysis module
+* Files changed
+* Functionality completed
+* Tests run and results
+* Deferred operations
+* Any architectural decisions requiring approval
+
+Do not commit or push.

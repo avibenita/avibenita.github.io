@@ -520,6 +520,9 @@ const TOOLS_CATEGORY_TILES = [
 const PREPARE_CATEGORY_TILES = [
   {
     id: "prepare-quality",
+    section: "Prepare Data",
+    sectionId: "prepare",
+    sectionSubtitle: "Resolve data problems that prevent or weaken statistical analysis",
     title: "Data Quality",
     icon: "fa-magnifying-glass-chart",
     accent: "#14b8a6",
@@ -540,6 +543,7 @@ const PREPARE_CATEGORY_TILES = [
   },
   {
     id: "prepare-dataset",
+    sectionId: "prepare",
     title: "Prepare Dataset",
     icon: "fa-table-columns",
     accent: "#14b8a6",
@@ -560,21 +564,10 @@ const PREPARE_CATEGORY_TILES = [
   }
 ];
 let HUB_CLUSTER_TILES = {
-  prepare: PREPARE_CATEGORY_TILES,
   analytics: HUB_CATEGORY_TILES,
-  tools: TOOLS_CATEGORY_TILES
+  tools: PREPARE_CATEGORY_TILES.concat(TOOLS_CATEGORY_TILES)
 };
 let HUB_CLUSTER_META = {
-  prepare: {
-    eyebrow: "Before analysis",
-    name: "Prepare Data",
-    tagline: "Resolve data problems that prevent or weaken statistical analysis",
-    color: "#5eead4",
-    colorDark: "#0f766e",
-    icon: "fa-broom",
-    brandFrom: "#5eead4",
-    brandTo: "#14b8a6"
-  },
   analytics: {
     eyebrow: "Statistico flagship",
     name: "Statistical Analysis",
@@ -596,14 +589,22 @@ let HUB_CLUSTER_META = {
     brandTo: "#c97a32"
   }
 };
-let HUB_VISIBLE_CLUSTERS = ["prepare", "analytics", "tools"];
-/* Active Range is shown on Specialized Tools for Applications only.
+let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
+/* Active Range is shown on Specialized Tools for Prepare Data and Applications.
    Calculators and Utilities pick their own inputs. */
-let HUB_RANGE_VISIBLE_CLUSTERS = ["prepare", "analytics", "tools"];
+let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
 let ACTIVE_TOOLS_SECTION = "applications";
 var TOOLS_SECTION_META = {
+  prepare: {
+    id: "prepare",
+    label: "Prepare Data",
+    subtitle: "Resolve data problems that prevent or weaken statistical analysis",
+    icon: "fa-broom",
+    color: "#14b8a6",
+    colorDark: "#0f766e"
+  },
   applications: {
     id: "applications",
     label: "Applications",
@@ -629,8 +630,8 @@ var TOOLS_SECTION_META = {
     colorDark: "#059669"
   }
 };
-var TOOLS_SECTION_ORDER = ["applications", "calculators", "utilities"];
-var TOOLS_RANGE_SECTIONS = ["applications"];
+var TOOLS_SECTION_ORDER = ["prepare", "applications", "calculators", "utilities"];
+var TOOLS_RANGE_SECTIONS = ["prepare", "applications"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {

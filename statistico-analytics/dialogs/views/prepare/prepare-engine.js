@@ -266,7 +266,7 @@
         kind: 'empty_rows',
         rowIndexes: frame.emptyRows.slice(0, 50),
         recipeType: 'filter',
-        inspect: frame.emptyRows.slice(0, 8).map(function (i) { return { row: i + 1, value: '(empty row)' }; })
+        inspect: frame.emptyRows.slice(0, 8).map(function (i) { return { row: i + 2, value: '(empty Excel row)' }; })
       });
     }
     if (frame.emptyCols.length) {
@@ -284,6 +284,7 @@
 
     var rowKeys = {};
     rows.forEach(function (row, i) {
+      if (frame.emptyRows.indexOf(i) >= 0) return;
       var key = headers.map(function (_h, c) { return cellKey(row ? row[c] : null); }).join('\u0001');
       if (!rowKeys[key]) rowKeys[key] = [];
       rowKeys[key].push(i);
@@ -301,7 +302,7 @@
         kind: 'duplicate_rows',
         recipeType: 'flagDuplicates',
         inspect: dupGroups.slice(0, 6).map(function (k) {
-          return { row: rowKeys[k].map(function (i) { return i + 1; }).join(', '), value: 'identical rows' };
+          return { row: rowKeys[k].map(function (i) { return i + 2; }).join(', '), value: 'identical data rows' };
         })
       });
     }

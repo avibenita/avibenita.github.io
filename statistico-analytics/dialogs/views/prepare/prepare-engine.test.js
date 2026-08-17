@@ -33,6 +33,21 @@ describe('Statistico Prepare Data engine', () => {
     expect(scan.issues.find((i) => i.kind === 'inconsistent_categories').variants.length).toBeGreaterThanOrEqual(2);
   });
 
+  test('trailing blank rows are empty, not duplicate observations', () => {
+    const headers = ['Study_ID', 'Year'];
+    const data = [
+      ['B01', 2018],
+      ['B08', 2022],
+      ['', ''],
+      ['', ''],
+      ['', '']
+    ];
+    const scan = Prep.scanQuality(headers, data);
+    expect(scan.issues.some((i) => i.kind === 'empty_rows')).toBe(true);
+    expect(scan.issues.some((i) => i.kind === 'duplicate_rows')).toBe(false);
+    expect(scan.issues.find((i) => i.kind === 'empty_rows').affected).toBe(3);
+  });
+
   test('blank trailing columns are reported as information', () => {
     const headers = ['A', 'B', ''];
     const data = [

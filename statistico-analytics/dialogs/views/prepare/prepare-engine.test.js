@@ -21,6 +21,11 @@ describe('Statistico Prepare Data engine', () => {
     expect(Prep.uniqueSheetName(['Prepared_Data', 'Prepared_Data_2'], 'Prepared_Data')).toBe('Prepared_Data_3');
   });
 
+  test('scan reports columns with no header', () => {
+    const out = Prep.scanQuality(['ID', '', 'Score'], [[1, 2, 3]]);
+    expect(out.issues.some((i) => i.kind === 'blank_headers')).toBe(true);
+  });
+
   test('scan reports empty rows, duplicates, missing, mixed types, and category variants', () => {
     const scan = Prep.scanQuality(HEADERS, rows(), { missingCodes: [99] });
     expect(scan.rowsScanned).toBe(7);

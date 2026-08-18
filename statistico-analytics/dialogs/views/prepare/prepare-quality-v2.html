@@ -41,6 +41,22 @@
     .info-tip { background:none; border:0; color:var(--cfg-text3); cursor:help; padding:0 2px; font-size:13px; }
     .sel-note { font-size:11px; color:var(--cfg-text2); line-height:1.4; margin:0; }
     .finding { font-weight:600; white-space:nowrap; }
+    .lbl-row { display:flex; align-items:baseline; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .how-ov { display:none; position:fixed; inset:0; z-index:13000; background:rgba(8,12,20,.55); align-items:center; justify-content:center; padding:12px; }
+    .how-ov.on { display:flex; }
+    .how-card { width:min(440px,100%); max-height:92vh; overflow:auto; border-radius:14px; background:var(--cfg-surface); color:var(--cfg-text); border:1px solid var(--cfg-border); box-shadow:0 18px 50px rgba(0,0,0,.35); padding:14px 16px 16px; }
+    .how-card h3 { margin:0 0 8px; font-size:15px; font-weight:800; }
+    .how-card p { margin:0 0 8px; font-size:12px; line-height:1.45; color:var(--cfg-text2); }
+    .how-ex { margin:10px 0; padding:10px; border:1px solid var(--cfg-border); border-radius:10px; background:var(--cfg-surface2,#0d1117); font-size:11.5px; line-height:1.45; }
+    .how-ex strong { color:var(--cfg-text); }
+    .how-box { border:1px solid var(--cfg-border); border-radius:8px; padding:8px 10px; margin-top:8px; background:var(--cfg-surface); }
+    .how-box-lbl { font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); margin-bottom:4px; }
+    .how-arrow { text-align:center; color:var(--prep-acc); font-size:11px; font-weight:700; margin:6px 0 0; }
+    .how-ex .how-mini { margin-top:8px; width:100%; border-collapse:collapse; font-size:11px; }
+    .how-ex .how-mini th,.how-ex .how-mini td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--cfg-border); }
+    .how-kpi { display:inline-block; border:1px solid var(--cfg-border); border-radius:6px; padding:4px 8px; margin-right:6px; text-align:center; }
+    .how-kpi b { display:block; font-size:15px; }
+    .how-foot { display:flex; justify-content:flex-end; margin-top:12px; }
   </style>
 </head>
 <body>
@@ -75,7 +91,10 @@
         <button type="button" class="cfg-btn save-config" id="btnScan" style="padding:5px 10px;font-size:11px;">Scan</button>
       </div>
       <div id="kpiWrap" style="display:none;">
-        <div class="prep-status" id="overallStatus"></div>
+        <div class="lbl-row">
+          <div class="prep-status" id="overallStatus"></div>
+          <button type="button" class="linkish" id="btnHowScreen">How this scan is organised</button>
+        </div>
         <div class="prep-kpis">
           <div class="prep-kpi"><span>Rows scanned</span><b id="kpiRows">0</b></div>
           <div class="prep-kpi"><span>Variables</span><b id="kpiVars">0</b></div>
@@ -108,6 +127,35 @@
       <button class="cfg-btn cancel" onclick="cancel()"><i class="fa-solid fa-times"></i> Cancel</button>
       <button class="cfg-btn save-config" id="btnAddRecipe" onclick="transferSelected()" disabled title="Tick one or more selectable findings first">Add selected corrections to recipe</button>
       <button class="cfg-btn run" id="btnOpenPrep" onclick="openPrepare()" disabled>Open Prepare Dataset</button>
+    </div>
+    <div class="how-ov" id="howOverlay" role="dialog" aria-modal="true" aria-labelledby="howTitle">
+      <div class="how-card">
+        <h3 id="howTitle">How this scan is organised</h3>
+        <p>The <strong>tiles</strong> count findings. The <strong>table</strong> lists each finding as a row. The numbers match: an Information count of 1 means there is one Information row below.</p>
+        <div class="how-ex">
+          <strong>Example</strong>
+          <div class="how-box">
+            <div class="how-box-lbl">1. Top tiles — counts</div>
+            <span class="how-kpi"><span style="font-size:9px;color:var(--cfg-text3);">MAY BLOCK NUMERIC</span><b>0</b></span>
+            <span class="how-kpi"><span style="font-size:9px;color:var(--cfg-text3);">REVIEW</span><b>0</b></span>
+            <span class="how-kpi"><span style="font-size:9px;color:var(--cfg-text3);">INFORMATION</span><b>1</b></span>
+          </div>
+          <div class="how-arrow">↓ that count of 1 is this table row</div>
+          <div class="how-box">
+            <div class="how-box-lbl">2. Table — one row per finding</div>
+            <table class="how-mini">
+              <thead><tr><th>Variable</th><th>Issue</th><th>Finding</th><th>Severity</th></tr></thead>
+              <tbody>
+                <tr><td>N</td><td>Missing values</td><td>1 missing</td><td>Information</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p style="margin:8px 0 0;">Tick the row if it has a checkbox, then <strong>Open Prepare Dataset</strong>. That screen opens on <strong>Define missing-value codes</strong> so you can apply the correction.</p>
+        </div>
+        <div class="how-foot">
+          <button type="button" class="cfg-btn save-config" id="howClose">Got it</button>
+        </div>
+      </div>
     </div>
   </div>
   <script>
@@ -198,6 +246,7 @@
       }
       updateAddButton();
       qs('btnOpenPrep').disabled = false;
+      maybeShowHowScan();
     }
 
     function esc(s) {
@@ -275,6 +324,27 @@
     });
     qs('btnScan').addEventListener('click', runScan);
     qs('missingCodes').addEventListener('change', runScan);
+    var HOW_KEY = 'statisticoDqHowScreen';
+    function showHowScan() {
+      qs('howOverlay').classList.add('on');
+    }
+    function hideHowScan() {
+      qs('howOverlay').classList.remove('on');
+      try { sessionStorage.setItem(HOW_KEY, '1'); } catch (e) {}
+    }
+    function maybeShowHowScan() {
+      try { if (sessionStorage.getItem(HOW_KEY) === '1') return; } catch (e) {}
+      if (!STATE.scan || !STATE.scan.issues || !STATE.scan.issues.length) return;
+      showHowScan();
+    }
+    qs('btnHowScreen').addEventListener('click', showHowScan);
+    qs('howClose').addEventListener('click', hideHowScan);
+    qs('howOverlay').addEventListener('click', function (e) {
+      if (e.target === qs('howOverlay')) hideHowScan();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && qs('howOverlay').classList.contains('on')) hideHowScan();
+    });
 
     Office.onReady(function () {
       if (Office.context && Office.context.ui && Office.EventType && Office.EventType.DialogParentMessageReceived) {

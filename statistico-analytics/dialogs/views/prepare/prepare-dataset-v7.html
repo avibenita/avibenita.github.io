@@ -73,17 +73,13 @@
     .var-actions button { background:none; border:none; color:var(--prep-acc); font-size:10.5px; font-weight:700; cursor:pointer; padding:0; }
     .op-lead { display:none; }
     .op-lead.on { display:block; }
-    .op-table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:11px; background:var(--cfg-surface); border:1px solid var(--cfg-border); border-radius:8px; overflow:hidden; }
-    .op-table .op-cat th { width:33.33%; text-align:left; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); padding:6px 8px 4px; background:var(--cfg-tbl-head,#1c2333); border-left:1px solid var(--cfg-border); }
-    .op-table .op-cat th:first-child { border-left:none; }
-    .op-table td { width:33.33%; vertical-align:top; padding:0; border-top:1px solid var(--cfg-border); border-left:1px solid var(--cfg-border); }
-    .op-table td:first-child { border-left:none; }
-    .op-table td.empty { background:transparent; }
-    .op-table label { display:flex; gap:6px; align-items:flex-start; cursor:pointer; color:var(--cfg-text2); font-weight:500; padding:6px 7px; line-height:1.3; }
-    .op-table td:hover:not(.empty) { background:var(--cfg-tbl-hover); }
-    .op-table td.on { background:rgba(20,184,166,.12); }
-    .op-table td.on:hover { background:rgba(20,184,166,.18); }
-    .op-table td.on label { color:var(--cfg-text); font-weight:800; }
+    .op-table { display:table; width:100%; table-layout:fixed; border-collapse:collapse; font-size:11px; background:var(--cfg-surface); border:1px solid var(--cfg-border); border-radius:8px; overflow:hidden; }
+    .op-col { display:table-cell; width:33.33%; vertical-align:top; border-left:1px solid var(--cfg-border); }
+    .op-col:first-child { border-left:none; }
+    .op-cat { font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); padding:6px 8px 4px; background:var(--cfg-tbl-head,#1c2333); }
+    .op-table label { display:flex; gap:6px; align-items:flex-start; cursor:pointer; color:var(--cfg-text2); font-weight:500; padding:6px 7px; line-height:1.3; border-top:1px solid var(--cfg-border); }
+    .op-table label:hover { background:var(--cfg-tbl-hover); }
+    .op-table label.on { background:rgba(20,184,166,.12); color:var(--cfg-text); font-weight:800; }
     .op-table input { margin:2px 0 0; flex:none; }
     .op-ex-row { display:flex; justify-content:flex-end; margin-top:4px; }
   </style>
@@ -114,7 +110,7 @@
           <p class="cfg-analysis-scope-note" style="margin-top:0;">Creates a new worksheet. Nothing on the original Excel range is changed.</p>
 
           <label class="lbl">1. What do you want to do?</label>
-          <table class="op-table" id="opTable"></table>
+          <div class="op-table" id="opTable"></div>
           <div class="op-ex-row">
             <button type="button" class="cfg-btn save-config" id="btnOpExample" style="padding:6px 10px;font-size:11px;white-space:nowrap;" title="Watch a before / how / after example">Example</button>
           </div>
@@ -379,30 +375,19 @@
         { id: 'structure', label: 'Table shape' }
       ];
       var cur = currentOp() || StatisticoPrepare.AVAILABLE_OPERATIONS[0].id;
-      var cols = order.map(function (g) {
-        return StatisticoPrepare.AVAILABLE_OPERATIONS.filter(function (op) { return op.category === g.id; });
-      });
-      var max = 0;
-      cols.forEach(function (c) { if (c.length > max) max = c.length; });
-      var html = '<thead><tr class="op-cat">' + order.map(function (g) {
-        return '<th>' + esc(g.label) + '</th>';
-      }).join('') + '</tr></thead><tbody>';
-      var r, c, op;
-      for (r = 0; r < max; r++) {
-        html += '<tr>';
-        for (c = 0; c < cols.length; c++) {
-          op = cols[c][r];
-          if (!op) {
-            html += '<td class="empty"></td>';
-            continue;
-          }
-          html += '<td class="' + (op.id === cur ? 'on' : '') + '"><label>' +
+      var html = '';
+      var i, ops, j, op;
+      for (i = 0; i < order.length; i++) {
+        ops = StatisticoPrepare.AVAILABLE_OPERATIONS.filter(function (o) { return o.category === order[i].id; });
+        html += '<div class="op-col"><div class="op-cat">' + esc(order[i].label) + '</div>';
+        for (j = 0; j < ops.length; j++) {
+          op = ops[j];
+          html += '<label class="' + (op.id === cur ? 'on' : '') + '">' +
             '<input type="radio" name="prepOp" value="' + op.id + '"' + (op.id === cur ? ' checked' : '') + '/>' +
-            '<span>' + esc(op.label) + '</span></label></td>';
+            '<span>' + esc(op.label) + '</span></label>';
         }
-        html += '</tr>';
+        html += '</div>';
       }
-      html += '</tbody>';
       box.innerHTML = html;
     }
     function selectedVars() {

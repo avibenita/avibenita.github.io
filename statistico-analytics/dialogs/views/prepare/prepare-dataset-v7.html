@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260715b"></script>
-  <script src="prepare-engine.js?v=20260818ex1"></script>
-  <script src="prepare-op-examples-v3.js?v=20260818ex3"></script>
+  <script src="prepare-engine-bal.js?v=20260818bal1"></script>
+  <script src="prepare-op-examples-v4.js?v=20260818ex4"></script>
   <style>
     :root { --prep-acc: #14b8a6; }
     [data-theme="light"] { --prep-acc: #0f766e; }
@@ -78,8 +78,9 @@
     .op-col:first-child { border-left:none; }
     .op-cat { font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); padding:6px 8px 4px; background:var(--cfg-tbl-head,#1c2333); }
     .op-table label { display:flex; gap:6px; align-items:flex-start; cursor:pointer; color:var(--cfg-text2); font-weight:500; padding:6px 7px; line-height:1.3; border-top:1px solid var(--cfg-border); }
+    .op-col label:first-child { border-top:none; }
     .op-table label:hover { background:var(--cfg-tbl-hover); }
-    .op-table label.on { background:rgba(20,184,166,.12); color:var(--cfg-text); font-weight:800; }
+    .op-table label.on { background:transparent; color:var(--cfg-text); font-weight:800; }
     .op-table input { margin:2px 0 0; flex:none; }
     .op-ex-row { display:flex; justify-content:flex-end; margin-top:4px; }
   </style>
@@ -121,6 +122,16 @@
             <label class="lbl">2. Subject / ID column</label>
             <select class="fld" id="wideId"></select>
             <div class="help" style="margin-top:4px;">Pick the column that identifies each person or case. It is copied onto every long row and is not stacked.</div>
+          </div>
+          <div id="longWideBlock" class="op-lead">
+            <label class="lbl">2. Subject / ID column</label>
+            <select class="fld" id="longId"></select>
+            <label class="lbl" style="margin-top:6px;">3. Occasion column</label>
+            <select class="fld" id="longTime"></select>
+            <div class="help" style="margin-top:4px;">Each distinct value here becomes a new column name.</div>
+            <label class="lbl" style="margin-top:6px;">4. Value column</label>
+            <select class="fld" id="longValue"></select>
+            <div class="help" style="margin-top:4px;">These cell values fill the new occasion columns. One row per ID.</div>
           </div>
 
           <div class="prep-vars" id="prepVars">
@@ -216,6 +227,12 @@
                 <div><label class="lbl">Value (cell values go here)</label><input class="fld" id="wideValue" value="Value" /></div>
               </div>
               <div class="help">Example: columns Pre and Post become two rows, with Occasion = Pre/Post and Value = the score.</div>
+            </div>
+            <div class="op-sec" id="sec-longToWide">
+              <div class="help">The reverse of Wide to long: one row per person, with a column for each occasion.</div>
+            </div>
+            <div class="op-sec" id="sec-transpose">
+              <div class="help">The first column becomes the new header row. Current headers become the first column of the new sheet.</div>
             </div>
           </div>
 
@@ -349,6 +366,22 @@
           'Tick the repeated-measure columns to stack. Leave a column unticked if it should stay as a normal column.',
           'Name the new Occasion and Value columns, then preview the long table.'
         ]
+      },
+      longToWide: {
+        usesVars: 'none',
+        steps: [
+          'Choose the subject ID — one row per person in the wide table.',
+          'Choose the occasion column. Its values become the new column names.',
+          'Choose the value column. Those scores fill the new occasion columns.'
+        ]
+      },
+      transpose: {
+        usesVars: 'none',
+        steps: [
+          'The first column’s values become the new column names.',
+          'The current headers become the first column of the new sheet.',
+          'Preview the flipped table, then create a new worksheet.'
+        ]
       }
     };
     var FNS = ['+', '-', '*', '/', 'mean()', 'sum()', 'min()', 'max()', 'abs()', 'round()', 'if(,,)'];
@@ -369,19 +402,18 @@
     function renderOpTable() {
       var box = qs('opTable');
       if (!box || !window.StatisticoPrepare) return;
-      var order = [
-        { id: 'variables', label: 'Columns' },
-        { id: 'cases', label: 'Rows' },
-        { id: 'structure', label: 'Table shape' }
-      ];
-      var cur = currentOp() || StatisticoPrepare.AVAILABLE_OPERATIONS[0].id;
+      var ops = StatisticoPrepare.AVAILABLE_OPERATIONS;
+      var cur = currentOp() || ops[0].id;
+      var cols = 3;
+      var per = Math.max(4, Math.ceil(ops.length / cols));
       var html = '';
-      var i, ops, j, op;
-      for (i = 0; i < order.length; i++) {
-        ops = StatisticoPrepare.AVAILABLE_OPERATIONS.filter(function (o) { return o.category === order[i].id; });
-        html += '<div class="op-col"><div class="op-cat">' + esc(order[i].label) + '</div>';
-        for (j = 0; j < ops.length; j++) {
-          op = ops[j];
+      var c, r, op, idx;
+      for (c = 0; c < cols; c++) {
+        html += '<div class="op-col">';
+        for (r = 0; r < per; r++) {
+          idx = c * per + r;
+          if (idx >= ops.length) continue;
+          op = ops[idx];
           html += '<label class="' + (op.id === cur ? 'on' : '') + '">' +
             '<input type="radio" name="prepOp" value="' + op.id + '"' + (op.id === cur ? ' checked' : '') + '/>' +
             '<span>' + esc(op.label) + '</span></label>';
@@ -454,6 +486,13 @@
         step.timeName = (qs('wideTime').value || 'Occasion').trim();
         step.valueName = (qs('wideValue').value || 'Value').trim();
       }
+      if (type === 'longToWide') {
+        step.idVar = qs('longId').value;
+        step.timeVar = qs('longTime').value;
+        step.valueVar = qs('longValue').value;
+        step.variables = [step.idVar, step.timeVar, step.valueVar];
+      }
+      if (type === 'transpose') step.variables = [];
       return step;
     }
 
@@ -530,6 +569,15 @@
         if (stack.length) {
           html += impactRow('New shape', STATE.rows.length + ' rows × ' + stack.length + ' measures → ' + (STATE.rows.length * stack.length) + ' long rows', false);
         }
+      } else if (type === 'longToWide') {
+        html += impactRow('Subject ID', qs('longId').value || '—', !qs('longId').value);
+        html += impactRow('Occasion → columns', qs('longTime').value || '—', !qs('longTime').value);
+        html += impactRow('Values from', qs('longValue').value || '—', !qs('longValue').value);
+        html += impactRow('New shape', 'One row per ID', false);
+      } else if (type === 'transpose') {
+        html += impactRow('New headers', 'First column’s values', false);
+        html += impactRow('First new column', headers[0] ? 'Current headers' : '—', !headers.length);
+        html += impactRow('New shape', headers.length > 1 ? ((headers.length - 1) + ' rows × ' + (STATE.rows.length + 1) + ' columns') : 'Need two columns', headers.length < 2);
       } else if (type === 'dropVariables') {
         var kept = headers.filter(function (h) { return !STATE.selected[h]; });
         html += impactRow('Dropped', joinNames(vars), !vars.length);
@@ -591,6 +639,31 @@
       updateButtons();
     }
 
+    function fillHeaderSelect(id, current) {
+      var sel = qs(id);
+      if (!sel) return;
+      var keep = current || sel.value;
+      sel.innerHTML = STATE.headers.map(function (h) {
+        return '<option value="' + esc(h) + '">' + esc(h) + '</option>';
+      }).join('');
+      if (keep && STATE.headers.indexOf(keep) >= 0) sel.value = keep;
+    }
+
+    function fillLongWide() {
+      fillHeaderSelect('longId');
+      fillHeaderSelect('longTime');
+      fillHeaderSelect('longValue');
+      var h = STATE.headers;
+      if (h.length < 3) return;
+      var id = qs('longId').value;
+      var time = qs('longTime').value;
+      var val = qs('longValue').value;
+      if (id && time && val && id !== time && id !== val && time !== val) return;
+      qs('longId').value = h[0];
+      qs('longTime').value = h[1];
+      qs('longValue').value = h[h.length - 1];
+    }
+
     function fillWideId() {
       var sel = qs('wideId');
       var current = sel.value;
@@ -635,6 +708,7 @@
       var sec = qs('sec-' + type);
       if (sec) sec.classList.add('on');
       qs('wideIdBlock').classList.toggle('on', type === 'wideToLong');
+      qs('longWideBlock').classList.toggle('on', type === 'longToWide');
       qs('opSteps').innerHTML = (meta.steps || []).map(function (s) { return '<li>' + s + '</li>'; }).join('');
       if (type === 'wideToLong') {
         fillWideId();
@@ -646,6 +720,7 @@
           STATE.selected[id] = false;
         }
       }
+      if (type === 'longToWide') fillLongWide();
       if (meta.usesVars === 'one') {
         var first = selectedVars()[0];
         STATE.selected = {};
@@ -861,7 +936,7 @@
       renderVars();
       updateAffected();
     });
-    ['missCodes','recodeName','recodeMap','recodeRanges','recodeOtherwise','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideTime','wideValue','filtLogic'].forEach(function (id) {
+    ['missCodes','recodeName','recodeMap','recodeRanges','recodeOtherwise','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideTime','wideValue','filtLogic','longId','longTime','longValue'].forEach(function (id) {
       var el = qs(id);
       if (el) el.addEventListener('input', updateAffected);
       if (el) el.addEventListener('change', updateAffected);

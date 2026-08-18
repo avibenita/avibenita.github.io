@@ -248,6 +248,31 @@ describe('Statistico Prepare Data engine', () => {
     expect(out.rows[1]).toEqual([10, 22, 'T2', 4]);
   });
 
+  test('long-to-wide conversion pivots occasion into columns', () => {
+    const headers = ['ID', 'Age', 'Occasion', 'Score'];
+    const data = [[10, 22, 'T1', 3], [10, 22, 'T2', 4], [11, 30, 'T1', 5], [11, 30, 'T2', 6]];
+    const out = Prep.applyRecipe(headers, data, [{
+      type: 'longToWide',
+      idVar: 'ID',
+      timeVar: 'Occasion',
+      valueVar: 'Score',
+      enabled: true
+    }]);
+    expect(out.nRows).toBe(2);
+    expect(out.headers).toEqual(['ID', 'Age', 'T1', 'T2']);
+    expect(out.rows[0]).toEqual([10, 22, 3, 4]);
+    expect(out.rows[1]).toEqual([11, 30, 5, 6]);
+  });
+
+  test('transpose uses the first column as the new headers', () => {
+    const out = Prep.applyRecipe(['ID', 'Age', 'Score'], [['A', 22, 3], ['B', 30, 4]], [{
+      type: 'transpose',
+      enabled: true
+    }]);
+    expect(out.headers).toEqual(['ID', 'A', 'B']);
+    expect(out.rows).toEqual([['Age', 22, 30], ['Score', 3, 4]]);
+  });
+
   test('disabled and deleted recipe steps are skipped; later steps recalculate', () => {
     const headers = ['Q1', 'Q2'];
     const data = [[1, 2], [3, 4]];

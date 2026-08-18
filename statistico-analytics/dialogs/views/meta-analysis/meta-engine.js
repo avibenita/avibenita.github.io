@@ -315,6 +315,84 @@ function approximateNormalCDF(z) {
   return z > 0 ? 1 - p : p;
 }
 
+function logGamma(z) {
+  // Lanczos approximation for ln Γ(z), z > 0
+  if (!(z > 0)) return NaN;
+  const c = [
+    76.18009172947146, -86.50532032941677, 24.01409824083091,
+    -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5
+  ];
+  let x = z;
+  let y = z;
+  let tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) {
+    y += 1;
+    ser += c[j] / y;
+  }
+  return -tmp + Math.log(2.5066282746310005 * ser / x);
+}
+
+function betacf(a, b, x) {
+  // Continued fraction for incomplete beta (Lentz)
+  const MAXIT = 200;
+  const EPS = 3e-7;
+  const FPMIN = 1e-30;
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  let c = 1;
+  let d = 1 - qab * x / qap;
+  if (Math.abs(d) < FPMIN) d = FPMIN;
+  d = 1 / d;
+  let h = d;
+  for (let m = 1; m <= MAXIT; m++) {
+    const m2 = 2 * m;
+    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c;
+    if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = 1 + aa / c;
+    if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < EPS) break;
+  }
+  return h;
+}
+
+function regularizedIncompleteBeta(x, a, b) {
+  if (!(a > 0) || !(b > 0) || !isFinite(x)) return NaN;
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const lbeta = logGamma(a) + logGamma(b) - logGamma(a + b);
+  const front = Math.exp(a * Math.log(x) + b * Math.log(1 - x) - lbeta);
+  if (x < (a + 1) / (a + b + 2)) {
+    return front * betacf(a, b, x) / a;
+  }
+  return 1 - front * betacf(b, a, 1 - x) / b;
+}
+
+/** Two-sided Student-t p-value: P(|T_df| ≥ |t|). */
+function studentTTwoSidedP(t, df) {
+  if (!isFinite(t) || !(df > 0)) return 1;
+  if (t === 0) return 1;
+  const x = df / (df + t * t);
+  const p = regularizedIncompleteBeta(x, df / 2, 0.5);
+  if (!isFinite(p)) {
+    return 2 * (1 - approximateNormalCDF(Math.abs(t)));
+  }
+  return Math.min(1, Math.max(0, p));
+}
+
 function computeEggersTest(studies) {
   // Regress SND = yi/se on precision = 1/se; Egger's intercept tests asymmetry.
   if (!studies || studies.length < 3) {
@@ -342,7 +420,8 @@ function computeEggersTest(studies) {
   }
   const t = intercept / seIntercept;
   const df = n - 2;
-  const p = 2 * (1 - approximateNormalCDF(Math.abs(t)));
+  // Must use Student-t (df = k−2), not a normal approximation (which understates p).
+  const p = studentTTwoSidedP(t, df);
   return {
     available: true,
     intercept: intercept,
@@ -372,6 +451,7 @@ function approximateChiSquare(chiSq, df) {
 global.MetaEngine = {
   buildMetaBundle: buildMetaBundle,
   extractStudyEffect: _metaExtractStudyEffect,
+  studentTTwoSidedP: studentTTwoSidedP,
   defaultMeasure: function (effectType) {
     if (effectType === 'binary') return 'rr';
     if (effectType === 'direct') return null;

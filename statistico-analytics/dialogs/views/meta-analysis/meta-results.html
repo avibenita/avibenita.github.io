@@ -939,7 +939,7 @@
                 <div class="interp-v" id="interpMag">—</div>
               </div>
               <div class="interp-item">
-                <div class="interp-k">Certainty</div>
+                <div class="interp-k">Statistical evidence</div>
                 <div class="interp-v" id="interpCert">—</div>
               </div>
               <div class="interp-item">
@@ -1092,7 +1092,7 @@
 
       <div id="tab-bias" class="tab-panel">
         <p class="bias-page-note">Funnel plot and Egger’s regression test. Funnel asymmetry can arise from small-study effects, heterogeneity, methodological differences, or chance—not only publication bias.</p>
-        <div id="biasPowerBadge" class="bias-power-badge" hidden>Limited power: fewer than 10 studies</div>
+        <div id="biasPowerBadge" class="bias-power-badge" hidden>Limited reliability: fewer than 10 studies</div>
         <div class="panel-card">
           <div class="panel-heading">Egger's Regression Test</div>
           <div class="stats-grid">
@@ -1268,24 +1268,36 @@
       return band + ((k != null && k < 20) ? ' · Limited precision' : '');
     }
 
+    /** Recompute Egger p from t/df so stale bundles (normal approx) display correctly. */
+    function eggerP(bias) {
+      if (!bias || !bias.available) return null;
+      var df = bias.df;
+      if (bias.t != null && df != null && isFinite(bias.t) && isFinite(df) && df > 0) {
+        if (typeof MetaEngine !== 'undefined' && MetaEngine.studentTTwoSidedP) {
+          return MetaEngine.studentTTwoSidedP(bias.t, df);
+        }
+      }
+      return bias.p;
+    }
+
     function buildBiasInterpretation(bundle) {
       var bias = (bundle && bundle.bias) || {};
       if (!bias.available) return bias.reason || "Egger's test unavailable.";
       var k = bias.n || bundle.k;
       var df = (bias.df != null) ? bias.df : (k != null ? k - 2 : null);
+      var pVal = eggerP(bias);
       var tPart = 't' + (df != null ? '(' + df + ')' : '') + ' = ' + fmt(bias.t) +
-        ', p = ' + fmtPProse(bias.p);
+        ', p = ' + fmtPProse(pVal);
       var kWord = numberWord(k);
-      var lowPower = k != null && k < 10;
-      if (bias.p < 0.05) {
+      var lowK = k != null && k < 10;
+      if (pVal < 0.05) {
         return "Egger’s test detected funnel-plot asymmetry, <strong>" + tPart + '</strong>. ' +
-          (lowPower
-            ? ('With only ' + kWord + ' studies, the test has low power; ')
-            : ('With ' + kWord + ' studies, ')) +
-          'asymmetry can reflect small-study effects, heterogeneity, or chance—not only publication bias.';
+          (lowK
+            ? ('With only ' + kWord + ' studies, this result is unstable and should be interpreted cautiously. Asymmetry can reflect small-study effects, heterogeneity, methodological differences, or chance—not only publication bias.')
+            : ('With ' + kWord + ' studies, asymmetry can reflect small-study effects, heterogeneity, methodological differences, or chance—not only publication bias.'));
       }
       return "Egger’s test did not detect funnel-plot asymmetry, <strong>" + tPart + '</strong>. ' +
-        (lowPower
+        (lowK
           ? ('With only ' + kWord + ' studies, the test has low power; the evidence about small-study effects is inconclusive.')
           : ('With ' + kWord + ' studies, treat this as one piece of evidence about small-study effects.'));
     }
@@ -1979,7 +1991,7 @@
           se: roundAiNum(bias.se, 4),
           t: roundAiNum(bias.t, 4),
           df: bias.df != null ? bias.df : (bias.n != null ? bias.n - 2 : null),
-          p: roundAiNum(bias.p, 4),
+          p: roundAiNum(eggerP(bias), 4),
           n: bias.n
         } : { available: false, reason: bias.reason || null },
         studies: (b.studies || []).slice(0, 40).map(function (s) {
@@ -2357,12 +2369,13 @@
           ' <span class="info-icon" tabindex="0">i<span class="tip"><b>t statistic</b> for the Egger intercept (intercept / SE), with df = k − 2. Large |t| suggests asymmetry.</span></span>';
       }
       if (bias.available) {
+        var pBias = eggerP(bias);
         document.getElementById('eggerIntercept').textContent = fmt(bias.intercept);
         document.getElementById('eggerSE').textContent = fmt(bias.se);
         document.getElementById('eggerT').textContent = fmt(bias.t);
-        document.getElementById('eggerP').textContent = fmtP(bias.p);
+        document.getElementById('eggerP').textContent = fmtP(pBias);
         document.getElementById('eggerN').textContent = String(biasK);
-        document.getElementById('eggerStatus').textContent = bias.p < 0.05 ? 'Asymmetry' : 'Inconclusive';
+        document.getElementById('eggerStatus').textContent = pBias < 0.05 ? 'Asymmetry' : 'Inconclusive';
         document.getElementById('biasInterpretation').innerHTML = buildBiasInterpretation(bundle);
       } else {
         ['eggerIntercept', 'eggerSE', 'eggerT', 'eggerP', 'eggerN'].forEach(function (id) {
@@ -3369,11 +3382,39 @@
       });
     }
 
+    function funnelEffectAxisTitle(spec) {
+      if (isLogRatioMeasure(spec)) {
+        var m = (spec && spec.effectMeasure) || '';
+        if (m === 'or' || m === 'logor') return 'Log odds ratio';
+        if (m === 'rom') return 'Log ratio of means';
+        return 'Log risk ratio';
+      }
+      return 'Effect size';
+    }
+
+    function funnelSeAxisTitle(spec) {
+      if (isLogRatioMeasure(spec)) {
+        return 'SE of ' + effectMeasureTechShort(spec);
+      }
+      return 'Standard Error';
+    }
+
+    function funnelPooledLabel(spec) {
+      if (isLogRatioMeasure(spec)) {
+        return 'Pooled ' + effectMeasureTechShort(spec);
+      }
+      return 'Pooled effect';
+    }
+
     function renderFunnelPlot(bundle) {
       if (!bundle || !window.Highcharts || !bundle.studies || !bundle.pooled) return;
       var t = chartTheme();
       var mu = bundle.pooled.effect;
-      var measureShort = effectMeasureShort(bundle.spec);
+      var spec = bundle.spec || {};
+      var ratio = isLogRatioMeasure(spec);
+      var measureShort = effectMeasureShort(spec);
+      var techShort = effectMeasureTechShort(spec);
+      var pooledLabel = funnelPooledLabel(spec);
       var points = bundle.studies.map(function (s) {
         var se = (s.se != null && isFinite(s.se)) ? s.se : Math.sqrt(s.vi);
         return { x: s.yi, y: se, name: s.name || 'Study' };
@@ -3413,7 +3454,7 @@
         title: { text: null },
         credits: { enabled: false },
         xAxis: {
-          title: { text: 'Effect Size', style: { color: t.muted } },
+          title: { text: funnelEffectAxisTitle(spec), style: { color: t.muted } },
           min: xMin,
           max: xMax,
           gridLineColor: t.grid,
@@ -3430,7 +3471,7 @@
           }]
         },
         yAxis: {
-          title: { text: 'Standard Error', style: { color: t.muted } },
+          title: { text: funnelSeAxisTitle(spec), style: { color: t.muted } },
           reversed: true,
           min: 0,
           max: maxSe,
@@ -3457,6 +3498,14 @@
             if (this.series && this.series.options && this.series.options.isPooledLabel) {
               return false;
             }
+            if (ratio) {
+              var yi = this.point.x;
+              var rr = Math.exp(yi);
+              return '<b>' + escapeHtml(this.point.name || 'Study') + '</b><br/>' +
+                escapeHtml(techShort) + ' = ' + fmtSigned(yi, 3) + '<br/>' +
+                escapeHtml(measureShort) + ' = ' + fmt(rr, 3) + '<br/>' +
+                'SE of ' + escapeHtml(techShort) + ' = ' + fmt(this.point.y, 3);
+            }
             return '<b>' + escapeHtml(this.point.name || 'Study') + '</b><br/>' +
               escapeHtml(measureShort) + '=' + fmtSigned(this.point.x, 3) + '<br/>' +
               'SE=' + fmt(this.point.y, 3);
@@ -3480,7 +3529,7 @@
           showInLegend: false,
           dataLabels: {
             enabled: true,
-            format: 'Pooled effect',
+            format: pooledLabel,
             allowOverlap: true,
             crop: false,
             overflow: 'allow',
@@ -3541,7 +3590,7 @@
       lines.push('tau2,' + metaBundle.heterogeneity.tau2);
       if (metaBundle.bias && metaBundle.bias.available) {
         lines.push('Egger intercept,' + metaBundle.bias.intercept);
-        lines.push('Egger p,' + metaBundle.bias.p);
+        lines.push('Egger p,' + eggerP(metaBundle.bias));
       }
       lines.push('');
       lines.push('Study,Effect,Variance,Weight,WeightPct');

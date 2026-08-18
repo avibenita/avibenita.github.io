@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260810help1"/>
   <script src="../shared-config.js?v=20260810help1"></script>
-  <script src="../ds-guide.js?v=20260818corr1"></script>
+  <script src="../ds-guide.js?v=20260818corr2"></script>
   <style>
     :root {
       --meta-acc: #6366f1;
@@ -448,7 +448,7 @@
               <button type="button" data-type="continuous" class="active" title="Two-group means, SDs and sample sizes">Continuous</button>
               <button type="button" data-type="binary" title="Event counts for two groups">Binary</button>
               <button type="button" data-type="correlation" title="Pearson correlations via Fisher's z">Correlations</button>
-              <button type="button" data-type="direct" title="Study-level effect already computed">Precomputed</button>
+              <button type="button" data-type="direct" title="Other study-level effects already computed (not correlations)">Precomputed</button>
             </div>
             <button type="button" class="meta-help-btn" id="metaHelpBtn" title="Help for this data structure">
               <span aria-hidden="true">?</span> Help
@@ -472,13 +472,16 @@
             </select>
           </div>
           <div class="meta-subopt-row" id="correlationFormatRow" style="display:none;">
-            <label class="lbl-with-tip">Correlation input
-              <span class="info-icon" tabindex="0">i<span class="tip"><b>Pearson r + N</b> (recommended): Statistico computes Fisher z and SE<sub>z</sub> = 1/√(N−3).<br/><b>Fisher z + SE</b>: use when z and its standard error are already available.</span></span>
+            <label class="lbl-with-tip">Input format
+              <span class="info-icon" tabindex="0">i<span class="tip"><b>Pearson r + sample size</b> (recommended): Statistico computes Fisher z and SE<sub>z</sub> = 1/√(N−3).<br/><b>Fisher z + standard error</b> (advanced): use only when z and its SE are already available.</span></span>
             </label>
             <select id="correlationFormat" class="meta-select" aria-label="Correlation input format">
-              <option value="r_n" selected>Pearson r + sample size (N)</option>
-              <option value="z_se">Fisher z + standard error</option>
+              <option value="r_n" selected>Pearson r + sample size — recommended</option>
+              <option value="z_se">Fisher z + standard error — advanced / precomputed</option>
             </select>
+          </div>
+          <div class="meta-measure-hint" id="correlationFormatHint" style="display:none;">
+            Pearson r and sample size are converted automatically to Fisher z. Choose precomputed Fisher z only when transformed estimates and standard errors are already available.
           </div>
           <div class="meta-subopt-row" id="uncertaintyRow" style="display:none;">
             <label for="uncertaintyType" class="lbl-with-tip">Uncertainty
@@ -632,8 +635,7 @@
         { value: 'generic', label: 'Generic effect' },
         { value: 'logor', label: 'Log odds ratio' },
         { value: 'logrr', label: 'Log risk ratio' },
-        { value: 'smd', label: "Standardized mean difference" },
-        { value: 'fisherz', label: "Fisher's z" }
+        { value: 'smd', label: "Standardized mean difference" }
       ]
     };
 
@@ -656,12 +658,12 @@
         generic: "Generic study-level effect with matching SE / variance / CI.",
         logor: "Paste log odds ratios (ln OR), not OR on the natural scale.",
         logrr: "Paste log risk ratios (ln RR), not RR on the natural scale.",
-        smd: "Standardized mean difference already computed (e.g. Hedges’ g).",
-        fisherz: "Studies are pooled using Fisher z. Results are converted back to Pearson r for presentation. Prefer the Correlations tab if you have r and N."
+        smd: "Standardized mean difference already computed (e.g. Hedges’ g)."
       }
     };
 
     function isFisherWorkflow() {
+      // Input: Correlations tab only. Results may still see legacy direct+fisherz bundles.
       return effectType === 'correlation' || (effectType === 'direct' && effectMeasure === 'fisherz');
     }
 
@@ -756,23 +758,19 @@
           }
         ];
       }
-      // Precomputed
+      // Precomputed (non-correlation): generic / log OR / log RR / SMD
       var effectHint = {
         generic: 'Study-level effect estimate',
         logor: 'Log odds ratio',
         logrr: 'Log risk ratio',
-        smd: 'SMD / Hedges g',
-        fisherz: 'Fisher z estimate'
+        smd: 'SMD / Hedges g'
       }[effectMeasure] || 'Effect estimate';
       var effectTip = {
         generic: 'Already-computed effect on the scale you selected. Keep SE / variance / CI on the <b>same</b> scale.',
         logor: 'Log odds ratio (ln OR), not the OR itself. SE must also be on the log scale.',
         logrr: 'Log risk ratio (ln RR), not the RR itself. SE must also be on the log scale.',
-        smd: 'Standardized mean difference (e.g. Hedges’ g). SE must match this scale.',
-        fisherz: 'Fisher’s z for correlations. Do not paste raw r here — use the Correlations tab for r + N.'
+        smd: 'Standardized mean difference (e.g. Hedges’ g). SE must match this scale.'
       }[effectMeasure] || 'Study-level effect estimate on the selected scale.';
-      var seLabel = effectMeasure === 'fisherz' ? 'Standard error of Fisher z' : 'Standard error';
-      var seHint = effectMeasure === 'fisherz' ? 'SE of Fisher z' : 'SE of the effect';
       var zones = [
         study,
         { key: 'effectCol', label: effectHint, hint: 'On the selected scale', kind: 'num', tip: effectTip }
@@ -793,7 +791,7 @@
         });
       } else {
         zones.push({
-          key: 'seCol', label: seLabel, hint: seHint, kind: 'num',
+          key: 'seCol', label: 'Standard error', hint: 'SE of the effect', kind: 'num',
           tip: 'Standard error of the effect. Must be &gt; 0 and on the same scale as the effect column.'
         });
       }
@@ -846,7 +844,7 @@
         title: 'Precomputed effect',
         html:
           '<h3>Method</h3>' +
-          '<p>Paste study-level effects that are already computed (generic effect, log OR, log RR, SMD, or Fisher’s z) ' +
+          '<p>Paste study-level effects that are already computed (generic effect, log OR, log RR, or SMD) ' +
           'together with uncertainty (SE, variance, or CI). Statistico pools them; it does not rebuild means or 2×2 tables.</p>' +
           '<h3>Required inputs</h3>' +
           '<ul>' +
@@ -857,10 +855,9 @@
           '<h3>Scale checklist</h3>' +
           '<ul>' +
           '<li>Log OR / log RR — paste <b>logs</b>, not OR/RR on the natural scale</li>' +
-          '<li>Fisher’s z — not raw correlations (prefer the <b>Correlations</b> tab for r + N)</li>' +
           '<li>CI limits must match the effect scale (not back-transformed OR if effect is log OR)</li>' +
           '</ul>' +
-          '<div class="tipbox"><b>Tip:</b> If you only have a 95% CI, choose Confidence interval — SE is derived from (upper − lower) / (2 × 1.96) assuming a normal interval.</div>' +
+          '<div class="tipbox"><b>Correlations:</b> use the <b>Correlations</b> tab (Pearson r + N, or Fisher z + SE) — not this Precomputed tab.</div>' +
           '<div class="warn"><b>Warning:</b> Mixing scales (e.g. OR with SE of log OR) produces invalid pooling. SE and variance must be &gt; 0.</div>'
       },
       correlation: {
@@ -869,10 +866,10 @@
           '<h3>Method</h3>' +
           '<p>Each study reports a Pearson correlation. Statistico pools studies on the Fisher-z scale, then converts ' +
           'the pooled result back to Pearson <b>r = tanh(z)</b> for presentation. Fisher z remains available in Technical Details.</p>' +
-          '<h3>Two input routes</h3>' +
+          '<h3>Input format (one Correlations tab)</h3>' +
           '<ul>' +
-          '<li><b>Pearson r + N</b> (recommended) — most articles report r and sample size; z and SE<sub>z</sub> = 1/√(N−3) are computed automatically</li>' +
-          '<li><b>Fisher z + SE</b> — when transformed values are already available</li>' +
+          '<li><b>Pearson r + sample size</b> (recommended) — most articles report r and N; z and SE<sub>z</sub> = 1/√(N−3) are computed automatically</li>' +
+          '<li><b>Fisher z + standard error</b> (advanced) — when transformed values are already available</li>' +
           '</ul>' +
           '<h3>Required inputs</h3>' +
           '<ul>' +
@@ -971,15 +968,22 @@
       }).join('');
       var hint = qs('effectMeasureHint');
       if (hint) {
-        var map = MEASURE_HINTS[effectType] || {};
-        hint.textContent = map[effectMeasure] || '';
-        hint.style.display = hint.textContent ? '' : 'none';
+        if (effectType === 'correlation') {
+          hint.textContent = '';
+          hint.style.display = 'none';
+        } else {
+          var map = MEASURE_HINTS[effectType] || {};
+          hint.textContent = map[effectMeasure] || '';
+          hint.style.display = hint.textContent ? '' : 'none';
+        }
       }
       var binRow = qs('binaryFormatRow');
       var corrRow = qs('correlationFormatRow');
+      var corrHint = qs('correlationFormatHint');
       var uncRow = qs('uncertaintyRow');
       if (binRow) binRow.style.display = effectType === 'binary' ? 'flex' : 'none';
       if (corrRow) corrRow.style.display = effectType === 'correlation' ? 'flex' : 'none';
+      if (corrHint) corrHint.style.display = effectType === 'correlation' ? '' : 'none';
       var showUnc = effectType === 'direct' ||
         (effectType === 'correlation' && correlationFormat === 'z_se');
       if (uncRow) uncRow.style.display = showUnc ? 'flex' : 'none';
@@ -1059,10 +1063,9 @@
 
     function measureLabel() {
       if (effectType === 'correlation') {
-        return correlationFormat === 'z_se' ? 'Fisher z + standard error' : 'Pearson r + N';
-      }
-      if (effectType === 'direct' && effectMeasure === 'fisherz') {
-        return 'Fisher z + standard error';
+        return correlationFormat === 'z_se'
+          ? 'Fisher z + SE (precomputed)'
+          : 'Pearson r + N (recommended)';
       }
       var opts = MEASURES[effectType] || [];
       for (var i = 0; i < opts.length; i++) if (opts[i].value === effectMeasure) return opts[i].label;
@@ -1222,7 +1225,7 @@
         return;
       }
       var unc = '';
-      if (effectType === 'direct' && effectMeasure !== 'fisherz') {
+      if (effectType === 'direct') {
         unc = uncertaintyType === 'variance' ? ' + variance'
           : uncertaintyType === 'ci' ? ' + CI'
           : ' + SE';
@@ -1311,6 +1314,12 @@
       if (!spec) return;
       if (spec.effectType) effectType = spec.effectType;
       if (spec.effectMeasure) effectMeasure = spec.effectMeasure;
+      // Legacy: Fisher's z lived under Precomputed — redirect to Correlations.
+      if (effectType === 'direct' && effectMeasure === 'fisherz') {
+        effectType = 'correlation';
+        effectMeasure = 'fisherz';
+        correlationFormat = 'z_se';
+      }
       if (spec.binaryFormat) binaryFormat = spec.binaryFormat;
       if (spec.correlationFormat === 'z_se' || spec.correlationFormat === 'r_n') {
         correlationFormat = spec.correlationFormat;
@@ -1324,7 +1333,7 @@
       } else if (spec.effectDirection === 'control') {
         // Legacy: old “positive favors control” ≈ lower-is-better coding intent
         outcomeBetter = 'lower';
-      } else if (effectType === 'correlation' || (effectType === 'direct' && effectMeasure === 'fisherz')) {
+      } else if (effectType === 'correlation') {
         outcomeBetter = 'lower';
       } else {
         outcomeBetter = 'lower';
@@ -1767,7 +1776,6 @@
           hint.style.display = hint.textContent ? '' : 'none';
         }
         if (effectType === 'direct') {
-          if (effectMeasure === 'fisherz' && outcomeBetter === 'higher') outcomeBetter = 'lower';
           syncOutcomeBetterLabels();
           renderZones();
           renderVariables();

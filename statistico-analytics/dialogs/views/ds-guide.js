@@ -221,8 +221,8 @@
 
     meta: {
       badge: 'Study-level  one row per study',
-      rule:  'Each row is a study. Map a study label plus treatment/control means (or events + totals), or a precomputed effect with SE/variance/CI.',
-      note:  'Choose Continuous / Binary / Precomputed, then the effect measure. Random-effects defaults to REML with Hartung–Knapp.',
+      rule:  'Each row is a study. Map a study label plus treatment/control means (or events + totals), correlations (r+N or Fisher z+SE), or a precomputed effect with SE/variance/CI.',
+      note:  'Choose Continuous / Binary / Correlations / Precomputed, then the effect measure. Random-effects defaults to REML with Hartung–Knapp.',
       cols: [
         { label: 'Study', role: 'cat', roleLabel: 'Study' },
         { label: 'Mean_T', role: 'meas', roleLabel: 'Tx mean' },
@@ -235,6 +235,23 @@
       rows: [
         ['Smith 2019', '12.4', '3.1', '40', '10.1', '2.8', '38'],
         ['Lee 2021', '11.8', '2.9', '55', '10.6', '3.0', '52']
+      ]
+    },
+
+    'meta-correlation': {
+      badge: 'Correlation meta-analysis  one row per study',
+      rule:  'Each row is a study reporting a Pearson correlation. Prefer r + N (Statistico computes Fisher z), or paste Fisher z + SE_z.',
+      note:  'Pooling uses Fisher z; results are shown as Pearson r = tanh(z). Association labels are optional — not treatment contrasts.',
+      cols: [
+        { label: 'Study', role: 'cat', roleLabel: 'Study' },
+        { label: 'r', role: 'meas', roleLabel: 'Pearson r' },
+        { label: 'N', role: 'meas', roleLabel: 'Sample N' },
+        { label: 'Fisher_z', role: 'meas', roleLabel: 'Fisher z' },
+        { label: 'SE_z', role: 'meas', roleLabel: 'SE of z' }
+      ],
+      rows: [
+        ['Quinn 2014', '0.32', '64', '0.332', '0.128'],
+        ['Patel 2022', '0.41', '90', '0.436', '0.107']
       ]
     }
   };

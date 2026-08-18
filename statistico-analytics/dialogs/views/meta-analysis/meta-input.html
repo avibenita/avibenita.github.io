@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260810help1"/>
   <script src="../shared-config.js?v=20260810help1"></script>
-  <script src="../ds-guide.js?v=20260810meta"></script>
+  <script src="../ds-guide.js?v=20260818corr1"></script>
   <style>
     :root {
       --meta-acc: #6366f1;
@@ -1474,6 +1474,53 @@
       refreshMeasureOptions();
     }
 
+    function refreshDsGuide(collapsed) {
+      if (typeof DsGuide === 'undefined') return;
+      var key = effectType === 'correlation' ? 'meta-correlation' : 'meta';
+      DsGuide.render(key, 'dsGuideContainer', { collapsed: !!collapsed });
+    }
+
+    function softMapCorrelationColumns() {
+      if (effectType !== 'correlation' || !_headers.length) return;
+      var lower = _headers.map(function (h) { return String(h || '').toLowerCase().replace(/\s+/g, ''); });
+      function findExact(preds) {
+        for (var p = 0; p < preds.length; p++) {
+          var needle = String(preds[p] || '').toLowerCase().replace(/\s+/g, '');
+          for (var i = 0; i < lower.length; i++) if (lower[i] === needle) return _headers[i];
+        }
+        return null;
+      }
+      function findToken(preds) {
+        for (var p = 0; p < preds.length; p++) {
+          var needle = String(preds[p] || '').toLowerCase().replace(/\s+/g, '');
+          var re = new RegExp('(^|[^a-z0-9])' + needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)');
+          for (var i = 0; i < lower.length; i++) if (re.test(lower[i])) return _headers[i];
+        }
+        return null;
+      }
+      function find(preds) { return findExact(preds) || findToken(preds); }
+      if (!assignments.studyCol) {
+        assignments.studyCol = find(['study', 'author', 'trial', 'studyname', 'studylabel']) ||
+          (columnStats.find(function (s) { return !s.isNumeric; }) || {}).name || null;
+      }
+      if (correlationFormat === 'z_se') {
+        if (!assignments.effectCol) {
+          assignments.effectCol = find(['fisher_z', 'fisherz', 'fishers_z', 'fishersz']);
+        }
+        if (!assignments.seCol && uncertaintyType === 'se') {
+          assignments.seCol = find(['se_z', 'sez', 'se_fisher', 'sefisher']);
+        }
+      } else {
+        if (!assignments.rCol) {
+          assignments.rCol = find(['pearson_r', 'pearsonr', 'corr', 'correlation', 'rho']);
+        }
+        if (!assignments.nCol) {
+          assignments.nCol = findExact(['n', 'n_total', 'ntotal', 'samplesize', 'sample_size']) ||
+            find(['samplesize', 'sample_size', 'n_total', 'ntotal']);
+        }
+      }
+    }
+
     function setEffectType(type, skipRender) {
       if (!MEASURES[type]) return;
       var prev = effectType;
@@ -1490,6 +1537,8 @@
       syncOptionControls();
       refreshMeasureOptions();
       resetAssignmentsForType();
+      if (type === 'correlation') softMapCorrelationColumns();
+      refreshDsGuide(false);
       if (!skipRender) {
         renderZones();
         renderVariables();
@@ -1573,7 +1622,7 @@
       renderZones();
       renderVariables();
       updateSummary();
-      if (typeof DsGuide !== 'undefined') DsGuide.render('meta', 'dsGuideContainer', { collapsed: false });
+      if (typeof DsGuide !== 'undefined') refreshDsGuide(false);
       validateModel();
     }
 
@@ -1736,6 +1785,7 @@
         correlationFormat = qs('correlationFormat').value === 'z_se' ? 'z_se' : 'r_n';
         refreshMeasureOptions();
         resetAssignmentsForType();
+        softMapCorrelationColumns();
         renderZones();
         renderVariables();
         updateSummary();
@@ -1753,7 +1803,7 @@
       refreshMeasureOptions();
       syncOptionControls();
 
-      if (typeof DsGuide !== 'undefined') DsGuide.render('meta', 'dsGuideContainer', { collapsed: true });
+      if (typeof DsGuide !== 'undefined') refreshDsGuide(true);
 
       if (window.__META_WEB_DEMO__) {
         document.body.classList.add('cfg-embed');

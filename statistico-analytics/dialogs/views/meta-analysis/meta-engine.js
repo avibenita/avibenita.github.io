@@ -261,7 +261,11 @@ function buildMetaBundle(headers, rows, spec) {
     });
 
     if (studies.length < 2) {
-      return { error: "Need at least 2 valid studies for meta-analysis" };
+      return {
+        error: effectType === "correlation"
+          ? "Need at least 2 valid correlation studies. Check Study label plus Fisher z & SE (or Pearson r & N with |r|<1 and N>3)."
+          : "Need at least 2 valid studies for meta-analysis"
+      };
     }
 
     const yi = studies.map(function (s) { return s.yi; });

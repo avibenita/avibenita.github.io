@@ -144,7 +144,12 @@ function _metaNum(v) {
 
 function _metaExtractStudyEffect(row, spec) {
   const effectType = spec.effectType || "continuous";
-  const measure = spec.effectMeasure || (effectType === "binary" ? "rr" : effectType === "direct" ? "generic" : "smd");
+  const measure = spec.effectMeasure || (
+    effectType === "binary" ? "rr"
+      : effectType === "direct" ? "generic"
+        : effectType === "correlation" ? "fisherz"
+          : "smd"
+  );
   let yi = null, vi = null;
   let arms = { sourceKind: effectType };
 
@@ -260,6 +265,49 @@ function _metaExtractStudyEffect(row, spec) {
     }
     if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
     arms = { sourceKind: "direct" };
+    if (measure === "fisherz") {
+      arms.fisherz = yi;
+      arms.pearsonR = Math.tanh(yi);
+    }
+  } else if (effectType === "correlation") {
+    // Pool on Fisher z; UI presents Pearson r = tanh(z).
+    const format = spec.correlationFormat || "r_n";
+    if (format === "z_se") {
+      yi = _metaNum(row[spec.effectCol]);
+      const unc = spec.uncertaintyType || "se";
+      if (unc === "variance") {
+        vi = _metaNum(row[spec.varCol]);
+      } else if (unc === "ci") {
+        const lo = _metaNum(row[spec.loCol]);
+        const hi = _metaNum(row[spec.hiCol]);
+        if (![yi, lo, hi].every(isFinite) || !(hi > lo)) return null;
+        const se = (hi - lo) / (2 * 1.96);
+        vi = se * se;
+      } else {
+        const se = _metaNum(row[spec.seCol]);
+        vi = se * se;
+      }
+      if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
+      arms = {
+        sourceKind: "correlation",
+        fisherz: yi,
+        pearsonR: Math.tanh(yi)
+      };
+    } else {
+      const r = _metaNum(row[spec.rCol]);
+      const n = _metaNum(row[spec.nCol]);
+      if (!isFinite(r) || !isFinite(n) || !(Math.abs(r) < 1) || !(n > 3)) return null;
+      yi = 0.5 * Math.log((1 + r) / (1 - r));
+      vi = 1 / (n - 3);
+      if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
+      arms = {
+        sourceKind: "correlation",
+        pearsonR: r,
+        n: n,
+        totalN: n,
+        fisherz: yi
+      };
+    }
   } else {
     return null;
   }
@@ -320,6 +368,10 @@ function _metaTCritApprox(df, alphaHalf) {
 }
 
 function buildMetaBundle(headers, rows, spec) {
+  // Prefer shared engine when available (keeps correlation / Egger math in sync).
+  if (typeof MetaEngine !== "undefined" && typeof MetaEngine.buildMetaBundle === "function") {
+    return MetaEngine.buildMetaBundle(headers, rows, spec);
+  }
   // Core meta-analysis computation
   try {
     const effectType = spec.effectType || "continuous";
@@ -327,7 +379,12 @@ function buildMetaBundle(headers, rows, spec) {
     const tauEstimator = spec.tauEstimator === "dl" ? "dl" : "reml";
     const useHK = model === "random" && spec.hartungKnapp !== false;
     const studyCol = spec.studyCol;
-    const effectMeasure = spec.effectMeasure || (effectType === "binary" ? "rr" : effectType === "direct" ? "generic" : "smd");
+    const effectMeasure = spec.effectMeasure || (
+      effectType === "binary" ? "rr"
+        : effectType === "direct" ? "generic"
+          : effectType === "correlation" ? "fisherz"
+            : "smd"
+    );
 
     const studies = [];
     rows.forEach(function (row, idx) {
@@ -344,7 +401,11 @@ function buildMetaBundle(headers, rows, spec) {
     });
 
     if (studies.length < 2) {
-      return { error: "Need at least 2 valid studies for meta-analysis" };
+      return {
+        error: effectType === "correlation"
+          ? "Need at least 2 valid correlation studies. Check Study label plus Fisher z & SE (or Pearson r & N with |r|<1 and N>3)."
+          : "Need at least 2 valid studies for meta-analysis"
+      };
     }
 
     const yi = studies.map(function (s) { return s.yi; });

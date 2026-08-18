@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260715b"></script>
   <script src="prepare-engine.js?v=20260818ex1"></script>
-  <script src="prepare-op-examples-v2.js?v=20260818ex2"></script>
+  <script src="prepare-op-examples-v3.js?v=20260818ex3"></script>
   <style>
     :root { --prep-acc: #14b8a6; }
     [data-theme="light"] { --prep-acc: #0f766e; }
@@ -73,6 +73,9 @@
     .var-actions button { background:none; border:none; color:var(--prep-acc); font-size:10.5px; font-weight:700; cursor:pointer; padding:0; }
     .op-lead { display:none; }
     .op-lead.on { display:block; }
+    .op-quick { display:flex; flex-direction:column; gap:1px; margin:2px 0 6px; }
+    .op-quick-item { text-align:left; background:transparent; border:0; color:var(--cfg-text2); font-size:12px; line-height:1.35; padding:3px 2px; cursor:pointer; font-weight:500; }
+    .op-quick-item.on { color:var(--cfg-text); font-weight:800; }
   </style>
 </head>
 <body>
@@ -101,6 +104,7 @@
           <p class="cfg-analysis-scope-note" style="margin-top:0;">Creates a new worksheet. Nothing on the original Excel range is changed.</p>
 
           <label class="lbl">1. What do you want to do?</label>
+          <div class="op-quick" id="opQuick"></div>
           <div style="display:flex;gap:6px;align-items:center;">
             <select id="opSelect" class="fld" style="flex:1;"></select>
             <button type="button" class="cfg-btn save-config" id="btnOpExample" style="padding:6px 10px;font-size:11px;white-space:nowrap;" title="Watch a before / how / after example">Example</button>
@@ -356,6 +360,15 @@
     }
     function cancel() { send('close'); }
     function currentOp() { return qs('opSelect').value; }
+    function renderOpQuick() {
+      var box = qs('opQuick');
+      if (!box || !window.StatisticoPrepare) return;
+      var ops = StatisticoPrepare.AVAILABLE_OPERATIONS.slice(0, 3);
+      var cur = currentOp();
+      box.innerHTML = ops.map(function (op) {
+        return '<button type="button" class="op-quick-item' + (op.id === cur ? ' on' : '') + '" data-op="' + op.id + '">' + esc(op.label) + '</button>';
+      }).join('');
+    }
     function selectedVars() {
       return STATE.headers.filter(function (h) { return STATE.selected[h]; });
     }
@@ -619,6 +632,7 @@
       }
       renderVars();
       updateAffected();
+      renderOpQuick();
       if (STATE.autoExample && window.StatisticoPrepareExamples) {
         STATE.autoExample = false;
         StatisticoPrepareExamples.show(type, { auto: true });
@@ -754,7 +768,6 @@
       qs('flowNote').style.display = '';
       qs('mainContent').style.display = 'flex';
       fillWideId();
-      STATE.autoExample = true;
       showOp();
       renderRecipe();
       renderConds();
@@ -778,8 +791,18 @@
         sel.lastChild.appendChild(o);
       });
       qs('fnChips').innerHTML = FNS.map(function (fn) { return '<button type="button" class="chip" data-fn="' + fn + '">' + fn + '</button>'; }).join('');
+      renderOpQuick();
     })();
 
+    qs('opQuick').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-op]');
+      if (!b) return;
+      qs('opSelect').value = b.getAttribute('data-op');
+      STATE.selected = {};
+      STATE.mapping = null;
+      STATE.autoExample = false;
+      showOp();
+    });
     qs('opSelect').addEventListener('change', function () {
       STATE.selected = {};
       STATE.mapping = null;

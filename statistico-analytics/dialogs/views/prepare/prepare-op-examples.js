@@ -180,12 +180,12 @@
     style.textContent = [
       '.ex-ov{position:fixed;inset:0;background:rgba(8,12,20,.62);z-index:12000;display:none;align-items:center;justify-content:center;padding:12px;backdrop-filter:blur(4px);}',
       '.ex-ov.on{display:flex;}',
-      '.ex-card{width:min(420px,100%);max-height:92vh;overflow:auto;border-radius:14px;background:var(--cfg-surface,#161b27);color:var(--cfg-text,#e2e8f0);border:1px solid var(--cfg-border,#2d3a52);box-shadow:0 18px 50px rgba(0,0,0,.4);}',
-      '.ex-head{display:flex;align-items:flex-start;gap:8px;padding:12px 12px 8px;border-bottom:1px solid var(--cfg-border,#2d3a52);}',
+      '.ex-card{width:min(420px,100%);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;border-radius:14px;background:var(--cfg-surface,#161b27);color:var(--cfg-text,#e2e8f0);border:1px solid var(--cfg-border,#2d3a52);box-shadow:0 18px 50px rgba(0,0,0,.4);}',
+      '.ex-head{flex:0 0 auto;display:flex;align-items:flex-start;gap:8px;padding:12px 12px 8px;border-bottom:1px solid var(--cfg-border,#2d3a52);}',
       '.ex-head h3{margin:0;font-size:14px;font-weight:800;}',
       '.ex-head p{margin:3px 0 0;font-size:11px;color:var(--cfg-text3,#94a3b8);}',
       '.ex-x{margin-left:auto;border:0;background:transparent;color:var(--cfg-text3,#94a3b8);font-size:18px;cursor:pointer;line-height:1;}',
-      '.ex-body{padding:10px 12px 12px;}',
+      '.ex-body{flex:1 1 auto;overflow:auto;padding:10px 12px 12px;}',
       '.ex-phase{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--prep-acc,#14b8a6);margin-bottom:6px;}',
       '.ex-dot{width:7px;height:7px;border-radius:99px;background:#334155;cursor:pointer;border:0;padding:0;}',
       '.ex-dot.on{background:var(--prep-acc,#14b8a6);box-shadow:0 0 0 4px rgba(20,184,166,.18);}',
@@ -198,12 +198,13 @@
       '.ex-hit{outline:1px solid rgba(20,184,166,.55);}',
       '.ex-miss{font-style:italic;color:#f97316;font-weight:700;}',
       '.ex-howbox{margin:8px 0;padding:8px 10px;border-radius:10px;border:1px dashed var(--prep-acc,#14b8a6);color:var(--prep-acc,#14b8a6);font-size:12px;font-weight:700;text-align:center;}',
-      '.ex-foot{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 12px 12px;}',
-      '.ex-btn{border:0;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;}',
+      '.ex-foot{flex:0 0 auto;display:flex;flex-wrap:nowrap;gap:8px;align-items:center;padding:10px 12px 12px;border-top:1px solid var(--cfg-border,#2d3a52);background:inherit;}',
+      '.ex-btn{border:0;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:800;cursor:pointer;}',
       '.ex-btn:disabled{opacity:.4;cursor:default;}',
-      '.ex-btn.pri{background:var(--prep-acc,#14b8a6);color:#042f2e;}',
+      '.ex-btn.pri{flex:1;min-width:96px;background:#0f766e;color:#fff;}',
+      '[data-theme="light"] .ex-btn.pri{background:#0f766e;color:#fff;}',
       '.ex-btn.ghost{background:transparent;color:var(--cfg-text2,#94a3b8);border:1px solid var(--cfg-border,#2d3a52);}',
-      '.ex-skip{margin-left:auto;font-size:10px;color:var(--cfg-text3,#64748b);display:flex;gap:5px;align-items:center;}'
+      '.ex-skip{margin-left:auto;font-size:10px;color:var(--cfg-text3,#64748b);display:flex;gap:5px;align-items:center;white-space:nowrap;}'
     ].join('');
     document.head.appendChild(style);
 
@@ -228,7 +229,6 @@
           '<button type="button" class="ex-btn ghost" id="exBack">Back</button>' +
           '<button type="button" class="ex-btn pri" id="exNext">Next</button>' +
           '<button type="button" class="ex-btn ghost" id="exDone">Got it</button>' +
-          '<label class="ex-skip"><input type="checkbox" id="exSkipAuto"/> Don’t auto-open</label>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -244,7 +244,7 @@
     ['exDot0', 'exDot1', 'exDot2'].forEach(function (id) {
       $(id).onclick = function () { go(Number(this.getAttribute('data-step'))); };
     });
-    $('exSkipAuto').onchange = function () { setSkipAuto($('exSkipAuto').checked); };
+    $('exSkipAuto') && ($('exSkipAuto').onchange = function () { setSkipAuto($('exSkipAuto').checked); });
   }
 
   function hide() {
@@ -292,7 +292,7 @@
     var ov = $('prepExOverlay');
     ov.setAttribute('data-op', type);
     ov.classList.add('on');
-    $('exSkipAuto').checked = skipAuto();
+    $('exSkipAuto') && ($('exSkipAuto').checked = skipAuto());
     $('exTitle').textContent = EXAMPLES[type].title;
     go(0);
   }

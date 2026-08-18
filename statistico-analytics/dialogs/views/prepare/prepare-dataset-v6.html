@@ -73,15 +73,18 @@
     .var-actions button { background:none; border:none; color:var(--prep-acc); font-size:10.5px; font-weight:700; cursor:pointer; padding:0; }
     .op-lead { display:none; }
     .op-lead.on { display:block; }
-    .op-table { width:100%; border-collapse:collapse; font-size:12px; background:var(--cfg-surface); border:1px solid var(--cfg-border); border-radius:8px; overflow:hidden; }
-    .op-table .op-cat th { text-align:left; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); padding:6px 8px 3px; background:var(--cfg-tbl-head,#1c2333); }
-    .op-table td { padding:0; border-top:1px solid var(--cfg-border); }
-    .op-table label { display:flex; gap:8px; align-items:center; cursor:pointer; color:var(--cfg-text2); font-weight:500; padding:6px 8px; }
-    .op-table tr:not(.op-cat):hover td { background:var(--cfg-tbl-hover); }
-    .op-table tr.on td { background:rgba(20,184,166,.12); }
-    .op-table tr.on:hover td { background:rgba(20,184,166,.18); }
-    .op-table tr.on label { color:var(--cfg-text); font-weight:800; }
-    .op-table input { margin:0; }
+    .op-table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:11px; background:var(--cfg-surface); border:1px solid var(--cfg-border); border-radius:8px; overflow:hidden; }
+    .op-table .op-cat th { width:33.33%; text-align:left; font-size:10px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); padding:6px 8px 4px; background:var(--cfg-tbl-head,#1c2333); border-left:1px solid var(--cfg-border); }
+    .op-table .op-cat th:first-child { border-left:none; }
+    .op-table td { width:33.33%; vertical-align:top; padding:0; border-top:1px solid var(--cfg-border); border-left:1px solid var(--cfg-border); }
+    .op-table td:first-child { border-left:none; }
+    .op-table td.empty { background:transparent; }
+    .op-table label { display:flex; gap:6px; align-items:flex-start; cursor:pointer; color:var(--cfg-text2); font-weight:500; padding:6px 7px; line-height:1.3; }
+    .op-table td:hover:not(.empty) { background:var(--cfg-tbl-hover); }
+    .op-table td.on { background:rgba(20,184,166,.12); }
+    .op-table td.on:hover { background:rgba(20,184,166,.18); }
+    .op-table td.on label { color:var(--cfg-text); font-weight:800; }
+    .op-table input { margin:2px 0 0; flex:none; }
     .op-ex-row { display:flex; justify-content:flex-end; margin-top:4px; }
   </style>
 </head>
@@ -370,19 +373,36 @@
     function renderOpTable() {
       var box = qs('opTable');
       if (!box || !window.StatisticoPrepare) return;
-      var groups = { variables: 'Columns', cases: 'Rows', structure: 'Table shape' };
+      var order = [
+        { id: 'variables', label: 'Columns' },
+        { id: 'cases', label: 'Rows' },
+        { id: 'structure', label: 'Table shape' }
+      ];
       var cur = currentOp() || StatisticoPrepare.AVAILABLE_OPERATIONS[0].id;
-      var last = '';
-      var html = '';
-      StatisticoPrepare.AVAILABLE_OPERATIONS.forEach(function (op) {
-        if (op.category !== last) {
-          html += '<tr class="op-cat"><th colspan="1">' + esc(groups[op.category] || op.category) + '</th></tr>';
-          last = op.category;
-        }
-        html += '<tr class="' + (op.id === cur ? 'on' : '') + '"><td><label>' +
-          '<input type="radio" name="prepOp" value="' + op.id + '"' + (op.id === cur ? ' checked' : '') + '/>' +
-          '<span>' + esc(op.label) + '</span></label></td></tr>';
+      var cols = order.map(function (g) {
+        return StatisticoPrepare.AVAILABLE_OPERATIONS.filter(function (op) { return op.category === g.id; });
       });
+      var max = 0;
+      cols.forEach(function (c) { if (c.length > max) max = c.length; });
+      var html = '<thead><tr class="op-cat">' + order.map(function (g) {
+        return '<th>' + esc(g.label) + '</th>';
+      }).join('') + '</tr></thead><tbody>';
+      var r, c, op;
+      for (r = 0; r < max; r++) {
+        html += '<tr>';
+        for (c = 0; c < cols.length; c++) {
+          op = cols[c][r];
+          if (!op) {
+            html += '<td class="empty"></td>';
+            continue;
+          }
+          html += '<td class="' + (op.id === cur ? 'on' : '') + '"><label>' +
+            '<input type="radio" name="prepOp" value="' + op.id + '"' + (op.id === cur ? ' checked' : '') + '/>' +
+            '<span>' + esc(op.label) + '</span></label></td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody>';
       box.innerHTML = html;
     }
     function selectedVars() {

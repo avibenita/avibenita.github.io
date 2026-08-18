@@ -1211,6 +1211,10 @@
       { value: 'higher', label: 'Event is beneficial', full: 'Event is beneficial' },
       { value: 'none', label: 'Direction not specified', full: 'Direction not specified' }
     ];
+    var BENEFIT_OPTIONS_CORR = [
+      { value: 'lower', label: 'Neg / pos association', full: 'Negative / positive association labels' },
+      { value: 'none', label: 'No direction labels', full: 'Do not display direction labels' }
+    ];
     var BENEFIT_OPTIONS = BENEFIT_OPTIONS_CONTINUOUS;
     var TITLE_MAP = {
       summary: 'Summary',
@@ -1402,6 +1406,12 @@
     function isBinaryOutcome(spec) {
       return ((spec && spec.effectType) || '') === 'binary';
     }
+    /** Correlation meta-analysis pooled on Fisher z, shown as Pearson r. */
+    function isFisherCorrelation(spec) {
+      var t = (spec && spec.effectType) || '';
+      var m = (spec && spec.effectMeasure) || '';
+      return t === 'correlation' || (t === 'direct' && m === 'fisherz');
+    }
     /** Measures modelled on the log scale but shown to users on the natural scale. */
     function isLogRatioMeasure(spec) {
       var t = (spec && spec.effectType) || 'continuous';
@@ -1416,11 +1426,13 @@
     }
     function toDisplayEffect(yi, spec) {
       if (yi == null || !isFinite(yi)) return yi;
-      return isLogRatioMeasure(spec) ? Math.exp(yi) : yi;
+      if (isLogRatioMeasure(spec)) return Math.exp(yi);
+      if (isFisherCorrelation(spec)) return Math.tanh(yi);
+      return yi;
     }
     function fmtDisplay(n, spec, d) {
       if (n == null || !isFinite(n)) return '—';
-      var digits = d != null ? d : (isLogRatioMeasure(spec) ? 2 : 3);
+      var digits = d != null ? d : (isLogRatioMeasure(spec) || isFisherCorrelation(spec) ? 3 : 3);
       return Number(n).toFixed(digits);
     }
     function fmtDisplaySigned(n, spec, d) {
@@ -1435,11 +1447,11 @@
         if (m === 'rd') return 'Risk difference';
         return 'Odds ratio';
       }
+      if (t === 'correlation' || (t === 'direct' && m === 'fisherz')) return 'Pearson correlation (r)';
       if (t === 'direct') {
         if (m === 'logor') return 'Odds ratio';
         if (m === 'logrr') return 'Risk ratio';
         if (m === 'smd') return 'SMD';
-        if (m === 'fisherz') return "Fisher's z";
         return 'Precomputed effect';
       }
       if (m === 'md') return 'Mean difference';
@@ -1456,11 +1468,11 @@
         if (m === 'rd') return 'RD';
         return 'OR';
       }
+      if (isFisherCorrelation(spec)) return 'r';
       if (t === 'direct') {
         if (m === 'logor') return 'OR';
         if (m === 'logrr') return 'RR';
         if (m === 'smd') return 'SMD';
-        if (m === 'fisherz') return "Fisher's z";
         return 'Effect';
       }
       if (m === 'md') return 'MD';
@@ -1468,8 +1480,9 @@
       if (m === 'cohend') return "Cohen's d";
       return "Hedges' g";
     }
-    /** Analysis-scale short name (log RR) for technical columns. */
+    /** Analysis-scale short name (log RR / Fisher's z) for technical columns. */
     function effectMeasureTechShort(spec) {
+      if (isFisherCorrelation(spec)) return "Fisher's z";
       if (!isLogRatioMeasure(spec)) return effectMeasureShort(spec);
       var m = (spec && spec.effectMeasure) || '';
       var t = (spec && spec.effectType) || 'continuous';
@@ -1484,6 +1497,7 @@
       return s.charAt(0) === '-' ? ('\u2212' + s.slice(1)) : s;
     }
     function comparisonLabel(spec) {
+      if (isFisherCorrelation(spec)) return 'Association';
       if (isLogRatioMeasure(spec) || (isBinaryOutcome(spec) && (spec.effectMeasure || '') === 'rd')) {
         return isLogRatioMeasure(spec) ? 'Treatment / Control' : 'Treatment − Control';
       }
@@ -1491,10 +1505,14 @@
     }
 
     function modelLabel(bundle) {
-      if (!bundle || bundle.model === 'fixed') return 'Fixed-effect';
+      if (!bundle || bundle.model === 'fixed') {
+        return isFisherCorrelation(bundle && bundle.spec) ? 'Fixed-effect correlation' : 'Fixed-effect';
+      }
       var est = (bundle.heterogeneity && bundle.heterogeneity.tauEstimator) ||
         (bundle.spec && bundle.spec.tauEstimator) || 'reml';
-      var bits = ['Random-effects', est === 'dl' ? 'DL' : 'REML'];
+      var bits = isFisherCorrelation(bundle.spec)
+        ? ['Random-effects correlation', est === 'dl' ? 'DL' : 'REML']
+        : ['Random-effects', est === 'dl' ? 'DL' : 'REML'];
       if (bundle.hartungKnapp || (bundle.spec && bundle.spec.hartungKnapp !== false && bundle.model === 'random')) {
         bits.push('HK');
       }
@@ -1624,10 +1642,15 @@
       var mag = magnitudeBand(bundle, et);
       var ratio = isLogRatioMeasure(spec);
       var binary = isBinaryOutcome(spec);
-      var nullLabel = ratio ? '1.00' : 'no effect';
+      var fisher = isFisherCorrelation(spec);
+      var nullLabel = ratio ? '1.00' : '0';
 
       var magLine;
-      if (ratio && binary) {
+      if (fisher) {
+        if (disp > 0.05) magLine = 'Positive association (r = ' + g + ')';
+        else if (disp < -0.05) magLine = 'Negative association (r = ' + g + ')';
+        else magLine = 'Near-zero association (r = ' + g + ')';
+      } else if (ratio && binary) {
         if (outcomeBetter === 'lower' && disp > 0 && disp < 1) {
           magLine = 'Lower event risk with treatment (~' +
             Math.round((1 - disp) * 100) + '% relative risk reduction)';
@@ -1664,7 +1687,14 @@
       }
 
       var narrative;
-      if (ratio && binary) {
+      if (fisher) {
+        narrative = 'Across ' + k + ' studies, the pooled Pearson correlation was r = ' + g +
+          ' (95% CI ' + lo + ' to ' + hi + '). Studies were pooled on the Fisher-z scale and back-transformed with r = tanh(z). ';
+        narrative += excludesNull
+          ? 'The confidence interval excludes 0 (<strong>p' +
+            (bundle.pooled.p < 0.001 ? ' &lt; .001' : (' = ' + fmtPProse(bundle.pooled.p))) + '</strong>). '
+          : 'The confidence interval includes 0 (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
+      } else if (ratio && binary) {
         var eventPhrase = outcomeBetter === 'lower'
           ? 'indicating an estimated ' + Math.round(Math.abs(1 - disp) * 100) + '% ' +
             (disp < 1 ? 'lower' : 'higher') + ' event risk in the treatment group than in the control group'
@@ -1750,14 +1780,18 @@
     function syncBenefitControl(bundle) {
       var better = outcomeBetterOf(bundle);
       var binary = isBinaryOutcome(bundle && bundle.spec);
-      BENEFIT_OPTIONS = binary ? BENEFIT_OPTIONS_BINARY : BENEFIT_OPTIONS_CONTINUOUS;
+      var fisher = isFisherCorrelation(bundle && bundle.spec);
+      BENEFIT_OPTIONS = fisher ? BENEFIT_OPTIONS_CORR
+        : binary ? BENEFIT_OPTIONS_BINARY
+          : BENEFIT_OPTIONS_CONTINUOUS;
       var titleEl = document.getElementById('cfgBenefitTitle');
-      if (titleEl) titleEl.textContent = binary ? 'Event' : 'Benefit';
+      if (titleEl) titleEl.textContent = fisher ? 'Direction' : binary ? 'Event' : 'Benefit';
       var label = document.getElementById('cfgBenefitLabel');
       var menu = document.getElementById('cfgBenefitMenu');
       var tip = document.getElementById('cfgContrastTip');
       var contrastLabel = document.getElementById('cfgContrastLabel');
       var chip = document.getElementById('cfgContrastChip');
+      if (fisher && better === 'higher') better = 'lower';
       var hit = BENEFIT_OPTIONS.find(function (o) { return o.value === better; }) || BENEFIT_OPTIONS[0];
       if (label) label.textContent = hit.label;
       if (menu) {
@@ -1776,7 +1810,12 @@
       var cmp = comparisonLabel(bundle && bundle.spec);
       if (contrastLabel) contrastLabel.textContent = cmp;
       var tipText;
-      if (binary) {
+      if (fisher) {
+        tipText = 'Correlations are associations, not treatment contrasts. Pooling uses Fisher z; results are shown as Pearson r. ' +
+          (better === 'none'
+            ? 'Direction labels are hidden.'
+            : 'Forest axis: Negative association ← 0 → Positive association.');
+      } else if (binary) {
         tipText = 'Comparison is Treatment / Control for ratios (Treatment − Control for risk difference). ' +
           (better === 'lower'
             ? 'Event is adverse → RR or OR below 1 favours treatment.'
@@ -1804,9 +1843,13 @@
       var dirEl = document.getElementById('resultDirection');
       var favorEl = document.getElementById('resultFavor');
       var binary = isBinaryOutcome(bundle.spec);
+      var fisher = isFisherCorrelation(bundle.spec);
       if (dirEl) {
         if (better === 'none') {
-          dirEl.textContent = binary ? 'Event meaning: not specified' : 'Favour labels: hidden';
+          dirEl.textContent = fisher ? 'Direction labels: hidden'
+            : binary ? 'Event meaning: not specified' : 'Favour labels: hidden';
+        } else if (fisher) {
+          dirEl.textContent = 'Association: negative ← 0 → positive';
         } else if (binary) {
           dirEl.textContent = better === 'lower' ? 'Event is adverse' : 'Event is beneficial';
         } else if (better === 'lower') {
@@ -1816,13 +1859,14 @@
         }
       }
       if (favorEl) {
-        if (better === 'none') favorEl.textContent = '';
+        if (better === 'none' || fisher) favorEl.textContent = '';
         else favorEl.textContent = arm ? ('Result favors ' + arm) : 'Result near no difference';
       }
       var contrastEl = document.getElementById('resultContrast');
       if (contrastEl) {
         contrastEl.textContent =
-          (isLogRatioMeasure(bundle.spec) ? 'Comparison: ' : 'Contrast: ') +
+          (isFisherCorrelation(bundle.spec) ? 'Scale: '
+            : isLogRatioMeasure(bundle.spec) ? 'Comparison: ' : 'Contrast: ') +
           comparisonLabel(bundle.spec);
       }
       var et = effectTypeLabel(bundle.spec);
@@ -2304,14 +2348,19 @@
         et + ' = ' + fmtDisplay(dispE, spec) +
         ' · 95% CI [' + fmtDisplay(dispLo, spec) + ', ' + fmtDisplay(dispHi, spec) + ']';
       document.getElementById('resultContrast').textContent =
-        (isLogRatioMeasure(spec) ? 'Comparison: ' : 'Contrast: ') + comparisonLabel(spec);
+        (isFisherCorrelation(spec) ? 'Scale: '
+          : isLogRatioMeasure(spec) ? 'Comparison: ' : 'Contrast: ') + comparisonLabel(spec);
       var binary = isBinaryOutcome(spec);
+      var fisher = isFisherCorrelation(spec);
       document.getElementById('resultDirection').textContent =
         better === 'none'
-          ? (binary ? 'Event meaning: not specified' : 'Favour labels: hidden')
-          : binary
-            ? (better === 'lower' ? 'Event is adverse' : 'Event is beneficial')
-            : (better === 'lower' ? 'Better outcomes: Lower values' : 'Better outcomes: Higher values');
+          ? (fisher ? 'Direction labels: hidden'
+            : binary ? 'Event meaning: not specified' : 'Favour labels: hidden')
+          : fisher
+            ? 'Association: negative ← 0 → positive'
+            : binary
+              ? (better === 'lower' ? 'Event is adverse' : 'Event is beneficial')
+              : (better === 'lower' ? 'Better outcomes: Lower values' : 'Better outcomes: Higher values');
       var favorEl = document.getElementById('resultFavor');
       if (favorEl) {
         if (better === 'none') favorEl.textContent = '';
@@ -2444,6 +2493,12 @@
     function hasArmNs(studies) {
       return (studies || []).some(function (s) { return s.n1 != null && isFinite(s.n1); });
     }
+    function hasCorrN(studies) {
+      return (studies || []).some(function (s) {
+        return (s.sourceKind === 'correlation' || s.pearsonR != null) &&
+          s.n != null && isFinite(s.n);
+      });
+    }
 
     function hasContinuousSource(studies) {
       return (studies || []).some(function (s) {
@@ -2569,8 +2624,10 @@
       var measure = effectMeasureShort(spec);
       var techMeasure = effectMeasureTechShort(spec);
       var ratio = isLogRatioMeasure(spec);
+      var fisher = isFisherCorrelation(spec);
       var showBinary = hasBinarySource(primary.studies);
       var showN = !showBinary && hasArmNs(primary.studies);
+      var showCorrN = fisher && !showBinary && !showN && hasCorrN(primary.studies);
       var tech = !!studiesView.tech;
       var cols = [];
       cols.push({ key: 'include', label: '', html: true });
@@ -2583,12 +2640,14 @@
       } else if (showN) {
         cols.push({ key: 'n1', label: 'Treatment n' });
         cols.push({ key: 'n2', label: 'Control n' });
+      } else if (showCorrN) {
+        cols.push({ key: 'n', label: 'N' });
       }
       cols.push({ key: 'effect', label: measure, sort: 'effect' });
       cols.push({ key: 'ci', label: '95% CI' });
       if (tech) {
-        if (ratio) cols.push({ key: 'logy', label: techMeasure });
-        cols.push({ key: 'se', label: ratio ? 'SE of ' + techMeasure : 'SE' });
+        if (ratio || fisher) cols.push({ key: 'logy', label: techMeasure });
+        cols.push({ key: 'se', label: (ratio || fisher) ? 'SE of ' + techMeasure : 'SE' });
         cols.push({ key: 'vi', label: 'Sampling variance' });
         cols.push({ key: 'wraw', label: 'IV weight' });
         if (showBinary) cols.push({ key: 'cc', label: 'Continuity correction' });
@@ -2634,12 +2693,14 @@
         } else if (showN) {
           cells.push('<td>' + (s.n1 != null && isFinite(s.n1) ? String(Math.round(s.n1)) : '—') + '</td>');
           cells.push('<td>' + (s.n2 != null && isFinite(s.n2) ? String(Math.round(s.n2)) : '—') + '</td>');
+        } else if (showCorrN) {
+          cells.push('<td>' + (s.n != null && isFinite(s.n) ? String(Math.round(s.n)) : '—') + '</td>');
         }
         cells.push('<td>' + fmtDisplaySigned(yiDisp, spec, dispDec) + '</td>');
         cells.push('<td>[' + fmtDisplaySigned(loDisp, spec, dispDec) + ', ' +
           fmtDisplaySigned(hiDisp, spec, dispDec) + ']</td>');
         if (tech) {
-          if (ratio) cells.push('<td>' + fmtSigned(s.yi, techDec) + '</td>');
+          if (ratio || fisher) cells.push('<td>' + fmtSigned(s.yi, techDec) + '</td>');
           cells.push('<td>' + fmt(se, techDec) + '</td>');
           cells.push('<td>' + fmt(s.vi, viDec) + '</td>');
           cells.push('<td>' + (excluded || w.weight == null ? '—' : fmt(w.weight, 4)) + '</td>');
@@ -2657,7 +2718,7 @@
           ' [' + fmtDisplaySigned(toDisplayEffect(pooled.ciLower, spec), spec, ratio ? 2 : 3) + ', ' +
           fmtDisplaySigned(toDisplayEffect(pooled.ciUpper, spec), spec, ratio ? 2 : 3) + ']')
         : '—';
-      var spanLead = 2 + (showBinary ? 4 : (showN ? 2 : 0));
+      var spanLead = 2 + (showBinary ? 4 : (showN ? 2 : (showCorrN ? 1 : 0)));
       var midCols = Math.max(1, cols.length - spanLead - 1);
       foot.innerHTML =
         '<tr><td colspan="' + spanLead + '">' + escapeHtml(modelTxt) + '</td>' +
@@ -2770,6 +2831,9 @@
       // Labels follow outcome / event coding only (analysis scale never flips).
       var better = outcomeBetterOf(bundle);
       if (better === 'none') return null;
+      if (isFisherCorrelation(bundle && bundle.spec)) {
+        return { left: 'Negative association', right: 'Positive association' };
+      }
       if (better === 'lower') {
         return { left: 'Favours treatment', right: 'Favours control' };
       }
@@ -2906,6 +2970,7 @@
     }
 
     function forestEffectColumnHeader(spec) {
+      if (isFisherCorrelation(spec)) return 'Pearson r [95% CI]';
       if (isLogRatioMeasure(spec)) {
         var m = (spec && spec.effectMeasure) || '';
         if (m === 'or' || m === 'logor') return 'Odds ratio [95% CI]';
@@ -3174,7 +3239,9 @@
           label: {
             text: (isLogRatioMeasure(bundle.spec)
               ? ('Pooled ' + effectMeasureShort(bundle.spec))
-              : 'Pooled'),
+              : isFisherCorrelation(bundle.spec)
+                ? 'Pooled r'
+                : 'Pooled'),
             align: 'center',
             verticalAlign: 'top',
             rotation: 0,
@@ -3383,6 +3450,7 @@
     }
 
     function funnelEffectAxisTitle(spec) {
+      if (isFisherCorrelation(spec)) return "Fisher's z";
       if (isLogRatioMeasure(spec)) {
         var m = (spec && spec.effectMeasure) || '';
         if (m === 'or' || m === 'logor') return 'Log odds ratio';
@@ -3393,6 +3461,7 @@
     }
 
     function funnelSeAxisTitle(spec) {
+      if (isFisherCorrelation(spec)) return "SE of Fisher's z";
       if (isLogRatioMeasure(spec)) {
         return 'SE of ' + effectMeasureTechShort(spec);
       }
@@ -3400,6 +3469,7 @@
     }
 
     function funnelPooledLabel(spec) {
+      if (isFisherCorrelation(spec)) return "Pooled Fisher's z";
       if (isLogRatioMeasure(spec)) {
         return 'Pooled ' + effectMeasureTechShort(spec);
       }
@@ -3412,6 +3482,7 @@
       var mu = bundle.pooled.effect;
       var spec = bundle.spec || {};
       var ratio = isLogRatioMeasure(spec);
+      var fisher = isFisherCorrelation(spec);
       var measureShort = effectMeasureShort(spec);
       var techShort = effectMeasureTechShort(spec);
       var pooledLabel = funnelPooledLabel(spec);
@@ -3505,6 +3576,13 @@
                 escapeHtml(techShort) + ' = ' + fmtSigned(yi, 3) + '<br/>' +
                 escapeHtml(measureShort) + ' = ' + fmt(rr, 3) + '<br/>' +
                 'SE of ' + escapeHtml(techShort) + ' = ' + fmt(this.point.y, 3);
+            }
+            if (fisher) {
+              var z = this.point.x;
+              return '<b>' + escapeHtml(this.point.name || 'Study') + '</b><br/>' +
+                "Fisher's z = " + fmtSigned(z, 3) + '<br/>' +
+                'r = ' + fmt(Math.tanh(z), 3) + '<br/>' +
+                "SE of Fisher's z = " + fmt(this.point.y, 3);
             }
             return '<b>' + escapeHtml(this.point.name || 'Study') + '</b><br/>' +
               escapeHtml(measureShort) + '=' + fmtSigned(this.point.x, 3) + '<br/>' +

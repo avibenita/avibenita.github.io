@@ -8,7 +8,12 @@ function _metaNum(v) {
 
 function _metaExtractStudyEffect(row, spec) {
   const effectType = spec.effectType || "continuous";
-  const measure = spec.effectMeasure || (effectType === "binary" ? "rr" : effectType === "direct" ? "generic" : "smd");
+  const measure = spec.effectMeasure || (
+    effectType === "binary" ? "rr"
+      : effectType === "direct" ? "generic"
+        : effectType === "correlation" ? "fisherz"
+          : "smd"
+  );
   let yi = null, vi = null;
   let arms = { sourceKind: effectType };
 
@@ -124,6 +129,49 @@ function _metaExtractStudyEffect(row, spec) {
     }
     if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
     arms = { sourceKind: "direct" };
+    if (measure === "fisherz") {
+      arms.fisherz = yi;
+      arms.pearsonR = Math.tanh(yi);
+    }
+  } else if (effectType === "correlation") {
+    // Pool on Fisher z; present Pearson r = tanh(z) in the UI.
+    const format = spec.correlationFormat || "r_n";
+    if (format === "z_se") {
+      yi = _metaNum(row[spec.effectCol]);
+      const unc = spec.uncertaintyType || "se";
+      if (unc === "variance") {
+        vi = _metaNum(row[spec.varCol]);
+      } else if (unc === "ci") {
+        const lo = _metaNum(row[spec.loCol]);
+        const hi = _metaNum(row[spec.hiCol]);
+        if (![yi, lo, hi].every(isFinite) || !(hi > lo)) return null;
+        const se = (hi - lo) / (2 * 1.96);
+        vi = se * se;
+      } else {
+        const se = _metaNum(row[spec.seCol]);
+        vi = se * se;
+      }
+      if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
+      arms = {
+        sourceKind: "correlation",
+        fisherz: yi,
+        pearsonR: Math.tanh(yi)
+      };
+    } else {
+      const r = _metaNum(row[spec.rCol]);
+      const n = _metaNum(row[spec.nCol]);
+      if (!isFinite(r) || !isFinite(n) || !(Math.abs(r) < 1) || !(n > 3)) return null;
+      yi = 0.5 * Math.log((1 + r) / (1 - r));
+      vi = 1 / (n - 3);
+      if (!isFinite(yi) || !isFinite(vi) || !(vi > 0)) return null;
+      arms = {
+        sourceKind: "correlation",
+        pearsonR: r,
+        n: n,
+        totalN: n,
+        fisherz: yi
+      };
+    }
   } else {
     return null;
   }
@@ -191,7 +239,12 @@ function buildMetaBundle(headers, rows, spec) {
     const tauEstimator = spec.tauEstimator === "dl" ? "dl" : "reml";
     const useHK = model === "random" && spec.hartungKnapp !== false;
     const studyCol = spec.studyCol;
-    const effectMeasure = spec.effectMeasure || (effectType === "binary" ? "rr" : effectType === "direct" ? "generic" : "smd");
+    const effectMeasure = spec.effectMeasure || (
+      effectType === "binary" ? "rr"
+        : effectType === "direct" ? "generic"
+          : effectType === "correlation" ? "fisherz"
+            : "smd"
+    );
 
     const studies = [];
     rows.forEach(function (row, idx) {
@@ -455,6 +508,7 @@ global.MetaEngine = {
   defaultMeasure: function (effectType) {
     if (effectType === 'binary') return 'rr';
     if (effectType === 'direct') return null;
+    if (effectType === 'correlation') return 'fisherz';
     return 'smd';
   },
   measuresFor: function (effectType) {
@@ -471,6 +525,11 @@ global.MetaEngine = {
         { value: 'rr', label: 'Risk ratio' },
         { value: 'or', label: 'Odds ratio' },
         { value: 'rd', label: 'Risk difference' }
+      ];
+    }
+    if (effectType === 'correlation') {
+      return [
+        { value: 'fisherz', label: "Pearson's r (via Fisher's z)" }
       ];
     }
     return [];

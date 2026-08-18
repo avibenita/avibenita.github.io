@@ -109,13 +109,13 @@
     .reg-equation-strip strong { color: var(--meta-acc); font-weight: 700; }
 
     .meta-seg {
-      display: flex; gap: 3px; padding: 3px; border-radius: 8px;
+      display: flex; flex-wrap: wrap; gap: 3px; padding: 3px; border-radius: 8px;
       background: var(--cfg-surface2, #1c2333); border: 1px solid var(--cfg-border); flex-shrink: 0;
     }
     .meta-seg button {
-      flex: 1; border: none; background: transparent; cursor: pointer;
-      padding: 7px 6px; border-radius: 6px; font-size: 11px; font-weight: 700;
-      color: #cbd5e1; transition: all .15s;
+      flex: 1 1 auto; border: none; background: transparent; cursor: pointer;
+      padding: 7px 5px; border-radius: 6px; font-size: 10.5px; font-weight: 700;
+      color: #cbd5e1; transition: all .15s; white-space: nowrap;
     }
     .meta-seg button:hover { color: #f8fafc; background: rgba(148,163,184,.14); }
     .meta-seg button.active {
@@ -445,9 +445,10 @@
 
           <div class="meta-seg-row">
             <div class="meta-seg" id="effectTypeSeg" role="group" aria-label="Data structure">
-              <button type="button" data-type="continuous" class="active" title="Two-group means, SDs and sample sizes">Continuous outcomes</button>
-              <button type="button" data-type="binary" title="Event counts for two groups">Binary outcomes</button>
-              <button type="button" data-type="direct" title="Study-level effect already computed">Precomputed effect</button>
+              <button type="button" data-type="continuous" class="active" title="Two-group means, SDs and sample sizes">Continuous</button>
+              <button type="button" data-type="binary" title="Event counts for two groups">Binary</button>
+              <button type="button" data-type="correlation" title="Pearson correlations via Fisher's z">Correlations</button>
+              <button type="button" data-type="direct" title="Study-level effect already computed">Precomputed</button>
             </div>
             <button type="button" class="meta-help-btn" id="metaHelpBtn" title="Help for this data structure">
               <span aria-hidden="true">?</span> Help
@@ -468,6 +469,15 @@
             <select id="binaryFormat" class="meta-select" aria-label="Binary count format">
               <option value="events_total" selected>Events + total N</option>
               <option value="events_nonevents">Events + non-events</option>
+            </select>
+          </div>
+          <div class="meta-subopt-row" id="correlationFormatRow" style="display:none;">
+            <label class="lbl-with-tip">Correlation input
+              <span class="info-icon" tabindex="0">i<span class="tip"><b>Pearson r + N</b> (recommended): Statistico computes Fisher z and SE<sub>z</sub> = 1/√(N−3).<br/><b>Fisher z + SE</b>: use when z and its standard error are already available.</span></span>
+            </label>
+            <select id="correlationFormat" class="meta-select" aria-label="Correlation input format">
+              <option value="r_n" selected>Pearson r + sample size (N)</option>
+              <option value="z_se">Fisher z + standard error</option>
             </select>
           </div>
           <div class="meta-subopt-row" id="uncertaintyRow" style="display:none;">
@@ -581,6 +591,7 @@
       <div class="meta-help-tabs" id="metaHelpTabs">
         <button type="button" class="meta-help-tab" data-help="continuous">Continuous</button>
         <button type="button" class="meta-help-tab" data-help="binary">Binary</button>
+        <button type="button" class="meta-help-tab" data-help="correlation">Correlations</button>
         <button type="button" class="meta-help-tab" data-help="direct">Precomputed</button>
       </div>
       <div class="meta-help-body" id="metaHelpBody"></div>
@@ -593,6 +604,7 @@
     var effectType = 'continuous';
     var effectMeasure = 'smd';
     var binaryFormat = 'events_total';
+    var correlationFormat = 'r_n';
     var uncertaintyType = 'se';
     var modelType = 'random';
     var tauEstimator = 'reml';
@@ -613,6 +625,9 @@
         { value: 'or', label: 'Odds ratio' },
         { value: 'rd', label: 'Risk difference' }
       ],
+      correlation: [
+        { value: 'fisherz', label: "Pearson's r (via Fisher's z)" }
+      ],
       direct: [
         { value: 'generic', label: 'Generic effect' },
         { value: 'logor', label: 'Log odds ratio' },
@@ -624,17 +639,31 @@
 
     var MEASURE_HINTS = {
       continuous: {
-        smd: "Hedges’ g: use when studies measure the same construct on different scales (default).",
-        cohend: "Cohen’s d: uncorrected standardized mean difference (no small-sample correction).",
-        md: "Mean difference: use when every study uses the same measurement scale.",
+        smd: "Hedges’ g: same construct, different scales (default for continuous).",
+        cohend: "Cohen’s d: uncorrected SMD.",
+        md: "Mean difference: every study shares the same measurement scale.",
         rom: "Ratio of means (log): relative change; means should be positive."
       },
       binary: {
         rr: "Risk ratio: default — usually easiest to interpret for trials and cohorts.",
         or: "Odds ratio: common for case–control designs and logistic settings.",
         rd: "Risk difference: absolute difference in event rates."
+      },
+      correlation: {
+        fisherz: "Studies are pooled using Fisher z. Results are converted back to Pearson r for presentation."
+      },
+      direct: {
+        generic: "Generic study-level effect with matching SE / variance / CI.",
+        logor: "Paste log odds ratios (ln OR), not OR on the natural scale.",
+        logrr: "Paste log risk ratios (ln RR), not RR on the natural scale.",
+        smd: "Standardized mean difference already computed (e.g. Hedges’ g).",
+        fisherz: "Studies are pooled using Fisher z. Results are converted back to Pearson r for presentation. Prefer the Correlations tab if you have r and N."
       }
     };
+
+    function isFisherWorkflow() {
+      return effectType === 'correlation' || (effectType === 'direct' && effectMeasure === 'fisherz');
+    }
 
     function zoneDefsForType() {
       var study = {
@@ -684,21 +713,66 @@
             tip: 'Total sample size of the control arm. Must be ≥ control events.' }
         ];
       }
+      if (effectType === 'correlation') {
+        if (correlationFormat === 'z_se') {
+          var zZones = [
+            study,
+            {
+              key: 'effectCol', label: 'Fisher z estimate', hint: 'Transformed correlation', kind: 'num',
+              tip: 'Fisher’s z = ½ ln((1+r)/(1−r)). Do <b>not</b> paste raw Pearson r here.'
+            }
+          ];
+          if (uncertaintyType === 'variance') {
+            zZones.push({
+              key: 'varCol', label: 'Variance of Fisher z', hint: 'Sampling variance (= SE²)', kind: 'num',
+              tip: 'Sampling variance of Fisher z. Must be &gt; 0.'
+            });
+          } else if (uncertaintyType === 'ci') {
+            zZones.push({
+              key: 'loCol', label: 'CI lower (z)', hint: 'Lower limit on Fisher-z scale', kind: 'num',
+              tip: 'Lower confidence limit on the Fisher-z scale.'
+            });
+            zZones.push({
+              key: 'hiCol', label: 'CI upper (z)', hint: 'Upper limit on Fisher-z scale', kind: 'num',
+              tip: 'Upper confidence limit on the Fisher-z scale.'
+            });
+          } else {
+            zZones.push({
+              key: 'seCol', label: 'Standard error of Fisher z', hint: 'SE<sub>z</sub>', kind: 'num',
+              tip: 'Standard error of Fisher z (often 1/√(N−3)). Must be &gt; 0.'
+            });
+          }
+          return zZones;
+        }
+        return [
+          study,
+          {
+            key: 'rCol', label: 'Pearson correlation (r)', hint: 'Reported study correlation', kind: 'num',
+            tip: 'Pearson correlation coefficient (−1 &lt; r &lt; 1). Statistico converts to Fisher z for pooling.'
+          },
+          {
+            key: 'nCol', label: 'Sample size (N)', hint: 'Observations used for the correlation', kind: 'num',
+            tip: 'Sample size used to estimate r. Must be &gt; 3 so that SE<sub>z</sub> = 1/√(N−3) is defined.'
+          }
+        ];
+      }
       // Precomputed
       var effectHint = {
         generic: 'Study-level effect estimate',
         logor: 'Log odds ratio',
         logrr: 'Log risk ratio',
         smd: 'SMD / Hedges g',
-        fisherz: "Fisher's z"
+        fisherz: 'Fisher z estimate'
       }[effectMeasure] || 'Effect estimate';
       var effectTip = {
         generic: 'Already-computed effect on the scale you selected. Keep SE / variance / CI on the <b>same</b> scale.',
         logor: 'Log odds ratio (ln OR), not the OR itself. SE must also be on the log scale.',
         logrr: 'Log risk ratio (ln RR), not the RR itself. SE must also be on the log scale.',
         smd: 'Standardized mean difference (e.g. Hedges’ g). SE must match this scale.',
-        fisherz: "Fisher’s z for correlations. Do not paste raw r here unless you convert first."
+        fisherz: 'Fisher’s z for correlations. Do not paste raw r here — use the Correlations tab for r + N.'
       }[effectMeasure] || 'Study-level effect estimate on the selected scale.';
+      var seLabel = effectMeasure === 'fisherz' ? 'Standard error of Fisher z' : 'Standard error';
+      var seHint = effectMeasure === 'fisherz' ? 'SE of Fisher z' : 'SE of the effect';
       var zones = [
         study,
         { key: 'effectCol', label: effectHint, hint: 'On the selected scale', kind: 'num', tip: effectTip }
@@ -719,7 +793,7 @@
         });
       } else {
         zones.push({
-          key: 'seCol', label: 'Standard error', hint: 'SE of the effect', kind: 'num',
+          key: 'seCol', label: seLabel, hint: seHint, kind: 'num',
           tip: 'Standard error of the effect. Must be &gt; 0 and on the same scale as the effect column.'
         });
       }
@@ -783,11 +857,30 @@
           '<h3>Scale checklist</h3>' +
           '<ul>' +
           '<li>Log OR / log RR — paste <b>logs</b>, not OR/RR on the natural scale</li>' +
-          '<li>Fisher’s z — not raw correlations</li>' +
+          '<li>Fisher’s z — not raw correlations (prefer the <b>Correlations</b> tab for r + N)</li>' +
           '<li>CI limits must match the effect scale (not back-transformed OR if effect is log OR)</li>' +
           '</ul>' +
           '<div class="tipbox"><b>Tip:</b> If you only have a 95% CI, choose Confidence interval — SE is derived from (upper − lower) / (2 × 1.96) assuming a normal interval.</div>' +
           '<div class="warn"><b>Warning:</b> Mixing scales (e.g. OR with SE of log OR) produces invalid pooling. SE and variance must be &gt; 0.</div>'
+      },
+      correlation: {
+        title: 'Correlations',
+        html:
+          '<h3>Method</h3>' +
+          '<p>Each study reports a Pearson correlation. Statistico pools studies on the Fisher-z scale, then converts ' +
+          'the pooled result back to Pearson <b>r = tanh(z)</b> for presentation. Fisher z remains available in Technical Details.</p>' +
+          '<h3>Two input routes</h3>' +
+          '<ul>' +
+          '<li><b>Pearson r + N</b> (recommended) — most articles report r and sample size; z and SE<sub>z</sub> = 1/√(N−3) are computed automatically</li>' +
+          '<li><b>Fisher z + SE</b> — when transformed values are already available</li>' +
+          '</ul>' +
+          '<h3>Required inputs</h3>' +
+          '<ul>' +
+          '<li><b>Study label</b></li>' +
+          '<li>Either <b>r</b> and <b>N</b>, or <b>Fisher z</b> and its <b>SE</b></li>' +
+          '</ul>' +
+          '<div class="tipbox"><b>Tip:</b> Association direction labels (negative / positive) are optional — correlations are not treatment contrasts.</div>' +
+          '<div class="warn"><b>Warning:</b> |r| must be &lt; 1 and N must be &gt; 3. Do not mix raw r into a Fisher-z column.</div>'
       }
     };
 
@@ -870,6 +963,7 @@
       if (!keep) {
         if (effectType === 'binary') effectMeasure = 'rr';
         else if (effectType === 'continuous') effectMeasure = 'smd';
+        else if (effectType === 'correlation') effectMeasure = 'fisherz';
         else effectMeasure = opts[0] ? opts[0].value : 'generic';
       }
       sel.innerHTML = opts.map(function (o) {
@@ -882,34 +976,59 @@
         hint.style.display = hint.textContent ? '' : 'none';
       }
       var binRow = qs('binaryFormatRow');
+      var corrRow = qs('correlationFormatRow');
       var uncRow = qs('uncertaintyRow');
       if (binRow) binRow.style.display = effectType === 'binary' ? 'flex' : 'none';
-      if (uncRow) uncRow.style.display = effectType === 'direct' ? 'flex' : 'none';
+      if (corrRow) corrRow.style.display = effectType === 'correlation' ? 'flex' : 'none';
+      var showUnc = effectType === 'direct' ||
+        (effectType === 'correlation' && correlationFormat === 'z_se');
+      if (uncRow) uncRow.style.display = showUnc ? 'flex' : 'none';
+      // Hide measure dropdown chrome when correlation has a single fixed measure
+      var measureRow = document.querySelector('.meta-measure-row');
+      if (measureRow) {
+        measureRow.style.display = effectType === 'correlation' ? 'none' : 'flex';
+      }
       syncOutcomeBetterLabels();
       syncModelOptionVisibility();
     }
 
     function syncOutcomeBetterLabels() {
       var binary = effectType === 'binary';
+      var fisher = isFisherWorkflow();
       var title = qs('outcomeBetterTitle');
       var tip = qs('outcomeBetterTip');
+      var higherWrap = qs('dirHigherLabel');
+      if (higherWrap) higherWrap.style.display = fisher ? 'none' : '';
       if (title) {
-        title.childNodes[0].textContent = binary ? 'Event meaning ' : 'Beneficial outcome direction ';
+        title.childNodes[0].textContent = binary
+          ? 'Event meaning '
+          : fisher
+            ? 'Association direction labels '
+            : 'Beneficial outcome direction ';
       }
       if (tip) {
         tip.innerHTML = binary
           ? 'Does <b>not</b> change calculated effects. For ratios, comparison is <b>Treatment / Control</b>. Coding only sets favour labels.<br/><b>Event is adverse</b> — death, relapse, infection (RR/OR &lt; 1 favours treatment).<br/><b>Event is beneficial</b> — recovery, response (RR/OR &gt; 1 favours treatment).<br/><b>Direction not specified</b> — hide favour labels.'
-          : 'Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.';
+          : fisher
+            ? 'Does <b>not</b> change pooled correlations. Optional forest-plot labels only.<br/><b>Negative / positive association</b> — label the sides of zero.<br/><b>Do not display direction labels</b> — show numeric correlations only.'
+            : 'Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.';
       }
       var map = binary
         ? { lower: 'Event is adverse', higher: 'Event is beneficial', none: 'Direction not specified' }
-        : { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display favour labels' };
+        : fisher
+          ? { lower: 'Negative / positive association', higher: 'Negative / positive association', none: 'Do not display direction labels' }
+          : { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display favour labels' };
       ['lower', 'higher', 'none'].forEach(function (v) {
         var lab = document.querySelector('label.opt-radio input[name="outcomeBetter"][value="' + v + '"]');
         if (!lab) return;
         var span = lab.parentNode.querySelector('.dir-label-text');
         if (span) span.textContent = map[v];
       });
+      if (fisher && outcomeBetter === 'higher') {
+        outcomeBetter = 'lower';
+        var lowerRadio = document.querySelector('input[name="outcomeBetter"][value="lower"]');
+        if (lowerRadio) lowerRadio.checked = true;
+      }
     }
 
     function syncModelOptionVisibility() {
@@ -931,16 +1050,23 @@
       return 'Sheet: ' + addr + ' · ' + _rows.length + ' studies';
     }
 
-    function measureLabel() {
-      var opts = MEASURES[effectType] || [];
-      for (var i = 0; i < opts.length; i++) if (opts[i].value === effectMeasure) return opts[i].label;
-      return effectMeasure;
-    }
-
     function typeLabel() {
       if (effectType === 'continuous') return 'Two-group continuous outcomes';
       if (effectType === 'binary') return 'Binary outcomes';
+      if (effectType === 'correlation') return 'Correlation meta-analysis';
       return 'Precomputed effects';
+    }
+
+    function measureLabel() {
+      if (effectType === 'correlation') {
+        return correlationFormat === 'z_se' ? 'Fisher z + standard error' : 'Pearson r + N';
+      }
+      if (effectType === 'direct' && effectMeasure === 'fisherz') {
+        return 'Fisher z + standard error';
+      }
+      var opts = MEASURES[effectType] || [];
+      for (var i = 0; i < opts.length; i++) if (opts[i].value === effectMeasure) return opts[i].label;
+      return effectMeasure;
     }
 
     function modelStatusLabel() {
@@ -1096,7 +1222,7 @@
         return;
       }
       var unc = '';
-      if (effectType === 'direct') {
+      if (effectType === 'direct' && effectMeasure !== 'fisherz') {
         unc = uncertaintyType === 'variance' ? ' + variance'
           : uncertaintyType === 'ci' ? ' + CI'
           : ' + SE';
@@ -1158,9 +1284,12 @@
     function buildModelSpec() {
       var spec = {
         effectType: effectType,
-        effectMeasure: effectMeasure,
+        effectMeasure: effectType === 'correlation' ? 'fisherz' : effectMeasure,
         binaryFormat: effectType === 'binary' ? binaryFormat : undefined,
-        uncertaintyType: effectType === 'direct' ? uncertaintyType : undefined,
+        correlationFormat: effectType === 'correlation' ? correlationFormat : undefined,
+        uncertaintyType: (effectType === 'direct' ||
+          (effectType === 'correlation' && correlationFormat === 'z_se'))
+          ? uncertaintyType : undefined,
         model: modelType,
         tauEstimator: modelType === 'random' ? tauEstimator : undefined,
         hartungKnapp: modelType === 'random' ? !!hartungKnapp : false,
@@ -1183,6 +1312,9 @@
       if (spec.effectType) effectType = spec.effectType;
       if (spec.effectMeasure) effectMeasure = spec.effectMeasure;
       if (spec.binaryFormat) binaryFormat = spec.binaryFormat;
+      if (spec.correlationFormat === 'z_se' || spec.correlationFormat === 'r_n') {
+        correlationFormat = spec.correlationFormat;
+      }
       if (spec.uncertaintyType) uncertaintyType = spec.uncertaintyType;
       if (spec.model) modelType = spec.model === 'fixed' ? 'fixed' : 'random';
       if (spec.tauEstimator) tauEstimator = spec.tauEstimator === 'dl' ? 'dl' : 'reml';
@@ -1191,6 +1323,8 @@
         outcomeBetter = spec.outcomeBetter;
       } else if (spec.effectDirection === 'control') {
         // Legacy: old “positive favors control” ≈ lower-is-better coding intent
+        outcomeBetter = 'lower';
+      } else if (effectType === 'correlation' || (effectType === 'direct' && effectMeasure === 'fisherz')) {
         outcomeBetter = 'lower';
       } else {
         outcomeBetter = 'lower';
@@ -1245,6 +1379,8 @@
       if (hkLab) hkLab.classList.toggle('active', !!hartungKnapp);
       var bf = qs('binaryFormat');
       if (bf) bf.value = binaryFormat;
+      var cf = qs('correlationFormat');
+      if (cf) cf.value = correlationFormat;
       var ut = qs('uncertaintyType');
       if (ut) ut.value = uncertaintyType;
       syncModelOptionVisibility();
@@ -1276,6 +1412,11 @@
       var mean1 = find(['mean1', 'mean_t', 'meant', 'mean_treat', 'meantreat', 'treatmentmean', 'm1']);
       var eventsTx = find(['events_t', 'event_t', 'eventst', 'a', 'treatmentevents', 'txevents']);
       var totalTx = find(['n1', 'n_t', 'nt', 'n_treat', 'treatmentn', 'treatmenttotal']);
+      var fisherZ = find(['fisher_z', 'fisherz', 'fishers_z', 'fishersz', 'z_fisher', 'zfisher']);
+      var seZ = find(['se_z', 'sez', 'se_fisher', 'sefisher', 'se_fisherz']);
+      var pearsonR = find(['pearson_r', 'pearsonr', 'corr', 'correlation', 'rho', 'r_pearson']);
+      var corrN = findExact(['n', 'n_total', 'ntotal', 'samplesize', 'sample_size']) ||
+        find(['samplesize', 'sample_size', 'n_total', 'ntotal']);
       var effect = find(['effect', 'smd', 'hedges', 'yi', 'logor', 'lor', 'estimate']);
       var se = find(['se', 'stderr', 'std.err', 'stderror', 'standarderror']);
       var variance = find(['vi', 'variance', 'var']);
@@ -1296,6 +1437,22 @@
         assignments.n1Col = totalTx;
         assignments.cCol = find(['events_c', 'event_c', 'eventsc', 'c', 'controlevents']);
         assignments.n2Col = find(['n2', 'n_c', 'nc', 'n_ctrl', 'controln', 'controltotal']);
+      } else if (fisherZ && (seZ || se || variance)) {
+        effectType = 'correlation';
+        effectMeasure = 'fisherz';
+        correlationFormat = 'z_se';
+        outcomeBetter = 'lower';
+        uncertaintyType = variance && !(seZ || se) ? 'variance' : 'se';
+        assignments.effectCol = fisherZ;
+        if (uncertaintyType === 'variance') assignments.varCol = variance;
+        else assignments.seCol = seZ || se;
+      } else if (pearsonR && corrN) {
+        effectType = 'correlation';
+        effectMeasure = 'fisherz';
+        correlationFormat = 'r_n';
+        outcomeBetter = 'lower';
+        assignments.rCol = pearsonR;
+        assignments.nCol = corrN;
       } else if (effect && (se || variance)) {
         effectType = 'direct';
         effectMeasure = 'generic';
@@ -1319,9 +1476,14 @@
 
     function setEffectType(type, skipRender) {
       if (!MEASURES[type]) return;
+      var prev = effectType;
       effectType = type;
       if (type === 'continuous' && !['smd', 'cohend', 'md', 'rom'].includes(effectMeasure)) effectMeasure = 'smd';
       if (type === 'binary' && !['or', 'rr', 'rd'].includes(effectMeasure)) effectMeasure = 'rr';
+      if (type === 'correlation') {
+        effectMeasure = 'fisherz';
+        if (prev !== 'correlation') outcomeBetter = 'lower';
+      }
       if (type === 'direct' && !MEASURES.direct.some(function (m) { return m.value === effectMeasure; })) {
         effectMeasure = 'generic';
       }
@@ -1396,6 +1558,7 @@
       effectType = 'continuous';
       effectMeasure = 'smd';
       binaryFormat = 'events_total';
+      correlationFormat = 'r_n';
       uncertaintyType = 'se';
       modelType = 'random';
       tauEstimator = 'reml';
@@ -1552,12 +1715,26 @@
           hint.textContent = map[effectMeasure] || '';
           hint.style.display = hint.textContent ? '' : 'none';
         }
-        if (effectType === 'direct') renderZones();
+        if (effectType === 'direct') {
+          if (effectMeasure === 'fisherz' && outcomeBetter === 'higher') outcomeBetter = 'lower';
+          syncOutcomeBetterLabels();
+          renderZones();
+          renderVariables();
+        }
         updateSummary();
         validateModel();
       });
       qs('binaryFormat').addEventListener('change', function () {
         binaryFormat = qs('binaryFormat').value === 'events_nonevents' ? 'events_nonevents' : 'events_total';
+        resetAssignmentsForType();
+        renderZones();
+        renderVariables();
+        updateSummary();
+        validateModel();
+      });
+      qs('correlationFormat').addEventListener('change', function () {
+        correlationFormat = qs('correlationFormat').value === 'z_se' ? 'z_se' : 'r_n';
+        refreshMeasureOptions();
         resetAssignmentsForType();
         renderZones();
         renderVariables();

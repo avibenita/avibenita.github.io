@@ -92,27 +92,29 @@
     var modalClose = document.getElementById('wsModalClose');
     var modalCta = document.getElementById('wsModalCta');
     var modalScreen = modalFrame ? modalFrame.closest('.ws-screen') : null;
-    var DESKTOP_W = 1280;
-    var DESKTOP_H = 800;
+    var fitRetries = 0;
+
+    function clearScale() {
+      if (modalScreen) modalScreen.classList.remove('ws-screen--scaled');
+      if (!modalFrame) return;
+      modalFrame.style.transform = '';
+      modalFrame.style.width = '';
+      modalFrame.style.height = '';
+    }
 
     function fitFrame() {
       if (!modalFrame || !modalScreen || !backdrop.classList.contains('open')) return;
-      var sw = modalScreen.clientWidth || 1;
-      var sh = modalScreen.clientHeight || 1;
-      var needsScale = sw < 980 || sh < 640;
-      modalScreen.classList.toggle('ws-screen--scaled', needsScale);
-      if (!needsScale) {
-        modalFrame.style.transform = '';
-        modalFrame.style.width = '';
-        modalFrame.style.height = '';
+      var sw = modalScreen.clientWidth || 0;
+      var sh = modalScreen.clientHeight || 0;
+      if (sw < 160 || sh < 120) {
+        clearScale();
+        if (fitRetries++ < 30) requestAnimationFrame(fitFrame);
         return;
       }
-      var scale = Math.min(sw / DESKTOP_W, sh / DESKTOP_H);
-      var ox = Math.max(0, (sw - DESKTOP_W * scale) / 2);
-      var oy = Math.max(0, (sh - DESKTOP_H * scale) / 2);
-      modalFrame.style.width = DESKTOP_W + 'px';
-      modalFrame.style.height = DESKTOP_H + 'px';
-      modalFrame.style.transform = 'translate(' + ox + 'px,' + oy + 'px) scale(' + scale + ')';
+      fitRetries = 0;
+      // Fill the visible frame. A virtual 1280×800 scale clips dialogs and
+      // can collapse to a sliver if fit runs before flex layout has height.
+      clearScale();
     }
 
     function openWorkspaceWindow(url, title) {

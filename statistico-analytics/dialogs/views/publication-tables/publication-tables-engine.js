@@ -1781,18 +1781,23 @@
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
   }
 
+  function showTab(tab) {
+    state.tab = tab;
+    document.querySelectorAll(".pt2-tab-btn").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-tab") === tab);
+    });
+    ["build", "preview", "details"].forEach(function (t) {
+      var el = $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1));
+      if (el) el.classList.toggle("active", t === tab);
+    });
+    if (tab === "details") renderDetails();
+    if (tab === "preview") renderPreview();
+  }
+
   function wireTabs() {
-    var btns = document.querySelectorAll(".pt2-tab-btn");
-    btns.forEach(function (btn) {
+    document.querySelectorAll(".pt2-tab-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var tab = btn.getAttribute("data-tab");
-        state.tab = tab;
-        btns.forEach(function (b) { b.classList.toggle("active", b === btn); });
-        ["build", "preview", "details"].forEach(function (t) {
-          $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle("active", t === tab);
-        });
-        if (tab === "details") renderDetails();
-        if (tab === "preview") renderPreview();
+        showTab(btn.getAttribute("data-tab"));
       });
     });
   }
@@ -2939,14 +2944,7 @@
       applyAiDraftFromForm();
       syncControlsFromState();
       renderAll();
-      state.tab = "preview";
-      document.querySelectorAll(".pt2-tab-btn").forEach(function (b) {
-        b.classList.toggle("active", b.getAttribute("data-tab") === "preview");
-      });
-      ["build", "preview", "details"].forEach(function (t) {
-        $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle("active", t === "preview");
-      });
-      renderPreview();
+      showTab("preview");
       $("pt2AiStatus").textContent = "Caption & Notes updated. Results draft copied to clipboard when available.";
       return;
     }
@@ -3049,6 +3047,7 @@
     wireAiAssistant();
     syncControlsFromState();
     renderAll();
+    if (window.__PT2_WEB_DEMO__) showTab("preview");
 
     var closeBtn = $("pt2CloseBtn");
     if (closeBtn) closeBtn.addEventListener("click", function () { sendToHost({ action: "close" }); });

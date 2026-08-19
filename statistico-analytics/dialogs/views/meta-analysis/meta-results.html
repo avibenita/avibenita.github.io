@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
   <title>Meta-Analysis Results</title>
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    // Public demo/case-study embeds (embed=1) never run inside an Office host.
+    // Skipping office.js avoids its dialog/parent-frame handshake blanking the
+    // nested marketing-site modal iframe (page -> wsModalFrame -> this page).
+    if (!/(?:^|[?&])embed=1(?:&|$)/.test(window.location.search)) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></scr' + 'ipt>');
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260812-hetguide1"/>
@@ -3765,6 +3772,74 @@
       }
     }
 
+    function isMetaWebDemo() {
+      var q = (location.search || '').toLowerCase();
+      return q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0;
+    }
+
+    function demoStudyPayload() {
+      return {
+        address: 'Demo studies',
+        headers: ['Study', 'Mean1', 'SD1', 'N1', 'Mean2', 'SD2', 'N2'],
+        rows: [
+          ['Anderson 2019', 12.4, 3.1, 48, 10.1, 2.8, 46],
+          ['Chen 2020', 11.8, 2.9, 62, 10.6, 3.0, 60],
+          ['Rivera 2021', 13.2, 3.4, 55, 11.0, 3.2, 54],
+          ['Okada 2022', 12.0, 2.7, 71, 11.2, 2.9, 69],
+          ['Müller 2023', 14.1, 3.6, 40, 11.5, 3.1, 42],
+          ['Patel 2024', 12.7, 3.0, 58, 10.9, 2.8, 57]
+        ]
+      };
+    }
+
+    function demoModelSpec() {
+      return {
+        effectType: 'continuous',
+        effectMeasure: 'smd',
+        model: 'random',
+        tauEstimator: 'reml',
+        hartungKnapp: true,
+        outcomeBetter: 'lower',
+        studyCol: 0,
+        mean1Col: 1,
+        sd1Col: 2,
+        n1Col: 3,
+        mean2Col: 4,
+        sd2Col: 5,
+        n2Col: 6,
+        colNames: {
+          studyCol: 'Study',
+          mean1Col: 'Mean1',
+          sd1Col: 'SD1',
+          n1Col: 'N1',
+          mean2Col: 'Mean2',
+          sd2Col: 'SD2',
+          n2Col: 'N2'
+        }
+      };
+    }
+
+    function loadDemoResults() {
+      var src = demoStudyPayload();
+      var spec = demoModelSpec();
+      if (typeof MetaEngine === 'undefined' || typeof MetaEngine.buildMetaBundle !== 'function') {
+        console.error('[meta-results] MetaEngine missing — cannot build demo');
+        return;
+      }
+      var bundle = MetaEngine.buildMetaBundle(src.headers, src.rows, spec);
+      if (!bundle || bundle.error) {
+        console.error('[meta-results] demo failed', bundle && bundle.error);
+        return;
+      }
+      bundle.source = src;
+      try {
+        sessionStorage.setItem('metaBundle', JSON.stringify(bundle));
+        sessionStorage.setItem('metaSource', JSON.stringify(src));
+        sessionStorage.setItem('metaModelSpec', JSON.stringify(spec));
+      } catch (_e) {}
+      populateResults(bundle);
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
       var ok = bootHeader();
       if (!ok) {
@@ -3968,7 +4043,9 @@
         });
       }, true);
 
-      if (typeof Office !== 'undefined' && Office.onReady) {
+      if (isMetaWebDemo()) {
+        loadDemoResults();
+      } else if (typeof Office !== 'undefined' && Office.onReady) {
         Office.onReady(function () {
           try {
             if (Office.context && Office.context.ui &&

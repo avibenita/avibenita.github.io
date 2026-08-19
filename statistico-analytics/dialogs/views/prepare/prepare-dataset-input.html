@@ -906,6 +906,34 @@
       updateButtons();
     }
 
+    function demoPayload() {
+      return {
+        headers: ['ID', 'Department', 'Satisfaction', 'Intention', 'Tenure'],
+        rows: [
+          [1, 'Sales', 4.2, 3.8, 2],
+          [2, 'Sales', 3.1, 2.9, 5],
+          [3, 'Ops', 4.8, 4.5, 8],
+          [4, 'Ops', 2.6, 2.1, 1],
+          [5, 'R&D', 4.4, 4.2, 4],
+          [6, 'R&D', 3.7, 3.5, 6],
+          [7, 'Sales', 4.9, 4.6, 3],
+          [8, 'Ops', 3.3, 3.0, 7],
+          [9, 'R&D', 2.4, 2.2, 2],
+          [10, 'Sales', 3.9, 3.6, 9]
+        ],
+        address: 'A1:E11 (built-in sample)',
+        worksheetName: 'Survey (built-in)',
+        sheetNames: ['Survey (built-in)']
+      };
+    }
+
+    function maybeLoadDemo() {
+      if (!/[?&]demo=1/.test(window.location.search || '')) return false;
+      if (STATE.headers && STATE.headers.length) return false;
+      applyPayload(demoPayload());
+      return true;
+    }
+
     (function initOps() {
       var sel = qs('opSelect');
       var groups = { variables: 'Columns', cases: 'Rows', structure: 'Table shape' };
@@ -1052,8 +1080,22 @@
       updateButtons();
     });
 
-    Office.onReady(function () {
-      if (Office.context && Office.context.ui && Office.EventType && Office.EventType.DialogParentMessageReceived) {
+    function bootPrepare() {
+      send('ready');
+      if (maybeLoadDemo()) return;
+      var tries = 0;
+      var timer = setInterval(function () {
+        if (STATE.headers.length || ++tries > 12) {
+          clearInterval(timer);
+          if (!STATE.headers.length) maybeLoadDemo();
+          return;
+        }
+        send('requestData');
+      }, 500);
+    }
+
+    function startPrepare() {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.EventType && Office.EventType.DialogParentMessageReceived) {
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
           try {
             var msg = JSON.parse(arg.message || '{}');
@@ -1063,13 +1105,14 @@
           } catch (e) {}
         });
       }
-      send('ready');
-      var tries = 0;
-      var timer = setInterval(function () {
-        if (STATE.headers.length || ++tries > 12) { clearInterval(timer); return; }
-        send('requestData');
-      }, 500);
-    });
+      bootPrepare();
+    }
+
+    if (typeof Office !== 'undefined' && Office.onReady) {
+      Office.onReady(function () { startPrepare(); });
+    } else {
+      startPrepare();
+    }
   </script>
 </body>
 </html>

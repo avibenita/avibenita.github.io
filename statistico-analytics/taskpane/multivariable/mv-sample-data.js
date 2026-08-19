@@ -1,5 +1,5 @@
 /**
- * Shared Multivariable Explorer sample — countries bubble dataset.
+ * Shared Multivariable Visualisation sample — countries bubble dataset.
  * Used by dialogs (input/results) and the hub taskpane panel.
  */
 (function (global) {

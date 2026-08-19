@@ -2180,7 +2180,7 @@ const FOOTER_TEMPLATE = `
       activePage = 'faq';
     } else if (currentFile === 'index-Calculators.html' || currentPath.indexOf('/calculators/') >= 0) {
       activePage = 'calculators';
-    } else if (currentFile === 'publication-tables.html') {
+    } else if (currentFile === 'publication-tables.html' || currentFile === 'multivariable-visualisation.html' || currentFile === 'data-manipulation.html') {
       /* Lives under /analytics/ path but belongs to Specialized Tools */
       activePage = 'addins';
     } else if (currentFile === 'index-Analytics.html' || currentPath.indexOf('/analytics/') >= 0) {
@@ -2223,6 +2223,7 @@ function trailIconForLabel(label) {
   if (t === 'platform' || t === 'launcher') return 'fa-sitemap';
   if (t.indexOf('publication') >= 0) return 'fa-graduation-cap';
   if (t.indexOf('meta') >= 0) return 'fa-layer-group';
+  if (t.indexOf('visualis') >= 0 || t.indexOf('visualiz') >= 0 || t.indexOf('multivariable') >= 0) return 'fa-circle-dot';
   if (t.indexOf('bubble') >= 0) return 'fa-circle';
   if (t.indexOf('manipulat') >= 0 || t.indexOf('prepare') >= 0) return 'fa-table-columns';
   if (t.indexOf('regression') >= 0) return 'fa-chart-line';
@@ -2317,6 +2318,22 @@ function resolveTrailCrumbs() {
       { label: 'Statistico', href: links.home },
       { label: 'Specialized Tools', href: links.addins },
       { label: 'Publication Tables' }
+    ];
+  }
+
+  if (file === 'multivariable-visualisation.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Specialized Tools', href: links.addins },
+      { label: 'Multivariable Visualisation' }
+    ];
+  }
+
+  if (file === 'data-manipulation.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Specialized Tools', href: links.addins },
+      { label: 'Data Manipulation' }
     ];
   }
 

@@ -474,7 +474,7 @@ const TOOLS_CATEGORY_TILES = [
     section: "Utilities",
     sectionId: "utilities",
     sectionSubtitle: "Visual exploration and Excel-to-Office publishing",
-    title: "Multivariable Explorer",
+    title: "Multivariable Visualisation",
     icon: "fa-chart-scatter",
     accent: "#34d399",
     accentDark: "#059669",
@@ -483,12 +483,12 @@ const TOOLS_CATEGORY_TILES = [
     subtitle: "Interactive bubble, quadrant, and 3D scatter charts from your Excel data",
     desc: "Map X, Y, size, color, and labels on a multivariable bubble, quadrant, or 3D scatter chart.",
     info: [
-      "Multivariable Explorer: bubble, quadrant, and 3D scatter (X, Y, size, color)",
+      "Multivariable Visualisation: bubble, quadrant, and 3D scatter (X, Y, size, color)",
       "Select the Excel range from the input panel",
       "Uses a built-in country sample if you click Load sample"
     ],
     modules: [
-      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
+      { id: "multivariable", label: "Multivariable Visualisation", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
     ]
   },
   {
@@ -2045,7 +2045,7 @@ function openMultivariableSampleFromHub() {
     if (!result || !result.ok) {
       try {
         window.alert("Could not write the sample sheet.\n\n" + ((result && result.error) || "Unknown error") +
-          "\n\nOpening Multivariable Explorer with built-in sample data instead.");
+          "\n\nOpening Multivariable Visualisation with built-in sample data instead.");
       } catch (e) {}
       finish();
       openMultivariableDialogFromHub();

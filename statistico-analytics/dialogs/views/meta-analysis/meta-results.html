@@ -1406,6 +1406,13 @@
     function isBinaryOutcome(spec) {
       return ((spec && spec.effectType) || '') === 'binary';
     }
+    /** Binary events and precomputed log OR / log RR share Event meaning labels. */
+    function usesEventMeaningLabels(spec) {
+      if (isBinaryOutcome(spec)) return true;
+      var t = (spec && spec.effectType) || '';
+      var m = (spec && spec.effectMeasure) || '';
+      return t === 'direct' && (m === 'logor' || m === 'logrr');
+    }
     /** Correlation meta-analysis pooled on Fisher z, shown as Pearson r. */
     function isFisherCorrelation(spec) {
       var t = (spec && spec.effectType) || '';
@@ -1641,7 +1648,7 @@
       var arm = favoredArm(e, outcomeBetter);
       var mag = magnitudeBand(bundle, et);
       var ratio = isLogRatioMeasure(spec);
-      var binary = isBinaryOutcome(spec);
+      var eventMeaning = usesEventMeaningLabels(spec);
       var fisher = isFisherCorrelation(spec);
       var nullLabel = ratio ? '1.00' : '0';
 
@@ -1650,7 +1657,7 @@
         if (disp > 0.05) magLine = 'Positive association (r = ' + g + ')';
         else if (disp < -0.05) magLine = 'Negative association (r = ' + g + ')';
         else magLine = 'Near-zero association (r = ' + g + ')';
-      } else if (ratio && binary) {
+      } else if (ratio && eventMeaning) {
         if (outcomeBetter === 'lower' && disp > 0 && disp < 1) {
           magLine = 'Lower event risk with treatment (~' +
             Math.round((1 - disp) * 100) + '% relative risk reduction)';
@@ -1694,7 +1701,7 @@
           ? 'The confidence interval excludes 0 (<strong>p' +
             (bundle.pooled.p < 0.001 ? ' &lt; .001' : (' = ' + fmtPProse(bundle.pooled.p))) + '</strong>). '
           : 'The confidence interval includes 0 (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
-      } else if (ratio && binary) {
+      } else if (ratio && eventMeaning) {
         var eventPhrase = outcomeBetter === 'lower'
           ? 'indicating an estimated ' + Math.round(Math.abs(1 - disp) * 100) + '% ' +
             (disp < 1 ? 'lower' : 'higher') + ' event risk in the treatment group than in the control group'
@@ -1779,13 +1786,21 @@
 
     function syncBenefitControl(bundle) {
       var better = outcomeBetterOf(bundle);
-      var binary = isBinaryOutcome(bundle && bundle.spec);
+      var eventMeaning = usesEventMeaningLabels(bundle && bundle.spec);
       var fisher = isFisherCorrelation(bundle && bundle.spec);
+      var genericDirect = ((bundle && bundle.spec && bundle.spec.effectType) === 'direct') &&
+        ((bundle.spec.effectMeasure || '') === 'generic');
       BENEFIT_OPTIONS = fisher ? BENEFIT_OPTIONS_CORR
-        : binary ? BENEFIT_OPTIONS_BINARY
-          : BENEFIT_OPTIONS_CONTINUOUS;
+        : eventMeaning ? BENEFIT_OPTIONS_BINARY
+          : genericDirect
+            ? [
+              { value: 'lower', label: 'Lower values better', full: 'Lower values are better' },
+              { value: 'higher', label: 'Higher values better', full: 'Higher values are better' },
+              { value: 'none', label: 'No direction labels', full: 'Do not display direction labels' }
+            ]
+            : BENEFIT_OPTIONS_CONTINUOUS;
       var titleEl = document.getElementById('cfgBenefitTitle');
-      if (titleEl) titleEl.textContent = fisher ? 'Direction' : binary ? 'Event' : 'Benefit';
+      if (titleEl) titleEl.textContent = fisher ? 'Direction' : eventMeaning ? 'Event' : 'Benefit';
       var label = document.getElementById('cfgBenefitLabel');
       var menu = document.getElementById('cfgBenefitMenu');
       var tip = document.getElementById('cfgContrastTip');
@@ -1815,7 +1830,7 @@
           (better === 'none'
             ? 'Direction labels are hidden.'
             : 'Forest axis: Negative association ← 0 → Positive association.');
-      } else if (binary) {
+      } else if (eventMeaning) {
         tipText = 'Comparison is Treatment / Control for ratios (Treatment − Control for risk difference). ' +
           (better === 'lower'
             ? 'Event is adverse → RR or OR below 1 favours treatment.'
@@ -1829,7 +1844,9 @@
             ? 'Lower values are better → negative effects favour treatment.'
             : better === 'higher'
               ? 'Higher values are better → positive effects favour treatment.'
-              : 'Favour labels are hidden.');
+              : genericDirect
+                ? 'Direction labels are hidden.'
+                : 'Favour labels are hidden.');
       }
       if (tip) tip.textContent = tipText;
       if (chip) chip.title = tipText;
@@ -1842,15 +1859,18 @@
       var arm = favoredArm(bundle.pooled && bundle.pooled.effect, better);
       var dirEl = document.getElementById('resultDirection');
       var favorEl = document.getElementById('resultFavor');
-      var binary = isBinaryOutcome(bundle.spec);
+      var eventMeaning = usesEventMeaningLabels(bundle.spec);
       var fisher = isFisherCorrelation(bundle.spec);
       if (dirEl) {
         if (better === 'none') {
           dirEl.textContent = fisher ? 'Direction labels: hidden'
-            : binary ? 'Event meaning: not specified' : 'Favour labels: hidden';
+            : eventMeaning ? 'Event meaning: not specified'
+              : ((bundle.spec && bundle.spec.effectType) === 'direct' && (bundle.spec.effectMeasure || '') === 'generic')
+                ? 'Direction labels: hidden'
+                : 'Favour labels: hidden';
         } else if (fisher) {
           dirEl.textContent = 'Association: negative ← 0 → positive';
-        } else if (binary) {
+        } else if (eventMeaning) {
           dirEl.textContent = better === 'lower' ? 'Event is adverse' : 'Event is beneficial';
         } else if (better === 'lower') {
           dirEl.textContent = 'Better outcomes: Lower values';
@@ -2350,15 +2370,18 @@
       document.getElementById('resultContrast').textContent =
         (isFisherCorrelation(spec) ? 'Scale: '
           : isLogRatioMeasure(spec) ? 'Comparison: ' : 'Contrast: ') + comparisonLabel(spec);
-      var binary = isBinaryOutcome(spec);
+      var eventMeaning = usesEventMeaningLabels(spec);
       var fisher = isFisherCorrelation(spec);
       document.getElementById('resultDirection').textContent =
         better === 'none'
           ? (fisher ? 'Direction labels: hidden'
-            : binary ? 'Event meaning: not specified' : 'Favour labels: hidden')
+            : eventMeaning ? 'Event meaning: not specified'
+              : (spec.effectType === 'direct' && (spec.effectMeasure || '') === 'generic')
+                ? 'Direction labels: hidden'
+                : 'Favour labels: hidden')
           : fisher
             ? 'Association: negative ← 0 → positive'
-            : binary
+            : eventMeaning
               ? (better === 'lower' ? 'Event is adverse' : 'Event is beneficial')
               : (better === 'lower' ? 'Better outcomes: Lower values' : 'Better outcomes: Higher values');
       var favorEl = document.getElementById('resultFavor');

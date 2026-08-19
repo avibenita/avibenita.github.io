@@ -218,6 +218,29 @@
       font-size: 10.5px; line-height: 1.4; color: var(--cfg-text3);
       padding: 0 2px 2px; flex-shrink: 0;
     }
+    .meta-suggest-banner {
+      display: none; flex-shrink: 0; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+      margin: 2px 0 4px; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid rgba(234,179,8,.45);
+      background: rgba(234,179,8,.10);
+      color: var(--cfg-text2); font-size: 11px; line-height: 1.4;
+    }
+    .meta-suggest-banner.show { display: flex; }
+    .meta-suggest-banner strong { color: #fbbf24; font-weight: 700; }
+    [data-theme="light"] .meta-suggest-banner {
+      background: rgba(245,158,11,.12); border-color: rgba(217,119,6,.35); color: #78350f;
+    }
+    [data-theme="light"] .meta-suggest-banner strong { color: #b45309; }
+    .meta-suggest-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+    .meta-suggest-actions button {
+      border: 1px solid var(--cfg-border); border-radius: 6px; cursor: pointer;
+      padding: 4px 8px; font-size: 10.5px; font-weight: 700;
+      background: var(--cfg-surface); color: var(--cfg-text);
+    }
+    .meta-suggest-actions button.primary {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border-color: transparent; color: #fff;
+    }
     .meta-select {
       flex: 1; min-width: 140px; padding: 6px 8px; border-radius: 7px;
       border: 1px solid var(--cfg-border); background: var(--cfg-surface2, #1c2333);
@@ -462,6 +485,13 @@
             <select id="effectMeasure" class="meta-select" aria-label="Effect measure"></select>
           </div>
           <div class="meta-measure-hint" id="effectMeasureHint"></div>
+          <div class="meta-suggest-banner" id="corrSuggestBanner" role="status">
+            <span><strong>These columns appear to contain correlation effects.</strong> Use the Correlations tab?</span>
+            <span class="meta-suggest-actions">
+              <button type="button" class="primary" id="corrSuggestSwitch">Switch to Correlations</button>
+              <button type="button" id="corrSuggestDismiss">Dismiss</button>
+            </span>
+          </div>
           <div class="meta-subopt-row" id="binaryFormatRow" style="display:none;">
             <label class="lbl-with-tip">Count format
               <span class="info-icon" tabindex="0">i<span class="tip"><b>Events + total N</b> is preferred when you have group sizes. <b>Events + non-events</b> is equivalent if totals are complete (events + non-events = N).</span></span>
@@ -615,6 +645,7 @@
     var outcomeBetter = 'lower';
     var assignments = {};
     var draggedElement = null;
+    var corrSuggestDismissed = false;
 
     var MEASURES = {
       continuous: [
@@ -946,10 +977,74 @@
       return zoneDefsForType().map(function (z) { return z.key; });
     }
 
+    /** Keep Study label only — clear effect / numeric roles when tab or measure changes. */
     function resetAssignmentsForType() {
-      var next = {};
-      activeZoneKeys().forEach(function (k) { next[k] = assignments[k] || null; });
-      assignments = next;
+      var study = assignments.studyCol || null;
+      assignments = {};
+      if (study) assignments.studyCol = study;
+    }
+
+    function normalizeHeaderToken(name) {
+      return String(name || '').toLowerCase().replace(/[\s_\-\.]+/g, '');
+    }
+
+    function looksLikeFisherZCol(name) {
+      var n = normalizeHeaderToken(name);
+      if (!n) return false;
+      return n === 'fisherz' || n === 'fishersz' || n === 'zfisher' || n === 'zfishers' ||
+        n === 'fisherszr' || n.indexOf('fisherz') >= 0;
+    }
+
+    function looksLikeFisherSeCol(name) {
+      var n = normalizeHeaderToken(name);
+      if (!n) return false;
+      return n === 'sez' || n === 'sezfisher' || n === 'sefisher' || n === 'sefisherz' ||
+        n === 'fisherzse' || n === 'sezfisher' || n.indexOf('sefisher') >= 0 ||
+        (n.indexOf('sez') === 0 && n.length <= 8);
+    }
+
+    function assignedCorrLikeNames() {
+      var keys = ['effectCol', 'seCol', 'varCol', 'ciLowCol', 'ciHighCol', 'rCol', 'nCol'];
+      var out = [];
+      keys.forEach(function (k) {
+        var name = assignments[k];
+        if (!name) return;
+        if (looksLikeFisherZCol(name) || looksLikeFisherSeCol(name)) out.push(name);
+      });
+      return out;
+    }
+
+    function sheetHasFisherZPair() {
+      var headers = _headers || [];
+      var hasZ = false;
+      var hasSe = false;
+      for (var i = 0; i < headers.length; i++) {
+        if (looksLikeFisherZCol(headers[i])) hasZ = true;
+        if (looksLikeFisherSeCol(headers[i])) hasSe = true;
+      }
+      return hasZ && hasSe;
+    }
+
+    function syncCorrSuggestBanner() {
+      var banner = qs('corrSuggestBanner');
+      if (!banner) return;
+      var assignedConflict = assignedCorrLikeNames().length > 0;
+      var show = effectType === 'direct' &&
+        (assignedConflict || (!corrSuggestDismissed && sheetHasFisherZPair()));
+      banner.classList.toggle('show', !!show);
+    }
+
+    /** Precomputed log OR / log RR use the same Event meaning labels as binary. */
+    function usesEventMeaningLabels() {
+      return effectType === 'binary' ||
+        (effectType === 'direct' && (effectMeasure === 'logor' || effectMeasure === 'logrr'));
+    }
+
+    function defaultOutcomeBetterForContext() {
+      if (isFisherWorkflow()) return 'lower';
+      if (effectType === 'direct' && effectMeasure === 'generic') return 'none';
+      if (usesEventMeaningLabels()) return 'lower';
+      return 'lower';
     }
 
     function refreshMeasureOptions() {
@@ -997,31 +1092,36 @@
     }
 
     function syncOutcomeBetterLabels() {
-      var binary = effectType === 'binary';
+      var eventMeaning = usesEventMeaningLabels();
       var fisher = isFisherWorkflow();
+      var genericDirect = effectType === 'direct' && effectMeasure === 'generic';
       var title = qs('outcomeBetterTitle');
       var tip = qs('outcomeBetterTip');
       var higherWrap = qs('dirHigherLabel');
       if (higherWrap) higherWrap.style.display = fisher ? 'none' : '';
       if (title) {
-        title.childNodes[0].textContent = binary
+        title.childNodes[0].textContent = eventMeaning
           ? 'Event meaning '
           : fisher
             ? 'Association direction labels '
             : 'Beneficial outcome direction ';
       }
       if (tip) {
-        tip.innerHTML = binary
+        tip.innerHTML = eventMeaning
           ? 'Does <b>not</b> change calculated effects. For ratios, comparison is <b>Treatment / Control</b>. Coding only sets favour labels.<br/><b>Event is adverse</b> — death, relapse, infection (RR/OR &lt; 1 favours treatment).<br/><b>Event is beneficial</b> — recovery, response (RR/OR &gt; 1 favours treatment).<br/><b>Direction not specified</b> — hide favour labels.'
           : fisher
             ? 'Controls the labels on either side of zero in the forest plot. It does not affect the calculations.'
-            : 'Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.';
+            : genericDirect
+              ? 'Does <b>not</b> change effect sizes or CIs. Use only when “better” has a clear meaning on this scale.<br/><b>Lower / higher values are better</b> — sets favour labels on the forest axis.<br/><b>Do not display direction labels</b> — show the numeric effect only (recommended when direction is ambiguous).'
+              : 'Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.';
       }
-      var map = binary
+      var map = eventMeaning
         ? { lower: 'Event is adverse', higher: 'Event is beneficial', none: 'Direction not specified' }
         : fisher
           ? { lower: 'Show negative / positive association', higher: 'Show negative / positive association', none: 'Do not display direction labels' }
-          : { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display favour labels' };
+          : genericDirect
+            ? { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display direction labels' }
+            : { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display favour labels' };
       ['lower', 'higher', 'none'].forEach(function (v) {
         var lab = document.querySelector('label.opt-radio input[name="outcomeBetter"][value="' + v + '"]');
         if (!lab) return;
@@ -1236,15 +1336,21 @@
     function validateModel() {
       var keys = activeZoneKeys();
       var missing = keys.filter(function (k) { return !assignments[k]; }).length;
-      var ok = missing === 0 && keys.length > 0;
+      var corrConflict = effectType === 'direct' && assignedCorrLikeNames().length > 0;
+      var ok = missing === 0 && keys.length > 0 && !corrConflict;
       if (qs('btnRun')) qs('btnRun').disabled = !ok;
       if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !ok || !_headers.length;
       var hint = qs('runHint');
       if (hint) {
-        hint.textContent = ok
-          ? 'Ready to run'
-          : ('Assign ' + missing + ' required column' + (missing === 1 ? '' : 's') + ' to continue');
+        if (corrConflict) {
+          hint.textContent = 'Assigned columns look like Fisher z / SE_z — switch to Correlations or reassign';
+        } else {
+          hint.textContent = ok
+            ? 'Ready to run'
+            : ('Assign ' + missing + ' required column' + (missing === 1 ? '' : 's') + ' to continue');
+        }
       }
+      syncCorrSuggestBanner();
       var hasSaved = typeof CfgSave !== 'undefined' && CfgSave.getSavedList(STORAGE_KEY).length > 0;
       if (qs('btnLoadPrev')) qs('btnLoadPrev').disabled = !hasSaved;
       if (typeof CfgSave !== 'undefined' && typeof CfgSave.syncConfigButtons === 'function') {
@@ -1262,8 +1368,12 @@
         if (assignments[k] === name) assignments[k] = null;
       });
       assignments[zoneKey] = name;
+      if (effectType === 'direct' && (looksLikeFisherZCol(name) || looksLikeFisherSeCol(name))) {
+        corrSuggestDismissed = false;
+      }
       renderAssignments();
       renderVariables();
+      validateModel();
     }
 
     function setupDropZones() {
@@ -1534,6 +1644,7 @@
       if (!MEASURES[type]) return;
       var prev = effectType;
       effectType = type;
+      if (type !== prev) corrSuggestDismissed = false;
       if (type === 'continuous' && !['smd', 'cohend', 'md', 'rom'].includes(effectMeasure)) effectMeasure = 'smd';
       if (type === 'binary' && !['or', 'rr', 'rd'].includes(effectMeasure)) effectMeasure = 'rr';
       if (type === 'correlation') {
@@ -1542,6 +1653,9 @@
       }
       if (type === 'direct' && !MEASURES.direct.some(function (m) { return m.value === effectMeasure; })) {
         effectMeasure = 'generic';
+      }
+      if (type === 'direct' && prev !== 'direct') {
+        outcomeBetter = defaultOutcomeBetterForContext();
       }
       syncOptionControls();
       refreshMeasureOptions();
@@ -1586,6 +1700,12 @@
 
     function runAnalysis() {
       if (qs('btnRun') && qs('btnRun').disabled) return;
+      if (effectType === 'direct' && assignedCorrLikeNames().length > 0) {
+        corrSuggestDismissed = false;
+        syncCorrSuggestBanner();
+        validateModel();
+        return;
+      }
       var spec = buildModelSpec();
       var btn = qs('btnRun');
       if (btn) {
@@ -1742,6 +1862,23 @@
       document.querySelectorAll('#effectTypeSeg button').forEach(function (btn) {
         btn.addEventListener('click', function () { setEffectType(btn.dataset.type); });
       });
+      var corrSwitch = qs('corrSuggestSwitch');
+      if (corrSwitch) {
+        corrSwitch.addEventListener('click', function () {
+          corrSuggestDismissed = false;
+          correlationFormat = sheetHasFisherZPair() || assignedCorrLikeNames().some(looksLikeFisherZCol)
+            ? 'z_se'
+            : correlationFormat;
+          setEffectType('correlation');
+        });
+      }
+      var corrDismiss = qs('corrSuggestDismiss');
+      if (corrDismiss) {
+        corrDismiss.addEventListener('click', function () {
+          corrSuggestDismissed = true;
+          syncCorrSuggestBanner();
+        });
+      }
       document.querySelectorAll('input[name="model"]').forEach(function (r) {
         r.addEventListener('change', function () { setModelType(r.value); });
       });
@@ -1768,18 +1905,23 @@
         });
       }
       qs('effectMeasure').addEventListener('change', function () {
+        var prevMeasure = effectMeasure;
         effectMeasure = qs('effectMeasure').value;
+        if (effectMeasure !== prevMeasure) {
+          corrSuggestDismissed = false;
+          resetAssignmentsForType();
+          outcomeBetter = defaultOutcomeBetterForContext();
+          syncOptionControls();
+        }
         var hint = qs('effectMeasureHint');
         if (hint) {
           var map = MEASURE_HINTS[effectType] || {};
           hint.textContent = map[effectMeasure] || '';
           hint.style.display = hint.textContent ? '' : 'none';
         }
-        if (effectType === 'direct') {
-          syncOutcomeBetterLabels();
-          renderZones();
-          renderVariables();
-        }
+        syncOutcomeBetterLabels();
+        renderZones();
+        renderVariables();
         updateSummary();
         validateModel();
       });

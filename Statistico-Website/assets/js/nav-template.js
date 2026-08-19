@@ -2226,6 +2226,7 @@ function trailIconForLabel(label) {
   if (t.indexOf('visualis') >= 0 || t.indexOf('visualiz') >= 0 || t.indexOf('multivariable') >= 0) return 'fa-circle-dot';
   if (t.indexOf('bubble') >= 0) return 'fa-circle';
   if (t.indexOf('manipulat') >= 0 || t.indexOf('prepare') >= 0) return 'fa-table-columns';
+  if (t.indexOf('contingency') >= 0 || (t.indexOf('frequency') >= 0 && t.indexOf('table') >= 0)) return 'fa-border-all';
   if (t.indexOf('regression') >= 0) return 'fa-chart-line';
   if (t.indexOf('anova') >= 0) return 'fa-table-cells';
   if (t.indexOf('factor') >= 0) return 'fa-diagram-project';
@@ -2293,6 +2294,7 @@ function resolveTrailCrumbs() {
   const analyticsModules = {
     'univariate.html': 'Univariate Analysis',
     'correlation.html': 'Correlation Analysis',
+    'contingency-tables.html': 'Frequency & Contingency Tables',
     'linear-regression.html': 'Linear Regression',
     'logistic-regression.html': 'Logistic Regression',
     'anova.html': 'ANOVA',

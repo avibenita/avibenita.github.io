@@ -2301,6 +2301,7 @@ function resolveTrailCrumbs() {
     'independent-means.html': 'Independent Means',
     'paired-repeated.html': 'Paired / Repeated Means',
     'mixed-models.html': 'Mixed Models',
+    'meta-analysis.html': 'Meta-Analysis',
     'factor-analysis.html': 'Factor Analysis',
     'pca.html': 'Principal Component Analysis',
     'k-means.html': 'K-Means Clustering',

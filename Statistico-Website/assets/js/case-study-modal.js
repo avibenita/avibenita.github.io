@@ -15,10 +15,10 @@
     style.textContent = [
       '.ws-modal-backdrop{position:fixed;inset:0;z-index:9000;background:rgba(215,220,228,.85);backdrop-filter:blur(14px);display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .25s ease;overflow:hidden}',
       '.ws-modal-backdrop.open{opacity:1;pointer-events:all}',
-      '.ws-modal{position:relative;width:min(96vw,1480px);height:calc(100vh - 96px);max-height:860px;padding:10px;box-sizing:border-box;background:#e8eaee;border:1px solid rgba(15,23,42,.08);border-radius:16px;overflow:hidden;box-shadow:0 30px 90px rgba(15,23,42,.30),inset 0 1px 0 rgba(255,255,255,.7);display:flex;flex-direction:column;gap:12px;transform:translateY(18px) scale(.97);transition:transform .28s cubic-bezier(.22,.68,0,1.1)}',
+      '.ws-modal{position:relative;width:min(98vw,1600px);height:calc(100vh - 28px);max-height:none;padding:10px 48px 10px 10px;box-sizing:border-box;background:#e8eaee;border:1px solid rgba(15,23,42,.08);border-radius:16px;overflow:hidden;box-shadow:0 30px 90px rgba(15,23,42,.30),inset 0 1px 0 rgba(255,255,255,.7);display:flex;flex-direction:column;gap:10px;transform:translateY(18px) scale(.97);transition:transform .28s cubic-bezier(.22,.68,0,1.1)}',
       '.ws-modal-backdrop.open .ws-modal{transform:none}',
       '.ws-modal-title{display:none}',
-      '.ws-modal-close{position:absolute;top:30px;right:34px;z-index:6;width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(7,14,24,.78);color:rgba(255,255,255,.72);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit;backdrop-filter:blur(8px)}',
+      '.ws-modal-close{position:absolute;top:10px;right:8px;z-index:6;width:38px;height:38px;border-radius:12px;border:1px solid rgba(15,23,42,.16);background:#0f172a;color:rgba(255,255,255,.86);cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit}',
       '.ws-modal-close:hover{background:rgba(255,80,60,.18);border-color:rgba(255,80,60,.4);color:#fff}',
       '.ws-modal-cta{position:static;align-self:center;flex-shrink:0;z-index:6;display:inline-flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:999px;background:rgba(7,14,24,.88);border:1px solid rgba(120,200,255,.35);backdrop-filter:blur(8px);font-size:.82rem;color:rgba(255,255,255,.88);box-shadow:0 10px 26px rgba(0,0,0,.35);max-width:92%}',
       '.ws-modal-cta[hidden]{display:none}',
@@ -92,6 +92,8 @@
     var modalClose = document.getElementById('wsModalClose');
     var modalCta = document.getElementById('wsModalCta');
     var modalScreen = modalFrame ? modalFrame.closest('.ws-screen') : null;
+    var MODAL_DESKTOP_W = 1280;
+    var MODAL_DESKTOP_H = 800;
     var fitRetries = 0;
 
     function clearScale() {
@@ -100,6 +102,8 @@
       modalFrame.style.transform = '';
       modalFrame.style.width = '';
       modalFrame.style.height = '';
+      modalFrame.style.left = '';
+      modalFrame.style.top = '';
     }
 
     function fitFrame() {
@@ -111,10 +115,21 @@
         if (fitRetries++ < 30) requestAnimationFrame(fitFrame);
         return;
       }
+      var scale = Math.min(sw / MODAL_DESKTOP_W, sh / MODAL_DESKTOP_H);
+      if (!(scale > 0) || !isFinite(scale)) {
+        if (fitRetries++ < 30) requestAnimationFrame(fitFrame);
+        return;
+      }
       fitRetries = 0;
-      // Fill the visible frame. A virtual 1280×800 scale clips dialogs and
-      // can collapse to a sliver if fit runs before flex layout has height.
-      clearScale();
+      // Render at the Excel dialog size, then scale the whole workspace into
+      // the visible frame so header, sidebar, and results stay unclipped.
+      modalScreen.classList.add('ws-screen--scaled');
+      modalFrame.style.width = MODAL_DESKTOP_W + 'px';
+      modalFrame.style.height = MODAL_DESKTOP_H + 'px';
+      modalFrame.style.transformOrigin = 'top left';
+      modalFrame.style.transform = 'scale(' + scale + ')';
+      modalFrame.style.left = Math.max(0, (sw - MODAL_DESKTOP_W * scale) / 2) + 'px';
+      modalFrame.style.top = Math.max(0, (sh - MODAL_DESKTOP_H * scale) / 2) + 'px';
     }
 
     function openWorkspaceWindow(url, title) {
@@ -151,6 +166,8 @@
         modalFrame.style.transform = '';
         modalFrame.style.width = '';
         modalFrame.style.height = '';
+        modalFrame.style.left = '';
+        modalFrame.style.top = '';
         modalFrame.onload = null;
         setTimeout(function () { modalFrame.src = ''; }, 300);
       }

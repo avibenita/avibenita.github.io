@@ -1,7 +1,8 @@
 /**
  * Scale Reliability engine for Statistico.
- * Computes Cronbach’s alpha, standardized alpha, McDonald’s omega total,
- * item diagnostics, inter-item correlations, a PCA dimensionality diagnostic,
+ * Computes Cronbach’s alpha, standardized alpha, McDonald’s omega total
+ * from a one-factor common-factor model, item diagnostics, inter-item
+ * correlations, a PCA dimensionality diagnostic, scale-score descriptives,
  * bootstrap confidence intervals, and optional by-group summaries.
  *
  * Never mutates the caller’s source arrays. Returns null (not NaN/Infinity)
@@ -87,6 +88,28 @@
     return v == null ? null : Math.sqrt(Math.max(0, v));
   }
 
+  function median(arr) {
+    if (!arr || !arr.length) return null;
+    var s = arr.slice().sort(function (a, b) { return a - b; });
+    var m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+
+  function skewness(arr) {
+    if (!arr || arr.length < 3) return null;
+    var m = mean(arr);
+    var sd = sampleSd(arr);
+    if (m == null || !(sd > 0)) return null;
+    var m3 = 0;
+    for (var i = 0; i < arr.length; i++) {
+      var d = arr[i] - m;
+      m3 += d * d * d;
+    }
+    m3 /= arr.length;
+    var g = m3 / (sd * sd * sd);
+    return isFinite(g) ? g : null;
+  }
+
   function pearson(x, y) {
     if (!x || !y || x.length !== y.length || x.length < 2) return null;
     var n = x.length;
@@ -152,6 +175,10 @@
       structure: {
         unidimensionality: true,
         scree: true
+      },
+      scaleScore: {
+        method: 'mean',
+        minCompleted: 'all'
       },
       rngSeed: null
     };
@@ -219,6 +246,65 @@
 
   function cloneMatrix(A) {
     return A.map(function (r) { return r.slice(); });
+  }
+
+  function invertMatrix(A) {
+    if (!A || !A.length) return null;
+    var n = A.length;
+    var M = cloneMatrix(A);
+    var I = identity(n);
+    var i;
+    var j;
+    var col;
+    for (col = 0; col < n; col++) {
+      var pivot = col;
+      for (i = col + 1; i < n; i++) {
+        if (Math.abs(M[i][col]) > Math.abs(M[pivot][col])) pivot = i;
+      }
+      if (Math.abs(M[pivot][col]) < 1e-10) return null;
+      if (pivot !== col) {
+        var tmpM = M[col]; M[col] = M[pivot]; M[pivot] = tmpM;
+        var tmpI = I[col]; I[col] = I[pivot]; I[pivot] = tmpI;
+      }
+      var div = M[col][col];
+      for (j = 0; j < n; j++) {
+        M[col][j] /= div;
+        I[col][j] /= div;
+      }
+      for (i = 0; i < n; i++) {
+        if (i === col) continue;
+        var f = M[i][col];
+        for (j = 0; j < n; j++) {
+          M[i][j] -= f * M[col][j];
+          I[i][j] -= f * I[col][j];
+        }
+      }
+    }
+    return I;
+  }
+
+  function initialCommunalities(R) {
+    var k = R.length;
+    var inv = invertMatrix(R);
+    var h2 = [];
+    var i;
+    var j;
+    for (i = 0; i < k; i++) {
+      var est = null;
+      if (inv && inv[i][i] > 1) {
+        est = 1 - 1 / inv[i][i];
+      }
+      if (est == null || !isFinite(est) || est <= 0) {
+        var mx = 0;
+        for (j = 0; j < k; j++) {
+          if (i === j || R[i][j] == null || !isFinite(R[i][j])) continue;
+          mx = Math.max(mx, Math.abs(R[i][j]));
+        }
+        est = mx;
+      }
+      h2[i] = Math.max(0.01, Math.min(0.98, est));
+    }
+    return h2;
   }
 
   function jacobiEigen(A, maxIter, eps) {
@@ -468,78 +554,104 @@
     };
   }
 
-  function omegaFromCorrelation(R) {
+  function omegaFromCorrelation(R, options) {
+    options = options || {};
+    var maxIter = options.maxIter == null ? 40 : options.maxIter;
     var fail = function (reason) {
       return {
         omega: null,
         status: 'not_estimable',
         reason: reason,
-        method: 'one_factor_pca_correlation',
-        extraction: 'principal_component_first_factor',
+        method: 'one_factor_paf_correlation',
+        extraction: 'principal_axis_one_factor',
         uniquenesses: null,
         loadings: null
       };
     };
     if (!R || R.length < 2) return fail('Fewer than two items.');
     if (matrixHasNull(R)) return fail('Correlation matrix is incomplete.');
-    var eig;
+    var k = R.length;
+    var minEigR;
     try {
-      eig = jacobiEigen(R);
-    } catch (e) {
+      minEigR = Math.min.apply(null, jacobiEigen(R, 80).eigenvalues);
+    } catch (e0) {
       return fail('Eigen decomposition failed.');
     }
-    var evals = eig.eigenvalues || [];
-    if (!evals.length || evals[0] == null || !isFinite(evals[0]) || evals[0] <= PD_EPS) {
-      return fail('First eigenvalue is not positive.');
-    }
-    var minEig = Math.min.apply(null, evals);
-    var notPd = minEig < -PD_EPS;
-    var k = R.length;
+    var notPd = minEigR < -PD_EPS;
+    if (notPd) return fail('Correlation matrix is not positive definite.');
+
+    var h2 = initialCommunalities(R);
     var loadings = [];
-    var uniquenesses = [];
+    var iter;
     var i;
-    var lam1 = Math.sqrt(Math.max(0, evals[0]));
-    for (i = 0; i < k; i++) {
-      var loading = (eig.eigenvectors[i][0] || 0) * lam1;
-      if (!isFinite(loading)) return fail('Invalid factor loading.');
-      loadings.push(loading);
-      var u = 1 - loading * loading;
-      uniquenesses.push(u);
+    var lastEig = null;
+    for (iter = 0; iter < maxIter; iter++) {
+      var A = cloneMatrix(R);
+      for (i = 0; i < k; i++) A[i][i] = h2[i];
+      var eig;
+      try {
+        eig = jacobiEigen(A, 80);
+      } catch (e) {
+        return fail('Eigen decomposition failed.');
+      }
+      var evals = eig.eigenvalues || [];
+      if (!evals.length || evals[0] == null || !isFinite(evals[0]) || evals[0] <= PD_EPS) {
+        return fail('First common-factor eigenvalue is not positive.');
+      }
+      lastEig = evals[0];
+      var lam1 = Math.sqrt(Math.max(0, evals[0]));
+      loadings = [];
+      for (i = 0; i < k; i++) {
+        var loading = (eig.eigenvectors[i][0] || 0) * lam1;
+        if (!isFinite(loading)) return fail('Invalid factor loading.');
+        loadings.push(loading);
+      }
+      var sign = 0;
+      for (i = 0; i < k; i++) sign += loadings[i];
+      if (sign < 0) {
+        for (i = 0; i < k; i++) loadings[i] = -loadings[i];
+      }
+      var maxDiff = 0;
+      var nextH = [];
+      for (i = 0; i < k; i++) {
+        var h = loadings[i] * loadings[i];
+        nextH[i] = Math.max(0.001, Math.min(0.999, h));
+        maxDiff = Math.max(maxDiff, Math.abs(nextH[i] - h2[i]));
+      }
+      h2 = nextH;
+      if (maxDiff < 1e-6) break;
     }
-    var sign = 0;
-    for (i = 0; i < k; i++) sign += loadings[i];
-    if (sign < 0) {
-      for (i = 0; i < k; i++) loadings[i] = -loadings[i];
-    }
+
+    var uniquenesses = [];
     var sumL = 0;
     var sumU = 0;
     var heywood = 0;
     for (i = 0; i < k; i++) {
+      var u = 1 - loadings[i] * loadings[i];
+      uniquenesses.push(u);
       sumL += loadings[i];
-      var ui = uniquenesses[i];
-      if (ui < -0.05) heywood++;
-      sumU += Math.max(0, ui);
+      if (u < -0.02) heywood++;
+      sumU += Math.max(0, u);
     }
     var den = (sumL * sumL) + sumU;
     if (!(den > 0)) return fail('Omega denominator is zero.');
-    if (notPd) return fail('Correlation matrix is not positive definite.');
     var omega = (sumL * sumL) / den;
     if (!isFinite(omega)) return fail('Omega was not finite.');
     var status = 'estimated';
-    var reason = 'McDonald omega total from a one-factor principal-component model on the inter-item correlation matrix. Unique/error variances are 1 − λ².';
+    var reason = 'McDonald’s omega total from a one-factor common-factor model (principal-axis loadings; uniquenesses ψ = 1 − λ²). This is not a PCA-based approximation.';
     if (heywood) {
       status = 'estimated_with_warning';
-      reason += ' One or more uniqueness estimates were negative (Heywood-like).';
+      reason += ' One or more uniqueness estimates were negative (Heywood case).';
     }
     return {
       omega: omega,
       status: status,
       reason: reason,
-      method: 'one_factor_pca_correlation',
-      extraction: 'principal_component_first_factor',
+      method: 'one_factor_paf_correlation',
+      extraction: 'principal_axis_one_factor',
       uniquenesses: uniquenesses,
       loadings: loadings,
-      firstEigenvalue: evals[0],
+      firstEigenvalue: lastEig,
       notPositiveDefinite: notPd
     };
   }
@@ -588,6 +700,159 @@
       dominantItemIndex: dominantIndex,
       notPositiveDefinite: minEigRaw < -PD_EPS,
       status: 'estimated'
+    };
+  }
+
+  function inferItemBounds(itemCols, scoreRange) {
+    if (scoreRange && asNumber(scoreRange.min) != null && asNumber(scoreRange.max) != null) {
+      return { min: asNumber(scoreRange.min), max: asNumber(scoreRange.max), source: 'declared' };
+    }
+    var nums = [];
+    var allInt = true;
+    var c;
+    var i;
+    for (c = 0; c < itemCols.length; c++) {
+      for (i = 0; i < itemCols[c].length; i++) {
+        var v = itemCols[c][i];
+        if (v == null || !isFinite(v)) continue;
+        nums.push(v);
+        if (Math.abs(v - Math.round(v)) > 1e-9) allInt = false;
+      }
+    }
+    if (!nums.length) return { min: null, max: null, source: 'none' };
+    return {
+      min: Math.min.apply(null, nums),
+      max: Math.max.apply(null, nums),
+      source: allInt ? 'observed_integer' : 'observed'
+    };
+  }
+
+  function describeItemColumn(col, bounds) {
+    var nOrig = col.length;
+    var valid = [];
+    var i;
+    for (i = 0; i < nOrig; i++) {
+      if (col[i] != null && isFinite(col[i])) valid.push(col[i]);
+    }
+    var missingN = nOrig - valid.length;
+    var floorN = 0;
+    var ceilN = 0;
+    if (bounds && bounds.min != null && bounds.max != null) {
+      for (i = 0; i < valid.length; i++) {
+        if (Math.abs(valid[i] - bounds.min) <= 1e-9) floorN++;
+        if (Math.abs(valid[i] - bounds.max) <= 1e-9) ceilN++;
+      }
+    }
+    var varEst = sampleVariance(valid);
+    return {
+      validN: valid.length,
+      missingN: missingN,
+      missingPct: nOrig ? 100 * missingN / nOrig : null,
+      mean: finiteOrNull(mean(valid)),
+      sd: finiteOrNull(sampleSd(valid)),
+      variance: finiteOrNull(varEst),
+      min: valid.length ? Math.min.apply(null, valid) : null,
+      max: valid.length ? Math.max.apply(null, valid) : null,
+      floorPct: valid.length ? 100 * floorN / valid.length : null,
+      ceilingPct: valid.length ? 100 * ceilN / valid.length : null,
+      skewness: finiteOrNull(skewness(valid))
+    };
+  }
+
+  function resolveMinCompleted(cfg, k) {
+    var raw = cfg.scaleScore && cfg.scaleScore.minCompleted;
+    if (raw == null || raw === '' || raw === 'all') return k;
+    var n = Number(raw);
+    if (!isFinite(n)) return k;
+    return Math.max(1, Math.min(k, Math.round(n)));
+  }
+
+  function computeScaleScores(itemCols, method, minCompleted) {
+    var n = itemCols[0] ? itemCols[0].length : 0;
+    var k = itemCols.length;
+    var need = minCompleted == null ? k : minCompleted;
+    var scores = [];
+    var missingRespondents = 0;
+    var r;
+    var j;
+    for (r = 0; r < n; r++) {
+      var vals = [];
+      for (j = 0; j < k; j++) {
+        if (itemCols[j][r] != null && isFinite(itemCols[j][r])) vals.push(itemCols[j][r]);
+      }
+      if (vals.length < need) {
+        missingRespondents++;
+        continue;
+      }
+      var s = 0;
+      for (j = 0; j < vals.length; j++) s += vals[j];
+      scores.push(method === 'sum' ? s : s / vals.length);
+    }
+    return { scores: scores, missingRespondents: missingRespondents, minCompleted: need };
+  }
+
+  function describeScaleScores(pack, method, itemCount, bounds) {
+    var scores = pack.scores || [];
+    var empty = {
+      method: method,
+      minCompleted: pack.minCompleted,
+      validN: 0,
+      itemCount: itemCount,
+      mean: null,
+      sd: null,
+      min: null,
+      max: null,
+      median: null,
+      possibleMin: null,
+      possibleMax: null,
+      observedMin: null,
+      observedMax: null,
+      missingRespondents: pack.missingRespondents,
+      floorPct: null,
+      ceilingPct: null,
+      scores: []
+    };
+    var possibleMin = bounds && bounds.min != null
+      ? (method === 'sum' ? bounds.min * itemCount : bounds.min)
+      : null;
+    var possibleMax = bounds && bounds.max != null
+      ? (method === 'sum' ? bounds.max * itemCount : bounds.max)
+      : null;
+    if (method === 'sum' && pack.minCompleted < itemCount && bounds && bounds.min != null) {
+      possibleMin = bounds.min * pack.minCompleted;
+    }
+    if (!scores.length) {
+      empty.possibleMin = possibleMin;
+      empty.possibleMax = possibleMax;
+      return empty;
+    }
+    var floorN = 0;
+    var ceilN = 0;
+    var i;
+    if (possibleMin != null && possibleMax != null) {
+      for (i = 0; i < scores.length; i++) {
+        if (Math.abs(scores[i] - possibleMin) <= 1e-9) floorN++;
+        if (Math.abs(scores[i] - possibleMax) <= 1e-9) ceilN++;
+      }
+    }
+    return {
+      method: method,
+      minCompleted: pack.minCompleted,
+      validN: scores.length,
+      itemCount: itemCount,
+      mean: finiteOrNull(mean(scores)),
+      sd: finiteOrNull(sampleSd(scores)),
+      min: Math.min.apply(null, scores),
+      max: Math.max.apply(null, scores),
+      median: finiteOrNull(median(scores)),
+      possibleMin: possibleMin,
+      possibleMax: possibleMax,
+      observedMin: Math.min.apply(null, scores),
+      observedMax: Math.max.apply(null, scores),
+      missingRespondents: pack.missingRespondents,
+      floorPct: scores.length ? 100 * floorN / scores.length : null,
+      ceilingPct: scores.length ? 100 * ceilN / scores.length : null,
+      scores: scores
     };
   }
 
@@ -686,7 +951,7 @@
       }
       alphaDraws.push(a);
       if (wantOmega) {
-        var om = omegaFromCorrelation(correlationFromCov(cov.matrix));
+        var om = omegaFromCorrelation(correlationFromCov(cov.matrix), { maxIter: 8 });
         if (om.omega != null) omegaDraws.push(om.omega);
       }
     }
@@ -791,9 +1056,11 @@
     var omegaPack = omegaFromCorrelation(R);
     var structure = structureFromCov(covPack.matrix);
 
+    var bounds = inferItemBounds(itemCols, cfg.scoreRange);
     var items = [];
     for (i = 0; i < k; i++) {
-      var col = pairwise ? itemCols[i].filter(function (v) { return v != null; }) : columnsFromRows(listwise, k)[i];
+      var fullCol = itemCols[i];
+      var desc = describeItemColumn(fullCol, bounds);
       var reduced = dropIndex(covPack.matrix, i);
       var alphaDel = k > 2 ? cronbachAlphaFromCov(reduced) : null;
       var omegaDel = null;
@@ -805,9 +1072,17 @@
       }
       var item = {
         item: itemNames[i],
-        mean: finiteOrNull(mean(col)),
-        sd: finiteOrNull(sampleSd(col)),
-        validN: col.length,
+        mean: desc.mean,
+        sd: desc.sd,
+        variance: desc.variance,
+        min: desc.min,
+        max: desc.max,
+        validN: desc.validN,
+        missingN: desc.missingN,
+        missingPct: desc.missingPct,
+        floorPct: desc.floorPct,
+        ceilingPct: desc.ceilingPct,
+        skewness: desc.skewness,
         itemTotalCorrelation: itemTotalFromCov(covPack.matrix, i),
         alphaIfDeleted: alphaDel,
         omegaIfDeleted: omegaDel,
@@ -998,7 +1273,13 @@
       confidenceLevel: cfg.confidenceLevel,
       bootstrapSamples: cfg.bootstrapSamples,
       weakItemThreshold: cfg.weakItemThreshold,
-      coefficients: clone(cfg.coefficients)
+      coefficients: clone(cfg.coefficients),
+      scaleScore: {
+        method: (cfg.scaleScore && cfg.scaleScore.method === 'sum') ? 'sum' : 'mean',
+        minCompleted: (cfg.scaleScore && cfg.scaleScore.minCompleted != null && cfg.scaleScore.minCompleted !== '')
+          ? cfg.scaleScore.minCompleted
+          : 'all'
+      }
     };
 
     if (errors.length) {
@@ -1149,6 +1430,16 @@
       });
     }
     warnings = warnings.concat(core.warnings || []);
+
+    var scoreMethod = analysisConfig.scaleScore.method;
+    var minCompleted = resolveMinCompleted(cfg, itemNames.length);
+    var scoreBounds = inferItemBounds(analysisCols, analysisConfig.scoreRange);
+    var scaleScore = describeScaleScores(
+      computeScaleScores(analysisCols, scoreMethod, minCompleted),
+      scoreMethod,
+      itemNames.length,
+      scoreBounds
+    );
 
     var ci = {
       alpha: null,
@@ -1301,7 +1592,8 @@
       warnings: warnings,
       missingMethod: analysisConfig.missingMethod,
       weakestItem: core.weakestItem,
-      alphaBand: alphaBand(core.alpha)
+      alphaBand: alphaBand(core.alpha),
+      scaleScore: scaleScore
     };
 
     var result = {
@@ -1329,7 +1621,7 @@
         'Do not recommend deleting an item solely because alpha-if-deleted increases; content validity matters.',
         'Identify possible reverse-coded items when item–total correlations are negative.',
         'Mention possible redundancy when reliability is extremely high (.90+).',
-        'Never describe unrelated columns (IDs, years, weights, standard errors, effect sizes) as a valid psychological or survey scale.'
+        'McDonald’s omega total is estimated from a one-factor common-factor model, not from PCA loadings.',
       ],
       analysisConfig: config,
       observedResults: observed,

@@ -208,6 +208,9 @@ describe('Scale Reliability engine', () => {
     expect(ok.observedResults.omegaTotal).not.toBeNull();
     expect(ok.observedResults.omegaStatus).toMatch(/estimated/);
     expect(ok.observedResults.omegaTotal).not.toBe(ok.observedResults.alpha);
+    expect(ok.observedResults.omegaMeta.method).toBe('one_factor_paf_correlation');
+    expect(ok.observedResults.omegaMeta.reason).toMatch(/common-factor/i);
+    expect(ok.observedResults.omegaMeta.reason).not.toMatch(/principal-component/i);
 
     const Rbad = [
       [1, 2, 2],
@@ -355,5 +358,90 @@ describe('Scale Reliability engine', () => {
     expect(demo.notes.weakItem).toBe('Q8');
     const missing = demo.rows.some((r) => r.some((v) => v === ''));
     expect(missing).toBe(true);
+  });
+
+  test('item diagnostics include missing, range, floor/ceiling, and variance', () => {
+    const headers = ['Q1', 'Q2', 'Q3'];
+    const rows = [
+      [1, 1, 1],
+      [5, 5, 5],
+      [3, 3, 3],
+      [1, 2, 3],
+      [5, 4, 3],
+      [2, '', 4],
+      [3, 3, 3],
+      [4, 4, 4]
+    ];
+    const out = Rel.analyze(headers, rows, {
+      items: headers,
+      scoreRange: { min: 1, max: 5 },
+      bootstrapSamples: 0,
+      coefficients: { confidenceInterval: false, alpha: true, omegaTotal: true, standardizedAlpha: false }
+    });
+    expect(out.ok).toBe(true);
+    const q2 = out.observedResults.items.find((it) => it.item === 'Q2');
+    expect(q2.missingN).toBe(1);
+    expect(q2.missingPct).toBeGreaterThan(0);
+    expect(q2.min).toBeGreaterThanOrEqual(1);
+    expect(q2.max).toBeLessThanOrEqual(5);
+    expect(q2.floorPct).not.toBeNull();
+    expect(q2.ceilingPct).not.toBeNull();
+    expect(q2.variance).not.toBeNull();
+  });
+
+  test('scale score mean is the default and sum multiplies by item count on complete cases', () => {
+    const headers = ['Q1', 'Q2', 'Q3'];
+    const rows = [
+      [1, 1, 1],
+      [2, 2, 2],
+      [3, 3, 3],
+      [4, 4, 4],
+      [5, 5, 5]
+    ];
+    const meanOut = Rel.analyze(headers, rows, {
+      items: headers,
+      bootstrapSamples: 0,
+      coefficients: { confidenceInterval: false, alpha: true, omegaTotal: false, standardizedAlpha: false }
+    });
+    const sumOut = Rel.analyze(headers, rows, {
+      items: headers,
+      scaleScore: { method: 'sum', minCompleted: 'all' },
+      bootstrapSamples: 0,
+      coefficients: { confidenceInterval: false, alpha: true, omegaTotal: false, standardizedAlpha: false }
+    });
+    expect(meanOut.observedResults.scaleScore.method).toBe('mean');
+    expect(meanOut.observedResults.scaleScore.validN).toBe(5);
+    expect(meanOut.observedResults.scaleScore.mean).toBe(3);
+    expect(meanOut.observedResults.scaleScore.possibleMin).toBe(1);
+    expect(meanOut.observedResults.scaleScore.possibleMax).toBe(5);
+    expect(sumOut.observedResults.scaleScore.method).toBe('sum');
+    expect(sumOut.observedResults.scaleScore.mean).toBe(9);
+    expect(sumOut.observedResults.scaleScore.possibleMin).toBe(3);
+    expect(sumOut.observedResults.scaleScore.possibleMax).toBe(15);
+  });
+
+  test('minimum completed items still scores respondents with some missing values', () => {
+    const headers = ['Q1', 'Q2', 'Q3'];
+    const rows = [
+      [1, 2, 3],
+      [2, '', 4],
+      [3, 4, 3],
+      [4, 5, ''],
+      [5, 4, 2]
+    ];
+    const allReq = Rel.analyze(headers, rows, {
+      items: headers,
+      scaleScore: { method: 'mean', minCompleted: 'all' },
+      bootstrapSamples: 0,
+      coefficients: { confidenceInterval: false, alpha: true, omegaTotal: false, standardizedAlpha: false }
+    });
+    const twoReq = Rel.analyze(headers, rows, {
+      items: headers,
+      scaleScore: { method: 'mean', minCompleted: 2 },
+      bootstrapSamples: 0,
+      coefficients: { confidenceInterval: false, alpha: true, omegaTotal: false, standardizedAlpha: false }
+    });
+    expect(allReq.observedResults.scaleScore.validN).toBe(3);
+    expect(twoReq.observedResults.scaleScore.validN).toBe(5);
   });
 });

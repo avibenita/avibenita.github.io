@@ -11,8 +11,8 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260820-tools3"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260820rel1"></script>
-  <script src="reliability-engine.js?v=20260820rel1"></script>
+  <script src="../shared-header.js?v=20260820rel2"></script>
+  <script src="reliability-engine.js?v=20260820rel2"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -48,7 +48,18 @@
     .panel-body{padding:12px 14px;}
     .warn-banner{border-left:3px solid var(--warning);background:rgba(251,191,36,.12);padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;}
     .warn-banner.danger{border-left-color:var(--danger);background:rgba(251,113,133,.12);}
-    .warn-banner.suitability{border-left-color:#f97316;background:rgba(249,115,22,.14);font-weight:600;}
+    .suit-panel{border:1px solid rgba(249,115,22,.45);background:rgba(249,115,22,.1);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+    .suit-summary{display:flex;align-items:flex-start;gap:10px;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:12px 14px;cursor:pointer;font:inherit;}
+    .suit-summary i{color:#fb923c;margin-top:2px;}
+    .suit-title{font-weight:800;font-size:13px;}
+    .suit-lead{font-size:12.5px;color:var(--text-secondary);margin-top:3px;line-height:1.4;}
+    .suit-details{display:none;padding:0 14px 12px 36px;}
+    .suit-panel.open .suit-details{display:block;}
+    .suit-details li{margin:4px 0;font-size:12.5px;color:var(--text-secondary);}
+    .col-toggle{display:flex;gap:4px;flex-wrap:wrap;}
+    .col-toggle button{border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text-primary);padding:5px 10px;border-radius:999px;cursor:pointer;font-size:11px;font-weight:650;}
+    .col-toggle button.active{background:#1d4ed8;border-color:#1d4ed8;color:#fff;}
+    #scale-hist{width:100%;height:220px;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
     thead th{text-align:left;padding:8px;background:var(--surface-2);cursor:pointer;white-space:nowrap;}
     td{padding:8px;border-bottom:1px solid var(--border);}
@@ -65,7 +76,7 @@
     .btn:disabled{opacity:.45;cursor:not-allowed;}
     .btn-primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:#1d4ed8;color:#fff;}
     .sb-item.is-disabled{opacity:.45;pointer-events:none;}
-    #alpha-gauge,#scree-chart,#group-chart{width:100%;height:220px;}
+    #alpha-gauge,#scree-chart,#group-chart,#scale-hist{width:100%;height:220px;}
     .help{font-size:12.5px;color:var(--text-secondary);line-height:1.45;}
     .item-name{position:sticky;left:0;background:var(--surface-1);font-weight:700;}
     @media (max-width: 900px) {
@@ -135,13 +146,25 @@
             <div class="panel-heading">Scale assessment</div>
             <div class="panel-body" id="assessmentCard"></div>
           </div>
+          <div class="panel">
+            <div class="panel-heading">Scale score</div>
+            <div class="panel-body">
+              <p class="help" id="scaleScoreHelp">Mean of valid items. Reliability coefficients are calculated separately from this score.</p>
+              <div id="scaleScoreTable"></div>
+              <div id="scale-hist" style="margin-top:10px;"></div>
+            </div>
+          </div>
         </section>
 
         <section id="tab-items" class="tab-panel">
           <div class="panel">
             <div class="panel-heading">
               <span>Item diagnostics</span>
-              <label class="toolbar"><input type="checkbox" id="showMeanSd" checked /> Show item mean and SD</label>
+              <div class="col-toggle" role="group" aria-label="Item table columns">
+                <button type="button" data-cols="diagnostics" class="active">Diagnostics</button>
+                <button type="button" data-cols="descriptives">Descriptives</button>
+                <button type="button" data-cols="all">All columns</button>
+              </div>
             </div>
             <div class="panel-body">
               <p class="help" title="Removing an item should also be justified by content validity and the intended construct.">Corrected item–total correlation uses the sum of the remaining items. Removing an item should also be justified by content validity and the intended construct.</p>
@@ -203,6 +226,15 @@
     var _bundle = null;
     var _rawPreview = null;
     var _itemSort = { key: 'item', dir: 'asc' };
+    var _itemCols = 'diagnostics';
+    var SUITABILITY_CODES = {
+      suspicious_names: true,
+      mixed_ranges: true,
+      few_items: true,
+      small_n: true,
+      some_out_of_range: true,
+      reverse_out_of_range: true
+    };
     var TAB_TITLES = {
       overview: 'Overview',
       items: 'Item Diagnostics',
@@ -268,10 +300,26 @@
       var host = document.getElementById('overviewWarnings');
       var list = (obs.warnings || []).slice();
       if (!list.length) { host.innerHTML = ''; return; }
-      host.innerHTML = list.map(function (w) {
-        var cls = w.code === 'suspicious_names' ? 'suitability' : (w.code === 'negative_alpha' ? 'danger' : '');
-        return '<div class="warn-banner ' + cls + '">' + esc(w.message) + (w.columns ? ' (' + w.columns.map(esc).join(', ') + ')' : '') + '</div>';
-      }).join('');
+      var suit = list.filter(function (w) { return SUITABILITY_CODES[w.code]; });
+      var other = list.filter(function (w) { return !SUITABILITY_CODES[w.code]; });
+      var details = suit.concat(other);
+      var lead = suit.length
+        ? (suit[0].message + (suit.length + other.length > 1 ? ' Additional notes are listed below.' : ''))
+        : (details.length === 1 ? details[0].message : (details.length + ' analysis notes. Expand for details.'));
+      host.innerHTML =
+        '<div class="suit-panel" id="suitPanel">'
+        + '<button type="button" class="suit-summary" id="suitToggle">'
+        + '<i class="fa-solid fa-triangle-exclamation"></i>'
+        + '<span><div class="suit-title">Data suitability</div><div class="suit-lead">' + esc(lead) + '</div></span>'
+        + '</button>'
+        + '<ul class="suit-details">'
+        + details.map(function (w) {
+          return '<li>' + esc(w.message) + (w.columns ? ' (' + w.columns.map(esc).join(', ') + ')' : '') + '</li>';
+        }).join('')
+        + '</ul></div>';
+      document.getElementById('suitToggle').onclick = function () {
+        document.getElementById('suitPanel').classList.toggle('open');
+      };
     }
 
     function renderOverview(obs, cfg) {
@@ -291,7 +339,7 @@
       document.getElementById('statAlphaNote').textContent = note;
       document.getElementById('statOmega').textContent = fmt(obs.omegaTotal);
       document.getElementById('statOmegaStatus').textContent = obs.omegaStatus === 'estimated' || obs.omegaStatus === 'estimated_with_warning'
-        ? 'Estimated' : 'Not estimable';
+        ? 'One-factor common-factor model' : 'Not estimable';
       document.getElementById('statOmegaNote').textContent = (obs.omegaMeta && obs.omegaMeta.reason) || '';
       document.getElementById('statItems').textContent = obs.itemCount != null ? String(obs.itemCount) : '—';
       document.getElementById('statN').textContent = obs.nValid != null ? String(obs.nValid) : '—';
@@ -301,7 +349,7 @@
       var rows = [
         ['Cronbach’s alpha', fmt(obs.alpha), ci && ci.lower != null ? fmt(ci.lower) + ' – ' + fmt(ci.upper) : '—'],
         ['Standardized alpha', fmt(obs.standardizedAlpha), 'From the average inter-item correlation'],
-        ['McDonald’s omega total', fmt(obs.omegaTotal), obs.omegaStatus || '']
+        ['McDonald’s omega total', fmt(obs.omegaTotal), 'One-factor common-factor model (not PCA)']
       ];
       document.getElementById('coefTable').innerHTML = '<table><thead><tr><th>Coefficient</th><th>Estimate</th><th>Notes</th></tr></thead><tbody>'
         + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + esc(r[2]) + '</td></tr>'; }).join('')
@@ -311,16 +359,81 @@
       var dim = obs.structure && obs.structure.firstComponentVariance != null
         ? ('First component explains ' + fmt(obs.structure.firstComponentVariance, 1) + '% of variance (diagnostic only).')
         : 'Dimensionality diagnostic not available.';
-      var important = (obs.warnings || []).slice(0, 3).map(function (w) { return w.message; }).join(' ') || 'No blocking warnings.';
       document.getElementById('assessmentCard').innerHTML =
         '<div class="stat-field"><span class="stat-label">Reliability level</span> <strong>' + esc(band.label || '—') + '</strong></div>'
         + '<div class="stat-field"><span class="stat-label">Weakest item</span> <strong>' + esc(weak && weak.item ? weak.item : '—')
         + '</strong>' + (weak && weak.itemTotalCorrelation != null ? ' (item–total ' + fmt(weak.itemTotalCorrelation, 2) + ')' : '') + '</div>'
         + '<div class="stat-field"><span class="stat-label">Average inter-item correlation</span> <strong>' + fmt(obs.averageInterItemCorrelation, 3) + '</strong></div>'
-        + '<div class="stat-note" style="margin-top:8px;">' + esc(dim) + '</div>'
-        + '<div class="stat-note" style="margin-top:6px;">' + esc(important) + '</div>';
+        + '<div class="stat-note" style="margin-top:8px;">' + esc(dim) + '</div>';
 
       renderGauge(obs.alpha);
+      renderScaleScore(obs, cfg);
+    }
+
+    function renderScaleScore(obs, cfg) {
+      var sc = obs.scaleScore || {};
+      var method = sc.method === 'sum' ? 'Sum of valid items' : 'Mean of valid items';
+      var need = (cfg.scaleScore && cfg.scaleScore.minCompleted) || 'all';
+      document.getElementById('scaleScoreHelp').textContent = method
+        + (need === 'all' ? ' · respondents must complete every item' : (' · at least ' + need + ' completed items'))
+        + '. Reliability coefficients are calculated separately from this score.';
+      var rows = [
+        ['Scoring method', method],
+        ['Valid N', sc.validN != null ? String(sc.validN) : '—'],
+        ['Number of items', sc.itemCount != null ? String(sc.itemCount) : '—'],
+        ['Mean', fmt(sc.mean, 2)],
+        ['SD', fmt(sc.sd, 2)],
+        ['Median', fmt(sc.median, 2)],
+        ['Minimum', fmt(sc.min, 2)],
+        ['Maximum', fmt(sc.max, 2)],
+        ['Possible range', (sc.possibleMin != null && sc.possibleMax != null) ? fmt(sc.possibleMin, 2) + ' – ' + fmt(sc.possibleMax, 2) : '—'],
+        ['Observed range', (sc.observedMin != null && sc.observedMax != null) ? fmt(sc.observedMin, 2) + ' – ' + fmt(sc.observedMax, 2) : '—'],
+        ['Missing respondents', sc.missingRespondents != null ? String(sc.missingRespondents) : '—'],
+        ['Floor %', fmt(sc.floorPct, 1)],
+        ['Ceiling %', fmt(sc.ceilingPct, 1)]
+      ];
+      document.getElementById('scaleScoreTable').innerHTML = '<table><thead><tr><th>Statistic</th><th>Value</th></tr></thead><tbody>'
+        + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('')
+        + '</tbody></table>';
+      renderScaleHist(sc);
+    }
+
+    function renderScaleHist(sc) {
+      var el = document.getElementById('scale-hist');
+      if (typeof Highcharts === 'undefined' || !sc || !sc.scores || sc.scores.length < 2) {
+        if (el) el.innerHTML = '';
+        return;
+      }
+      var scores = sc.scores.slice().sort(function (a, b) { return a - b; });
+      var lo = sc.possibleMin != null ? sc.possibleMin : scores[0];
+      var hi = sc.possibleMax != null ? sc.possibleMax : scores[scores.length - 1];
+      if (!(hi > lo)) { hi = lo + 1; }
+      var bins = Math.max(6, Math.min(12, Math.round(Math.sqrt(scores.length))));
+      var width = (hi - lo) / bins;
+      var counts = [];
+      var cats = [];
+      var b;
+      for (b = 0; b < bins; b++) {
+        var a = lo + b * width;
+        var c = b === bins - 1 ? hi : lo + (b + 1) * width;
+        cats.push(fmt(a, 1) + '–' + fmt(c, 1));
+        counts.push(0);
+      }
+      scores.forEach(function (v) {
+        var idx = Math.floor((v - lo) / width);
+        if (idx >= bins) idx = bins - 1;
+        if (idx < 0) idx = 0;
+        counts[idx]++;
+      });
+      Highcharts.chart('scale-hist', {
+        chart: { type: 'column', backgroundColor: 'transparent' },
+        title: { text: null },
+        xAxis: { categories: cats, title: { text: sc.method === 'sum' ? 'Sum score' : 'Mean score' } },
+        yAxis: { title: { text: 'Respondents' }, min: 0, allowDecimals: false },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        series: [{ name: 'Respondents', data: counts, color: 'rgb(120,200,255)' }]
+      });
     }
 
     function renderGauge(alpha) {
@@ -346,7 +459,7 @@
     }
 
     function renderItems(obs) {
-      var show = document.getElementById('showMeanSd').checked;
+      var mode = _itemCols;
       var items = (obs.items || []).slice();
       var key = _itemSort.key;
       var dir = _itemSort.dir === 'asc' ? 1 : -1;
@@ -359,24 +472,46 @@
         return (av - bv) * dir;
       });
       var thresh = (_bundle.analysisConfig && _bundle.analysisConfig.weakItemThreshold) || 0.30;
-      var head = '<thead><tr>'
-        + '<th data-k="item">Item</th>'
-        + (show ? '<th data-k="mean">Mean</th><th data-k="sd">SD</th>' : '')
-        + '<th data-k="validN">Valid N</th>'
-        + '<th data-k="itemTotalCorrelation">Corrected item–total</th>'
-        + '<th data-k="alphaIfDeleted">α if deleted</th>'
-        + '<th data-k="omegaIfDeleted">ω if deleted</th>'
-        + '<th data-k="flag">Decision</th></tr></thead>';
+      function show(col) {
+        if (mode === 'all') return true;
+        if (mode === 'descriptives') {
+          return ['item', 'validN', 'missingPct', 'mean', 'sd', 'min', 'max', 'floorPct', 'ceilingPct', 'variance', 'skewness'].indexOf(col) >= 0;
+        }
+        return ['item', 'validN', 'missingN', 'mean', 'sd', 'min', 'max', 'itemTotalCorrelation', 'alphaIfDeleted', 'omegaIfDeleted', 'flag'].indexOf(col) >= 0;
+      }
+      var cols = [
+        { k: 'item', label: 'Item' },
+        { k: 'validN', label: 'Valid N' },
+        { k: 'missingN', label: 'Missing' },
+        { k: 'missingPct', label: 'Missing %' },
+        { k: 'mean', label: 'Mean' },
+        { k: 'sd', label: 'SD' },
+        { k: 'min', label: 'Min' },
+        { k: 'max', label: 'Max' },
+        { k: 'floorPct', label: 'Floor %' },
+        { k: 'ceilingPct', label: 'Ceiling %' },
+        { k: 'variance', label: 'Variance' },
+        { k: 'skewness', label: 'Skewness' },
+        { k: 'itemTotalCorrelation', label: 'Item–total r' },
+        { k: 'alphaIfDeleted', label: 'α if deleted' },
+        { k: 'omegaIfDeleted', label: 'ω if deleted' },
+        { k: 'flag', label: 'Flag' }
+      ].filter(function (c) { return show(c.k); });
+      var head = '<thead><tr>' + cols.map(function (c) { return '<th data-k="' + c.k + '">' + c.label + '</th>'; }).join('') + '</tr></thead>';
       var body = items.map(function (it) {
         var flagCls = it.flag === 'Good' ? 'flag-good' : (String(it.flag).indexOf('Negative') >= 0 ? 'flag-bad' : 'flag-weak');
         var itcCls = (it.itemTotalCorrelation != null && it.itemTotalCorrelation < thresh) ? 'flag-weak' : '';
-        return '<tr><td class="item-name">' + esc(it.item) + '</td>'
-          + (show ? '<td>' + fmt(it.mean, 2) + '</td><td>' + fmt(it.sd, 2) + '</td>' : '')
-          + '<td>' + (it.validN != null ? it.validN : '—') + '</td>'
-          + '<td class="' + itcCls + '">' + fmt(it.itemTotalCorrelation, 2) + '</td>'
-          + '<td title="Removing an item should also be justified by content validity and the intended construct.">' + fmt(it.alphaIfDeleted, 3) + '</td>'
-          + '<td>' + fmt(it.omegaIfDeleted, 3) + '</td>'
-          + '<td class="' + flagCls + '">' + esc(it.flag || '') + '</td></tr>';
+        return '<tr>' + cols.map(function (c) {
+          var cls = c.k === 'item' ? 'item-name' : (c.k === 'flag' ? flagCls : (c.k === 'itemTotalCorrelation' ? itcCls : ''));
+          var val;
+          if (c.k === 'item' || c.k === 'flag') val = esc(it[c.k] || '');
+          else if (c.k === 'validN' || c.k === 'missingN') val = it[c.k] != null ? it[c.k] : '—';
+          else if (c.k === 'missingPct' || c.k === 'floorPct' || c.k === 'ceilingPct') val = fmt(it[c.k], 1);
+          else if (c.k === 'mean' || c.k === 'sd' || c.k === 'min' || c.k === 'max') val = fmt(it[c.k], 2);
+          else val = fmt(it[c.k], 3);
+          var title = c.k === 'alphaIfDeleted' ? ' title="Removing an item should also be justified by content validity and the intended construct."' : '';
+          return '<td class="' + cls + '"' + title + '>' + val + '</td>';
+        }).join('') + '</tr>';
       }).join('');
       var table = document.getElementById('itemTable');
       table.innerHTML = head + '<tbody>' + body + '</tbody>';
@@ -575,7 +710,7 @@
       var pkg = _bundle && _bundle.aiPackage;
       StatisticoHeader._lastAiMeta = { primarySignal: 'Scale Reliability' };
       var prompt = 'You are interpreting a Statistico Scale Reliability analysis.\n'
-        + 'Avoid treating .70 as an absolute pass/fail rule. Mention sample size and uncertainty. Distinguish reliability from validity and from unidimensionality. Do not recommend deleting an item solely because alpha-if-deleted increases. Identify possible reverse-coded items. Mention possible redundancy when reliability is extremely high. Never describe unrelated columns as a valid psychological or survey scale.\n\n'
+        + 'Distinguish reliability from validity and from unidimensionality. McDonald’s omega total is from a one-factor common-factor model, not PCA. Do not recommend deleting an item solely because alpha-if-deleted increases. Identify possible reverse-coded items. Mention possible redundancy when reliability is extremely high. Never describe unrelated columns as a valid psychological or survey scale.\n\n'
         + JSON.stringify(pkg || getExportData(), null, 2)
         + '\n\nReply ONLY in this exact format:\nCONCLUSION: [one sentence]\nEVIDENCE: [finding] | [finding] | [finding]\nINTERPRETATION: [3 sentences]\nIMPLICATIONS: [1] | [2] | [3]\nACTION: [1] | [2] | [3]\nSTRENGTH: [High, Moderate, or Low - short reason]';
       StatisticoHeader._callAiForSidebar(prompt).then(function (raw) {
@@ -586,8 +721,14 @@
       });
     };
 
-    document.getElementById('showMeanSd').addEventListener('change', function () {
-      if (_bundle && _bundle.observedResults) renderItems(_bundle.observedResults);
+    document.querySelectorAll('.col-toggle button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        _itemCols = btn.getAttribute('data-cols') || 'diagnostics';
+        document.querySelectorAll('.col-toggle button').forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+        });
+        if (_bundle && _bundle.observedResults) renderItems(_bundle.observedResults);
+      });
     });
     document.querySelectorAll('input[name="mxMode"]').forEach(function (el) {
       el.addEventListener('change', function () { if (_bundle) renderMatrix(_bundle.observedResults); });

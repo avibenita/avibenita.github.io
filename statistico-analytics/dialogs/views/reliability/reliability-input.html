@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260715a"/>
   <script src="../shared-config.js?v=20260715b"></script>
-  <script src="reliability-engine.js?v=20260820rel1"></script>
+  <script src="reliability-engine.js?v=20260820rel2"></script>
   <style>
     :root { --rel-var: #38bdf8; --rel-acc: #ec4899; }
     [data-theme="light"] { --rel-var: #0369a1; --rel-acc: #be185d; }
@@ -242,6 +242,19 @@
             </div>
 
             <div class="opt-card">
+              <h4>Scale score</h4>
+              <label class="opt-check"><input type="radio" name="scoreMethod" value="mean" checked /> Mean of valid items (default)</label>
+              <label class="opt-check"><input type="radio" name="scoreMethod" value="sum" /> Sum of valid items</label>
+              <div class="opt-row">
+                <label for="minCompleted">Minimum completed items</label>
+                <select id="minCompleted" class="cfg-select" style="width:140px;">
+                  <option value="all" selected>All items</option>
+                </select>
+              </div>
+              <div class="opt-help">Used for the Overview scale-score descriptives and histogram. Reliability coefficients still use the missing-values method above.</div>
+            </div>
+
+            <div class="opt-card">
               <h4>Missing values</h4>
               <label class="opt-check"><input type="radio" name="missing" value="listwise" checked /> Listwise deletion (default)</label>
               <label class="opt-check"><input type="radio" name="missing" value="pairwise" /> Pairwise deletion</label>
@@ -255,7 +268,7 @@
               <div class="opt-card">
                 <h4>Reliability coefficients</h4>
                 <label class="opt-check"><input type="checkbox" id="optAlpha" checked /> Cronbach’s alpha</label>
-                <label class="opt-check"><input type="checkbox" id="optOmega" checked /> McDonald’s omega total</label>
+                <label class="opt-check"><input type="checkbox" id="optOmega" checked /> McDonald’s omega total (one-factor common-factor model)</label>
                 <label class="opt-check"><input type="checkbox" id="optStdAlpha" /> Standardized alpha</label>
                 <label class="opt-check"><input type="checkbox" id="optCI" checked /> Confidence interval</label>
                 <div class="opt-row">
@@ -530,11 +543,29 @@
       refresh();
     }
 
+    function renderMinCompleted() {
+      var sel = qs('minCompleted');
+      var current = sel.value || 'all';
+      var k = selectedItems.length;
+      sel.innerHTML = '<option value="all">All items</option>';
+      if (k >= 2) {
+        for (var n = k - 1; n >= 1; n--) {
+          var opt = document.createElement('option');
+          opt.value = String(n);
+          opt.textContent = n === 1 ? '1 item' : (n + ' items');
+          sel.appendChild(opt);
+        }
+      }
+      if (current === 'all' || (k && Number(current) <= k)) sel.value = current;
+      else sel.value = 'all';
+    }
+
     function refresh() {
       renderVariables();
       renderItems();
       renderReverse();
       renderGroupOptions();
+      renderMinCompleted();
       validate();
     }
 
@@ -593,6 +624,10 @@
         structure: {
           unidimensionality: qs('optUni').checked,
           scree: qs('optScree').checked
+        },
+        scaleScore: {
+          method: (document.querySelector('input[name="scoreMethod"]:checked') || {}).value || 'mean',
+          minCompleted: qs('minCompleted').value || 'all'
         }
       };
       return spec;

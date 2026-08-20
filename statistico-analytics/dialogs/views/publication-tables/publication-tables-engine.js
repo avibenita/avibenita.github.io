@@ -1799,8 +1799,9 @@
 
     var view = $("pt2View" + tab.charAt(0).toUpperCase() + tab.slice(1));
     if (view) {
-      view.querySelectorAll(".pt2-layout, .pt2-main, .pt2-sidebar").forEach(function (el) {
+      view.querySelectorAll(".pt2-layout, .pt2-main, .pt2-sidebar, .pt2-paper-wrap").forEach(function (el) {
         el.scrollTop = 0;
+        el.scrollLeft = 0;
       });
     }
   }

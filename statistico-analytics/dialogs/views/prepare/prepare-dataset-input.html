@@ -6,7 +6,14 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Prepare Dataset</title>
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script>
+    // Public demo/case-study embeds (embed=1) never run inside an Office host.
+    // Skipping office.js avoids its dialog/parent-frame handshake blanking the
+    // nested marketing-site modal iframe (page -> wsModalFrame -> this page).
+    if (!/(?:^|[?&])embed=1(?:&|$)/.test(window.location.search)) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></scr' + 'ipt>');
+    }
+  </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260715b"></script>
@@ -92,6 +99,8 @@
     .impact { border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); padding:10px 12px; }
     .impact-need { font-size:12px; color:var(--cfg-text2); font-weight:600; margin-top:6px; }
     .safety { font-size:11px; color:var(--cfg-text2); margin:0; }
+    html[data-hub-embed="1"] .prep-layout { overflow:auto; }
+    html[data-hub-embed="1"] #mainContent { min-height:0; }
   </style>
 </head>
 <body>
@@ -906,6 +915,34 @@
       updateButtons();
     }
 
+    function demoPayload() {
+      return {
+        headers: ['ID', 'Department', 'Satisfaction', 'Intention', 'Tenure'],
+        rows: [
+          [1, 'Sales', 4.2, 3.8, 2],
+          [2, 'Sales', 3.1, 2.9, 5],
+          [3, 'Ops', 4.8, 4.5, 8],
+          [4, 'Ops', 2.6, 2.1, 1],
+          [5, 'R&D', 4.4, 4.2, 4],
+          [6, 'R&D', 3.7, 3.5, 6],
+          [7, 'Sales', 4.9, 4.6, 3],
+          [8, 'Ops', 3.3, 3.0, 7],
+          [9, 'R&D', 2.4, 2.2, 2],
+          [10, 'Sales', 3.9, 3.6, 9]
+        ],
+        address: 'A1:E11 (built-in sample)',
+        worksheetName: 'Survey (built-in)',
+        sheetNames: ['Survey (built-in)']
+      };
+    }
+
+    function maybeLoadDemo() {
+      if (!/[?&]demo=1/.test(window.location.search || '')) return false;
+      if (STATE.headers && STATE.headers.length) return false;
+      applyPayload(demoPayload());
+      return true;
+    }
+
     (function initOps() {
       var sel = qs('opSelect');
       var groups = { variables: 'Columns', cases: 'Rows', structure: 'Table shape' };
@@ -1052,8 +1089,22 @@
       updateButtons();
     });
 
-    Office.onReady(function () {
-      if (Office.context && Office.context.ui && Office.EventType && Office.EventType.DialogParentMessageReceived) {
+    function bootPrepare() {
+      send('ready');
+      if (maybeLoadDemo()) return;
+      var tries = 0;
+      var timer = setInterval(function () {
+        if (STATE.headers.length || ++tries > 12) {
+          clearInterval(timer);
+          if (!STATE.headers.length) maybeLoadDemo();
+          return;
+        }
+        send('requestData');
+      }, 500);
+    }
+
+    function startPrepare() {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.EventType && Office.EventType.DialogParentMessageReceived) {
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
           try {
             var msg = JSON.parse(arg.message || '{}');
@@ -1063,13 +1114,14 @@
           } catch (e) {}
         });
       }
-      send('ready');
-      var tries = 0;
-      var timer = setInterval(function () {
-        if (STATE.headers.length || ++tries > 12) { clearInterval(timer); return; }
-        send('requestData');
-      }, 500);
-    });
+      bootPrepare();
+    }
+
+    if (typeof Office !== 'undefined' && Office.onReady) {
+      Office.onReady(function () { startPrepare(); });
+    } else {
+      startPrepare();
+    }
   </script>
 </body>
 </html>

@@ -222,7 +222,7 @@
     meta: {
       badge: 'Study-level  one row per study',
       rule:  'Each row is a study. Map a study label plus treatment/control means (or events + totals), correlations (r+N or Fisher z+SE), or a precomputed effect with SE/variance/CI.',
-      note:  'Choose Continuous / Binary / Correlations / Precomputed, then the effect measure. Random-effects defaults to REML with Hartung–Knapp.',
+      note:  'Choose Continuous / Binary / Correlations / Precomputed. Correlations use r+N or Fisher z+SE. Precomputed is for other externally calculated effects (not correlations). Random-effects defaults to REML with Hartung–Knapp.',
       cols: [
         { label: 'Study', role: 'cat', roleLabel: 'Study' },
         { label: 'Mean_T', role: 'meas', roleLabel: 'Tx mean' },

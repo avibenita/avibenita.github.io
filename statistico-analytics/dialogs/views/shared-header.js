@@ -1246,6 +1246,77 @@ const StatisticoHeader = {
     });
   },
 
+  _sidebarGroupKey(title) {
+    return String(title || 'group').trim().toLowerCase().replace(/\s+/g, '-');
+  },
+
+  _isSidebarGroupDefaultOpen(title) {
+    return this._sidebarGroupKey(title) === 'advanced-diagnostics';
+  },
+
+  _bindCollapsibleSidebarGroups(nav) {
+    nav = nav || document.getElementById('sidebarNav');
+    if (!nav) return;
+    const groups = nav.querySelectorAll('.sb-body .sb-group');
+    groups.forEach((group) => {
+      if (group.dataset.collapseBound === '1') return;
+      const kids = Array.from(group.children);
+      let rail = kids.find((c) => c.classList && c.classList.contains('sb-items-rail'));
+      if (!rail) {
+        rail = document.createElement('div');
+        rail.className = 'sb-items-rail';
+        kids.forEach((child) => {
+          if (child.classList && (child.classList.contains('sb-group-title') || child.classList.contains('sb-group-toggle'))) return;
+          rail.appendChild(child);
+        });
+        group.appendChild(rail);
+      }
+
+      let toggle = kids.find((c) => c.classList && c.classList.contains('sb-group-toggle'));
+      const titleEl = kids.find((c) => c.classList && c.classList.contains('sb-group-title'));
+      const titleNode = toggle && toggle.querySelector('.sb-group-title-text');
+      const titleText = (titleNode ? titleNode.textContent : (titleEl ? titleEl.textContent : 'Section')).replace(/\s+/g, ' ').trim();
+
+      if (!toggle) {
+        toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'sb-group-toggle';
+        toggle.innerHTML = `<span class="sb-group-title-text">${titleText}</span>`
+          + `<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>`;
+        if (titleEl) titleEl.replaceWith(toggle);
+        else group.insertBefore(toggle, rail);
+      } else if (!toggle.querySelector('.sb-collapse-chevron')) {
+        toggle.insertAdjacentHTML('beforeend', '<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>');
+      }
+
+      group.dataset.collapseBound = '1';
+      group.dataset.sbGroup = this._sidebarGroupKey(titleText);
+
+      const storageKey = `statistico.sbGroupOpen.${this.module || 'mod'}.${group.dataset.sbGroup}`;
+      const hasActive = !!(group.querySelector('.sb-item.active, .sb-faceted.is-active-group, .sb-item.sb-item-sub.active'));
+      let stored = null;
+      try { stored = localStorage.getItem(storageKey); } catch (_) {}
+      const defaultOpen = this._isSidebarGroupDefaultOpen(titleText);
+      const open = hasActive || stored === '1' || (stored == null && defaultOpen);
+
+      const apply = (isOpen, persist) => {
+        group.classList.toggle('is-open', isOpen);
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) rail.removeAttribute('hidden');
+        else rail.setAttribute('hidden', '');
+        if (persist) {
+          try { localStorage.setItem(storageKey, isOpen ? '1' : '0'); } catch (_) {}
+        }
+      };
+      apply(open, false);
+
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        apply(!group.classList.contains('is-open'), true);
+      });
+    });
+  },
+
   _isSidebarItemActive(item) {
     if (item.active === true) return true;
     if (item.view && item.view === this.currentView) return true;

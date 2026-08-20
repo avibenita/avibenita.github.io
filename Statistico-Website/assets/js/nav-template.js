@@ -63,13 +63,13 @@ const NAV_TEMPLATE = `
             </svg>
             Calculators
           </a>
-          <a href="/Statistico-Website/index-Addins.html" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Applications">
+          <a href="/Statistico-Website/index-Addins.html" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Specialized Tools">
             <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="1" width="10" height="14" rx="1.5"/>
               <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
               <line x1="6" y1="11" x2="8.5" y2="11"/>
             </svg>
-            Applications
+            Specialized Tools
           </a>
         </div>
       </li>
@@ -322,6 +322,12 @@ const NAV_STYLE = `
 .nav-products-row .nav-link--product[data-page="analytics"] {
   font-size: 0.86rem;
   font-weight: 500;
+}
+
+.nav-products-row .nav-link--product-lite[data-page="addins"] {
+  font-size: 0.8rem;
+  padding-left: 9px;
+  padding-right: 9px;
 }
 
 .nav-products-row .nav-link--product:not(:first-child),
@@ -1911,7 +1917,7 @@ const FOOTER_TEMPLATE = `
         <h4>Products</h4>
         <a href="/Statistico-Website/index-Analytics.html" id="footer-link-analytics">Statistico Analytics</a>
         <a href="/Statistico-Website/index-Calculators.html" id="footer-link-calculators">Statistico Calculators</a>
-        <a href="/Statistico-Website/index-Addins.html" id="footer-link-addins">Statistico Applications</a>
+        <a href="/Statistico-Website/index-Addins.html" id="footer-link-addins">Statistico Specialized Tools</a>
       </div>
       <div class="footer-section">
         <h4>Resources</h4>
@@ -2174,8 +2180,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'faq';
     } else if (currentFile === 'index-Calculators.html' || currentPath.indexOf('/calculators/') >= 0) {
       activePage = 'calculators';
-    } else if (currentFile === 'publication-tables.html') {
-      /* Lives under /analytics/ path but belongs to Applications Hub */
+    } else if (currentFile === 'publication-tables.html' || currentFile === 'multivariable-visualisation.html' || currentFile === 'data-manipulation.html') {
+      /* Lives under /analytics/ path but belongs to Specialized Tools */
       activePage = 'addins';
     } else if (currentFile === 'index-Analytics.html' || currentPath.indexOf('/analytics/') >= 0) {
       activePage = 'analytics';
@@ -2204,7 +2210,7 @@ function trailIconForLabel(label) {
   const t = String(label || '').trim().toLowerCase();
   if (t === 'statistico') return 'fa-house';
   if (t === 'analytics') return 'fa-chart-column';
-  if (t === 'applications') return 'fa-puzzle-piece';
+  if (t === 'applications' || t === 'specialized tools') return 'fa-puzzle-piece';
   if (t === 'calculators') return 'fa-calculator';
   if (t === 'ezpaste' || t.indexOf('ezpaste') === 0) return 'fa-bullseye';
   if (t === 'the paradigm') return 'fa-lightbulb';
@@ -2216,6 +2222,11 @@ function trailIconForLabel(label) {
   if (t === 'privacy' || t.indexOf('privacy') === 0) return 'fa-shield-halved';
   if (t === 'platform' || t === 'launcher') return 'fa-sitemap';
   if (t.indexOf('publication') >= 0) return 'fa-graduation-cap';
+  if (t.indexOf('meta') >= 0) return 'fa-layer-group';
+  if (t.indexOf('visualis') >= 0 || t.indexOf('visualiz') >= 0 || t.indexOf('multivariable') >= 0) return 'fa-circle-dot';
+  if (t.indexOf('bubble') >= 0) return 'fa-circle';
+  if (t.indexOf('manipulat') >= 0 || t.indexOf('prepare') >= 0) return 'fa-table-columns';
+  if (t.indexOf('contingency') >= 0 || (t.indexOf('frequency') >= 0 && t.indexOf('table') >= 0)) return 'fa-border-all';
   if (t.indexOf('regression') >= 0) return 'fa-chart-line';
   if (t.indexOf('anova') >= 0) return 'fa-table-cells';
   if (t.indexOf('factor') >= 0) return 'fa-diagram-project';
@@ -2283,12 +2294,14 @@ function resolveTrailCrumbs() {
   const analyticsModules = {
     'univariate.html': 'Univariate Analysis',
     'correlation.html': 'Correlation Analysis',
+    'contingency-tables.html': 'Frequency & Contingency Tables',
     'linear-regression.html': 'Linear Regression',
     'logistic-regression.html': 'Logistic Regression',
     'anova.html': 'ANOVA',
     'independent-means.html': 'Independent Means',
     'paired-repeated.html': 'Paired / Repeated Means',
     'mixed-models.html': 'Mixed Models',
+    'meta-analysis.html': 'Meta-Analysis',
     'factor-analysis.html': 'Factor Analysis',
     'pca.html': 'Principal Component Analysis',
     'k-means.html': 'K-Means Clustering',
@@ -2306,8 +2319,24 @@ function resolveTrailCrumbs() {
   if (file === 'publication-tables.html') {
     return [
       { label: 'Statistico', href: links.home },
-      { label: 'Applications', href: links.addins },
+      { label: 'Specialized Tools', href: links.addins },
       { label: 'Publication Tables' }
+    ];
+  }
+
+  if (file === 'multivariable-visualisation.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Specialized Tools', href: links.addins },
+      { label: 'Multivariable Visualisation' }
+    ];
+  }
+
+  if (file === 'data-manipulation.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Specialized Tools', href: links.addins },
+      { label: 'Data Manipulation' }
     ];
   }
 
@@ -2336,14 +2365,14 @@ function resolveTrailCrumbs() {
   if (file === 'index-Addins.html') {
     return [
       { label: 'Statistico', href: links.home },
-      { label: 'Applications' }
+      { label: 'Specialized Tools' }
     ];
   }
 
   if (file === 'index-EzPaste.html') {
     return [
       { label: 'Statistico', href: links.home },
-      { label: 'Applications', href: links.addins },
+      { label: 'Specialized Tools', href: links.addins },
       { label: 'EzPaste' }
     ];
   }

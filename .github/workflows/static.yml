@@ -35,8 +35,10 @@ jobs:
             echo ".nojekyll file already exists"
           fi
 
-      # Mirror power UI into analytics/embed for GitHub Pages: statistico.live currently 404s deep paths under
-      # statistico-calculators/ even though sources live in git; embed sits next to ANOVA and deploys reliably.
+      # Mirror power UI into analytics/embed. The 404 on deep statistico-calculators/ paths that
+      # originally forced this no longer reproduces (checked 2026-08-20, all four calculator URLs
+      # return 200), so this exists only to keep the embed URL the add-in points at alive. Retire
+      # it once nothing references statistico-analytics/embed.
       - name: Sync power UI into statistico-analytics/embed
         run: |
           mkdir -p statistico-analytics/embed
@@ -51,6 +53,12 @@ jobs:
       - name: Regenerate sitemap.xml
         continue-on-error: true
         run: node scripts/generate-sitemap.mjs
+
+      # Same reasoning for the search index: it is derived from the pages being
+      # deployed, so rebuild it here rather than trusting the committed copy.
+      - name: Regenerate search index
+        continue-on-error: true
+        run: node scripts/generate-search-index.mjs
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

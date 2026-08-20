@@ -34,6 +34,7 @@ const RANKS = [
   [/index-Analytics\.html$/, '0.9', 'weekly'],
   [/index-(Calculators|Addins|EzPaste)\.html$/, '0.8', 'weekly'],
   [/\/analytics\/[^/]+\.html$/, '0.7', 'monthly'],
+  [/\/calculators\/[^/]+\.html$/, '0.7', 'monthly'],
   [/(how-it-works|why-another-package|faq)\.html$/, '0.6', 'monthly'],
   [/\/ezpaste\/docs\//, '0.6', 'monthly'],
   [/(about-us|contact)\.html$/, '0.5', 'monthly'],

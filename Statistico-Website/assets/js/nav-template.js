@@ -2316,6 +2316,20 @@ function resolveTrailCrumbs() {
     ];
   }
 
+  const calculatorPages = {
+    'power-sample-size.html': 'Power & Sample Size',
+    'precision-sample-size.html': 'Precision-Based Sample Size',
+    'distributions.html': 'Statistical Distributions'
+  };
+
+  if (calculatorPages[file]) {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Calculators', href: links.calculators },
+      { label: calculatorPages[file] }
+    ];
+  }
+
   if (file === 'publication-tables.html') {
     return [
       { label: 'Statistico', href: links.home },

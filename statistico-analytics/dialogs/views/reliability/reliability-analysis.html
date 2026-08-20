@@ -58,6 +58,22 @@
     .coef-compact th,.coef-compact td{padding:5px 8px;}
     .panel.compact .panel-heading{padding:8px 12px;font-size:13px;}
     .panel.compact .panel-body{padding:8px 12px;}
+    .panel.collapsible .panel-heading{
+      width:100%;border:0;border-bottom:1px solid var(--border);background:transparent;
+      cursor:pointer;text-align:left;font:inherit;font-weight:700;color:var(--accent-1);
+      appearance:none;-webkit-appearance:none;
+    }
+    .panel.collapsible .panel-heading .chev{transition:transform .15s ease;font-size:11px;opacity:.85;}
+    .panel.collapsible:not(.open) .panel-heading{border-bottom:0;}
+    .panel.collapsible:not(.open) .panel-body{display:none;}
+    .panel.collapsible.open .chev{transform:rotate(90deg);}
+    .band-legend{
+      margin-top:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+      background:rgba(255,255,255,.04);font-size:12px;color:var(--text-secondary);line-height:1.45;
+    }
+    .band-legend strong{color:var(--text-primary);}
+    .band-legend .band-row{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px;}
+    .band-legend .band-row span{white-space:nowrap;}
     :root[data-theme="light"] .stat-panel{background:var(--surface-1);box-shadow:0 2px 8px rgba(0,0,0,.06);}
     .stat-panel-heading{background:linear-gradient(135deg, rgba(0,51,102,.82), rgba(0,102,204,.62));color:#fff;padding:8px 12px;font-weight:700;font-size:.9rem;display:flex;align-items:center;}
     .stat-panel-body{padding:10px 12px;}
@@ -180,9 +196,12 @@
               </div>
             </div>
           </div>
-          <div class="panel compact">
-            <div class="panel-heading">Technical details</div>
-            <div class="panel-body">
+          <div class="panel compact collapsible" id="techDetailsPanel">
+            <button type="button" class="panel-heading" id="techDetailsToggle" aria-expanded="false" aria-controls="techDetailsBody">
+              <span>Technical details</span>
+              <i class="fa-solid fa-chevron-right chev" aria-hidden="true"></i>
+            </button>
+            <div class="panel-body" id="techDetailsBody">
               <div id="coefTable"></div>
             </div>
           </div>
@@ -396,7 +415,9 @@
         ? 'Diagnostic warning'
         : 'Internal consistency';
 
-      var ciTxt = ci && ci.lower != null ? fmt(ci.lower) + ' – ' + fmt(ci.upper) : '—';
+      var ciTxt = ci && ci.lower != null
+        ? (Math.round((ci.level || 0.95) * 100) + '% bootstrap CI ' + fmt(ci.lower) + ' to ' + fmt(ci.upper))
+        : 'No interval estimated';
       var rows = [
         ['Cronbach’s alpha', fmt(obs.alpha), ciTxt],
         ['Standardized alpha', fmt(obs.standardizedAlpha), 'From the average inter-item correlation'],
@@ -405,7 +426,17 @@
       document.getElementById('coefTable').innerHTML = '<table class="coef-compact"><thead><tr><th>Coefficient</th><th>Estimate</th><th>Notes</th></tr></thead><tbody>'
         + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + esc(r[2]) + '</td></tr>'; }).join('')
         + '</tbody></table>'
-        + '<p class="help" style="margin-top:6px;">Bands (.60 / .70 / .80 / .90) are rough conventions, not pass/fail rules.</p>';
+        + '<div class="band-legend">'
+        + '<strong>How to read alpha bands</strong>'
+        + '<div class="band-row">'
+        + '<span>&lt; .60 Low</span>'
+        + '<span>.60–.70 Questionable</span>'
+        + '<span>.70–.80 Acceptable</span>'
+        + '<span>.80–.90 Good</span>'
+        + '<span>.90+ Very high</span>'
+        + '</div>'
+        + '<div style="margin-top:4px;">These are reporting conventions, not pass/fail cutoffs. Very high values can also mean redundant items.</div>'
+        + '</div>';
 
       var lowest = obs.weakestItem;
       var dim = obs.structure && obs.structure.firstComponentVariance != null
@@ -823,6 +854,12 @@
     });
     document.getElementById('showPairN').addEventListener('change', function () {
       if (_bundle) renderMatrix(_bundle.observedResults);
+    });
+    document.getElementById('techDetailsToggle').addEventListener('click', function () {
+      var panel = document.getElementById('techDetailsPanel');
+      var open = !panel.classList.contains('open');
+      panel.classList.toggle('open', open);
+      this.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
 
     document.addEventListener('DOMContentLoaded', function () {

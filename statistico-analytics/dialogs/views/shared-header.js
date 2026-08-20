@@ -290,6 +290,8 @@ const StatisticoHeader = {
       this.module = 'logistic';
     } else if (viewName.includes('factor')) {
       this.module = 'factor';
+    } else if (viewName.includes('reliability')) {
+      this.module = 'reliability';
     } else if (viewName.includes('cluster')) {
       this.module = 'cluster';
     } else if (viewName.includes('independent')) {
@@ -413,6 +415,7 @@ const StatisticoHeader = {
       'logistic': 'Logistic Regression',
       'factor': 'Factor Analysis',
       'pca': 'PCA',
+      'reliability': 'Scale Reliability',
       'cluster': 'Cluster Analysis',
       'anova': 'ANOVA',
       'power': 'Power & Sample Size',
@@ -481,7 +484,7 @@ const StatisticoHeader = {
       'correlation-matrix': 'Correlation Matrix',
       'correlation-network': 'Correlation Network',
       'partial-correlations': 'Partial Correlations',
-      'reliability': 'Reliability Coefficients',
+      'reliability': 'Overview',
       'taylor-diagram': 'Taylor Diagram',
       'correlation-by-group': 'Correlations by Group',
       'rolling-correlations': 'Rolling Correlations',
@@ -535,6 +538,7 @@ const StatisticoHeader = {
       'logistic': 'Logistic Regression',
       'factor': 'Factor Analysis',
       'pca': 'PCA',
+      'reliability': 'Scale Reliability',
       'cluster': 'Cluster Analysis',
       'anova': 'ANOVA',
       'power': 'Power & Sample Size',
@@ -550,7 +554,7 @@ const StatisticoHeader = {
     const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation');
 
     const topHeader = `
       <div class="statistico-header">
@@ -913,6 +917,11 @@ const StatisticoHeader = {
         'Which indicators map cleanly to each factor?',
         'Is the factor solution interpretable and stable?'
       ],
+      'reliability': [
+        'How internally consistent are the selected items?',
+        'Which items weaken or reverse the scale?',
+        'Is a single dominant dimension plausible?'
+      ],
       'pca': [
         'How many components summarize most variance?',
         'Which loadings define each component?',
@@ -1056,7 +1065,6 @@ const StatisticoHeader = {
       { id: 'correlation-matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix-v2.html' },
       { id: 'correlation-network', label: 'Correlation Network', file: 'correlations/correlation-network.html' },
       { id: 'partial-correlations', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
-      { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
       { id: 'taylor-diagram', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
       { id: 'correlation-by-group', label: 'Correlations by Group', file: 'correlations/by-group.html' }
@@ -1164,7 +1172,78 @@ const StatisticoHeader = {
   },
 
   _isSharedSidebarModule() {
-    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'anova', 'power', 'regression'].includes(this.module);
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression'].includes(this.module);
+  },
+
+  _sidebarGroupKey(title) {
+    return String(title || 'group').trim().toLowerCase().replace(/\s+/g, '-');
+  },
+
+  _isSidebarGroupDefaultOpen(title) {
+    return this._sidebarGroupKey(title) === 'advanced-diagnostics';
+  },
+
+  _bindCollapsibleSidebarGroups(nav) {
+    nav = nav || document.getElementById('sidebarNav');
+    if (!nav) return;
+    const groups = nav.querySelectorAll('.sb-body .sb-group');
+    groups.forEach((group) => {
+      if (group.dataset.collapseBound === '1') return;
+      const kids = Array.from(group.children);
+      let rail = kids.find((c) => c.classList && c.classList.contains('sb-items-rail'));
+      if (!rail) {
+        rail = document.createElement('div');
+        rail.className = 'sb-items-rail';
+        kids.forEach((child) => {
+          if (child.classList && (child.classList.contains('sb-group-title') || child.classList.contains('sb-group-toggle'))) return;
+          rail.appendChild(child);
+        });
+        group.appendChild(rail);
+      }
+
+      let toggle = kids.find((c) => c.classList && c.classList.contains('sb-group-toggle'));
+      const titleEl = kids.find((c) => c.classList && c.classList.contains('sb-group-title'));
+      const titleNode = toggle && toggle.querySelector('.sb-group-title-text');
+      const titleText = (titleNode ? titleNode.textContent : (titleEl ? titleEl.textContent : 'Section')).replace(/\s+/g, ' ').trim();
+
+      if (!toggle) {
+        toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'sb-group-toggle';
+        toggle.innerHTML = `<span class="sb-group-title-text">${titleText}</span>`
+          + `<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>`;
+        if (titleEl) titleEl.replaceWith(toggle);
+        else group.insertBefore(toggle, rail);
+      } else if (!toggle.querySelector('.sb-collapse-chevron')) {
+        toggle.insertAdjacentHTML('beforeend', '<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>');
+      }
+
+      group.dataset.collapseBound = '1';
+      group.dataset.sbGroup = this._sidebarGroupKey(titleText);
+
+      const storageKey = `statistico.sbGroupOpen.${this.module || 'mod'}.${group.dataset.sbGroup}`;
+      const hasActive = !!(group.querySelector('.sb-item.active, .sb-faceted.is-active-group, .sb-item.sb-item-sub.active'));
+      let stored = null;
+      try { stored = localStorage.getItem(storageKey); } catch (_) {}
+      const defaultOpen = this._isSidebarGroupDefaultOpen(titleText);
+      const open = hasActive || stored === '1' || (stored == null && defaultOpen);
+
+      const apply = (isOpen, persist) => {
+        group.classList.toggle('is-open', isOpen);
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) rail.removeAttribute('hidden');
+        else rail.setAttribute('hidden', '');
+        if (persist) {
+          try { localStorage.setItem(storageKey, isOpen ? '1' : '0'); } catch (_) {}
+        }
+      };
+      apply(open, false);
+
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        apply(!group.classList.contains('is-open'), true);
+      });
+    });
   },
 
   _isSidebarItemActive(item) {
@@ -1271,6 +1350,7 @@ const StatisticoHeader = {
           },
           {
             title: 'Advanced diagnostics',
+            defaultOpen: true,
             items: [
               {
                 type: 'navigate',
@@ -1308,7 +1388,6 @@ const StatisticoHeader = {
               { type: 'navigate', viewIn: ['correlation-matrix'], file: 'correlations/correlation-matrix-v2.html', icon: 'fa-table-cells', label: 'Pairwise Matrix', description: 'All r-values, p-values, and scatterplots side by side.' },
               { type: 'navigate', viewIn: ['correlation-network'], file: 'correlations/correlation-network.html', icon: 'fa-circle-nodes', label: 'Network Graph', description: 'Strong correlations as a graph: spot clusters and isolates.' },
               { type: 'navigate', viewIn: ['partial-correlations'], file: 'correlations/correlation-partial.html', icon: 'fa-filter', label: 'Partial r', description: 'Net relationships after holding selected covariates fixed.' },
-              { type: 'navigate', viewIn: ['reliability'], file: 'correlations/correlation-reliability.html', icon: 'fa-check-double', label: 'Scale Reliability', description: 'Cronbach alpha, omega, and item-total diagnostics.' },
               { type: 'navigate', viewIn: ['taylor-diagram'], file: 'correlations/correlation-taylor.html', icon: 'fa-compass-drafting', label: 'Taylor Diagram', description: 'Benchmark each variable against a reference signal.' }
             ]
           },
@@ -1494,6 +1573,31 @@ const StatisticoHeader = {
             { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics' }
           ]
         }]
+      };
+    }
+
+    if (this.module === 'reliability') {
+      return {
+        logoIcon: 'fa-check-double',
+        logoSub: 'Reliability',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Reliability views',
+            items: [
+              { type: 'tab', tab: 'overview', icon: 'fa-clipboard-check', label: 'Overview', description: 'Overall reliability, uncertainty, and scale assessment.', active: true },
+              { type: 'tab', tab: 'items', icon: 'fa-list-check', label: 'Item Diagnostics', description: 'Identify weak, inconsistent, or potentially reversed items.' },
+              { type: 'tab', tab: 'matrix', icon: 'fa-table-cells', label: 'Inter-item Matrix', description: 'Examine correlations among the selected scale items.' },
+              { type: 'tab', tab: 'structure', icon: 'fa-chart-line', label: 'Scale Structure', description: 'Assess whether one dominant dimension is plausible.' }
+            ]
+          },
+          {
+            title: 'Additional analyses',
+            items: [
+              { type: 'tab', tab: 'by-group', icon: 'fa-layer-group', label: 'By Group', description: 'Compare reliability across selected group levels.' }
+            ]
+          }
+        ]
       };
     }
 
@@ -2704,7 +2808,16 @@ const StatisticoHeader = {
       const itemsHtml = (group.items || []).map((item) => this._renderSidebarNavItem(item)).join('');
 
       if (!itemsHtml) return '';
-      return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
+      const title = group.title || '';
+      const hasActive = (group.items || []).some((item) => this._isSidebarItemActive(item));
+      const defaultOpen = group.defaultOpen === true || this._isSidebarGroupDefaultOpen(title);
+      const open = hasActive || defaultOpen;
+      return `<div class="sb-group${open ? ' is-open' : ''}" data-sb-group="${this._sidebarGroupKey(title)}">`
+        + `<button type="button" class="sb-group-toggle" aria-expanded="${open ? 'true' : 'false'}">`
+        + `<span class="sb-group-title-text">${title}</span>`
+        + `<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>`
+        + `</button>`
+        + `<div class="sb-items-rail"${open ? '' : ' hidden'}>${itemsHtml}</div></div>`;
     }).join('');
 
     nav.innerHTML = `
@@ -3433,7 +3546,6 @@ const StatisticoHeader = {
       { id: 'matrix', label: 'Correlation Matrix', file: 'correlations/correlation-matrix-v2.html' },
       { id: 'network', label: 'Correlation Network', file: 'correlations/correlation-network.html' },
       { id: 'partial', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
-      { id: 'reliability', label: 'Reliability Coefficients', file: 'correlations/correlation-reliability.html' },
       { id: 'taylor', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'descriptives', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
       { id: 'by-group', label: 'Correlations by Group', file: 'correlations/by-group.html' }
@@ -4695,7 +4807,7 @@ const StatisticoHeader = {
     this.__statisticoLegacyKeysSwept = true;
     const legacyModules = [
       'univariate', 'correlations', 'regression', 'logistic', 'mixed',
-      'anova', 'independent', 'dependent', 'pca', 'factor', 'cluster',
+      'anova', 'independent', 'dependent', 'pca', 'factor', 'reliability', 'cluster',
       'pareto', 'power'
     ];
     legacyModules.forEach((m) => {
@@ -4975,6 +5087,7 @@ const StatisticoHeader = {
     if (k.includes('dependent')) return 'dependent';
     if (k.includes('pca')) return 'pca';
     if (k.includes('factor')) return 'factor';
+    if (k.includes('reliability')) return 'reliability';
     if (k.includes('cluster')) return 'cluster';
     if (k.includes('pareto')) return 'pareto';
     if (k.includes('power')) return 'power';
@@ -4993,6 +5106,7 @@ const StatisticoHeader = {
     if (t.includes('dependent')) return 'dependent';
     if (t.includes('pca')) return 'pca';
     if (t.includes('factor')) return 'factor';
+    if (t.includes('reliability')) return 'reliability';
     if (t.includes('cluster')) return 'cluster';
     if (t.includes('pareto')) return 'pareto';
     if (t.includes('power')) return 'power';
@@ -6018,6 +6132,11 @@ const StatisticoHeader = {
     anchor.appendChild(pinned);
   },
 
+  _sidebarAiButtonInnerHtml(busy) {
+    if (busy) return '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
+    return '<i class="fa-solid fa-wand-magic-sparkles"></i><span>Interpret with AI</span><sup class="sb-ai-sup">AI</sup>';
+  },
+
   _mountSidebarUtilities() {
     const nav = document.getElementById('sidebarNav');
     if (!nav) return;
@@ -6039,6 +6158,8 @@ const StatisticoHeader = {
     if (existing) existing.remove();
     const existingAi = document.getElementById('sbAiSection');
     if (existingAi) existingAi.remove();
+    const existingExport = document.getElementById('sbExportWrap');
+    if (existingExport) existingExport.remove();
     const existingProductFooter = document.getElementById('sbProductFooter');
     if (existingProductFooter) existingProductFooter.remove();
     const existingFooter = document.getElementById('sbNavFooter');
@@ -6053,20 +6174,20 @@ const StatisticoHeader = {
     const hasHtml = typeof actions.exportHtml === 'function';
     const hasJson = typeof actions.exportJson === 'function';
 
-    // ── AI pill — above utilities ─────────────────────────────────────────
+    // ── AI pill — above export / tools ────────────────────────────────────
     const isDependentKplus = this.module === 'dependent' && this.currentView === 'dependent-results-kplus';
     const supportsIndependentAi = this.module === 'independent';
     const supportsMixedAi = this.module === 'mixed-model';
     const supportsFactorAi = this.module === 'factor';
+    const supportsReliabilityAi = this.module === 'reliability';
     const supportsClusterAi = this.module === 'cluster';
     const supportsMetaAi = this.module === 'meta-analysis';
-    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi || supportsClusterAi || supportsMetaAi;
+    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi || supportsReliabilityAi || supportsClusterAi || supportsMetaAi;
     const supportsFullAiPill = supportsIndependentAi || isDependentKplus;
     if (supportsSharedAi || isDependentKplus) {
       const aiSection = document.createElement('div');
       aiSection.id = 'sbAiSection';
       aiSection.className = 'sb-ai-section-wrap';
-      const isCorrelation = this.module === 'correlations';
       const aiClick = supportsIndependentAi
         ? 'StatisticoHeader._sbAiIndependentInterpret()'
         : isDependentKplus
@@ -6075,55 +6196,29 @@ const StatisticoHeader = {
           ? 'requestMixedModelAI()'
         : supportsFactorAi
           ? 'requestFactorModuleAI()'
+        : supportsReliabilityAi
+          ? 'requestReliabilityModuleAI()'
         : supportsClusterAi
           ? 'requestClusterModuleAI()'
         : supportsMetaAi
           ? 'requestMetaModuleAI()'
           : 'StatisticoHeader._sbAiGlobalInterpret()';
-      const aiTitle = supportsIndependentAi
-        ? 'AI statistical summary for this independent means analysis'
-        : isDependentKplus
-          ? 'Full AI interpretation of this repeated-measures analysis'
-        : supportsMixedAi
-          ? 'AI interpretation of the mixed model results'
-        : supportsFactorAi
-          ? 'Full factor analysis - synthesises suitability, extraction, rotation & diagnostics into one report'
-        : supportsClusterAi
-          ? 'Full cluster analysis - synthesises quality, sizes, profiles & separation into one report'
-        : supportsMetaAi
-          ? 'Full meta-analysis — synthesises pooled effect, heterogeneity, and publication bias into one report'
-          : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
-      const aiLabel = supportsFullAiPill ? 'Full AI Analysis' : 'Full Analysis';
-      const aiBadge = supportsFullAiPill ? 'ALL' : 'AI';
+      const aiTitle = 'Generate an AI-assisted interpretation of the complete analysis, assumptions, and key findings.';
       aiSection.innerHTML = `
         <button class="sb-ai-sidebar-pill ${supportsFullAiPill ? 'sb-ai-sidebar-pill--full' : ''}"
                 id="sbAiBtn"
                 onclick="${aiClick}"
                 title="${aiTitle}">
-          <i class="fa-solid ${supportsFullAiPill ? 'fa-layer-group' : 'fa-brain'}"></i>
-          <span>${aiLabel}</span>
-          <sup class="sb-ai-sup">${aiBadge}</sup>
+          ${this._sidebarAiButtonInnerHtml(false)}
         </button>
       `;
       footer.appendChild(aiSection);
     }
 
-    // ── Utilities ──────────────────────────────────────────────────────────
-    const utilities = document.createElement('div');
-    utilities.id = 'sbUtilities';
-    utilities.className = 'sb-bottom';
-    utilities.innerHTML = `
-      <div class="sb-bottom-row">
-        <i class="fa-solid fa-wand-magic-sparkles sb-bottom-icon"></i>
-        <span class="sb-bottom-label">Utilities</span>
-      </div>
-      <button class="sb-bottom-btn sb-bottom-btn--data ${hasView ? '' : 'sb-bottom-btn--disabled'}"
-              id="sbViewDataBtn"
-              ${hasView ? 'onclick="StatisticoHeader._toggleViewData()"' : 'disabled'}
-              title="${hasView ? 'Toggle between used observations and all observations' : 'View Data is not available for this page yet'}">
-        <i class="fa-solid fa-eye"></i>
-        <span class="sb-item-label">View Data</span>
-      </button>
+    const exportWrap = document.createElement('div');
+    exportWrap.id = 'sbExportWrap';
+    exportWrap.className = 'sb-export-wrap';
+    exportWrap.innerHTML = `
       <button class="sb-bottom-btn sb-bottom-btn--html ${hasHtml ? '' : 'sb-bottom-btn--disabled'}"
               id="sbExportHtmlBtn"
               ${hasHtml ? 'onclick="StatisticoHeader._pendingActions.exportHtml()"' : 'disabled'}
@@ -6131,30 +6226,70 @@ const StatisticoHeader = {
         <i class="fa-solid fa-file-export"></i>
         <span class="sb-item-label">Export Report</span>
       </button>
-      <button class="sb-bottom-btn sb-bottom-btn--png"
-              id="sbSavePngBtn"
-              onclick="StatisticoHeader.exportPreviewPng()"
-              title="Save the on-screen chart preview as a PNG image">
-        <i class="fa-solid fa-image"></i>
-        <span class="sb-item-label">Save as PNG</span>
+    `;
+    footer.appendChild(exportWrap);
+
+    let toolsOpen = false;
+
+    const utilities = document.createElement('div');
+    utilities.id = 'sbUtilities';
+    utilities.className = 'sb-bottom sb-output-tools' + (toolsOpen ? ' is-open' : '');
+    utilities.innerHTML = `
+      <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
+              aria-expanded="${toolsOpen ? 'true' : 'false'}"
+              title="View Data, Save PNG, Change style, Download JSON">
+        <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
+        <span class="sb-bottom-label">Output &amp; Tools</span>
+        <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>
       </button>
-      <button class="sb-bottom-btn sb-bottom-btn--tpl"
-              id="sbTemplateLibBtn"
-              onclick="StatisticoHeader.openTemplateLibrary()"
-              title="Change the live chart colors and texture">
-        <i class="fa-solid fa-swatchbook"></i>
-        <span class="sb-item-label">Change style</span>
-      </button>
-      <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
-              id="sbExportJsonBtn"
-              ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
-              title="${hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet'}">
-        <i class="fa-solid fa-download"></i>
-        <span class="sb-item-label">JSON</span>
-      </button>
+      <div class="sb-output-tools-body" id="sbOutputToolsBody" ${toolsOpen ? '' : 'hidden'}>
+        <button class="sb-bottom-btn sb-bottom-btn--data ${hasView ? '' : 'sb-bottom-btn--disabled'}"
+                id="sbViewDataBtn"
+                ${hasView ? 'onclick="StatisticoHeader._toggleViewData()"' : 'disabled'}
+                title="${hasView ? 'Toggle between used observations and all observations' : 'View Data is not available for this page yet'}">
+          <i class="fa-solid fa-eye"></i>
+          <span class="sb-item-label">View Data</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--png"
+                id="sbSavePngBtn"
+                onclick="StatisticoHeader.exportPreviewPng()"
+                title="Save the on-screen chart preview as a PNG image">
+          <i class="fa-solid fa-image"></i>
+          <span class="sb-item-label">Save as PNG</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--tpl"
+                id="sbTemplateLibBtn"
+                onclick="StatisticoHeader.openTemplateLibrary()"
+                title="Change the live chart colors and texture">
+          <i class="fa-solid fa-swatchbook"></i>
+          <span class="sb-item-label">Change style</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
+                id="sbExportJsonBtn"
+                ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
+                title="${hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet'}">
+          <i class="fa-solid fa-download"></i>
+          <span class="sb-item-label">Download JSON</span>
+        </button>
+      </div>
     `;
     footer.appendChild(utilities);
     nav.appendChild(footer);
+
+    const toolsToggle = document.getElementById('sbOutputToolsToggle');
+    const toolsBody = document.getElementById('sbOutputToolsBody');
+    if (toolsToggle && toolsBody) {
+      toolsToggle.addEventListener('click', () => {
+        const open = !utilities.classList.contains('is-open');
+        utilities.classList.toggle('is-open', open);
+        toolsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) toolsBody.removeAttribute('hidden');
+        else toolsBody.setAttribute('hidden', '');
+        try { localStorage.setItem('statistico.sbOutputToolsOpen', open ? '1' : '0'); } catch (_) {}
+      });
+    }
+
+    this._bindCollapsibleSidebarGroups(nav);
 
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
@@ -6876,6 +7011,11 @@ const StatisticoHeader = {
       'pca-interpretation': 'Loadings & Rotation',
       'pca-scores': 'Scores',
       'pca-diagnostics': 'Diagnostics',
+      'reliability-overview': 'Overview',
+      'reliability-items': 'Item Diagnostics',
+      'reliability-matrix': 'Inter-item Matrix',
+      'reliability-structure': 'Scale Structure',
+      'reliability-by-group': 'By Group',
       'anova-overview': 'Summary',
       'anova-inference': 'Inference',
       'anova-comparisons': 'Comparisons',
@@ -7240,8 +7380,8 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
       if (!sidebarBtn) return;
       sidebarBtn.disabled = busy;
       sidebarBtn.innerHTML = busy
-        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Generating...</span>'
-        : '<i class="fa-solid fa-layer-group"></i><span>Full AI Analysis</span><sup class="sb-ai-sup">ALL</sup>';
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>'
+        : this._sidebarAiButtonInnerHtml(false);
     };
     if (typeof switchTab === 'function') switchTab('ai-interpretation');
     setBusy(true);
@@ -7264,7 +7404,7 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
         btn.disabled = busy;
         btn.innerHTML = busy
           ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Generating...</span>'
-          : '<i class="fa-solid fa-layer-group"></i><span>Full AI Analysis</span><sup class="sb-ai-sup">ALL</sup>';
+          : this._sidebarAiButtonInnerHtml(false);
       });
       if (floatBtn) floatBtn.disabled = busy;
     };
@@ -7555,7 +7695,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-brain"></i><span>Full Analysis</span><sup class="sb-ai-sup">AI</sup>';
+        btn.innerHTML = this._sidebarAiButtonInnerHtml(false);
       }
     }
   },

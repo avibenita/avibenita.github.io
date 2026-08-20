@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scale Reliability</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared-config.css?v=20260715a"/>
+  <script src="../shared-config.js?v=20260715b"></script>
+  <script src="reliability-engine.js?v=20260820rel1"></script>
+  <style>
+    :root { --rel-var: #38bdf8; --rel-acc: #ec4899; }
+    [data-theme="light"] { --rel-var: #0369a1; --rel-acc: #be185d; }
+
+    body.cfg-embed .cfg-header { display: none; }
+    body.cfg-embed .cfg-shell { min-height: 100%; }
+
+    .rel-layout {
+      display: flex; gap: 10px; flex: 1 1 0; min-height: 0;
+      padding: 8px 10px; overflow: hidden;
+    }
+    .reg-vars-col {
+      flex: 0 0 200px; display: flex; flex-direction: column;
+      gap: 6px; min-height: 0; overflow: hidden;
+    }
+    .reg-model-col {
+      flex: 1 1 0; display: flex; flex-direction: column;
+      gap: 8px; min-height: 0; overflow: hidden;
+    }
+    .reg-vars-header {
+      display: flex; flex-direction: column; gap: 4px;
+      padding: 0 2px 6px; border-bottom: 1px solid var(--cfg-border); flex-shrink: 0;
+    }
+    .reg-vars-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .55px; color: var(--cfg-text);
+    }
+    .reg-vars-summary { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+    .reg-vars-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+    }
+    .reg-vb-num  { background: rgba(56,189,248,.12); color: #0369a1; border: 1px solid rgba(56,189,248,.3); }
+    .reg-vb-cat  { background: rgba(148,163,184,.12); color: #64748b; border: 1px solid rgba(148,163,184,.3); }
+
+    .reg-vars-box {
+      flex: 1 1 0; min-height: 0; overflow-y: auto;
+      border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface);
+    }
+    .reg-var-row {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      cursor: grab; border-bottom: 1px solid var(--cfg-border);
+      user-select: none;
+    }
+    .reg-var-row:last-child { border-bottom: none; }
+    .reg-var-row:hover:not(.used):not(.ineligible) { background: var(--cfg-tbl-hover); }
+    .reg-var-row.dragging { opacity: .4; }
+    .reg-var-row.used { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .reg-var-row.ineligible { opacity: .45; cursor: not-allowed; }
+    .reg-var-icon {
+      width: 16px; height: 16px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; flex-shrink: 0;
+    }
+    .reg-var-icon.num { background: rgba(56,189,248,.2); color: var(--rel-var); }
+    .reg-var-icon.cat { background: rgba(148,163,184,.2); color: #94a3b8; }
+    .reg-var-body { flex: 1; min-width: 0; }
+    .reg-var-name {
+      font-size: 12px; font-weight: 600; color: var(--cfg-text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reg-var-stats { font-size: 9.5px; color: var(--cfg-text3); }
+    .reg-var-miss { color: #f97316; font-weight: 600; }
+
+    .cfg-tabs {
+      display: flex; gap: 0; flex-shrink: 0;
+      border-bottom: 1px solid var(--cfg-border);
+    }
+    .cfg-tab {
+      flex: 1; padding: 7px 8px; border: none; background: transparent;
+      color: var(--cfg-text3); font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .4px; cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .cfg-tab.active { color: var(--rel-acc); border-bottom-color: var(--rel-acc); }
+    .tab-pane { display: none; flex: 1 1 0; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: flex; flex-direction: column; gap: 8px; }
+
+    .reg-zone-card {
+      border: 1px solid rgba(56,189,248,.35); border-radius: 8px;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .reg-zone-card.zone-rev { border-color: rgba(236,72,153,.35); }
+    .reg-zone-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 10px; font-size: 11.5px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .45px;
+      border-bottom: 1px solid var(--cfg-border);
+      background: rgba(56,189,248,.08); color: var(--rel-var);
+    }
+    .zone-rev .reg-zone-head { background: rgba(236,72,153,.08); color: var(--rel-acc); }
+    .zone-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .zone-hint {
+      font-size: 9.5px; font-weight: 400; letter-spacing: .1px;
+      text-transform: none; opacity: .85; line-height: 1.25;
+    }
+    .zone-req { font-size: 13px; font-weight: 900; color: #dc2626; opacity: .85; }
+    .reg-zone-body {
+      padding: 6px; background: rgba(56,189,248,.04);
+      min-height: 48px; display: flex; flex-wrap: wrap;
+      gap: 4px; align-content: flex-start;
+    }
+    .zone-rev .reg-zone-body { background: rgba(236,72,153,.04); }
+    .reg-zone-body.drag-over { background: rgba(56,189,248,.12); }
+    .reg-zone-placeholder {
+      width: 100%; text-align: center; font-size: 11px; font-style: italic;
+      color: var(--cfg-text3); padding: 8px 0;
+    }
+    .reg-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 6px 3px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; border: 1px solid;
+      background: rgba(56,189,248,.15); border-color: rgba(56,189,248,.4); color: var(--rel-var);
+    }
+    .reg-chip-x {
+      background: none; border: none; cursor: pointer;
+      padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; line-height: 1;
+    }
+    .live-summary {
+      font-size: 11.5px; color: var(--cfg-text2);
+      padding: 6px 8px; border-radius: 6px;
+      background: var(--cfg-surface); border: 1px dashed var(--cfg-border);
+    }
+    .live-summary strong { color: var(--rel-acc); }
+    .opt-grid { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 8px; }
+    .opt-card {
+      border: 1px solid var(--cfg-border); border-radius: 8px;
+      padding: 8px 10px; background: var(--cfg-surface);
+    }
+    .opt-card h4 {
+      margin: 0 0 6px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .4px; color: var(--cfg-text);
+    }
+    .opt-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--cfg-text2); margin: 4px 0; }
+    .opt-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 12px; color: var(--cfg-text2); }
+    .opt-row label { min-width: 120px; }
+    .opt-help { font-size: 10.5px; color: var(--cfg-text3); line-height: 1.35; margin-top: 4px; }
+    .range-row { display: none; gap: 8px; align-items: center; margin-top: 6px; font-size: 12px; }
+    .range-row.show { display: flex; }
+    .warn-line { font-size: 11px; color: #dc2626; min-height: 16px; }
+    .fac-quick-row { display: flex; gap: 6px; flex-shrink: 0; }
+    .fac-quick-btn {
+      flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 6px 8px; border-radius: 8px; border: 1px solid var(--cfg-border);
+      background: var(--cfg-surface); color: var(--cfg-text);
+      font-size: 10px; font-weight: 600; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="cfg-shell">
+    <header class="cfg-header">
+      <div class="cfg-header-icon"><i class="fa-solid fa-check-double"></i></div>
+      <span class="cfg-header-title">Scale Reliability</span>
+      <span class="cfg-meta-badge" id="metaBadge">—</span>
+      <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme">
+        <span class="cfg-toggle-icon">&#x1F319;</span>
+        <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
+        <span class="cfg-toggle-label">Dark</span>
+      </button>
+    </header>
+
+    <div id="loadingSpinner" class="cfg-spinner">
+      <i class="fa-solid fa-spinner fa-spin"></i> Loading data&hellip;
+    </div>
+
+    <div id="mainContent" style="display:none;flex:1;min-height:0;overflow:hidden;">
+      <div class="rel-layout">
+        <div class="reg-vars-col">
+          <div class="reg-vars-header">
+            <span class="reg-vars-title">Available Variables</span>
+            <span class="reg-vars-summary" id="varsSummary"></span>
+          </div>
+          <div class="reg-vars-box" id="variablesListBox">
+            <div style="color:var(--cfg-text3);font-style:italic;font-size:11px;text-align:center;padding:20px 10px;">
+              No data loaded yet.
+            </div>
+          </div>
+        </div>
+
+        <div class="reg-model-col">
+          <div class="cfg-tabs">
+            <button type="button" class="cfg-tab active" data-tab="setup">Setup</button>
+            <button type="button" class="cfg-tab" data-tab="options">Options</button>
+          </div>
+
+          <div id="pane-setup" class="tab-pane active">
+            <div class="live-summary" id="liveSummary">Select questionnaire or scale items to assess their internal consistency.</div>
+
+            <div class="reg-zone-card">
+              <div class="reg-zone-head">
+                <div class="zone-head-main">
+                  <div>Scale items</div>
+                  <div class="zone-hint">Select items intended to measure the same construct. Do not include IDs, dates, totals, weights, standard errors, variances, or other calculated variables.</div>
+                </div>
+                <span class="zone-req">*</span>
+              </div>
+              <div class="reg-zone-body drop-zone" id="zoneItems">
+                <div class="reg-zone-placeholder" id="zonePlaceholder">Drag numeric items here</div>
+              </div>
+            </div>
+
+            <div class="fac-quick-row">
+              <button type="button" class="fac-quick-btn" id="btnAddAllNumeric"><i class="fa-solid fa-hashtag"></i> Add all numeric</button>
+              <button type="button" class="fac-quick-btn" id="btnClearAll"><i class="fa-solid fa-eraser"></i> Clear</button>
+            </div>
+
+            <div class="reg-zone-card zone-rev">
+              <div class="reg-zone-head">
+                <div class="zone-head-main">
+                  <div>Reverse-coded items</div>
+                  <div class="zone-hint">Optional. Choose a subset of the scale items that were reverse-keyed.</div>
+                </div>
+              </div>
+              <div class="reg-zone-body" id="zoneReverse">
+                <div class="reg-zone-placeholder">Select scale items first</div>
+              </div>
+              <div class="range-row" id="scoreRangeRow" style="padding:6px 10px 10px;">
+                <label>Min score</label>
+                <input id="scoreMin" class="cfg-select" type="number" style="width:72px;min-height:28px;" />
+                <label>Max score</label>
+                <input id="scoreMax" class="cfg-select" type="number" style="width:72px;min-height:28px;" />
+              </div>
+            </div>
+
+            <div class="opt-card">
+              <h4>Group variable</h4>
+              <select id="groupVariable" class="cfg-select">
+                <option value="">None — overall analysis only</option>
+              </select>
+              <div class="opt-help">Optional categorical variable for the By Group results view. A scale item cannot also be the grouping variable.</div>
+            </div>
+
+            <div class="opt-card">
+              <h4>Missing values</h4>
+              <label class="opt-check"><input type="radio" name="missing" value="listwise" checked /> Listwise deletion (default)</label>
+              <label class="opt-check"><input type="radio" name="missing" value="pairwise" /> Pairwise deletion</label>
+              <div class="opt-help">Listwise: uses respondents with valid values on every selected item. Pairwise: uses all available pairs; sample size may differ between correlations.</div>
+            </div>
+            <div class="warn-line" id="setupWarn"></div>
+          </div>
+
+          <div id="pane-options" class="tab-pane">
+            <div class="opt-grid">
+              <div class="opt-card">
+                <h4>Reliability coefficients</h4>
+                <label class="opt-check"><input type="checkbox" id="optAlpha" checked /> Cronbach’s alpha</label>
+                <label class="opt-check"><input type="checkbox" id="optOmega" checked /> McDonald’s omega total</label>
+                <label class="opt-check"><input type="checkbox" id="optStdAlpha" /> Standardized alpha</label>
+                <label class="opt-check"><input type="checkbox" id="optCI" checked /> Confidence interval</label>
+                <div class="opt-row">
+                  <label for="optLevel">Confidence level</label>
+                  <select id="optLevel" class="cfg-select" style="width:90px;">
+                    <option value="0.90">90%</option>
+                    <option value="0.95" selected>95%</option>
+                    <option value="0.99">99%</option>
+                  </select>
+                </div>
+                <div class="opt-row">
+                  <label for="optBoot">Bootstrap samples</label>
+                  <select id="optBoot" class="cfg-select" style="width:110px;">
+                    <option value="500">500 (preview)</option>
+                    <option value="1000" selected>1,000</option>
+                  </select>
+                </div>
+              </div>
+              <div class="opt-card">
+                <h4>Item diagnostics</h4>
+                <label class="opt-check"><input type="checkbox" id="optITC" checked /> Corrected item–total correlation</label>
+                <label class="opt-check"><input type="checkbox" id="optAlphaDel" checked /> Alpha if item deleted</label>
+                <label class="opt-check"><input type="checkbox" id="optOmegaDel" checked /> Omega if item deleted</label>
+                <label class="opt-check"><input type="checkbox" id="optMatrix" checked /> Inter-item correlation matrix</label>
+                <label class="opt-check"><input type="checkbox" id="optFlagWeak" checked /> Flag weak item–total correlations below</label>
+                <div class="opt-row">
+                  <label for="optThresh">Threshold</label>
+                  <input id="optThresh" class="cfg-select" type="number" min="0" max="1" step="0.05" value="0.30" style="width:80px;min-height:28px;" />
+                </div>
+              </div>
+              <div class="opt-card">
+                <h4>Scale structure</h4>
+                <label class="opt-check"><input type="checkbox" id="optUni" checked /> Unidimensionality check (diagnostic)</label>
+                <label class="opt-check"><input type="checkbox" id="optScree" checked /> Scree plot</label>
+                <div class="opt-help">Reliability coefficients do not establish that a scale is unidimensional. Use Factor Analysis for a fuller assessment.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cfg-footer">
+      <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn run" id="btnRun" disabled>
+        <i class="fa-solid fa-play"></i> Run Reliability
+      </button>
+    </div>
+  </div>
+
+  <script>
+    var _headers = [];
+    var _rows = [];
+    var _address = '';
+    var columnStats = [];
+    var selectedItems = [];
+    var reverseItems = [];
+    var draggedElement = null;
+
+    function qs(id) { return document.getElementById(id); }
+
+    function send(action, data) {
+      var payload = JSON.stringify({ action: action, data: data || null, payload: data || null });
+      if (Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+        Office.context.ui.messageParent(payload);
+      }
+    }
+
+    function asNumber(v) {
+      if (typeof StatisticoReliability !== 'undefined') return null;
+      return v;
+    }
+
+    function num(v) {
+      if (v == null || v === '') return null;
+      var n = Number(String(v).replace(',', '.'));
+      return isFinite(n) ? n : null;
+    }
+
+    function headerIndex(name) {
+      var want = String(name || '').trim().toLowerCase();
+      for (var i = 0; i < _headers.length; i++) {
+        if (String(_headers[i] || '').trim().toLowerCase() === want) return i;
+      }
+      return -1;
+    }
+
+    function countValidRespondents() {
+      if (selectedItems.length < 1) return 0;
+      var idxs = selectedItems.map(headerIndex).filter(function(i) { return i >= 0; });
+      var n = 0;
+      _rows.forEach(function(row) {
+        var ok = idxs.every(function(i) { return num(row[i]) != null; });
+        if (ok) n++;
+      });
+      return n;
+    }
+
+    function switchCfgTab(tab) {
+      document.querySelectorAll('.cfg-tab').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+      });
+      qs('pane-setup').classList.toggle('active', tab === 'setup');
+      qs('pane-options').classList.toggle('active', tab === 'options');
+    }
+
+    function buildColumnStats() {
+      columnStats = _headers.map(function(name, colIdx) {
+        var numeric = 0, string = 0, missing = 0;
+        _rows.forEach(function(row) {
+          var value = row[colIdx];
+          if (value === null || value === undefined || value === '') { missing++; return; }
+          var n = num(value);
+          if (n != null) numeric++;
+          else string++;
+        });
+        var isNumeric = numeric > string;
+        return {
+          name: name || ('Col ' + (colIdx + 1)),
+          idx: colIdx,
+          numeric: numeric,
+          string: string,
+          missing: missing,
+          isNumeric: isNumeric,
+          eligible: isNumeric && numeric >= 2
+        };
+      });
+    }
+
+    function isSelected(name) { return selectedItems.indexOf(name) >= 0; }
+
+    function renderVariables() {
+      var box = qs('variablesListBox');
+      box.innerHTML = '';
+      var numCount = 0, catCount = 0;
+      columnStats.forEach(function(s) {
+        if (s.isNumeric) numCount++;
+        else if (s.string > 0) catCount++;
+        var used = isSelected(s.name);
+        var row = document.createElement('div');
+        row.className = 'reg-var-row' + (used ? ' used' : '') + (!s.eligible ? ' ineligible' : '');
+        row.draggable = s.eligible && !used;
+        row.dataset.varName = s.name;
+        var statsText = s.numeric + ' num';
+        if (s.string > 0) statsText += ' · ' + s.string + ' cat';
+        if (s.missing > 0) statsText += ' · <span class="reg-var-miss">' + s.missing + ' miss</span>';
+        row.innerHTML = '<div class="reg-var-icon ' + (s.isNumeric ? 'num' : 'cat') + '">' + (s.isNumeric ? '#' : 'A') + '</div>'
+          + '<div class="reg-var-body"><div class="reg-var-name">' + s.name + '</div><div class="reg-var-stats">' + statsText + '</div></div>';
+        if (s.eligible && !used) {
+          row.addEventListener('dragstart', handleDragStart);
+          row.addEventListener('dragend', handleDragEnd);
+          row.addEventListener('dblclick', function() { addItem(s.name); });
+        }
+        box.appendChild(row);
+      });
+      var html = '';
+      if (numCount) html += '<span class="reg-vars-badge reg-vb-num">' + numCount + ' num</span>';
+      if (catCount) html += '<span class="reg-vars-badge reg-vb-cat">' + catCount + ' cat</span>';
+      qs('varsSummary').innerHTML = html;
+    }
+
+    function renderItems() {
+      var zone = qs('zoneItems');
+      zone.innerHTML = '';
+      if (!selectedItems.length) {
+        zone.innerHTML = '<div class="reg-zone-placeholder" id="zonePlaceholder">Drag numeric items here</div>';
+        return;
+      }
+      selectedItems.forEach(function(name) {
+        var chip = document.createElement('span');
+        chip.className = 'reg-chip';
+        chip.innerHTML = name + ' <button type="button" class="reg-chip-x" data-name="' + name + '">&times;</button>';
+        chip.querySelector('button').addEventListener('click', function() { removeItem(name); });
+        zone.appendChild(chip);
+      });
+    }
+
+    function renderReverse() {
+      var zone = qs('zoneReverse');
+      zone.innerHTML = '';
+      if (!selectedItems.length) {
+        zone.innerHTML = '<div class="reg-zone-placeholder">Select scale items first</div>';
+        qs('scoreRangeRow').classList.remove('show');
+        reverseItems = [];
+        return;
+      }
+      reverseItems = reverseItems.filter(function(n) { return selectedItems.indexOf(n) >= 0; });
+      selectedItems.forEach(function(name) {
+        var lab = document.createElement('label');
+        lab.className = 'opt-check';
+        lab.style.margin = '2px 8px 2px 0';
+        var checked = reverseItems.indexOf(name) >= 0 ? ' checked' : '';
+        lab.innerHTML = '<input type="checkbox" data-rev="' + name + '"' + checked + ' /> ' + name;
+        lab.querySelector('input').addEventListener('change', function() {
+          if (this.checked) {
+            if (reverseItems.indexOf(name) < 0) reverseItems.push(name);
+          } else {
+            reverseItems = reverseItems.filter(function(n) { return n !== name; });
+          }
+          updateRangeRow();
+          validate();
+        });
+        zone.appendChild(lab);
+      });
+      updateRangeRow();
+    }
+
+    function updateRangeRow() {
+      var row = qs('scoreRangeRow');
+      if (reverseItems.length) {
+        row.classList.add('show');
+        if (!qs('scoreMin').value || !qs('scoreMax').value) inferRange();
+      } else {
+        row.classList.remove('show');
+      }
+    }
+
+    function inferRange() {
+      var vals = [];
+      reverseItems.forEach(function(name) {
+        var idx = headerIndex(name);
+        _rows.forEach(function(row) {
+          var n = num(row[idx]);
+          if (n != null) vals.push(n);
+        });
+      });
+      if (!vals.length) return;
+      var allInt = vals.every(function(v) { return Math.abs(v - Math.round(v)) < 1e-9; });
+      if (allInt) {
+        qs('scoreMin').value = Math.min.apply(null, vals);
+        qs('scoreMax').value = Math.max.apply(null, vals);
+      }
+    }
+
+    function renderGroupOptions() {
+      var sel = qs('groupVariable');
+      var current = sel.value;
+      sel.innerHTML = '<option value="">None — overall analysis only</option>';
+      columnStats.forEach(function(s) {
+        if (selectedItems.indexOf(s.name) >= 0) return;
+        var opt = document.createElement('option');
+        opt.value = s.name;
+        opt.textContent = s.name + (s.isNumeric ? ' (numeric)' : '');
+        sel.appendChild(opt);
+      });
+      if (current && selectedItems.indexOf(current) < 0) sel.value = current;
+    }
+
+    function addItem(name) {
+      var s = columnStats.filter(function(c) { return c.name === name; })[0];
+      if (!s || !s.eligible || isSelected(name)) return;
+      selectedItems.push(name);
+      refresh();
+    }
+
+    function removeItem(name) {
+      selectedItems = selectedItems.filter(function(n) { return n !== name; });
+      reverseItems = reverseItems.filter(function(n) { return n !== name; });
+      refresh();
+    }
+
+    function selectAllNumeric() {
+      columnStats.forEach(function(s) {
+        if (s.eligible && !isSelected(s.name)) selectedItems.push(s.name);
+      });
+      refresh();
+    }
+
+    function clearAll() {
+      selectedItems = [];
+      reverseItems = [];
+      refresh();
+    }
+
+    function refresh() {
+      renderVariables();
+      renderItems();
+      renderReverse();
+      renderGroupOptions();
+      validate();
+    }
+
+    function validate() {
+      var nItems = selectedItems.length;
+      var nValid = countValidRespondents();
+      var ok = nItems >= 2;
+      qs('btnRun').disabled = !ok;
+      var summary = qs('liveSummary');
+      if (!nItems) {
+        summary.textContent = 'Select questionnaire or scale items to assess their internal consistency.';
+      } else {
+        summary.innerHTML = '<strong>' + nItems + '</strong> item' + (nItems === 1 ? '' : 's') + ' selected · <strong>' + nValid + '</strong> valid respondents';
+        if (nItems === 2) summary.innerHTML += ' · 3 or more items are preferable';
+      }
+      qs('metaBadge').textContent = nItems ? (nItems + ' items') : '—';
+      var warn = [];
+      if (nItems === 1) warn.push('Add at least one more numeric item.');
+      var min = Number(qs('scoreMin').value);
+      var max = Number(qs('scoreMax').value);
+      if (reverseItems.length && isFinite(min) && isFinite(max) && !(min < max)) {
+        warn.push('Minimum must be smaller than maximum.');
+        qs('btnRun').disabled = true;
+      }
+      qs('setupWarn').textContent = warn.join(' ');
+    }
+
+    function buildSpec() {
+      var missing = (document.querySelector('input[name="missing"]:checked') || {}).value || 'listwise';
+      var spec = {
+        analysisMode: 'reliability',
+        items: selectedItems.slice(),
+        reverseItems: reverseItems.slice(),
+        scoreRange: reverseItems.length ? {
+          min: Number(qs('scoreMin').value),
+          max: Number(qs('scoreMax').value)
+        } : null,
+        groupVariable: qs('groupVariable').value || null,
+        missingMethod: missing,
+        coefficients: {
+          alpha: qs('optAlpha').checked,
+          omegaTotal: qs('optOmega').checked,
+          standardizedAlpha: qs('optStdAlpha').checked,
+          confidenceInterval: qs('optCI').checked
+        },
+        confidenceLevel: Number(qs('optLevel').value),
+        bootstrapSamples: Number(qs('optBoot').value),
+        weakItemThreshold: Number(qs('optThresh').value) || 0.30,
+        itemDiagnostics: {
+          itemTotal: qs('optITC').checked,
+          alphaIfDeleted: qs('optAlphaDel').checked,
+          omegaIfDeleted: qs('optOmegaDel').checked,
+          interItemMatrix: qs('optMatrix').checked,
+          flagWeak: qs('optFlagWeak').checked
+        },
+        structure: {
+          unidimensionality: qs('optUni').checked,
+          scree: qs('optScree').checked
+        }
+      };
+      return spec;
+    }
+
+    function runAnalysis() {
+      if (selectedItems.length < 2) return;
+      send('reliabilityModel', buildSpec());
+    }
+
+    function handleDragStart(e) {
+      draggedElement = e.target.closest('.reg-var-row');
+      if (draggedElement) draggedElement.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    }
+    function handleDragEnd(e) {
+      var row = e.target.closest('.reg-var-row');
+      if (row) row.classList.remove('dragging');
+    }
+
+    function setupDropZone() {
+      var zone = qs('zoneItems');
+      zone.addEventListener('dragover', function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+      zone.addEventListener('dragenter', function() { zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', function(e) {
+        if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+      });
+      zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        if (!draggedElement) return;
+        addItem(draggedElement.dataset.varName);
+      });
+    }
+
+    function applyPayload(p) {
+      if (!p || !p.headers) return;
+      _headers = p.headers || [];
+      _rows = p.rows || [];
+      _address = p.address || '';
+      buildColumnStats();
+      selectedItems = [];
+      reverseItems = [];
+      if (p.savedModelSpec && Array.isArray(p.savedModelSpec.items)) {
+        selectedItems = p.savedModelSpec.items.filter(function(n) {
+          return columnStats.some(function(s) { return s.name === n && s.eligible; });
+        });
+      }
+      qs('loadingSpinner').style.display = 'none';
+      qs('mainContent').style.display = 'flex';
+      refresh();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      setupDropZone();
+      document.querySelectorAll('.cfg-tab').forEach(function(b) {
+        b.addEventListener('click', function() { switchCfgTab(b.getAttribute('data-tab')); });
+      });
+      qs('btnCancel').addEventListener('click', function() { send('close', null); });
+      qs('btnRun').addEventListener('click', runAnalysis);
+      qs('btnAddAllNumeric').addEventListener('click', selectAllNumeric);
+      qs('btnClearAll').addEventListener('click', clearAll);
+      ['scoreMin', 'scoreMax', 'groupVariable', 'optThresh'].forEach(function(id) {
+        qs(id).addEventListener('input', validate);
+        qs(id).addEventListener('change', validate);
+      });
+      if (typeof Office !== 'undefined' && Office.onReady) {
+        Office.onReady(function() {
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if ((msg.type === 'RELIABILITY_DATA' || msg.type === 'FACTOR_DATA') && msg.payload) applyPayload(msg.payload);
+            } catch (_e) {}
+          });
+          send('ready', null);
+          setInterval(function() {
+            if (_headers.length) return;
+            send('requestData', null);
+          }, 500);
+        });
+      }
+    });
+  </script>
+</body>
+</html>

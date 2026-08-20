@@ -12,6 +12,10 @@
     dependent: ['dependent/dependent-input-panel.js'],
     factor: ['factor/factor-input-panel.js'],
     pca: ['pca/pca-input-panel.js'],
+    reliability: [
+      '../dialogs/views/reliability/reliability-engine.js',
+      'reliability/reliability-input-panel.js'
+    ],
     logistic: ['logistic/logistic-input-panel.js'],
     contingency: ['contingency/contingency-input-panel.js'],
     'meta-analysis': [

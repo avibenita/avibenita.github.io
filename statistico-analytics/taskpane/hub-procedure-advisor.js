@@ -173,6 +173,20 @@
         outputs: ["Factor loadings", "Rotation results", "Communalities"]
       }
     },
+    reliability: {
+      moduleId: "reliability",
+      label: "Scale Reliability",
+      titleFull: "Scale Reliability",
+      category: "Discover Structure",
+      difficulty: "Medium",
+      duration: "≈ 2 min",
+      reason: "You have questionnaire items that should measure the same construct and want Cronbach’s alpha, omega, and item diagnostics.",
+      learnWhy: {
+        assumptions: ["Items intended to measure one construct", "Numeric item scores", "At least two items"],
+        variables: ["Multiple numeric scale items", "Optional grouping variable"],
+        outputs: ["Cronbach’s alpha", "McDonald’s omega", "Item–total diagnostics", "Inter-item correlations"]
+      }
+    },
     kmeans: {
       moduleId: "kmeans",
       label: "K-Means",
@@ -213,8 +227,9 @@
     regression: ["correlations", "logistic"],
     logistic: ["regression", "contingency"],
     contingency: ["logistic", "correlations"],
-    pca: ["factor", "correlations"],
-    factor: ["pca"],
+    pca: ["factor", "reliability", "correlations"],
+    factor: ["pca", "reliability"],
+    reliability: ["factor", "pca"],
     kmeans: ["hierarchical"],
     hierarchical: ["kmeans"]
   };

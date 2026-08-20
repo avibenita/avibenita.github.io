@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>Scale Reliability</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts-more.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/solid-gauge.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260820-tools3"/>
+  <script src="../shared-brand-logo.js?v=20260716cover"></script>
+  <script src="../shared-header.js?v=20260820rel1"></script>
+  <script src="reliability-engine.js?v=20260820rel1"></script>
+  <style>
+    :root {
+      --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
+      --accent-1:rgb(255,165,120); --accent-2:rgb(120,200,255);
+      --text-primary:#fff; --text-secondary:rgba(255,255,255,.82); --text-muted:rgba(255,255,255,.55);
+      --success:#4ade80; --warning:#fbbf24; --danger:#fb7185;
+      --panel-radius:10px;
+    }
+    :root[data-theme="light"] {
+      --surface-0:#eef0f4; --surface-1:#ffffff; --surface-2:#f3f4f6; --border:#cbd5e1;
+      --accent-1:#2563eb; --accent-2:#1d4ed8;
+      --text-primary:#111827; --text-secondary:#1f2937; --text-muted:#374151;
+    }
+    html,body{height:100%;margin:0;padding:0;}
+    body{background:var(--surface-0);color:var(--text-primary);font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;overflow-x:hidden;}
+    .wrap{display:flex;justify-content:center;padding:8px 12px 20px;}
+    .card{width:min(1600px,99%);background:var(--surface-1);min-height:640px;border-radius:var(--panel-radius);border:1px solid var(--border);display:flex;flex-direction:column;}
+    .card-body{padding:12px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
+    .state-msg{text-align:center;padding:48px 20px;color:var(--text-secondary);}
+    .state-msg i{font-size:42px;margin-bottom:12px;display:block;color:var(--accent-2);}
+    .stats-container{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+    .stat-panel{flex:1;min-width:180px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--panel-radius);overflow:hidden;}
+    :root[data-theme="light"] .stat-panel{background:var(--surface-1);box-shadow:0 2px 8px rgba(0,0,0,.06);}
+    .stat-panel-heading{background:linear-gradient(135deg, rgba(0,51,102,.82), rgba(0,102,204,.62));color:#fff;padding:8px 12px;font-weight:700;font-size:.9rem;}
+    .stat-panel-body{padding:10px 12px;}
+    .stat-value{font-size:1.45rem;font-weight:800;color:var(--accent-1);}
+    .stat-label{font-size:12px;color:var(--text-muted);}
+    .stat-note{font-size:12px;color:var(--text-secondary);margin-top:6px;line-height:1.4;}
+    .panel{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--panel-radius);margin-bottom:12px;overflow:hidden;}
+    .panel-heading{padding:10px 14px;font-weight:700;color:var(--accent-1);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+    .panel-body{padding:12px 14px;}
+    .warn-banner{border-left:3px solid var(--warning);background:rgba(251,191,36,.12);padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;}
+    .warn-banner.danger{border-left-color:var(--danger);background:rgba(251,113,133,.12);}
+    .warn-banner.suitability{border-left-color:#f97316;background:rgba(249,115,22,.14);font-weight:600;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead th{text-align:left;padding:8px;background:var(--surface-2);cursor:pointer;white-space:nowrap;}
+    td{padding:8px;border-bottom:1px solid var(--border);}
+    .flag-weak{color:var(--warning);font-weight:700;}
+    .flag-bad{color:var(--danger);font-weight:700;}
+    .flag-good{color:var(--success);}
+    .matrix-wrap{overflow-x:auto;}
+    .corr-cell.neg{background:rgba(251,113,133,.28);}
+    .corr-cell.high{background:rgba(251,191,36,.28);}
+    .corr-cell.heat-pos{background:rgba(120,200,255,var(--a, .2));}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;}
+    .toolbar label{display:flex;align-items:center;gap:4px;}
+    .btn{border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text-primary);padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:650;}
+    .btn:disabled{opacity:.45;cursor:not-allowed;}
+    .btn-primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:#1d4ed8;color:#fff;}
+    .sb-item.is-disabled{opacity:.45;pointer-events:none;}
+    #alpha-gauge,#scree-chart,#group-chart{width:100%;height:220px;}
+    .help{font-size:12.5px;color:var(--text-secondary);line-height:1.45;}
+    .item-name{position:sticky;left:0;background:var(--surface-1);font-weight:700;}
+    @media (max-width: 900px) {
+      .stats-container{flex-direction:column;}
+      .stat-panel{min-width:0;}
+    }
+  </style>
+</head>
+<body>
+  <div id="header-container"></div>
+  <div class="wrap">
+    <section class="card" role="main">
+      <div class="card-body">
+        <div id="emptyState" class="state-msg">
+          <i class="fa-solid fa-check-double"></i>
+          <p>Select questionnaire or scale items to assess their internal consistency.</p>
+        </div>
+        <div id="loadingState" class="state-msg" style="display:none;">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <p>Calculating reliability and item diagnostics…</p>
+        </div>
+        <div id="errorState" class="state-msg" style="display:none;">
+          <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i>
+          <p id="errorText">Reliability requires multiple items intended to measure the same construct.</p>
+        </div>
+
+        <section id="tab-overview" class="tab-panel">
+          <div id="overviewWarnings"></div>
+          <div class="stats-container">
+            <div class="stat-panel">
+              <div class="stat-panel-heading">Cronbach’s alpha</div>
+              <div class="stat-panel-body">
+                <div class="stat-value" id="statAlpha">—</div>
+                <div class="stat-label" id="statAlphaBand"></div>
+                <div class="stat-note" id="statAlphaNote"></div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading">McDonald’s omega total</div>
+              <div class="stat-panel-body">
+                <div class="stat-value" id="statOmega">—</div>
+                <div class="stat-label" id="statOmegaStatus"></div>
+                <div class="stat-note" id="statOmegaNote"></div>
+              </div>
+            </div>
+            <div class="stat-panel">
+              <div class="stat-panel-heading">Scale</div>
+              <div class="stat-panel-body">
+                <div class="stat-field"><span class="stat-label">Items</span> <span class="stat-value" id="statItems" style="font-size:1.1rem;">—</span></div>
+                <div class="stat-field"><span class="stat-label">Valid respondents</span> <span class="stat-value" id="statN" style="font-size:1.1rem;">—</span></div>
+                <div class="stat-note" id="statMissing"></div>
+              </div>
+            </div>
+            <div class="stat-panel" id="gaugePanel">
+              <div class="stat-panel-heading">Alpha gauge</div>
+              <div class="stat-panel-body"><div id="alpha-gauge"></div></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">Reliability coefficients</div>
+            <div class="panel-body">
+              <div id="coefTable"></div>
+              <p class="help" style="margin-top:8px;">Bands (.60 / .70 / .80 / .90) are rough conventions, not universal rules. Very high reliability may indicate redundant items.</p>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-heading">Scale assessment</div>
+            <div class="panel-body" id="assessmentCard"></div>
+          </div>
+        </section>
+
+        <section id="tab-items" class="tab-panel">
+          <div class="panel">
+            <div class="panel-heading">
+              <span>Item diagnostics</span>
+              <label class="toolbar"><input type="checkbox" id="showMeanSd" checked /> Show item mean and SD</label>
+            </div>
+            <div class="panel-body">
+              <p class="help" title="Removing an item should also be justified by content validity and the intended construct.">Corrected item–total correlation uses the sum of the remaining items. Removing an item should also be justified by content validity and the intended construct.</p>
+              <div class="matrix-wrap" style="margin-top:8px;"><table id="itemTable"></table></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-matrix" class="tab-panel">
+          <div class="panel">
+            <div class="panel-heading">
+              <span>Inter-item correlations (Pearson)</span>
+              <div class="toolbar">
+                <label><input type="radio" name="mxMode" value="values" /> Values</label>
+                <label><input type="radio" name="mxMode" value="heatmap" /> Heatmap</label>
+                <label><input type="radio" name="mxMode" value="both" checked /> Values + heatmap</label>
+                <label><input type="checkbox" id="showPairN" /> Pairwise N</label>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="matrixSummary" class="stat-note" style="margin-bottom:8px;"></div>
+              <div class="matrix-wrap" id="matrixHost"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-structure" class="tab-panel">
+          <div class="panel">
+            <div class="panel-heading">Dimensionality diagnostic</div>
+            <div class="panel-body">
+              <p class="help">Reliability coefficients do not establish that a scale is unidimensional. This view provides an initial structural diagnostic; use Factor Analysis for a fuller assessment.</p>
+              <div id="structureSummary" class="stat-note" style="margin:10px 0;"></div>
+              <div id="scree-chart"></div>
+              <div class="matrix-wrap" style="margin-top:10px;"><table id="eigenTable"></table></div>
+              <div style="margin-top:12px;">
+                <button type="button" class="btn btn-primary" id="openFactorBtn" disabled title="Opens Factor Analysis with the current scale items.">
+                  <i class="fa-solid fa-cubes"></i> Open in Factor Analysis
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-by-group" class="tab-panel">
+          <div class="panel">
+            <div class="panel-heading">Reliability by group</div>
+            <div class="panel-body">
+              <p class="help" id="groupHelp">The observed reliability estimates differ, but sampling uncertainty and group size should be considered.</p>
+              <div class="matrix-wrap"><table id="groupTable"></table></div>
+              <div id="group-chart" style="margin-top:12px;"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    var _bundle = null;
+    var _rawPreview = null;
+    var _itemSort = { key: 'item', dir: 'asc' };
+    var TAB_TITLES = {
+      overview: 'Overview',
+      items: 'Item Diagnostics',
+      matrix: 'Inter-item Matrix',
+      structure: 'Scale Structure',
+      'by-group': 'By Group'
+    };
+
+    function fmt(v, d) {
+      if (v == null || !isFinite(v)) return '—';
+      return Number(v).toFixed(d == null ? 3 : d);
+    }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+      });
+    }
+    function showState(which) {
+      ['emptyState', 'loadingState', 'errorState'].forEach(function (id) {
+        document.getElementById(id).style.display = id === which ? 'block' : 'none';
+      });
+      document.querySelectorAll('.tab-panel').forEach(function (p) {
+        if (which) p.classList.remove('active');
+      });
+    }
+
+    function switchTab(tabKey) {
+      if (tabKey === 'by-group' && _bundle && !(_bundle.analysisConfig && _bundle.analysisConfig.groupVariable)) {
+        return;
+      }
+      if (TAB_TITLES[tabKey] && typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.updateTitle(TAB_TITLES[tabKey]);
+      }
+      document.querySelectorAll('.sb-item[data-tab]').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabKey);
+      });
+      document.querySelectorAll('.tab-panel').forEach(function (panel) {
+        panel.classList.toggle('active', panel.id === 'tab-' + tabKey);
+      });
+      if (typeof Highcharts !== 'undefined') {
+        setTimeout(function () {
+          (Highcharts.charts || []).forEach(function (c) { if (c) try { c.reflow(); } catch (e) {} });
+        }, 40);
+      }
+    }
+    window.switchTab = switchTab;
+
+    function updateByGroupNav(enabled) {
+      var btn = document.querySelector('.sb-item[data-tab="by-group"]');
+      if (!btn) return;
+      btn.classList.toggle('is-disabled', !enabled);
+      btn.title = enabled
+        ? 'Compare reliability across selected group levels.'
+        : 'Select a grouping variable in Setup to compare reliability across groups.';
+      if (!enabled) {
+        btn.setAttribute('aria-disabled', 'true');
+      } else {
+        btn.removeAttribute('aria-disabled');
+      }
+    }
+
+    function renderWarnings(obs) {
+      var host = document.getElementById('overviewWarnings');
+      var list = (obs.warnings || []).slice();
+      if (!list.length) { host.innerHTML = ''; return; }
+      host.innerHTML = list.map(function (w) {
+        var cls = w.code === 'suspicious_names' ? 'suitability' : (w.code === 'negative_alpha' ? 'danger' : '');
+        return '<div class="warn-banner ' + cls + '">' + esc(w.message) + (w.columns ? ' (' + w.columns.map(esc).join(', ') + ')' : '') + '</div>';
+      }).join('');
+    }
+
+    function renderOverview(obs, cfg) {
+      document.getElementById('statAlpha').textContent = fmt(obs.alpha);
+      var band = obs.alphaBand || {};
+      document.getElementById('statAlphaBand').textContent = band.label || '';
+      var ci = obs.alphaCI;
+      var note = '';
+      if (obs.alpha != null && obs.alpha < 0) {
+        note = 'Negative alpha indicates that items are negatively related on average. Check item direction, reverse coding, and whether the items belong to one scale.';
+      } else if (band.key === 'veryHigh') {
+        note = 'Very high reliability may indicate redundant items.';
+      } else if (ci && ci.lower != null) {
+        note = '95%'.replace('95', String(Math.round((ci.level || 0.95) * 100))) + ' CI ' + fmt(ci.lower) + ' to ' + fmt(ci.upper)
+          + (ci.successful != null ? ' · ' + ci.successful + ' bootstrap replications' : '');
+      }
+      document.getElementById('statAlphaNote').textContent = note;
+      document.getElementById('statOmega').textContent = fmt(obs.omegaTotal);
+      document.getElementById('statOmegaStatus').textContent = obs.omegaStatus === 'estimated' || obs.omegaStatus === 'estimated_with_warning'
+        ? 'Estimated' : 'Not estimable';
+      document.getElementById('statOmegaNote').textContent = (obs.omegaMeta && obs.omegaMeta.reason) || '';
+      document.getElementById('statItems').textContent = obs.itemCount != null ? String(obs.itemCount) : '—';
+      document.getElementById('statN').textContent = obs.nValid != null ? String(obs.nValid) : '—';
+      document.getElementById('statMissing').textContent = (cfg.missingMethod === 'pairwise' ? 'Pairwise deletion' : 'Listwise deletion')
+        + (obs.nOriginal != null ? ' · original N ' + obs.nOriginal : '');
+
+      var rows = [
+        ['Cronbach’s alpha', fmt(obs.alpha), ci && ci.lower != null ? fmt(ci.lower) + ' – ' + fmt(ci.upper) : '—'],
+        ['Standardized alpha', fmt(obs.standardizedAlpha), 'From the average inter-item correlation'],
+        ['McDonald’s omega total', fmt(obs.omegaTotal), obs.omegaStatus || '']
+      ];
+      document.getElementById('coefTable').innerHTML = '<table><thead><tr><th>Coefficient</th><th>Estimate</th><th>Notes</th></tr></thead><tbody>'
+        + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + esc(r[2]) + '</td></tr>'; }).join('')
+        + '</tbody></table>';
+
+      var weak = obs.weakestItem;
+      var dim = obs.structure && obs.structure.firstComponentVariance != null
+        ? ('First component explains ' + fmt(obs.structure.firstComponentVariance, 1) + '% of variance (diagnostic only).')
+        : 'Dimensionality diagnostic not available.';
+      var important = (obs.warnings || []).slice(0, 3).map(function (w) { return w.message; }).join(' ') || 'No blocking warnings.';
+      document.getElementById('assessmentCard').innerHTML =
+        '<div class="stat-field"><span class="stat-label">Reliability level</span> <strong>' + esc(band.label || '—') + '</strong></div>'
+        + '<div class="stat-field"><span class="stat-label">Weakest item</span> <strong>' + esc(weak && weak.item ? weak.item : '—')
+        + '</strong>' + (weak && weak.itemTotalCorrelation != null ? ' (item–total ' + fmt(weak.itemTotalCorrelation, 2) + ')' : '') + '</div>'
+        + '<div class="stat-field"><span class="stat-label">Average inter-item correlation</span> <strong>' + fmt(obs.averageInterItemCorrelation, 3) + '</strong></div>'
+        + '<div class="stat-note" style="margin-top:8px;">' + esc(dim) + '</div>'
+        + '<div class="stat-note" style="margin-top:6px;">' + esc(important) + '</div>';
+
+      renderGauge(obs.alpha);
+    }
+
+    function renderGauge(alpha) {
+      var panel = document.getElementById('gaugePanel');
+      if (typeof Highcharts === 'undefined') return;
+      if (alpha == null || !isFinite(alpha) || alpha < 0) {
+        panel.style.display = alpha != null && alpha < 0 ? 'block' : 'none';
+        if (alpha != null && alpha < 0) {
+          document.getElementById('alpha-gauge').innerHTML = '<div class="warn-banner danger">Negative alpha is shown as a diagnostic warning, not as a 0–1 reliability gauge.</div>';
+        }
+        return;
+      }
+      panel.style.display = 'block';
+      Highcharts.chart('alpha-gauge', {
+        chart: { type: 'solidgauge', backgroundColor: 'transparent', height: 200 },
+        title: { text: null },
+        pane: { center: ['50%', '70%'], size: '120%', startAngle: -90, endAngle: 90, background: { backgroundColor: 'rgba(255,255,255,.08)', innerRadius: '60%', outerRadius: '100%', shape: 'arc' } },
+        yAxis: { min: 0, max: 1, stops: [[0.6, '#fb7185'], [0.7, '#fbbf24'], [0.8, '#4ade80']], lineWidth: 0, tickWidth: 0, minorTickInterval: null, labels: { enabled: false } },
+        series: [{ name: 'Alpha', data: [Math.max(0, Math.min(1, alpha))], dataLabels: { format: '{y:.2f}', y: -20, borderWidth: 0, style: { fontSize: '16px', color: '#fff' } } }],
+        credits: { enabled: false },
+        tooltip: { enabled: false }
+      });
+    }
+
+    function renderItems(obs) {
+      var show = document.getElementById('showMeanSd').checked;
+      var items = (obs.items || []).slice();
+      var key = _itemSort.key;
+      var dir = _itemSort.dir === 'asc' ? 1 : -1;
+      items.sort(function (a, b) {
+        var av = a[key], bv = b[key];
+        if (typeof av === 'string' || typeof bv === 'string') return String(av).localeCompare(String(bv)) * dir;
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return (av - bv) * dir;
+      });
+      var thresh = (_bundle.analysisConfig && _bundle.analysisConfig.weakItemThreshold) || 0.30;
+      var head = '<thead><tr>'
+        + '<th data-k="item">Item</th>'
+        + (show ? '<th data-k="mean">Mean</th><th data-k="sd">SD</th>' : '')
+        + '<th data-k="validN">Valid N</th>'
+        + '<th data-k="itemTotalCorrelation">Corrected item–total</th>'
+        + '<th data-k="alphaIfDeleted">α if deleted</th>'
+        + '<th data-k="omegaIfDeleted">ω if deleted</th>'
+        + '<th data-k="flag">Decision</th></tr></thead>';
+      var body = items.map(function (it) {
+        var flagCls = it.flag === 'Good' ? 'flag-good' : (String(it.flag).indexOf('Negative') >= 0 ? 'flag-bad' : 'flag-weak');
+        var itcCls = (it.itemTotalCorrelation != null && it.itemTotalCorrelation < thresh) ? 'flag-weak' : '';
+        return '<tr><td class="item-name">' + esc(it.item) + '</td>'
+          + (show ? '<td>' + fmt(it.mean, 2) + '</td><td>' + fmt(it.sd, 2) + '</td>' : '')
+          + '<td>' + (it.validN != null ? it.validN : '—') + '</td>'
+          + '<td class="' + itcCls + '">' + fmt(it.itemTotalCorrelation, 2) + '</td>'
+          + '<td title="Removing an item should also be justified by content validity and the intended construct.">' + fmt(it.alphaIfDeleted, 3) + '</td>'
+          + '<td>' + fmt(it.omegaIfDeleted, 3) + '</td>'
+          + '<td class="' + flagCls + '">' + esc(it.flag || '') + '</td></tr>';
+      }).join('');
+      var table = document.getElementById('itemTable');
+      table.innerHTML = head + '<tbody>' + body + '</tbody>';
+      table.querySelectorAll('th[data-k]').forEach(function (th) {
+        th.onclick = function () {
+          var k = th.getAttribute('data-k');
+          _itemSort = { key: k, dir: _itemSort.key === k && _itemSort.dir === 'asc' ? 'desc' : 'asc' };
+          renderItems(obs);
+        };
+      });
+    }
+
+    function renderMatrix(obs) {
+      var names = (obs.items || []).map(function (it) { return it.item; });
+      var R = obs.correlationMatrix || [];
+      var N = obs.pairwiseN || [];
+      var mode = (document.querySelector('input[name="mxMode"]:checked') || {}).value || 'both';
+      var showN = document.getElementById('showPairN').checked;
+      var inter = obs.interItem || {};
+      document.getElementById('matrixSummary').textContent =
+        'Average r = ' + fmt(inter.mean, 3) + ' · min ' + fmt(inter.min, 3) + ' · max ' + fmt(inter.max, 3)
+        + (inter.negatives ? ' · ' + inter.negatives + ' negative pair(s)' : '')
+        + (inter.high ? ' · ' + inter.high + ' pair(s) above .90 (possible redundancy)' : '');
+      var html = '<table><thead><tr><th></th>' + names.map(function (n) { return '<th>' + esc(n) + '</th>'; }).join('') + '</tr></thead><tbody>';
+      for (var i = 0; i < names.length; i++) {
+        html += '<tr><th class="item-name">' + esc(names[i]) + '</th>';
+        for (var j = 0; j < names.length; j++) {
+          var r = R[i] && R[i][j];
+          var cls = 'corr-cell';
+          var style = '';
+          if (i !== j && r != null && r < 0) cls += ' neg';
+          if (i !== j && r != null && r > 0.90) cls += ' high';
+          if (mode !== 'values' && r != null && isFinite(r)) {
+            var a = Math.min(0.72, Math.abs(r));
+            style = 'background:rgba(' + (r < 0 ? '251,113,133,' : '120,200,255,') + a + ')';
+          }
+          var txt = i === j ? '1.00' : fmt(r, 2);
+          if (mode === 'heatmap' && i !== j) txt = '';
+          if (showN && i !== j && N[i] && N[i][j] != null) txt += '<div style="font-size:10px;opacity:.75;">n=' + N[i][j] + '</div>';
+          html += '<td class="' + cls + '" style="' + style + '">' + txt + '</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      document.getElementById('matrixHost').innerHTML = html;
+    }
+
+    function renderStructure(obs, cfg) {
+      var st = obs.structure || {};
+      var txt = 'Dimensionality diagnostic from a principal-component decomposition of the inter-item correlations. This is not proof of unidimensionality.';
+      if (st.firstComponentVariance != null) {
+        txt = 'First component explains ' + fmt(st.firstComponentVariance, 1) + '% of variance. '
+          + (st.firstComponentVariance > 40
+            ? 'A single dominant dimension is plausible, but this is only a diagnostic.'
+            : 'More than one dimension may be present; inspect Factor Analysis.');
+      }
+      document.getElementById('structureSummary').textContent = txt;
+      var evals = st.eigenvalues || [];
+      var pct = st.variancePercent || [];
+      var body = evals.map(function (e, i) {
+        return '<tr><td>PC ' + (i + 1) + '</td><td>' + fmt(e, 3) + '</td><td>' + fmt(pct[i], 1) + '%</td></tr>';
+      }).join('');
+      document.getElementById('eigenTable').innerHTML = '<thead><tr><th>Component</th><th>Eigenvalue</th><th>% variance</th></tr></thead><tbody>' + body + '</tbody>';
+      if (typeof Highcharts !== 'undefined' && evals.length) {
+        Highcharts.chart('scree-chart', {
+          chart: { type: 'line', backgroundColor: 'transparent' },
+          title: { text: null },
+          xAxis: { categories: evals.map(function (_, i) { return 'PC ' + (i + 1); }) },
+          yAxis: { title: { text: 'Eigenvalue' }, min: 0 },
+          credits: { enabled: false },
+          series: [{ name: 'Eigenvalue', data: evals, color: 'rgb(120,200,255)' }]
+        });
+      }
+      var btn = document.getElementById('openFactorBtn');
+      var items = (cfg && cfg.items) || [];
+      btn.disabled = items.length < 2;
+      btn.onclick = function () {
+        try {
+          sessionStorage.setItem('factorModelSpec', JSON.stringify({
+            analysisMode: 'factor',
+            variables: items.slice(),
+            xn: items.slice()
+          }));
+        } catch (e) {}
+        try {
+          if (Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+            Office.context.ui.messageParent(JSON.stringify({ action: 'openFactorAnalysis', items: items }));
+          }
+        } catch (e2) {}
+      };
+    }
+
+    function renderGroups(obs) {
+      var groups = obs.groups || [];
+      if (!groups.length) {
+        document.getElementById('groupTable').innerHTML = '';
+        document.getElementById('groupHelp').textContent = 'No grouping variable was selected.';
+        return;
+      }
+      document.getElementById('groupHelp').textContent = 'The observed reliability estimates differ, but sampling uncertainty and group size should be considered.';
+      var html = '<thead><tr><th>Group</th><th>Valid N</th><th>Items</th><th>Alpha</th><th>Alpha CI</th><th>Omega</th><th>Mean inter-item r</th><th>Status</th></tr></thead><tbody>';
+      groups.forEach(function (g) {
+        var ci = g.alphaCI && g.alphaCI.lower != null ? fmt(g.alphaCI.lower) + ' – ' + fmt(g.alphaCI.upper) : '—';
+        html += '<tr><td>' + esc(g.group) + '</td><td>' + g.validN + '</td><td>' + g.itemCount + '</td><td>' + fmt(g.alpha)
+          + '</td><td>' + ci + '</td><td>' + fmt(g.omega) + '</td><td>' + fmt(g.averageInterItemCorrelation, 3)
+          + '</td><td>' + esc(g.status) + (g.warnings && g.warnings.length ? ' · ' + esc(g.warnings[0]) : '') + '</td></tr>';
+      });
+      html += '</tbody>';
+      document.getElementById('groupTable').innerHTML = html;
+      if (typeof Highcharts !== 'undefined') {
+        Highcharts.chart('group-chart', {
+          chart: { type: 'column', backgroundColor: 'transparent' },
+          title: { text: null },
+          xAxis: { categories: groups.map(function (g) { return g.group; }) },
+          yAxis: { title: { text: 'Coefficient' }, min: null },
+          credits: { enabled: false },
+          series: [
+            { name: 'Alpha', data: groups.map(function (g) { return g.alpha; }), color: 'rgb(255,165,120)' },
+            { name: 'Omega', data: groups.map(function (g) { return g.omega; }), color: 'rgb(120,200,255)' }
+          ]
+        });
+      }
+    }
+
+    function applyBundle(bundle) {
+      _bundle = bundle;
+      if (!bundle) {
+        showState('emptyState');
+        return;
+      }
+      if (!bundle.ok) {
+        document.getElementById('errorText').textContent = ((bundle.errors || []).map(function (e) { return e.message; }).join(' ')
+          || 'Some reliability statistics could not be estimated. Review item variability, sample size, missing values, and item direction.');
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('errorState').style.display = 'block';
+        return;
+      }
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('errorState').style.display = 'none';
+      var obs = bundle.observedResults;
+      var cfg = bundle.analysisConfig || {};
+      renderWarnings(obs);
+      renderOverview(obs, cfg);
+      renderItems(obs);
+      renderMatrix(obs);
+      renderStructure(obs, cfg);
+      renderGroups(obs);
+      updateByGroupNav(!!cfg.groupVariable);
+      switchTab('overview');
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.sampleSize = obs.nValid || 0;
+        StatisticoHeader.variableName = (cfg.items || []).length + ' items';
+        if (StatisticoHeader.render) StatisticoHeader.render();
+        if (StatisticoHeader.initSidebarPage) StatisticoHeader.initSidebarPage();
+        updateByGroupNav(!!cfg.groupVariable);
+        StatisticoHeader.updateTitle('Overview');
+      }
+    }
+
+    function exportReliabilityHtml() {
+      if (!_bundle || !_bundle.ok) return;
+      var obs = _bundle.observedResults;
+      var w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write('<html><head><title>Scale Reliability</title><style>body{font-family:Segoe UI,sans-serif;padding:24px;color:#111} table{border-collapse:collapse;width:100%} td,th{border:1px solid #ccc;padding:6px;text-align:left}</style></head><body>');
+      w.document.write('<h1>Scale Reliability</h1>');
+      w.document.write('<p>' + esc(JSON.stringify(_bundle.analysisConfig)) + '</p>');
+      w.document.write('<h2>Overview</h2><p>Alpha ' + fmt(obs.alpha) + ' · Omega ' + fmt(obs.omegaTotal) + ' · N ' + obs.nValid + '</p>');
+      w.document.write(document.getElementById('coefTable').innerHTML);
+      w.document.write('<h2>Item diagnostics</h2>' + document.getElementById('itemTable').outerHTML);
+      w.document.write('</body></html>');
+      w.document.close();
+    }
+
+    function getExportData() {
+      if (!_bundle) return null;
+      var cfg = _bundle.analysisConfig || {};
+      var names = cfg.items || [];
+      var rows = (_rawPreview && _rawPreview.rows) || [];
+      return {
+        headers: names,
+        allRows: rows,
+        usedRows: rows,
+        fullRange: 'Scale Reliability input items',
+        usedRange: 'Scale Reliability input items',
+        analysisConfig: cfg,
+        observedResults: _bundle.observedResults,
+        aiPackage: _bundle.aiPackage
+      };
+    }
+
+    window.requestReliabilityModuleAI = function () {
+      if (typeof StatisticoHeader === 'undefined') return;
+      var pkg = _bundle && _bundle.aiPackage;
+      StatisticoHeader._lastAiMeta = { primarySignal: 'Scale Reliability' };
+      var prompt = 'You are interpreting a Statistico Scale Reliability analysis.\n'
+        + 'Avoid treating .70 as an absolute pass/fail rule. Mention sample size and uncertainty. Distinguish reliability from validity and from unidimensionality. Do not recommend deleting an item solely because alpha-if-deleted increases. Identify possible reverse-coded items. Mention possible redundancy when reliability is extremely high. Never describe unrelated columns as a valid psychological or survey scale.\n\n'
+        + JSON.stringify(pkg || getExportData(), null, 2)
+        + '\n\nReply ONLY in this exact format:\nCONCLUSION: [one sentence]\nEVIDENCE: [finding] | [finding] | [finding]\nINTERPRETATION: [3 sentences]\nIMPLICATIONS: [1] | [2] | [3]\nACTION: [1] | [2] | [3]\nSTRENGTH: [High, Moderate, or Low - short reason]';
+      StatisticoHeader._callAiForSidebar(prompt).then(function (raw) {
+        var sections = StatisticoHeader._parseAiStructured(raw);
+        StatisticoHeader._showAiOverlay(sections, 'overview', 'full');
+      }).catch(function (err) {
+        StatisticoHeader._showAiOverlay({ error: err.message || 'AI request failed.' }, 'overview', 'full');
+      });
+    };
+
+    document.getElementById('showMeanSd').addEventListener('change', function () {
+      if (_bundle && _bundle.observedResults) renderItems(_bundle.observedResults);
+    });
+    document.querySelectorAll('input[name="mxMode"]').forEach(function (el) {
+      el.addEventListener('change', function () { if (_bundle) renderMatrix(_bundle.observedResults); });
+    });
+    document.getElementById('showPairN').addEventListener('change', function () {
+      if (_bundle) renderMatrix(_bundle.observedResults);
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('reliability-overview', 'Scale Reliability', 0, 'reliability');
+        StatisticoHeader.registerActions({
+          getData: getExportData,
+          exportHtml: exportReliabilityHtml,
+          exportJson: function () {
+            var blob = new Blob([JSON.stringify({
+              analysisConfig: _bundle && _bundle.analysisConfig,
+              observedResults: _bundle && _bundle.observedResults,
+              aiPackage: _bundle && _bundle.aiPackage
+            }, null, 2)], { type: 'application/json' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'scale-reliability.json';
+            a.click();
+          },
+          moduleName: 'Scale Reliability'
+        });
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Overview');
+      }
+      if (typeof Office !== 'undefined' && Office.onReady) {
+        Office.onReady(function () {
+          try {
+            Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
+            Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+              try {
+                var msg = JSON.parse(arg.message || '{}');
+                if (msg.theme && typeof StatisticoHeader !== 'undefined') StatisticoHeader.applyTheme(msg.theme);
+                if (msg.type === 'RELIABILITY_BUNDLE') applyBundle(msg.payload);
+                if (msg.type === 'RELIABILITY_RAW_DATA') _rawPreview = msg.payload;
+              } catch (e) {}
+            });
+          } catch (e) {}
+        });
+      }
+    });
+  </script>
+</body>
+</html>

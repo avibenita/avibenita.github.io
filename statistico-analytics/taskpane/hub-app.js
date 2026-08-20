@@ -214,17 +214,18 @@ const HUB_CATEGORY_TILES = [
     color: "#ec4899",
     colorDark: "#be185d",
     tabStyle: "soft",
-    subtitle: "PCA and factor analysis",
-    desc: "Reduce many correlated variables into fewer components or latent factors that capture shared structure.",
+    subtitle: "PCA, factor analysis, and scale reliability",
+    desc: "Reduce many correlated variables into fewer components or latent factors, and assess the internal consistency of multi-item scales.",
     info: [
       "Factor analysis: latent constructs and rotations",
       "PCA: variance-maximizing dimension reduction",
-      "Scree plots, loadings, and adequacy checks",
-      "Useful for scale development and data compression"
+      "Scale Reliability: Cronbach’s alpha, omega, and item diagnostics",
+      "Scree plots, loadings, and adequacy checks"
     ],
     modules: [
       { id: "factor", label: "Factor Analysis", tip: "Latent factor extraction and rotation for construct discovery." },
-      { id: "pca", label: "PCA", tip: "Principal component reduction for compact feature representation." }
+      { id: "pca", label: "PCA", tip: "Principal component reduction for compact feature representation." },
+      { id: "reliability", label: "Scale Reliability", tip: "Internal consistency of multi-item scales: alpha, omega, and item diagnostics." }
     ]
   },
   {
@@ -474,7 +475,7 @@ const TOOLS_CATEGORY_TILES = [
     section: "Utilities",
     sectionId: "utilities",
     sectionSubtitle: "Visual exploration and Excel-to-Office publishing",
-    title: "Multivariable Explorer",
+    title: "Multivariable Visualisation",
     icon: "fa-chart-scatter",
     accent: "#34d399",
     accentDark: "#059669",
@@ -483,12 +484,12 @@ const TOOLS_CATEGORY_TILES = [
     subtitle: "Interactive bubble, quadrant, and 3D scatter charts from your Excel data",
     desc: "Map X, Y, size, color, and labels on a multivariable bubble, quadrant, or 3D scatter chart.",
     info: [
-      "Multivariable Explorer: bubble, quadrant, and 3D scatter (X, Y, size, color)",
+      "Multivariable Visualisation: bubble, quadrant, and 3D scatter (X, Y, size, color)",
       "Select the Excel range from the input panel",
       "Uses a built-in country sample if you click Load sample"
     ],
     modules: [
-      { id: "multivariable", label: "Multivariable Explorer", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
+      { id: "multivariable", label: "Multivariable Visualisation", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
     ]
   },
   {
@@ -2045,7 +2046,7 @@ function openMultivariableSampleFromHub() {
     if (!result || !result.ok) {
       try {
         window.alert("Could not write the sample sheet.\n\n" + ((result && result.error) || "Unknown error") +
-          "\n\nOpening Multivariable Explorer with built-in sample data instead.");
+          "\n\nOpening Multivariable Visualisation with built-in sample data instead.");
       } catch (e) {}
       finish();
       openMultivariableDialogFromHub();
@@ -2352,6 +2353,27 @@ function openPcaConfigFromHub() {
   });
 }
 
+function openReliabilityConfigFromHub() {
+  try { sessionStorage.removeItem("reliabilityModelSpec"); } catch (e) {}
+  return openBuilderDialogFromHub({
+    moduleId: "reliability",
+    dialogPath: "reliability/reliability-input.html",
+    dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
+    dataType: "RELIABILITY_DATA",
+    payloadBuilder: function (gr) {
+      return { headers: gr.values[0] || [], rows: gr.values.slice(1), address: gr.address || "", savedModelSpec: null };
+    },
+    modelActions: ["reliabilityModel"],
+    onModel: function (msg) {
+      var spec = msg.payload || msg.data || {};
+      spec.analysisMode = "reliability";
+      sessionStorage.setItem("reliabilityModelSpec", JSON.stringify(spec));
+    },
+    hubResultsKey: "reliability",
+    nextDelayMs: 450
+  });
+}
+
 function openMixedConfigFromHub() {
   return openBuilderDialogFromHub({
     moduleId: "mixed",
@@ -2605,6 +2627,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "pca") {
     if (openPcaConfigFromHub()) return;
+  }
+  if (id === "reliability") {
+    if (openReliabilityConfigFromHub()) return;
   }
   if (id === "meta-analysis") {
     if (openMetaConfigFromHub()) return;

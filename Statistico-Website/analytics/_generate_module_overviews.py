@@ -141,7 +141,7 @@ MODULES = [
         "related_title": "Other Explore Data and related modules",
         "related": [
             ("univariate.html", "Univariate", "Distribution shape, outliers, and normality."),
-            ("linear-regression.html", "Linear Regression", "Continuous outcomes and diagnostics."),
+            ("reliability.html", "Scale Reliability", "Alpha, omega, and item diagnostics."),
             ("factor-analysis.html", "Factor Analysis", "Latent structure and rotation."),
             ("pca.html", "PCA", "Component retention and biplots."),
         ],
@@ -525,11 +525,75 @@ MODULES = [
         "related_title": "Other Reduce Dimensions and related modules",
         "related": [
             ("factor-analysis.html", "Factor Analysis", "Latent factors and rotation."),
+            ("reliability.html", "Scale Reliability", "Alpha, omega, and item diagnostics."),
             ("correlation.html", "Correlation", "Pairwise relationships and redundancy."),
             ("k-means.html", "K-Means", "Partition cases into segments."),
-            ("hierarchical.html", "Hierarchical", "Merge-tree segmentation."),
         ],
         "final_cta": "Explore PCA as an interactive module",
+    },
+    {
+        "slug": "reliability",
+        "file": "reliability.html",
+        "key": "reliability",
+        "title": "Scale Reliability",
+        "short": "Scale Reliability",
+        "family": "Reduce Dimensions",
+        "family_icon": "fa-layer-group",
+        "accent": "purple",
+        "meta_desc": "Explore Scale Reliability in Statistico: Cronbach’s alpha, McDonald’s omega, item diagnostics, reverse coding, and bootstrap intervals inside Excel.",
+        "app_desc": "Interactive scale reliability module inside Excel: Cronbach’s alpha, standardized alpha, McDonald’s omega total from a one-factor model, item diagnostics, inter-item matrix, dimensionality scree, scale-score descriptives, and optional by-group reliability.",
+        "hero_subline": "Experience a completed Scale Reliability analysis exactly as it appears inside Statistico.",
+        "hero_lead": "Assess whether selected items behave as one consistent scale — coefficients, weak items, reverse-coding cues, and a dimensionality diagnostic stay in the same workspace.",
+        "why_chain": ["Select items", "Reverse-code if needed", "Read alpha and omega", "Inspect weak items", "Check structure", "Compare groups"],
+        "why_brand": "From item set to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "live_steps": [
+            ("fa-clipboard-check", "Overview"),
+            ("fa-list-check", "Item diagnostics"),
+            ("fa-table-cells", "Inter-item matrix"),
+            ("fa-chart-line", "Scale structure"),
+        ],
+        "caps": [
+            ("fa-check-double", "Cronbach’s alpha with bootstrap confidence interval"),
+            ("fa-sigma", "McDonald’s omega total from a one-factor common-factor model"),
+            ("fa-list-check", "Item–total correlations and alpha / omega if deleted"),
+            ("fa-right-left", "Reverse-keyed items with an explicit score range"),
+            ("fa-table-cells", "Inter-item correlation matrix with heatmap"),
+            ("fa-chart-simple", "Dimensionality diagnostic (scree) with a Factor Analysis hand-off"),
+            ("fa-layer-group", "Optional reliability by group"),
+            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+        ],
+        "workflow_title": "One scale. Connected reliability views.",
+        "workflow_lead": "Click a stage to inspect it — each view stays inside the same item set, so there's no re-running the analysis to move between them.",
+        "views": [
+            ("overview", "fa-clipboard-check", "Overview", "Read alpha, omega, uncertainty, scale-score descriptives, and a suitability note before inspecting items."),
+            ("items", "fa-list-check", "Item Diagnostics", "Find weak, inconsistent, or potentially reversed items with item–total correlations and if-deleted coefficients."),
+            ("matrix", "fa-table-cells", "Inter-item Matrix", "Examine Pearson correlations among the selected items as values, a heatmap, or both."),
+            ("structure", "fa-chart-line", "Scale Structure", "A PCA scree diagnostic for whether one dominant dimension is plausible — not a substitute for Factor Analysis."),
+            ("by-group", "fa-layer-group", "By Group", "Compare alpha and omega across levels of an optional grouping variable."),
+            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of consistency, weak items, and next checks — see the caution below."),
+        ],
+        "feature_kicker": "Coefficients",
+        "feature_title": "Alpha and omega sit on the same scale",
+        "feature_lead": "Cronbach’s alpha, standardized alpha, and McDonald’s omega total are reported together, with omega estimated from a one-factor common-factor model rather than a PCA approximation.",
+        "feature_chips": ["Cronbach’s alpha", "Standardized alpha", "McDonald’s omega total", "Bootstrap CI", "Average inter-item r"],
+        "feature_shot": "overview",
+        "assess_kicker": "Item review",
+        "assess_title": "Assess weak items before deleting them",
+        "assess_lead": "Item–total correlations, alpha-if-deleted, and reverse-coding flags stay next to the coefficients, and the module does not treat a higher alpha-if-deleted as a deletion instruction.",
+        "assess_chips": ["Item–total r", "Alpha if deleted", "Omega if deleted", "Reverse-keyed items", "Weak-item flags", "Missing-data notes"],
+        "extra_kicker": "Structure",
+        "extra_title": "Reliability is not unidimensionality",
+        "extra_lead": "The structure view offers a scree diagnostic and a hand-off into Factor Analysis, so internal consistency is not mistaken for a single latent dimension.",
+        "ai_title": "Interpretation within the analytical workflow",
+        "ai_lead": "Statistico's AI-assisted assessment summarizes alpha, omega, weak items, and reverse-coding cues from the same reliability output already in the workspace, and distinguishes reliability from validity.",
+        "related_title": "Other Reduce Dimensions and related modules",
+        "related": [
+            ("factor-analysis.html", "Factor Analysis", "Latent factors, rotation, and construct structure."),
+            ("pca.html", "PCA", "Component retention, scree, and biplots."),
+            ("correlation.html", "Correlation", "Pairwise relationships before forming a scale."),
+            ("data-manipulation.html", "Data Manipulation", "Reverse-score Likert items and build composites."),
+        ],
+        "final_cta": "Explore Scale Reliability as an interactive module",
     },
     {
         "slug": "k-means",
@@ -1417,7 +1481,7 @@ def render_page(m: dict) -> str:
 
   <div id="footer-placeholder"></div>
 
-  <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-07-31-navactivefix"></script>
+  <script src="/Statistico-Website/assets/js/nav-template.js?v=20260820rel"></script>
   <script>
     (function () {{
       const tabs = Array.from(document.querySelectorAll('.lr-flow-step[role="tab"]'));

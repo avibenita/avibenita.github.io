@@ -2304,6 +2304,7 @@ function resolveTrailCrumbs() {
     'meta-analysis.html': 'Meta-Analysis',
     'factor-analysis.html': 'Factor Analysis',
     'pca.html': 'Principal Component Analysis',
+    'reliability.html': 'Scale Reliability',
     'k-means.html': 'K-Means Clustering',
     'hierarchical.html': 'Hierarchical Clustering'
   };

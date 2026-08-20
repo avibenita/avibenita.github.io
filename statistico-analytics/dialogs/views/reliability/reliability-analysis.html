@@ -262,6 +262,7 @@
     var _rawPreview = null;
     var _itemSort = { key: 'item', dir: 'asc' };
     var _itemCols = 'diagnostics';
+    var _isWebDemo = /(?:^|[?&])(?:demo|embed)=1(?:&|$)/i.test(location.search || '');
     var SUITABILITY_CODES = {
       suspicious_names: true,
       mixed_ranges: true,
@@ -678,6 +679,26 @@
       }
     }
 
+    function loadWebDemo() {
+      var Rel = window.StatisticoReliability;
+      if (!Rel || typeof Rel.demoLikertScale !== 'function') return false;
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('errorState').style.display = 'none';
+      document.getElementById('loadingState').style.display = 'block';
+      var demo = Rel.demoLikertScale();
+      var result = Rel.analyze(demo.headers, demo.rows, Rel.defaultConfig({
+        items: demo.suggestedConfig.items,
+        reverseItems: demo.suggestedConfig.reverseItems,
+        scoreRange: demo.suggestedConfig.scoreRange,
+        groupVariable: demo.suggestedConfig.groupVariable,
+        missingMethod: demo.suggestedConfig.missingMethod,
+        bootstrapSamples: 240,
+        coefficients: { alpha: true, omegaTotal: true, standardizedAlpha: true, confidenceInterval: true }
+      }));
+      applyBundle(result);
+      return true;
+    }
+
     function applyBundle(bundle) {
       _bundle = bundle;
       if (!bundle) {
@@ -799,6 +820,10 @@
         });
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('Overview');
+      }
+      if (_isWebDemo) {
+        loadWebDemo();
+        return;
       }
       if (typeof Office !== 'undefined' && Office.onReady) {
         Office.onReady(function () {

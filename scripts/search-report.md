@@ -1,62 +1,64 @@
 # Site search quality report
 
-Index generated 2026-08-20 - 33 records, 74 query synonyms.
+Index generated 2026-08-20 - 34 records, 77 query synonyms.
 
 ## concept vocabulary the site never uses
 
-- ok   `cronbach alpha` -> Correlation Analysis [Statistico Analytics] (alias)
+- ok   `cronbach alpha` -> Scale Reliability [Reduce Dimensions] (title, alias)
 - ok   `fisher exact` -> Frequency & Contingency Tables [Statistico Analytics] (title)
-- ok   `forest plot` -> Meta-Analysis [Statistico Analytics] (title)
+- ok   `forest plot` -> Meta-Analysis [Synthesize] (title)
 - ok   `sample size` -> Power & Sample Size Calculator [Calculators] (title)
-- ok   `cluster analysis` -> Hierarchical Clustering [Statistico Analytics] (title)
-- ok   `dendrogram` -> Hierarchical Clustering [Statistico Analytics] (title)
+- ok   `cluster analysis` -> Hierarchical Clustering [Find Segments] (title)
+- ok   `dendrogram` -> Hierarchical Clustering [Find Segments] (title)
 - ok   `margin of error` -> Precision-Based Sample Size Calculator [Calculators] (title)
-- ok   `internal consistency` -> Correlation Analysis [Statistico Analytics] (alias)
-- ok   `multilevel model` -> Mixed Models [Statistico Analytics] (title, alias)
+- ok   `internal consistency` -> Scale Reliability [Reduce Dimensions] (title, alias)
+- ok   `mcdonalds omega` -> Scale Reliability [Reduce Dimensions] (title, alias)
+- ok   `multilevel model` -> Mixed Models [Advanced Comparisons] (title, alias)
 - ok   `table 1` -> Publication Tables [Statistico Specialized Tools] (title, alias)
 
 ## test and method names
 
-- ok   `t test` -> Independent Means [Statistico Analytics] (title)
-- ok   `paired t test` -> Paired / Repeated Means [Statistico Analytics] (title)
-- ok   `analysis of variance` -> ANOVA [Statistico Analytics] (title)
-- ok   `one way anova` -> ANOVA [Statistico Analytics] (alias, title)
+- ok   `t test` -> Independent Means [Compare Means] (title)
+- ok   `paired t test` -> Paired / Repeated Means [Compare Means] (title)
+- ok   `analysis of variance` -> ANOVA [Advanced Comparisons] (title)
+- ok   `one way anova` -> ANOVA [Advanced Comparisons] (alias, title)
 - ok   `chi square` -> Frequency & Contingency Tables [Statistico Analytics] (alias)
 - ok   `logistic regression` -> Logistic Regression [Statistico Analytics] (title, term)
-- ok   `linear regression` -> Linear Regression [Statistico Analytics] (title, alias)
-- ok   `tukey` -> ANOVA [Statistico Analytics] (alias)
-- ok   `shapiro wilk` -> Univariate Analysis [Statistico Analytics] (term)
-- ok   `repeated measures` -> Paired / Repeated Means [Statistico Analytics] (title)
-- ok   `wilcoxon` -> Paired / Repeated Means [Statistico Analytics] (title)
-- ok   `mann whitney` -> Independent Means [Statistico Analytics] (title)
+- ok   `linear regression` -> Linear Regression [Model Relationships] (title, alias)
+- ok   `tukey` -> ANOVA [Advanced Comparisons] (alias)
+- ok   `shapiro wilk` -> Univariate Analysis [Explore Data] (term)
+- ok   `repeated measures` -> Paired / Repeated Means [Compare Means] (title)
+- ok   `wilcoxon` -> Paired / Repeated Means [Compare Means] (title)
+- ok   `mann whitney` -> Independent Means [Compare Means] (title)
 
 ## outputs and artefacts
 
 - ok   `scree plot` -> Factor Analysis [Statistico Analytics] (alias)
 - ok   `factor loadings` -> Factor Analysis [Statistico Analytics] (title, alias)
 - ok   `odds ratio` -> Logistic Regression [Statistico Analytics] (alias)
-- ok   `heatmap` -> Correlation Analysis [Statistico Analytics] (term)
-- ok   `box plot` -> Univariate Analysis [Statistico Analytics] (term, title)
-- ok   `histogram` -> Univariate Analysis [Statistico Analytics] (title, term)
-- ok   `qq plot` -> Univariate Analysis [Statistico Analytics] (term)
-- ok   `residual plot` -> Linear Regression [Statistico Analytics] (title, term)
+- ok   `heatmap` -> Correlation Analysis [Explore Data] (term)
+- ok   `box plot` -> Univariate Analysis [Explore Data] (term, title)
+- ok   `histogram` -> Univariate Analysis [Explore Data] (title, term)
+- ok   `qq plot` -> Univariate Analysis [Explore Data] (term)
+- ok   `residual plot` -> Linear Regression [Model Relationships] (title, term)
 - ok   `bubble chart` -> Multivariable Visualisation [Statistico Specialized Tools] (alias)
 - ok   `3d scatter` -> Multivariable Visualisation [Statistico Specialized Tools] (alias)
-- ok   `dendrogram plot` -> Hierarchical Clustering [Statistico Analytics] (title)
-- ok   `funnel plot` -> Meta-Analysis [Statistico Analytics] (term, alias)
+- ok   `dendrogram plot` -> Hierarchical Clustering [Find Segments] (title)
+- ok   `funnel plot` -> Meta-Analysis [Synthesize] (term, alias)
 
 ## plain language questions
 
 - ok   `how many participants do i need` -> Power & Sample Size Calculator [Calculators] (title, term)
-- ok   `compare two groups` -> Independent Means [Statistico Analytics] (alias)
-- ok   `compare three groups` -> ANOVA [Statistico Analytics] (alias)
-- ok   `group similar customers` -> K-Means Clustering [Statistico Analytics] (alias)
-- ok   `reduce number of variables` -> Principal Component Analysis [Statistico Analytics] (title, alias)
-- ok   `is my data normal` -> Univariate Analysis [Statistico Analytics] (term, alias)
-- ok   `before and after treatment` -> Paired / Repeated Means [Statistico Analytics] (alias)
+- ok   `compare two groups` -> Independent Means [Compare Means] (alias)
+- ok   `compare three groups` -> ANOVA [Advanced Comparisons] (alias)
+- ok   `group similar customers` -> K-Means Clustering [Find Segments] (alias)
+- ok   `reduce number of variables` -> Principal Component Analysis [Reduce Dimensions] (title, alias)
+- ok   `is my data normal` -> Univariate Analysis [Explore Data] (term, alias)
+- ok   `before and after treatment` -> Paired / Repeated Means [Compare Means] (alias)
 - ok   `yes no outcome` -> Logistic Regression [Statistico Analytics] (alias)
-- ok   `combine results from several studies` -> Meta-Analysis [Statistico Analytics] (alias)
+- ok   `combine results from several studies` -> Meta-Analysis [Synthesize] (alias)
 - ok   `reverse score likert items` -> Data Manipulation [Statistico Specialized Tools] (alias, term)
+- ok   `is my questionnaire reliable` -> Scale Reliability [Reduce Dimensions] (term, title)
 - ok   `journal ready table` -> Publication Tables [Statistico Specialized Tools] (alias)
 
 ## calculators
@@ -73,12 +75,12 @@ Index generated 2026-08-20 - 33 records, 74 query synonyms.
 
 ## spelling, plurals and variants
 
-- ok   `corelation` -> Correlation Analysis [Statistico Analytics] (title)
-- ok   `regresion` -> Linear Regression [Statistico Analytics] (title)
+- ok   `corelation` -> Correlation Analysis [Explore Data] (title)
+- ok   `regresion` -> Linear Regression [Model Relationships] (title)
 - ok   `visualization` -> Multivariable Visualisation [Statistico Specialized Tools] (alias)
-- ok   `clustering` -> Hierarchical Clustering [Statistico Analytics] (title, term)
-- ok   `anova` -> ANOVA [Statistico Analytics] (title)
-- ok   `pca` -> Principal Component Analysis [Statistico Analytics] (title, alias)
+- ok   `clustering` -> Hierarchical Clustering [Find Segments] (title, term)
+- ok   `anova` -> ANOVA [Advanced Comparisons] (title)
+- ok   `pca` -> Principal Component Analysis [Reduce Dimensions] (title, alias)
 
 ## site navigation
 
@@ -111,4 +113,4 @@ Index generated 2026-08-20 - 33 records, 74 query synonyms.
 
 ## Result
 
-71/71 cases return the expected page first (100%).
+73/73 cases return the expected page first (100%).

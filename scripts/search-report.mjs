@@ -39,14 +39,15 @@ if (askAt !== -1) {
    is a genuinely correct first answer, or null when nothing should match. */
 const CASES = [
   ['concept vocabulary the site never uses', [
-    ['cronbach alpha', 'correlation'],
+    ['cronbach alpha', 'reliability'],
     ['fisher exact', 'contingency-tables'],
     ['forest plot', 'meta-analysis'],
     ['sample size', 'power-sample-size'],
     ['cluster analysis', ['k-means', 'hierarchical']],
     ['dendrogram', 'hierarchical'],
     ['margin of error', 'precision-sample-size'],
-    ['internal consistency', 'correlation'],
+    ['internal consistency', 'reliability'],
+    ['mcdonalds omega', 'reliability'],
     ['multilevel model', 'mixed-models'],
     ['table 1', 'publication-tables'],
   ]],
@@ -89,6 +90,7 @@ const CASES = [
     ['yes no outcome', 'logistic-regression'],
     ['combine results from several studies', 'meta-analysis'],
     ['reverse score likert items', 'data-manipulation'],
+    ['is my questionnaire reliable', 'reliability'],
     ['journal ready table', 'publication-tables'],
   ]],
   ['calculators', [

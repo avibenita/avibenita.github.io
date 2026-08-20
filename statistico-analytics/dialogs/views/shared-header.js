@@ -1655,8 +1655,9 @@ const StatisticoHeader = {
         groups: [
           {
             title: 'Reliability views',
+            defaultOpen: true,
             items: [
-              { type: 'tab', tab: 'overview', icon: 'fa-clipboard-check', label: 'Overview', description: 'Overall reliability, uncertainty, and scale assessment.', active: true },
+              { type: 'tab', tab: 'overview', icon: 'fa-clipboard-check', label: 'Overview', description: 'Overall reliability, uncertainty, and scale assessment.' },
               { type: 'tab', tab: 'items', icon: 'fa-list-check', label: 'Item Diagnostics', description: 'Identify weak, inconsistent, or potentially reversed items.' },
               { type: 'tab', tab: 'matrix', icon: 'fa-table-cells', label: 'Inter-item Matrix', description: 'Examine correlations among the selected scale items.' },
               { type: 'tab', tab: 'structure', icon: 'fa-chart-line', label: 'Scale Structure', description: 'Assess whether one dominant dimension is plausible.' }
@@ -1664,6 +1665,7 @@ const StatisticoHeader = {
           },
           {
             title: 'Additional analyses',
+            defaultOpen: true,
             items: [
               { type: 'tab', tab: 'by-group', icon: 'fa-layer-group', label: 'By Group', description: 'Compare reliability across selected group levels.' }
             ]

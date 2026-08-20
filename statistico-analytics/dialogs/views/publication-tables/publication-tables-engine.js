@@ -1792,6 +1792,13 @@
     });
     if (tab === "details") renderDetails();
     if (tab === "preview") renderPreview();
+
+    var view = $("pt2View" + tab.charAt(0).toUpperCase() + tab.slice(1));
+    if (view) {
+      view.querySelectorAll(".pt2-layout, .pt2-main, .pt2-sidebar").forEach(function (el) {
+        el.scrollTop = 0;
+      });
+    }
   }
 
   function wireTabs() {

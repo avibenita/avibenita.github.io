@@ -1167,6 +1167,72 @@ const StatisticoHeader = {
     return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'anova', 'power', 'regression'].includes(this.module);
   },
 
+  _sidebarGroupKey(title) {
+    return String(title || 'group').trim().toLowerCase().replace(/\s+/g, '-');
+  },
+
+  _bindCollapsibleSidebarGroups(nav) {
+    nav = nav || document.getElementById('sidebarNav');
+    if (!nav) return;
+    const groups = nav.querySelectorAll('.sb-body .sb-group');
+    groups.forEach((group) => {
+      if (group.dataset.collapseBound === '1') return;
+      const kids = Array.from(group.children);
+      let rail = kids.find((c) => c.classList && c.classList.contains('sb-items-rail'));
+      if (!rail) {
+        rail = document.createElement('div');
+        rail.className = 'sb-items-rail';
+        kids.forEach((child) => {
+          if (child.classList && (child.classList.contains('sb-group-title') || child.classList.contains('sb-group-toggle'))) return;
+          rail.appendChild(child);
+        });
+        group.appendChild(rail);
+      }
+
+      let toggle = kids.find((c) => c.classList && c.classList.contains('sb-group-toggle'));
+      const titleEl = kids.find((c) => c.classList && c.classList.contains('sb-group-title'));
+      const titleNode = toggle && toggle.querySelector('.sb-group-title-text');
+      const titleText = (titleNode ? titleNode.textContent : (titleEl ? titleEl.textContent : 'Section')).replace(/\s+/g, ' ').trim();
+
+      if (!toggle) {
+        toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'sb-group-toggle';
+        toggle.innerHTML = `<span class="sb-group-title-text">${titleText}</span>`
+          + `<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>`;
+        if (titleEl) titleEl.replaceWith(toggle);
+        else group.insertBefore(toggle, rail);
+      } else if (!toggle.querySelector('.sb-collapse-chevron')) {
+        toggle.insertAdjacentHTML('beforeend', '<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>');
+      }
+
+      group.dataset.collapseBound = '1';
+      group.dataset.sbGroup = this._sidebarGroupKey(titleText);
+
+      const storageKey = `statistico.sbGroupOpen.${this.module || 'mod'}.${group.dataset.sbGroup}`;
+      const hasActive = !!(group.querySelector('.sb-item.active, .sb-faceted.is-active-group, .sb-item.sb-item-sub.active'));
+      let stored = null;
+      try { stored = localStorage.getItem(storageKey); } catch (_) {}
+      const open = hasActive || stored !== '0';
+
+      const apply = (isOpen, persist) => {
+        group.classList.toggle('is-open', isOpen);
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) rail.removeAttribute('hidden');
+        else rail.setAttribute('hidden', '');
+        if (persist) {
+          try { localStorage.setItem(storageKey, isOpen ? '1' : '0'); } catch (_) {}
+        }
+      };
+      apply(open, false);
+
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        apply(!group.classList.contains('is-open'), true);
+      });
+    });
+  },
+
   _isSidebarItemActive(item) {
     if (item.active === true) return true;
     if (item.view && item.view === this.currentView) return true;
@@ -2704,7 +2770,13 @@ const StatisticoHeader = {
       const itemsHtml = (group.items || []).map((item) => this._renderSidebarNavItem(item)).join('');
 
       if (!itemsHtml) return '';
-      return `<div class="sb-group"><div class="sb-group-title">${group.title || ''}</div><div class="sb-items-rail">${itemsHtml}</div></div>`;
+      const title = group.title || '';
+      return `<div class="sb-group is-open" data-sb-group="${this._sidebarGroupKey(title)}">`
+        + `<button type="button" class="sb-group-toggle" aria-expanded="true">`
+        + `<span class="sb-group-title-text">${title}</span>`
+        + `<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>`
+        + `</button>`
+        + `<div class="sb-items-rail">${itemsHtml}</div></div>`;
     }).join('');
 
     nav.innerHTML = `
@@ -6124,7 +6196,7 @@ const StatisticoHeader = {
               title="View Data, Save PNG, Change style, Download JSON">
         <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
         <span class="sb-bottom-label">Output &amp; Tools</span>
-        <i class="fa-solid fa-chevron-right sb-output-tools-chevron" aria-hidden="true"></i>
+        <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>
       </button>
       <div class="sb-output-tools-body" id="sbOutputToolsBody" ${toolsOpen ? '' : 'hidden'}>
         <button class="sb-bottom-btn sb-bottom-btn--data ${hasView ? '' : 'sb-bottom-btn--disabled'}"
@@ -6172,6 +6244,8 @@ const StatisticoHeader = {
         try { localStorage.setItem('statistico.sbOutputToolsOpen', open ? '1' : '0'); } catch (_) {}
       });
     }
+
+    this._bindCollapsibleSidebarGroups(nav);
 
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();

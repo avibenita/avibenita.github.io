@@ -1559,14 +1559,18 @@
     if (!wrap || !paper) return;
     var zoom = state.previewZoom;
     wrap.classList.toggle("fit-width", zoom === "fit");
+    /* CSS zoom, not transform: scale — a transformed paper keeps its unscaled
+       layout box, so 125% was clipped on both sides with nothing to scroll to
+       and 75% left a dead gap below the table. */
+    paper.style.transform = "";
     if (zoom === "fit") {
-      paper.style.transform = "none";
+      paper.style.zoom = "";
       paper.style.width = "100%";
       paper.style.maxWidth = "none";
     } else {
       paper.style.maxWidth = "";
       paper.style.width = "";
-      paper.style.transform = "scale(" + (Number(zoom) / 100) + ")";
+      paper.style.zoom = Number(zoom) / 100;
     }
     document.querySelectorAll(".pt2-zoom-bar [data-zoom]").forEach(function (btn) {
       btn.classList.toggle("active", String(btn.getAttribute("data-zoom")) === String(zoom));

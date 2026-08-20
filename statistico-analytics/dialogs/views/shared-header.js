@@ -1171,6 +1171,10 @@ const StatisticoHeader = {
     return String(title || 'group').trim().toLowerCase().replace(/\s+/g, '-');
   },
 
+  _isSidebarGroupDefaultOpen(title) {
+    return this._sidebarGroupKey(title) === 'advanced-diagnostics';
+  },
+
   _bindCollapsibleSidebarGroups(nav) {
     nav = nav || document.getElementById('sidebarNav');
     if (!nav) return;
@@ -1213,7 +1217,8 @@ const StatisticoHeader = {
       const hasActive = !!(group.querySelector('.sb-item.active, .sb-faceted.is-active-group, .sb-item.sb-item-sub.active'));
       let stored = null;
       try { stored = localStorage.getItem(storageKey); } catch (_) {}
-      const open = hasActive || stored === '1';
+      const defaultOpen = this._isSidebarGroupDefaultOpen(titleText);
+      const open = hasActive || stored === '1' || (stored == null && defaultOpen);
 
       const apply = (isOpen, persist) => {
         group.classList.toggle('is-open', isOpen);
@@ -1337,6 +1342,7 @@ const StatisticoHeader = {
           },
           {
             title: 'Advanced diagnostics',
+            defaultOpen: true,
             items: [
               {
                 type: 'navigate',
@@ -2772,12 +2778,14 @@ const StatisticoHeader = {
       if (!itemsHtml) return '';
       const title = group.title || '';
       const hasActive = (group.items || []).some((item) => this._isSidebarItemActive(item));
-      return `<div class="sb-group${hasActive ? ' is-open' : ''}" data-sb-group="${this._sidebarGroupKey(title)}">`
-        + `<button type="button" class="sb-group-toggle" aria-expanded="${hasActive ? 'true' : 'false'}">`
+      const defaultOpen = group.defaultOpen === true || this._isSidebarGroupDefaultOpen(title);
+      const open = hasActive || defaultOpen;
+      return `<div class="sb-group${open ? ' is-open' : ''}" data-sb-group="${this._sidebarGroupKey(title)}">`
+        + `<button type="button" class="sb-group-toggle" aria-expanded="${open ? 'true' : 'false'}">`
         + `<span class="sb-group-title-text">${title}</span>`
         + `<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>`
         + `</button>`
-        + `<div class="sb-items-rail"${hasActive ? '' : ' hidden'}>${itemsHtml}</div></div>`;
+        + `<div class="sb-items-rail"${open ? '' : ' hidden'}>${itemsHtml}</div></div>`;
     }).join('');
 
     nav.innerHTML = `

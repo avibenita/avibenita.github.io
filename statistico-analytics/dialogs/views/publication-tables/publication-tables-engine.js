@@ -1559,14 +1559,18 @@
     if (!wrap || !paper) return;
     var zoom = state.previewZoom;
     wrap.classList.toggle("fit-width", zoom === "fit");
+    /* CSS zoom, not transform: scale — a transformed paper keeps its unscaled
+       layout box, so 125% was clipped on both sides with nothing to scroll to
+       and 75% left a dead gap below the table. */
+    paper.style.transform = "";
     if (zoom === "fit") {
-      paper.style.transform = "none";
+      paper.style.zoom = "";
       paper.style.width = "100%";
       paper.style.maxWidth = "none";
     } else {
       paper.style.maxWidth = "";
       paper.style.width = "";
-      paper.style.transform = "scale(" + (Number(zoom) / 100) + ")";
+      paper.style.zoom = Number(zoom) / 100;
     }
     document.querySelectorAll(".pt2-zoom-bar [data-zoom]").forEach(function (btn) {
       btn.classList.toggle("active", String(btn.getAttribute("data-zoom")) === String(zoom));
@@ -1781,18 +1785,30 @@
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
   }
 
+  function showTab(tab) {
+    state.tab = tab;
+    document.querySelectorAll(".pt2-tab-btn").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-tab") === tab);
+    });
+    ["build", "preview", "details"].forEach(function (t) {
+      var el = $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1));
+      if (el) el.classList.toggle("active", t === tab);
+    });
+    if (tab === "details") renderDetails();
+    if (tab === "preview") renderPreview();
+
+    var view = $("pt2View" + tab.charAt(0).toUpperCase() + tab.slice(1));
+    if (view) {
+      view.querySelectorAll(".pt2-layout, .pt2-main, .pt2-sidebar").forEach(function (el) {
+        el.scrollTop = 0;
+      });
+    }
+  }
+
   function wireTabs() {
-    var btns = document.querySelectorAll(".pt2-tab-btn");
-    btns.forEach(function (btn) {
+    document.querySelectorAll(".pt2-tab-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var tab = btn.getAttribute("data-tab");
-        state.tab = tab;
-        btns.forEach(function (b) { b.classList.toggle("active", b === btn); });
-        ["build", "preview", "details"].forEach(function (t) {
-          $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle("active", t === tab);
-        });
-        if (tab === "details") renderDetails();
-        if (tab === "preview") renderPreview();
+        showTab(btn.getAttribute("data-tab"));
       });
     });
   }
@@ -2939,14 +2955,7 @@
       applyAiDraftFromForm();
       syncControlsFromState();
       renderAll();
-      state.tab = "preview";
-      document.querySelectorAll(".pt2-tab-btn").forEach(function (b) {
-        b.classList.toggle("active", b.getAttribute("data-tab") === "preview");
-      });
-      ["build", "preview", "details"].forEach(function (t) {
-        $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle("active", t === "preview");
-      });
-      renderPreview();
+      showTab("preview");
       $("pt2AiStatus").textContent = "Caption & Notes updated. Results draft copied to clipboard when available.";
       return;
     }
@@ -3049,6 +3058,7 @@
     wireAiAssistant();
     syncControlsFromState();
     renderAll();
+    if (window.__PT2_WEB_DEMO__) showTab("preview");
 
     var closeBtn = $("pt2CloseBtn");
     if (closeBtn) closeBtn.addEventListener("click", function () { sendToHost({ action: "close" }); });

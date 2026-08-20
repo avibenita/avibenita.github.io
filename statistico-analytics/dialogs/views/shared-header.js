@@ -6905,6 +6905,7 @@ const StatisticoHeader = {
   },
 
   _injectPerViewAiButton() {
+    if (this.module === 'reliability') return;
     if (!this._supportsInsightGuide()) return;
     if (document.getElementById('sbAiFloatBtn')) return;
 

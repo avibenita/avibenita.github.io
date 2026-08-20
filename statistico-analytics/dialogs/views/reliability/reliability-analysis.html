@@ -11,7 +11,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260820-tools4"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260820rel3"></script>
+  <script src="../shared-header.js?v=20260820rel4"></script>
   <script src="reliability-engine.js?v=20260820rel2"></script>
   <style>
     :root {
@@ -41,9 +41,26 @@
     .state-msg{text-align:center;padding:48px 20px;color:var(--text-secondary);}
     .state-msg i{font-size:42px;margin-bottom:12px;display:block;color:var(--accent-2);}
     .stats-container{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
-    .stat-panel{flex:1;min-width:180px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--panel-radius);overflow:hidden;}
+    .stat-panel{flex:1;min-width:160px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--panel-radius);overflow:hidden;}
+    .stat-panel.status-panel{flex:0 0 150px;min-width:140px;}
+    .status-chip{display:inline-flex;align-items:center;justify-content:center;min-width:88px;padding:8px 12px;border-radius:999px;font-size:13px;font-weight:800;margin-top:4px;}
+    .status-chip.good,.status-chip.acceptable{background:rgba(74,222,128,.18);color:var(--success);}
+    .status-chip.veryHigh{background:rgba(74,222,128,.28);color:var(--success);}
+    .status-chip.questionable,.status-chip.low{background:rgba(251,191,36,.18);color:var(--warning);}
+    .status-chip.negative,.status-chip.na{background:rgba(251,113,133,.18);color:var(--danger);}
+    .omega-tech{margin-left:6px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:800;cursor:help;line-height:1;}
+    .assess-note{font-size:12.5px;color:var(--text-secondary);line-height:1.45;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);}
+    .scale-score-layout{display:grid;grid-template-columns:minmax(240px,1fr) minmax(280px,1.2fr);gap:12px;align-items:start;}
+    .scale-score-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:12.5px;}
+    .scale-score-grid .k{color:var(--text-muted);}
+    .scale-score-grid .v{font-weight:700;}
+    .coef-compact{font-size:12px;}
+    .coef-compact th,.coef-compact td{padding:5px 8px;}
+    .panel.compact .panel-heading{padding:8px 12px;font-size:13px;}
+    .panel.compact .panel-body{padding:8px 12px;}
+    #scale-hist{width:100%;height:180px;}
     :root[data-theme="light"] .stat-panel{background:var(--surface-1);box-shadow:0 2px 8px rgba(0,0,0,.06);}
-    .stat-panel-heading{background:linear-gradient(135deg, rgba(0,51,102,.82), rgba(0,102,204,.62));color:#fff;padding:8px 12px;font-weight:700;font-size:.9rem;}
+    .stat-panel-heading{background:linear-gradient(135deg, rgba(0,51,102,.82), rgba(0,102,204,.62));color:#fff;padding:8px 12px;font-weight:700;font-size:.9rem;display:flex;align-items:center;}
     .stat-panel-body{padding:10px 12px;}
     .stat-value{font-size:1.45rem;font-weight:800;color:var(--accent-1);}
     .stat-label{font-size:12px;color:var(--text-muted);}
@@ -64,7 +81,6 @@
     .col-toggle{display:flex;gap:4px;flex-wrap:wrap;}
     .col-toggle button{border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text-primary);padding:5px 10px;border-radius:999px;cursor:pointer;font-size:11px;font-weight:650;}
     .col-toggle button.active{background:#1d4ed8;border-color:#1d4ed8;color:#fff;}
-    #scale-hist{width:100%;height:220px;}
     table{width:100%;border-collapse:collapse;font-size:13px;}
     thead th{text-align:left;padding:8px;background:var(--surface-2);cursor:pointer;white-space:nowrap;}
     td{padding:8px;border-bottom:1px solid var(--border);}
@@ -81,12 +97,15 @@
     .btn:disabled{opacity:.45;cursor:not-allowed;}
     .btn-primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);border-color:#1d4ed8;color:#fff;}
     .sb-item.is-disabled{opacity:.45;pointer-events:none;}
-    #alpha-gauge,#scree-chart,#group-chart,#scale-hist{width:100%;height:220px;}
+    #sbAiFloatBtn{display:none !important;}
+    #scree-chart,#group-chart,#scale-hist{width:100%;height:220px;}
+    #scale-hist{height:180px;}
     .help{font-size:12.5px;color:var(--text-secondary);line-height:1.45;}
     .item-name{position:sticky;left:0;background:var(--surface-1);font-weight:700;}
     @media (max-width: 900px) {
       .stats-container{flex-direction:column;}
       .stat-panel{min-width:0;}
+      .scale-score-layout{grid-template-columns:1fr;}
     }
   </style>
 </head>
@@ -123,10 +142,12 @@
               </div>
             </div>
             <div class="stat-panel">
-              <div class="stat-panel-heading">McDonald’s omega total</div>
+              <div class="stat-panel-heading">
+                McDonald’s omega total
+                <button type="button" class="omega-tech" id="omegaTechBtn" title="">i</button>
+              </div>
               <div class="stat-panel-body">
                 <div class="stat-value" id="statOmega">—</div>
-                <div class="stat-label" id="statOmegaStatus"></div>
                 <div class="stat-note" id="statOmegaNote"></div>
               </div>
             </div>
@@ -138,16 +159,12 @@
                 <div class="stat-note" id="statMissing"></div>
               </div>
             </div>
-            <div class="stat-panel" id="gaugePanel">
-              <div class="stat-panel-heading">Alpha gauge</div>
-              <div class="stat-panel-body"><div id="alpha-gauge"></div></div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-heading">Reliability coefficients</div>
-            <div class="panel-body">
-              <div id="coefTable"></div>
-              <p class="help" style="margin-top:8px;">Bands (.60 / .70 / .80 / .90) are rough conventions, not universal rules. Very high reliability may indicate redundant items.</p>
+            <div class="stat-panel status-panel">
+              <div class="stat-panel-heading">Status</div>
+              <div class="stat-panel-body">
+                <div class="status-chip" id="statusChip">—</div>
+                <div class="stat-note" id="statusNote"></div>
+              </div>
             </div>
           </div>
           <div class="panel">
@@ -157,9 +174,17 @@
           <div class="panel">
             <div class="panel-heading">Scale score</div>
             <div class="panel-body">
-              <p class="help" id="scaleScoreHelp">Mean of valid items. Reliability coefficients are calculated separately from this score.</p>
-              <div id="scaleScoreTable"></div>
-              <div id="scale-hist" style="margin-top:10px;"></div>
+              <p class="help" id="scaleScoreHelp"></p>
+              <div class="scale-score-layout">
+                <div id="scaleScoreTable"></div>
+                <div id="scale-hist"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel compact">
+            <div class="panel-heading">Technical details</div>
+            <div class="panel-body">
+              <div id="coefTable"></div>
             </div>
           </div>
         </section>
@@ -343,68 +368,97 @@
       } else if (band.key === 'veryHigh') {
         note = 'Very high reliability may indicate redundant items.';
       } else if (ci && ci.lower != null) {
-        note = '95%'.replace('95', String(Math.round((ci.level || 0.95) * 100))) + ' CI ' + fmt(ci.lower) + ' to ' + fmt(ci.upper)
+        note = Math.round((ci.level || 0.95) * 100) + '% CI ' + fmt(ci.lower) + ' to ' + fmt(ci.upper)
           + (ci.successful != null ? ' · ' + ci.successful + ' bootstrap replications' : '');
       }
       document.getElementById('statAlphaNote').textContent = note;
       document.getElementById('statOmega').textContent = fmt(obs.omegaTotal);
-      document.getElementById('statOmegaStatus').textContent = obs.omegaStatus === 'estimated' || obs.omegaStatus === 'estimated_with_warning'
-        ? 'One-factor common-factor model' : 'Not estimable';
-      document.getElementById('statOmegaNote').textContent = (obs.omegaMeta && obs.omegaMeta.reason) || '';
+      var omegaOk = obs.omegaStatus === 'estimated' || obs.omegaStatus === 'estimated_with_warning';
+      document.getElementById('statOmegaNote').textContent = omegaOk
+        ? 'Estimated using a one-factor common-factor model.'
+        : 'Not estimable.';
+      var tech = (obs.omegaMeta && obs.omegaMeta.reason)
+        ? obs.omegaMeta.reason
+        : 'McDonald’s omega total from principal-axis factor loadings; uniquenesses ψ = 1 − λ².';
+      var techBtn = document.getElementById('omegaTechBtn');
+      techBtn.title = tech;
+      techBtn.setAttribute('aria-label', tech);
+
       document.getElementById('statItems').textContent = obs.itemCount != null ? String(obs.itemCount) : '—';
       document.getElementById('statN').textContent = obs.nValid != null ? String(obs.nValid) : '—';
       document.getElementById('statMissing').textContent = (cfg.missingMethod === 'pairwise' ? 'Pairwise deletion' : 'Listwise deletion')
         + (obs.nOriginal != null ? ' · original N ' + obs.nOriginal : '');
 
-      var rows = [
-        ['Cronbach’s alpha', fmt(obs.alpha), ci && ci.lower != null ? fmt(ci.lower) + ' – ' + fmt(ci.upper) : '—'],
-        ['Standardized alpha', fmt(obs.standardizedAlpha), 'From the average inter-item correlation'],
-        ['McDonald’s omega total', fmt(obs.omegaTotal), 'One-factor common-factor model (not PCA)']
-      ];
-      document.getElementById('coefTable').innerHTML = '<table><thead><tr><th>Coefficient</th><th>Estimate</th><th>Notes</th></tr></thead><tbody>'
-        + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + esc(r[2]) + '</td></tr>'; }).join('')
-        + '</tbody></table>';
+      var chip = document.getElementById('statusChip');
+      chip.textContent = band.label || '—';
+      chip.className = 'status-chip ' + (band.key || 'na');
+      document.getElementById('statusNote').textContent = band.key === 'negative'
+        ? 'Diagnostic warning'
+        : 'Internal consistency';
 
-      var weak = obs.weakestItem;
+      var ciTxt = ci && ci.lower != null ? fmt(ci.lower) + ' – ' + fmt(ci.upper) : '—';
+      var rows = [
+        ['Cronbach’s alpha', fmt(obs.alpha), ciTxt],
+        ['Standardized alpha', fmt(obs.standardizedAlpha), 'From the average inter-item correlation'],
+        ['McDonald’s omega total', fmt(obs.omegaTotal), omegaOk ? 'One-factor common-factor model' : (obs.omegaStatus || 'Not estimable')]
+      ];
+      document.getElementById('coefTable').innerHTML = '<table class="coef-compact"><thead><tr><th>Coefficient</th><th>Estimate</th><th>Notes</th></tr></thead><tbody>'
+        + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + esc(r[2]) + '</td></tr>'; }).join('')
+        + '</tbody></table>'
+        + '<p class="help" style="margin-top:6px;">Bands (.60 / .70 / .80 / .90) are rough conventions, not pass/fail rules.</p>';
+
+      var lowest = obs.weakestItem;
       var dim = obs.structure && obs.structure.firstComponentVariance != null
-        ? ('First component explains ' + fmt(obs.structure.firstComponentVariance, 1) + '% of variance (diagnostic only).')
+        ? ('First component explains ' + fmt(obs.structure.firstComponentVariance, 1) + '% of variance in the Scale Structure diagnostic.')
         : 'Dimensionality diagnostic not available.';
       document.getElementById('assessmentCard').innerHTML =
         '<div class="stat-field"><span class="stat-label">Reliability level</span> <strong>' + esc(band.label || '—') + '</strong></div>'
-        + '<div class="stat-field"><span class="stat-label">Weakest item</span> <strong>' + esc(weak && weak.item ? weak.item : '—')
-        + '</strong>' + (weak && weak.itemTotalCorrelation != null ? ' (item–total ' + fmt(weak.itemTotalCorrelation, 2) + ')' : '') + '</div>'
+        + '<div class="stat-field"><span class="stat-label">Lowest item–total correlation</span> <strong>' + esc(lowest && lowest.item ? lowest.item : '—')
+        + '</strong>' + (lowest && lowest.itemTotalCorrelation != null ? ' (' + fmt(lowest.itemTotalCorrelation, 2) + ')' : '') + '</div>'
         + '<div class="stat-field"><span class="stat-label">Average inter-item correlation</span> <strong>' + fmt(obs.averageInterItemCorrelation, 3) + '</strong></div>'
-        + '<div class="stat-note" style="margin-top:8px;">' + esc(dim) + '</div>';
+        + '<div class="stat-note" style="margin-top:8px;">' + esc(dim) + '</div>'
+        + '<div class="assess-note">Reliability is not validity. Internal consistency does not establish that the scale measures the intended construct. The Scale Structure view is a dimensionality diagnostic, not proof of unidimensionality.</div>';
 
-      renderGauge(obs.alpha);
       renderScaleScore(obs, cfg);
+    }
+
+    function scaleScoreSentence(obs, cfg, sc) {
+      var k = sc.itemCount != null ? sc.itemCount : ((cfg.items || []).length || obs.itemCount);
+      var n = sc.validN != null ? sc.validN : obs.nValid;
+      var method = sc.method === 'sum' ? 'Sum' : 'Mean';
+      var need = (cfg.scaleScore && cfg.scaleScore.minCompleted) || 'all';
+      var missing = cfg.missingMethod === 'pairwise' ? 'pairwise' : 'listwise';
+      if (missing === 'listwise' && (need === 'all' || need === k || need === String(k))) {
+        return method + ' of the ' + k + ' selected items, calculated for the ' + n + ' respondents with complete data.';
+      }
+      if (need !== 'all') {
+        return method + ' of completed items among the ' + n + ' respondents with at least ' + need + ' of ' + k + ' items.';
+      }
+      return method + ' of available items, calculated with pairwise deletion (N = ' + n + ').';
     }
 
     function renderScaleScore(obs, cfg) {
       var sc = obs.scaleScore || {};
-      var method = sc.method === 'sum' ? 'Sum of valid items' : 'Mean of valid items';
-      var need = (cfg.scaleScore && cfg.scaleScore.minCompleted) || 'all';
-      document.getElementById('scaleScoreHelp').textContent = method
-        + (need === 'all' ? ' · respondents must complete every item' : (' · at least ' + need + ' completed items'))
-        + '. Reliability coefficients are calculated separately from this score.';
-      var rows = [
-        ['Scoring method', method],
+      document.getElementById('scaleScoreHelp').textContent = scaleScoreSentence(obs, cfg, sc);
+      var cells = [
+        ['Scoring', sc.method === 'sum' ? 'Sum' : 'Mean'],
         ['Valid N', sc.validN != null ? String(sc.validN) : '—'],
-        ['Number of items', sc.itemCount != null ? String(sc.itemCount) : '—'],
+        ['Items', sc.itemCount != null ? String(sc.itemCount) : '—'],
         ['Mean', fmt(sc.mean, 2)],
         ['SD', fmt(sc.sd, 2)],
         ['Median', fmt(sc.median, 2)],
-        ['Minimum', fmt(sc.min, 2)],
-        ['Maximum', fmt(sc.max, 2)],
+        ['Min', fmt(sc.min, 2)],
+        ['Max', fmt(sc.max, 2)],
         ['Possible range', (sc.possibleMin != null && sc.possibleMax != null) ? fmt(sc.possibleMin, 2) + ' – ' + fmt(sc.possibleMax, 2) : '—'],
         ['Observed range', (sc.observedMin != null && sc.observedMax != null) ? fmt(sc.observedMin, 2) + ' – ' + fmt(sc.observedMax, 2) : '—'],
         ['Missing respondents', sc.missingRespondents != null ? String(sc.missingRespondents) : '—'],
-        ['Floor %', fmt(sc.floorPct, 1)],
-        ['Ceiling %', fmt(sc.ceilingPct, 1)]
+        ['Floor / ceiling', fmt(sc.floorPct, 1) + '% / ' + fmt(sc.ceilingPct, 1) + '%']
       ];
-      document.getElementById('scaleScoreTable').innerHTML = '<table><thead><tr><th>Statistic</th><th>Value</th></tr></thead><tbody>'
-        + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('')
-        + '</tbody></table>';
+      document.getElementById('scaleScoreTable').innerHTML = '<div class="scale-score-grid">'
+        + cells.map(function (r) {
+          return '<div class="k">' + r[0] + '</div><div class="v">' + r[1] + '</div>';
+        }).join('')
+        + '</div>';
       renderScaleHist(sc);
     }
 
@@ -443,28 +497,6 @@
         credits: { enabled: false },
         legend: { enabled: false },
         series: [{ name: 'Respondents', data: counts, color: 'rgb(120,200,255)' }]
-      });
-    }
-
-    function renderGauge(alpha) {
-      var panel = document.getElementById('gaugePanel');
-      if (typeof Highcharts === 'undefined') return;
-      if (alpha == null || !isFinite(alpha) || alpha < 0) {
-        panel.style.display = alpha != null && alpha < 0 ? 'block' : 'none';
-        if (alpha != null && alpha < 0) {
-          document.getElementById('alpha-gauge').innerHTML = '<div class="warn-banner danger">Negative alpha is shown as a diagnostic warning, not as a 0–1 reliability gauge.</div>';
-        }
-        return;
-      }
-      panel.style.display = 'block';
-      Highcharts.chart('alpha-gauge', {
-        chart: { type: 'solidgauge', backgroundColor: 'transparent', height: 200 },
-        title: { text: null },
-        pane: { center: ['50%', '70%'], size: '120%', startAngle: -90, endAngle: 90, background: { backgroundColor: 'rgba(255,255,255,.08)', innerRadius: '60%', outerRadius: '100%', shape: 'arc' } },
-        yAxis: { min: 0, max: 1, stops: [[0.6, '#fb7185'], [0.7, '#fbbf24'], [0.8, '#4ade80']], lineWidth: 0, tickWidth: 0, minorTickInterval: null, labels: { enabled: false } },
-        series: [{ name: 'Alpha', data: [Math.max(0, Math.min(1, alpha))], dataLabels: { format: '{y:.2f}', y: -20, borderWidth: 0, style: { fontSize: '16px', color: '#fff' } } }],
-        credits: { enabled: false },
-        tooltip: { enabled: false }
       });
     }
 

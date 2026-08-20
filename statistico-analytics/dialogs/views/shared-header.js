@@ -1213,7 +1213,7 @@ const StatisticoHeader = {
       const hasActive = !!(group.querySelector('.sb-item.active, .sb-faceted.is-active-group, .sb-item.sb-item-sub.active'));
       let stored = null;
       try { stored = localStorage.getItem(storageKey); } catch (_) {}
-      const open = hasActive || stored !== '0';
+      const open = hasActive || stored === '1';
 
       const apply = (isOpen, persist) => {
         group.classList.toggle('is-open', isOpen);
@@ -2771,12 +2771,13 @@ const StatisticoHeader = {
 
       if (!itemsHtml) return '';
       const title = group.title || '';
-      return `<div class="sb-group is-open" data-sb-group="${this._sidebarGroupKey(title)}">`
-        + `<button type="button" class="sb-group-toggle" aria-expanded="true">`
+      const hasActive = (group.items || []).some((item) => this._isSidebarItemActive(item));
+      return `<div class="sb-group${hasActive ? ' is-open' : ''}" data-sb-group="${this._sidebarGroupKey(title)}">`
+        + `<button type="button" class="sb-group-toggle" aria-expanded="${hasActive ? 'true' : 'false'}">`
         + `<span class="sb-group-title-text">${title}</span>`
         + `<i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>`
         + `</button>`
-        + `<div class="sb-items-rail">${itemsHtml}</div></div>`;
+        + `<div class="sb-items-rail"${hasActive ? '' : ' hidden'}>${itemsHtml}</div></div>`;
     }).join('');
 
     nav.innerHTML = `
@@ -6185,7 +6186,6 @@ const StatisticoHeader = {
     footer.appendChild(exportWrap);
 
     let toolsOpen = false;
-    try { toolsOpen = localStorage.getItem('statistico.sbOutputToolsOpen') === '1'; } catch (_) {}
 
     const utilities = document.createElement('div');
     utilities.id = 'sbUtilities';

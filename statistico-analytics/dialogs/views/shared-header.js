@@ -6018,6 +6018,11 @@ const StatisticoHeader = {
     anchor.appendChild(pinned);
   },
 
+  _sidebarAiButtonInnerHtml(busy) {
+    if (busy) return '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
+    return '<i class="fa-solid fa-wand-magic-sparkles"></i><span>Interpret with AI</span><sup class="sb-ai-sup">AI</sup>';
+  },
+
   _mountSidebarUtilities() {
     const nav = document.getElementById('sidebarNav');
     if (!nav) return;
@@ -6039,6 +6044,8 @@ const StatisticoHeader = {
     if (existing) existing.remove();
     const existingAi = document.getElementById('sbAiSection');
     if (existingAi) existingAi.remove();
+    const existingExport = document.getElementById('sbExportWrap');
+    if (existingExport) existingExport.remove();
     const existingProductFooter = document.getElementById('sbProductFooter');
     if (existingProductFooter) existingProductFooter.remove();
     const existingFooter = document.getElementById('sbNavFooter');
@@ -6053,7 +6060,7 @@ const StatisticoHeader = {
     const hasHtml = typeof actions.exportHtml === 'function';
     const hasJson = typeof actions.exportJson === 'function';
 
-    // ── AI pill — above utilities ─────────────────────────────────────────
+    // ── AI pill — above export / tools ────────────────────────────────────
     const isDependentKplus = this.module === 'dependent' && this.currentView === 'dependent-results-kplus';
     const supportsIndependentAi = this.module === 'independent';
     const supportsMixedAi = this.module === 'mixed-model';
@@ -6066,7 +6073,6 @@ const StatisticoHeader = {
       const aiSection = document.createElement('div');
       aiSection.id = 'sbAiSection';
       aiSection.className = 'sb-ai-section-wrap';
-      const isCorrelation = this.module === 'correlations';
       const aiClick = supportsIndependentAi
         ? 'StatisticoHeader._sbAiIndependentInterpret()'
         : isDependentKplus
@@ -6080,50 +6086,22 @@ const StatisticoHeader = {
         : supportsMetaAi
           ? 'requestMetaModuleAI()'
           : 'StatisticoHeader._sbAiGlobalInterpret()';
-      const aiTitle = supportsIndependentAi
-        ? 'AI statistical summary for this independent means analysis'
-        : isDependentKplus
-          ? 'Full AI interpretation of this repeated-measures analysis'
-        : supportsMixedAi
-          ? 'AI interpretation of the mixed model results'
-        : supportsFactorAi
-          ? 'Full factor analysis - synthesises suitability, extraction, rotation & diagnostics into one report'
-        : supportsClusterAi
-          ? 'Full cluster analysis - synthesises quality, sizes, profiles & separation into one report'
-        : supportsMetaAi
-          ? 'Full meta-analysis — synthesises pooled effect, heterogeneity, and publication bias into one report'
-          : (isCorrelation ? 'Full correlation analysis - synthesises all correlation views into one report' : 'Full variable analysis - synthesises all diagnostics into one report');
-      const aiLabel = supportsFullAiPill ? 'Full AI Analysis' : 'Full Analysis';
-      const aiBadge = supportsFullAiPill ? 'ALL' : 'AI';
+      const aiTitle = 'Generate an AI-assisted interpretation of the complete analysis, assumptions, and key findings.';
       aiSection.innerHTML = `
         <button class="sb-ai-sidebar-pill ${supportsFullAiPill ? 'sb-ai-sidebar-pill--full' : ''}"
                 id="sbAiBtn"
                 onclick="${aiClick}"
                 title="${aiTitle}">
-          <i class="fa-solid ${supportsFullAiPill ? 'fa-layer-group' : 'fa-brain'}"></i>
-          <span>${aiLabel}</span>
-          <sup class="sb-ai-sup">${aiBadge}</sup>
+          ${this._sidebarAiButtonInnerHtml(false)}
         </button>
       `;
       footer.appendChild(aiSection);
     }
 
-    // ── Utilities ──────────────────────────────────────────────────────────
-    const utilities = document.createElement('div');
-    utilities.id = 'sbUtilities';
-    utilities.className = 'sb-bottom';
-    utilities.innerHTML = `
-      <div class="sb-bottom-row">
-        <i class="fa-solid fa-wand-magic-sparkles sb-bottom-icon"></i>
-        <span class="sb-bottom-label">Utilities</span>
-      </div>
-      <button class="sb-bottom-btn sb-bottom-btn--data ${hasView ? '' : 'sb-bottom-btn--disabled'}"
-              id="sbViewDataBtn"
-              ${hasView ? 'onclick="StatisticoHeader._toggleViewData()"' : 'disabled'}
-              title="${hasView ? 'Toggle between used observations and all observations' : 'View Data is not available for this page yet'}">
-        <i class="fa-solid fa-eye"></i>
-        <span class="sb-item-label">View Data</span>
-      </button>
+    const exportWrap = document.createElement('div');
+    exportWrap.id = 'sbExportWrap';
+    exportWrap.className = 'sb-export-wrap';
+    exportWrap.innerHTML = `
       <button class="sb-bottom-btn sb-bottom-btn--html ${hasHtml ? '' : 'sb-bottom-btn--disabled'}"
               id="sbExportHtmlBtn"
               ${hasHtml ? 'onclick="StatisticoHeader._pendingActions.exportHtml()"' : 'disabled'}
@@ -6131,30 +6109,69 @@ const StatisticoHeader = {
         <i class="fa-solid fa-file-export"></i>
         <span class="sb-item-label">Export Report</span>
       </button>
-      <button class="sb-bottom-btn sb-bottom-btn--png"
-              id="sbSavePngBtn"
-              onclick="StatisticoHeader.exportPreviewPng()"
-              title="Save the on-screen chart preview as a PNG image">
-        <i class="fa-solid fa-image"></i>
-        <span class="sb-item-label">Save as PNG</span>
+    `;
+    footer.appendChild(exportWrap);
+
+    let toolsOpen = false;
+    try { toolsOpen = localStorage.getItem('statistico.sbOutputToolsOpen') === '1'; } catch (_) {}
+
+    const utilities = document.createElement('div');
+    utilities.id = 'sbUtilities';
+    utilities.className = 'sb-bottom sb-output-tools' + (toolsOpen ? ' is-open' : '');
+    utilities.innerHTML = `
+      <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
+              aria-expanded="${toolsOpen ? 'true' : 'false'}"
+              title="View Data, Save PNG, Change style, Download JSON">
+        <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
+        <span class="sb-bottom-label">Output &amp; Tools</span>
+        <i class="fa-solid fa-chevron-right sb-output-tools-chevron" aria-hidden="true"></i>
       </button>
-      <button class="sb-bottom-btn sb-bottom-btn--tpl"
-              id="sbTemplateLibBtn"
-              onclick="StatisticoHeader.openTemplateLibrary()"
-              title="Change the live chart colors and texture">
-        <i class="fa-solid fa-swatchbook"></i>
-        <span class="sb-item-label">Change style</span>
-      </button>
-      <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
-              id="sbExportJsonBtn"
-              ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
-              title="${hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet'}">
-        <i class="fa-solid fa-download"></i>
-        <span class="sb-item-label">JSON</span>
-      </button>
+      <div class="sb-output-tools-body" id="sbOutputToolsBody" ${toolsOpen ? '' : 'hidden'}>
+        <button class="sb-bottom-btn sb-bottom-btn--data ${hasView ? '' : 'sb-bottom-btn--disabled'}"
+                id="sbViewDataBtn"
+                ${hasView ? 'onclick="StatisticoHeader._toggleViewData()"' : 'disabled'}
+                title="${hasView ? 'Toggle between used observations and all observations' : 'View Data is not available for this page yet'}">
+          <i class="fa-solid fa-eye"></i>
+          <span class="sb-item-label">View Data</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--png"
+                id="sbSavePngBtn"
+                onclick="StatisticoHeader.exportPreviewPng()"
+                title="Save the on-screen chart preview as a PNG image">
+          <i class="fa-solid fa-image"></i>
+          <span class="sb-item-label">Save as PNG</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--tpl"
+                id="sbTemplateLibBtn"
+                onclick="StatisticoHeader.openTemplateLibrary()"
+                title="Change the live chart colors and texture">
+          <i class="fa-solid fa-swatchbook"></i>
+          <span class="sb-item-label">Change style</span>
+        </button>
+        <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
+                id="sbExportJsonBtn"
+                ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
+                title="${hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet'}">
+          <i class="fa-solid fa-download"></i>
+          <span class="sb-item-label">Download JSON</span>
+        </button>
+      </div>
     `;
     footer.appendChild(utilities);
     nav.appendChild(footer);
+
+    const toolsToggle = document.getElementById('sbOutputToolsToggle');
+    const toolsBody = document.getElementById('sbOutputToolsBody');
+    if (toolsToggle && toolsBody) {
+      toolsToggle.addEventListener('click', () => {
+        const open = !utilities.classList.contains('is-open');
+        utilities.classList.toggle('is-open', open);
+        toolsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) toolsBody.removeAttribute('hidden');
+        else toolsBody.setAttribute('hidden', '');
+        try { localStorage.setItem('statistico.sbOutputToolsOpen', open ? '1' : '0'); } catch (_) {}
+      });
+    }
 
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
@@ -7240,8 +7257,8 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
       if (!sidebarBtn) return;
       sidebarBtn.disabled = busy;
       sidebarBtn.innerHTML = busy
-        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Generating...</span>'
-        : '<i class="fa-solid fa-layer-group"></i><span>Full AI Analysis</span><sup class="sb-ai-sup">ALL</sup>';
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>'
+        : this._sidebarAiButtonInnerHtml(false);
     };
     if (typeof switchTab === 'function') switchTab('ai-interpretation');
     setBusy(true);
@@ -7264,7 +7281,7 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
         btn.disabled = busy;
         btn.innerHTML = busy
           ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Generating...</span>'
-          : '<i class="fa-solid fa-layer-group"></i><span>Full AI Analysis</span><sup class="sb-ai-sup">ALL</sup>';
+          : this._sidebarAiButtonInnerHtml(false);
       });
       if (floatBtn) floatBtn.disabled = busy;
     };
@@ -7555,7 +7572,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-brain"></i><span>Full Analysis</span><sup class="sb-ai-sup">AI</sup>';
+        btn.innerHTML = this._sidebarAiButtonInnerHtml(false);
       }
     }
   },

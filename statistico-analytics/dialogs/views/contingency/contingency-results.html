@@ -14,9 +14,9 @@
     }
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <link rel="stylesheet" href="../shared-header.css?v=20260820-tools4"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260821ct1"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260820-tools4"></script>
+  <script src="../shared-header.js?v=20260821ct1"></script>
   <script src="contingency-engine.js?v=20260814ct8"></script>
   <script src="contingency-sample-data.js?v=20260814ct8"></script>
   <style>
@@ -351,8 +351,34 @@
       padding-bottom:6px;
     }
     .viz-check input { accent-color:#8b5cf6; }
-    #vizChartWrap.chart-wrap { width:100%; height:440px; border-radius:10px; overflow:hidden; }
+    #vizChartWrap.chart-wrap { width:100%; height:380px; border-radius:10px; overflow:hidden; }
     #vizChart { width:100%; height:100%; }
+    .tt-map {
+      display:grid; grid-template-columns:minmax(240px,1fr) auto; gap:14px 20px; align-items:start;
+    }
+    .tt-fields { display:flex; flex-wrap:wrap; gap:10px 14px; margin-top:8px; }
+    .tt-fields label {
+      display:flex; flex-direction:column; gap:4px;
+      font-size:11px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; color:var(--text-muted);
+    }
+    .tt-fields select.ct-sel { text-transform:none; letter-spacing:0; font-weight:700; min-width:140px; }
+    .tt-outcome { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; font-size:12px; color:var(--text-secondary); }
+    .tt-grid-wrap { overflow:auto; }
+    table.tt-grid { border-collapse:collapse; font-size:13px; min-width:280px; }
+    table.tt-grid th, table.tt-grid td {
+      border:1px solid var(--border); padding:7px 10px; text-align:center; white-space:nowrap;
+    }
+    table.tt-grid th { background:var(--surface-2); font-size:11.5px; font-weight:800; color:var(--text-secondary); }
+    table.tt-grid th.stub, table.tt-grid td.stub { text-align:left; font-weight:800; color:var(--text-primary); }
+    table.tt-grid td.num { font-variant-numeric:tabular-nums; font-weight:700; }
+    table.tt-grid .tt-cell-lab { display:block; font-size:10px; font-weight:700; color:var(--text-muted); margin-bottom:1px; }
+    .tt-kpis { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); }
+    .kpi-v-main { font-size:24px; font-weight:700; color:var(--accent-ct); margin-top:4px; line-height:1.15; }
+    .kpi-ci { font-size:12px; font-weight:650; color:var(--text-muted); margin-top:3px; }
+    .kpi-interp { font-size:13.5px; line-height:1.4; color:var(--text-secondary); margin-top:8px; }
+    @media (max-width: 820px) {
+      .tt-map { grid-template-columns:1fr; }
+    }
   </style>
 </head>
 <body>
@@ -378,13 +404,9 @@
               <i class="fa-solid fa-table sb-item-icon"></i>
               <span class="sb-item-copy"><span class="sb-item-label">Contingency Table</span><span class="sb-item-description">Counts, percents, adjusted residuals.</span></span>
             </button>
-            <button class="sb-item" onclick="switchTab('visualization')" data-tab="visualization">
-              <i class="fa-solid fa-chart-column sb-item-icon"></i>
-              <span class="sb-item-copy"><span class="sb-item-label">Visualization</span><span class="sb-item-description">Chart columns by n, %, or residual.</span></span>
-            </button>
             <button class="sb-item" onclick="switchTab('diagnostics')" data-tab="diagnostics">
               <i class="fa-solid fa-stethoscope sb-item-icon"></i>
-              <span class="sb-item-copy"><span class="sb-item-label">Diagnostics</span><span class="sb-item-description">Expected-count checks and residual heat map.</span></span>
+              <span class="sb-item-copy"><span class="sb-item-label">Diagnostics &amp; Visualization</span><span class="sb-item-description">Residual map, expected-count checks, and charts.</span></span>
             </button>
             <button class="sb-item" onclick="switchTab('twobytwo')" data-tab="twobytwo" id="tab2x2Btn">
               <i class="fa-solid fa-border-all sb-item-icon"></i>
@@ -436,8 +458,26 @@
             </div>
           </div>
         </div>
-        <div id="tab-visualization" class="tab-panel">
+        <div id="tab-diagnostics" class="tab-panel">
+          <div class="warn-banner" id="diagWarn"></div>
+          <div class="kpi-row" id="diagKpis"></div>
           <div class="card">
+            <div class="card-title-row">
+              <div class="card-title">Adjusted residuals</div>
+              <button type="button" class="ct-help-btn" id="diagHelpBtn" title="How to read this table" aria-label="How to read this table">?</button>
+            </div>
+            <p class="muted" style="margin-bottom:8px;">|r| &lt; 2 neutral · 2–3 moderate · ≥ 3 strong. Blue = fewer than expected; orange = more than expected.</p>
+            <div class="ws-mode-tabbar" id="diagModeBar"></div>
+            <div id="heatWrap"></div>
+            <div class="tbl-wrap" id="residWrap" style="display:none;"></div>
+            <div class="legend">
+              <span class="sw" style="background:#2563eb;"></span> Fewer than expected
+              <span class="sw" style="background:#64748b;"></span> Near expected
+              <span class="sw" style="background:#ea580c;"></span> More than expected
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Chart</div>
             <div class="viz-controls">
               <label>Y axis
                 <select class="ct-sel" id="vizMetric"></select>
@@ -462,37 +502,32 @@
             </div>
           </div>
         </div>
-        <div id="tab-diagnostics" class="tab-panel">
-          <div class="warn-banner" id="diagWarn"></div>
-          <div class="kpi-row" id="diagKpis"></div>
-          <div class="card">
-            <div class="card-title-row">
-              <div class="card-title">Adjusted residuals</div>
-              <button type="button" class="ct-help-btn" id="diagHelpBtn" title="How to read this table" aria-label="How to read this table">?</button>
-            </div>
-            <p class="muted" style="margin-bottom:8px;">|r| &lt; 2 neutral · 2–3 moderate · ≥ 3 strong. Blue = fewer than expected; orange = more than expected.</p>
-            <div class="ws-mode-tabbar" id="diagModeBar"></div>
-            <div id="heatWrap"></div>
-            <div class="tbl-wrap" id="residWrap" style="display:none;"></div>
-            <div class="legend">
-              <span class="sw" style="background:#2563eb;"></span> Fewer than expected
-              <span class="sw" style="background:#64748b;"></span> Near expected
-              <span class="sw" style="background:#ea580c;"></span> More than expected
-            </div>
-          </div>
-        </div>
         <div id="tab-twobytwo" class="tab-panel">
           <div class="card">
-            <div class="card-title">Category mapping</div>
-            <p class="layout-note">Measures compare the index row with the reference row for the selected event column. Changing the mapping recalculates odds and risk immediately — it does not silently reverse the effect.</p>
-            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-              <label class="muted">Index row <select class="ct-sel" id="selRowIndex"></select></label>
-              <label class="muted">Event column <select class="ct-sel" id="selColEvent"></select></label>
+            <div class="tt-map">
+              <div class="tt-map-copy">
+                <div class="card-title">Category mapping</div>
+                <p class="layout-note">Compare the group of interest with the other row, for the outcome treated as the event. Changing either dropdown recalculates the measures.</p>
+                <div class="tt-fields">
+                  <label>Group of interest
+                    <select class="ct-sel" id="selRowIndex"></select>
+                  </label>
+                  <label>Outcome treated as event
+                    <select class="ct-sel" id="selColEvent"></select>
+                  </label>
+                </div>
+                <div class="tt-outcome">
+                  <span>Treat this outcome as</span>
+                  <div class="viz-seg" id="ttOutcomeSeg">
+                    <button type="button" class="active" data-ben="1">Beneficial</button>
+                    <button type="button" data-ben="0">Harmful</button>
+                  </div>
+                </div>
+              </div>
+              <div class="tt-grid-wrap" id="ttGrid"></div>
             </div>
-            <p class="muted" id="mapCaption" style="margin-top:8px;"></p>
           </div>
-          <div class="kpi-row" id="rrKpis"></div>
-          <div class="card" id="rrNotes"></div>
+          <div class="kpi-row tt-kpis" id="rrKpis"></div>
         </div>
       </div>
     </div>
@@ -582,11 +617,12 @@
     var vizWeighted = true;
     var vizUnweightedCache = null;
     var vizBound = false;
+    var outcomeBeneficial = true;
     var TITLE_MAP = {
       overview: 'Overview',
       table: 'Contingency Table',
-      visualization: 'Visualization',
-      diagnostics: 'Diagnostics',
+      visualization: 'Diagnostics & Visualization',
+      diagnostics: 'Diagnostics & Visualization',
       twobytwo: '2×2 Measures'
     };
     var MEASURES = [
@@ -657,6 +693,10 @@
       d = d == null ? 2 : d;
       if (Math.abs(x - Math.round(x)) < 1e-9 && d <= 2) return String(Math.round(x));
       return Number(x).toFixed(d);
+    }
+    function fmtFixed(x, d) {
+      if (!isFinite(x)) return '—';
+      return Number(x).toFixed(d == null ? 2 : d);
     }
     function esc(s) {
       return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -987,7 +1027,7 @@
 
     function switchTab(name) {
       if (name === 'tests') name = 'overview';
-      if (name === 'viz') name = 'visualization';
+      if (name === 'viz' || name === 'visualization') name = 'diagnostics';
       if (name === 'twobytwo' && !(bundle && bundle.nRows === 2 && bundle.nCols === 2)) name = 'overview';
       activeTab = name;
       document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
@@ -999,8 +1039,8 @@
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
         StatisticoHeader.updateTitle(TITLE_MAP[name] || 'Contingency Tables');
       }
-      if (name === 'diagnostics') renderDiagView();
-      if (name === 'visualization') {
+      if (name === 'diagnostics') {
+        renderDiagView();
         renderVizChart();
         setTimeout(function () { if (vizChart && vizChart.reflow) vizChart.reflow(); }, 40);
       }
@@ -1124,7 +1164,7 @@
       renderTable();
       renderHeat();
       renderResidValues();
-      if (activeTab === 'visualization') renderVizChart();
+      if (activeTab === 'diagnostics') renderVizChart();
     }
 
     function renderTable() {
@@ -1231,7 +1271,7 @@
         renderTable();
         renderHeat();
         renderResidValues();
-        if (activeTab === 'visualization') renderVizChart();
+        if (activeTab === 'diagnostics') renderVizChart();
       }
       wrap.querySelectorAll('th.col-drag, th.row-drag').forEach(function (th) {
         th.addEventListener('pointerdown', function (e) {
@@ -1342,11 +1382,9 @@
       if (!(r.nRows === 2 && r.nCols === 2)) return;
       var selR = document.getElementById('selRowIndex');
       var selC = document.getElementById('selColEvent');
-      if (!selR.options.length) {
+      if (selR && !selR.options.length) {
         r.rowLabels.forEach(function (lab) { selR.appendChild(new Option(lab, lab)); });
         r.colLabels.forEach(function (lab) { selC.appendChild(new Option(lab, lab)); });
-        selR.value = r.rowLabels[0];
-        selC.value = r.colLabels[0];
         selR.onchange = selC.onchange = function () {
           bundle = StatisticoContingency.remap2x2(bundle, selR.value, selC.value);
           renderAll();
@@ -1354,30 +1392,115 @@
         };
       }
       var m = r.measures2x2;
+      if (!m || !m.layout) return;
       var lay = m.layout;
-      document.getElementById('mapCaption').textContent =
-        'Index row: ' + lay.rowIndex + '  ·  Reference row: ' + lay.rowReference +
-        '  ·  Event: ' + lay.colEvent + '  ·  Non-event: ' + lay.colReference +
-        '  ·  a=' + fmtN(lay.cells.a, 2) + ', b=' + fmtN(lay.cells.b, 2) +
-        ', c=' + fmtN(lay.cells.c, 2) + ', d=' + fmtN(lay.cells.d, 2);
-      function measKpi(title, obj, isDiff, tip) {
-        if (!obj || !obj.available) return kpi(title, obj && obj.reason ? obj.reason : 'Not estimable', tip);
-        var ci = fmtN(obj.ciLower, 3) + ' to ' + fmtN(obj.ciUpper, 3);
-        return kpi(title, fmtN(obj.value, 3) + '  (' + Math.round(r.confidence * 100) + '% CI ' + ci + ')', tip);
-      }
-      qsHtml('rrKpis',
-        measKpi('Odds ratio', m.oddsRatio, false, 'Odds of the event in the index row divided by odds in the reference row. 1 = no association. Symmetric: swapping event/non-event inverts the OR.') +
-        measKpi('Risk ratio', m.riskRatio, false, 'Risk (row proportion) in the index row divided by risk in the reference row. 1 = no difference. Not symmetric if you swap the event column.') +
-        measKpi('Risk difference', m.riskDifference, true, 'Risk in the index row minus risk in the reference row. 0 = no difference. On the probability scale, so it is easier to interpret than a ratio.')
+      var cells = lay.cells || {};
+      var g1 = lay.rowIndex;
+      var g0 = lay.rowReference;
+      var ev = lay.colEvent;
+      var nonev = lay.colReference;
+      var a = cells.a, b = cells.b, c = cells.c, d = cells.d;
+      if (selR) selR.value = g1;
+      if (selC) selC.value = ev;
+      document.querySelectorAll('#ttOutcomeSeg button').forEach(function (btn) {
+        btn.classList.toggle('active', (btn.getAttribute('data-ben') === '1') === !!outcomeBeneficial);
+        btn.onclick = function () {
+          outcomeBeneficial = btn.getAttribute('data-ben') === '1';
+          render2x2();
+        };
+      });
+      var n1 = a + b, n2 = c + d;
+      qsHtml('ttGrid',
+        '<table class="tt-grid"><thead><tr><th class="stub"></th>' +
+        '<th>' + esc(ev) + '</th><th>' + esc(nonev) + '</th><th>Total</th></tr></thead><tbody>' +
+        '<tr><th class="stub">' + esc(g1) + '</th>' +
+        '<td class="num"><span class="tt-cell-lab">a</span>' + esc(fmtN(a, 2)) + '</td>' +
+        '<td class="num"><span class="tt-cell-lab">b</span>' + esc(fmtN(b, 2)) + '</td>' +
+        '<td class="num">' + esc(fmtN(n1, 2)) + '</td></tr>' +
+        '<tr><th class="stub">' + esc(g0) + '</th>' +
+        '<td class="num"><span class="tt-cell-lab">c</span>' + esc(fmtN(c, 2)) + '</td>' +
+        '<td class="num"><span class="tt-cell-lab">d</span>' + esc(fmtN(d, 2)) + '</td>' +
+        '<td class="num">' + esc(fmtN(n2, 2)) + '</td></tr>' +
+        '</tbody></table>'
       );
-      var notes = [];
-      if (m.oddsRatio && m.oddsRatio.available && m.oddsRatio.continuityCorrection) {
-        notes.push('Odds ratio uses a 0.5 continuity correction because at least one cell is zero.');
+      var ciPct = Math.round((r.confidence || 0.95) * 100);
+      function ttCard(title, main, ci, interp, tip) {
+        return '<div class="kpi">' +
+          '<div class="kpi-k">' + esc(title) + (tip ? infoTip(title, tip) : '') + '</div>' +
+          '<div class="kpi-v-main">' + esc(main) + '</div>' +
+          (ci ? '<div class="kpi-ci">' + esc(ci) + '</div>' : '') +
+          (interp ? '<div class="kpi-interp">' + esc(interp) + '</div>' : '') +
+          '</div>';
       }
-      if (m.oddsRatio && m.oddsRatio.formula) notes.push(m.oddsRatio.formula);
-      if (m.riskRatio && m.riskRatio.formula) notes.push(m.riskRatio.formula);
-      if (m.riskDifference && m.riskDifference.formula) notes.push(m.riskDifference.formula);
-      qsHtml('rrNotes', '<div class="card-title">Notes</div><div class="interp">' + notes.map(function (n) { return '<p>' + esc(n) + '</p>'; }).join('') + '</div>');
+      var cards = '';
+      var or = m.oddsRatio;
+      if (or && or.available) {
+        var orTip = 'Odds of the event in the group of interest divided by odds in the reference group. 1 = no association. Swapping the event/non-event inverts the OR. Formula: OR = (a·d) / (b·c).';
+        if (or.continuityCorrection) orTip += ' A 0.5 continuity correction was applied because at least one cell is zero.';
+        var orInterp = or.value === 1
+          ? 'The odds of ' + ev + ' are the same with ' + g1 + ' and ' + g0 + '.'
+          : (or.value > 1
+            ? 'The odds of ' + ev + ' are ' + fmtFixed(or.value, 2) + ' times higher with ' + g1 + '.'
+            : 'The odds of ' + ev + ' are ' + fmtFixed(or.value, 2) + ' times as high with ' + g1 + '.');
+        cards += ttCard('Odds ratio', fmtFixed(or.value, 2),
+          ciPct + '% CI: ' + fmtFixed(or.ciLower, 3) + '–' + fmtFixed(or.ciUpper, 3),
+          orInterp, orTip);
+      } else {
+        cards += ttCard('Odds ratio', or && or.reason ? or.reason : 'Not estimable', '', '',
+          'Odds of the event in the group of interest divided by odds in the reference group. Formula: OR = (a·d) / (b·c).');
+      }
+      var rr = m.riskRatio;
+      if (rr && rr.available) {
+        var rrInterp = rr.value === 1
+          ? 'The probability of ' + ev + ' is the same with ' + g1 + ' and ' + g0 + '.'
+          : 'The probability of ' + ev + ' is ' + fmtFixed(rr.value, 2) + ' times as high with ' + g1 + '.';
+        cards += ttCard('Risk ratio', fmtFixed(rr.value, 2),
+          ciPct + '% CI: ' + fmtFixed(rr.ciLower, 3) + '–' + fmtFixed(rr.ciUpper, 3),
+          rrInterp,
+          'Probability of the event in the group of interest divided by that probability in the reference group. 1 = no difference. Not symmetric if you swap the event column. Formula: RR = P(event | group of interest) / P(event | reference).');
+      } else {
+        cards += ttCard('Risk ratio', rr && rr.reason ? rr.reason : 'Not estimable', '', '',
+          'Probability of the event in the group of interest divided by that probability in the reference group. Formula: RR = P(event | group of interest) / P(event | reference).');
+      }
+      var rd = m.riskDifference;
+      if (rd && rd.available) {
+        var pp = 100 * rd.value;
+        var absPp = Math.abs(pp);
+        var rdDir = pp === 0 ? 'the same as' : (pp > 0 ? 'higher' : 'lower');
+        var rdInterp = pp === 0
+          ? ev + ' is equally common with ' + g1 + ' and ' + g0 + '.'
+          : ev + ' is ' + fmtFixed(absPp, 1) + ' percentage points ' + rdDir + ' with ' + g1 + '.';
+        cards += ttCard('Risk difference', fmtFixed(absPp, 1) + '%',
+          ciPct + '% CI: ' + fmtFixed(100 * rd.ciLower, 1) + '–' + fmtFixed(100 * rd.ciUpper, 1) + ' pp',
+          rdInterp,
+          'Probability of the event in the group of interest minus that probability in the reference group. 0 = no difference. Shown in percentage points. Formula: RD = P(event | group of interest) − P(event | reference).');
+        if (rd.value !== 0 && isFinite(rd.value)) {
+          var nnt = 1 / Math.abs(rd.value);
+          var useNnt = (outcomeBeneficial && rd.value > 0) || (!outcomeBeneficial && rd.value < 0);
+          var nnLabel = useNnt ? 'Number needed to treat (NNT)' : 'Number needed to harm (NNH)';
+          var nPeople = Math.max(1, Math.ceil(nnt - 1e-9));
+          var nnInterp;
+          if (useNnt && rd.value > 0) {
+            nnInterp = 'About ' + nPeople + ' patients would need to receive ' + g1 + ' rather than ' + g0 +
+              ' for one additional ' + ev + '.';
+          } else if (!useNnt && rd.value > 0) {
+            nnInterp = 'About ' + nPeople + ' patients would need to receive ' + g1 + ' rather than ' + g0 +
+              ' for one additional ' + ev + ' (harm).';
+          } else if (useNnt && rd.value < 0) {
+            nnInterp = 'About ' + nPeople + ' patients would need to receive ' + g1 + ' rather than ' + g0 +
+              ' to prevent one ' + ev + '.';
+          } else {
+            nnInterp = 'About ' + nPeople + ' patients would need to receive ' + g1 + ' rather than ' + g0 +
+              ' for one fewer ' + ev + '.';
+          }
+          cards += ttCard(nnLabel, fmtFixed(nnt, 1), '', nnInterp,
+            '1 / |risk difference|. The average number of people in the group of interest, instead of the reference group, associated with one extra (or prevented) event. NNT is shown when the selected outcome is beneficial and more common in the group of interest, or when a harmful outcome is less common. Otherwise NNH is shown.');
+        }
+      } else {
+        cards += ttCard('Risk difference', rd && rd.reason ? rd.reason : 'Not estimable', '', '',
+          'Probability of the event in the group of interest minus that probability in the reference group. Formula: RD = P(event | group of interest) − P(event | reference).');
+      }
+      qsHtml('rrKpis', cards);
     }
 
     function renderHeat() {
@@ -1461,7 +1584,7 @@
       renderDiagView();
       render2x2();
       bindVizControls();
-      if (activeTab === 'visualization') renderVizChart();
+      if (activeTab === 'diagnostics') renderVizChart();
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
         StatisticoHeader.updateVariable((bundle.rowVar || '') + ' × ' + (bundle.colVar || ''), bundle.N);
       }
@@ -1503,8 +1626,7 @@
       var sections = [
         { id: 'overview', label: 'Overview' },
         { id: 'table', label: 'Contingency Table' },
-        { id: 'visualization', label: 'Visualization' },
-        { id: 'diagnostics', label: 'Diagnostics' }
+        { id: 'diagnostics', label: 'Diagnostics & Visualization' }
       ];
       if (bundle.nRows === 2 && bundle.nCols === 2) {
         sections.push({ id: 'twobytwo', label: '2×2 Measures' });
@@ -1609,7 +1731,7 @@
       if (Array.isArray(vd.allRows)) bundle.allViewRows = vd.allRows;
       if (Array.isArray(vd.usedRows)) bundle.usedViewRows = vd.usedRows;
       vizUnweightedCache = null;
-      if (activeTab === 'visualization') renderVizChart();
+      if (activeTab === 'diagnostics') renderVizChart();
       if (document.getElementById('hdpModal') && typeof StatisticoHeader !== 'undefined' && StatisticoHeader._populateDataModal) {
         var live = ctViewData();
         StatisticoHeader._lastDataResult = live;
@@ -1772,7 +1894,7 @@
           if (bundle && bundle.analyzable) {
             renderTable();
             if (activeTab === 'diagnostics') renderDiagView();
-            if (activeTab === 'visualization') renderVizChart();
+            if (activeTab === 'diagnostics') renderVizChart();
           }
         }, 40);
       }

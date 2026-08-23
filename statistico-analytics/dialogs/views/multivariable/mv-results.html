@@ -445,6 +445,7 @@
             <div class="seg" id="xCutMode">
               <button type="button" data-cut="median" class="active">Median</button>
               <button type="button" data-cut="mean">Mean</button>
+              <button type="button" data-cut="midpoint" title="Halfway between the axis min and max — equal-sized quadrants">Center</button>
               <button type="button" data-cut="custom">Custom</button>
             </div>
           </div>
@@ -457,6 +458,7 @@
             <div class="seg" id="yCutMode">
               <button type="button" data-cut="median" class="active">Median</button>
               <button type="button" data-cut="mean">Mean</button>
+              <button type="button" data-cut="midpoint" title="Halfway between the axis min and max — equal-sized quadrants">Center</button>
               <button type="button" data-cut="custom">Custom</button>
             </div>
           </div>
@@ -731,7 +733,8 @@
       colorColName: "Region", labelColName: "Country",
       xColIndex: 2, yColIndex: 3, sizeColIndex: 4,
       colorColIndex: 1, labelColIndex: 0
-    }
+    },
+    isSample: true
   };
 
   var Q_NAME_PRESETS = {
@@ -991,6 +994,10 @@
       state.map.color = null;
     }
     applyDefaultView();
+    if (run.isSample) {
+      state.xCutMode = "midpoint";
+      state.yCutMode = "midpoint";
+    }
     state.mode = spec.chartMode === "bubble" ? "bubble" : spec.chartMode === "true3d" ? "true3d" : "quadrant";
     captureLoadState();
     MvUtils.applyCss(MvUtils.template(state.templateId));
@@ -1105,8 +1112,26 @@
     return String(Math.round(v * 10) / 10);
   }
 
+  function midpoint(vals) {
+    if (!vals.length) return 0;
+    var lo = vals[0], hi = vals[0];
+    for (var i = 1; i < vals.length; i++) {
+      if (vals[i] < lo) lo = vals[i];
+      if (vals[i] > hi) hi = vals[i];
+    }
+    return (lo + hi) / 2;
+  }
+
+  function cutModeLabel(mode) {
+    if (mode === "mean") return "Mean";
+    if (mode === "custom") return "Custom";
+    if (mode === "midpoint") return "Center";
+    return "Median";
+  }
+
   function cutValue(mode, custom, vals) {
     if (mode === "mean") return mean(vals);
+    if (mode === "midpoint") return midpoint(vals);
     if (mode === "custom" && custom != null && isFinite(+custom)) return +custom;
     return median(vals);
   }
@@ -1938,7 +1963,7 @@
 
   function dividerPhrase() {
     function word(mode) {
-      return mode === "mean" ? "means" : mode === "custom" ? "custom values" : "medians";
+      return mode === "mean" ? "means" : mode === "custom" ? "custom values" : mode === "midpoint" ? "axis centers" : "medians";
     }
     if (state.xCutMode === state.yCutMode) return word(state.xCutMode);
     return word(state.xCutMode) + " / " + word(state.yCutMode);
@@ -2405,10 +2430,8 @@
     var tpl = currentTpl();
     var xPlot = [], yPlot = [];
     if (!true3d && state.mode === "quadrant" && state.showCuts && cuts.x != null) {
-      var xLab = (state.xCutMode === "mean" ? "Mean" : state.xCutMode === "custom" ? "Custom" : "Median") +
-        " X = " + formatNumber(cuts.x, state.xFormat);
-      var yLab = (state.yCutMode === "mean" ? "Mean" : state.yCutMode === "custom" ? "Custom" : "Median") +
-        " Y = " + formatNumber(cuts.y, state.yFormat);
+      var xLab = cutModeLabel(state.xCutMode) + " X = " + formatNumber(cuts.x, state.xFormat);
+      var yLab = cutModeLabel(state.yCutMode) + " Y = " + formatNumber(cuts.y, state.yFormat);
       xPlot = [{
         value: cuts.x, color: tpl.cut, width: 1.5, dashStyle: "Dash", zIndex: 5,
         label: { text: xLab, style: { color: tpl.cutLabel, fontSize: axisPx }, rotation: 270, align: "right", x: -4, y: 12 }

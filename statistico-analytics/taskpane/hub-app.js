@@ -986,12 +986,14 @@ function renderHubAccordionPanel(sectionId, tilesHtml, open, tiles) {
   if (!meta) return tilesHtml || "";
   var names = getAccordionModuleNames(tiles);
   var tipText = names.length
-    ? meta.label + ": " + names.join(" · ")
+    ? meta.label + "\n" + names.map(function (n) { return "| " + n; }).join("\n")
     : (meta.subtitle || meta.label);
   var tipHtml =
     '<span class="st-tt-title">' + escapeHtml(meta.label) + "</span>" +
     '<span class="st-tt-body">' +
-    (names.length ? names.map(escapeHtml).join("<br>") : escapeHtml(meta.subtitle || meta.label)) +
+    (names.length
+      ? names.map(function (n) { return "| " + escapeHtml(n); }).join("<br>")
+      : escapeHtml(meta.subtitle || meta.label)) +
     "</span>";
   return (
     '<div class="hub-accordion-panel' + (open ? " is-open" : "") + '" data-section="' + escapeHtml(sectionId) + '"' +

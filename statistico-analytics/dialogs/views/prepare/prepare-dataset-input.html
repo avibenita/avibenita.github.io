@@ -7,10 +7,10 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Prepare Dataset</title>
   <script>
-    // Public demo/case-study embeds (embed=1) never run inside an Office host.
+    // Public demo/case-study embeds (embed=1 / demo=1) never run inside an Office host.
     // Skipping office.js avoids its dialog/parent-frame handshake blanking the
     // nested marketing-site modal iframe (page -> wsModalFrame -> this page).
-    if (!/(?:^|[?&])embed=1(?:&|$)/.test(window.location.search)) {
+    if (!/(?:^|[?&])(?:embed|demo)=1(?:&|$)/.test(window.location.search)) {
       document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></scr' + 'ipt>');
     }
   </script>
@@ -99,8 +99,11 @@
     .impact { border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); padding:10px 12px; }
     .impact-need { font-size:12px; color:var(--cfg-text2); font-weight:600; margin-top:6px; }
     .safety { font-size:11px; color:var(--cfg-text2); margin:0; }
-    html[data-hub-embed="1"] .prep-layout { overflow:auto; }
-    html[data-hub-embed="1"] #mainContent { min-height:0; }
+    html[data-hub-embed="1"],
+    html[data-hub-embed="1"] body { height: 100%; overflow: hidden; }
+    html[data-hub-embed="1"] .cfg-shell { min-height: 0; overflow: hidden; }
+    html[data-hub-embed="1"] .prep-layout { overflow: auto; min-height: 0; }
+    html[data-hub-embed="1"] #mainContent { min-height: 0; flex: 1 1 auto; }
   </style>
 </head>
 <body>
@@ -417,8 +420,12 @@
       catch (e) { return String(Date.now()); }
     }
     function send(action, payload) {
-      var s = JSON.stringify({ action: action, payload: payload || {} });
-      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) Office.context.ui.messageParent(s);
+      try {
+        var s = JSON.stringify({ action: action, payload: payload || {} });
+        if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+          Office.context.ui.messageParent(s);
+        }
+      } catch (e) {}
     }
     function cancel() { send('close'); }
     function currentOp() { return qs('opSelect').value; }
@@ -937,7 +944,7 @@
     }
 
     function maybeLoadDemo() {
-      if (!/[?&]demo=1/.test(window.location.search || '')) return false;
+      if (!/[?&](?:demo|embed)=1/.test(window.location.search || '')) return false;
       if (STATE.headers && STATE.headers.length) return false;
       applyPayload(demoPayload());
       return true;

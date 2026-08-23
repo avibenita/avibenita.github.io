@@ -3059,7 +3059,14 @@
     wireAiAssistant();
     syncControlsFromState();
     renderAll();
-    if (window.__PT2_WEB_DEMO__) showTab("preview");
+    if (window.__PT2_WEB_DEMO__) {
+      showTab("preview");
+      try {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      } catch (e) {}
+    }
 
     var closeBtn = $("pt2CloseBtn");
     if (closeBtn) closeBtn.addEventListener("click", function () { sendToHost({ action: "close" }); });

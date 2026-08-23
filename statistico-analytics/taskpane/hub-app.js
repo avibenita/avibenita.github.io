@@ -834,9 +834,13 @@ function renderCategoryTiles(query) {
       return getAnalyticsTileSectionId(c, allSource) === sectionId;
     });
     if (!familyTiles.length) return;
-    var tilesHtml = familyTiles.map(function (c) {
-      return renderCategoryTileHtml(c, clusterColor, clusterColorDark);
-    }).join("");
+    var tilesHtml = '<div class="category-modules">' + familyTiles.map(function (c) {
+      var tabStyle = c.tabStyle === "soft" ? "soft" : "pill";
+      var scopePrefix = ACTIVE_CLUSTER + ":" + c.id;
+      return getCategoryModules(c).map(function (m) {
+        return renderCategoryModuleBtn(m, tabStyle, scopePrefix);
+      }).join("");
+    }).join("") + "</div>";
     html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
   });
   holder.innerHTML = html;

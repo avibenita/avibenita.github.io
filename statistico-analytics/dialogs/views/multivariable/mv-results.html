@@ -102,18 +102,23 @@
     .panel {
       min-height: 0; height: 100%; max-height: 100%;
       border-right: 1px solid var(--border); background: var(--surface-1);
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
       padding: 0;
       display: flex; flex-direction: column;
-    }
-    .panel-body {
-      min-height: 0; flex: 1;
-      overflow-x: hidden; overflow-y: auto;
-      padding: 10px;
-      display: flex; flex-direction: column; gap: 8px;
-      align-content: flex-start;
       scrollbar-width: thin;
       scrollbar-color: rgba(56,189,248,.45) rgba(15,23,42,.35);
+    }
+    .panel::-webkit-scrollbar { width: 8px; }
+    .panel::-webkit-scrollbar-thumb {
+      background: rgba(56,189,248,.4); border-radius: 999px;
+    }
+    .panel-body {
+      min-height: 0; flex: 1 1 auto;
+      overflow: visible;
+      padding: 10px 10px 8px;
+      display: flex; flex-direction: column; gap: 8px;
+      align-content: flex-start;
     }
     .panel-body::-webkit-scrollbar { width: 8px; }
     .panel-body::-webkit-scrollbar-thumb {
@@ -314,10 +319,11 @@
     .q-grid label { font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 3px; }
 
     .mv-utils {
-      flex-shrink: 0;
+      flex: 0 0 auto;
+      margin-top: auto;
       border-top: 1px solid var(--border);
-      padding: 4px 0 8px;
-      display: flex; flex-direction: column; gap: 0;
+      padding: 8px 10px calc(18px + env(safe-area-inset-bottom, 0px));
+      display: flex; flex-direction: column; gap: 6px;
       background: #141b2b;
       position: relative;
       z-index: 8;
@@ -1839,6 +1845,14 @@
           toolsToggle.setAttribute("aria-expanded", open ? "true" : "false");
           if (open) toolsBody.removeAttribute("hidden");
           else toolsBody.setAttribute("hidden", "");
+          layoutPanels();
+          if (open) {
+            var panel = document.querySelector(".panel");
+            requestAnimationFrame(function () {
+              if (toolsBox.scrollIntoView) toolsBox.scrollIntoView({ block: "nearest", inline: "nearest" });
+              if (panel) panel.scrollTop = panel.scrollHeight;
+            });
+          }
         });
       }
       if (aiBtn) {
@@ -2817,18 +2831,22 @@
   }
 
   function layoutPanels() {
-    var panel = document.querySelector(".panel-body") || document.querySelector(".panel");
+    var root = document.querySelector(".panel");
+    var panel = document.querySelector(".panel-body") || root;
     if (!panel) return;
+    var utils = document.getElementById("mvUtils");
     var open = Array.prototype.slice.call(panel.querySelectorAll(".acc.open:not(.hidden-mode)"));
     var closed = Array.prototype.slice.call(panel.querySelectorAll(".acc:not(.open):not(.hidden-mode)"));
     var gap = 8;
     var pad = 20;
     var closedH = 0;
     closed.forEach(function (el) { closedH += el.offsetHeight || 36; });
-    var avail = Math.max(160, panel.clientHeight - pad - closedH - gap * Math.max(0, open.length + closed.length - 1));
+    var footerH = utils ? utils.getBoundingClientRect().height : 0;
+    var shellH = root ? root.clientHeight : panel.clientHeight;
+    var avail = Math.max(120, shellH - footerH - pad - closedH - gap * Math.max(0, open.length + closed.length - 1));
     var each = open.length ? Math.floor(avail / open.length) : avail;
-    // Prefer content height: do not force a tall empty body when only one section is open
-    each = Math.max(140, Math.min(each, open.length <= 1 ? Math.min(avail, 520) : each));
+    // Keep room for the footer; do not force a tall empty body when one section is open
+    each = Math.max(96, Math.min(each, open.length <= 1 ? Math.min(avail, 360) : each));
     open.forEach(function (el) {
       el.style.setProperty("--acc-max", each + "px");
     });

@@ -48,7 +48,7 @@ MODULES = [
             ("fa-list-check", "Descriptives and percentiles"),
             ("fa-stethoscope", "Six-test normality index"),
             ("fa-bullseye", "Confidence intervals and hypothesis tests"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One variable. Connected views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same selected variable, so there's no re-running the analysis to move between them.",
@@ -58,7 +58,7 @@ MODULES = [
             ("qq", "fa-chart-line", "QQ Plot", "Compare sample quantiles with a normal reference before trusting normal-based procedures."),
             ("density", "fa-wave-square", "Kernel Density", "Smooth the distribution without forcing fixed histogram bins."),
             ("normality", "fa-stethoscope", "Normality", "Six normality tests summarized as one strength index, with supporting detail available."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of shape, outliers, and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of shape, outliers, and next checks — see the caution below."),
         ],
         "feature_kicker": "Distribution",
         "feature_title": "Distribution exploration is part of the workflow",
@@ -112,7 +112,7 @@ MODULES = [
             ("fa-bullseye", "Taylor diagram view"),
             ("fa-link", "Partial correlations"),
             ("fa-shield-halved", "Reliability coefficients"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One matrix. Connected relationship views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same correlation workspace, so there's no re-running the analysis to move between them.",
@@ -122,7 +122,7 @@ MODULES = [
             ("taylor", "fa-bullseye", "Taylor Diagram", "Compare variables against a reference using correlation angle and standard deviation in one compact diagnostic view."),
             ("descriptives", "fa-list-check", "Descriptives", "Review variable-level descriptive statistics before interpreting pairwise relationships."),
             ("partial", "fa-link", "Partial Correlations", "Estimate unique relationships after controlling for other variables."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of strong links, redundancy, and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of strong links, redundancy, and next checks — see the caution below."),
         ],
         "feature_kicker": "Exploration",
         "feature_title": "Click-through scatter analysis is part of the workflow",
@@ -176,7 +176,7 @@ MODULES = [
             ("fa-ruler-horizontal", "Effect sizes with confidence intervals"),
             ("fa-bolt", "Power and sample-size workflow"),
             ("fa-file-lines", "APA-ready report output"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One comparison. Connected inferential views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same comparison, so there's no re-running the analysis to move between them.",
@@ -186,7 +186,7 @@ MODULES = [
             ("results", "fa-flask", "Results", "Separate the main statistical result from supporting details and robustness checks."),
             ("effects", "fa-ruler-horizontal", "Effect Sizes", "Translate statistical significance into practical magnitude and uncertainty."),
             ("power", "fa-bolt", "Power Analysis", "Estimate achieved power or required sample size from the same workflow."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of the comparison and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of the comparison and next checks — see the caution below."),
         ],
         "feature_kicker": "Exploration",
         "feature_title": "Explore groups before committing to a test",
@@ -240,7 +240,7 @@ MODULES = [
             ("fa-ruler-horizontal", "Effect size reporting"),
             ("fa-bolt", "Power analysis for repeated designs"),
             ("fa-file-lines", "APA-ready report output"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One design. Connected within-subject views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same paired or repeated design, so there's no re-running the analysis to move between them.",
@@ -250,7 +250,7 @@ MODULES = [
             ("results", "fa-flask", "Results", "Review the primary within-subject result alongside supporting detail."),
             ("trajectories", "fa-chart-line", "Trajectories", "Visualize change across occasions for repeated-measures variants."),
             ("effects", "fa-ruler-horizontal", "Effect Sizes", "Report practical magnitude for paired or repeated designs."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of change and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of change and next checks — see the caution below."),
         ],
         "feature_kicker": "Change",
         "feature_title": "Trajectories are part of the inferential workflow",
@@ -304,7 +304,7 @@ MODULES = [
             ("fa-chart-column", "Visuals with effect-size badges"),
             ("fa-bolt", "Power tools for compute power or N"),
             ("fa-file-lines", "Report view"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One design. Connected multi-group views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same fitted ANOVA, so there's no re-running the analysis to move between them.",
@@ -314,7 +314,7 @@ MODULES = [
             ("comparisons", "fa-table-cells", "Comparisons", "Drill into pairwise or post-hoc differences after the omnibus result."),
             ("diagnostics", "fa-stethoscope", "Diagnostics", "Check residuals, assumptions, and observations that may affect the comparison."),
             ("visuals", "fa-chart-column", "Visuals", "Use charts and effect-size badges to turn the comparison into a faster diagnostic read."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of the omnibus result and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of the omnibus result and next checks — see the caution below."),
         ],
         "feature_kicker": "Post-hoc",
         "feature_title": "Post-hoc comparisons are part of the model workflow",
@@ -368,7 +368,7 @@ MODULES = [
             ("fa-scale-balanced", "Likelihood-ratio and information criteria"),
             ("fa-percent", "Marginal and conditional R²"),
             ("fa-stethoscope", "Diagnostics panel"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One multilevel model. Connected views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same fitted mixed model, so there's no re-running the analysis to move between them.",
@@ -378,7 +378,7 @@ MODULES = [
             ("means", "fa-table", "Marginal Means", "Compare estimated marginal means and pairwise contrasts after model adjustment."),
             ("diagnostics", "fa-stethoscope", "Diagnostics", "Review residual and model-quality diagnostics for the multilevel fit."),
             ("advanced", "fa-sliders", "Advanced", "Inspect likelihood-ratio tests, AIC/BIC, and marginal versus conditional fit."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of structure, ICC, and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of structure, ICC, and next checks — see the caution below."),
         ],
         "feature_kicker": "Structure",
         "feature_title": "Fixed and random effects stay in one model story",
@@ -432,7 +432,7 @@ MODULES = [
             ("fa-diagram-project", "Interactions and ANCOVA branches"),
             ("fa-flask", "Prediction scenarios"),
             ("fa-chart-area", "Model visualization"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One model. Connected regression views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same fitted model, so there's no re-running the analysis to move between them.",
@@ -442,7 +442,7 @@ MODULES = [
             ("partial", "fa-chart-scatter", "Partial Plots", "Show each predictor contribution after accounting for the rest of the model."),
             ("residuals", "fa-stethoscope", "Residual Diagnostics", "Check residual patterns, diagnostic plots, and assumption-related warnings."),
             ("influence", "fa-magnifying-glass", "Influential Cases", "Find observations that may be pulling the fitted regression model."),
-            ("ai", "fa-wand-magic-sparkles", "AI Insights", "Plain-language summary of fit, coefficients, and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Insights", "Plain-language summary of fit, coefficients, and next checks — see the caution below."),
         ],
         "feature_kicker": "Diagnostics",
         "feature_title": "Residuals and influence are part of the model workflow",
@@ -496,7 +496,7 @@ MODULES = [
             ("fa-chart-scatter", "Biplot and score plot"),
             ("fa-bullseye", "Contribution plot and outlier map"),
             ("fa-border-all", "Correlation-matrix heatmap"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One reduction. Connected component views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same PCA solution, so there's no re-running the analysis to move between them.",
@@ -506,7 +506,7 @@ MODULES = [
             ("loadings", "fa-table-cells", "Loadings", "Read loading matrices to understand which variables define each component."),
             ("biplot", "fa-chart-scatter", "Biplot", "Place observations and variable loadings in one map to explain dimensional structure."),
             ("scores", "fa-bullseye", "Score Plot", "Map cases in component-score space to reveal structure or outliers."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of retention and structure — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of retention and structure — see the caution below."),
         ],
         "feature_kicker": "Retention",
         "feature_title": "Retention guidance is part of the PCA workflow",
@@ -560,7 +560,7 @@ MODULES = [
             ("fa-table-cells", "Inter-item correlation matrix with heatmap"),
             ("fa-chart-simple", "Dimensionality diagnostic (scree) with a Factor Analysis hand-off"),
             ("fa-layer-group", "Optional reliability by group"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One scale. Connected reliability views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same item set, so there's no re-running the analysis to move between them.",
@@ -570,7 +570,7 @@ MODULES = [
             ("matrix", "fa-table-cells", "Inter-item Matrix", "Examine Pearson correlations among the selected items as values, a heatmap, or both."),
             ("structure", "fa-chart-line", "Scale Structure", "A PCA scree diagnostic for whether one dominant dimension is plausible — not a substitute for Factor Analysis."),
             ("by-group", "fa-layer-group", "By Group", "Compare alpha and omega across levels of an optional grouping variable."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of consistency, weak items, and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of consistency, weak items, and next checks — see the caution below."),
         ],
         "feature_kicker": "Coefficients",
         "feature_title": "Alpha and omega sit on the same scale",
@@ -624,7 +624,7 @@ MODULES = [
             ("fa-stethoscope", "WCSS and assignment diagnostics"),
             ("fa-map", "Separation and cluster map"),
             ("fa-ruler-combined", "Distance and standardisation controls"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One partition. Connected cluster views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same K-means solution, so there's no re-running the analysis to move between them.",
@@ -688,7 +688,7 @@ MODULES = [
             ("fa-chart-bar", "Mean z-score profiles by cluster"),
             ("fa-map", "Separation and cluster map"),
             ("fa-diagram-project", "Average, complete, or single linkage"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One merge tree. Connected cluster views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same hierarchical solution, so there's no re-running the analysis to move between them.",
@@ -698,7 +698,7 @@ MODULES = [
             ("clusters", "fa-chart-pie", "Clusters", "Review sizes, merge steps, and assignments at the chosen tree cut."),
             ("profiles", "fa-chart-bar", "Profiles", "Read mean z-score profiles across variables for each cluster."),
             ("map", "fa-map", "Separation & Map", "Explore how separated the cut clusters appear in reduced space."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of the merge structure and next checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of the merge structure and next checks — see the caution below."),
         ],
         "feature_kicker": "Dendrogram",
         "feature_title": "The merge tree is part of the clustering workflow",
@@ -752,7 +752,7 @@ MODULES = [
             ("fa-chart-simple", "Forest plot with study weights"),
             ("fa-chart-pie", "I² / Q heterogeneity diagnostics"),
             ("fa-filter", "Funnel plot and Egger’s test"),
-            ("fa-wand-magic-sparkles", "AI-assisted interpretation"),
+            ("st-ai-icon", "AI-assisted interpretation"),
         ],
         "workflow_title": "One synthesis. Connected views.",
         "workflow_lead": "Click a stage to inspect it — each view stays inside the same pooled analysis, so there's no re-running the meta-analysis to move between them.",
@@ -762,7 +762,7 @@ MODULES = [
             ("heterogeneity", "fa-chart-pie", "Heterogeneity", "Inspect I², Q, and τ² so between-study variation is visible before you report a single number."),
             ("bias", "fa-triangle-exclamation", "Small-study Effects", "Review the funnel plot and Egger’s regression for funnel asymmetry and small-study skew."),
             ("studies", "fa-table", "Study Details", "Audit study-level rows, weights, and sensitivity notes from the Active Range."),
-            ("ai", "fa-wand-magic-sparkles", "AI Interpretation", "Plain-language summary of the pooled effect, heterogeneity, and bias checks — see the caution below."),
+            ("ai", "st-ai-icon", "AI Interpretation", "Plain-language summary of the pooled effect, heterogeneity, and bias checks — see the caution below."),
         ],
         "feature_kicker": "Pooling",
         "feature_title": "Study effects stay in one synthesis story",
@@ -1189,6 +1189,11 @@ def css_block(a1: tuple[int, int, int], a2: tuple[int, int, int]) -> str:
 """
 
 
+def fa_icon(icon: str, extra: str = 'aria-hidden="true"') -> str:
+    cls = icon if icon.startswith("st-") else f"fa-solid {icon}"
+    return f'<i class="{cls}" {extra}></i>'
+
+
 def shot_name(slug: str, view_id: str) -> str:
     return f"{slug}-{view_id}.webp"
 
@@ -1204,12 +1209,12 @@ def render_page(m: dict) -> str:
     live_parts = []
     for i, (icon, label) in enumerate(m["live_steps"]):
         live_parts.append(
-            f'<div class="live-step" role="listitem"><div class="dot"><i class="fa-solid {icon}" aria-hidden="true"></i></div><span>{label}</span></div>'
+            f'<div class="live-step" role="listitem"><div class="dot">{fa_icon(icon)}</div><span>{label}</span></div>'
         )
         if i < len(m["live_steps"]) - 1:
             live_parts.append('<div class="live-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></div>')
     caps_html = "\n".join(
-        f'          <div class="cap-item"><i class="fa-solid {icon}" aria-hidden="true"></i><span>{label}</span></div>'
+        f'          <div class="cap-item">{fa_icon(icon)}<span>{label}</span></div>'
         for icon, label in m["caps"]
     )
 
@@ -1218,7 +1223,7 @@ def render_page(m: dict) -> str:
     for i, (vid, icon, label, copy) in enumerate(m["views"]):
         active = i == 0
         tab_parts.append(
-            f'<button type="button" class="lr-flow-step{" is-active" if active else ""}" id="tab-{vid}" role="tab" aria-selected="{"true" if active else "false"}" aria-controls="panel-{vid}" tabindex="{"0" if active else "-1"}"><i class="fa-solid {icon}" aria-hidden="true"></i><span>{label}</span></button>'
+            f'<button type="button" class="lr-flow-step{" is-active" if active else ""}" id="tab-{vid}" role="tab" aria-selected="{"true" if active else "false"}" aria-controls="panel-{vid}" tabindex="{"0" if active else "-1"}">{fa_icon(icon)}<span>{label}</span></button>'
         )
         if i < len(m["views"]) - 1:
             tab_parts.append('<div class="lr-flow-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></div>')

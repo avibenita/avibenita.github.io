@@ -1912,7 +1912,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260816rail1',
+  _TAB_ASSET_VER: '20260823ai1',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -6237,9 +6237,39 @@ const StatisticoHeader = {
     anchor.appendChild(pinned);
   },
 
+  _aiIconHtml() {
+    return '<i class="st-ai-icon" aria-hidden="true"></i>';
+  },
+
   _sidebarAiButtonInnerHtml(busy) {
     if (busy) return '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
-    return '<i class="fa-solid fa-wand-magic-sparkles"></i><span>Interpret with AI</span><sup class="sb-ai-sup">AI</sup>';
+    return this._aiIconHtml() + '<span>Interpret with AI</span><sup class="sb-ai-sup">AI</sup>';
+  },
+
+  _explainViewButtonInnerHtml() {
+    return this._aiIconHtml() + '<span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
+  },
+
+  _sidebarAiOnClick() {
+    if (this.module === 'independent') return this._sbAiIndependentInterpret();
+    if (this.module === 'dependent' && this.currentView === 'dependent-results-kplus') {
+      return this._sbAiDependentKplusInterpret();
+    }
+    if (typeof window.requestMixedModelAI === 'function') return window.requestMixedModelAI();
+    if (typeof window.requestFactorModuleAI === 'function') return window.requestFactorModuleAI();
+    if (typeof window.requestReliabilityModuleAI === 'function') return window.requestReliabilityModuleAI();
+    if (typeof window.requestClusterModuleAI === 'function') return window.requestClusterModuleAI();
+    if (typeof window.requestMetaModuleAI === 'function') return window.requestMetaModuleAI();
+    if (typeof window.requestRegressionAI === 'function') return window.requestRegressionAI();
+    if (typeof window.runParetoAI === 'function') return window.runParetoAI();
+    if (typeof window.requestAIInterpretation === 'function'
+        && this.module === 'univariate' && this.currentView === 'hypothesis') {
+      return window.requestAIInterpretation();
+    }
+    if (this.module === 'univariate' || this.module === 'correlations') {
+      return this._sbAiGlobalInterpret();
+    }
+    return this._sbAiPerViewInterpret();
   },
 
   _mountSidebarUtilities() {
@@ -6279,46 +6309,22 @@ const StatisticoHeader = {
     const hasHtml = typeof actions.exportHtml === 'function';
     const hasJson = typeof actions.exportJson === 'function';
 
-    // ── AI pill — above export / tools ────────────────────────────────────
+    // ── AI pill — above export / tools (every sidebar module) ─────────────
     const isDependentKplus = this.module === 'dependent' && this.currentView === 'dependent-results-kplus';
-    const supportsIndependentAi = this.module === 'independent';
-    const supportsMixedAi = this.module === 'mixed-model';
-    const supportsFactorAi = this.module === 'factor';
-    const supportsReliabilityAi = this.module === 'reliability';
-    const supportsClusterAi = this.module === 'cluster';
-    const supportsMetaAi = this.module === 'meta-analysis';
-    const supportsSharedAi = (this.module === 'univariate' && this.currentView !== 'hypothesis') || this.module === 'correlations' || supportsIndependentAi || supportsMixedAi || supportsFactorAi || supportsReliabilityAi || supportsClusterAi || supportsMetaAi;
-    const supportsFullAiPill = supportsIndependentAi || isDependentKplus;
-    if (supportsSharedAi || isDependentKplus) {
-      const aiSection = document.createElement('div');
-      aiSection.id = 'sbAiSection';
-      aiSection.className = 'sb-ai-section-wrap';
-      const aiClick = supportsIndependentAi
-        ? 'StatisticoHeader._sbAiIndependentInterpret()'
-        : isDependentKplus
-          ? 'StatisticoHeader._sbAiDependentKplusInterpret()'
-        : supportsMixedAi
-          ? 'requestMixedModelAI()'
-        : supportsFactorAi
-          ? 'requestFactorModuleAI()'
-        : supportsReliabilityAi
-          ? 'requestReliabilityModuleAI()'
-        : supportsClusterAi
-          ? 'requestClusterModuleAI()'
-        : supportsMetaAi
-          ? 'requestMetaModuleAI()'
-          : 'StatisticoHeader._sbAiGlobalInterpret()';
-      const aiTitle = 'Generate an AI-assisted interpretation of the complete analysis, assumptions, and key findings.';
-      aiSection.innerHTML = `
-        <button class="sb-ai-sidebar-pill ${supportsFullAiPill ? 'sb-ai-sidebar-pill--full' : ''}"
-                id="sbAiBtn"
-                onclick="${aiClick}"
-                title="${aiTitle}">
-          ${this._sidebarAiButtonInnerHtml(false)}
-        </button>
-      `;
-      footer.appendChild(aiSection);
-    }
+    const supportsFullAiPill = this.module === 'independent' || isDependentKplus;
+    const aiSection = document.createElement('div');
+    aiSection.id = 'sbAiSection';
+    aiSection.className = 'sb-ai-section-wrap';
+    const aiTitle = 'Generate an AI-assisted interpretation of the complete analysis, assumptions, and key findings.';
+    aiSection.innerHTML = `
+      <button class="sb-ai-sidebar-pill ${supportsFullAiPill ? 'sb-ai-sidebar-pill--full' : ''}"
+              id="sbAiBtn"
+              onclick="StatisticoHeader._sidebarAiOnClick()"
+              title="${aiTitle}">
+        ${this._sidebarAiButtonInnerHtml(false)}
+      </button>
+    `;
+    footer.appendChild(aiSection);
 
     const exportWrap = document.createElement('div');
     exportWrap.id = 'sbExportWrap';
@@ -6946,7 +6952,7 @@ const StatisticoHeader = {
       btn.id = 'sbAiFloatBtn';
       btn.className = 'sb-ai-float-btn sb-ai-float-btn--tab';
       btn.title = 'Start explaining the active Independent Means view';
-      btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
+      btn.innerHTML = this._explainViewButtonInnerHtml();
       btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentTabInterpret());
       this._mountFloatingAiButton(btn);
       return;
@@ -6958,7 +6964,7 @@ const StatisticoHeader = {
     btn.id = 'sbAiFloatBtn';
     btn.className = 'sb-ai-float-btn';
     btn.title = `Start explaining the ${label} view`;
-    btn.innerHTML = `<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>`;
+    btn.innerHTML = this._explainViewButtonInnerHtml();
     btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
 
     this._mountFloatingAiButton(btn);
@@ -7562,7 +7568,7 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
+        btn.innerHTML = this._explainViewButtonInnerHtml();
       }
     }
   },
@@ -7719,10 +7725,15 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
    */
   async _sbAiPerViewInterpret() {
     const btn = document.getElementById('sbAiFloatBtn');
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view...</span>';
-    }
+    const sidebarBtn = document.getElementById('sbAiBtn');
+    const markBusy = (busy) => {
+      [btn, sidebarBtn].forEach((el) => {
+        if (!el) return;
+        el.disabled = busy;
+        if (busy) el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view...</span>';
+      });
+    };
+    markBusy(true);
     const viewKey = this._getInsightGuideViewKey();
     try {
       // Rule-based Insight Guide for meta heterogeneity (deterministic stats — not AI)
@@ -7752,10 +7763,9 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     } catch (err) {
       this._showAiOverlay({ error: err.message || 'AI request failed.' }, viewKey, 'per-view', this._lastAiMeta);
     } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-compass"></i><span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
-      }
+      markBusy(false);
+      if (btn) btn.innerHTML = this._explainViewButtonInnerHtml();
+      if (sidebarBtn) sidebarBtn.innerHTML = this._sidebarAiButtonInnerHtml(false);
     }
   },
 
@@ -9185,7 +9195,9 @@ Always follow the exact output format requested.` },
       ? (this.module === 'correlations' ? 'Full Correlation Analysis' : (this.module === 'independent' ? 'Independent Means Analysis' : (this.module === 'factor' ? 'Full Factor Analysis' : 'Full Variable Analysis')))
       : mode === 'per-view' ? `Insight Guide — ${viewLabel}`
       : `AI Insight — ${viewLabel}`;
-    const titleIcon = mode === 'full' ? 'fa-brain' : 'fa-compass';
+    const titleIconHtml = mode === 'full'
+      ? '<i class="fa-solid fa-brain"></i>'
+      : this._aiIconHtml();
 
     let bodyHtml;
 
@@ -9333,7 +9345,7 @@ Always follow the exact output format requested.` },
     overlay.innerHTML = `
       <div class="sb-ai-panel${meta?.ruleBased ? ' sb-ai-panel--compact' : ''}">
         <div class="sb-ai-header">
-          <span class="sb-ai-title"><i class="fa-solid ${titleIcon}"></i> ${title}</span>
+          <span class="sb-ai-title">${titleIconHtml} ${title}</span>
           <button class="sb-ai-close" onclick="document.getElementById('sbAiOverlay').remove()" title="Close">&times;</button>
         </div>
         <div class="sb-ai-body">${bodyHtml}</div>

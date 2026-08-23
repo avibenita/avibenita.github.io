@@ -316,8 +316,8 @@
     .mv-utils {
       flex-shrink: 0;
       border-top: 1px solid var(--border);
-      padding: 10px 10px 12px;
-      display: flex; flex-direction: column; gap: 6px;
+      padding: 4px 0 8px;
+      display: flex; flex-direction: column; gap: 0;
       background: #141b2b;
       position: relative;
       z-index: 8;
@@ -671,19 +671,39 @@
       </div>
       </div>
       <div class="mv-utils" id="mvUtils">
-        <div class="mv-utils-h"><i class="fa-solid fa-wand-magic-sparkles"></i> Utilities</div>
-        <button class="sb-bottom-btn sb-bottom-btn--tpl" id="btnTemplates" type="button" title="Change the live chart colors and texture">
-          <i class="fa-solid fa-swatchbook"></i>
-          <span class="sb-item-label">Change style</span>
-        </button>
-        <button class="sb-bottom-btn sb-bottom-btn--html" id="btnSaveHtml" type="button" title="Save a standalone HTML file of this chart">
-          <i class="fa-solid fa-file-code"></i>
-          <span class="sb-item-label">Save as HTML</span>
-        </button>
-        <button class="sb-bottom-btn sb-bottom-btn--png" id="btnSavePng" type="button" title="Save the on-screen chart preview as a PNG image">
-          <i class="fa-solid fa-image"></i>
-          <span class="sb-item-label">Save as PNG</span>
-        </button>
+        <div class="sb-ai-section-wrap" id="sbAiSection">
+          <button class="sb-ai-sidebar-pill" id="sbAiBtn" type="button"
+                  title="Generate an AI-assisted interpretation of this visualisation.">
+            <i class="st-ai-icon" aria-hidden="true"></i>
+            <span>Interpret with AI</span>
+            <sup class="sb-ai-sup">AI</sup>
+          </button>
+        </div>
+        <div class="sb-export-wrap">
+          <button class="sb-bottom-btn sb-bottom-btn--html" id="btnSaveHtml" type="button" title="Export full analysis as HTML, PDF, or Word">
+            <i class="fa-solid fa-file-export"></i>
+            <span class="sb-item-label">Export Report</span>
+          </button>
+        </div>
+        <div class="sb-bottom sb-output-tools" id="sbUtilities">
+          <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
+                  aria-expanded="false"
+                  title="Change style, Save as PNG">
+            <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
+            <span class="sb-bottom-label">Output &amp; Tools</span>
+            <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>
+          </button>
+          <div class="sb-output-tools-body" id="sbOutputToolsBody" hidden>
+            <button class="sb-bottom-btn sb-bottom-btn--tpl" id="btnTemplates" type="button" title="Change the live chart colors and texture">
+              <i class="fa-solid fa-swatchbook"></i>
+              <span class="sb-item-label">Change style</span>
+            </button>
+            <button class="sb-bottom-btn sb-bottom-btn--png" id="btnSavePng" type="button" title="Save the on-screen chart preview as a PNG image">
+              <i class="fa-solid fa-image"></i>
+              <span class="sb-item-label">Save as PNG</span>
+            </button>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -1800,6 +1820,10 @@
       var style = document.getElementById("btnTemplates");
       var overlay = document.getElementById("mvStyleOverlay");
       var close = document.getElementById("mvStyleClose");
+      var toolsToggle = document.getElementById("sbOutputToolsToggle");
+      var toolsBox = document.getElementById("sbUtilities");
+      var toolsBody = document.getElementById("sbOutputToolsBody");
+      var aiBtn = document.getElementById("sbAiBtn");
       if (png) png.onclick = function () { self.savePng(); };
       if (html) html.onclick = function () { self.saveHtml(); };
       if (style) style.onclick = function () { self.changeStyle(); };
@@ -1809,7 +1833,43 @@
           if (e.target === overlay) self.closeStyle();
         };
       }
+      if (toolsToggle && toolsBox && toolsBody) {
+        toolsToggle.addEventListener("click", function () {
+          var open = !toolsBox.classList.contains("is-open");
+          toolsBox.classList.toggle("is-open", open);
+          toolsToggle.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open) toolsBody.removeAttribute("hidden");
+          else toolsBody.setAttribute("hidden", "");
+        });
+      }
+      if (aiBtn) {
+        aiBtn.onclick = function () { self.interpretAi(); };
+      }
       this.applyCss(this.template(state.templateId));
+    },
+
+    interpretAi: async function () {
+      var btn = document.getElementById("sbAiBtn");
+      var orig = btn ? btn.innerHTML : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
+      }
+      try {
+        if (typeof StatisticoHeader !== "undefined") {
+          StatisticoHeader.module = StatisticoHeader.module || "multivariable";
+          StatisticoHeader.currentView = StatisticoHeader.currentView || "multivariable";
+          if (typeof StatisticoHeader._sbAiPerViewInterpret === "function") {
+            await StatisticoHeader._sbAiPerViewInterpret();
+            return;
+          }
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = orig || '<i class="st-ai-icon" aria-hidden="true"></i><span>Interpret with AI</span><sup class="sb-ai-sup">AI</sup>';
+        }
+      }
     }
   };
   window.MvUtils = MvUtils;

@@ -489,7 +489,7 @@ const TOOLS_CATEGORY_TILES = [
       "Uses a built-in country sample if you click Load sample"
     ],
     modules: [
-      { id: "multivariable", label: "Multivariable Visualisation", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
+      { id: "multivariable", label: "Multivariable Visualisation — Bubble Chart", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
     ]
   },
   {
@@ -511,7 +511,7 @@ const TOOLS_CATEGORY_TILES = [
     modules: [
       {
         id: "ezpaste-open",
-        label: "EzPaste",
+        label: "EzPaste — XL to PPT automation",
         tip: "Open EzPaste — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.",
         dialogUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
       }

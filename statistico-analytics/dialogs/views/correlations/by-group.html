@@ -444,7 +444,8 @@
     .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
     .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
     .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
-    .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
+    .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
     .group-option small { color:var(--text-secondary); font-weight:500; }
     .level-preview { padding:12px; overflow:auto; min-height:360px; }
     .level-preview.is-hidden { display:none; }
@@ -469,7 +470,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260823-bygroup-v7">
+<body data-page-version="20260823-bygroup-v8">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -530,7 +531,7 @@
         <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to preview its levels and n.</div></div>
       </div>
       <div class="group-dialog-foot">
-        <button type="button" class="group-dialog-done-btn" onclick="closeGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
+        <button type="button" class="group-dialog-done-btn" onclick="confirmGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
       </div>
     </div>
   </div>
@@ -693,14 +694,39 @@
     }
 
     function updateGroupChoiceLabel() {
-      document.getElementById('groupChoiceLabel').textContent = groupIndex == null
+      document.getElementById('groupChoiceLabel').textContent = !isValidGroupIndex(groupIndex)
         ? 'No grouping column selected'
         : `Group by: ${sourceHeaders[groupIndex] || 'Group'}`;
     }
 
+    function isValidGroupIndex(idx) {
+      const n = Number(idx);
+      return idx != null && idx !== '' && Number.isInteger(n) && n >= 0 && n < sourceHeaders.length;
+    }
+
+    function findDefaultGroupIndex() {
+      const analysisSet = new Set(analysisHeaders);
+      let bestIdx = null;
+      let bestLevels = Infinity;
+      sourceHeaders.forEach((header, idx) => {
+        if (analysisSet.has(header)) return;
+        const nLevels = getLevelCounts(idx).length;
+        if (nLevels < 2 || nLevels > 40) return;
+        if (nLevels < bestLevels) {
+          bestLevels = nLevels;
+          bestIdx = idx;
+        }
+      });
+      if (bestIdx != null) return bestIdx;
+      const nonAnalysis = sourceHeaders.findIndex((header) => !analysisSet.has(header));
+      if (nonAnalysis >= 0) return nonAnalysis;
+      return sourceHeaders.length ? 0 : null;
+    }
+
     function refreshGroupDialogSelection() {
       document.querySelectorAll('.group-option').forEach((btn) => {
-        btn.classList.toggle('is-selected', Number(btn.getAttribute('data-group-index')) === Number(groupIndex));
+        const idx = Number(btn.getAttribute('data-group-index'));
+        btn.classList.toggle('is-selected', isValidGroupIndex(groupIndex) && idx === Number(groupIndex));
       });
     }
 
@@ -749,9 +775,17 @@
 
     function openGroupDialog() {
       if (!sourceHeaders.length) return;
+      if (!isValidGroupIndex(groupIndex)) {
+        const fallback = findDefaultGroupIndex();
+        if (isValidGroupIndex(fallback)) {
+          groupIndex = Number(fallback);
+          updateGroupChoiceLabel();
+          renderByGroup();
+        }
+      }
       refreshGroupDialogSelection();
-      if (groupIndex == null) hideLevelPreview();
-      else renderLevelPreview(groupIndex);
+      if (isValidGroupIndex(groupIndex)) renderLevelPreview(groupIndex);
+      else hideLevelPreview();
       document.getElementById('groupDialog').classList.add('is-visible');
     }
 
@@ -759,13 +793,26 @@
       document.getElementById('groupDialog').classList.remove('is-visible');
     }
 
+    function confirmGroupDialog() {
+      let idx = isValidGroupIndex(groupIndex) ? Number(groupIndex) : null;
+      if (!isValidGroupIndex(idx) && isValidGroupIndex(previewGroupIndex)) idx = Number(previewGroupIndex);
+      if (!isValidGroupIndex(idx)) {
+        const selected = document.querySelector('#groupDialogList .group-option.is-selected');
+        if (selected) idx = Number(selected.getAttribute('data-group-index'));
+      }
+      if (!isValidGroupIndex(idx)) idx = findDefaultGroupIndex();
+      if (!isValidGroupIndex(idx)) return;
+      selectGroupColumn(idx, false);
+    }
+
     function selectGroupColumn(idx, keepDialogOpen) {
+      if (!isValidGroupIndex(idx)) return;
       groupIndex = Number(idx);
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();
       renderLevelPreview(groupIndex);
-      if (!keepDialogOpen) closeGroupDialog();
       renderByGroup();
+      if (!keepDialogOpen) closeGroupDialog();
     }
 
     function onCorrTypeChange() {
@@ -1353,7 +1400,7 @@
     }
 
     function renderByGroup() {
-      if (groupIndex == null) return setEmpty('Choose a grouping column to compare correlations across levels.');
+      if (!isValidGroupIndex(groupIndex)) return setEmpty('Choose a grouping column to compare correlations across levels.');
       activeGroups = buildIncludedGroups();
       if (!activeGroups.length) return setEmpty('No rows remain for the selected group levels. Adjust level filters or the row filter.');
 
@@ -1539,6 +1586,7 @@
 
     window.openGroupDialog = openGroupDialog;
     window.closeGroupDialog = closeGroupDialog;
+    window.confirmGroupDialog = confirmGroupDialog;
     window.selectGroupColumn = selectGroupColumn;
     window.togglePreviewLevel = togglePreviewLevel;
     window.setAllPreviewLevels = setAllPreviewLevels;

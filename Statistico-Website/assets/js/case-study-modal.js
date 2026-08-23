@@ -71,6 +71,7 @@
     if (!anchor || !anchor.getAttribute) return false;
     var href = anchor.getAttribute('href') || '';
     if (!href || href.charAt(0) === '#') return false;
+    if (/\/(publication-tables|multivariable|prepare)\//i.test(href)) return false;
     if (href.indexOf('/statistico-analytics/dialogs/views/') === -1) return false;
     var text = (anchor.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
     if (text.indexOf('start case study') !== -1) return true;

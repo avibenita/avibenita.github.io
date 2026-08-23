@@ -46,6 +46,38 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
         compactSidebar();
       }
       window.addEventListener('resize', compactSidebar);
+
+      function injectSiteReturnLink() {
+        if (window.self !== window.top) return;
+        if (document.getElementById('st-site-return')) return;
+        if (!document.getElementById('st-site-return-style')) {
+          const style = document.createElement('style');
+          style.id = 'st-site-return-style';
+          style.textContent =
+            '.st-site-return{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;margin-right:10px;' +
+            'padding:5px 11px;border-radius:999px;text-decoration:none;font-size:11px;font-weight:700;' +
+            'color:#e8f6ff;border:1px solid rgba(120,200,255,.45);background:rgba(120,200,255,.16);white-space:nowrap}' +
+            '.st-site-return:hover{filter:brightness(1.12);color:#fff}';
+          document.head.appendChild(style);
+        }
+        const a = document.createElement('a');
+        a.id = 'st-site-return';
+        a.className = 'st-site-return';
+        const path = (window.location.pathname || '').toLowerCase();
+        const specialized = /\/(publication-tables|multivariable|prepare)\//.test(path);
+        a.href = specialized
+          ? 'https://statistico.live/Statistico-Website/index-Addins.html'
+          : 'https://statistico.live/Statistico-Website/index-Analytics.html';
+        a.innerHTML = specialized ? '← Back to Specialized Tools' : '← Back to Analytics';
+        const bar = document.querySelector('.mv-topbar') || document.querySelector('.cfg-header');
+        if (bar) bar.insertBefore(a, bar.firstChild);
+        else document.body.insertBefore(a, document.body.firstChild);
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', injectSiteReturnLink, { once: true });
+      } else {
+        injectSiteReturnLink();
+      }
     }
   } catch (_embedInitErr) {}
 
@@ -631,7 +663,7 @@ const StatisticoHeader = {
 
     // Inject website link into the footer (create footer if absent)
     (function injectSiteLink() {
-      const SITE_URL = 'https://avibenita.github.io/Statistico-Website/index.html';
+      const SITE_URL = 'https://statistico.live/Statistico-Website/index.html';
       const LINK_CLASS = 'statistico-footer-site-link';
 
       let footer = document.querySelector('.statistico-footer');

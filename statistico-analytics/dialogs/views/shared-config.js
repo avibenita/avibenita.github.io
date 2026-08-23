@@ -107,12 +107,39 @@
     applyTheme(next);
   }
 
+  function injectSiteReturnLink() {
+    if (!isHubDemoEmbed()) return;
+    try { if (window.self !== window.top) return; } catch (_) {}
+    if (document.getElementById('st-site-return')) return;
+
+    if (!document.getElementById('st-site-return-style')) {
+      var style = document.createElement('style');
+      style.id = 'st-site-return-style';
+      style.textContent =
+        '.st-site-return{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;margin-right:10px;' +
+        'padding:5px 11px;border-radius:999px;text-decoration:none;font-size:11px;font-weight:700;' +
+        'color:#e8f6ff;border:1px solid rgba(120,200,255,.45);background:rgba(120,200,255,.16);white-space:nowrap}' +
+        '.st-site-return:hover{filter:brightness(1.12);color:#fff}';
+      document.head.appendChild(style);
+    }
+
+    var a = document.createElement('a');
+    a.id = 'st-site-return';
+    a.className = 'st-site-return';
+    a.href = 'https://statistico.live/Statistico-Website/index-Addins.html';
+    a.innerHTML = '← Back to Specialized Tools';
+    var header = document.querySelector('.cfg-header');
+    if (header) header.insertBefore(a, header.firstChild);
+    else document.body.insertBefore(a, document.body.firstChild);
+  }
+
   // Apply saved theme immediately (prevents flash)
   applyTheme(getSaved());
 
   // Re-sync once DOM is ready (so button icon reflects state)
   document.addEventListener('DOMContentLoaded', function () {
     applyTheme(getSaved());
+    injectSiteReturnLink();
     const btn = document.getElementById('cfgThemeToggle');
     if (btn && !isHubDemoEmbed()) btn.addEventListener('click', toggleTheme);
     if (!document.getElementById('statistico-minimal-css')) {

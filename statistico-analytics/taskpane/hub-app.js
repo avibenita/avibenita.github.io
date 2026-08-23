@@ -489,7 +489,7 @@ const TOOLS_CATEGORY_TILES = [
       "Uses a built-in country sample if you click Load sample"
     ],
     modules: [
-      { id: "multivariable", label: "Multivariable Visualisation — Bubble Chart", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
+      { id: "multivariable", label: "Multivar. chart (Bubble)", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
     ]
   },
   {

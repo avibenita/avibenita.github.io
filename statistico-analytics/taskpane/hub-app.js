@@ -51,7 +51,7 @@ const HUB_CATEGORY_TILES = [
       "Useful first pass before regression or group comparisons"
     ],
     modules: [
-      { id: "univariate", label: "Univariate", tip: "Distribution summaries, outliers, and normality checks for single variables." }
+      { id: "univariate", label: "Univariate Analysis", tip: "Distribution summaries, outliers, and normality checks for single variables." }
     ]
   },
   {
@@ -71,7 +71,7 @@ const HUB_CATEGORY_TILES = [
       "Useful first pass before regression or group comparisons"
     ],
     modules: [
-      { id: "correlations", label: "Correlation", tip: "Pairwise associations and correlation matrix between numeric variables." }
+      { id: "correlations", label: "Correlation Analysis", tip: "Pairwise associations and correlation matrix between numeric variables." }
     ]
   },
   {
@@ -90,7 +90,7 @@ const HUB_CATEGORY_TILES = [
       "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "contingency", label: "Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." }
+      { id: "contingency", label: "Frequency & Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." }
     ]
   },
   /* ── Compare Groups ──────────────────────────────────────────────── */
@@ -113,7 +113,7 @@ const HUB_CATEGORY_TILES = [
       "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "independent", label: "Independent", tip: "Compare two independent groups on a numeric outcome." }
+      { id: "independent", label: "Independent Samples t-Test", tip: "Compare two independent groups on a numeric outcome." }
     ]
   },
   {
@@ -133,7 +133,7 @@ const HUB_CATEGORY_TILES = [
       "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "dependent", label: "Repeated", tip: "Compare paired or repeated measurements for the same cases." }
+      { id: "dependent", label: "Paired / Repeated Measures", tip: "Compare paired or repeated measurements for the same cases." }
     ]
   },
   {
@@ -153,7 +153,7 @@ const HUB_CATEGORY_TILES = [
       "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "anova", label: "ANOVA", tip: "Compare means across 3+ groups with post-hoc support." }
+      { id: "anova", label: "One-Way ANOVA", tip: "Compare means across 3+ groups with post-hoc support." }
     ]
   },
   /* ── Model & Predict ─────────────────────────────────────────────── */
@@ -198,7 +198,7 @@ const HUB_CATEGORY_TILES = [
       "Diagnostics stay inside the module"
     ],
     modules: [
-      { id: "mixed", label: "Mixed Models", tip: "Mixed-effects models for grouped or repeated-measures style data." }
+      { id: "mixed", label: "Mixed-Effects Models", tip: "Mixed-effects models for grouped or repeated-measures style data." }
     ]
   },
   /* ── Discover Structure ──────────────────────────────────────────── */
@@ -224,8 +224,8 @@ const HUB_CATEGORY_TILES = [
     ],
     modules: [
       { id: "factor", label: "Factor Analysis", tip: "Latent factor extraction and rotation for construct discovery." },
-      { id: "pca", label: "PCA", tip: "Principal component reduction for compact feature representation." },
-      { id: "reliability", label: "Scale Reliability", tip: "Internal consistency of multi-item scales: alpha, omega, and item diagnostics." }
+      { id: "pca", label: "Principal Component Analysis", tip: "Principal component reduction for compact feature representation." },
+      { id: "reliability", label: "Scale Reliability (Alpha / Omega)", tip: "Internal consistency of multi-item scales: alpha, omega, and item diagnostics." }
     ]
   },
   {
@@ -246,8 +246,8 @@ const HUB_CATEGORY_TILES = [
       "Cluster sizes, profiles, and case assignments"
     ],
     modules: [
-      { id: "kmeans", label: "K-Means", tip: "Partition cases into k groups around centroids." },
-      { id: "hierarchical", label: "Hierarchical", tip: "Agglomerative merge tree with dendrogram; cut at k." }
+      { id: "kmeans", label: "K-Means Clustering", tip: "Partition cases into k groups around centroids." },
+      { id: "hierarchical", label: "Hierarchical Clustering", tip: "Agglomerative merge tree with dendrogram; cut at k." }
     ]
   },
   /* ── Synthesize & Evaluate ───────────────────────────────────────── */
@@ -303,7 +303,7 @@ const TOOLS_CATEGORY_TILES = [
       "Copy to Word/Excel or export .doc/.xls"
     ],
     modules: [
-      { id: "publication-tables", label: "Create a Table", tip: "Build a publication-ready Table 1 or descriptive summary from your Excel data — formatted for Word and journals." }
+      { id: "publication-tables", label: "Publication Table (Table 1)", tip: "Build a publication-ready Table 1 or descriptive summary from your Excel data — formatted for Word and journals." }
     ]
   },
   {
@@ -326,7 +326,7 @@ const TOOLS_CATEGORY_TILES = [
     modules: [
       {
         id: "pareto2080",
-        label: "Pareto 80/20",
+        label: "Pareto Analysis (80/20)",
         tip: "Identify the vital few contributors using interactive Pareto analysis with the 80/20 rule."
       }
     ]
@@ -380,7 +380,7 @@ const TOOLS_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-distribution-hub",
-        label: "Distribution Hub",
+        label: "Distribution Calculators",
         tip: "Open the distribution family hub in a dialog.",
         dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/index-distribution.html"
       }
@@ -405,13 +405,13 @@ const TOOLS_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-precision",
-        label: "Precision",
+        label: "Sample Size — Precision",
         tip: "Estimate sample size by target precision.",
         dialogUrl: "https://statistico.live/statistico-calculators/Precision-Based%20-Sample/PrecisionSampleCalculator.html"
       },
       {
         id: "calc-power",
-        label: "Power",
+        label: "Sample Size — Power",
         tip: "Power-based sample size calculator.",
         dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html"
       }
@@ -437,7 +437,7 @@ const TOOLS_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-effect-size",
-        label: "Effect Size",
+        label: "Effect Size Converter",
         tip: "Open the effect-size conversion family.",
         dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=effect"
       }

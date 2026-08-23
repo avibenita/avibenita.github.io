@@ -442,6 +442,7 @@ const StatisticoHeader = {
       'univariate': 'Univariate',
       'correlations': 'Correlations',
       'regression': 'Regression',
+      'multivariable': 'Multivariable Explorer',
       'independent': 'Independent Means',
       'dependent': 'Dependent Means',
       'logistic': 'Logistic Regression',
@@ -565,6 +566,7 @@ const StatisticoHeader = {
       'univariate': 'Univariate',
       'correlations': 'Correlations',
       'regression': 'Regression',
+      'multivariable': 'Multivariable Explorer',
       'independent': 'Independent Means',
       'dependent': 'Dependent Means',
       'logistic': 'Logistic Regression',
@@ -899,6 +901,36 @@ const StatisticoHeader = {
         'How many meaningful clusters are present?',
         'How distinct and compact are discovered clusters?',
         'Which variables differentiate clusters most strongly?'
+      ],
+      'multivariable-quadrant': [
+        'Which cases sit in high-X / high-Y versus the other three quadrants?',
+        'How does bubble size change across the plane?',
+        'Do color groups cluster in particular quadrants?',
+        'Are the divider lines placing cases where you expect?'
+      ],
+      'multivariable-bubble': [
+        'How do X and Y relate visually across the plotted cases?',
+        'Which points are largest, and does size track position?',
+        'Do color groups separate, overlap, or mix across the plane?',
+        'Are there outliers on any mapped dimension (position, size, or color)?'
+      ],
+      'multivariable-true3d': [
+        'How does Z separate points that look similar in the X–Y plane?',
+        'Which combinations of X, Y, and Z stand out?',
+        'Does rotating the view reveal hidden clusters or alignments?',
+        'Is bubble size still adding a readable fourth dimension?'
+      ],
+      'quadrant chart': [
+        'Which cases sit in high-X / high-Y versus the other three quadrants?',
+        'How does bubble size change across the plane?',
+        'Do color groups cluster in particular quadrants?',
+        'Are the divider lines placing cases where you expect?'
+      ],
+      'bubble chart': [
+        'How do X and Y relate visually across the plotted cases?',
+        'Which points are largest, and does size track position?',
+        'Do color groups separate, overlap, or mix across the plane?',
+        'Are there outliers on any mapped dimension (position, size, or color)?'
       ]
     };
 
@@ -963,6 +995,11 @@ const StatisticoHeader = {
         'Are natural subgroups present in the data?',
         'How separated are clusters?',
         'Which features characterize each cluster?'
+      ],
+      'multivariable': [
+        'How do the mapped variables relate across X, Y, size, and color?',
+        'Which cases, groups, or quadrants stand out visually?',
+        'Are there outliers or overlapping groups worth investigating?'
       ],
       'power': [
         'Is planned sample size sufficient for target power/precision?',
@@ -6974,6 +7011,7 @@ const StatisticoHeader = {
     if (this.module === 'univariate') return true;
     if (this.module === 'cluster') return true;
     if (this.module === 'meta-analysis') return true;
+    if (this.module === 'multivariable') return true;
     return this._isSharedSidebarModule();
   },
 
@@ -6997,6 +7035,16 @@ const StatisticoHeader = {
   },
 
   _getInsightGuideViewKey() {
+    const onMultivariable = this.module === 'multivariable' || /\/multivariable\//.test(String(location.pathname || ''));
+    if (onMultivariable) {
+      let mode = this.currentView;
+      if (typeof window.getMvInsightMode === 'function') {
+        try { mode = window.getMvInsightMode() || mode; } catch (_e) {}
+      }
+      if (mode === 'true3d' || mode === 'multivariable-true3d') return 'multivariable-true3d';
+      if (mode === 'bubble' || mode === 'multivariable-bubble') return 'multivariable-bubble';
+      return 'multivariable-quadrant';
+    }
     if (this.module === 'univariate' && this.currentView === 'by-group') {
       const tab = globalThis.__byGroupActiveTab || 'stats';
       return `by-group-${tab}`;
@@ -7171,7 +7219,10 @@ const StatisticoHeader = {
       'cluster-hi-dendrogram':  'Hierarchical — Dendrogram',
       'cluster-hi-clusters':    'Hierarchical — Clusters',
       'cluster-hi-profiles':    'Hierarchical — Profiles & Centroids',
-      'cluster-hi-map':         'Hierarchical — Separation & Map'
+      'cluster-hi-map':         'Hierarchical — Separation & Map',
+      'multivariable-quadrant': 'Quadrant Chart',
+      'multivariable-bubble':   'Bubble Chart',
+      'multivariable-true3d':   '3D Scatter'
     };
   },
 
@@ -7335,7 +7386,13 @@ const StatisticoHeader = {
       'cluster-hi-profiles':
         'Read the profile line chart (one line per cluster at the chosen cut) with the centroid table below it. The Standardised / Raw means toggle switches both together: standardised shows mean z-scores colour-coded by sign, raw shows original units. The Original order / By separation toggle reorders variables by discriminatory power, putting the most cluster-separating variables first. Use this view to characterise what each hierarchical cluster represents.',
       'cluster-hi-map':
-        'This page combines the two separation views for the hierarchical solution at the chosen cut. TOP — the cluster map: each dot is a case coloured by its cluster, with larger semi-transparent markers at the centroids (mean vectors). PCA (auto) projects all variables onto the two directions preserving the most variance (axis percentages = share of variance; a dominant PC1 usually signals unstandardised inputs); Variables mode plots any two raw variables instead. The Merge trails checkbox overlays the hierarchy above the cut: dashed amber connectors run from each pair of clusters to the centroid of their union, in the order the tree would merge them next — short connectors flag pairs that are nearly one group (what a smaller k would fuse), long connectors mean the cut separates genuinely distant groups. Drag to zoom; click legend entries to isolate clusters. BOTTOM — the centroid-distance heatmap: pairwise distances between centroids on a blue scale, deeper blue meaning farther apart (better separated) and the palest cells marking the closest, least-distinct pairs. Read them together — a pale cell names the weakest pair, the map shows whether their members truly overlap — and cross-check ambiguous cases against the dendrogram\u2019s merge heights.'
+        'This page combines the two separation views for the hierarchical solution at the chosen cut. TOP — the cluster map: each dot is a case coloured by its cluster, with larger semi-transparent markers at the centroids (mean vectors). PCA (auto) projects all variables onto the two directions preserving the most variance (axis percentages = share of variance; a dominant PC1 usually signals unstandardised inputs); Variables mode plots any two raw variables instead. The Merge trails checkbox overlays the hierarchy above the cut: dashed amber connectors run from each pair of clusters to the centroid of their union, in the order the tree would merge them next — short connectors flag pairs that are nearly one group (what a smaller k would fuse), long connectors mean the cut separates genuinely distant groups. Drag to zoom; click legend entries to isolate clusters. BOTTOM — the centroid-distance heatmap: pairwise distances between centroids on a blue scale, deeper blue meaning farther apart (better separated) and the palest cells marking the closest, least-distinct pairs. Read them together — a pale cell names the weakest pair, the map shows whether their members truly overlap — and cross-check ambiguous cases against the dendrogram\u2019s merge heights.',
+      'multivariable-quadrant':
+        'A quadrant bubble chart: each case is a bubble on two numeric axes, split by divider lines into four regions. Bubble size encodes a third numeric variable; optional color groups or scales cases. Use Variables to remap roles, Quadrants to set divider method and labels, and click a bubble (Ctrl+click for multi-select) to inspect it.',
+      'multivariable-bubble':
+        'A bubble chart: each case is plotted by two numeric axes, with bubble size encoding a third variable and optional color for groups or a scale. Use it to compare position and magnitude together. Hover for values; click to select; legend click focuses a group, Ctrl+click hides it, double-click isolates it.',
+      'multivariable-true3d':
+        'A 3D scatter of X, Y, and Z, with bubble size as a fourth encoding. Drag the plot to rotate so points that overlap in two dimensions can separate along the third. Use the 3D sliders for alpha, beta, and depth, and map Z in Variables.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -7431,6 +7488,12 @@ const StatisticoHeader = {
         + 'Do not recite merge-step or silhouette numbers here — those belong to the Clusters and Diagnostics views.',
       'cluster-hi-dendrogram':
         'This is a dendrogram (merge tree) with a draggable cut line the user can apply to re-run at a new k. Describe merge heights, long stems, and where cutting the tree gives well-separated groups — and, if the current cut looks suboptimal, say where a better cut would fall — not numeric tables from other views.',
+      'multivariable-quadrant':
+        'This is a quadrant bubble chart, not a histogram. Describe position on X and Y, which quadrant each cluster of points occupies, bubble size, and optional color groups. Do not discuss distribution shape, skew, or binning.',
+      'multivariable-bubble':
+        'This is a bubble chart of two numeric axes with size encoding a third variable. Describe the X–Y relationship, size pattern, color grouping, and outliers. Do not discuss histogram shape, symmetry, or binning.',
+      'multivariable-true3d':
+        'This is a 3D scatter with optional bubble size. Describe how Z separates points that overlap in X–Y, and what rotation reveals. Do not discuss histogram shape or univariate distribution.',
       'meta-forest':
         'This is a forest plot of study effects with CIs and the pooled estimate. Describe study consistency, outliers, and where the pooled effect sits relative to the null — not Egger funnel statistics.',
       'meta-bias':
@@ -7742,6 +7805,17 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
         const guide = window.buildMetaHeterogeneityInsightGuide();
         if (guide && guide.sections) {
           this._showAiOverlay(guide.sections, viewKey, 'per-view', guide.meta || { ruleBased: true });
+          return;
+        }
+      }
+      if ((this.module === 'multivariable' || String(viewKey).indexOf('multivariable-') === 0) &&
+          typeof window.buildMultivariableInsightGuide === 'function') {
+        const mvGuide = window.buildMultivariableInsightGuide();
+        if (mvGuide && mvGuide.sections) {
+          this._showAiOverlay(mvGuide.sections, viewKey, 'per-view', Object.assign({
+            includeQuestions: true,
+            openReading: true
+          }, mvGuide.meta || {}));
           return;
         }
       }
@@ -9231,7 +9305,7 @@ Always follow the exact output format requested.` },
         </div>` : ''}
 
         ${/* ── What Questions This View Answers (static, per-view only; skip for rule-based meta guides) ── */ ''}
-        ${mode === 'per-view' && !meta?.ruleBased ? (() => {
+        ${mode === 'per-view' && (!meta?.ruleBased || meta?.includeQuestions) ? (() => {
           const qs = this._getQuestionsAnsweredContent();
           if (!qs.length) return '';
           return `<div class="sb-ai-section sb-ai-section--questions">

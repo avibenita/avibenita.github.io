@@ -20,7 +20,7 @@
   <script src="../shared/vendor/highcharts/modules/exporting.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260820-tools4" />
   <script src="../shared-brand-logo.js?v=20260816mv3"></script>
-  <script src="../shared-header.js?v=20260823-back1"></script>
+  <script src="../shared-header.js?v=20260823-mvguide1"></script>
   <script src="mv-sample-data.js?v=20260816mv3"></script>
   <style>
     :root {
@@ -1036,6 +1036,7 @@
     buildRoleMap();
     syncUiFromState();
     layoutPanels();
+    syncInsightIdentity();
     requestAnimationFrame(function () { layoutPanels(); render(); });
   }
 
@@ -1870,8 +1871,7 @@
       }
       try {
         if (typeof StatisticoHeader !== "undefined") {
-          StatisticoHeader.module = StatisticoHeader.module || "multivariable";
-          StatisticoHeader.currentView = StatisticoHeader.currentView || "multivariable";
+          syncInsightIdentity();
           if (typeof StatisticoHeader._sbAiPerViewInterpret === "function") {
             await StatisticoHeader._sbAiPerViewInterpret();
             return;
@@ -2107,6 +2107,144 @@
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
+
+  function getMvInsightMode() {
+    if (isTrue3d()) return "true3d";
+    return state.mode === "bubble" ? "bubble" : "quadrant";
+  }
+
+  function syncInsightIdentity() {
+    if (typeof StatisticoHeader === "undefined") return;
+    StatisticoHeader.module = "multivariable";
+    StatisticoHeader.currentView = getMvInsightMode();
+  }
+
+  function buildMultivariableInsightGuide() {
+    syncInsightIdentity();
+    var mode = getMvInsightMode();
+    var xName = axisDisplayName("x");
+    var yName = axisDisplayName("y");
+    var sizeName = sizeDisplayName();
+    var sizeBy = state.sizeBy === "width" ? "width" : "area";
+    var zMeta = state.map.z ? fieldMeta(state.map.z) : null;
+    var zName = zMeta ? zMeta.label : (state.map.z || "Z");
+    var colorMeta = state.map.color ? fieldMeta(state.map.color) : null;
+    var colorName = colorMeta ? colorMeta.label : state.map.color;
+    var pts = [];
+    records.forEach(function (r) {
+      var x = num(r[state.map.x]);
+      var y = num(r[state.map.y]);
+      if (!isFinite(x) || !isFinite(y)) return;
+      pts.push({
+        x: x,
+        y: y,
+        z: state.map.z ? num(r[state.map.z]) : NaN,
+        size: num(r[state.map.size]),
+        color: state.map.color ? r[state.map.color] : null
+      });
+    });
+    var n = pts.length;
+    var nTxt = pointPhrase(n);
+    var about;
+    var controls;
+    var patterns;
+    if (mode === "true3d") {
+      about = "This 3D scatter places each case in X, Y, and Z, with bubble " + sizeBy + " encoding a fourth numeric variable. Rotate the view so points that overlap in two dimensions can separate along the third.";
+      controls = [
+        "Drag the plot to rotate; use the 3D sliders if you need a fixed alpha, beta, or depth.",
+        "Hover a bubble for X, Y, Z, and size; click to select, Ctrl+click to add more.",
+        "Map Z under Variables — it is used only in 3D scatter, not on the 2D bubble or quadrant chart.",
+        "Use Labels and Color By to name points and compare groups in space."
+      ];
+      patterns = [
+        "Clouds that look mixed in X–Y may split cleanly once Z is visible.",
+        "A size gradient through the cloud means the fourth variable tracks position.",
+        "Isolated points far from the main cloud on any axis are candidates for follow-up.",
+        "Color groups that occupy different regions of space are separating on the mapped variables."
+      ];
+    } else if (mode === "bubble") {
+      about = "This bubble chart plots each case on two numeric axes, with bubble " + sizeBy + " encoding a third variable" + (colorName ? " and color showing " + colorName : "") + ". Read position and magnitude together — this is not a single-variable distribution chart.";
+      controls = [
+        "Hover a bubble for X, Y, and size" + (colorName ? ", plus " + colorName : "") + "; click to select, Ctrl+click to add more.",
+        "Remap X, Y, size, and color under Variables when you want a different comparison.",
+        "Adjust bubble scale and whether size maps to " + sizeBy + " in Bubbles.",
+        colorName && state.colorMode === "cat"
+          ? "Legend: click a group to focus, Ctrl+click to hide, double-click to show only that group."
+          : "Turn on Labels to name points; search to highlight a case."
+      ];
+      patterns = [
+        "A rising or falling cloud shows how Y changes with X; a round cloud means little linear association.",
+        "Larger bubbles clustering in one region means the size variable tracks that part of the plane.",
+        "Color groups that occupy different regions are separating; overlapping colors mean mixed groups.",
+        "Points sitting far from the main cloud on X, Y, or size are visual outliers worth checking."
+      ];
+    } else {
+      about = "This quadrant chart is a bubble plot split by divider lines, so each case is high or low on X and Y at a glance. Bubble " + sizeBy + " encodes " + sizeName + (colorName ? ", and color shows " + colorName : "") + ".";
+      controls = [
+        "Hover a bubble for X, Y, size, and its quadrant; click to select, Ctrl+click to add more.",
+        "Set divider method (median, mean, midpoint, or custom) under Quadrants, and rename the four regions if needed.",
+        "Remap X, Y, size, and color under Variables when the comparison should change.",
+        colorName && state.colorMode === "cat"
+          ? "Legend: click a group to focus, Ctrl+click to hide, double-click to show only that group."
+          : "Use Labels to name points; search to find a case."
+      ];
+      patterns = [
+        "Uneven quadrant counts mean cases are not balanced around the chosen cuts.",
+        "Empty or sparse quadrants flag combinations of X and Y that rarely occur.",
+        "Size or color concentrating in one quadrant means those attributes track that high/low pairing.",
+        "Points near a divider are sensitive to cut method — check whether median vs mean vs midpoint moves them."
+      ];
+    }
+
+    var bits = [nTxt];
+    bits.push("X = " + xName);
+    bits.push("Y = " + yName);
+    if (mode === "true3d") bits.push("Z = " + zName);
+    bits.push("size (" + sizeBy + ") = " + sizeName);
+    if (colorName) {
+      if (state.colorMode === "cat") {
+        var nGroups = (state.lastSeriesNames || []).length;
+        bits.push("color by " + colorName + (nGroups ? " (" + nGroups + (nGroups === 1 ? " group" : " groups") + ")" : ""));
+      } else if (state.colorMode === "num") {
+        bits.push("color scale " + colorName);
+      }
+    }
+    var reading = "The chart plots " + bits.join(", ") + ".";
+    if (mode === "quadrant" && !isTrue3d() && state.lastCuts && state.lastCuts.x != null && state.lastCuts.y != null) {
+      var cuts = state.lastCuts;
+      var counts = { NE: 0, NW: 0, SE: 0, SW: 0 };
+      pts.forEach(function (p) {
+        var qx = p.x >= cuts.x;
+        var qy = p.y >= cuts.y;
+        counts[qx && qy ? "NE" : (!qx && qy ? "NW" : (qx && !qy ? "SE" : "SW"))]++;
+      });
+      var qBits = ["NE", "NW", "SE", "SW"].map(function (k) {
+        return (state.qNames[k] || k) + " " + counts[k];
+      });
+      reading += " Dividers are at X = " + formatNumber(cuts.x, state.xFormat) +
+        " and Y = " + formatNumber(cuts.y, state.yFormat) +
+        " (" + dividerPhrase() + "). Quadrant counts: " + qBits.join("; ") + ".";
+    } else if (mode === "true3d") {
+      reading += " Drag to rotate — overlap in X–Y can still separate along Z.";
+    }
+    var nSel = Object.keys(state.selected || {}).length;
+    if (nSel) reading += " " + nSel + (nSel === 1 ? " point is" : " points are") + " selected.";
+
+    return {
+      sections: {
+        ABOUT: about,
+        CONTROLS: controls,
+        PATTERNS: patterns,
+        READING: escHtml(reading)
+      },
+      meta: {
+        includeQuestions: true,
+        openReading: true
+      }
+    };
+  }
+  window.getMvInsightMode = getMvInsightMode;
+  window.buildMultivariableInsightGuide = buildMultivariableInsightGuide;
 
   function updateStatus(nPoints, nSeries, cuts) {
     var sizeLabel = (fieldMeta(state.map.size) || {}).label || "size";
@@ -2956,6 +3094,7 @@
         syncModeTabs();
         syncTrue3dUi();
         syncQuadVisibility();
+        syncInsightIdentity();
         render();
       });
     });

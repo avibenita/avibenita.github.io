@@ -755,18 +755,32 @@ function renderModules(list) {
   if (noResults) noResults.style.display = list.length ? "none" : "block";
 }
 
-/* Park the Active Range bar under the Applications section header
-   (immediately above Report Tables) on the Specialized Tools tab; restore it
-   above the tile list on Statistical Analysis. Must run after every tile
-   re-render, and before wiping #categoryTiles (or the node is destroyed). */
+function parkRangeInStickyChrome(range) {
+  var chrome = document.getElementById("hubStickyChrome");
+  var allBar = document.getElementById("hubAnalyticsAllBar");
+  if (!chrome) return false;
+  if (allBar && allBar.parentElement === chrome) {
+    chrome.insertBefore(range, allBar);
+  } else if (range.parentElement !== chrome) {
+    chrome.insertBefore(range, chrome.firstChild);
+  }
+  return true;
+}
+
+/* Keep the Active Range bar in the frozen chrome (logo / tabs / search stay
+   put while modules scroll). On Specialized Tools section views, park it under
+   the first category header so it still sits above Report Tables. Must run
+   after every tile re-render, and before wiping #categoryTiles. */
 function placeHubRangeSection() {
   var range = document.getElementById("hubRangeSection");
   var holder = document.getElementById("categoryTiles");
-  if (!range || !holder || !holder.parentElement) return;
+  if (!range || !holder) return;
   if (ACTIVE_CLUSTER === "tools") {
     var firstTile = holder.querySelector(".category-tile");
     if (ACTIVE_TOOLS_SECTION === "all") {
-      holder.parentElement.insertBefore(range, holder);
+      if (!parkRangeInStickyChrome(range) && holder.parentElement) {
+        holder.parentElement.insertBefore(range, holder);
+      }
       return;
     }
     if (firstTile) {
@@ -774,12 +788,13 @@ function placeHubRangeSection() {
       return;
     }
   }
+  if (parkRangeInStickyChrome(range)) return;
   var allBar = document.getElementById("hubAnalyticsAllBar");
-  if (allBar && allBar.classList.contains("is-active")) {
-    holder.parentElement.insertBefore(range, allBar);
+  if (allBar && allBar.classList.contains("is-active") && allBar.parentElement) {
+    allBar.parentElement.insertBefore(range, allBar);
     return;
   }
-  holder.parentElement.insertBefore(range, holder);
+  if (holder.parentElement) holder.parentElement.insertBefore(range, holder);
 }
 
 function renderCategoryTiles(query) {
@@ -790,7 +805,9 @@ function renderCategoryTiles(query) {
   // Rescue the range node if a previous tools-tab render parked it inside
   // #categoryTiles — innerHTML replacement would otherwise delete it.
   if (range && holder.contains(range)) {
-    holder.parentElement.insertBefore(range, holder);
+    if (!parkRangeInStickyChrome(range) && holder.parentElement) {
+      holder.parentElement.insertBefore(range, holder);
+    }
   }
   HUB_ACTIONS = {};
   var allSource = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {

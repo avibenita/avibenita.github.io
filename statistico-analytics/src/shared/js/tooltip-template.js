@@ -21,19 +21,22 @@
         z-index: 2147483000;
         max-width: 280px;
         min-width: 140px;
-        padding: 9px 11px;
-        border-radius: 8px;
-        background: #0f172a;
-        color: #f8fafc;
-        border: 1px solid rgba(255,255,255,.16);
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: #f8fafc;
+        color: #1e293b;
+        border: 1px solid rgba(15, 23, 42, .08);
         font-size: 11.5px;
         font-weight: 400;
         line-height: 1.45;
-        box-shadow: 0 8px 20px rgba(0,0,0,.28);
+        box-shadow:
+          0 1px 2px rgba(15, 23, 42, .08),
+          0 12px 32px rgba(15, 23, 42, .28),
+          0 0 0 1px rgba(255,255,255,.7) inset;
         pointer-events: none;
         opacity: 0;
-        transform: translateY(2px);
-        transition: opacity .12s ease, transform .12s ease;
+        transform: translateY(6px);
+        transition: opacity .14s ease, transform .14s ease;
         white-space: normal;
       }
       .st-tooltip[data-visible="1"] {
@@ -44,21 +47,21 @@
         display: block;
         font-size: 12px;
         font-weight: 700;
-        color: #ffffff;
+        color: #0f172a;
         margin-bottom: 4px;
         letter-spacing: .01em;
       }
       .st-tt-body {
         display: block;
         font-size: 11px;
-        color: rgba(248,250,252,0.78);
+        color: #475569;
         line-height: 1.5;
       }
       .st-tt-hint {
         display: block;
         margin-top: 5px;
         font-size: 10.5px;
-        color: rgba(248,250,252,0.48);
+        color: #64748b;
         font-style: italic;
       }
       /* Suppress legacy CSS tooltips once managed by this script */

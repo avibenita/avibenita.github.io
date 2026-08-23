@@ -1329,6 +1329,9 @@ function loadHubScopeConfigIfAny() {
 
 function syncClusterHeader() {
   var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
+  var tabAccent = ACTIVE_CLUSTER === "tools" ? "#fde047" : "#b49cff";
+  document.documentElement.setAttribute("data-hub-cluster", ACTIVE_CLUSTER);
+  document.documentElement.style.setProperty("--hub-tab-accent", tabAccent);
   document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-from", meta.brandFrom || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-to", meta.brandTo || meta.colorDark || meta.color || "#ea580c");

@@ -164,6 +164,8 @@ const StatisticoHeader = {
   sampleSize: 0,
   module: 'univariate', // 'univariate' | 'correlations' | 'regression'
   previewTemplateId: 'night',
+  PREVIEW_TPL_STORAGE_KEY: 'statistico-preview-tpl',
+  _previewReady: false,
 
   /* ── Theme helpers ──────────────────────────────────────────── */
   /**
@@ -287,6 +289,8 @@ const StatisticoHeader = {
         });
       } catch (_e) {}
     }
+
+    if (this._previewReady) this._restorePreviewTemplate();
   },
 
   /**
@@ -349,6 +353,9 @@ const StatisticoHeader = {
     this.ensureLaptopFrame();
     
     this.render();
+    this._installPreviewChartHook();
+    this._previewReady = true;
+    this._restorePreviewTemplate();
   },
 
   /**
@@ -6144,6 +6151,9 @@ const StatisticoHeader = {
     setTimeout(() => this.applyDecimalPreferenceToPage(persistedDecimals), 0);
     setTimeout(() => this._injectPerViewAiButton(), 0);
     this._injectUniFilterAssets();
+    this._installPreviewChartHook();
+    this._previewReady = true;
+    this._restorePreviewTemplate();
   },
 
   _isValidRegressionNavPayload(payload) {
@@ -6584,17 +6594,52 @@ const StatisticoHeader = {
     return this.PREVIEW_TEMPLATES[key] || this.PREVIEW_TEMPLATES.night;
   },
 
+  _readStoredPreviewTemplateId() {
+    try {
+      const id = localStorage.getItem(this.PREVIEW_TPL_STORAGE_KEY);
+      if (id && this.PREVIEW_TEMPLATES[id]) return id;
+    } catch (e) {}
+    return this.previewTemplateId || 'night';
+  },
+
+  _restorePreviewTemplate() {
+    this.applyPreviewTemplate(this._readStoredPreviewTemplateId(), { silent: true, skipStore: true });
+  },
+
   applyPreviewTemplate(id, opts) {
     const tpl = this.getPreviewTemplate(id);
     this.previewTemplateId = tpl.id;
+    if (!(opts && opts.skipStore)) {
+      try { localStorage.setItem(this.PREVIEW_TPL_STORAGE_KEY, tpl.id); } catch (e) {}
+    }
     const root = document.documentElement;
-    root.setAttribute('data-preview-tpl', tpl.id);
-    root.style.setProperty('--preview-bg', tpl.wrapBg);
-    root.style.setProperty('--preview-tex', tpl.cssTexture === 'none' ? 'none' : tpl.cssTexture);
-    root.style.setProperty('--preview-tex-size', tpl.texSize || '24px 24px');
-    root.style.setProperty('--preview-tex-opacity', tpl.texOpacity == null ? '1' : String(tpl.texOpacity));
-    root.classList.toggle('preview-tpl-light', !!tpl.light);
-    if (!(opts && opts.skipCharts)) this._restyleHighchartsForPreview(tpl);
+    const previewVars = [
+      '--preview-bg', '--preview-tex', '--preview-tex-size', '--preview-tex-opacity',
+      '--preview-axis', '--preview-grid', '--preview-legend', '--preview-label', '--preview-ink'
+    ];
+    if (tpl.id === 'night') {
+      root.removeAttribute('data-preview-tpl');
+      root.classList.remove('preview-tpl-light');
+      previewVars.forEach((prop) => root.style.removeProperty(prop));
+    } else {
+      root.setAttribute('data-preview-tpl', tpl.id);
+      root.style.setProperty('--preview-bg', tpl.wrapBg);
+      root.style.setProperty('--preview-tex', tpl.cssTexture === 'none' ? 'none' : tpl.cssTexture);
+      root.style.setProperty('--preview-tex-size', tpl.texSize || '24px 24px');
+      root.style.setProperty('--preview-tex-opacity', tpl.texOpacity == null ? '1' : String(tpl.texOpacity));
+      root.style.setProperty('--preview-axis', tpl.axis);
+      root.style.setProperty('--preview-grid', tpl.grid);
+      root.style.setProperty('--preview-legend', tpl.legend);
+      root.style.setProperty('--preview-label', tpl.label || tpl.legend);
+      root.style.setProperty('--preview-ink', tpl.light ? '#1c1917' : '#e2e8f0');
+      root.classList.toggle('preview-tpl-light', !!tpl.light);
+      this._stampPreviewCanvases();
+    }
+    this._installPreviewChartHook();
+    if (!(opts && opts.skipCharts)) {
+      this._restyleHighchartsForPreview(tpl);
+      this._restylePlotlyForPreview(tpl);
+    }
     if (!(opts && opts.silent)) {
       try {
         window.dispatchEvent(new CustomEvent('statistico:preview-template', { detail: { id: tpl.id, template: tpl } }));
@@ -6606,11 +6651,75 @@ const StatisticoHeader = {
         card.classList.toggle('is-active', card.getAttribute('data-tpl') === tpl.id);
       });
     }
+    if (tpl.id !== 'night') {
+      requestAnimationFrame(() => this._stampPreviewCanvases());
+      setTimeout(() => {
+        this._stampPreviewCanvases();
+        if (!(opts && opts.skipCharts)) {
+          this._restyleHighchartsForPreview(tpl);
+          this._restylePlotlyForPreview(tpl);
+        }
+      }, 280);
+    }
     return tpl;
   },
 
-  _restyleHighchartsForPreview(tpl) {
-    const charts = (window.Highcharts && Highcharts.charts) || [];
+  _stampPreviewCanvases() {
+    const skipSel = '.sb-nav, .st-tpl-overlay, #header-container, .statistico-shell, .sb-nav-footer';
+    const mark = (el) => {
+      if (!el || el.nodeType !== 1) return;
+      if (el.closest(skipSel)) return;
+      el.setAttribute('data-preview-canvas', '');
+    };
+    document.querySelectorAll('.highcharts-container, .js-plotly-plot, .plotly-graph-div').forEach((el) => {
+      mark(el.closest('.hist-card, .chart-wrap, .chart-panel, .panel, .boxplot-wrap, .view-card, .results-container, .card, .wrap, [data-preview-canvas]') || el.parentElement);
+    });
+    document.querySelectorAll([
+      '.results-container',
+      '.view-wrap',
+      '.view-card',
+      '.chart-wrap',
+      '.hist-card',
+      '.hist-chart',
+      '.chart-panel',
+      '.boxplot-wrap',
+      '.right-col .wrap',
+      '.right-col .card',
+      '#histogram-panel',
+      '#histogram-chart',
+      '#groupBoxplotChart'
+    ].join(',')).forEach(mark);
+  },
+
+  _installPreviewChartHook() {
+    if (this._previewHookInstalled) return;
+    this._previewHookInstalled = true;
+    const self = this;
+    const tryHook = () => {
+      if (self._hcLoadHooked) return true;
+      if (!window.Highcharts || typeof Highcharts.addEvent !== 'function' || !Highcharts.Chart) return false;
+      self._hcLoadHooked = true;
+      try {
+        Highcharts.setOptions({ chart: { backgroundColor: 'transparent' } });
+      } catch (e) {}
+      Highcharts.addEvent(Highcharts.Chart, 'load', function () {
+        const tpl = self.getPreviewTemplate();
+        if (tpl.id !== 'night') self._stampPreviewCanvases();
+        self._applyPreviewToHighchart(this, tpl);
+      });
+      return true;
+    };
+    if (!tryHook()) {
+      let n = 0;
+      const timer = setInterval(() => {
+        n += 1;
+        if (tryHook() || n > 40) clearInterval(timer);
+      }, 200);
+    }
+  },
+
+  _applyPreviewToHighchart(chart, tpl) {
+    if (!chart || typeof chart.update !== 'function') return;
     const axisPatch = {
       title: { style: { color: tpl.axis } },
       labels: { style: { color: tpl.axis } },
@@ -6619,25 +6728,48 @@ const StatisticoHeader = {
       lineColor: tpl.line,
       tickColor: tpl.line
     };
-    charts.forEach((chart) => {
-      if (!chart || typeof chart.update !== 'function') return;
+    try {
+      chart.update({
+        chart: { backgroundColor: 'transparent', plotBackgroundColor: 'transparent' },
+        legend: {
+          itemStyle: { color: tpl.legend },
+          itemHoverStyle: { color: tpl.light ? '#0f172a' : '#fff' },
+          itemHiddenStyle: { color: tpl.legendHidden },
+          title: { style: { color: tpl.legendTitle } }
+        },
+        tooltip: {
+          backgroundColor: tpl.tooltipBg,
+          borderColor: tpl.tooltipBorder,
+          style: { color: tpl.tooltipText }
+        },
+        xAxis: axisPatch,
+        yAxis: axisPatch
+      }, true, false, false);
+    } catch (e) {}
+  },
+
+  _restyleHighchartsForPreview(tpl) {
+    const charts = (window.Highcharts && Highcharts.charts) || [];
+    charts.forEach((chart) => this._applyPreviewToHighchart(chart, tpl));
+  },
+
+  _restylePlotlyForPreview(tpl) {
+    if (!window.Plotly || typeof Plotly.relayout !== 'function') return;
+    document.querySelectorAll('.js-plotly-plot, .plotly-graph-div').forEach((gd) => {
       try {
-        chart.update({
-          chart: { backgroundColor: tpl.chartBg },
-          legend: {
-            itemStyle: { color: tpl.legend },
-            itemHoverStyle: { color: tpl.light ? '#0f172a' : '#fff' },
-            itemHiddenStyle: { color: tpl.legendHidden },
-            title: { style: { color: tpl.legendTitle } }
-          },
-          tooltip: {
-            backgroundColor: tpl.tooltipBg,
-            borderColor: tpl.tooltipBorder,
-            style: { color: tpl.tooltipText }
-          },
-          xAxis: axisPatch,
-          yAxis: axisPatch
-        }, true, false, false);
+        Plotly.relayout(gd, {
+          paper_bgcolor: 'rgba(0,0,0,0)',
+          plot_bgcolor: 'rgba(0,0,0,0)',
+          'font.color': tpl.axis,
+          'xaxis.tickfont.color': tpl.axis,
+          'yaxis.tickfont.color': tpl.axis,
+          'xaxis.title.font.color': tpl.axis,
+          'yaxis.title.font.color': tpl.axis,
+          'xaxis.gridcolor': tpl.grid,
+          'yaxis.gridcolor': tpl.grid,
+          'xaxis.linecolor': tpl.line,
+          'yaxis.linecolor': tpl.line
+        });
       } catch (e) {}
     });
   },

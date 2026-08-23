@@ -596,7 +596,7 @@ let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
-let ACTIVE_TOOLS_SECTION = "applications";
+let ACTIVE_TOOLS_SECTION = "all";
 var TOOLS_SECTION_META = {
   prepare: {
     id: "prepare",
@@ -678,6 +678,7 @@ var ANALYTICS_SECTION_META = {
 };
 var ANALYTICS_FAMILY_ORDER = ["explore", "compare", "model", "structure", "synthesize"];
 var ACTIVE_ANALYTICS_SECTION = "all";
+var HUB_OPEN_SECTIONS = { analytics: { explore: true }, tools: { applications: true } };
 let HUB_ACTIONS = {};
 
 /** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
@@ -776,17 +777,10 @@ function placeHubRangeSection() {
   var holder = document.getElementById("categoryTiles");
   if (!range || !holder) return;
   if (ACTIVE_CLUSTER === "tools") {
-    var firstTile = holder.querySelector(".category-tile");
-    if (ACTIVE_TOOLS_SECTION === "all") {
-      if (!parkRangeInStickyChrome(range) && holder.parentElement) {
-        holder.parentElement.insertBefore(range, holder);
-      }
-      return;
+    if (!parkRangeInStickyChrome(range) && holder.parentElement) {
+      holder.parentElement.insertBefore(range, holder);
     }
-    if (firstTile) {
-      holder.insertBefore(range, firstTile);
-      return;
-    }
+    return;
   }
   if (parkRangeInStickyChrome(range)) return;
   var allBar = document.getElementById("hubAnalyticsAllBar");
@@ -814,15 +808,6 @@ function renderCategoryTiles(query) {
     return !c.hidden;
   });
   var source = allSource;
-  if (ACTIVE_CLUSTER === "tools" && ACTIVE_TOOLS_SECTION !== "all") {
-    source = allSource.filter(function (c) {
-      return getToolsTileSectionId(c, allSource) === ACTIVE_TOOLS_SECTION;
-    });
-  } else if (ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION !== "all") {
-    source = allSource.filter(function (c) {
-      return getAnalyticsTileSectionId(c, allSource) === ACTIVE_ANALYTICS_SECTION;
-    });
-  }
   var clusterMeta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
   var clusterColor = clusterMeta.color || "#1f6fff";
   var clusterColorDark = clusterMeta.colorDark || clusterColor;
@@ -835,54 +820,25 @@ function renderCategoryTiles(query) {
     if ((c.section || "").toLowerCase().indexOf(q) >= 0) return true;
     var familyMeta = ANALYTICS_SECTION_META[getAnalyticsTileSectionId(c, allSource)];
     if (familyMeta && familyMeta.label.toLowerCase().indexOf(q) >= 0) return true;
+    var toolsMeta = TOOLS_SECTION_META[getToolsTileSectionId(c, allSource)];
+    if (toolsMeta && toolsMeta.label.toLowerCase().indexOf(q) >= 0) return true;
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
   var html = "";
-  if (ACTIVE_CLUSTER === "tools" && ACTIVE_TOOLS_SECTION === "all") {
-    var toolsEmitted = 0;
-    TOOLS_SECTION_ORDER.forEach(function (sectionId) {
-      var familyTiles = list.filter(function (c) {
-        return getToolsTileSectionId(c, allSource) === sectionId;
-      });
-      if (!familyTiles.length) return;
-      html += renderToolsSectionHeader(sectionId, toolsEmitted > 0);
-      html += familyTiles.map(function (c) {
-        return renderCategoryTileHtml(c, clusterColor, clusterColorDark);
-      }).join("");
-      toolsEmitted += familyTiles.length;
+  var sectionOrder = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_ORDER : ANALYTICS_FAMILY_ORDER;
+  var searching = !!q;
+  var openSet = getHubOpenSectionSet();
+  sectionOrder.forEach(function (sectionId) {
+    var familyTiles = list.filter(function (c) {
+      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, allSource) === sectionId;
+      return getAnalyticsTileSectionId(c, allSource) === sectionId;
     });
-  } else if (ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION === "all") {
-    var emitted = 0;
-    ANALYTICS_FAMILY_ORDER.forEach(function (sectionId) {
-      var familyTiles = list.filter(function (c) {
-        return getAnalyticsTileSectionId(c, allSource) === sectionId;
-      });
-      if (!familyTiles.length) return;
-      html += renderAnalyticsSectionHeader(sectionId, emitted > 0);
-      html += familyTiles.map(function (c) {
-        return renderCategoryTileHtml(c, clusterColor, clusterColorDark);
-      }).join("");
-      emitted += familyTiles.length;
-    });
-  } else {
-    html = list.map(function (c, idx) {
-      var sectionHtml = "";
-      if (ACTIVE_CLUSTER === "tools" && c.section) {
-        var sectionMeta = TOOLS_SECTION_META[c.sectionId] || null;
-        var sectionColor = sectionMeta ? sectionMeta.color : (c.accent || clusterColor);
-        sectionHtml =
-          '<div class="category-section-header' + (idx > 0 ? " with-divider" : "") + '"' +
-          ' style="--section-color:' + escapeHtml(sectionColor) + ';">' +
-          '<div class="category-section-title">' + escapeHtml(c.section) + "</div>" +
-          (c.sectionSubtitle ? '<div class="category-section-subtitle">' + escapeHtml(c.sectionSubtitle) + "</div>" : "") +
-          "</div>";
-      } else if (ACTIVE_CLUSTER === "analytics" && idx === 0) {
-        var familyId = getAnalyticsTileSectionId(c, allSource);
-        sectionHtml = renderAnalyticsSectionHeader(familyId, false);
-      }
-      return sectionHtml + renderCategoryTileHtml(c, clusterColor, clusterColorDark);
+    if (!familyTiles.length) return;
+    var tilesHtml = familyTiles.map(function (c) {
+      return renderCategoryTileHtml(c, clusterColor, clusterColorDark);
     }).join("");
-  }
+    html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId]);
+  });
   holder.innerHTML = html;
   if (noResults) noResults.style.display = list.length ? "none" : "block";
   syncAnalyticsAllBar(q);
@@ -938,23 +894,58 @@ function getAvailableAnalyticsSections() {
 }
 
 function isAnalyticsAllView() {
-  return ACTIVE_CLUSTER === "analytics" && ACTIVE_ANALYTICS_SECTION === "all";
+  return ACTIVE_CLUSTER === "analytics";
+}
+
+function getHubOpenSectionSet() {
+  if (!HUB_OPEN_SECTIONS[ACTIVE_CLUSTER]) HUB_OPEN_SECTIONS[ACTIVE_CLUSTER] = {};
+  return HUB_OPEN_SECTIONS[ACTIVE_CLUSTER];
+}
+
+function toggleHubAccordion(sectionId) {
+  if (!sectionId) return;
+  var openSet = getHubOpenSectionSet();
+  openSet[sectionId] = !openSet[sectionId];
+  var panel = document.querySelector('.hub-accordion-panel[data-section="' + sectionId + '"]');
+  if (!panel) return;
+  var open = !!openSet[sectionId];
+  panel.classList.toggle("is-open", open);
+  var head = panel.querySelector(".hub-accordion-head");
+  if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function renderHubAccordionPanel(sectionId, tilesHtml, open) {
+  var meta = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_META[sectionId] : ANALYTICS_SECTION_META[sectionId];
+  if (!meta) return tilesHtml || "";
+  return (
+    '<div class="hub-accordion-panel' + (open ? " is-open" : "") + '" data-section="' + escapeHtml(sectionId) + '"' +
+    ' style="--section-color:' + escapeHtml(meta.color) + ';">' +
+    '<button type="button" class="hub-accordion-head" aria-expanded="' + (open ? "true" : "false") + '"' +
+    ' onclick="toggleHubAccordion(\'' + sectionId + '\')">' +
+    '<span class="hub-accordion-icon"><i class="fa-solid ' + escapeHtml(meta.icon) + '" aria-hidden="true"></i></span>' +
+    '<span class="hub-accordion-copy">' +
+    '<span class="hub-accordion-title">' + escapeHtml(meta.label) + "</span>" +
+    (meta.subtitle ? '<span class="hub-accordion-desc">' + escapeHtml(meta.subtitle) + "</span>" : "") +
+    "</span>" +
+    '<i class="fa-solid fa-chevron-down hub-accordion-caret" aria-hidden="true"></i>' +
+    "</button>" +
+    '<div class="hub-accordion-body">' + (tilesHtml || "") + "</div>" +
+    "</div>"
+  );
 }
 
 function syncAnalyticsAllBar(query) {
   var bar = document.getElementById("hubAnalyticsAllBar");
+  var title = document.getElementById("hubAnalyticsAllBarTitle");
   var input = document.getElementById("hubSearch");
-  var show = isAnalyticsAllView();
   if (bar) {
-    bar.classList.toggle("is-active", show);
-    bar.hidden = !show;
+    bar.classList.add("is-active");
+    bar.hidden = false;
   }
+  if (title) title.textContent = ACTIVE_CLUSTER === "tools" ? "All Tools" : "All Analyses";
   if (input) {
-    if (show) {
-      if (typeof query === "string") input.value = query;
-    } else if (ACTIVE_CLUSTER !== "analytics" || ACTIVE_ANALYTICS_SECTION !== "all") {
-      input.value = "";
-    }
+    input.placeholder = ACTIVE_CLUSTER === "tools" ? "Search tools…" : "Search analyses…";
+    if (typeof query === "string") input.value = query;
   }
 }
 
@@ -1422,6 +1413,10 @@ function setHubAnalyticsSection(sectionId) {
   ACTIVE_ANALYTICS_SECTION = sectionId;
   ACTIVE_CLUSTER = "analytics";
   persistAnalyticsSection(sectionId);
+  if (sectionId !== "all") {
+    HUB_OPEN_SECTIONS.analytics = {};
+    HUB_OPEN_SECTIONS.analytics[sectionId] = true;
+  }
   closeHubAnalyticsMenu();
   closeHubToolsMenu();
   syncClusterHeader();
@@ -2730,6 +2725,7 @@ window.setHubToolsSection = setHubToolsSection;
 window.toggleHubToolsMenu = toggleHubToolsMenu;
 window.setHubAnalyticsSection = setHubAnalyticsSection;
 window.toggleHubAnalyticsMenu = toggleHubAnalyticsMenu;
+window.toggleHubAccordion = toggleHubAccordion;
 window.runHubModuleAction = runHubModuleAction;
 window.setSelectedModuleCard = setSelectedModuleCard;
 
@@ -2757,6 +2753,10 @@ Office.onReady(function(info) {
     var available = getAvailableAnalyticsSections();
     if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
       ACTIVE_ANALYTICS_SECTION = available[0] || "all";
+    }
+    if (ACTIVE_ANALYTICS_SECTION !== "all" && ANALYTICS_SECTION_META[ACTIVE_ANALYTICS_SECTION]) {
+      HUB_OPEN_SECTIONS.analytics = {};
+      HUB_OPEN_SECTIONS.analytics[ACTIVE_ANALYTICS_SECTION] = true;
     }
     syncClusterHeader();
     renderCategoryTiles("");

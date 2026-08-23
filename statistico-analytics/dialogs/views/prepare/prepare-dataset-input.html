@@ -26,10 +26,11 @@
     .prep-tab { background:transparent; border:none; color:var(--cfg-text3); font-size:11px; font-weight:700; padding:7px 10px; cursor:pointer; border-bottom:2px solid transparent; }
     .prep-tab.active { color:var(--prep-acc); border-bottom-color:var(--prep-acc); }
     .prep-pane { display:none; flex:1; min-height:0; overflow:hidden; }
-    .prep-pane.active { display:flex; }
-    .prep-layout { display:flex; flex-direction:column; gap:8px; padding:8px 10px 10px; flex:1; min-height:0; overflow:auto; }
-    .prep-vars { display:flex; flex-direction:column; min-height:0; }
+    .prep-pane.active { display:flex; flex-direction:column; }
+    .prep-layout { display:flex; flex-direction:column; gap:8px; padding:8px 10px 16px; flex:1; min-height:0; overflow:auto; }
+    .prep-vars { display:flex; flex-direction:column; flex-shrink:0; }
     .prep-varbox { max-height:168px; overflow:auto; border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface); }
+    .prep-vars.one-var .prep-varbox { max-height:none; overflow:visible; border:none; background:transparent; border-radius:0; }
     .prep-var { display:grid; grid-template-columns:16px minmax(0,1fr) auto; gap:8px; align-items:center; padding:6px 8px; font-size:11px; cursor:pointer; border-bottom:1px solid var(--cfg-border); }
     .prep-var:last-child { border-bottom:none; }
     .prep-var:hover { background:var(--cfg-tbl-hover); }
@@ -47,14 +48,17 @@
     .role-keep, .role-skip { color:var(--cfg-text3); font-weight:600; }
     [data-theme="light"] .role-id { color:#2563eb; }
     [data-theme="light"] .role-drop { color:#dc2626; }
-    .lbl { font-size:10px; font-weight:700; color:var(--cfg-text3); text-transform:uppercase; letter-spacing:.04em; }
+    .lbl { display:block; font-size:10px; font-weight:700; color:var(--cfg-text3); text-transform:uppercase; letter-spacing:.04em; margin:6px 0 3px; }
+    .lbl-row .lbl { margin:0; }
     .fld, select.fld, textarea.fld { width:100%; box-sizing:border-box; background:var(--cfg-input-bg); color:var(--cfg-input-text); border:1px solid var(--cfg-border); border-radius:6px; padding:5px 7px; font-size:11px; }
     textarea.fld { min-height:58px; font-family:ui-monospace,Consolas,monospace; }
-    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    textarea.fld.recode-ta { min-height:64px; height:64px; resize:vertical; }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; align-items:start; }
+    @media (max-width: 520px) { .row2 { grid-template-columns:1fr; } }
     .help { font-size:10.5px; color:var(--cfg-text3); line-height:1.35; }
     .count { font-size:11px; color:var(--prep-acc); font-weight:700; }
     .op-sec { display:none; }
-    .op-sec.on { display:block; }
+    .op-sec.on { display:flex; flex-direction:column; gap:2px; }
     .chip-row { display:flex; flex-wrap:wrap; gap:4px; }
     .chip { border:1px solid var(--cfg-border); background:var(--cfg-surface2); color:var(--cfg-text2); border-radius:999px; font-size:10px; padding:3px 7px; cursor:pointer; }
     .recipe-item { border:1px solid var(--cfg-border); border-radius:8px; padding:7px 8px; background:var(--cfg-surface); margin-bottom:6px; }
@@ -173,18 +177,31 @@
               <div class="help">Ticked columns are omitted from the new sheet. Unticked columns are kept. At least one column must remain.</div>
             </div>
             <div class="op-sec" id="sec-recode">
-              <label class="lbl">New variable name</label>
-              <input class="fld" id="recodeName" placeholder="Sex_recode" />
-              <label class="lbl">Exact mappings (old=new, one per line)</label>
-              <textarea class="fld" id="recodeMap" placeholder="1=Yes&#10;2=No"></textarea>
-              <label class="lbl">Numeric ranges (min-max=new)</label>
-              <textarea class="fld" id="recodeRanges" placeholder="0-17=child"></textarea>
-              <label class="lbl">Unmatched values</label>
-              <select class="fld" id="recodeOtherwise">
-                <option value="keep">Keep original</option>
-                <option value="missing">Output as missing</option>
-              </select>
-              <div class="help">A new column is added. The source column is kept unless you later drop it.</div>
+              <div class="row2">
+                <div>
+                  <label class="lbl" for="recodeName">New variable name</label>
+                  <input class="fld" id="recodeName" placeholder="Sex_recode" />
+                </div>
+                <div>
+                  <label class="lbl" for="recodeOtherwise">Unmatched values</label>
+                  <select class="fld" id="recodeOtherwise">
+                    <option value="keep">Keep original</option>
+                    <option value="missing">Set to missing</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row2">
+                <div>
+                  <label class="lbl" for="recodeMap">Exact mappings</label>
+                  <textarea class="fld recode-ta" id="recodeMap" placeholder="1=Yes&#10;2=No"></textarea>
+                  <div class="help">One per line: old=new</div>
+                </div>
+                <div>
+                  <label class="lbl" for="recodeRanges">Numeric ranges</label>
+                  <textarea class="fld recode-ta" id="recodeRanges" placeholder="0-17=child"></textarea>
+                  <div class="help">One per line: min-max=new</div>
+                </div>
+              </div>
             </div>
             <div class="op-sec" id="sec-compute">
               <label class="lbl">New variable name</label>
@@ -322,7 +339,7 @@
         blurb: 'Create a new column from old=new rules. The source column stays unless you remove it later.',
         how: 'Choose one source column, name the new column, and enter the recode rules.',
         varTitle: 'Source column to recode',
-        varHint: 'Choose one column. A new column is created; this source column stays unless you remove it later.'
+        varHint: 'Select one column. A new column is added; the original is kept.'
       },
       compute: {
         usesVars: 'none',
@@ -717,26 +734,39 @@
       var pane = qs('prepVars');
       if (meta.usesVars === 'none') {
         pane.style.display = 'none';
+        pane.classList.remove('one-var');
         qs('varActions').innerHTML = '';
         return;
       }
       pane.style.display = '';
       qs('varTitle').textContent = meta.varTitle || 'Columns';
       qs('varHint').textContent = meta.varHint || '';
+      if (meta.usesVars === 'one') {
+        pane.classList.add('one-var');
+        var current = selectedVars()[0] || STATE.headers[0] || '';
+        if (current && !STATE.selected[current]) {
+          STATE.selected = {};
+          STATE.selected[current] = true;
+        }
+        qs('varList').innerHTML = STATE.headers.length
+          ? '<select class="fld" id="oneVarPick">' + STATE.headers.map(function (h) {
+              return '<option value="' + esc(h) + '"' + (h === current ? ' selected' : '') + '>' + esc(h) +
+                (STATE.unnamed[h] ? ' (no header)' : '') + '</option>';
+            }).join('') + '</select>'
+          : '<div class="empty-state">No variables in the selected range.</div>';
+        qs('varActions').innerHTML = '';
+        return;
+      }
+      pane.classList.remove('one-var');
       var idVar = type === 'wideToLong' ? qs('wideId').value : '';
-      var inputType = meta.usesVars === 'one' ? 'radio' : 'checkbox';
       qs('varList').innerHTML = STATE.headers.map(function (h) {
         var st = columnRole(type, h, idVar);
         return '<label class="prep-var' + (st.checked ? ' sel' : '') + (st.disabled ? ' dim' : '') + '">' +
-          '<input type="' + inputType + '" name="prepVar" data-var="' + esc(h) + '"' + (st.checked ? ' checked' : '') + (st.disabled ? ' disabled' : '') + '/>' +
+          '<input type="checkbox" name="prepVar" data-var="' + esc(h) + '"' + (st.checked ? ' checked' : '') + (st.disabled ? ' disabled' : '') + '/>' +
           '<span class="prep-var-name">' + esc(h) + (STATE.unnamed[h] ? '<span class="no-hdr">No header detected</span>' : '') + '</span>' +
           '<span class="prep-var-role ' + st.cls + '">' + esc(st.role) + '</span></label>';
       }).join('') || '<div class="empty-state">No variables in the selected range.</div>';
-      if (meta.usesVars === 'multi') {
-        qs('varActions').innerHTML = '<button type="button" id="btnVarAll">Select all</button><button type="button" id="btnVarNone">Clear</button>';
-      } else {
-        qs('varActions').innerHTML = '';
-      }
+      qs('varActions').innerHTML = '<button type="button" id="btnVarAll">Select all</button><button type="button" id="btnVarNone">Clear</button>';
     }
 
     function showOp() {
@@ -762,7 +792,7 @@
       }
       if (type === 'longToWide') fillLongWide();
       if (meta.usesVars === 'one') {
-        var first = selectedVars()[0];
+        var first = selectedVars()[0] || STATE.headers[0];
         STATE.selected = {};
         if (first) STATE.selected[first] = true;
       }
@@ -997,16 +1027,16 @@
       }
     });
     qs('varList').addEventListener('change', function (e) {
+      if (e.target && e.target.id === 'oneVarPick') {
+        STATE.selected = {};
+        if (e.target.value) STATE.selected[e.target.value] = true;
+        updateAffected();
+        return;
+      }
       var cb = e.target.closest('input[data-var]');
       if (!cb || cb.disabled) return;
       var name = cb.getAttribute('data-var');
-      var meta = OP_META[currentOp()] || {};
-      if (meta.usesVars === 'one' || cb.type === 'radio') {
-        STATE.selected = {};
-        STATE.selected[name] = true;
-      } else {
-        STATE.selected[name] = cb.checked;
-      }
+      STATE.selected[name] = cb.checked;
       renderVars();
       updateAffected();
     });

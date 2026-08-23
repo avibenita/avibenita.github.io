@@ -678,7 +678,7 @@ var ANALYTICS_SECTION_META = {
 };
 var ANALYTICS_FAMILY_ORDER = ["explore", "compare", "model", "structure", "synthesize"];
 var ACTIVE_ANALYTICS_SECTION = "all";
-var HUB_OPEN_SECTIONS = { analytics: { explore: true }, tools: { applications: true } };
+var HUB_OPEN_SECTIONS = { analytics: {}, tools: {} };
 let HUB_ACTIONS = {};
 
 /** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
@@ -837,7 +837,7 @@ function renderCategoryTiles(query) {
     var tilesHtml = familyTiles.map(function (c) {
       return renderCategoryTileHtml(c, clusterColor, clusterColorDark);
     }).join("");
-    html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId]);
+    html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
   });
   holder.innerHTML = html;
   if (noResults) noResults.style.display = list.length ? "none" : "block";
@@ -912,15 +912,94 @@ function toggleHubAccordion(sectionId) {
   panel.classList.toggle("is-open", open);
   var head = panel.querySelector(".hub-accordion-head");
   if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+  syncHubExpandAllButton();
 }
 
-function renderHubAccordionPanel(sectionId, tilesHtml, open) {
+function getHubVisibleSectionIds() {
+  var allSource = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
+    return !c.hidden;
+  });
+  var sectionOrder = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_ORDER : ANALYTICS_FAMILY_ORDER;
+  return sectionOrder.filter(function (sectionId) {
+    return allSource.some(function (c) {
+      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, allSource) === sectionId;
+      return getAnalyticsTileSectionId(c, allSource) === sectionId;
+    });
+  });
+}
+
+function areAllVisibleHubSectionsOpen() {
+  var openSet = getHubOpenSectionSet();
+  var ids = getHubVisibleSectionIds();
+  if (!ids.length) return false;
+  return ids.every(function (id) { return !!openSet[id]; });
+}
+
+function syncHubExpandAllButton() {
+  var btn = document.getElementById("hubExpandAllBtn");
+  var label = document.getElementById("hubExpandAllBtnLabel");
+  var icon = btn && btn.querySelector("i");
+  var allOpen = areAllVisibleHubSectionsOpen();
+  if (label) label.textContent = allOpen ? "Collapse All" : "Expand All";
+  if (icon) icon.className = allOpen ? "fa-solid fa-angles-up" : "fa-solid fa-angles-down";
+  if (btn) {
+    btn.setAttribute("aria-label", allOpen ? "Collapse all sections" : "Expand all sections");
+    btn.setAttribute("data-st-tip", allOpen ? "Collapse all sections" : "Expand all sections");
+  }
+}
+
+function toggleHubExpandAll() {
+  var expand = !areAllVisibleHubSectionsOpen();
+  var openSet = getHubOpenSectionSet();
+  getHubVisibleSectionIds().forEach(function (id) {
+    openSet[id] = expand;
+  });
+  var input = document.getElementById("hubSearch");
+  renderCategoryTiles(input ? input.value : "");
+  if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === "function") {
+    window.StatisticoTooltip.refresh();
+  }
+}
+
+function getAccordionModuleNames(tiles) {
+  var names = [];
+  var seen = {};
+  (tiles || []).forEach(function (c) {
+    var mods = getCategoryModules(c);
+    if (mods.length) {
+      mods.forEach(function (m) {
+        var label = (m && m.label) || "";
+        if (!label || seen[label]) return;
+        seen[label] = true;
+        names.push(label);
+      });
+    } else if (c.title && !seen[c.title]) {
+      seen[c.title] = true;
+      names.push(c.title);
+    }
+  });
+  return names;
+}
+
+function renderHubAccordionPanel(sectionId, tilesHtml, open, tiles) {
   var meta = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_META[sectionId] : ANALYTICS_SECTION_META[sectionId];
   if (!meta) return tilesHtml || "";
+  var names = getAccordionModuleNames(tiles);
+  var tipText = names.length
+    ? meta.label + ": " + names.join(" · ")
+    : (meta.subtitle || meta.label);
+  var tipHtml =
+    '<span class="st-tt-title">' + escapeHtml(meta.label) + "</span>" +
+    '<span class="st-tt-body">' +
+    (names.length ? names.map(escapeHtml).join("<br>") : escapeHtml(meta.subtitle || meta.label)) +
+    "</span>";
   return (
     '<div class="hub-accordion-panel' + (open ? " is-open" : "") + '" data-section="' + escapeHtml(sectionId) + '"' +
     ' style="--section-color:' + escapeHtml(meta.color) + ';">' +
     '<button type="button" class="hub-accordion-head" aria-expanded="' + (open ? "true" : "false") + '"' +
+    ' aria-label="' + escapeHtml(meta.label) + '"' +
+    ' data-st-tip="' + escapeHtml(tipText) + '"' +
+    ' data-st-tip-html="' + tipHtml.replace(/"/g, "&quot;") + '"' +
     ' onclick="toggleHubAccordion(\'' + sectionId + '\')">' +
     '<span class="hub-accordion-icon"><i class="fa-solid ' + escapeHtml(meta.icon) + '" aria-hidden="true"></i></span>' +
     '<span class="hub-accordion-copy">' +
@@ -936,17 +1015,16 @@ function renderHubAccordionPanel(sectionId, tilesHtml, open) {
 
 function syncAnalyticsAllBar(query) {
   var bar = document.getElementById("hubAnalyticsAllBar");
-  var title = document.getElementById("hubAnalyticsAllBarTitle");
   var input = document.getElementById("hubSearch");
   if (bar) {
     bar.classList.add("is-active");
     bar.hidden = false;
   }
-  if (title) title.textContent = ACTIVE_CLUSTER === "tools" ? "All Tools" : "All Analyses";
   if (input) {
     input.placeholder = ACTIVE_CLUSTER === "tools" ? "Search tools…" : "Search analyses…";
     if (typeof query === "string") input.value = query;
   }
+  syncHubExpandAllButton();
 }
 
 function renderAnalyticsSectionHeader(sectionId, withDivider) {
@@ -1413,10 +1491,6 @@ function setHubAnalyticsSection(sectionId) {
   ACTIVE_ANALYTICS_SECTION = sectionId;
   ACTIVE_CLUSTER = "analytics";
   persistAnalyticsSection(sectionId);
-  if (sectionId !== "all") {
-    HUB_OPEN_SECTIONS.analytics = {};
-    HUB_OPEN_SECTIONS.analytics[sectionId] = true;
-  }
   closeHubAnalyticsMenu();
   closeHubToolsMenu();
   syncClusterHeader();
@@ -2726,6 +2800,7 @@ window.toggleHubToolsMenu = toggleHubToolsMenu;
 window.setHubAnalyticsSection = setHubAnalyticsSection;
 window.toggleHubAnalyticsMenu = toggleHubAnalyticsMenu;
 window.toggleHubAccordion = toggleHubAccordion;
+window.toggleHubExpandAll = toggleHubExpandAll;
 window.runHubModuleAction = runHubModuleAction;
 window.setSelectedModuleCard = setSelectedModuleCard;
 
@@ -2753,10 +2828,6 @@ Office.onReady(function(info) {
     var available = getAvailableAnalyticsSections();
     if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
       ACTIVE_ANALYTICS_SECTION = available[0] || "all";
-    }
-    if (ACTIVE_ANALYTICS_SECTION !== "all" && ANALYTICS_SECTION_META[ACTIVE_ANALYTICS_SECTION]) {
-      HUB_OPEN_SECTIONS.analytics = {};
-      HUB_OPEN_SECTIONS.analytics[ACTIVE_ANALYTICS_SECTION] = true;
     }
     syncClusterHeader();
     renderCategoryTiles("");

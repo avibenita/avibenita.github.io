@@ -2972,9 +2972,6 @@ const StatisticoHeader = {
     nav.innerHTML = `
       <div class="sb-logo">
         <div class="sb-logo-icon" data-statistico-brand-logo></div>
-        <button class="sb-toggle-btn sb-toggle-btn--logo" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand sidebar" aria-label="Collapse sidebar">
-          <i class="fa-solid fa-chevron-left"></i>
-        </button>
       </div>
       <div class="sb-body">${groupsHtml}${this._renderSidebarPinnedNav(cfg)}</div>
     `;
@@ -6322,6 +6319,7 @@ const StatisticoHeader = {
   _mountSidebarUtilities() {
     const nav = document.getElementById('sidebarNav');
     if (!nav) return;
+    nav.querySelectorAll('.sb-toggle-btn').forEach((el) => el.remove());
     this._ensureRegressionByGroupNav(nav);
     this._ensureRegressionAncovaNav(nav);
     this._ensureRegressionPowerNav(nav);
@@ -6989,12 +6987,11 @@ const StatisticoHeader = {
   },
 
   /**
-   * Toggle the sidebar collapsed/expanded state.
-   * Pages can wire this to the sb-toggle-btn onclick.
+   * Sidebar collapse control was removed; keep the rail expanded.
    */
   toggleSidebar() {
     const nav = document.getElementById('sidebarNav');
-    if (nav) nav.classList.toggle('collapsed');
+    if (nav) nav.classList.remove('collapsed');
   },
 
   // ── Global AI Interpretation (univariate sidebar) ────────────────────────

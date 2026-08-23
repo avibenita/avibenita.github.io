@@ -1148,6 +1148,27 @@
       } catch (err) { console.warn('Partial filter install failed:', err); }
     }
 
+    function toFiniteNumber(value) {
+      if (value == null || value === '') return null;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+      const n = parseFloat(String(value).replace(/,/g, '').replace(/^\uFEFF/, '').trim());
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function rowField(row, header) {
+      if (!row || header == null) return undefined;
+      if (Object.prototype.hasOwnProperty.call(row, header)) return row[header];
+      const wanted = String(header).replace(/^\uFEFF/, '').trim();
+      for (const key of Object.keys(row)) {
+        if (String(key).replace(/^\uFEFF/, '').trim() === wanted) return row[key];
+      }
+      return row[header];
+    }
+
+    function fmtCorr(value) {
+      return Number.isFinite(value) ? Number(value).toFixed(3) : '—';
+    }
+
     /**
      * Calculate correlation matrix from raw data
      */
@@ -1162,25 +1183,21 @@
             correlationMatrix[i][j] = 1.0;
             nMatrix[i][j] = data.length;
           } else {
-            const col1 = data.map(row => row[headers[i]]);
-            const col2 = data.map(row => row[headers[j]]);
+            const col1 = data.map(row => toFiniteNumber(rowField(row, headers[i])));
+            const col2 = data.map(row => toFiniteNumber(rowField(row, headers[j])));
             
-            // Filter valid pairs
             const validPairs = [];
             for (let k = 0; k < col1.length; k++) {
-              if (col1[k] != null && col2[k] != null && !isNaN(col1[k]) && !isNaN(col2[k])) {
-                validPairs.push([col1[k], col2[k]]);
-              }
+              if (col1[k] != null && col2[k] != null) validPairs.push([col1[k], col2[k]]);
             }
             
             nMatrix[i][j] = validPairs.length;
             
             if (validPairs.length < 2) {
-              correlationMatrix[i][j] = 0;
+              correlationMatrix[i][j] = null;
               continue;
             }
             
-            // Calculate Pearson correlation
             const x = validPairs.map(p => p[0]);
             const y = validPairs.map(p => p[1]);
             const meanX = x.reduce((a, b) => a + b, 0) / x.length;
@@ -1196,7 +1213,8 @@
             }
             
             const denom = Math.sqrt(denomX * denomY);
-            correlationMatrix[i][j] = denom === 0 ? 0 : numerator / denom;
+            const r = denom === 0 ? null : numerator / denom;
+            correlationMatrix[i][j] = Number.isFinite(r) ? r : null;
           }
         }
       }
@@ -1413,11 +1431,11 @@
       }
       
       if (controlIndices.length === 0) {
-        // Simple correlation
         const r = precomputedCorrelationMatrix[var1Idx][var2Idx];
         const n = precomputedNMatrix[var1Idx][var2Idx];
         const df = n - 2;
-        
+        if (!Number.isFinite(r)) return { correlation: null, pValue: null, n, df };
+
         let pValue = null;
         if (n > 2 && Math.abs(r) < 0.999) {
           const t = r * Math.sqrt(df / (1 - r * r));
@@ -1449,7 +1467,11 @@
       
       try {
         const P = safeInvertMatrix(R);
-        const partialCorr = -P[0][1] / Math.sqrt(P[0][0] * P[1][1]);
+        const denom = Math.sqrt(P[0][0] * P[1][1]);
+        const partialCorr = denom ? (-P[0][1] / denom) : NaN;
+        if (!Number.isFinite(partialCorr)) {
+          return { correlation: null, pValue: null, n, df };
+        }
         
         let pValue = null;
         if (df > 0 && Math.abs(partialCorr) < 0.999) {
@@ -1608,7 +1630,7 @@
             // Correlation value (clickable)
             const corrSpan = document.createElement('span');
             corrSpan.className = 'clickable-correlation';
-            corrSpan.textContent = result.correlation !== null ? result.correlation.toFixed(3) : '.';
+            corrSpan.textContent = fmtCorr(result.correlation);
             corrSpan.title = `Click to view details: ${variableNames[varIdx]} vs ${variableNames[var2Idx]}${excludedIndices.length ? ' (excluded: ' + excludedIndices.map(idx => variableNames[idx]).join(', ') + ')' : ''}`;
             corrSpan.addEventListener('click', () => {
               showCorrelationModal(varIdx, var2Idx, variableNames[varIdx], variableNames[var2Idx], td);
@@ -1676,7 +1698,7 @@
           } else {
             const result = calculatePartialCorrelation(rowIdx, colIdx, controlIndices);
             const corr = result.correlation;
-            td.textContent = corr !== null ? corr.toFixed(3) : '.';
+            td.textContent = fmtCorr(corr);
             if (corr !== null) {
               td.dataset.corr = String(corr);
               const intensity = Math.min(1, Math.abs(corr));
@@ -1706,10 +1728,10 @@
       
       // Update modal
       document.getElementById('modalTitle').textContent = `${var1Name} vs ${var2Name}`;
-      document.getElementById('regularR').textContent = regularCorr.correlation !== null ? regularCorr.correlation.toFixed(3) : '-';
+      document.getElementById('regularR').textContent = fmtCorr(regularCorr.correlation);
       document.getElementById('regularP').textContent = regularCorr.pValue !== null ? (regularCorr.pValue < 0.001 ? '<.001' : regularCorr.pValue.toFixed(3)) : '-';
       document.getElementById('regularDF').textContent = regularCorr.df || '-';
-      document.getElementById('partialR').textContent = partialCorr.correlation !== null ? partialCorr.correlation.toFixed(3) : '-';
+      document.getElementById('partialR').textContent = fmtCorr(partialCorr.correlation);
       document.getElementById('partialP').textContent = partialCorr.pValue !== null ? (partialCorr.pValue < 0.001 ? '<.001' : partialCorr.pValue.toFixed(3)) : '-';
       document.getElementById('partialDF').textContent = partialCorr.df || '-';
       

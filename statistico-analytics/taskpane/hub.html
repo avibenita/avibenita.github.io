@@ -111,17 +111,18 @@
       overflow: visible;
     }
 
-    /* Sliding highlight — follows hover, pins to active */
+    /* Sliding highlight — follows hover, pins to the active tab only */
     .hub-tab-slider {
       position: absolute;
-      top: 4px;
+      top: 0;
       left: 0;
-      height: calc(100% - 8px);
+      height: 36px;
       border-radius: 9px;
       background: #b49cff;
       box-shadow: 0 2px 10px rgba(167, 139, 250, 0.38);
       transition: transform 0.22s cubic-bezier(0.34,1.2,0.64,1),
                   width    0.22s cubic-bezier(0.34,1.2,0.64,1),
+                  height   0.22s cubic-bezier(0.34,1.2,0.64,1),
                   opacity  0.18s ease,
                   background 0.3s ease,
                   box-shadow 0.3s ease;
@@ -135,26 +136,26 @@
     .hub-nav-tab {
       position: relative;
       z-index: 1;
-      height: 32px;
-      padding: 0 6px;
+      height: 36px;
+      padding: 0 8px;
       border: none;
       background: transparent;
       border-radius: 9px;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: color 0.15s ease;
+      transition: color 0.15s ease, background 0.15s ease;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 5px;
+      gap: 6px;
       white-space: nowrap;
       flex: 1 1 auto;
       min-width: 0;
       box-sizing: border-box;
     }
     .hub-nav-tab-icon {
-      font-size: 11px;
+      font-size: 14px;
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
@@ -171,10 +172,16 @@
     .hub-nav-tab:hover { color: #111827 !important; }
     .hub-nav-tab.active {
       font-weight: 700;
+      background: #b49cff;
+      color: #2e1065;
+    }
+    .hub-nav-tab.active[data-cluster="tools"] {
+      background: #fde047;
+      color: #451a03;
     }
     .hub-nav-tab.active::before { display: none; }
     .hub-nav-tab-caret {
-      font-size: 9px;
+      font-size: 11px;
       opacity: .75;
       margin-left: 1px;
       flex-shrink: 0;
@@ -1460,9 +1467,19 @@
     border-color: rgba(255,255,255,.08) !important;
   }
   .hub-nav-tab { color: rgba(255,255,255,.72) !important; }
-  .hub-nav-tab.active { font-weight: 700; }
-  /* Light slider (yellow / purple) sits under the hovered tab — use dark text */
-  .hub-nav-tab:hover:not(.active) { color: #111827 !important; }
+  .hub-nav-tab.active {
+    font-weight: 700;
+    background: #b49cff !important;
+    color: #2e1065 !important;
+  }
+  .hub-nav-tab.active[data-cluster="tools"] {
+    background: #fde047 !important;
+    color: #451a03 !important;
+  }
+  .hub-nav-tab:hover:not(.active) {
+    color: #ffffff !important;
+    background: rgba(255,255,255,.08);
+  }
 
   .hub-tools-menu {
     background: #0b1220 !important;
@@ -2231,13 +2248,15 @@
 
       function pin(tab) {
         var wrap = tab.closest('.hub-nav-tools-wrap') || tab;
-        var x = wrap.offsetLeft;
-        if (wrap.offsetParent !== tabsRow) {
-          x = wrap.getBoundingClientRect().left - tabsRow.getBoundingClientRect().left - (tabsRow.clientLeft || 0);
-        }
+        var rowRect = tabsRow.getBoundingClientRect();
+        var wrapRect = wrap.getBoundingClientRect();
+        var x = wrapRect.left - rowRect.left - (tabsRow.clientLeft || 0);
+        var y = wrapRect.top - rowRect.top - (tabsRow.clientTop || 0);
         if (x < 0) x = 0;
+        if (y < 0) y = 0;
         slider.style.width = wrap.offsetWidth + 'px';
-        slider.style.transform = 'translateX(' + x + 'px)';
+        slider.style.height = wrap.offsetHeight + 'px';
+        slider.style.transform = 'translate(' + x + 'px,' + y + 'px)';
       }
 
       var tabs = Array.from(tabsRow.querySelectorAll('.hub-nav-tab'));

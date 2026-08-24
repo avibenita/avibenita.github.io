@@ -6,9 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <title>Pareto 80/20</title>
-  <!-- build: 20260519-included-cols -->
-
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <!-- build: 20260824-webdemo -->
+  <script>
+    // Public demo/case-study embeds never run inside an Office host.
+    if (!/(?:^|[?&])(?:embed|demo)=1(?:&|$)/.test(window.location.search)) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></scr' + 'ipt>');
+    }
+  </script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" />
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/modules/exporting.js"></script>
@@ -1446,10 +1450,62 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
   };
 
   /* ─────────────────────────────────────────────────────────
+     Demo dataset for the public website (demo=1 / embed=1)
+  ───────────────────────────────────────────────────────── */
+  function demoParetoPayload() {
+    var headers = ['Issue', 'Tickets', 'Team'];
+    var rows = [
+      ['Login timeout', 412, 'Auth'],
+      ['Payment declined', 287, 'Billing'],
+      ['Search no results', 196, 'Catalog'],
+      ['Slow dashboard', 94, 'Reporting'],
+      ['Export failed', 61, 'Reporting'],
+      ['Wrong currency', 38, 'Billing'],
+      ['Missing tooltip', 22, 'UI'],
+      ['Typo on invoice', 14, 'Billing'],
+      ['Dark-mode flicker', 9, 'UI'],
+      ['Help-link 404', 6, 'Docs']
+    ];
+    return {
+      headers: headers,
+      includedIndices: [0, 1, 2],
+      categoryColIndex: 0,
+      valuesColIndex: 1,
+      categoryColName: 'Issue',
+      valuesColName: 'Tickets',
+      chartTitle: 'Support tickets — Pareto 80/20',
+      rawValues: [headers].concat(rows)
+    };
+  }
+
+  function isBrowserPreview() {
+    try {
+      if (/(?:^|[?&])(?:embed|demo)=1(?:&|$)/.test(window.location.search || '')) return true;
+      if (typeof Office === 'undefined') return true;
+      if (!Office.context) return true;
+      if (!Office.context.ui || typeof Office.context.ui.messageParent !== 'function') return true;
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function startDemo() {
+    _cfg = demoParetoPayload();
+    var overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.add('hidden');
+    init();
+  }
+
+  /* ─────────────────────────────────────────────────────────
      Boot — receive data via DialogParentMessageReceived
   ───────────────────────────────────────────────────────── */
-  Office.onReady(function () {
+  function boot() {
     document.getElementById('loadingOverlay').classList.remove('hidden');
+    if (isBrowserPreview()) {
+      startDemo();
+      return;
+    }
     try {
       Office.context.ui.addHandlerAsync(
         Office.EventType.DialogParentMessageReceived,
@@ -1466,7 +1522,13 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
       );
       Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
     } catch (e) { showError('Init error: ' + e.message); }
-  });
+  }
+
+  if (typeof Office !== 'undefined' && Office.onReady) {
+    Office.onReady(function () { boot(); });
+  } else {
+    boot();
+  }
 
   /* ─────────────────────────────────────────────────────────
      Init

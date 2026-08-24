@@ -601,7 +601,7 @@ var TOOLS_SECTION_META = {
   prepare: {
     id: "prepare",
     label: "Prepare Data",
-    subtitle: "Resolve data problems that prevent or weaken statistical analysis",
+    subtitle: "Find and fix problems in the worksheet.\nClean data before it weakens the analysis.",
     icon: "fa-broom",
     color: "#14b8a6",
     colorDark: "#0f766e"
@@ -609,7 +609,7 @@ var TOOLS_SECTION_META = {
   applications: {
     id: "applications",
     label: "Applications",
-    subtitle: "Specialized modules using your selected Excel data",
+    subtitle: "Applied tools that use your Excel data.\nPublication tables, Pareto, and related workflows.",
     icon: "fa-table",
     color: "#eab308",
     colorDark: "#a16207"
@@ -617,7 +617,7 @@ var TOOLS_SECTION_META = {
   calculators: {
     id: "calculators",
     label: "Calculators & Planning",
-    subtitle: "Standalone calculations, study design, and simulation tools",
+    subtitle: "Plan samples and look up probabilities.\nStandalone tools — no worksheet range required.",
     icon: "fa-calculator",
     color: "#38bdf8",
     colorDark: "#0284c7"
@@ -625,7 +625,7 @@ var TOOLS_SECTION_META = {
   utilities: {
     id: "utilities",
     label: "Utilities",
-    subtitle: "Visual exploration and Excel-to-Office publishing",
+    subtitle: "Visualise multivariable patterns.\nSend Excel charts and ranges to Office.",
     icon: "fa-wrench",
     color: "#34d399",
     colorDark: "#059669"
@@ -638,7 +638,7 @@ var ANALYTICS_SECTION_META = {
   explore: {
     id: "explore",
     label: "Explore & Summarize",
-    subtitle: "Explore distributions, relationships, and categorical patterns",
+    subtitle: "Explore distributions, relationships, and categories.\nA first look at your variables before modelling.",
     icon: "fa-chart-bar",
     color: "#f97316",
     colorDark: "#c2410c"
@@ -646,7 +646,7 @@ var ANALYTICS_SECTION_META = {
   compare: {
     id: "compare",
     label: "Compare Groups",
-    subtitle: "Compare outcomes across independent, paired or repeated observations",
+    subtitle: "Compare outcomes across groups or occasions.\nIndependent, paired, and repeated designs.",
     icon: "fa-scale-balanced",
     color: "#10b981",
     colorDark: "#0f766e"
@@ -654,7 +654,7 @@ var ANALYTICS_SECTION_META = {
   model: {
     id: "model",
     label: "Model & Predict",
-    subtitle: "Explain outcomes, estimate effects, and produce predictions",
+    subtitle: "Explain outcomes and estimate effects.\nBuild predictions from one or more predictors.",
     icon: "fa-chart-line",
     color: "#0ea5e9",
     colorDark: "#0369a1"
@@ -662,7 +662,7 @@ var ANALYTICS_SECTION_META = {
   structure: {
     id: "structure",
     label: "Discover Structure",
-    subtitle: "Uncover latent dimensions, relationships, or groups",
+    subtitle: "Find latent dimensions or natural groups.\nPCA, factor analysis, reliability, and clustering.",
     icon: "fa-circle-nodes",
     color: "#ec4899",
     colorDark: "#be185d"
@@ -670,7 +670,7 @@ var ANALYTICS_SECTION_META = {
   synthesize: {
     id: "synthesize",
     label: "Synthesize & Evaluate",
-    subtitle: "Evidence synthesis and method evaluation",
+    subtitle: "Pool study-level results into one estimate.\nCheck heterogeneity and publication bias.",
     icon: "fa-flask",
     color: "#818cf8",
     colorDark: "#4f46e5"
@@ -1010,7 +1010,7 @@ function renderHubAccordionPanel(sectionId, tilesHtml, open, tiles) {
     '<span class="hub-accordion-icon"><i class="fa-solid ' + escapeHtml(meta.icon) + '" aria-hidden="true"></i></span>' +
     '<span class="hub-accordion-copy">' +
     '<span class="hub-accordion-title">' + escapeHtml(meta.label) + "</span>" +
-    (meta.subtitle ? '<span class="hub-accordion-desc">' + escapeHtml(meta.subtitle) + "</span>" : "") +
+    (meta.subtitle ? '<span class="hub-accordion-desc">' + escapeHtml(meta.subtitle).replace(/\n/g, "<br>") + "</span>" : "") +
     "</span>" +
     '<i class="fa-solid fa-chevron-down hub-accordion-caret" aria-hidden="true"></i>' +
     "</button>" +

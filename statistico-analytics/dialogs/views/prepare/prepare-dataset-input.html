@@ -68,10 +68,57 @@
     .icon-btn { background:none; border:none; color:var(--cfg-text3); cursor:pointer; padding:2px 4px; }
     .preview-table { width:100%; border-collapse:collapse; font-size:10.5px; }
     .preview-table th,.preview-table td { padding:4px 6px; border-bottom:1px solid var(--cfg-border); text-align:left; }
-    .preview-table .chg { color:#fbbf24; }
-    .preview-table .new { color:#5eead4; }
+    .preview-table .chg, .preview-table .chg { color:#d97706; font-weight:700; }
+    .preview-table .new, .preview-table td.new-col {
+      color:#0f766e; font-weight:800;
+      background:rgba(13,148,136,.16);
+    }
+    .preview-table th.new-col {
+      color:#0f766e; font-weight:800; white-space:nowrap;
+      background:rgba(13,148,136,.22);
+      box-shadow:inset 3px 0 0 #0f766e;
+    }
+    .preview-table td.new-col { box-shadow:inset 3px 0 0 #0f766e; }
+    .new-badge {
+      display:inline-block; font-size:9px; font-weight:800; letter-spacing:.04em;
+      text-transform:uppercase; background:#0f766e; color:#fff;
+      border-radius:4px; padding:1px 5px; margin-right:4px; vertical-align:middle;
+    }
+    .new-count { color:var(--cfg-text3); font-weight:700; }
+    .new-count.on {
+      display:inline-block; color:#0f766e; background:rgba(13,148,136,.16);
+      border:1px solid rgba(15,118,110,.45); border-radius:999px;
+      padding:1px 8px; font-weight:800;
+    }
     .empty-state { color:var(--cfg-text3); font-size:12px; padding:20px 10px; text-align:center; }
-    .warn { font-size:11px; color:#fbbf24; }
+    .warn {
+      display:none; align-items:flex-start; gap:8px; margin:6px 0 4px;
+      padding:8px 10px; border-radius:8px; border:1px solid #d97706;
+      background:#fff7ed; color:#9a3412; font-size:13px; font-weight:800; line-height:1.35;
+    }
+    .warn.on { display:flex; }
+    .warn::before {
+      content:"!"; flex:none; width:18px; height:18px; border-radius:50%;
+      background:#ea580c; color:#fff; font-size:12px; font-weight:900;
+      line-height:18px; text-align:center;
+    }
+    html:not([data-theme="light"]) .preview-table .chg,
+    html:not([data-theme="light"]) .preview-table .chg { color:#fbbf24; }
+    html:not([data-theme="light"]) .preview-table .new,
+    html:not([data-theme="light"]) .preview-table td.new-col {
+      color:#5eead4; background:rgba(45,212,191,.16);
+    }
+    html:not([data-theme="light"]) .preview-table th.new-col {
+      color:#5eead4; background:rgba(45,212,191,.22); box-shadow:inset 3px 0 0 #2dd4bf;
+    }
+    html:not([data-theme="light"]) .preview-table td.new-col { box-shadow:inset 3px 0 0 #2dd4bf; }
+    html:not([data-theme="light"]) .new-badge { background:#14b8a6; color:#042f2e; }
+    html:not([data-theme="light"]) .new-count.on {
+      color:#5eead4; background:rgba(45,212,191,.16); border-color:rgba(45,212,191,.45);
+    }
+    html:not([data-theme="light"]) .warn {
+      background:rgba(245,158,11,.18); border-color:#f59e0b; color:#fbbf24;
+    }
     .cond-row { display:grid; grid-template-columns:1fr 90px 1fr; gap:4px; margin-bottom:4px; }
     .flow-note { font-size:10.5px; color:var(--cfg-text3); padding:6px 10px 0; }
     .prep-steps { margin:4px 0 0; padding-left:18px; font-size:11px; color:var(--cfg-text2); line-height:1.45; }
@@ -890,21 +937,32 @@
       STATE.previewedKey = draftKey();
       qs('previewEmpty').style.display = 'none';
       qs('previewBody').style.display = '';
-      qs('previewSummary').textContent = preview.totalRows + ' rows · ' + preview.totalVars + ' variables · ' +
-        preview.newVariables.length + ' new variables · ' + preview.excludedCases + ' excluded cases' +
+      var nNew = (preview.newVariables || []).length;
+      qs('previewSummary').innerHTML = preview.totalRows + ' rows · ' + preview.totalVars + ' variables · ' +
+        '<span class="new-count' + (nNew ? ' on' : '') + '">' + nNew + ' new variable' + (nNew === 1 ? '' : 's') + '</span> · ' +
+        preview.excludedCases + ' excluded cases' +
         (preview.structural ? ' · structure changed' : '');
-      qs('previewWarn').textContent = (preview.warnings || []).join(' ');
+      var warnText = (preview.warnings || []).join(' ');
+      qs('previewWarn').textContent = warnText;
+      qs('previewWarn').classList.toggle('on', !!warnText);
+      var newNames = {};
+      (preview.newVariables || []).forEach(function (h) { newNames[h] = true; });
+      function headerCell(h) {
+        return newNames[h]
+          ? '<th class="new-col"><span class="new-badge">New</span> ' + esc(h) + '</th>'
+          : '<th>' + esc(h) + '</th>';
+      }
       var tbl = qs('previewTable');
       if (preview.structural) {
-        tbl.innerHTML = '<thead><tr>' + preview.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        tbl.innerHTML = '<thead><tr>' + preview.headers.map(headerCell).join('') + '</tr></thead><tbody>' +
           preview.diffs.map(function (d) {
-            return '<tr>' + (d.proposed || []).map(function (v) { return '<td class="new">' + esc(v) + '</td>'; }).join('') + '</tr>';
+            return '<tr>' + (d.proposed || []).map(function (v) { return '<td class="new new-col">' + esc(v) + '</td>'; }).join('') + '</tr>';
           }).join('') + '</tbody>';
       } else {
-        tbl.innerHTML = '<thead><tr><th>Row</th><th>Status</th>' + preview.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        tbl.innerHTML = '<thead><tr><th>Row</th><th>Status</th>' + preview.headers.map(headerCell).join('') + '</tr></thead><tbody>' +
           preview.diffs.map(function (d) {
             return '<tr><td>' + d.row + '</td><td>' + d.status + '</td>' + (d.cells || []).map(function (c) {
-              var cls = c.isNew ? 'new' : (c.changed ? 'chg' : '');
+              var cls = c.isNew ? 'new new-col' : (c.changed ? 'chg' : '');
               var txt = c.changed ? (c.original == null || c.original === '' ? '' : c.original) + ' → ' + (c.proposed == null ? '' : c.proposed) : (c.proposed == null ? '' : c.proposed);
               return '<td class="' + cls + '">' + esc(txt) + '</td>';
             }).join('') + '</tr>';

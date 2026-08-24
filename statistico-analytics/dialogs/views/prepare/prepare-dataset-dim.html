@@ -173,39 +173,55 @@
     .var-actions button { background:none; border:none; color:var(--prep-acc); font-size:10.5px; font-weight:700; cursor:pointer; padding:0; }
     .op-lead { display:none; }
     .op-lead.on { display:block; }
+    .op-pick {
+      position:sticky; top:0; z-index:12;
+      background:var(--cfg-bg); margin:0 -10px; padding:0 10px 8px;
+      box-shadow:0 8px 14px rgba(15,23,42,.08);
+    }
     .op-table {
       display:table; width:100%; table-layout:fixed; border-collapse:separate; border-spacing:0;
       font-size:11px; overflow:hidden; border-radius:12px;
       background:#eef6f4; border:1px solid #0f766e66;
       box-shadow:0 8px 18px rgba(15,23,42,.07);
     }
-    .op-col { display:table-cell; width:33.33%; vertical-align:top; border-left:1px solid rgba(15,118,110,.22); background:transparent; }
+    .op-col { display:table-cell; width:24%; vertical-align:top; border-left:1px solid rgba(15,118,110,.22); background:transparent; }
+    .op-col.vars { width:52%; }
     .op-col:first-child { border-left:none; }
     .op-cat {
-      display:flex; align-items:center; gap:8px;
-      padding:8px 10px; min-height:44px; box-sizing:border-box;
+      display:flex; align-items:flex-start; gap:8px;
+      padding:8px 10px; min-height:48px; box-sizing:border-box;
       background:#115e59; color:#fff;
     }
-    .op-cat i { flex:none; width:16px; font-size:13px; color:#5eead4; text-align:center; }
+    .op-cat i { flex:none; width:16px; font-size:13px; color:#5eead4; text-align:center; margin-top:2px; }
     .op-cat-t {
       display:block; font-size:11px; font-weight:800; letter-spacing:.07em;
       text-transform:uppercase; line-height:1.15;
     }
     .op-cat-s {
-      display:block; margin-top:2px; font-size:10px; font-weight:600;
-      letter-spacing:0; text-transform:none; color:#99f6e4; line-height:1.2;
+      display:block; margin-top:3px; font-size:10px; font-weight:600;
+      letter-spacing:0; text-transform:none; color:#99f6e4; line-height:1.25;
+    }
+    .op-ops { display:flex; flex-direction:column; }
+    .op-col.vars .op-ops {
+      display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(4, minmax(28px, auto));
     }
     .op-table label {
-      display:flex; gap:6px; align-items:flex-start; cursor:pointer;
-      color:#334155; font-weight:500; padding:7px 8px; line-height:1.3;
+      display:flex; gap:5px; align-items:flex-start; cursor:pointer;
+      color:#334155; font-weight:500; padding:6px 7px; line-height:1.25;
       border-top:1px solid rgba(15,118,110,.12); background:transparent;
     }
+    .op-col.vars label {
+      border-top:none; border-right:1px solid rgba(15,118,110,.1);
+      border-bottom:1px solid rgba(15,118,110,.12); font-size:10.5px; padding:5px 6px;
+    }
+    .op-col.vars label:nth-child(2n) { border-right:none; }
     .op-table label:hover { background:rgba(15,118,110,.08); }
     .op-table label.on {
       background:rgba(15,118,110,.16); color:#0f766e; font-weight:800;
       box-shadow:inset 3px 0 0 #0f766e;
     }
     .op-table input { margin:2px 0 0; flex:none; }
+    html:not([data-theme="light"]) .op-pick { box-shadow:0 8px 14px rgba(0,0,0,.35); }
     html:not([data-theme="light"]) .op-table {
       background:#0f1c22; border-color:#134e4a;
       box-shadow:0 8px 18px rgba(0,0,0,.25);
@@ -215,6 +231,7 @@
     html:not([data-theme="light"]) .op-cat i { color:#2dd4bf; }
     html:not([data-theme="light"]) .op-cat-s { color:#5eead4; }
     html:not([data-theme="light"]) .op-table label { color:var(--cfg-text2); border-top-color:#134e4a; }
+    html:not([data-theme="light"]) .op-col.vars label { border-right-color:#134e4a; border-bottom-color:#134e4a; }
     html:not([data-theme="light"]) .op-table label:hover { background:rgba(45,212,191,.1); }
     html:not([data-theme="light"]) .op-table label.on {
       background:rgba(45,212,191,.14); color:#5eead4; box-shadow:inset 3px 0 0 #2dd4bf;
@@ -267,14 +284,16 @@
         <div class="prep-layout cards-on">
           <div class="help">Source <strong id="tbRange">—</strong> on <strong id="tbSheet">—</strong> · <span id="tbDims">0 × 0</span> (rows × columns)</div>
 
+          <div class="op-pick" id="opPick">
           <div class="lbl-row">
             <label class="lbl">What do you want to do?</label>
             <button type="button" class="op-ex-link" id="btnHowScreen">How this screen works</button>
           </div>
           <div class="op-table" id="opTable"></div>
+          </div>
           <select id="opSelect" hidden></select>
           <div class="op-head" id="opHead">
-            <h2 id="opTitle">Define missing-value codes</h2>
+            <h2 id="opTitle">Recode values</h2>
             <button type="button" class="op-ex-link" id="btnOpExample">Show example</button>
           </div>
           <p class="op-blurb" id="opBlurb"></p>
@@ -689,26 +708,26 @@
       var box = qs('opTable');
       if (!box || !window.StatisticoPrepare) return;
       var order = [
-        { id: 'variables', label: 'Variables', hint: 'Columns', icon: 'fa-table-columns' },
-        { id: 'cases', label: 'Cases', hint: 'Rows', icon: 'fa-filter' },
-        { id: 'structure', label: 'Structure', hint: 'Table shape', icon: 'fa-table' }
+        { id: 'variables', label: 'Variables', hint: 'Change will occur in columns', icon: 'fa-table-columns' },
+        { id: 'cases', label: 'Cases', hint: 'Change will occur in rows', icon: 'fa-filter' },
+        { id: 'structure', label: 'Structure', hint: 'Change will occur in the table shape', icon: 'fa-table' }
       ];
-      var cur = currentOp() || StatisticoPrepare.AVAILABLE_OPERATIONS[0].id;
+      var cur = currentOp() || 'recode';
       var html = '';
       var i, ops, j, op;
       for (i = 0; i < order.length; i++) {
         ops = StatisticoPrepare.AVAILABLE_OPERATIONS.filter(function (o) { return o.category === order[i].id; });
-        html += '<div class="op-col"><div class="op-cat">' +
+        html += '<div class="op-col' + (order[i].id === 'variables' ? ' vars' : '') + '"><div class="op-cat">' +
           '<i class="fa-solid ' + order[i].icon + '" aria-hidden="true"></i>' +
           '<span><span class="op-cat-t">' + esc(order[i].label) + '</span>' +
-          '<span class="op-cat-s">' + esc(order[i].hint) + '</span></span></div>';
+          '<span class="op-cat-s">' + esc(order[i].hint) + '</span></span></div><div class="op-ops">';
         for (j = 0; j < ops.length; j++) {
           op = ops[j];
           html += '<label class="' + (op.id === cur ? 'on' : '') + '">' +
             '<input type="radio" name="prepOp" value="' + op.id + '"' + (op.id === cur ? ' checked' : '') + '/>' +
             '<span>' + esc(op.label) + '</span></label>';
         }
-        html += '</div>';
+        html += '</div></div>';
       }
       box.innerHTML = html;
     }
@@ -1205,7 +1224,6 @@
       numberCards();
       updateAffected();
       renderOpTable();
-      requestAnimationFrame(scrollOpIntoView);
     }
 
     function addCondition() {
@@ -1355,6 +1373,8 @@
       if (p.intent && p.intent.prefill && p.intent.prefill.type) {
         qs('opSelect').value = p.intent.prefill.type;
         (p.intent.variables || []).forEach(function (v) { STATE.selected[v] = true; });
+      } else {
+        qs('opSelect').value = 'recode';
       }
       qs('tbRange').textContent = STATE.address || '—';
       qs('tbSheet').textContent = STATE.sheetName || '—';
@@ -1389,9 +1409,7 @@
         sel.lastChild.appendChild(o);
       });
       qs('fnChips').innerHTML = FNS.map(function (fn) { return '<button type="button" class="chip" data-fn="' + fn + '">' + fn + '</button>'; }).join('');
-      if (!qs('opSelect').value && StatisticoPrepare.AVAILABLE_OPERATIONS[0]) {
-        qs('opSelect').value = StatisticoPrepare.AVAILABLE_OPERATIONS[0].id;
-      }
+      qs('opSelect').value = 'recode';
       renderOpTable();
     })();
 

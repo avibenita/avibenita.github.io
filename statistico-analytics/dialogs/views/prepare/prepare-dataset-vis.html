@@ -52,8 +52,31 @@
       .row2 { grid-template-columns:1fr; }
       .row3 { grid-template-columns:1fr; }
     }
-    .map-grid { display:grid; grid-template-columns:1fr 1fr 26px; gap:4px; align-items:center; }
-    .range-grid { display:grid; grid-template-columns:1fr 1fr 1fr 26px; gap:4px; align-items:center; }
+    .map-grid, .range-grid {
+      display:grid; gap:4px; align-items:center;
+      border:1px solid var(--cfg-border); border-radius:8px; padding:6px;
+      background:var(--cfg-surface2);
+    }
+    .map-grid { grid-template-columns:1fr 1fr 26px; }
+    .range-grid { grid-template-columns:1fr 1fr 1fr 26px; }
+    .rc-card {
+      background:var(--cfg-surface); border:1px solid var(--cfg-border);
+      border-radius:10px; padding:10px 12px 12px; margin-top:10px;
+    }
+    .rc-card-h {
+      display:flex; align-items:center; gap:8px;
+      font-size:13px; font-weight:800; color:var(--cfg-text); margin:0 0 8px;
+    }
+    .rc-n {
+      flex:none; width:20px; height:20px; border-radius:50%;
+      background:var(--prep-acc); color:#fff; font-size:11px; font-weight:800;
+      display:inline-flex; align-items:center; justify-content:center;
+    }
+    .rc-methods { display:flex; flex-wrap:wrap; gap:8px 14px; margin:0 0 10px; }
+    .rc-methods label { display:flex; gap:6px; align-items:center; cursor:pointer; color:var(--cfg-text); font-size:12px; font-weight:600; }
+    .prep-layout.recode-on .op-how { display:none; }
+    .prep-layout.recode-on #impactBox { margin-top:10px; padding:10px 12px 12px; }
+    .prep-layout:not(.recode-on) #impactHead { display:none; }
     .grid-hd { font-size:9.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); }
     .grid-x { background:none; border:none; color:var(--cfg-text3); cursor:pointer; font-size:14px; line-height:1; padding:2px 0; }
     .grid-add { background:none; border:none; color:var(--prep-acc); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; text-align:left; }
@@ -201,7 +224,7 @@
           </div>
           <div class="op-table" id="opTable"></div>
           <select id="opSelect" hidden></select>
-          <div class="op-head">
+          <div class="op-head" id="opHead">
             <h2 id="opTitle">Define missing-value codes</h2>
             <button type="button" class="op-ex-link" id="btnOpExample">Show example</button>
           </div>
@@ -241,55 +264,76 @@
               <div class="help">Ticked columns are omitted from the new sheet. Unticked columns are kept. At least one column must remain.</div>
             </div>
             <div class="op-sec" id="sec-recode">
-              <div class="help">Select one column. A new column is added; the original is kept.</div>
-              <div class="row3">
-                <div>
-                  <label class="lbl" for="recodeSource">Column</label>
-                  <select class="fld" id="recodeSource"></select>
+              <div class="rc-card">
+                <div class="rc-card-h"><span class="rc-n">1</span> Source and output</div>
+                <div class="row3">
+                  <div>
+                    <label class="lbl" for="recodeSource">Source variable</label>
+                    <select class="fld" id="recodeSource"></select>
+                  </div>
+                  <div>
+                    <label class="lbl" for="recodeName">New variable name</label>
+                    <input class="fld" id="recodeName" placeholder="logi_recode" />
+                  </div>
+                  <div>
+                    <label class="lbl" for="recodeOtherwise">Values without a rule</label>
+                    <select class="fld" id="recodeOtherwise">
+                      <option value="keep">Keep original value</option>
+                      <option value="missing">Set as missing</option>
+                      <option value="value">Use another value</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label class="lbl" for="recodeName">New variable name</label>
-                  <input class="fld" id="recodeName" placeholder="Sex_recode" />
-                </div>
-                <div>
-                  <label class="lbl" for="recodeOtherwise">Unmatched values</label>
-                  <select class="fld" id="recodeOtherwise">
-                    <option value="keep">Keep original</option>
-                    <option value="missing">Set to missing</option>
-                  </select>
+                <div id="recodeOtherValWrap" style="display:none;margin-top:6px;">
+                  <label class="lbl" for="recodeOtherVal">Use this value</label>
+                  <input class="fld" id="recodeOtherVal" placeholder="Other" />
                 </div>
               </div>
-              <label class="lbl">Exact mappings</label>
-              <div class="map-grid" id="recodeMapGrid">
-                <div class="grid-hd">Actual code</div>
-                <div class="grid-hd">New value</div>
-                <div></div>
-              </div>
-              <button type="button" class="grid-add" id="btnAddMap">Add mapping</button>
-              <label class="lbl" style="margin-top:8px;">Numeric ranges</label>
-              <div class="range-grid" id="recodeRangeGrid">
-                <div class="grid-hd">From</div>
-                <div class="grid-hd">To</div>
-                <div class="grid-hd">Code</div>
-                <div></div>
-              </div>
-              <button type="button" class="grid-add" id="btnAddRange">Add range</button>
-              <div class="split-row">
-                <div>
-                  <label class="lbl" for="splitFrom">Split from</label>
-                  <input class="fld mini" id="splitFrom" type="number" />
+              <div class="rc-card">
+                <div class="rc-card-h"><span class="rc-n">2</span> Define recoding rules</div>
+                <p class="help" style="margin:0 0 8px;">Choose one method. Example values appear only if you click Show example.</p>
+                <div class="rc-methods" id="recodeMethods">
+                  <label><input type="radio" name="recodeMethod" value="values" checked /> Individual values</label>
+                  <label><input type="radio" name="recodeMethod" value="ranges" /> Numeric ranges</label>
+                  <label><input type="radio" name="recodeMethod" value="equal" /> Create equal ranges</label>
                 </div>
-                <div>
-                  <label class="lbl" for="splitTo">To</label>
-                  <input class="fld mini" id="splitTo" type="number" />
+                <div id="recodePaneValues">
+                  <div class="map-grid" id="recodeMapGrid">
+                    <div class="grid-hd">Original value</div>
+                    <div class="grid-hd">New value</div>
+                    <div></div>
+                  </div>
+                  <button type="button" class="grid-add" id="btnAddMap">Add value mapping</button>
                 </div>
-                <div>
-                  <label class="lbl" for="splitN">Equal ranges</label>
-                  <input class="fld mini n" id="splitN" type="number" min="2" step="1" value="4" />
+                <div id="recodePaneRanges" style="display:none;">
+                  <div class="range-grid" id="recodeRangeGrid">
+                    <div class="grid-hd">From</div>
+                    <div class="grid-hd">To</div>
+                    <div class="grid-hd">New value</div>
+                    <div></div>
+                  </div>
+                  <button type="button" class="grid-add" id="btnAddRange">Add numeric range</button>
                 </div>
-                <button type="button" class="cfg-btn cancel" id="btnSplitRanges" style="padding:5px 10px;font-size:11px;">Split</button>
+                <div id="recodePaneEqual" style="display:none;">
+                  <div class="split-row">
+                    <div>
+                      <label class="lbl" for="splitFrom">Minimum</label>
+                      <input class="fld mini" id="splitFrom" type="number" />
+                    </div>
+                    <div>
+                      <label class="lbl" for="splitTo">Maximum</label>
+                      <input class="fld mini" id="splitTo" type="number" />
+                    </div>
+                    <div>
+                      <label class="lbl" for="splitN">Number of groups</label>
+                      <input class="fld mini n" id="splitN" type="number" min="2" step="1" value="4" />
+                    </div>
+                    <button type="button" class="cfg-btn save-config" id="btnSplitRanges" style="padding:5px 10px;font-size:11px;">Generate ranges</button>
+                  </div>
+                  <div class="help" style="margin-top:6px;">Generated ranges appear in the table below. You can edit the new values.</div>
+                </div>
+                <button type="button" class="grid-add" id="btnAddRuleType" style="margin-top:8px;">Add another rule type</button>
               </div>
-              <div class="help">Split fills n equal-width ranges. Codes start at 1 and can be edited.</div>
             </div>
             <div class="op-sec" id="sec-compute">
               <label class="lbl">New variable name</label>
@@ -364,7 +408,8 @@
           </div>
 
           <div class="impact" id="impactBox">
-            <div class="lbl">This step will</div>
+            <div class="rc-card-h" id="impactHead"><span class="rc-n">3</span> Review this step</div>
+            <div class="lbl" id="impactLbl">This step will</div>
             <div id="impactBody"></div>
             <div class="count" id="affectedLine"></div>
             <div class="draft-err" id="draftError"></div>
@@ -431,7 +476,7 @@
     var STATE = {
       headers: [], rows: [], address: '', sheetName: '', sheetNames: [],
       recipe: [], selected: {}, mapping: null, conditions: [], preview: null, tab: 'configure',
-      unnamed: {}, previewedKey: null
+      unnamed: {}, previewedKey: null, recodeExtra: false
     };
     var OP_META = {
       defineMissing: {
@@ -453,8 +498,8 @@
       recode: {
         usesVars: 'none',
         title: 'Recode values',
-        blurb: 'Create a new column from old=new rules. The source column stays unless you remove it later.',
-        how: 'Choose the source column, name the new column, then fill exact mappings and/or numeric ranges.'
+        blurb: 'Create a new variable by replacing individual values or grouping numeric ranges.',
+        how: ''
       },
       compute: {
         usesVars: 'none',
@@ -684,7 +729,37 @@
         var b = roundNice(i === n - 1 ? hi : lo + (i + 1) * step);
         addRangeRow(a, b, String(i + 1));
       }
+      syncRecodeMethod();
       updateAffected();
+    }
+    function otherwiseLabel() {
+      var ow = qs('recodeOtherwise').value;
+      if (ow === 'missing') return 'Set as missing';
+      if (ow === 'value') {
+        var v = (qs('recodeOtherVal').value || '').trim();
+        return v ? ('Use “' + v + '”') : 'Use another value';
+      }
+      return 'Keep original value';
+    }
+    function recodeMethod() {
+      var el = document.querySelector('input[name="recodeMethod"]:checked');
+      return el ? el.value : 'values';
+    }
+    function syncRecodeMethod() {
+      var m = recodeMethod();
+      var extra = !!STATE.recodeExtra;
+      qs('recodePaneValues').style.display = (m === 'values' || extra) ? '' : 'none';
+      qs('recodePaneRanges').style.display = (m === 'ranges' || m === 'equal' || extra) ? '' : 'none';
+      qs('recodePaneEqual').style.display = m === 'equal' ? '' : 'none';
+      qs('recodeOtherValWrap').style.display = qs('recodeOtherwise').value === 'value' ? '' : 'none';
+      if ((m === 'ranges' || m === 'equal' || extra) && !qs('recodeRangeGrid').querySelector('.range-from')) addRangeRow('', '', '');
+      qs('btnAddRuleType').style.display = extra ? 'none' : '';
+    }
+    function scrollRecodeIntoView() {
+      var layout = document.querySelector('.prep-layout');
+      var head = qs('opHead');
+      if (!layout || !head) return;
+      layout.scrollTop = Math.max(0, head.offsetTop - 8);
     }
 
     function currentDraft() {
@@ -699,7 +774,8 @@
         step.outputName = (qs('recodeName').value || '').trim();
         step.mapping = collectMap();
         step.ranges = collectRanges();
-        step.otherwise = qs('recodeOtherwise').value;
+        var ow = qs('recodeOtherwise').value;
+        step.otherwise = ow === 'value' ? ((qs('recodeOtherVal').value || '').trim() || 'keep') : ow;
       }
       if (type === 'compute') {
         step.outputName = (qs('computeName').value || '').trim();
@@ -805,7 +881,9 @@
       var valid = StatisticoPrepare.validateStep(currentDraft(), liveHeaders());
       qs('affectedLine').textContent = '';
       if (!valid.ok) {
-        qs('impactBody').innerHTML = '<div class="impact-need">' + esc(valid.error) + '</div>';
+        var need = valid.error;
+        if (type === 'recode' && /recode rule/.test(need)) need = 'Add at least one complete recoding rule.';
+        qs('impactBody').innerHTML = '<div class="impact-need">' + esc(need) + '</div>';
         qs('draftError').textContent = '';
         return;
       }
@@ -843,9 +921,17 @@
         var n = StatisticoPrepare.countAffectedCells(headers, STATE.rows, vars, codes);
         html += impactRow('Affected cells', String(n), false);
       } else if (type === 'recode') {
-        html += impactRow('Source', vars[0], false);
-        html += impactRow('New column', (qs('recodeName').value || '').trim(), false);
-        html += impactRow('Other columns', 'Unchanged', false);
+        var nMap = Object.keys(collectMap()).length;
+        var nRange = collectRanges().length;
+        var bits = [];
+        if (nMap) bits.push(nMap + ' individual mapping' + (nMap === 1 ? '' : 's'));
+        if (nRange) bits.push(nRange + ' numeric range' + (nRange === 1 ? '' : 's'));
+        var owLab = otherwiseLabel();
+        html += impactRow('Read values from', qs('recodeSource').value, false);
+        html += impactRow('Create variable', (qs('recodeName').value || '').trim(), false);
+        html += impactRow('Apply', bits.join(', '), false);
+        html += impactRow('Values without a rule', owLab, false);
+        html += impactRow('Source variable', 'Preserved', false);
       } else if (type === 'compute') {
         html += impactRow('New column', (qs('computeName').value || '').trim(), false);
         html += impactRow('Existing columns', 'All kept', false);
@@ -974,6 +1060,9 @@
       qs('opTitle').textContent = meta.title || opLabel(type);
       qs('opBlurb').textContent = meta.blurb || '';
       qs('opHow').textContent = meta.how || '';
+      qs('opHow').style.display = meta.how ? '' : 'none';
+      qs('opBlurb').style.display = meta.blurb ? '' : 'none';
+      document.querySelector('.prep-layout').classList.toggle('recode-on', type === 'recode');
       if (type === 'wideToLong') {
         fillWideId();
         var id = qs('wideId').value;
@@ -985,7 +1074,10 @@
         }
       }
       if (type === 'longToWide') fillLongWide();
-      if (type === 'recode') fillRecodeSource();
+      if (type === 'recode') {
+        fillRecodeSource();
+        syncRecodeMethod();
+      }
       if (meta.usesVars === 'one') {
         var first = selectedVars()[0] || STATE.headers[0];
         STATE.selected = {};
@@ -994,6 +1086,9 @@
       renderVars();
       updateAffected();
       renderOpTable();
+      if (type === 'recode') {
+        requestAnimationFrame(scrollRecodeIntoView);
+      }
     }
 
     function addCondition() {
@@ -1251,7 +1346,7 @@
       renderVars();
       updateAffected();
     });
-    ['missCodes','recodeSource','recodeName','recodeOtherwise','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideTime','wideValue','filtLogic','longId','longTime','longValue'].forEach(function (id) {
+    ['missCodes','recodeSource','recodeName','recodeOtherwise','recodeOtherVal','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideTime','wideValue','filtLogic','longId','longTime','longValue'].forEach(function (id) {
       var el = qs(id);
       if (el) el.addEventListener('input', updateAffected);
       if (el) el.addEventListener('change', updateAffected);
@@ -1266,6 +1361,22 @@
         if (qs('splitTo').value === '') qs('splitTo').value = ext.max;
       }
       updateAffected();
+    });
+    qs('recodeOtherwise').addEventListener('change', syncRecodeMethod);
+    qs('recodeMethods').addEventListener('change', function () {
+      if (recodeMethod() === 'equal') {
+        var ext = sourceExtent();
+        if (ext) {
+          if (qs('splitFrom').value === '') qs('splitFrom').value = ext.min;
+          if (qs('splitTo').value === '') qs('splitTo').value = ext.max;
+        }
+      }
+      syncRecodeMethod();
+      updateAffected();
+    });
+    qs('btnAddRuleType').addEventListener('click', function () {
+      STATE.recodeExtra = true;
+      syncRecodeMethod();
     });
     qs('btnAddMap').addEventListener('click', function () { addMapRow('', ''); });
     qs('btnAddRange').addEventListener('click', function () { addRangeRow('', '', ''); });
@@ -1284,15 +1395,12 @@
       if (!b) return;
       var id = b.getAttribute('data-del-range');
       qs('recodeRangeGrid').querySelectorAll('[data-range="' + id + '"], [data-del-range="' + id + '"]').forEach(function (el) { el.remove(); });
-      if (!qs('recodeRangeGrid').querySelector('.range-from')) addRangeRow('', '', '');
+      if (!qs('recodeRangeGrid').querySelector('.range-from') && (recodeMethod() === 'ranges' || recodeMethod() === 'equal' || STATE.recodeExtra)) addRangeRow('', '', '');
       updateAffected();
     });
     qs('recodeRangeGrid').addEventListener('input', updateAffected);
-    addMapRow('1', 'Yes');
-    addMapRow('2', 'No');
     addMapRow('', '');
-    addRangeRow('', '', '');
-    addRangeRow('', '', '');
+    syncRecodeMethod();
     qs('fnChips').addEventListener('click', function (e) {
       var b = e.target.closest('[data-fn]');
       if (!b) return;

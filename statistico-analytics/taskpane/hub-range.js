@@ -8,10 +8,10 @@
   var lastPromptBindingId = null;
 
   var KIND_LABELS = {
-    used: "Current worksheet data",
-    prompt: "Selected range",
-    selection: "Current selection",
-    named: "Named range"
+    used: "Using data from the current worksheet",
+    prompt: "Using a selected range",
+    selection: "Using the current selection",
+    named: "Using a named range"
   };
   var SOURCE_LABELS = {
     used: "Automatically detected",

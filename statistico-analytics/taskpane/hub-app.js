@@ -35,7 +35,7 @@ const HUB_CATEGORY_TILES = [
     id: "explore-univariate",
     section: "Explore & Summarize",
     sectionId: "explore",
-    sectionSubtitle: "Understand variables before formal modelling",
+    sectionSubtitle: "Explore distributions, relationships, and categorical patterns",
     title: "Univariate Analysis",
     icon: "fa-chart-bar",
     accent: "#f97316",
@@ -90,7 +90,7 @@ const HUB_CATEGORY_TILES = [
       "Works from your Active Range in Excel"
     ],
     modules: [
-      { id: "contingency", label: "Frequency & Contingency Tables", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." }
+      { id: "contingency", label: "Frequencies & Crosstabs", tip: "Association between two categorical variables — χ², Cramér’s V, residuals, and 2×2 odds/risk measures." }
     ]
   },
   /* ── Compare Groups ──────────────────────────────────────────────── */
@@ -638,7 +638,7 @@ var ANALYTICS_SECTION_META = {
   explore: {
     id: "explore",
     label: "Explore & Summarize",
-    subtitle: "Understand variables before formal modelling",
+    subtitle: "Explore distributions, relationships, and categorical patterns",
     icon: "fa-chart-bar",
     color: "#f97316",
     colorDark: "#c2410c"
@@ -1139,7 +1139,7 @@ function renderCategoryModuleBtn(m, tabStyle, scopePrefix) {
   var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
   HUB_ACTIONS[actionKey] = m;
   var soonMark = m.comingSoon ? ' <span class="soon-badge">Soon</span>' : "";
-  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')">' + escapeHtml(m.label) + soonMark + "</button>";
+  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')"><span class="category-module-label">' + escapeHtml(m.label) + soonMark + '</span><i class="fa-solid fa-chevron-right category-module-chevron" aria-hidden="true"></i></button>';
 }
 
 var GROUP_COLORS = {

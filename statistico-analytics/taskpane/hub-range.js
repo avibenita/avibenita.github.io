@@ -1,14 +1,21 @@
 /* global Office, Excel, document, StatisticoGlobalRange */
 /**
- * Hub-only: compact Active Range bar; persists via StatisticoGlobalRange.
+ * Hub-only: compact data-source bar; persists via StatisticoGlobalRange.
+ * Default is detected worksheet data (Excel used range, never labeled as such).
  */
 (function () {
   var rangeMode = "used";
   var lastPromptBindingId = null;
 
-  var MODE_LABELS = {
-    prompt: "Sheet picker",
-    used: "Active region",
+  var KIND_LABELS = {
+    used: "Current worksheet data",
+    prompt: "Selected range",
+    selection: "Current selection",
+    named: "Named range"
+  };
+  var SOURCE_LABELS = {
+    used: "Automatically detected",
+    prompt: "Selected range",
     selection: "Current selection",
     named: "Named range"
   };
@@ -31,8 +38,10 @@
   }
 
   function updateSourceLabel() {
-    var el = document.getElementById("hubRangeSourceLabel");
-    if (el) el.textContent = "Active";
+    var sourceEl = document.getElementById("hubRangeSourceLabel");
+    var kindEl = document.getElementById("hubRangeKindLabel");
+    if (kindEl) kindEl.textContent = KIND_LABELS[rangeMode] || KIND_LABELS.used;
+    if (sourceEl) sourceEl.textContent = SOURCE_LABELS[rangeMode] || SOURCE_LABELS.used;
   }
 
   function setRangeMode(mode) {
@@ -334,19 +343,77 @@
     }
   }
 
+  function colLettersToIndex(letters) {
+    var n = 0;
+    var s = String(letters || "").toUpperCase();
+    for (var i = 0; i < s.length; i++) {
+      var code = s.charCodeAt(i);
+      if (code < 65 || code > 90) return 0;
+      n = n * 26 + (code - 64);
+    }
+    return n;
+  }
+
+  function splitExcelAddress(address) {
+    var raw = String(address || "").replace(/\$/g, "").trim();
+    if (!raw) return { sheet: "", a1: "" };
+    var bang = raw.lastIndexOf("!");
+    if (bang < 0) return { sheet: "", a1: raw };
+    return {
+      sheet: raw.slice(0, bang).replace(/^'+|'+$/g, ""),
+      a1: raw.slice(bang + 1)
+    };
+  }
+
+  function dimensionsFromA1(a1) {
+    var m = String(a1 || "").toUpperCase().match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
+    if (!m) return null;
+    var c1 = colLettersToIndex(m[1]);
+    var r1 = parseInt(m[2], 10);
+    var c2 = m[3] ? colLettersToIndex(m[3]) : c1;
+    var r2 = m[4] ? parseInt(m[4], 10) : r1;
+    return { rows: Math.abs(r2 - r1) + 1, cols: Math.abs(c2 - c1) + 1 };
+  }
+
+  function dimensionsFromValues(values) {
+    if (!values || !values.length) return null;
+    return { rows: values.length, cols: (values[0] && values[0].length) || 0 };
+  }
+
+  function formatRangeHeadline(address) {
+    var parts = splitExcelAddress(address);
+    if (parts.sheet && parts.a1) return parts.sheet + " · " + parts.a1;
+    return parts.a1 || address || "";
+  }
+
+  function formatRangeSize(dim) {
+    if (!dim || !dim.rows || !dim.cols) return "";
+    return dim.rows + " rows × " + dim.cols + " columns";
+  }
+
+  function setRangeSize(text) {
+    var sizeEl = document.getElementById("hubRangeSizeLabel");
+    if (sizeEl) sizeEl.textContent = text || "";
+  }
+
   function applyRangeData(values, address) {
     if (!values || values.length < 2) {
-      return showRangeState("Need header row + at least 1 data row", true);
+      setRangeSize("");
+      return showRangeState("Need a header row and at least 1 data row", true);
     }
     var addr = (address || "").trim();
-    showRangeState(addr || "Range loaded", false);
+    var parts = splitExcelAddress(addr);
+    var dim = dimensionsFromValues(values) || dimensionsFromA1(parts.a1);
+    showRangeState(formatRangeHeadline(addr) || "Range loaded", false);
+    setRangeSize(formatRangeSize(dim));
+    updateSourceLabel();
     if (window.StatisticoGlobalRange) {
       StatisticoGlobalRange.save(values, address || "", rangeMode);
     }
   }
 
   /**
-   * Read a worksheet range for a module dialog (no hub Active Range bar).
+   * Read a worksheet range for a module dialog (does not change the hub data-source bar).
    * mode: "prompt" (Excel Select Data) or "selection" (current Excel selection).
    */
   function captureRangeForDialog(mode, promptText) {
@@ -418,7 +485,6 @@
     var addrEl = document.getElementById("hubRangeBadgeText");
     var okIcon = document.getElementById("hubRangeOkIcon");
     var bar = document.getElementById("hubWdataBar");
-    var sourceEl = document.getElementById("hubRangeSourceLabel");
     var pending = /loading|detecting|select a range/i.test(text || "");
     if (addrEl) {
       addrEl.textContent = text;
@@ -427,7 +493,8 @@
     if (okIcon) {
       okIcon.style.display = isError || pending ? "none" : "";
     }
-    if (sourceEl) sourceEl.textContent = "Active";
+    if (isError || pending) setRangeSize("");
+    else updateSourceLabel();
     if (bar) {
       bar.classList.toggle("is-error", !!isError);
       bar.classList.toggle("is-ready", !isError && !pending);

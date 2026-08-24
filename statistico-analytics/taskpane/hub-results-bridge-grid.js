@@ -28,8 +28,8 @@
     multivariable: ['multivariable/mv-sample-data.js', 'multivariable/mv-input-panel.js'],
     segmentation: ['segmentation/segmentation-input-panel.js'],
     'survey-segmentation': ['segmentation/segmentation-input-panel.js'],
-    'prepare-quality': ['prepare/prepare-intent.js', 'prepare/prepare-input-panel-v15.js'],
-    'prepare-dataset': ['prepare/prepare-intent.js', 'prepare/prepare-input-panel-v15.js']
+    'prepare-quality': ['prepare/prepare-intent.js', 'prepare/prepare-input-panel-v16.js'],
+    'prepare-dataset': ['prepare/prepare-intent.js', 'prepare/prepare-input-panel-v16.js']
   };
 
   /* Timestamp buster: Office webviews cache ?v= URLs too aggressively across deploys. */

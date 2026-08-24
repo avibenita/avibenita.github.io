@@ -330,15 +330,6 @@
                   </div>
                   <button type="button" class="grid-add" id="btnAddMap">Add value mapping</button>
                 </div>
-                <div id="recodePaneRanges" style="display:none;">
-                  <div class="range-grid" id="recodeRangeGrid">
-                    <div class="grid-hd">From</div>
-                    <div class="grid-hd">To</div>
-                    <div class="grid-hd">New value</div>
-                    <div></div>
-                  </div>
-                  <button type="button" class="grid-add" id="btnAddRange">Add numeric range</button>
-                </div>
                 <div id="recodePaneEqual" style="display:none;">
                   <div class="split-row">
                     <div>
@@ -357,7 +348,16 @@
                   </div>
                   <div class="help" style="margin-top:6px;">Generated ranges appear in the table below. You can edit the new values.</div>
                 </div>
-                <button type="button" class="grid-add" id="btnAddRuleType" style="margin-top:8px;">Add another rule type</button>
+                <div id="recodePaneRanges" style="display:none;">
+                  <div class="range-grid" id="recodeRangeGrid">
+                    <div class="grid-hd">From</div>
+                    <div class="grid-hd">To</div>
+                    <div class="grid-hd">New value</div>
+                    <div></div>
+                  </div>
+                  <button type="button" class="grid-add" id="btnAddRange">Add numeric range</button>
+                </div>
+                <button type="button" class="grid-add" id="btnAddRuleType" style="display:none;">Add another rule type</button>
               </div>
             </div>
             <div class="op-sec" id="sec-compute">
@@ -778,13 +778,13 @@
     }
     function syncRecodeMethod() {
       var m = recodeMethod();
-      var extra = !!STATE.recodeExtra;
-      qs('recodePaneValues').style.display = (m === 'values' || extra) ? '' : 'none';
-      qs('recodePaneRanges').style.display = (m === 'ranges' || m === 'equal' || extra) ? '' : 'none';
+      var hasRanges = !!qs('recodeRangeGrid').querySelector('.range-from');
+      qs('recodePaneValues').style.display = m === 'values' ? '' : 'none';
       qs('recodePaneEqual').style.display = m === 'equal' ? '' : 'none';
+      qs('recodePaneRanges').style.display = (m === 'ranges' || (m === 'equal' && hasRanges)) ? '' : 'none';
       qs('recodeOtherValWrap').style.display = qs('recodeOtherwise').value === 'value' ? '' : 'none';
-      if ((m === 'ranges' || m === 'equal' || extra) && !qs('recodeRangeGrid').querySelector('.range-from')) addRangeRow('', '', '');
-      qs('btnAddRuleType').style.display = extra ? 'none' : '';
+      if (m === 'ranges' && !hasRanges) addRangeRow('', '', '');
+      qs('btnAddRuleType').style.display = 'none';
     }
     function scrollRecodeIntoView() {
       var layout = document.querySelector('.prep-layout');
@@ -803,8 +803,9 @@
         step.variables = src ? [src] : [];
         step.source = src;
         step.outputName = (qs('recodeName').value || '').trim();
-        step.mapping = collectMap();
-        step.ranges = collectRanges();
+        var method = recodeMethod();
+        step.mapping = method === 'values' ? collectMap() : {};
+        step.ranges = method === 'values' ? [] : collectRanges();
         var ow = qs('recodeOtherwise').value;
         step.otherwise = ow === 'value' ? ((qs('recodeOtherVal').value || '').trim() || 'keep') : ow;
       }
@@ -952,8 +953,9 @@
         var n = StatisticoPrepare.countAffectedCells(headers, STATE.rows, vars, codes);
         html += impactRow('Affected cells', String(n), false);
       } else if (type === 'recode') {
-        var nMap = Object.keys(collectMap()).length;
-        var nRange = collectRanges().length;
+        var method = recodeMethod();
+        var nMap = method === 'values' ? Object.keys(collectMap()).length : 0;
+        var nRange = method === 'values' ? 0 : collectRanges().length;
         var bits = [];
         if (nMap) bits.push(nMap + ' individual mapping' + (nMap === 1 ? '' : 's'));
         if (nRange) bits.push(nRange + ' numeric range' + (nRange === 1 ? '' : 's'));
@@ -1396,7 +1398,6 @@
       updateAffected();
     });
     qs('btnAddRuleType').addEventListener('click', function () {
-      STATE.recodeExtra = true;
       syncRecodeMethod();
     });
     qs('btnAddMap').addEventListener('click', function () { addMapRow('', ''); });
@@ -1416,7 +1417,7 @@
       if (!b) return;
       var id = b.getAttribute('data-del-range');
       qs('recodeRangeGrid').querySelectorAll('[data-range="' + id + '"], [data-del-range="' + id + '"]').forEach(function (el) { el.remove(); });
-      if (!qs('recodeRangeGrid').querySelector('.range-from') && (recodeMethod() === 'ranges' || recodeMethod() === 'equal' || STATE.recodeExtra)) addRangeRow('', '', '');
+      if (!qs('recodeRangeGrid').querySelector('.range-from') && recodeMethod() === 'ranges') addRangeRow('', '', '');
       updateAffected();
     });
     qs('recodeRangeGrid').addEventListener('input', updateAffected);

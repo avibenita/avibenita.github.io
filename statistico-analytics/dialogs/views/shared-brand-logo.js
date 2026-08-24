@@ -6,10 +6,11 @@
 (function (global) {
   'use strict';
 
-  var LOGO_VER = '20260717g';
+  var LOGO_VER = '20260824tools1';
   var LOGO_FILES = {
     default: 'statistico-logo-hub.png',
     analytics: 'statistico-logo-hub.png',
+    tools: 'statistico-logo-hub-calculators.png',
     calculators: 'statistico-logo-hub-calculators.png',
     applications: 'statistico-logo-hub-applications.png'
   };
@@ -49,6 +50,7 @@
   function mount(host, cluster) {
     if (!host) return;
     var clusterId = cluster || host.getAttribute('data-logo-cluster') || 'default';
+    if (cluster) host.setAttribute('data-logo-cluster', cluster);
     if (clusterId === 'default') clusterId = undefined;
     var src = getLogoSrc(clusterId);
     host.innerHTML = getLogoHtml(clusterId);

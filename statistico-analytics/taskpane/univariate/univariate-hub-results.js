@@ -121,15 +121,20 @@
     return startPath;
   }
 
-  function openUnivariateResultsFromHub() {
+  function openUnivariateResultsFromHub(startViewPath) {
     var results = loadStoredResults();
     if (!results) return false;
     try { global.sessionStorage.removeItem('univariateHubRunData'); } catch (_e) {}
-    openResultsAt(getDialogsBaseUrl() + resolveUnivariateStartViewPath() + '?cb=' + Date.now(), results);
+    var viewPath = startViewPath || resolveUnivariateStartViewPath();
+    openResultsAt(getDialogsBaseUrl() + viewPath + '?cb=' + Date.now(), results);
     return true;
   }
 
   global.StatisticoHubResults = global.StatisticoHubResults || {};
-  global.StatisticoHubResults.univariate = openUnivariateResultsFromHub;
-  global.StatisticoHubResults['univariate-workspace'] = openUnivariateResultsFromHub;
+  global.StatisticoHubResults.univariate = function () {
+    return openUnivariateResultsFromHub();
+  };
+  global.StatisticoHubResults['univariate-workspace'] = function () {
+    return openUnivariateResultsFromHub('univariate/univariate-workspace.html');
+  };
 })(window);

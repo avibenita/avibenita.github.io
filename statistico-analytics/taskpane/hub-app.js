@@ -515,7 +515,7 @@ const TOOLS_CATEGORY_TILES = [
         id: "ezpaste-open",
         label: "EzPaste — XL to PPT automation",
         tip: "Open EzPaste — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.",
-        dialogUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
+        browserUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
       }
     ]
   }
@@ -1546,6 +1546,11 @@ function runHubModuleAction(actionKey) {
   if (!module) return;
   if (module.comingSoon) {
     window.alert((module.label || "This module") + " is coming soon.");
+    return;
+  }
+  if (module.browserUrl) {
+    dismissAllHubDialogs();
+    window.open(module.browserUrl, "_blank");
     return;
   }
   if (module.dialogUrl) {

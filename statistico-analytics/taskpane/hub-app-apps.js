@@ -831,8 +831,9 @@ function renderCategoryTiles(query) {
     var tilesHtml = '<div class="category-modules">' + familyTiles.map(function (c) {
       var tabStyle = c.tabStyle === "soft" ? "soft" : "pill";
       var scopePrefix = ACTIVE_CLUSTER + ":" + c.id;
-      return getCategoryModules(c).map(function (m) {
-        return renderCategoryModuleBtn(m, tabStyle, scopePrefix);
+      var mods = getCategoryModules(c);
+      return mods.map(function (m) {
+        return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1);
       }).join("");
     }).join("") + "</div>";
     html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
@@ -843,8 +844,9 @@ function renderCategoryTiles(query) {
       var standaloneHtml = standaloneTiles.map(function (c) {
         var tabStyle = c.tabStyle === "soft" ? "soft" : "pill";
         var scopePrefix = ACTIVE_CLUSTER + ":" + c.id;
-        return getCategoryModules(c).map(function (m) {
-          return renderCategoryModuleBtn(m, tabStyle, scopePrefix);
+        var mods = getCategoryModules(c);
+        return mods.map(function (m) {
+          return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1);
         }).join("");
       }).join("");
       html += '<div class="hub-standalone-command"><div class="category-modules">' + standaloneHtml + "</div></div>";

@@ -1127,22 +1127,25 @@ function renderCategoryGroups(category, scopePrefix) {
   var tabStyle = category.tabStyle === "soft" ? "soft" : "pill";
   if (Array.isArray(category.subgroups) && category.subgroups.length) {
     return category.subgroups.map(function (g, idx) {
+      var mods = g.modules || [];
       return (
         '<div class="category-subgroup' + (idx > 0 ? " with-divider" : "") + '">' +
         '<div class="category-subgroup-label">' + escapeHtml(g.label || "") + "</div>" +
         '<div class="category-modules">' +
-        ((g.modules || []).map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix); }).join("")) +
+        (mods.map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1); }).join("")) +
         "</div></div>"
       );
     }).join("");
   }
-  return '<div class="category-modules">' + getCategoryModules(category).map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix); }).join("") + "</div>";
+  var mods = getCategoryModules(category);
+  return '<div class="category-modules">' + mods.map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1); }).join("") + "</div>";
 }
 
-function renderCategoryModuleBtn(m, tabStyle, scopePrefix) {
+function renderCategoryModuleBtn(m, tabStyle, scopePrefix, fullWidth) {
   var tip = m.tip || m.label;
   var styleClass = tabStyle === "soft" ? " category-module-btn--soft" : "";
   if (m.comingSoon) styleClass += " category-module-btn--soon";
+  if (fullWidth) styleClass += " category-module-btn--full";
   var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
   HUB_ACTIONS[actionKey] = m;
   var soonMark = m.comingSoon ? ' <span class="soon-badge">Soon</span>' : "";

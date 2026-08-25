@@ -201,6 +201,24 @@
       ]
     },
 
+    multivariable: {
+      badge: 'Wide format  one row per observation',
+      rule:  'Map numeric X, Y, and Size. Optional Color / group (a few shared categories) and Label (names each bubble).',
+      note:  'Do not put an ID column in Color / group — that creates one series per row. Use Label for names such as Country or Study.',
+      cols: [
+        { label: 'GDP', role: 'meas', roleLabel: 'X' },
+        { label: 'LifeExp', role: 'meas', roleLabel: 'Y' },
+        { label: 'Population', role: 'meas', roleLabel: 'Size' },
+        { label: 'Region', role: 'cat', roleLabel: 'Color' },
+        { label: 'Country', role: 'cat', roleLabel: 'Label' }
+      ],
+      rows: [
+        ['89', '83.2', '5.4', 'Europe', 'Norway'],
+        ['76', '77.3', '333', 'Americas', 'USA'],
+        ['34', '84.5', '125', 'Asia', 'Japan']
+      ]
+    },
+
     segmentation: {
       badge: 'Wide format  one row per respondent',
       rule:  'Each row is a respondent. Numeric item columns form the two dimensions; optional group, wave, ID, and weight columns sit beside them.',

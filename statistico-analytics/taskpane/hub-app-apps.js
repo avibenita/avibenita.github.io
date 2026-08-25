@@ -485,11 +485,11 @@ const TOOLS_CATEGORY_TILES = [
     desc: "Map X, Y, size, color, and labels on a multivariable bubble, quadrant, or 3D scatter chart.",
     info: [
       "Multivariable Visualisation: bubble, quadrant, and 3D scatter (X, Y, size, color)",
-      "Select the Excel range from the input panel",
-      "Uses a built-in country sample if you click Load sample"
+      "Guided input dialog: drag columns into roles, or load the built-in sample",
+      "Change range from inside the dialog (Use selection / Select range)"
     ],
     modules: [
-      { id: "multivariable", label: "Multivar. chart (Bubble)", tip: "Interactive bubble, quadrant, and 3D scatter charts — map X, Y, size, color, and labels. Pick the Excel range in the input panel, or load the built-in country sample." }
+      { id: "multivariable", label: "Multivar. chart (Bubble)", tip: "Opens a guided input dialog — drag columns into X, Y, Size, Color, and Label. Uses the active range, or pick/load sample inside the dialog." }
     ]
   },
   {
@@ -2131,21 +2131,9 @@ function openMultivariableDialogFromHub() {
 }
 
 function openMultivariableFromHub() {
-  setSelectedModuleCard("multivariable", true);
-  var capture = window.hubCaptureRange;
-  if (typeof capture !== "function") {
-    return openMultivariableDialogFromHub();
-  }
-  Promise.resolve(capture("prompt", "Select the table you want to chart (include a header row).")).then(function (result) {
-    if (!result || !result.values || result.values.length < 2) {
-      setSelectedModuleCard("multivariable", false);
-      return;
-    }
-    openMultivariableDialogFromHub();
-  }, function () {
-    setSelectedModuleCard("multivariable", false);
-  });
-  return true;
+  // Open the guided input dialog immediately (like Pareto). Range can be
+  // adjusted inside the dialog via Use selection / Select range / Load sample.
+  return openMultivariableDialogFromHub();
 }
 
 function openMultivariableSampleFromHub() {

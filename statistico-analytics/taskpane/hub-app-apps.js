@@ -303,7 +303,7 @@ const TOOLS_CATEGORY_TILES = [
       "Copy to Word/Excel or export .doc/.xls"
     ],
     modules: [
-      { id: "publication-tables", label: "Publication Table (Table 1)", tip: "Build a publication-ready Table 1 or descriptive summary from your Excel data — formatted for Word and journals." }
+      { id: "publication-tables", label: "Publication-Ready Tables", tip: "Build a publication-ready Table 1 or descriptive summary from your Excel data — formatted for Word and journals." }
     ]
   },
   {
@@ -468,13 +468,13 @@ const TOOLS_CATEGORY_TILES = [
       }
     ]
   },
-  /* ── Cluster 3: Utilities ─────────────────────────────────────────────
-     Applied visual and publishing workflows. */
+  /* ── Specialized visualisation ───────────────────────────────────────
+     Applied visual workflow using Excel data. */
   {
-    id: "utilities-bubble",
-    section: "Utilities",
-    sectionId: "utilities",
-    sectionSubtitle: "Visual exploration and Excel-to-Office publishing",
+    id: "specialized-bubble",
+    section: "Specialized Tools",
+    sectionId: "applications",
+    sectionSubtitle: "Purpose-built tools for analysis and reporting",
     title: "Multivariable Visualisation",
     icon: "fa-chart-scatter",
     accent: "#34d399",
@@ -494,6 +494,8 @@ const TOOLS_CATEGORY_TILES = [
   },
   {
     id: "ezpaste",
+    sectionId: "standalone",
+    standalone: true,
     title: "EzPaste",
     icon: "fa-bullseye",
     accent: "#34d399",
@@ -591,8 +593,8 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
-/* Active Range is shown on Specialized Tools for Prepare Data and Applications.
-   Calculators and Utilities pick their own inputs. */
+/* Active Range is shown on Specialized Tools for Data Preparation and purpose-built tools.
+   Calculators and standalone EzPaste pick their own inputs. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
@@ -600,16 +602,16 @@ let ACTIVE_TOOLS_SECTION = "all";
 var TOOLS_SECTION_META = {
   prepare: {
     id: "prepare",
-    label: "Prepare Data",
-    subtitle: "Rewrite data so it matches the purpose of your analysis.",
+    label: "Data Preparation",
+    subtitle: "Clean, recode, and transform your data for analysis.",
     icon: "fa-broom",
     color: "#14b8a6",
     colorDark: "#0f766e"
   },
   applications: {
     id: "applications",
-    label: "Applications",
-    subtitle: "Research publication tables and Pareto analysis.",
+    label: "Specialized Tools",
+    subtitle: "Purpose-built tools for analysis and reporting.",
     icon: "fa-table",
     color: "#eab308",
     colorDark: "#a16207"
@@ -621,17 +623,9 @@ var TOOLS_SECTION_META = {
     icon: "fa-calculator",
     color: "#38bdf8",
     colorDark: "#0284c7"
-  },
-  utilities: {
-    id: "utilities",
-    label: "Utilities",
-    subtitle: "Visualise patterns and export Excel content to Office.",
-    icon: "fa-wrench",
-    color: "#34d399",
-    colorDark: "#059669"
   }
 };
-var TOOLS_SECTION_ORDER = ["prepare", "applications", "calculators", "utilities"];
+var TOOLS_SECTION_ORDER = ["prepare", "applications", "calculators"];
 var TOOLS_RANGE_SECTIONS = ["prepare", "applications"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
@@ -843,6 +837,19 @@ function renderCategoryTiles(query) {
     }).join("") + "</div>";
     html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
   });
+  if (ACTIVE_CLUSTER === "tools") {
+    var standaloneTiles = list.filter(function (c) { return !!c.standalone; });
+    if (standaloneTiles.length) {
+      var standaloneHtml = standaloneTiles.map(function (c) {
+        var tabStyle = c.tabStyle === "soft" ? "soft" : "pill";
+        var scopePrefix = ACTIVE_CLUSTER + ":" + c.id;
+        return getCategoryModules(c).map(function (m) {
+          return renderCategoryModuleBtn(m, tabStyle, scopePrefix);
+        }).join("");
+      }).join("");
+      html += '<div class="hub-standalone-command"><div class="category-modules">' + standaloneHtml + "</div></div>";
+    }
+  }
   holder.innerHTML = html;
   if (noResults) noResults.style.display = list.length ? "none" : "block";
   syncAnalyticsAllBar(q);

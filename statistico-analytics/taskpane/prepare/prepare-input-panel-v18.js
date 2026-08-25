@@ -66,7 +66,7 @@ var prepareDialog = null;
 
 function openPrepareBuilder(kind) {
   var moduleId = kind === 'quality' ? 'prepare-quality' : 'prepare-dataset';
-  var path = kind === 'quality' ? 'prepare/prepare-quality-v4.html' : 'prepare/prepare-dataset-stick.html';
+  var path = kind === 'quality' ? 'prepare/prepare-quality-v4.html' : 'prepare/prepare-dataset-otherwise.html';
   var dataType = kind === 'quality' ? 'PREPARE_QUALITY_DATA' : 'PREPARE_DATASET_DATA';
   if (typeof setSelectedModuleCard === 'function') setSelectedModuleCard(moduleId, true);
   var url = getPrepareDialogsBaseUrl() + path + '?v=' + Date.now();

@@ -303,7 +303,7 @@ const TOOLS_CATEGORY_TILES = [
       "Copy to Word/Excel or export .doc/.xls"
     ],
     modules: [
-      { id: "publication-tables", label: "Publication Table (Table 1)", tip: "Build a publication-ready Table 1 or descriptive summary from your Excel data — formatted for Word and journals." }
+      { id: "publication-tables", label: "Publication-Ready Tables", tip: "Build a publication-ready Table 1 or descriptive summary from your Excel data — formatted for Word and journals." }
     ]
   },
   {

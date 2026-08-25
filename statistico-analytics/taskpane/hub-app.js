@@ -286,7 +286,7 @@ const TOOLS_CATEGORY_TILES = [
     id: "report-tables",
     section: "Applications",
     sectionId: "applications",
-    sectionSubtitle: "Specialized modules using your selected Excel data",
+    sectionSubtitle: "Build journal-ready tables and run Pareto (80/20) analysis on your Excel data",
     title: "Publication Tables",
     icon: "fa-graduation-cap",
     accent: "#eab308",
@@ -609,7 +609,7 @@ var TOOLS_SECTION_META = {
   applications: {
     id: "applications",
     label: "Applications",
-    subtitle: "Use applied tools with your Excel data.",
+    subtitle: "Research publication tables and Pareto analysis.",
     icon: "fa-table",
     color: "#eab308",
     colorDark: "#a16207"

@@ -608,8 +608,8 @@ var TOOLS_SECTION_META = {
   },
   applications: {
     id: "applications",
-    label: "Applications",
-    subtitle: "Research publication tables and Pareto analysis.",
+    label: "Specialized Tools",
+    subtitle: "Purpose-built tools for analysis and reporting.",
     icon: "fa-table",
     color: "#eab308",
     colorDark: "#a16207"

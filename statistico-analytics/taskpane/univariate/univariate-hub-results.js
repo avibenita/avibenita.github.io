@@ -131,4 +131,5 @@
 
   global.StatisticoHubResults = global.StatisticoHubResults || {};
   global.StatisticoHubResults.univariate = openUnivariateResultsFromHub;
+  global.StatisticoHubResults['univariate-workspace'] = openUnivariateResultsFromHub;
 })(window);

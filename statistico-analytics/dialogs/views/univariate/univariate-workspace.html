@@ -1,0 +1,2385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Statistico — Univariate Workspace</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Strip Office host-info query param as early as possible so URL bar stays clean -->
+  <script>
+    (function () {
+      try {
+        var u = new URL(window.location.href);
+        var dirty = false;
+        ['_host_Info', '_hostInfo', 'telemetry', 'isDialog'].forEach(function (k) {
+          if (u.searchParams.has(k)) { u.searchParams.delete(k); dirty = true; }
+        });
+        if (dirty) window.history.replaceState({}, document.title, u.pathname + (u.search ? u.search : '') + (u.hash || ''));
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- Office.js — skipped in hub/website embed mode (?embed=1) to prevent init races -->
+  <script>
+    if (new URLSearchParams(location.search).get('embed') !== '1') {
+      document.write('<script src="https://appsforoffice.microsoft.com/lib/1\/hosted\/office.js"><\/script>');
+    }
+  </script>
+
+  <!-- Premium fonts: Inter UI + JetBrains Mono for data values -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+
+  <!-- Highcharts -->
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/modules/histogram-bellcurve.js"></script>
+
+  <!-- Shared Header -->
+  <!-- build: 20260519u -->
+  <link rel="stylesheet" href="../shared-header.css?v=20260823-style1">
+  <script src="../shared-brand-logo.js?v=20260716cover"></script>
+  <script src="../shared-header.js?v=20260823-style1"></script>
+  <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
+  <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
+  <script src="../runtime-core.js?v=20260329a"></script>
+  <style>
+    /* EXACT COPY OF ORIGINAL HISTOGRAM STYLES */
+    :root {
+      --surface-0: #0c1624;
+      --surface-1: #1a1f2e;
+      --surface-2: #242938;
+      --border: #6b7280; /* Much brighter border - easily visible */
+      --accent-1: rgb(255,165,120);
+      --accent-2: rgb(120,200,255);
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.92);
+      --text-muted: rgba(255,255,255,0.85);
+      --panel-radius: 10px;
+      --panel-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+      --header-color: var(--accent-1);
+    }
+    /* ── Light Theme ── */
+    :root[data-theme="light"] {
+      --surface-0: #eef0f4;
+      --surface-1: #ffffff;
+      --surface-2: #f3f4f6;
+      --border: #cbd5e1;
+      --accent-1: #2563eb;
+      --accent-2: #1d4ed8;
+      --text-primary: #111827;
+      --text-secondary: #1f2937;
+      --text-muted: #374151;
+    }
+
+    /* Light theme: override hardcoded dark-only values */
+    :root[data-theme="light"] body { background: var(--surface-0); }
+    :root[data-theme="light"] .panel,
+    :root[data-theme="light"] .card,
+    :root[data-theme="light"] .stat-panel { background: var(--surface-1); border-color: var(--border); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    :root[data-theme="light"] .panel-heading,
+    :root[data-theme="light"] .card-header { background: var(--surface-2); color: var(--accent-1); }
+    :root[data-theme="light"] table { background: var(--surface-1); }
+    :root[data-theme="light"] thead th { background: linear-gradient(135deg, var(--surface-2), #dde3ef) !important; color: var(--text-primary) !important; border-color: var(--border) !important; }
+    :root[data-theme="light"] tbody tr:nth-child(even) { background: rgba(0,0,0,0.03); }
+    :root[data-theme="light"] tbody tr:hover { background: rgba(37,99,235,0.06); }
+    :root[data-theme="light"] td, :root[data-theme="light"] th { border-color: var(--border); color: var(--text-primary); }
+    :root[data-theme="light"] .results-container { background: var(--surface-0); }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      background-color: var(--surface-0);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      color: var(--text-primary);
+      overflow: hidden;
+      /* Use % height chain so layout works inside site iframes (100vh can match outer window). */
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Body inherits the global premium scrollbar from shared-header.css */
+
+    /* Results container - Compact */
+    .results-container {
+      display: none;
+      margin: 0;          /* no margin - use padding so width:100% doesn't overflow */
+      padding: 4px 8px;
+      flex: 1;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+
+    .results-container.show {
+      display: flex !important;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    /* Panel styling - Compact */
+    .panel {
+      background-color: var(--surface-1);
+      border-radius: var(--panel-radius);
+      box-shadow: var(--panel-shadow), 0 0 0 1px rgba(255, 255, 255, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      margin-bottom: 0;
+    }
+
+    .panel-heading {
+      background: transparent;
+      color: var(--header-color);
+      font-weight: 600;
+      padding: 5px 10px;
+      font-size: 0.9rem;
+      letter-spacing: .3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .panel-body {
+      padding: 5px 10px;
+    }
+
+    /* Table styling - EXACT match */
+    table {
+      width: 100%;
+      text-align: center;
+      background: var(--surface-2);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-collapse: collapse;
+    }
+
+    table th {
+      padding: 4px 8px;
+      font-weight: 600;
+      font-size: 11px;
+      background: var(--surface-0);
+      color: var(--accent-1);
+    }
+
+    table th.highlight {
+      background: rgba(255, 165, 120, 0.3);
+      color: var(--text-primary);
+    }
+
+    table td {
+      padding: 5px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    /* Stat panels (4 separate boxes) */
+    .stats-cards-panel { padding: 0 0 8px; flex-shrink: 0; width: 90%; margin: 0 auto;
+      border: none !important; box-shadow: none !important; background: transparent !important; }
+    .stat-insight-row {
+      font-size: 12px; font-weight: 500;
+      color: var(--accent-1, #ffa578);
+      margin-bottom: 8px; padding: 4px 0;
+      border-left: 3px solid var(--accent-1, #ffa578);
+      padding-left: 10px;
+      border-radius: 0 6px 6px 0; display: none;
+    }
+    .stat-insight-row.visible { display: block; }
+    .stat-cards-grid { display: flex; gap: 8px; flex-wrap: nowrap; }
+    .stat-card-group {
+      flex: 1; min-width: 0;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 10px; padding: 10px 10px 8px;
+    }
+    .stat-group-label {
+      font-size: 9px; font-weight: 700; letter-spacing: .8px;
+      text-transform: uppercase; color: var(--text-muted, #9faac0);
+      margin-bottom: 8px; padding-bottom: 5px;
+      border-bottom: 1px solid rgba(255,255,255,.75);
+    }
+    .stat-card-items { display: flex; flex-direction: column; gap: 4px; }
+    .stat-card {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 3px 6px; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    .stat-card.sc-mean   { background: rgba(255,155,102,.1); }
+    .stat-card.sc-median { background: rgba(83,214,161,.08); }
+    .sc-label { font-size: 10px; color: var(--text-muted, #9faac0); }
+    .sc-value { font-size: 12px; font-weight: 600; color: var(--text-primary, #f4f7fb); font-variant-numeric: tabular-nums; }
+    .stat-card.sc-mean   .sc-value { color: #ffa578; }
+    .stat-card.sc-median .sc-value { color: #53d6a1; }
+
+    /* Controls - EXACT match */
+    /* ONE ROW - ALL 4 CONTROLS */
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 12px;
+      flex-wrap: nowrap !important;      /* force same row */
+      align-items: center;    /* vertically aligned */
+      overflow-x: auto;      /* Allow horizontal scroll if needed */
+      overflow-y: hidden;
+    }
+
+    /* Smaller / shorter boxes */
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;      /* reduced */
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      min-height: 32px;       /* reduced from 42px */
+      flex-shrink: 0;        /* prevent shrinking */
+      white-space: nowrap;   /* prevent text wrapping */
+    }
+
+    /* Make labels less "tall" */
+    .control-group label {
+      color: var(--text-secondary);
+      font-size: 12px;        /* slightly smaller */
+      font-weight: 500;
+      white-space: nowrap;
+      min-width: auto;        /* important: stop forcing width */
+    }
+
+    /* Data range label */
+    .range-control > label {
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      min-width: auto;
+    }
+
+    /* Inputs shorter */
+    .control-group select,
+    .control-group input[type="number"] {
+      padding: 4px 10px;      /* reduced */
+      font-size: 12px;
+      height: 28px;           /* slimmer */
+      background: var(--surface-1);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      min-width: 140px;
+    }
+
+    .control-group input[type="range"] {
+      width: 100px;
+    }
+
+    .control-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    /* Overlay toggles: Normal / Mean / Median in one control box */
+    .control-group.overlay-toggles {
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .control-group.overlay-toggles .overlay-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .control-group.overlay-toggles .overlay-toggle input {
+      accent-color: var(--accent-1);
+    }
+
+    /* Source-range row filter (Pareto-style) */
+    .panel-heading-actions {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .panel-heading-actions i {
+      font-size: 12px;
+      opacity: 0.65;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .panel-heading-actions i:hover { opacity: 0.95; }
+    /* Legacy panel filter styles — filter lives in shared header only */
+
+    /* Data filter guide — visible notice under chart header */
+    .uni-data-guide {
+      margin: 0 8px 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(129,140,248,.45);
+      background: linear-gradient(135deg, rgba(129,140,248,.14) 0%, rgba(74,222,128,.08) 100%);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.04) inset;
+      font-size: 11px;
+      line-height: 1.55;
+      color: rgba(228,232,240,.92);
+    }
+    .uni-data-guide.hidden { display: none; }
+    .uni-data-guide-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #a5b4fc;
+    }
+    .uni-data-guide-head i { font-size: 14px; color: #86efac; }
+    .uni-data-guide-dismiss {
+      margin-left: auto;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,.45);
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .uni-data-guide-dismiss:hover { color: #fff; }
+    .uni-data-guide-body { display: grid; gap: 8px; }
+    .uni-data-guide-body p { margin: 0; }
+    .uni-data-guide-body strong { color: #e4e8f0; font-weight: 600; }
+    .uni-data-guide-steps {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 4px;
+    }
+    .uni-data-guide-steps li { padding-left: 2px; }
+    .uni-data-guide-outcomes {
+      margin-top: 4px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(0,0,0,.22);
+      border-left: 3px solid #86efac;
+      font-size: 10.5px;
+    }
+    .uni-data-guide-outcomes span { color: #86efac; font-weight: 600; }
+    :root[data-theme="light"] .uni-data-guide {
+      background: linear-gradient(135deg, rgba(37,99,235,.08) 0%, rgba(22,163,74,.06) 100%);
+      border-color: rgba(37,99,235,.35);
+      color: #1f2937;
+    }
+    :root[data-theme="light"] .uni-data-guide-head { color: #1d4ed8; }
+    :root[data-theme="light"] .uni-data-guide-body strong { color: #111827; }
+
+    .uni-filt-help-panel {
+      margin-bottom: 12px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(129,140,248,.35);
+      background: rgba(129,140,248,.08);
+      font-size: 12px;
+      line-height: 1.6;
+      color: rgba(228,232,240,.92);
+    }
+    .uni-filt-help-panel h4 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #a5b4fc;
+    }
+    .uni-filt-help-panel ol {
+      margin: 0;
+      padding-left: 20px;
+      display: grid;
+      gap: 6px;
+    }
+    #uniFilterOverlay { pointer-events: none; }
+    #uniFilterOverlay.sb-ai-overlay--visible { pointer-events: auto; }
+    .uni-filt-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .uni-filt-summary { font-size: 11px; color: rgba(203,213,225,.85); flex: 1; min-width: 140px; }
+    .uni-filt-clear-btn {
+      font-size: 10px; font-weight: 700; padding: 5px 12px; border-radius: 6px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--text-secondary); cursor: pointer;
+    }
+    .uni-filt-clear-btn:hover { border-color: var(--accent-1); color: var(--accent-1); }
+    .uni-filt-th { cursor: pointer; user-select: none; white-space: nowrap; }
+    .uni-filt-th.filtered { color: #4ade80 !important; }
+    .uni-filt-th .uni-filt-icon { font-size: 9px; margin-left: 4px; opacity: .75; }
+    .uni-excel-filter-dropdown {
+      position: fixed; z-index: 100050;
+      background: var(--surface-1); border: 1px solid var(--border);
+      border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+      min-width: 200px; max-width: 280px; max-height: 320px;
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .uni-excel-filter-dropdown .uni-filt-search {
+      width: 100%; padding: 7px 9px; border: none; border-bottom: 1px solid var(--border);
+      background: var(--surface-0); color: var(--text-primary); font-size: 12px; box-sizing: border-box;
+    }
+    .uni-excel-filter-dropdown .uni-filt-values { overflow-y: auto; max-height: 200px; padding: 6px 8px; }
+    .uni-excel-filter-dropdown label {
+      display: flex; align-items: center; gap: 8px; padding: 4px 2px;
+      font-size: 12px; cursor: pointer; color: var(--text-primary);
+    }
+    .uni-excel-filter-dropdown .uni-filt-actions {
+      display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border);
+    }
+    .uni-excel-filter-dropdown .uni-filt-ok {
+      flex: 1; padding: 6px; border: none; border-radius: 4px;
+      background: var(--accent-1); color: #0f172a; font-weight: 700; font-size: 11px; cursor: pointer;
+    }
+    .uni-excel-filter-dropdown .uni-filt-cancel {
+      flex: 1; padding: 6px; border: 1px solid var(--border); border-radius: 4px;
+      background: transparent; color: var(--text-secondary); font-size: 11px; cursor: pointer;
+    }
+
+    /* Chart container - Compact */
+    #histogram-chart {
+      min-height: 0;
+      height: 100%;
+      width: 100%;
+      margin: 4px auto 0;
+      padding: 0;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .chart-panel {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chart-panel .panel-body {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 4px;
+      overflow: hidden;
+    }
+
+    /* Range slider styling - EXACT match */
+    /* Make the 4th control flexible (it will take remaining width) */
+    .range-control {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;                /* IMPORTANT: this makes it fit in same row */
+      min-width: 320px;       /* prevents collapsing too much */
+      padding: 6px 10px;      /* reduced */
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 6px;
+      min-height: 32px;       /* reduced from 42px */
+      margin-top: 0;          /* remove the extra vertical spacing */
+      max-width: none;        /* remove 650px restriction */
+      flex-shrink: 0;        /* prevent shrinking */
+      white-space: nowrap;   /* prevent text wrapping */
+    }
+
+    .range-sliders {
+      position: relative;
+      flex: 1;
+      height: 16px;         /* was 20px */
+    }
+
+    .range-sliders input[type="range"] {
+      position: absolute;
+      width: 100%;
+      pointer-events: none;
+      -webkit-appearance: none;
+      background: transparent;
+    }
+
+    .range-sliders input[type="range"]::-webkit-slider-thumb {
+      pointer-events: all;
+      -webkit-appearance: none;
+      width: 14px;          /* slightly smaller thumb */
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      cursor: pointer;
+    }
+
+    .range-track {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 100%;
+      height: 3px;          /* thinner line */
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+    }
+
+    .range-active {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 3px;          /* thinner line */
+      background: var(--accent-1);
+      border-radius: 2px;
+    }
+
+    .value-display {
+      min-width: 40px;      /* slightly smaller */
+      font-size: 12px;
+      color: var(--accent-2);
+      font-weight: 600;
+      text-align: center;
+      display: inline-block;
+    }
+
+    .reset-button {
+      background: var(--accent-2);
+      color: white;
+      border: none;
+      padding: 3px 9px;     /* reduced */
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      height: 26px;         /* makes it align nicely */
+    }
+
+    .reset-button:hover {
+      opacity: 0.9;
+    }
+
+    /* Icon buttons */
+    .panel-heading i {
+      cursor: pointer;
+      margin-left: 10px;
+      transition: color 0.3s;
+    }
+
+    .panel-heading i:hover {
+      color: var(--accent-2);
+    }
+
+    /* Footer - sits at the very bottom, never grows */
+    .statistico-footer {
+      font-size: 11px;
+      color: rgba(255,255,255,0.72);
+      text-align: center;
+      padding: 4px 0;
+      opacity: 0.7;
+      flex: 0 0 auto;
+    }
+
+    .dialog-loading-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(12, 22, 36, 0.72);
+      z-index: 9999;
+      transition: opacity .2s ease;
+    }
+    .dialog-loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .dialog-loading-card {
+      min-width: 220px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(120, 200, 255, 0.35);
+      background: rgba(20, 31, 47, 0.96);
+      color: #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 26px rgba(0,0,0,.45);
+    }
+    .dialog-loading-spin {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(148, 163, 184, 0.35);
+      border-top-color: #78c8ff;
+      animation: dlgSpin .8s linear infinite;
+    }
+    @keyframes dlgSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  </style>
+  <style>
+    html,body{height:100%!important;overflow:hidden!important;}
+    body{display:flex!important;flex-direction:column!important;}
+    .sb-layout{display:flex;flex-direction:row;flex:1;min-height:0;overflow:hidden;}
+    .right-col{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
+
+    /* Demo embed polish: keep the full univariate module visible inside the website frame. */
+    body.demo-embed .statistico-header {
+      height: 52px;
+      padding: 0 12px;
+    }
+    body.demo-embed .header-center {
+      gap: 2px;
+    }
+    body.demo-embed .header-view-name {
+      font-size: clamp(14px, 1.15vw, 17px);
+    }
+    body.demo-embed .header-variable {
+      font-size: 9px;
+    }
+    body.demo-embed .header-right {
+      gap: 5px;
+    }
+    body.demo-embed .header-decimals-label {
+      font-size: 9px;
+    }
+    body.demo-embed .header-decimals-btn,
+    body.demo-embed .header-theme-btn {
+      height: 26px;
+      padding: 0 8px;
+      font-size: 10px;
+    }
+    body.demo-embed .demo-header-badges {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 36%;
+      min-width: 0;
+      pointer-events: none;
+    }
+    body.demo-embed .demo-header-pill,
+    body.demo-embed .demo-header-title {
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+      border-radius: 999px;
+      font-family: 'Montserrat', 'Segoe UI', sans-serif;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      line-height: 1;
+    }
+    body.demo-embed .demo-header-pill {
+      padding: 5px 10px;
+      background: rgba(255,165,120,.18);
+      border: 1px solid rgba(255,165,120,.28);
+      color: rgba(255,224,190,.98);
+      font-size: 9px;
+      font-weight: 900;
+    }
+    body.demo-embed .demo-header-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 6px 12px;
+      background: rgba(7,14,24,.58);
+      border: 1px solid rgba(255,255,255,.12);
+      color: rgba(255,214,176,.98);
+      font-size: 11px;
+      font-weight: 850;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    body.demo-embed .sb-nav {
+      --sb-w: 190px;
+      --sb-w-collapsed: 46px;
+    }
+    body.demo-embed .sb-logo {
+      padding: 10px 11px 8px;
+      gap: 8px;
+    }
+    body.demo-embed .sb-logo-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    body.demo-embed .sb-logo-name {
+      font-size: 16px;
+    }
+    body.demo-embed .sb-logo-sub {
+      font-size: 8px;
+      letter-spacing: .11em;
+      margin-top: 2px;
+    }
+    body.demo-embed .sb-header {
+      padding: 8px 9px;
+    }
+    body.demo-embed .sb-toggle-btn {
+      width: 26px;
+      height: 26px;
+    }
+    body.demo-embed .sb-body {
+      padding: 7px 0 6px;
+    }
+    body.demo-embed .sb-group {
+      margin-bottom: 8px;
+      padding: 0 8px;
+    }
+    body.demo-embed .sb-group-title {
+      margin: 8px 3px 6px;
+      padding-top: 8px;
+      font-size: 8px;
+      letter-spacing: .13em;
+    }
+    body.demo-embed .sb-items-rail {
+      margin-left: 6px;
+      padding-left: 7px;
+    }
+    body.demo-embed .sb-item {
+      min-height: 32px;
+      padding: 7px 9px 7px 10px;
+      gap: 9px;
+      margin: 1px 0;
+      border-radius: 0 9px 9px 0;
+      font-size: 11px;
+    }
+    body.demo-embed .sb-item-icon {
+      width: 15px;
+      font-size: 11px;
+    }
+    body.demo-embed .sb-ai-section-wrap,
+    body.demo-embed .sb-bottom {
+      padding: 7px 8px;
+      gap: 5px;
+    }
+    body.demo-embed .sb-ai-sidebar-pill,
+    body.demo-embed .sb-bottom-btn {
+      min-height: 28px;
+      padding: 7px 8px;
+      font-size: 10px;
+      border-radius: 8px;
+    }
+    body.demo-embed .results-container {
+      padding: 3px 6px;
+      gap: 4px;
+    }
+    body.demo-embed .stats-cards-panel {
+      width: 94%;
+      padding-bottom: 4px;
+    }
+    body.demo-embed .stat-card-group {
+      padding: 7px 8px 6px;
+      border-radius: 8px;
+    }
+    body.demo-embed .stat-group-label {
+      font-size: 8px;
+      margin-bottom: 5px;
+      padding-bottom: 3px;
+    }
+    body.demo-embed .stat-card {
+      padding: 2px 5px;
+    }
+    body.demo-embed .sc-label {
+      font-size: 9px;
+    }
+    body.demo-embed .sc-value {
+      font-size: 10px;
+    }
+    body.demo-embed .panel-heading {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+    body.demo-embed .panel-body {
+      padding: 5px 7px !important;
+    }
+    body.demo-embed .controls {
+      gap: 5px;
+      margin-bottom: 4px;
+      overflow-x: hidden;
+    }
+    body.demo-embed .control-group,
+    body.demo-embed .range-control {
+      min-height: 28px;
+      padding: 4px 7px;
+      gap: 5px;
+      flex-shrink: 1;
+    }
+    body.demo-embed .control-group label,
+    body.demo-embed .range-control > label {
+      font-size: 10px;
+    }
+    body.demo-embed .control-group select {
+      min-width: 104px;
+      height: 24px;
+      padding: 3px 7px;
+      font-size: 10px;
+    }
+    body.demo-embed .control-group input[type="range"] {
+      width: 76px;
+    }
+    body.demo-embed .range-control {
+      min-width: 245px;
+    }
+    body.demo-embed .range-sliders {
+      height: 14px;
+    }
+    body.demo-embed .value-display {
+      min-width: 34px;
+      font-size: 10px;
+    }
+    body.demo-embed .reset-button {
+      height: 22px;
+      padding: 2px 7px;
+      font-size: 10px;
+    }
+    body.demo-embed #histogram-chart {
+      width: 94%;
+      margin-top: 2px;
+    }
+    body.demo-embed .statistico-footer {
+      padding: 3px 10px;
+      font-size: 9px;
+    }
+    @media (max-width: 980px) {
+      body.demo-embed .demo-header-badges {
+        max-width: 30%;
+      }
+      body.demo-embed .demo-header-title {
+        font-size: 9px;
+        padding-inline: 9px;
+      }
+      body.demo-embed .header-variable {
+        display: none;
+      }
+    }
+  </style>
+
+  <!-- ╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝
+       PREMIUM EVALUATION THEME — Histogram
+       Design refs: Linear, Figma, Bloomberg (modern), Perplexity
+       Loaded last → overrides all existing per-view styles.
+       ╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝╝ -->
+  <style id="premium-theme">
+    /* ── Token system ────────────────────────────────────────────── */
+    :root {
+      --surface-0: #07090e;
+      --surface-1: #0b0e16;
+      --surface-2: #10141f;
+      --border:    rgba(255,255,255,0.16);
+      --accent-1:  #fb923c;
+      --accent-2:  #818cf8;
+      --text-primary:   #f1f5f9;
+      --text-secondary: rgba(241,245,249,0.92);
+      --text-muted:     rgba(210,220,235,0.88);
+      --panel-radius: 12px;
+      --panel-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 40px rgba(0,0,0,0.55);
+      --header-color: #818cf8;
+      /* premium-only tokens */
+      --p-indigo:     #818cf8;
+      --p-indigo-bg:  rgba(129,140,248,0.07);
+      --p-orange:     #fb923c;
+      --p-emerald:    #34d399;
+      --p-mono:       'JetBrains Mono', 'Consolas', monospace;
+    }
+
+    /* ── Typography ──────────────────────────────────────────────── */
+    html, body,
+    button, select, input, label, span, div, td, th {
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif !important;
+    }
+
+    body {
+      background: var(--surface-0) !important;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Scrollbar ───────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 3px !important; height: 3px !important; }
+    ::-webkit-scrollbar-track { background: transparent !important; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.08) !important;
+      border-radius: 4px !important;
+    }
+
+    /* ── Results wrapper ─────────────────────────────────────────── */
+    .results-container.show {
+      gap: 10px !important;
+      padding: 28px 14px 14px 14px !important;
+    }
+
+    /* ── Stat Panels ─────────────────────────────────────────────── */
+    .stats-cards-panel {
+      width: 96% !important;
+      padding: 0 0 4px !important;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    .stat-cards-grid { gap: 5px !important; }
+
+    .stat-card-group {
+      background: rgba(255,255,255,0.06) !important;
+      border: 1px solid rgba(255,255,255,0.16) !important;
+      border-radius: 10px !important;
+      padding: 10px 12px 9px !important;
+      transition: background 0.18s, border-color 0.18s !important;
+    }
+    .stat-card-group:hover {
+      background: rgba(255,255,255,0.09) !important;
+      border-color: rgba(255,255,255,0.22) !important;
+    }
+
+    .stat-group-label {
+      font-size: 8px !important;
+      font-weight: 600 !important;
+      letter-spacing: 0.14em !important;
+      text-transform: uppercase !important;
+      color: rgba(210,220,235,0.9) !important;
+      margin-bottom: 9px !important;
+      padding-bottom: 0 !important;
+      border-bottom: none !important;
+    }
+
+    .stat-card-items { gap: 4px !important; }
+
+    .stat-card {
+      display: flex !important;
+      justify-content: space-between !important;
+      align-items: baseline !important;
+      padding: 3px 0 !important;
+      border-radius: 0 !important;
+      border: none !important;
+      border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+      background: transparent !important;
+    }
+    .stat-card:last-child { border-bottom: none !important; }
+
+    .stat-card.sc-mean   { background: transparent !important; }
+    .stat-card.sc-median { background: transparent !important; }
+
+    .sc-label {
+      font-size: 9.5px !important;
+      font-weight: 500 !important;
+      color: rgba(210,220,235,0.9) !important;
+      letter-spacing: 0.01em !important;
+    }
+
+    .sc-value {
+      font-family: var(--p-mono) !important;
+      font-size: 11.5px !important;
+      font-weight: 500 !important;
+      color: #e8edf7 !important;
+      letter-spacing: -0.03em !important;
+      font-variant-numeric: tabular-nums !important;
+    }
+    .stat-card.sc-mean   .sc-value { color: var(--p-orange) !important; font-size: 12px !important; }
+    .stat-card.sc-median .sc-value { color: var(--p-emerald) !important; }
+
+    /* Insight bar */
+    .stat-insight-row {
+      font-size: 10.5px !important;
+      color: #a5b4fc !important;
+      border-left-color: var(--p-indigo) !important;
+      background: var(--p-indigo-bg) !important;
+      border-radius: 0 6px 6px 0 !important;
+      margin-bottom: 8px !important;
+    }
+
+    /* ── Chart Panel ─────────────────────────────────────────────── */
+    .panel.chart-panel {
+      background: #0b0e16 !important;
+      border: 1px solid rgba(255,255,255,0.14) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03),
+                  0 12px 48px rgba(0,0,0,0.55) !important;
+    }
+
+    .panel-heading {
+      padding: 9px 14px !important;
+      font-size: 10.5px !important;
+      font-weight: 500 !important;
+      letter-spacing: 0.03em !important;
+      color: rgba(228,232,240,0.9) !important;
+      text-transform: uppercase !important;
+      background: transparent !important;
+      border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+    }
+    .panel-heading i {
+      font-size: 12px !important;
+      opacity: 0.65 !important;
+      margin-left: 8px !important;
+      cursor: pointer !important;
+      transition: opacity 0.15s !important;
+    }
+    .panel-heading i:hover { opacity: 0.95 !important; }
+
+    .panel-body { padding: 10px 12px !important; }
+
+    /* ── Controls bar ────────────────────────────────────────────── */
+    .controls {
+      gap: 5px !important;
+      margin-bottom: 8px !important;
+    }
+
+    .control-group {
+      background: rgba(255,255,255,0.025) !important;
+      border: 1px solid rgba(255,255,255,0.14) !important;
+      border-radius: 8px !important;
+      padding: 5px 10px !important;
+      min-height: 30px !important;
+      gap: 7px !important;
+      transition: border-color 0.15s, background 0.15s !important;
+    }
+    .control-group:focus-within {
+      border-color: rgba(129,140,248,0.35) !important;
+      background: rgba(129,140,248,0.04) !important;
+    }
+
+    .control-group label,
+    .range-control > label {
+      font-size: 10px !important;
+      font-weight: 500 !important;
+      color: rgba(228,232,240,0.88) !important;
+      letter-spacing: 0.01em !important;
+    }
+
+    .control-group select,
+    .control-group input[type="number"] {
+      background: rgba(255,255,255,0.04) !important;
+      border: 1px solid rgba(255,255,255,0.09) !important;
+      border-radius: 5px !important;
+      color: #e4e8f0 !important;
+      font-size: 10.5px !important;
+      height: 25px !important;
+      padding: 0 8px !important;
+    }
+
+    /* Range control */
+    .range-control {
+      background: rgba(255,255,255,0.025) !important;
+      border: 1px solid rgba(255,255,255,0.14) !important;
+      border-radius: 8px !important;
+      padding: 5px 10px !important;
+      min-height: 30px !important;
+      gap: 7px !important;
+    }
+
+    .value-display {
+      font-family: var(--p-mono) !important;
+      font-size: 10px !important;
+      color: rgba(228,232,240,0.75) !important;
+      font-variant-numeric: tabular-nums !important;
+    }
+
+    .reset-button {
+      background: rgba(129,140,248,0.10) !important;
+      border: 1px solid rgba(129,140,248,0.22) !important;
+      color: #a5b4fc !important;
+      border-radius: 5px !important;
+      font-size: 9.5px !important;
+      font-weight: 500 !important;
+      padding: 2px 9px !important;
+      transition: background 0.15s !important;
+    }
+    .reset-button:hover {
+      background: rgba(129,140,248,0.20) !important;
+    }
+
+    /* Bin count badge */
+    #numBinsValue {
+      min-width: 20px !important;
+      text-align: center !important;
+      color: var(--p-indigo) !important;
+      font-size: 11px !important;
+    }
+
+    /* ── Chart container ─────────────────────────────────────────── */
+    #histogram-chart {
+      background: transparent !important;
+      border: none !important;
+      border-top: 1px solid rgba(255,255,255,0.04) !important;
+      border-radius: 0 0 10px 10px !important;
+      margin-top: 0 !important;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────── */
+    .statistico-footer {
+      font-size: 9px !important;
+      letter-spacing: 0.06em !important;
+      opacity: 0.22 !important;
+    }
+    .statistico-footer a { color: inherit !important; }
+
+    /* Fill available dialog height: flex chain + trim shared top padding */
+    body.sb-page .right-col #results-container.show {
+      padding: 6px 10px 4px !important;
+      overflow: hidden !important;
+    }
+    #results-container.show .stats-cards-panel { flex-shrink: 0; }
+    #results-container.show .statistico-footer { flex-shrink: 0; }
+    #results-container.show #histogram-panel {
+      flex: 1 1 0 !important;
+      min-height: 220px !important;
+      height: auto !important;
+    }
+    #histogram-panel .panel-body {
+      flex: 1 1 0 !important;
+      min-height: 0 !important;
+    }
+    #histogram-chart {
+      flex: 1 1 0 !important;
+      min-height: 200px !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+  </style>
+  <link rel="stylesheet" href="./univariate-workspace.css?v=20260825-real1">
+</head>
+<body>
+  <div class="dialog-loading-overlay" id="dialogLoadingOverlay">
+    <div class="dialog-loading-card">
+      <span class="dialog-loading-spin"></span>
+      <span id="dialogLoadingText">Loading results...</span>
+    </div>
+  </div>
+  <!-- ++ Sidebar Navigation ++ -->
+  <nav class="sb-nav" id="sidebarNav"></nav>
+  <!-- ++ Right column ++ -->
+  <div class="right-col">
+    <div id="header-container"></div>
+<!-- Shared Header will be inserted here by JavaScript -->
+
+  <!-- RESULTS CONTAINER - Initially hidden, shown when data loads -->
+  <div class="results-container" id="results-container">
+
+    <!-- STATISTICS PANEL - grouped stat cards -->
+    <div class="panel stats-cards-panel" id="statistics-panel">
+      <div class="stat-insight-row" id="stat-insight"></div>
+      <div class="stat-cards-grid">
+        <!-- Central Tendency -->
+        <div class="stat-card-group">
+          <div class="stat-group-label">Central</div>
+          <div class="stat-card-items">
+            <div class="stat-card"><span class="sc-label">n</span><span class="sc-value" id="stat-n">--</span></div>
+            <div class="stat-card sc-mean"><span class="sc-label">Mean</span><span class="sc-value" id="stat-mean">--</span></div>
+            <div class="stat-card sc-median"><span class="sc-label">Median</span><span class="sc-value" id="stat-median">--</span></div>
+          </div>
+        </div>
+        <!-- Spread -->
+        <div class="stat-card-group">
+          <div class="stat-group-label">Spread</div>
+          <div class="stat-card-items">
+            <div class="stat-card"><span class="sc-label">SD</span><span class="sc-value" id="stat-stddev">--</span></div>
+            <div class="stat-card"><span class="sc-label">Variance</span><span class="sc-value" id="stat-variance">--</span></div>
+            <div class="stat-card"><span class="sc-label">Range</span><span class="sc-value" id="stat-range">--</span></div>
+          </div>
+        </div>
+        <!-- Shape -->
+        <div class="stat-card-group">
+          <div class="stat-group-label">Shape</div>
+          <div class="stat-card-items">
+            <div class="stat-card"><span class="sc-label">Skewness</span><span class="sc-value" id="stat-skewness">--</span></div>
+            <div class="stat-card"><span class="sc-label">Kurtosis</span><span class="sc-value" id="stat-kurtosis">--</span></div>
+          </div>
+        </div>
+        <!-- Extremes -->
+        <div class="stat-card-group">
+          <div class="stat-group-label">Extremes</div>
+          <div class="stat-card-items">
+            <div class="stat-card"><span class="sc-label">Min</span><span class="sc-value" id="stat-min">--</span></div>
+            <div class="stat-card"><span class="sc-label">Q25</span><span class="sc-value" id="stat-q25">--</span></div>
+            <div class="stat-card"><span class="sc-label">Q75</span><span class="sc-value" id="stat-q75">--</span></div>
+            <div class="stat-card"><span class="sc-label">Max</span><span class="sc-value" id="stat-max">--</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTOGRAM PANEL - EXACT COPY -->
+    <div class="panel chart-panel" id="histogram-panel">
+      <div class="panel-heading">
+        <span id="histogram-title">Variable - Interactive Histogram</span>
+        <span class="panel-heading-actions">
+          <i class="fas fa-redo" title="Reload" onclick="createHistogram()"></i>
+          <i class="fas fa-times" title="Close" onclick="closeView()"></i>
+        </span>
+      </div>
+
+
+      <div class="panel-body" style="padding: 8px;">
+        <!-- Main Controls -->
+        <div class="controls">
+          <div class="control-group">
+            <label for="binningMethod">Binning Method:</label>
+            <select id="binningMethod" onchange="updateBinningMethod()">
+              <option value="manual">Manual</option>
+              <option value="sturges">Sturges</option>
+              <option value="scott">Scott</option>
+              <option value="fd">Freedman-Diaconis</option>
+            </select>
+          </div>
+
+          <div class="control-group" id="manualBinsControl">
+            <label for="numBins">Bins:</label>
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+              <span id="numBinsValue" class="value-display">5</span>
+              <input type="range" id="numBins" min="1" max="15" value="5" step="1" oninput="updateBins()" style="flex: 1;">
+            </div>
+          </div>
+
+          <div class="control-group overlay-toggles" id="overlayControls">
+            <label class="overlay-toggle" for="showNormalCurve">
+              <input type="checkbox" id="showNormalCurve" checked onchange="createHistogram()">
+              Normal
+            </label>
+            <label class="overlay-toggle" for="showMeanLine">
+              <input type="checkbox" id="showMeanLine" onchange="createHistogram()">
+              Mean
+            </label>
+            <label class="overlay-toggle" for="showMedianLine">
+              <input type="checkbox" id="showMedianLine" onchange="createHistogram()">
+              Median
+            </label>
+          </div>
+
+          <!-- Data Range - now inside controls -->
+          <div class="range-control">
+            <label>Data Range:</label>
+            <span class="value-display" id="leftRangeValue">0</span>
+            <div class="range-sliders" style="flex: 1;">
+              <div class="range-track"></div>
+              <div class="range-active" id="activeRangeIndicator"></div>
+              <input type="range" id="leftTruncation" min="0" max="100" value="0" step="1" oninput="updateRangeSliders()">
+              <input type="range" id="rightTruncation" min="0" max="100" value="100" step="1" oninput="updateRangeSliders()">
+            </div>
+            <span class="value-display" id="rightRangeValue">100</span>
+            <button class="reset-button" onclick="resetRangeSliders()">Reset</button>
+            <span class="value-display" style="margin-left: 8px;">n=<span id="remainingN">--</span></span>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div id="histogram-chart"></div>
+      </div>
+    </div>
+
+    <!-- Footer inside container so it shares the flex height correctly -->
+    <footer class="statistico-footer">
+      2026 Statistico-Interactive (TM) - All rights reserved
+    </footer>
+
+  </div>
+
+  <!-- JAVASCRIPT — merged from hist-main.js + premium chart theme -->
+  <script>
+    function getHistogramChartHeight() {
+      const chartEl = document.getElementById('histogram-chart');
+      if (!chartEl) return 360;
+      const panelBody = chartEl.closest('.panel-body');
+      if (!panelBody) return Math.max(260, chartEl.clientHeight || 360);
+      const controls = panelBody.querySelector('.controls');
+      const controlsH = controls ? controls.offsetHeight : 0;
+      const bodyH = panelBody.clientHeight || chartEl.parentElement.clientHeight || 0;
+      return Math.max(220, bodyH - controlsH - 16);
+    }
+
+    function fitLayout() {
+      const container = document.getElementById('results-container');
+      if (!container || !container.classList.contains('show')) return;
+
+      container.style.height = '';
+      container.style.width = '';
+      const chartPanel = document.getElementById('histogram-panel');
+      if (chartPanel) chartPanel.style.height = '';
+      const chartEl = document.getElementById('histogram-chart');
+      const chartH = getHistogramChartHeight();
+      if (chartEl) chartEl.style.height = chartH + 'px';
+
+      requestAnimationFrame(function () {
+        if (histogramChart && histogramChart.setSize) {
+          histogramChart.setSize(null, chartH, false);
+        } else if (histogramChart && histogramChart.reflow) {
+          histogramChart.reflow();
+        } else if (typeof Highcharts !== 'undefined') {
+          Highcharts.charts.forEach(function (c) { if (c && c.reflow) c.reflow(); });
+        }
+      });
+    }
+
+    function attachLayoutObserver() {
+      if (window._histLayoutObserver) return;
+      const target = document.querySelector('.right-col') || document.querySelector('.laptop-frame');
+      if (!target || typeof ResizeObserver === 'undefined') return;
+      window._histLayoutObserver = new ResizeObserver(function () {
+        requestAnimationFrame(fitLayout);
+      });
+      window._histLayoutObserver.observe(target);
+    }
+
+    window.addEventListener('resize', fitLayout);
+    attachLayoutObserver();
+
+
+    // Global variables
+    let histogramChart = null;
+    let originalData = [];
+    let currentData = [];
+    let originalMin = 0;
+    let originalMax = 100;
+    let currentDecimals = 2;
+    let _dialogLoadingTimer = null;
+    let _uniMeta = null; /* column, transform, trim, address, source rows */
+
+    function applyTransform(data, transform) {
+      const t = transform || 'none';
+      switch (t) {
+        case 'ln': return data.map(function (v) { return Math.log(v); });
+        case 'log10': return data.map(function (v) { return Math.log10(v); });
+        case 'sqrt': return data.map(function (v) { return Math.sqrt(v); });
+        case 'square': return data.map(function (v) { return v * v; });
+        case 'reciprocal': return data.map(function (v) { return 1 / v; });
+        case 'z': {
+          const m = data.reduce(function (a, b) { return a + b; }, 0) / data.length;
+          const sd = Math.sqrt(data.reduce(function (acc, v) { return acc + Math.pow(v - m, 2); }, 0) / data.length);
+          return data.map(function (v) { return (v - m) / sd; });
+        }
+        case 'minmax': {
+          const mn = Math.min.apply(null, data);
+          const mx = Math.max.apply(null, data);
+          return data.map(function (v) { return (v - mn) / (mx - mn); });
+        }
+        default: return data.slice();
+      }
+    }
+
+    function extractValuesFromRows(rows) {
+      if (!_uniMeta || _uniMeta.columnIndex == null) return [];
+      const idx = _uniMeta.columnIndex;
+      let data = (rows || []).map(function (r) { return r[idx]; })
+        .filter(function (v) { return v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)); })
+        .map(function (v) { return parseFloat(v); });
+      if (!data.length) return [];
+      const trim = _uniMeta.trim || { min: 0, max: 100 };
+      if (trim.min > 0 || trim.max < 100) {
+        const sorted = data.slice().sort(function (a, b) { return a - b; });
+        const minVal = sorted[Math.floor((sorted.length - 1) * trim.min / 100)];
+        const maxVal = sorted[Math.floor((sorted.length - 1) * trim.max / 100)];
+        data = data.filter(function (v) { return v >= minVal && v <= maxVal; });
+      }
+      return applyTransform(data, _uniMeta.transform);
+    }
+
+    function hasStoredRowFilter(data) {
+      const all = data && data.sourceRowsAll;
+      const rows = data && data.sourceRows;
+      return !!(data && data.rowFilterActive) ||
+        !!(all && rows && rows.length > 0 && rows.length < all.length);
+    }
+
+    function resolveAnalysisValues(data) {
+      const headers = data.sourceHeaders;
+      const allRows = data.sourceRowsAll || data.sourceRows;
+      const hasSource = headers && allRows && allRows.length;
+      if (typeof UniRowFilter !== 'undefined' && hasSource) {
+        UniRowFilter.init({
+          headers: headers,
+          rows: allRows,
+          columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+          onApply: rebuildFromSourceRows
+        });
+        const filtered = data.sourceRows || [];
+        if (hasStoredRowFilter(data) && filtered.length) {
+          UniRowFilter.setFilteredRows(filtered);
+        }
+        const fromRows = extractValuesFromRows(UniRowFilter.getFilteredRows());
+        if (fromRows.length) return fromRows;
+      }
+      if (hasStoredRowFilter(data) && ((data.values && data.values.length) || (data.data && data.data.length))) {
+        return (data.values || data.data).slice();
+      }
+      return (data.values || data.data || []).slice();
+    }
+
+    function rebuildFromSourceRows(filteredRows) {
+      const values = extractValuesFromRows(filteredRows);
+      if (!values.length) {
+        alert('No numeric values remain after filtering. Adjust filters or clear them.');
+        return;
+      }
+      originalData = values;
+      currentData = originalData.slice();
+      document.getElementById('leftTruncation').value = 0;
+      document.getElementById('rightTruncation').value = 100;
+      originalMin = Math.min.apply(null, originalData);
+      originalMax = Math.max.apply(null, originalData);
+      document.getElementById('leftRangeValue').textContent = originalMin.toFixed(currentDecimals);
+      document.getElementById('rightRangeValue').textContent = originalMax.toFixed(currentDecimals);
+      document.getElementById('remainingN').textContent = originalData.length;
+      document.getElementById('activeRangeIndicator').style.left = '0%';
+      document.getElementById('activeRangeIndicator').style.right = '0%';
+      const stats = calculateDescriptiveStats(currentData);
+      populateStatistics(stats);
+      createHistogram();
+      setTimeout(fitLayout, 80);
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader._setUniFilterMeta(_uniMeta);
+        var payload = StatisticoHeader.publishUniFilterChange(filteredRows, true);
+        registerHeaderActions(payload || buildPayloadForActions());
+        StatisticoHeader.updateUniFilterChrome(payload);
+      } else {
+        try { localStorage.setItem('univariateResults', JSON.stringify(buildPayloadForActions())); } catch (_e) {}
+        registerHeaderActions(buildPayloadForActions());
+      }
+    }
+
+    window.updateUniFilterButtonState = function () {
+      if (typeof StatisticoHeader !== 'undefined') StatisticoHeader.updateUniFilterChrome();
+    };
+
+    function buildPayloadForActions() {
+      const meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
+      return {
+        column: _uniMeta ? _uniMeta.column : 'Variable',
+        variableName: _uniMeta ? _uniMeta.column : 'Variable',
+        values: originalData,
+        data: originalData,
+        n: originalData.length,
+        transform: _uniMeta ? _uniMeta.transform : 'none',
+        trim: _uniMeta ? _uniMeta.trim : { min: 0, max: 100 },
+        dataSource: _uniMeta ? _uniMeta.dataSource : null,
+        sourceHeaders: meta ? meta.headers : (_uniMeta ? _uniMeta.sourceHeaders : null),
+        sourceRowsAll: meta ? meta.allRows : (_uniMeta ? (_uniMeta.sourceRowsAll || _uniMeta.sourceRows) : null),
+        sourceRows: meta ? meta.filteredRows : (_uniMeta ? _uniMeta.sourceRows : null),
+        columnIndex: _uniMeta ? _uniMeta.columnIndex : 0,
+        rowFilterActive: meta ? meta.hasActiveFilters : false
+      };
+    }
+
+    function showDialogLoading(message) {
+      const overlay = document.getElementById('dialogLoadingOverlay');
+      const text = document.getElementById('dialogLoadingText');
+      if (text && message) text.textContent = message;
+      if (overlay) overlay.classList.remove('hidden');
+      if (_dialogLoadingTimer) clearTimeout(_dialogLoadingTimer);
+      _dialogLoadingTimer = setTimeout(() => hideDialogLoading(), 12000);
+    }
+
+    function hideDialogLoading() {
+      if (_dialogLoadingTimer) {
+        clearTimeout(_dialogLoadingTimer);
+        _dialogLoadingTimer = null;
+      }
+      const overlay = document.getElementById('dialogLoadingOverlay');
+      if (overlay) overlay.classList.add('hidden');
+    }
+
+    function shouldUseSampleData() {
+      const params = new URLSearchParams(window.location.search || '');
+      return runtime.mode === SR.MODE.HUB_EMBED ||
+        params.get('demo') === '1' ||
+        params.get('sample') === '1';
+    }
+
+    function isSamplePayload(payload) {
+      if (!payload || typeof payload !== 'object') return false;
+      const source = String(payload.dataSource || '').toLowerCase();
+      return source.includes('demo sample') || source.includes('local browser test');
+    }
+
+    function clearStoredSamplePayload() {
+      try {
+        const stored = SR.tryLoadUnivariateFromStorage();
+        if (!isSamplePayload(stored)) return;
+        localStorage.removeItem('univariateResults');
+        sessionStorage.removeItem('univariateResults');
+        console.log('Cleared stored demo univariate payload before Office data load');
+      } catch (_e) {}
+    }
+
+    function loadStoredResultsIfAvailable() {
+      if (histogramChart) return false;
+      console.log('Checking localStorage for univariateResults...');
+      var parsedData = SR.tryLoadUnivariateFromStorage();
+      if (!parsedData) {
+        console.log('No localStorage data found');
+        return false;
+      }
+      if (isSamplePayload(parsedData) && !shouldUseSampleData()) {
+        console.log('Ignoring stored demo payload while waiting for Office data');
+        clearStoredSamplePayload();
+        return false;
+      }
+      try {
+        console.log('Found data in localStorage');
+        handleDataReceived(parsedData);
+        return true;
+      } catch (e) {
+        console.error('? Error parsing localStorage data:', e);
+        return false;
+      }
+    }
+
+    var SR = window.StatisticoRuntime;
+    var runtime = SR.createRuntime();
+    SR.logRuntime(runtime, 'initial');
+
+    SR.installOfficeBootstrap(runtime, {
+      onOfficeReady: function (reason) {
+        console.log('? Office.js initialized:', reason);
+        try {
+          if (Office.context && Office.context.ui) {
+            Office.context.ui.addHandlerAsync(
+              Office.EventType.DialogParentMessageReceived,
+              onMessageReceived
+            );
+          }
+        } catch (e) {
+          console.warn('Dialog message handler not available (browser/iframe):', e);
+        }
+        setTimeout(function () {
+          sendMessageToParent({ status: 'ready' });
+        }, 500);
+        setTimeout(function () {
+          loadStoredResultsIfAvailable();
+        }, 1000);
+      }
+    });
+
+    SR.whenDomReady(function () {
+      console.log('DOM Content Loaded');
+      showDialogLoading('Loading results...');
+      SR.applyUrlThemeOverride();
+      if (runtime.mode === SR.MODE.HUB_EMBED) {
+        document.body.classList.add('demo-embed');
+      }
+      if (!shouldUseSampleData()) clearStoredSamplePayload();
+      setTimeout(loadStoredResultsIfAvailable, 300);
+
+      StatisticoHeader.init('histogram', 'Variable', 0);
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Univariate Workspace · Distribution');
+      }
+      if (typeof window.updateUniFilterButtonState === 'function') window.updateUniFilterButtonState();
+      attachLayoutObserver();
+      mountDemoHeaderBadges();
+      console.log('? Shared header initialized');
+
+      if (runtime.mode === SR.MODE.HUB_EMBED) {
+        document.documentElement.setAttribute('data-hub-embed', '1');
+        SR.logRuntime(runtime, 'hub-embed bootstrap (sample data only)');
+        loadSampleData();
+        setTimeout(fitLayout, 150);
+        return;
+      }
+
+      setTimeout(fitLayout, 150);
+
+      setTimeout(function () {
+        console.log('? Checking Office.js availability...', typeof Office);
+        if (shouldUseSampleData()) {
+          console.log('Explicit demo/sample mode - loading sample data');
+          loadSampleData();
+        }
+      }, 100);
+
+      setTimeout(function () {
+        var resultsContainer = document.getElementById('results-container');
+        if (shouldUseSampleData() && resultsContainer && !resultsContainer.classList.contains('show')) {
+          console.log('Browser fallback: load sample if still no results');
+          loadSampleData();
+        }
+      }, 1000);
+    });
+
+    function mountDemoHeaderBadges() {
+      if (runtime.mode !== SR.MODE.HUB_EMBED) return;
+      const header = document.querySelector('.statistico-header');
+      if (!header || header.querySelector('.demo-header-badges')) return;
+      const badges = document.createElement('div');
+      badges.className = 'demo-header-badges';
+      badges.setAttribute('aria-hidden', 'true');
+      badges.innerHTML = '<span class="demo-header-pill">Demo</span><span class="demo-header-title">Univariate Analysis Demo</span>';
+      header.insertBefore(badges, header.firstChild);
+    }
+
+    // Handle messages from parent window
+    function onMessageReceived(arg) {
+      console.log('Message received:', arg);
+      const message = JSON.parse(arg.message);
+
+      if (message.theme) { applyTheme(message.theme); return; }
+      if (message.action === 'loadData') {
+        showDialogLoading('Loading results...');
+        handleDataReceived(message.data);
+      }
+    }
+
+    // Send message to parent window
+    function sendMessageToParent(message) {
+      if (typeof Office !== 'undefined' && Office.context && Office.context.ui) {
+        Office.context.ui.messageParent(JSON.stringify(message));
+        console.log('Sent message to parent:', message);
+      }
+    }
+
+    // Handle data received
+    function handleDataReceived(data) {
+      try {
+        if (typeof StatisticoHeader !== 'undefined' && !StatisticoHeader.shouldProcessUniPayload(data, 'histogram')) {
+          hideDialogLoading();
+          return;
+        }
+        console.log('Data received:', data);
+
+        _uniMeta = {
+          column: data.column || data.variableName || 'Variable',
+          columnIndex: data.columnIndex != null ? Number(data.columnIndex) : 0,
+          transform: (data.transform || 'none'),
+          trim: data.trim || { min: 0, max: 100 },
+          dataSource: data.dataSource || null,
+          sourceHeaders: data.sourceHeaders || null,
+          sourceRowsAll: data.sourceRowsAll || data.sourceRows || null,
+          sourceRows: data.sourceRows || null
+        };
+        if (typeof StatisticoHeader !== 'undefined') StatisticoHeader._setUniFilterMeta(_uniMeta);
+
+        originalData = resolveAnalysisValues(data);
+        if (typeof UniRowFilter !== 'undefined' && _uniMeta.sourceHeaders && (_uniMeta.sourceRowsAll || _uniMeta.sourceRows)) {
+          _uniMeta.sourceRows = UniRowFilter.getFilteredRows();
+        }
+
+        window.data = originalData;
+        currentData = originalData.slice();
+        console.log('? Data arrays set, length:', originalData.length);
+
+        // Always recalculate stats from actual data to ensure they're numeric
+        const calculatedStats = calculateDescriptiveStats(originalData);
+        populateStatistics(calculatedStats);
+        console.log('? Statistics populated from actual data');
+
+        // Update variable name
+        const varName = data.column || data.variableName || 'Variable';
+        const statsTitleEl = document.getElementById('statistics-title');
+        if (statsTitleEl) statsTitleEl.textContent = `${varName} - Descriptive Statistics`;
+        document.getElementById('histogram-title').textContent = `${varName} - Interactive Histogram`;
+        console.log('? Titles updated');
+
+        // Check if data was modified (trimmed or transformed)
+        const isTrimmed = data.trim && (data.trim.min > 0 || data.trim.max < 100);
+        const isTransformed = data.transform && data.transform !== 'none';
+        const isModified = isTrimmed || isTransformed;
+
+        console.log('Modification check:', { isTrimmed, isTransformed, trim: data.trim, transform: data.transform });
+
+        const displayN = isModified ? originalData.length + '*' : originalData.length;
+
+        // Update shared header with modified n indicator
+        if (typeof StatisticoHeader !== 'undefined') {
+          StatisticoHeader.updateUniFilterChrome(buildPayloadForActions());
+        } else {
+          StatisticoHeader.updateVariable(varName, displayN);
+        }
+        console.log('? Header updated with n:', displayN, 'isModified:', isModified);
+
+        // Initialize range
+        originalMin = Math.min(...originalData);
+        originalMax = Math.max(...originalData);
+        console.log('? Range initialized:', originalMin, '-', originalMax);
+        document.getElementById('leftRangeValue').textContent = originalMin.toFixed(currentDecimals);
+        document.getElementById('rightRangeValue').textContent = originalMax.toFixed(currentDecimals);
+        document.getElementById('remainingN').textContent = originalData.length;
+        document.getElementById('activeRangeIndicator').style.left = '0%';
+        document.getElementById('activeRangeIndicator').style.right = '0%';
+
+        // Show results
+        const resultsContainer = document.getElementById('results-container');
+        resultsContainer.classList.add('show');
+        console.log('? Results container shown');
+        setTimeout(fitLayout, 80); // measure after container is visible
+
+        // Create histogram
+        console.log('Creating histogram...');
+        createHistogram();
+        console.log('? Histogram created');
+
+        const storedPayload = buildPayloadForActions();
+        try {
+          localStorage.setItem('univariateResults', JSON.stringify(storedPayload));
+          sessionStorage.setItem('univariateResults', JSON.stringify(storedPayload));
+        } catch (e) {
+          console.error('? Error saving to localStorage:', e);
+        }
+        registerHeaderActions(storedPayload);
+
+        hideDialogLoading();
+      } catch (error) {
+        console.error('? Error in handleDataReceived:', error);
+        hideDialogLoading();
+        alert('Error handling data: ' + error.message);
+      }
+    }
+    window.handleDataReceived = handleDataReceived;
+
+    // Load sample data for testing
+    function loadSampleData() {
+      try {
+        console.log('Loading sample data for testing...');
+
+        // Generate realistic sample data (Horsepower-like)
+        const sampleData = [];
+        for (let i = 0; i < 369; i++) {
+          const u1 = Math.random();
+          const u2 = Math.random();
+          const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+          sampleData.push(201.17 + z * 60.64);
+        }
+
+        console.log('? Generated', sampleData.length, 'data points');
+
+        // Calculate descriptive stats
+        const descriptive = calculateDescriptiveStats(sampleData);
+        console.log('? Calculated descriptive stats:', descriptive);
+
+        const payload = {
+          values: sampleData,
+          descriptive: descriptive,
+          column: 'Horsepower',
+          n: sampleData.length,
+          columnIndex: 0,
+          sourceHeaders: ['Horsepower'],
+          sourceRows: sampleData.map(function (v) { return [v]; }),
+          dataSource: 'Demo sample (local browser test)'
+        };
+
+        // Persist so other standalones (CDF, Percentile, etc.) can read on navigation
+        try { localStorage.setItem('univariateResults', JSON.stringify(payload)); } catch(e) {}
+
+        handleDataReceived(payload);
+
+        console.log('? Sample data loaded successfully');
+      } catch (error) {
+        console.error('Error loading sample data:', error);
+        alert('Error loading sample data: ' + error.message);
+      }
+    }
+
+    // Calculate descriptive statistics
+    function calculateDescriptiveStats(data) {
+      const n = data.length;
+      const sorted = [...data].sort((a, b) => a - b);
+      const mean = data.reduce((a, b) => a + b, 0) / n;
+      const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
+      const stdDev = Math.sqrt(variance);
+
+      const q1 = sorted[Math.floor(n * 0.25)];
+      const median = sorted[Math.floor(n * 0.5)];
+      const q3 = sorted[Math.floor(n * 0.75)];
+
+      // Kurtosis: Fisher's G2 excess (matches SPSS)
+      const kurtosis = n >= 4 && stdDev > 0
+        ? ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3))) * data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 4), 0) - (3 * Math.pow(n - 1, 2)) / ((n - 2) * (n - 3))
+        : 0;
+
+      // Skewness: Fisher's G1 (matches SPSS)
+      const skewness = n >= 3 && stdDev > 0
+        ? (n / ((n - 1) * (n - 2))) * data.reduce((acc, val) => acc + Math.pow((val - mean) / stdDev, 3), 0)
+        : 0;
+
+      return {
+        n: n,
+        mean: mean,
+        stdDev: stdDev,
+        variance: variance,
+        kurtosis: kurtosis,
+        skewness: skewness,
+        range: sorted[n - 1] - sorted[0],
+        min: sorted[0],
+        q1: q1,
+        median: median,
+        q3: q3,
+        max: sorted[n - 1]
+      };
+    }
+
+    // Populate statistics table
+    function populateStatistics(stats) {
+      const d = currentDecimals;
+      const fmt = (value) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toFixed(d) : '--';
+      };
+      document.getElementById('stat-n').textContent = stats.n;
+      document.getElementById('stat-mean').textContent = fmt(stats.mean);
+      document.getElementById('stat-stddev').textContent = fmt(stats.stdDev);
+      document.getElementById('stat-variance').textContent = fmt(stats.variance);
+      document.getElementById('stat-kurtosis').textContent = fmt(stats.kurtosis);
+      document.getElementById('stat-skewness').textContent = fmt(stats.skewness);
+      document.getElementById('stat-range').textContent = fmt(stats.range);
+      document.getElementById('stat-min').textContent = fmt(stats.min);
+      document.getElementById('stat-q25').textContent = fmt(stats.q1);
+      document.getElementById('stat-median').textContent = fmt(stats.median);
+      document.getElementById('stat-q75').textContent = fmt(stats.q3);
+      document.getElementById('stat-max').textContent = fmt(stats.max);
+
+      // JS-computed insight sentence
+      const insightEl = document.getElementById('stat-insight');
+      if (insightEl && stats.stdDev > 0) {
+        const mmGapSD = (stats.mean - stats.median) / stats.stdDev;
+        const cv = Math.abs(stats.mean) > 0 ? Math.abs(stats.stdDev / stats.mean) : null;
+        const skew = stats.skewness;
+        const symmetryWord = (Math.abs(mmGapSD) < 0.15 && Math.abs(skew) < 0.3)
+          ? 'approximately symmetric'
+          : (skew > 0.5 || mmGapSD > 0.3) ? 'right-skewed'
+          : (skew < -0.5 || mmGapSD < -0.3) ? 'left-skewed'
+          : 'mildly skewed';
+        const spreadWord = cv !== null
+          ? (cv > 0.5 ? 'high spread' : cv > 0.25 ? 'moderate spread' : 'tight concentration')
+          : '';
+        const cvStr = cv !== null ? ` (CV\u202F=\u202F${cv.toFixed(2)})` : '';
+        insightEl.textContent = `Distribution is ${symmetryWord}${spreadWord ? ' with ' + spreadWord + cvStr : ''}.`;
+        insightEl.classList.add('visible');
+      }
+    }
+
+    // Update decimals
+    function updateDecimals(value) {
+      currentDecimals = parseInt(value);
+      if (!Array.isArray(currentData) || !currentData.length) return;
+      const stats = calculateDescriptiveStats(currentData);
+      populateStatistics(stats);
+    }
+
+    function setDecimalPrecision() {
+      const select = document.getElementById('decimalSelect');
+      if (!select) return;
+      const selected = String(select.value || 'auto');
+      const next = selected === 'auto' ? 2 : Math.max(0, parseInt(selected, 10) || 0);
+      updateDecimals(next);
+    }
+
+    // Update binning method
+    function updateBinningMethod() {
+      const method = document.getElementById('binningMethod').value;
+      document.getElementById('manualBinsControl').style.display =
+        method === 'manual' ? 'flex' : 'none';
+      createHistogram();
+    }
+
+    // Update bins slider
+    function updateBins() {
+      const value = document.getElementById('numBins').value;
+      document.getElementById('numBinsValue').textContent = value;
+
+      // Set slider moving flag to disable animation
+      isSliderMoving = true;
+
+      // Clear existing timeou
+      if (sliderTimeout) {
+        clearTimeout(sliderTimeout);
+      }
+
+      // Re-enable animation after slider stops moving for 300ms
+      sliderTimeout = setTimeout(() => {
+        isSliderMoving = false;
+      }, 300);
+
+      createHistogram();
+    }
+
+    // Create histogram - EXACT COPY of original logic
+    // Flag to control animation during slider moves
+    let isSliderMoving = false;
+    let sliderTimeout = null;
+
+    function createHistogram() {
+      const numBinsInput = document.getElementById('numBins');
+      const showNormal = document.getElementById('showNormalCurve').checked;
+      const showMeanLine = document.getElementById('showMeanLine').checked;
+      const showMedianLine = document.getElementById('showMedianLine').checked;
+
+      let numBins = parseInt(numBinsInput.value, 10);
+      const method = document.getElementById('binningMethod').value;
+
+      // Calculate bins based on method
+      if (method !== 'manual') {
+        numBins = calculateOptimalBins(method, currentData);
+      }
+      numBins = Math.max(1, Math.min(15, isFinite(numBins) ? numBins : 5));
+      numBinsInput.value = numBins;
+      document.getElementById('numBinsValue').textContent = numBins;
+
+      const min = Math.min(...currentData);
+      const max = Math.max(...currentData);
+      const binWidth = (max - min) / numBins;
+
+      // Calculate histogram bins with bin centers for alignmen
+      const histogramData = [];
+      const categories = [];
+
+      for (let i = 0; i < numBins; i++) {
+        const binStart = min + i * binWidth;
+        const binEnd = binStart + binWidth;
+
+        categories.push(`${binStart.toFixed(0)}-${binEnd.toFixed(0)}`);
+
+        const count = currentData.filter(v => v >= binStart && (i === numBins - 1 ? v <= binEnd : v < binEnd)).length;
+
+        // Use index for x-coordinate to align with categories
+        histogramData.push({
+          x: i,
+          y: coun
+        });
+      }
+
+      const series = [{
+        name: 'Frequency',
+        type: 'column',
+        data: histogramData,
+        color: 'rgba(99,102,241,0.95)',
+        borderColor: 'rgba(165,180,252,0.85)',
+        borderWidth: 1,
+        stickyTracking: false,
+        states: {
+          hover: { color: 'rgba(129,140,248,1)', brightness: 0 },
+          inactive: { opacity: 1 }
+        }
+      }];
+
+      // Add normal curve if checked
+      if (showNormal) {
+        const mean = currentData.reduce((a, b) => a + b, 0) / currentData.length;
+        const stdDev = Math.sqrt(currentData.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / currentData.length);
+
+        const normalData = [];
+        const numPoints = 100;
+        for (let i = 0; i <= numPoints; i++) {
+          const x = min + (i / numPoints) * (max - min);
+          const y = (1 / (stdDev * Math.sqrt(2 * Math.PI))) *
+                    Math.exp(-0.5 * Math.pow((x - mean) / stdDev, 2));
+
+          // Map x-value to category index position
+          const categoryIndex = ((x - min) / (max - min)) * (numBins - 1);
+
+          // Scale to match histogram frequency (not density)
+          normalData.push([categoryIndex, y * currentData.length * binWidth]);
+        }
+
+        series.push({
+          name: 'Normal Distribution',
+          type: 'spline',
+          data: normalData,
+          color: 'rgba(251,146,60,0.75)',
+          lineWidth: 2,
+          dashStyle: 'Solid',
+          stickyTracking: false,
+          findNearestPointBy: 'xy',
+          marker: {
+            enabled: false,
+            states: {
+              hover: { enabled: true, radius: 4, lineWidth: 1, fillColor: 'rgba(251,146,60,0.95)' }
+            }
+          },
+          states: {
+            inactive: { opacity: 1 },
+            hover: { lineWidthPlus: 0 }
+          },
+          yAxis: 0
+        });
+      }
+
+      // Determine if animation should be enabled
+      const enableAnimation = !isSliderMoving;
+
+      // Pre-compute chart overlay positions (mean, median, IQR)
+      const _overlayStats = calculateDescriptiveStats(currentData);
+      const _overlayRange = max - min || 1;
+      const _toCat = function(v) { return ((v - min) / _overlayRange) * (numBins - 1); };
+      const _chartPlotLines = [];
+      if (showMeanLine) {
+        _chartPlotLines.push({
+          color: 'rgba(251,146,60,0.75)', width: 1.5, dashStyle: 'Solid', value: _toCat(_overlayStats.mean),
+          label: { text: '\u00d8', style: { color: '#fb923c', fontSize: '10px', fontWeight: '600', fontFamily: 'Inter,sans-serif' }, align: 'left', x: 4, y: 14 }
+        });
+      }
+      if (showMedianLine) {
+        _chartPlotLines.push({
+          color: 'rgba(52,211,153,0.70)', width: 1.5, dashStyle: 'ShortDash', value: _toCat(_overlayStats.median),
+          label: { text: 'Md', style: { color: '#34d399', fontSize: '10px', fontWeight: '600', fontFamily: 'Inter,sans-serif' }, align: 'left', x: 4, y: 28 }
+        });
+      }
+      const _chartPlotBands = [];
+
+      // Create char
+      const chartContainer = document.getElementById('histogram-chart');
+      const chartHeight = getHistogramChartHeight();
+      if (chartContainer) chartContainer.style.height = chartHeight + 'px';
+
+      histogramChart = Highcharts.chart('histogram-chart', {
+        chart: {
+          backgroundColor: '#0b0e16',
+          style: { fontFamily: 'Inter, Segoe UI, system-ui, sans-serif' },
+          animation: enableAnimation ? { duration: 420 } : false,
+          spacingTop: 10,
+          spacingBottom: 8,
+          spacingLeft: 6,
+          spacingRight: 10,
+          height: chartHeight,
+          plotBackgroundColor: null,
+          plotBorderColor: null,
+          plotBorderWidth: 0,
+          plotShadow: false
+        },
+        title: {
+          text: null
+        },
+        xAxis: {
+          categories: categories,
+          title: {
+            text: 'Value Range',
+            style: { color: 'rgba(228,232,240,0.88)', fontSize: '10px', fontWeight: '500', letterSpacing: '0.04em' },
+            margin: 10
+          },
+          labels: {
+            rotation: -40,
+            style: { color: 'rgba(228,232,240,0.85)', fontSize: '9.5px', fontFamily: 'JetBrains Mono, Consolas, monospace' }
+          },
+          lineColor: 'rgba(255,255,255,0.14)',
+          tickColor: 'rgba(255,255,255,0.14)',
+          gridLineColor: 'rgba(255,255,255,0.08)',
+          plotLines: _chartPlotLines,
+          plotBands: _chartPlotBands
+        },
+        yAxis: {
+          title: {
+            text: 'Frequency',
+            style: { color: 'rgba(228,232,240,0.88)', fontSize: '10px', fontWeight: '500', letterSpacing: '0.04em' },
+            margin: 10
+          },
+          labels: {
+            style: { color: 'rgba(228,232,240,0.85)', fontSize: '9.5px', fontFamily: 'JetBrains Mono, Consolas, monospace' }
+          },
+          gridLineColor: 'rgba(255,255,255,0.08)',
+          gridLineDashStyle: 'Dot'
+        },
+        legend: {
+          itemStyle: { color: 'rgba(228,232,240,0.9)', fontSize: '10.5px', fontWeight: '500', fontFamily: 'Inter, sans-serif' },
+          itemHoverStyle: { color: '#e4e8f0' },
+          padding: 6,
+          itemMarginBottom: 2,
+          symbolRadius: 3,
+          backgroundColor: 'transparent',
+          borderWidth: 0
+        },
+        plotOptions: {
+          column: {
+            groupPadding: 0,
+            pointPadding: 0.04,
+            borderWidth: 0,
+            borderRadius: 3,
+            color: 'rgba(99,102,241,0.95)',
+            borderColor: 'rgba(165,180,252,0.85)',
+            borderWidth: 1,
+            stickyTracking: false,
+            states: {
+              hover: { color: 'rgba(129,140,248,1)', brightness: 0 },
+              inactive: { opacity: 1 }
+            },
+            animation: enableAnimation ? { duration: 400, easing: 'easeOutCubic' } : false
+          },
+          spline: {
+            stickyTracking: false,
+            findNearestPointBy: 'xy',
+            states: {
+              inactive: { opacity: 1 },
+              hover: { lineWidthPlus: 0 }
+            },
+            animation: enableAnimation ? { duration: 550 } : false
+          },
+          series: {
+            animation: enableAnimation,
+            stickyTracking: false,
+            states: {
+              inactive: { opacity: 1 },
+              hover: { enabled: true }
+            }
+          }
+        },
+        tooltip: {
+          shared: false,
+          stickOnContact: true,
+          followPointer: false,
+          backgroundColor: 'rgba(7,9,14,0.97)',
+          style: { color: '#e4e8f0', fontSize: '11.5px', fontFamily: 'Inter, sans-serif' },
+          borderColor: 'rgba(255,255,255,0.10)',
+          borderRadius: 8,
+          shadow: false,
+          padding: 10,
+          formatter: function() {
+            var axis = this.series && this.series.chart && this.series.chart.xAxis[0];
+            var catLabel = axis && axis.categories && this.point && this.point.x != null
+              ? axis.categories[this.point.x]
+              : this.x;
+            return '<span style="font-size:10px;color:rgba(228,232,240,0.45);font-family:\'JetBrains Mono\',monospace">' + catLabel + '</span><br/>' +
+              '<span style="color:' + this.color + '">\u25CF</span> ' +
+              '<span style="color:rgba(228,232,240,0.6)">' + this.series.name + '</span>: ' +
+              '<b style="color:#e4e8f0;font-family:\'JetBrains Mono\',monospace">' + (this.y != null ? this.y.toFixed(2) : '—') + '</b>';
+          }
+        },
+        series: series,
+        credits: { enabled: false }
+      });
+
+      // Let fitLayout() measure and size everything correctly
+      setTimeout(fitLayout, 100);
+    }
+
+    // Calculate optimal bins
+    function calculateOptimalBins(method, data) {
+      const n = data.length;
+
+      switch(method) {
+        case 'sturges':
+          return Math.ceil(Math.log2(n) + 1);
+        case 'scott':
+          const sorted = [...data].sort((a, b) => a - b);
+          const stdDev = Math.sqrt(data.reduce((sum, v) => sum + Math.pow(v - data.reduce((a,b)=>a+b,0)/n, 2), 0) / n);
+          const binWidth = 3.49 * stdDev / Math.pow(n, 1/3);
+          return Math.ceil((sorted[n-1] - sorted[0]) / binWidth);
+        case 'fd':
+          const sortedFD = [...data].sort((a, b) => a - b);
+          const q1 = sortedFD[Math.floor(n * 0.25)];
+          const q3 = sortedFD[Math.floor(n * 0.75)];
+          const iqr = q3 - q1;
+          const binWidthFD = 2 * iqr / Math.pow(n, 1/3);
+          return Math.ceil((sortedFD[n-1] - sortedFD[0]) / binWidthFD);
+        default:
+          return 5;
+      }
+    }
+
+    // Range sliders - with animation control
+    function updateRangeSliders() {
+      const leftSlider = document.getElementById('leftTruncation');
+      const rightSlider = document.getElementById('rightTruncation');
+
+      let leftVal = parseInt(leftSlider.value);
+      let rightVal = parseInt(rightSlider.value);
+
+      // Prevent crossing
+      if (leftVal >= rightVal) {
+        leftSlider.value = rightVal - 1;
+        leftVal = rightVal - 1;
+      }
+
+      // Update active indicator
+      const activeIndicator = document.getElementById('activeRangeIndicator');
+      activeIndicator.style.left = leftVal + '%';
+      activeIndicator.style.right = (100 - rightVal) + '%';
+
+      // Calculate actual values
+      const range = originalMax - originalMin;
+      const leftValue = originalMin + (leftVal / 100) * range;
+      const rightValue = originalMin + (rightVal / 100) * range;
+
+      document.getElementById('leftRangeValue').textContent = leftValue.toFixed(currentDecimals);
+      document.getElementById('rightRangeValue').textContent = rightValue.toFixed(currentDecimals);
+
+      // Filter data
+      currentData = originalData.filter(v => v >= leftValue && v <= rightValue);
+      document.getElementById('remainingN').textContent = currentData.length;
+
+      // Set slider moving flag to disable animation
+      isSliderMoving = true;
+
+      // Clear existing timeou
+      if (sliderTimeout) {
+        clearTimeout(sliderTimeout);
+      }
+
+      // Re-enable animation after slider stops moving for 300ms
+      sliderTimeout = setTimeout(() => {
+        isSliderMoving = false;
+        console.log('? Slider stopped, animations re-enabled');
+      }, 300);
+
+      // Update stats and chart (without animation)
+      const stats = calculateDescriptiveStats(currentData);
+      populateStatistics(stats);
+      createHistogram();
+    }
+
+    // Reset range sliders
+    function resetRangeSliders() {
+      document.getElementById('leftTruncation').value = 0;
+      document.getElementById('rightTruncation').value = 100;
+      currentData = [...originalData];
+      updateRangeSliders();
+    }
+
+    // Close view
+    function closeView() {
+      sendMessageToParent({ action: 'close' });
+    }
+
+    console.log('? Histogram view script loaded');
+
+    // Light / Dark theme suppor
+    function applyTheme(theme) {
+      try {
+        var _p = new URLSearchParams(window.location.search);
+        var _forceDark = _p.get('demo') === '1' || _p.get('embed') === '1' ||
+          document.documentElement.classList.contains('demo-force-dark') ||
+          document.documentElement.getAttribute('data-hub-embed') === '1';
+        if (!_forceDark && window.parent && window.parent !== window) {
+          try {
+            _forceDark = window.parent.document.documentElement.classList.contains('demo-force-dark') ||
+              window.parent.document.documentElement.getAttribute('data-hub-embed') === '1';
+          } catch (_e) {}
+        }
+        if (_forceDark) theme = 'dark';
+      } catch (_e) {}
+      if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      else document.documentElement.removeAttribute('data-theme');
+      document.dispatchEvent(new CustomEvent('statistico-theme-changed', { detail: { theme } }));
+    }
+    window.addEventListener('message', function(event) {
+      if (event.data && event.data.type === 'THEME_CHANGE') applyTheme(event.data.theme);
+    });
+    // Redraw Highcharts charts on theme change
+    document.addEventListener('statistico-theme-changed', function() {
+      if (typeof Highcharts !== 'undefined' && Highcharts.charts) {
+        Highcharts.charts.forEach(function(c) { if (c) {
+          var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+          var bg = isLight ? '#ffffff' : '#1a1f2e';
+          var tc = isLight ? '#111827' : '#ffffff';
+          var at = isLight ? '#374151' : '#aaaaaa';
+          var gl = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)';
+          var tt = isLight ? '#ffffff' : '#1a1f2e';
+          c.update({ chart: { backgroundColor: 'transparent' },
+            tooltip: { backgroundColor: tt, style: { color: tc } },
+            xAxis: { labels: { style: { color: at } }, gridLineColor: gl, lineColor: gl, tickColor: gl },
+            yAxis: { labels: { style: { color: at } }, gridLineColor: gl },
+            legend: { itemStyle: { color: tc }, itemHoverStyle: { color: tc } },
+            title: { style: { color: tc } }, subtitle: { style: { color: at } }
+          }, true);
+        }});
+      }
+    });
+
+    /* Register header action buttons (View Data / Save / HTML) */
+    function registerHeaderActions(data) {
+      if (typeof StatisticoHeader === 'undefined') return;
+
+      const varName  = data.column || data.variableName || 'Variable';
+      const values   = data.values || data.data || [];
+      const range    = data.dataSource || null;
+      const meta     = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
+      const hasSource = meta && meta.headers && meta.headers.length;
+
+      const isTrimmed    = data.trim && (data.trim.min > 0 || data.trim.max < 100);
+      const isTransformed = data.transform && data.transform !== 'none';
+      const rowFiltered  = meta && meta.hasActiveFilters;
+      const noteParts = [];
+      if (isTrimmed)     noteParts.push(`Trimmed ${data.trim.min}–${data.trim.max}%`);
+      if (isTransformed) noteParts.push(`Transform: ${data.transform}`);
+      if (rowFiltered)   noteParts.push('Row filters active on source range');
+      const notice = noteParts.length ? `Values shown after: ${noteParts.join(', ')}` : null;
+
+      const valueRows = values.map(function (v) { return [v === null || v === undefined ? null : v]; });
+
+      StatisticoHeader.registerActions({
+        getData: function () {
+          if (hasSource) {
+            return {
+              headers: meta.headers,
+              allRows: meta.allRows,
+              usedRows: meta.filteredRows,
+              fullRange: range,
+              usedRange: rowFiltered ? ((range || '') + ' (filtered rows)') : range,
+              columnRoles: null,
+              notice
+            };
+          }
+          return {
+            headers: [varName],
+            allRows: valueRows,
+            usedRows: valueRows,
+            fullRange: range,
+            usedRange: range,
+            columnRoles: null,
+            notice
+          };
+        },
+
+        moduleName: `Copy ${varName} values to clipboard`,
+
+        exportJson: () => {
+          try {
+            const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+            const name = varName.replace(/[^a-zA-Z0-9_]/g,'_').slice(0,30);
+            const readStat = id => { const el = document.getElementById(id); return el ? el.textContent.trim() : null; };
+            const payload = {
+              variableName : varName,
+              sampleSize   : values.length,
+              descriptives : {
+                n        : readStat('stat-n'),
+                mean     : readStat('stat-mean'),
+                stdDev   : readStat('stat-stddev'),
+                variance : readStat('stat-variance'),
+                kurtosis : readStat('stat-kurtosis'),
+                skewness : readStat('stat-skewness'),
+                range    : readStat('stat-range'),
+                min      : readStat('stat-min'),
+                q25      : readStat('stat-q25'),
+                median   : readStat('stat-median'),
+                q75      : readStat('stat-q75'),
+                max      : readStat('stat-max')
+              },
+              values : values
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = Object.assign(document.createElement('a'), { href: url, download: `Histogram_${name}_${ts}.json` });
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+          } catch(e) { alert('Export failed: ' + e.message); }
+        },
+
+        exportHtml: () => {
+          try {
+            const ts   = new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+            const name = varName.replace(/[^a-zA-Z0-9_]/g,'_').slice(0,30);
+            const blob = new Blob(['<!DOCTYPE html>\n' + document.documentElement.outerHTML], { type: 'text/html' });
+            const url  = URL.createObjectURL(blob);
+            const a    = Object.assign(document.createElement('a'), { href: url, download: `Histogram_${name}_${ts}.html` });
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+          } catch(e) { alert('Export failed: ' + e.message); }
+        }
+      });
+    }
+    window.registerHeaderActions = registerHeaderActions;</script>
+  <script src="./univariate-workspace.js?v=20260825-real1"></script>
+
+  </div><!-- end right-col -->
+</body>
+</html>

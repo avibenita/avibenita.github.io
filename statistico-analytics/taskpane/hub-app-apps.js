@@ -7,6 +7,8 @@
 let MODULES = [];
 let hubConfigDialog = null;
 let hubUnivariateFlowActive = false;
+let hubUnivariateModuleId = "univariate";
+let hubUnivariateStartView = null;
 let hubRegressionFlowActive = false;
 let hubRegressionConfigDialog = null;
 let hubRegressionResultsDialog = null;
@@ -51,7 +53,8 @@ const HUB_CATEGORY_TILES = [
       "Useful first pass before regression or group comparisons"
     ],
     modules: [
-      { id: "univariate", label: "Univariate Analysis", tip: "Distribution summaries, outliers, and normality checks for single variables." }
+      { id: "univariate", label: "Univariate Analysis", tip: "Distribution summaries, outliers, and normality checks for single variables." },
+      { id: "univariate-workspace", label: "Univariate Workspace", tip: "Focused live-data histogram workspace with only the Distribution view enabled." }
     ]
   },
   {
@@ -1603,7 +1606,9 @@ function setSelectedModuleCard(moduleId, active) {
 function finishHubUnivariateFlow() {
   hubUnivariateFlowActive = false;
   if (!hubConfigDialog && !(window.HubResultsBridge && HubResultsBridge.hasActive())) {
-    setSelectedModuleCard("univariate", false);
+    setSelectedModuleCard(hubUnivariateModuleId, false);
+    hubUnivariateModuleId = "univariate";
+    hubUnivariateStartView = null;
   }
 }
 
@@ -1762,10 +1767,12 @@ function sendUnivariateDialogData() {
   }));
 }
 
-function openUnivariateConfigFromHub() {
+function openUnivariateConfigFromHub(moduleId, startView) {
   var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  hubUnivariateModuleId = moduleId || "univariate";
+  hubUnivariateStartView = startView || null;
   hubUnivariateFlowActive = true;
-  setSelectedModuleCard("univariate", true);
+  setSelectedModuleCard(hubUnivariateModuleId, true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "univariate/univariate-input.html?v=" + Date.now(),
     DIALOG_SIZES.REGRESSION_BUILDER,
@@ -1783,16 +1790,18 @@ function openUnivariateConfigFromHub() {
           if (message.action === "ready" || message.action === "requestData") {
             sendUnivariateDialogData();
           } else if (message.action === "univariateResults" && message.data) {
+            var runSpec = Object.assign({}, message.spec || {});
+            if (hubUnivariateStartView) runSpec.startView = hubUnivariateStartView;
             try {
               sessionStorage.setItem("univariateHubRunData", JSON.stringify({
                 data: message.data,
-                spec: message.spec || {}
+                spec: runSpec
               }));
-              sessionStorage.setItem("univariateModelSpec", JSON.stringify(message.spec || {}));
+              sessionStorage.setItem("univariateModelSpec", JSON.stringify(runSpec));
             } catch (e) {}
             try { hubConfigDialog.close(); } catch (e2) {}
             hubConfigDialog = null;
-            if (window.HubResultsBridge) HubResultsBridge.open("univariate", 500);
+            if (window.HubResultsBridge) HubResultsBridge.open(hubUnivariateModuleId, 500);
           } else if (message.action === "close") {
             try { hubConfigDialog.close(); } catch (e) {}
             hubConfigDialog = null;
@@ -2695,7 +2704,10 @@ function navigateToModuleCore(id) {
     if (openPrepareDatasetFromHub()) return;
   }
   if (id === "univariate") {
-    if (openUnivariateConfigFromHub()) return;
+    if (openUnivariateConfigFromHub("univariate", null)) return;
+  }
+  if (id === "univariate-workspace") {
+    if (openUnivariateConfigFromHub("univariate-workspace", "univariate/univariate-workspace.html")) return;
   }
   if (id === "regression") {
     if (openRegressionConfigFromHub()) return;

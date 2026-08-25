@@ -7,6 +7,7 @@
 
   var PANEL_SCRIPTS = {
     univariate: ['univariate/univariate-hub-results.js'],
+    'univariate-workspace': ['univariate/univariate-hub-results.js'],
     anova: ['anova/anova-input-panel.js'],
     independent: ['independent/independent-input-panel.js'],
     dependent: ['dependent/dependent-input-panel.js'],

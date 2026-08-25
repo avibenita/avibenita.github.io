@@ -10,7 +10,7 @@
   <script src="../shared-config.js?v=20260715b"></script>
   <script src="../ds-guide.js?v=20260330g"></script>
   <style>
-    :root { --prt-cat: #f97316; --prt-val: #38bdf8; }
+    :root { --prt-cat: #f97316; --prt-val: #38bdf8; --ct-acc: var(--prt-cat); }
     body.cfg-embed .cfg-header { display: none; }
     body.cfg-embed .cfg-shell { min-height: 100%; }
     .reg-layout {
@@ -81,6 +81,8 @@
     .reg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid; white-space: nowrap; }
     .reg-chip.cat { background: rgba(249,115,22,.15); border-color: rgba(249,115,22,.4); color: var(--prt-cat); }
     .reg-chip.val { background: rgba(56,189,248,.15); border-color: rgba(56,189,248,.4); color: var(--prt-val); }
+    .reg-chip.cat { cursor: pointer; }
+    .reg-chip .chip-levels { font-size: 9px; font-weight: 600; opacity: .75; margin-left: 2px; }
     .reg-chip-x { background: none; border: none; cursor: pointer; padding: 0 1px; opacity: .7; font-size: 12px; color: inherit; }
     .adv-wrap { flex-shrink: 0; }
     .adv-toggle { width: 100%; display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid var(--cfg-border); border-radius: 8px; background: var(--cfg-surface); cursor: pointer; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--cfg-text); }
@@ -97,6 +99,36 @@
     }
     .prt-results-hint i { color: #38bdf8; margin-top: 1px; flex-shrink: 0; }
     .prt-results-hint strong { color: #38bdf8; font-weight: 700; }
+    .ct-cat-modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9000;
+      align-items: center; justify-content: center;
+    }
+    .ct-cat-modal-overlay.active { display: flex; }
+    .ct-cat-modal {
+      background: var(--cfg-surface,#1e293b); border: 1px solid var(--cfg-border,rgba(255,255,255,.1));
+      border-radius: 12px; width: 420px; max-width: 95vw; max-height: 80vh;
+      display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+    .ct-cat-modal-header { padding: 14px 18px; border-bottom: 1px solid var(--cfg-border,rgba(255,255,255,.08)); }
+    .ct-cat-modal-header h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--ct-acc); }
+    .ct-cat-modal-body { padding: 14px 18px; overflow-y: auto; flex: 1; }
+    .ct-cat-info {
+      background: var(--cfg-bg,rgba(255,255,255,.03)); border: 1px solid var(--cfg-border,rgba(255,255,255,.06));
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;
+    }
+    .ct-cat-info-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--cfg-text2,#94a3b8); padding: 3px 0; }
+    .ct-cat-info-value { font-weight: 700; color: var(--cfg-text1,#e2e8f0); }
+    .ct-cat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .ct-cat-table th {
+      padding: 6px 8px; font-size: 10px; font-weight: 700; color: var(--cfg-text3,#64748b);
+      text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--cfg-border,rgba(255,255,255,.07));
+    }
+    .ct-cat-table td { padding: 6px 8px; border-bottom: 1px solid var(--cfg-border,rgba(255,255,255,.04)); color: var(--cfg-text1,#e2e8f0); }
+    .ct-cat-table tbody tr { cursor: pointer; user-select: none; -webkit-user-select: none; }
+    .ct-cat-table tbody tr:hover { background: var(--cfg-tbl-hover,rgba(255,255,255,.04)); }
+    .ct-cat-table tbody tr.off { opacity: .45; }
+    .ct-cat-checkbox { pointer-events: none; width: 16px; height: 16px; accent-color: var(--ct-acc); }
+    .ct-cat-modal-footer { padding: 12px 18px; border-top: 1px solid var(--cfg-border,rgba(255,255,255,.08)); display: flex; justify-content: flex-end; gap: 8px; }
   </style>
 </head>
 <body>
@@ -149,9 +181,43 @@
       <button class="cfg-btn run" id="btnRun" disabled><i class="fa-solid fa-play"></i> Run Pareto</button>
     </div>
   </div>
+  <div class="ct-cat-modal-overlay" id="prtCatModal">
+    <div class="ct-cat-modal">
+      <div class="ct-cat-modal-header">
+        <h3><i class="fa-solid fa-layer-group"></i> <span id="prtCatModalTitle">Select categories</span></h3>
+      </div>
+      <div class="ct-cat-modal-body">
+        <div class="ct-cat-info">
+          <div class="ct-cat-info-row"><span>Variable:</span><span class="ct-cat-info-value" id="prtCatVarName"></span></div>
+          <div class="ct-cat-info-row"><span>Role:</span><span class="ct-cat-info-value">Category</span></div>
+          <div class="ct-cat-info-row"><span>Total observations:</span><span class="ct-cat-info-value" id="prtCatTotalObs"></span></div>
+          <div class="ct-cat-info-row"><span>Included observations:</span><span class="ct-cat-info-value" id="prtCatIncludedObs" style="color:var(--ct-acc);"></span></div>
+          <div class="ct-cat-info-row"><span>Selected levels:</span><span class="ct-cat-info-value" id="prtCatSelectedCount"></span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:11px;font-weight:600;color:var(--cfg-text3,#64748b);">Categories to include (need ≥2):</span>
+          <div style="display:flex;gap:6px;">
+            <button type="button" id="prtBtnSelectAll" style="font-size:10px;padding:3px 7px;border:1px solid var(--cfg-border);border-radius:5px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;">Select all</button>
+            <button type="button" id="prtBtnDeselectAll" style="font-size:10px;padding:3px 7px;border:1px solid var(--cfg-border);border-radius:5px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;">Deselect all</button>
+          </div>
+        </div>
+        <table class="ct-cat-table">
+          <thead><tr><th style="width:40px;text-align:center;">Include</th><th>Category</th><th style="text-align:center;">n</th></tr></thead>
+          <tbody id="prtCatTableBody"></tbody>
+        </table>
+      </div>
+      <div class="ct-cat-modal-footer">
+        <button type="button" id="prtBtnCatCancel" style="padding:6px 14px;border:1px solid var(--cfg-border);border-radius:7px;background:var(--cfg-surface);color:var(--cfg-text3);cursor:pointer;font-size:11px;">Cancel</button>
+        <button type="button" id="prtBtnCatConfirm" style="padding:6px 14px;border:none;border-radius:7px;background:var(--ct-acc);color:#fff;cursor:pointer;font-size:11px;font-weight:700;">
+          <i class="fa-solid fa-check"></i> Add variable
+        </button>
+      </div>
+    </div>
+  </div>
   <script>
     var _headers = [], _rows = [], _address = '', _saved = null;
     var columnStats = [], assignments = { category: null, values: null };
+    var categoryLevelSets = {}, pendingCategory = null;
     var draggedElement = null;
 
     function qs(id) { return document.getElementById(id); }
@@ -227,8 +293,17 @@
     function createChip(name, zone, cls) {
       var chip = document.createElement('div');
       chip.className = 'reg-chip ' + cls;
-      chip.innerHTML = '<span>' + name + '</span><button class="reg-chip-x" title="Remove">&times;</button>';
-      chip.querySelector('.reg-chip-x').addEventListener('click', function() {
+      var levels = zone === 'category' ? getCategoryLevelCounts(name) : [];
+      var selected = zone === 'category' && categoryLevelSets[name] ? categoryLevelSets[name].length : levels.length;
+      var levelHint = levels.length ? '<span class="chip-levels">(' + selected + '/' + levels.length + ')</span>' : '';
+      chip.innerHTML = '<span>' + name + '</span>' + levelHint + '<button class="reg-chip-x" title="Remove">&times;</button>';
+      if (zone === 'category') {
+        chip.title = 'Click to screen categories';
+        chip.addEventListener('click', function() { showCategoryModal(name, true); });
+      }
+      chip.querySelector('.reg-chip-x').addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (zone === 'category') delete categoryLevelSets[name];
         assignments[zone] = null;
         renderAssignments(); renderVariables(); validateModel();
       });
@@ -270,17 +345,142 @@
       }
     }
 
+    function categoryKey(value) {
+      return String(value === null || value === undefined ? '' : value).trim();
+    }
+
+    function getCategoryLevelCounts(name) {
+      var stat = getStat(name);
+      if (!stat) return [];
+      var freq = Object.create(null);
+      _rows.forEach(function(row) {
+        var key = categoryKey(row[stat.idx]);
+        if (!key) return;
+        freq[key] = (freq[key] || 0) + 1;
+      });
+      return Object.keys(freq).map(function(value) {
+        return { value: value, freq: freq[value] };
+      }).sort(function(a, b) { return b.freq - a.freq; });
+    }
+
+    function showCategoryModal(name, isEdit) {
+      var levels = getCategoryLevelCounts(name);
+      if (levels.length < 2) {
+        if (assignments.values === name) assignments.values = null;
+        assignments.category = name;
+        renderAssignments(); renderVariables();
+        return;
+      }
+      pendingCategory = { name: name, isEdit: !!isEdit };
+      qs('prtCatModalTitle').textContent = isEdit ? 'Edit categories' : 'Select categories';
+      qs('prtCatVarName').textContent = name;
+      qs('prtBtnCatConfirm').innerHTML = isEdit
+        ? '<i class="fa-solid fa-check"></i> Update categories'
+        : '<i class="fa-solid fa-check"></i> Add variable';
+      populateCategoryModal(levels, categoryLevelSets[name] || levels.map(function(level) { return level.value; }));
+      qs('prtCatModal').classList.add('active');
+    }
+
+    function populateCategoryModal(levels, preselected) {
+      var selectedSet = Object.create(null);
+      (preselected || []).forEach(function(value) { selectedSet[String(value)] = true; });
+      qs('prtCatTotalObs').textContent = levels.reduce(function(sum, level) { return sum + level.freq; }, 0);
+      var tbody = qs('prtCatTableBody');
+      tbody.innerHTML = '';
+      levels.forEach(function(level) {
+        var tr = document.createElement('tr');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!selectedSet[level.value];
+        cb.className = 'ct-cat-checkbox';
+        cb.dataset.value = level.value;
+        cb.dataset.freq = String(level.freq);
+        var includeCell = document.createElement('td');
+        includeCell.style.textAlign = 'center';
+        includeCell.appendChild(cb);
+        var categoryCell = document.createElement('td');
+        categoryCell.textContent = level.value;
+        var countCell = document.createElement('td');
+        countCell.style.cssText = 'text-align:center;font-weight:700;color:var(--ct-acc);';
+        countCell.textContent = level.freq;
+        tr.appendChild(includeCell);
+        tr.appendChild(categoryCell);
+        tr.appendChild(countCell);
+        tr.addEventListener('click', function(e) {
+          e.preventDefault();
+          cb.checked = !cb.checked;
+          updateCategoryStats();
+        });
+        tbody.appendChild(tr);
+      });
+      updateCategoryStats();
+    }
+
+    function updateCategoryStats() {
+      var checkboxes = document.querySelectorAll('#prtCatTableBody .ct-cat-checkbox');
+      var selected = 0, included = 0;
+      checkboxes.forEach(function(cb) {
+        if (cb.checked) {
+          selected++;
+          included += parseInt(cb.dataset.freq, 10) || 0;
+        }
+        cb.closest('tr').classList.toggle('off', !cb.checked);
+      });
+      qs('prtCatSelectedCount').textContent = selected + ' of ' + checkboxes.length;
+      qs('prtCatIncludedObs').textContent = included;
+      qs('prtBtnCatConfirm').disabled = selected < 2;
+      qs('prtBtnCatConfirm').style.opacity = selected < 2 ? '.5' : '1';
+    }
+
+    function hideCategoryModal() {
+      qs('prtCatModal').classList.remove('active');
+      pendingCategory = null;
+    }
+
+    function confirmCategoryModal() {
+      if (!pendingCategory) return;
+      var selected = [];
+      document.querySelectorAll('#prtCatTableBody .ct-cat-checkbox').forEach(function(cb) {
+        if (cb.checked) selected.push(cb.dataset.value);
+      });
+      if (selected.length < 2) return;
+      categoryLevelSets[pendingCategory.name] = selected;
+      if (assignments.values === pendingCategory.name) assignments.values = null;
+      assignments.category = pendingCategory.name;
+      hideCategoryModal();
+      renderAssignments(); renderVariables();
+    }
+
+    function wireCategoryModal() {
+      qs('prtBtnCatCancel').addEventListener('click', hideCategoryModal);
+      qs('prtBtnCatConfirm').addEventListener('click', confirmCategoryModal);
+      qs('prtBtnSelectAll').addEventListener('click', function() {
+        document.querySelectorAll('#prtCatTableBody .ct-cat-checkbox').forEach(function(cb) { cb.checked = true; });
+        updateCategoryStats();
+      });
+      qs('prtBtnDeselectAll').addEventListener('click', function() {
+        document.querySelectorAll('#prtCatTableBody .ct-cat-checkbox').forEach(function(cb) { cb.checked = false; });
+        updateCategoryStats();
+      });
+      qs('prtCatModal').addEventListener('click', function(e) {
+        if (e.target === qs('prtCatModal')) hideCategoryModal();
+      });
+    }
+
     function handleDrop(zoneType) {
       if (!draggedElement) return;
       var name = draggedElement.dataset.varName;
       var stat = getStat(name);
       if (!stat) return;
       if (zoneType === 'category') {
-        if (assignments.values === name) assignments.values = null;
-        assignments.category = name;
+        showCategoryModal(name, assignments.category === name);
+        return;
       } else if (zoneType === 'values') {
         if (!stat.isNumeric) { return; }
-        if (assignments.category === name) assignments.category = null;
+        if (assignments.category === name) {
+          delete categoryLevelSets[name];
+          assignments.category = null;
+        }
         assignments.values = name;
       }
       renderAssignments(); renderVariables();
@@ -305,6 +505,9 @@
         valuesColName: assignments.values || null,
         categoryColIndex: catIdx,
         valuesColIndex: valIdx,
+        categoryLevels: categoryLevelSets[assignments.category]
+          ? categoryLevelSets[assignments.category].slice()
+          : null,
         includedIndices: _headers.map(function(_, i) { return i; })
       };
     }
@@ -313,8 +516,15 @@
       if (!spec) return;
       assignments.category = null;
       assignments.values = null;
+      categoryLevelSets = {};
       if (spec.categoryColName && getStat(spec.categoryColName)) assignments.category = spec.categoryColName;
       else if (spec.categoryColIndex >= 0 && _headers[spec.categoryColIndex]) assignments.category = _headers[spec.categoryColIndex];
+      if (assignments.category && Array.isArray(spec.categoryLevels)) {
+        var available = Object.create(null);
+        getCategoryLevelCounts(assignments.category).forEach(function(level) { available[level.value] = true; });
+        var restored = spec.categoryLevels.map(categoryKey).filter(function(level) { return available[level]; });
+        if (restored.length >= 2) categoryLevelSets[assignments.category] = restored;
+      }
       if (spec.valuesColName && getStat(spec.valuesColName) && getStat(spec.valuesColName).isNumeric) assignments.values = spec.valuesColName;
       else if (spec.valuesColIndex >= 0 && _headers[spec.valuesColIndex] && getStat(_headers[spec.valuesColIndex]).isNumeric) assignments.values = _headers[spec.valuesColIndex];
     }
@@ -354,6 +564,7 @@
       qs('metaBadge').textContent = _rows.length + ' rows · ' + _headers.length + ' cols';
       buildColumnStats();
       assignments = { category: null, values: null };
+      categoryLevelSets = {};
       if (_saved) applySpec(_saved);
       if (!assignments.category) autoDetectCategory();
       renderVariables(); renderAssignments();
@@ -375,6 +586,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
       setupDropZones();
+      wireCategoryModal();
       qs('btnCancel').addEventListener('click', function() { send('close', null); });
       qs('btnRun').addEventListener('click', runAnalysis);
       qs('guideToggle').addEventListener('click', function() { qs('guideWrap').classList.toggle('open'); });

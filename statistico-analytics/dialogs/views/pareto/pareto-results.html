@@ -962,11 +962,11 @@
         <div class="hero-control-group" id="binGroup"
           style="background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.35);">
           <label style="color:#22d3ee;">
-            <i class="fa-solid fa-sliders" style="font-size:9px;"></i>&nbsp; Bin
+            <i class="fa-solid fa-layer-group" style="font-size:9px;"></i>&nbsp; Numeric ranges
           </label>
           <button class="bin-toggle-btn" id="binToggle" onclick="toggleBinMode()">OFF</button>
           <span class="bin-info-icon"
-            title="Group continuous numeric values into equal-width ranges and analyse the Pareto distribution across those ranges — like a histogram. Requires a numeric category column.">
+            title="When the selected Category contains numbers, group nearby values into equal-width ranges before creating the Pareto chart.">
             <i class="fa-solid fa-circle-info"></i>
           </span>
           <!-- bins counter — shown when ON -->
@@ -985,7 +985,7 @@
             <i class="fa-solid fa-arrow-up-1-9"></i> Pareto order
           </button>
           <!-- disabled notice — shown when col is not numeric -->
-          <span class="bin-disabled-note" id="binDisabledNote">Requires numeric column</span>
+          <span class="bin-disabled-note" id="binDisabledNote">Available only for a numeric Category</span>
         </div>
         </div>
 
@@ -1592,8 +1592,24 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
   /* ─────────────────────────────────────────────────────────
      Binning helpers
   ───────────────────────────────────────────────────────── */
-  function isCatColNumeric(catIdx) {
+  function prtGetScreenedRows(catIdx) {
     var rows = prtGetAnalysisRows();
+    if (!Array.isArray(_cfg.categoryLevels)
+        || Number(_cfg.categoryColIndex) !== Number(catIdx)) {
+      return rows;
+    }
+    var allow = Object.create(null);
+    _cfg.categoryLevels.forEach(function(level) {
+      allow[String(level).trim()] = true;
+    });
+    return rows.filter(function(row) {
+      var category = String(row[catIdx] === null || row[catIdx] === undefined ? '' : row[catIdx]).trim();
+      return !!allow[category];
+    });
+  }
+
+  function isCatColNumeric(catIdx) {
+    var rows = prtGetScreenedRows(catIdx);
     if (!rows.length) return false;
     var numCount = 0, total = 0;
     rows.forEach(function (row) {
@@ -1610,7 +1626,7 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
   }
 
   function buildBinnedData(catIdx, valIdx, nBins, sortDir, naturalOrder) {
-    var rows = prtGetAnalysisRows();
+    var rows = prtGetScreenedRows(catIdx);
     var numVals = [];
     rows.forEach(function (row) {
       var v = parseFloat(row[catIdx]);
@@ -1724,12 +1740,13 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
     }
     if (binToggleEl) {
       binToggleEl.disabled = !catIsNum;
+      binToggleEl.textContent = catIsNum ? (_binMode ? 'ON' : 'OFF') : 'N/A';
       binToggleEl.style.opacity = '';
       binToggleEl.style.cursor  = catIsNum ? '' : 'not-allowed';
     }
     if (binDisNote) binDisNote.style.display = catIsNum ? 'none' : '';
 
-    var rows = prtGetAnalysisRows();
+    var rows = prtGetScreenedRows(catIdx);
 
     if (_binMode && catIsNum) {
       /* ── Binned mode: equal-width histogram bins ── */

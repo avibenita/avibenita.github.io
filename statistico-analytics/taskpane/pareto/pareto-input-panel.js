@@ -27,11 +27,18 @@ function buildParetoRunData(headers, rows, spec) {
   const catIdx = spec.categoryColIndex != null ? Number(spec.categoryColIndex) : headers.indexOf(spec.categoryColName);
   const valIdxRaw = spec.valuesColIndex;
   const valIdx = valIdxRaw != null && valIdxRaw !== "" && Number(valIdxRaw) >= 0 ? Number(valIdxRaw) : null;
+  const categoryLevels = Array.isArray(spec.categoryLevels)
+    ? spec.categoryLevels.map((level) => String(level).trim()).filter(Boolean)
+    : null;
+  const categoryAllow = categoryLevels
+    ? new Set(categoryLevels)
+    : null;
   const map = {};
 
   rows.forEach((row) => {
     const cat = String(row[catIdx] || "").trim();
     if (!cat) return;
+    if (categoryAllow && !categoryAllow.has(cat)) return;
     let val = valIdx != null ? parseFloat(row[valIdx]) : 1;
     if (!isFinite(val)) val = 0;
     map[cat] = (map[cat] || 0) + val;
@@ -51,6 +58,7 @@ function buildParetoRunData(headers, rows, spec) {
     valuesColIndex: valIdx,
     categoryColName: spec.categoryColName || headers[catIdx] || "",
     valuesColName: valIdx != null ? (spec.valuesColName || headers[valIdx] || "") : "Count",
+    categoryLevels,
     paretoData,
     rawValues: [headers].concat(rows)
   };

@@ -57,6 +57,7 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
             '.st-site-return{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;margin-right:10px;' +
             'padding:5px 11px;border-radius:999px;text-decoration:none;font-size:11px;font-weight:700;' +
             'color:#e8f6ff;border:1px solid rgba(120,200,255,.45);background:rgba(120,200,255,.16);white-space:nowrap}' +
+            '.sb-nav-footer>.st-site-return{align-self:stretch;justify-content:center;margin:0 12px 10px;box-sizing:border-box}' +
             '.st-site-return:hover{filter:brightness(1.12);color:#fff}';
           document.head.appendChild(style);
         }
@@ -70,7 +71,9 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
           : 'https://statistico.live/Statistico-Website/index-Analytics.html';
         a.innerHTML = specialized ? '← Back to Specialized Tools' : '← Back to Analytics';
         const bar = document.querySelector('.mv-topbar') || document.querySelector('.cfg-header');
+        const sidebarFooter = document.querySelector('.sb-nav-footer');
         if (bar) bar.insertBefore(a, bar.firstChild);
+        else if (sidebarFooter) sidebarFooter.insertBefore(a, sidebarFooter.firstChild);
         else document.body.insertBefore(a, document.body.firstChild);
       }
       if (document.readyState === 'loading') {

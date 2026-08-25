@@ -602,8 +602,8 @@ let ACTIVE_TOOLS_SECTION = "all";
 var TOOLS_SECTION_META = {
   prepare: {
     id: "prepare",
-    label: "Prepare Data",
-    subtitle: "Rewrite data so it matches the purpose of your analysis.",
+    label: "Data Preparation",
+    subtitle: "Clean, recode, and transform your data for analysis.",
     icon: "fa-broom",
     color: "#14b8a6",
     colorDark: "#0f766e"

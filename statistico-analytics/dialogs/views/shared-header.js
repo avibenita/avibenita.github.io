@@ -190,43 +190,147 @@ const StatisticoHeader = {
     }
   },
 
-  /**
-   * Read persisted theme preference (default: dark)
-   */
-  getTheme() {
-    if (this.isForcedDarkEmbed()) return 'dark';
-    try { return localStorage.getItem('statistico-theme') || 'dark'; } catch(e) { return 'dark'; }
+  HC_FONT_FAMILY: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+
+  getSystemTheme() {
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (e) {
+      return 'dark';
+    }
   },
 
   /**
-   * Apply theme to the document and update the toggle button state.
-   * Injects CSS custom-property values directly onto <html> style so they
-   * always win over any per-page :root { } block, regardless of order.
+   * Persisted 3-state preference: auto | light | dark (Highcharts demo).
+   * Legacy stored "light"/"dark" values remain valid explicit choices.
+   */
+  getThemePreference() {
+    if (this.isForcedDarkEmbed()) return 'dark';
+    try {
+      const stored = localStorage.getItem('statistico-theme') || 'dark';
+      if (stored === 'auto' || stored === 'light' || stored === 'dark') return stored;
+    } catch (e) {}
+    return 'dark';
+  },
+
+  resolveTheme(pref) {
+    const preference = pref || this.getThemePreference();
+    if (preference === 'auto') return this.getSystemTheme();
+    return preference === 'light' ? 'light' : 'dark';
+  },
+
+  /**
+   * Resolved theme currently painted on the page ('light' | 'dark').
+   */
+  getTheme() {
+    if (this.isForcedDarkEmbed()) return 'dark';
+    return this.resolveTheme();
+  },
+
+  setThemePreference(pref) {
+    if (this.isForcedDarkEmbed()) return;
+    const next = (pref === 'auto' || pref === 'light' || pref === 'dark') ? pref : 'dark';
+    try { localStorage.setItem('statistico-theme', next); } catch (e) {}
+    this.applyTheme(this.resolveTheme(next), { savePreference: false, preference: next });
+  },
+
+  _installSystemThemeListener() {
+    if (this._systemThemeListenerBound) return;
+    this._systemThemeListenerBound = true;
+    try {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const onChange = () => {
+        if (this.getThemePreference() === 'auto') {
+          this.applyTheme(this.resolveTheme('auto'), { savePreference: false, preference: 'auto' });
+        } else {
+          this._syncThemeSwitcherUI();
+        }
+      };
+      if (mq.addEventListener) mq.addEventListener('change', onChange);
+      else if (mq.addListener) mq.addListener(onChange);
+    } catch (e) {}
+  },
+
+  _bindThemeSwitcher() {
+    if (this._themeSwitcherBound) return;
+    this._themeSwitcherBound = true;
+    document.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest && e.target.closest('[data-theme-pref]');
+      if (!btn) return;
+      e.preventDefault();
+      this.setThemePreference(btn.getAttribute('data-theme-pref'));
+    });
+  },
+
+  _renderThemeSwitcherHtml(extraClass) {
+    const pref = this.getThemePreference();
+    const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
+    const cls = extraClass ? `hc-theme-switch ${extraClass}` : 'hc-theme-switch';
+    return `
+      <div class="${cls}" id="${extraClass ? 'sbThemeSwitch' : 'headerThemeSwitch'}" role="radiogroup" aria-label="Color theme">
+        <button type="button" class="hc-theme-opt" data-theme-pref="auto" aria-pressed="${pref === 'auto' ? 'true' : 'false'}" title="Follow system color scheme">
+          Auto <span class="hc-theme-auto-hint">(${hint})</span>
+        </button>
+        <button type="button" class="hc-theme-opt" data-theme-pref="light" aria-pressed="${pref === 'light' ? 'true' : 'false'}" title="Highcharts light theme">Light</button>
+        <button type="button" class="hc-theme-opt" data-theme-pref="dark" aria-pressed="${pref === 'dark' ? 'true' : 'false'}" title="Statistico dark theme">Dark</button>
+      </div>
+    `;
+  },
+
+  _syncThemeSwitcherUI() {
+    const pref = this.getThemePreference();
+    const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
+    document.querySelectorAll('.hc-theme-switch').forEach((group) => {
+      group.querySelectorAll('[data-theme-pref]').forEach((btn) => {
+        btn.setAttribute('aria-pressed', btn.getAttribute('data-theme-pref') === pref ? 'true' : 'false');
+      });
+      group.querySelectorAll('.hc-theme-auto-hint').forEach((el) => {
+        el.textContent = `(${hint})`;
+      });
+    });
+  },
+
+  /**
+   * Apply resolved light/dark to the document.
+   * Injects CSS custom-property values directly onto <html> so they
+   * always win over any per-page :root { } block.
    * @param {'dark'|'light'} theme
    */
-  applyTheme(theme) {
+  applyTheme(theme, opts) {
+    const options = opts || {};
     const forcedDark = this.isForcedDarkEmbed();
     if (forcedDark) theme = 'dark';
+    else if (theme === 'auto') theme = this.getSystemTheme();
+    theme = theme === 'light' ? 'light' : 'dark';
+
+    const preference = forcedDark
+      ? 'dark'
+      : (options.preference || (theme === 'auto' ? 'auto' : this.getThemePreference()));
 
     const root = document.documentElement;
     root.setAttribute('data-theme', theme);
+    root.setAttribute('data-theme-pref', preference);
+    root.classList.toggle('highcharts-light', theme === 'light');
+    root.classList.toggle('highcharts-dark', theme === 'dark');
+    try { root.style.colorScheme = theme; } catch (e) {}
 
     /* ── Inject CSS variables directly so they beat page-level :root {} ── */
     if (theme === 'light') {
-      root.style.setProperty('--surface-0',      '#f4f5f7');
+      root.style.setProperty('--surface-0',      '#ffffff');
       root.style.setProperty('--surface-1',      '#ffffff');
-      root.style.setProperty('--surface-2',      '#f8f9fb');
-      root.style.setProperty('--border',         '#e2e5ea');
-      root.style.setProperty('--accent-1',       '#0d9488');
-      root.style.setProperty('--accent-2',       '#0ea5e9');
-      root.style.setProperty('--text-primary',   '#111827');
-      root.style.setProperty('--text-secondary', '#4b5563');
-      root.style.setProperty('--text-muted',     '#6b7280');
+      root.style.setProperty('--surface-2',      '#f7f7f7');
+      root.style.setProperty('--border',         '#e6e6e6');
+      root.style.setProperty('--accent-1',       '#2caffe');
+      root.style.setProperty('--accent-2',       '#544fc5');
+      root.style.setProperty('--text-primary',   '#000000');
+      root.style.setProperty('--text-secondary', '#333333');
+      root.style.setProperty('--text-muted',     '#666666');
       root.style.setProperty('--panel-shadow',   'none');
-      root.style.setProperty('--success',        '#16a34a');
-      root.style.setProperty('--warning',        '#d97706');
-      root.style.setProperty('--danger',         '#dc2626');
-      root.style.setProperty('--header-color',   '#0d9488');
+      root.style.setProperty('--success',        '#06b535');
+      root.style.setProperty('--warning',        '#fe6a35');
+      root.style.setProperty('--danger',         '#f21313');
+      root.style.setProperty('--header-color',   '#333333');
+      root.style.setProperty('--highcharts-background-color', '#ffffff');
     } else {
       root.style.setProperty('--surface-0',      '#0f1115');
       root.style.setProperty('--surface-1',      '#181b22');
@@ -244,18 +348,12 @@ const StatisticoHeader = {
       root.style.setProperty('--header-color',   'rgb(255,165,120)');
     }
 
-    // Never overwrite the website theme preference from demo/embed sessions.
-    if (!forcedDark) {
-      try { localStorage.setItem('statistico-theme', theme); } catch(e) {}
+    if (!forcedDark && options.savePreference !== false && (theme === 'light' || theme === 'dark') && !options.preference) {
+      try { localStorage.setItem('statistico-theme', theme); } catch (e) {}
     }
 
-    // Update compact header theme control (if present)
-    const headerThemeIcon = document.getElementById('headerThemeIcon');
-    const headerThemeLabel = document.getElementById('headerThemeLabel');
-    if (headerThemeIcon) headerThemeIcon.textContent = theme === 'light' ? '☀️' : '🌙';
-    if (headerThemeLabel) headerThemeLabel.textContent = theme === 'light' ? 'Light' : 'Dark';
+    this._syncThemeSwitcherUI();
 
-    // Backward-compatible top-bar theme button (if present)
     const btn = document.getElementById('themeToggleBtn');
     if (btn) {
       const icon  = btn.querySelector('.toggle-icon');
@@ -264,7 +362,6 @@ const StatisticoHeader = {
       if (label) label.textContent = theme === 'light' ? 'Light' : 'Dark';
       if (forcedDark) btn.style.display = 'none';
     }
-    // Update sidebar utility theme button (if present)
     const sidebarThemeBtn = document.getElementById('sbThemeToggleBtn');
     if (sidebarThemeBtn) {
       const icon = sidebarThemeBtn.querySelector('.sb-utility-theme-icon');
@@ -275,34 +372,36 @@ const StatisticoHeader = {
     }
     const headerThemeBtn = document.getElementById('headerThemeBtn');
     if (headerThemeBtn && forcedDark) headerThemeBtn.style.display = 'none';
+    document.querySelectorAll('.hc-theme-switch').forEach((el) => {
+      if (forcedDark) el.style.display = 'none';
+    });
 
-    // Fire an event so individual pages can react (e.g. reflow Highcharts)
-    document.dispatchEvent(new CustomEvent('statistico-theme-changed', { detail: { theme } }));
+    document.dispatchEvent(new CustomEvent('statistico-theme-changed', {
+      detail: { theme, preference }
+    }));
 
-    // Keep nested view iframes aligned with the forced dark demo theme.
-    if (forcedDark) {
-      try {
-        document.querySelectorAll('iframe').forEach((iframe) => {
-          try {
-            iframe.contentWindow && iframe.contentWindow.postMessage(
-              { type: 'THEME_CHANGE', theme: 'dark' },
-              '*'
-            );
-          } catch (_e) {}
-        });
-      } catch (_e) {}
-    }
+    try {
+      document.querySelectorAll('iframe').forEach((iframe) => {
+        try {
+          iframe.contentWindow && iframe.contentWindow.postMessage(
+            { type: 'THEME_CHANGE', theme, preference },
+            '*'
+          );
+        } catch (_e) {}
+      });
+    } catch (_e) {}
 
-    if (this._previewReady) this._restorePreviewTemplate();
+    if (this._previewReady) this._syncChartSkinToTheme(theme);
   },
 
   /**
-   * Toggle between light and dark themes.
+   * Cycle Auto → Light → Dark (legacy 2-state callers still work).
    */
   toggleTheme() {
     if (this.isForcedDarkEmbed()) return;
-    const next = this.getTheme() === 'dark' ? 'light' : 'dark';
-    this.applyTheme(next);
+    const pref = this.getThemePreference();
+    const next = pref === 'auto' ? 'light' : pref === 'light' ? 'dark' : 'auto';
+    this.setThemePreference(next);
   },
   /* ────────────────────────────────────────────────────────────── */
 
@@ -347,9 +446,12 @@ const StatisticoHeader = {
     this._applyActiveRowFilterToModuleStorage(this.module);
 
     // Apply persisted theme before rendering (avoids flash of wrong theme)
-    this.applyTheme(this.getTheme());
+    this.applyTheme(this.resolveTheme(), { savePreference: false, preference: this.getThemePreference() });
+    this._installSystemThemeListener();
+    this._bindThemeSwitcher();
     this._ensureMinimalStyles();
     this._ensureWorkspaceTabAssets();
+    this._ensureHighchartsThemeStyles();
     this._ensurePlainTabUnderlineStyles();
 
     // Keep univariate result dialogs visually capped to a laptop-like viewport.
@@ -1956,7 +2058,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260826view2',
+  _TAB_ASSET_VER: '20260826theme3',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2772,11 +2874,24 @@ const StatisticoHeader = {
     let link = document.getElementById('statistico-minimal-css');
     if (link) {
       link.href = href;
-      return;
+    } else {
+      link = document.createElement('link');
+      link.id = 'statistico-minimal-css';
+      link.rel = 'stylesheet';
+      link.href = href;
+      document.head.appendChild(link);
     }
-    link = document.createElement('link');
-    link.id = 'statistico-minimal-css';
-    link.rel = 'stylesheet';
+  },
+
+  _ensureHighchartsThemeStyles() {
+    const ver = this._TAB_ASSET_VER;
+    const href = this.resolveDialogUrl('highcharts-theme.css?v=' + ver);
+    let link = document.getElementById('statistico-hc-theme-css');
+    if (!link) {
+      link = document.createElement('link');
+      link.id = 'statistico-hc-theme-css';
+      link.rel = 'stylesheet';
+    }
     link.href = href;
     document.head.appendChild(link);
   },
@@ -2812,6 +2927,7 @@ const StatisticoHeader = {
     } else {
       runInit();
     }
+    this._ensureHighchartsThemeStyles();
   },
 
   _ensureUnivariateWorkspaceTabAssets() {
@@ -3529,8 +3645,6 @@ const StatisticoHeader = {
     const persisted = this.getDecimalPreference();
     const selected = decimalOptions.includes(persisted) ? persisted : (cfg?.defaultDecimal || '2');
     const optionsHtml = decimalOptions.map((v) => `<option value="${v}" ${v === selected ? 'selected' : ''}>${v === 'auto' ? 'Auto' : v}</option>`).join('');
-    const theme = this.getTheme();
-    const themeIcon = theme === 'light' ? '☀️' : '🌙';
     const uniFilterHtml = this._shouldRenderHeaderRowFilter()
       ? `
         <div class="header-uni-filter-wrap" id="headerUniFilterWrap">
@@ -3556,10 +3670,7 @@ const StatisticoHeader = {
         <select id="decimalSelect" class="header-decimals-hidden-select" aria-hidden="true" tabindex="-1" onchange="StatisticoHeader.onDecimalChange(this.value)">
           ${optionsHtml}
         </select>
-        <button id="headerThemeBtn" class="header-theme-btn" onclick="StatisticoHeader.toggleTheme()" title="Toggle light / dark theme">
-          <span id="headerThemeLabel">Theme</span>
-          <span id="headerThemeIcon">${themeIcon}</span>
-        </button>
+        ${this._renderThemeSwitcherHtml()}
       </div>
     `;
   },
@@ -6190,6 +6301,7 @@ const StatisticoHeader = {
     this._renderSharedSidebar();
     this._ensureMinimalStyles();
     this._ensureWorkspaceTabAssets();
+    this._ensureHighchartsThemeStyles();
     this._ensurePlainTabUnderlineStyles();
     this._ensureDefaultActions();
     this._mountSidebarUtilities();
@@ -6444,7 +6556,7 @@ const StatisticoHeader = {
     utilities.innerHTML = `
       <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
               aria-expanded="${toolsOpen ? 'true' : 'false'}"
-              title="View Data, Save PNG, Change style, Download JSON">
+              title="View Data, Save PNG, Color theme, Download JSON">
         <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
         <span class="sb-bottom-label">Output &amp; Tools</span>
         <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>
@@ -6464,13 +6576,9 @@ const StatisticoHeader = {
           <i class="fa-solid fa-image"></i>
           <span class="sb-item-label">Save as PNG</span>
         </button>
-        <button class="sb-bottom-btn sb-bottom-btn--tpl"
-                id="sbTemplateLibBtn"
-                onclick="StatisticoHeader.openTemplateLibrary()"
-                title="Change the live chart colors and texture">
-          <i class="fa-solid fa-swatchbook"></i>
-          <span class="sb-item-label">Change style</span>
-        </button>
+        <div class="sb-theme-switch-wrap" title="Color theme: Auto follows the system, Light matches Highcharts, Dark keeps Statistico dark">
+          ${this._renderThemeSwitcherHtml('hc-theme-switch--sidebar')}
+        </div>
         <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
                 id="sbExportJsonBtn"
                 ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
@@ -6517,7 +6625,22 @@ const StatisticoHeader = {
       qFill: 'rgba(15,23,42,.7)', qFillEmpty: 'rgba(15,23,42,.42)', qStroke: 'rgba(226,232,240,.22)',
       qText: '#f8fafc', qTextEmpty: '#e2e8f0', qOutline: '2px rgba(12,22,36,.9)',
       frameBottom: 'rgba(148,163,184,.35)', frameWall: 'rgba(148,163,184,.22)',
-      markerLine: 'rgba(255,255,255,.28)', swatch: '#111827'
+      markerLine: 'rgba(255,255,255,.28)',       swatch: '#111827'
+    },
+    hcLight: {
+      id: 'hcLight', name: 'Highcharts light', desc: 'Official Highcharts light canvas',
+      light: true, wrapBg: '#ffffff', pngBg: '#ffffff', chartBg: '#ffffff',
+      textureKind: 'none', cssTexture: 'none', texSize: '24px 24px', texOpacity: '0',
+      axis: '#333333', grid: '#e6e6e6', grid3d: '#cccccc',
+      minorGrid: '#f2f2f2', line: '#cccccc',
+      legend: '#333333', legendTitle: '#000000', legendHidden: '#999999', label: '#333333',
+      tooltipBg: '#f7f7f7', tooltipBorder: '#cccccc', tooltipText: '#333333',
+      cut: 'rgba(0,34,255,.75)', cutLabel: '#0022ff',
+      shades: { NW: 'rgba(44,175,254,0.08)', NE: 'rgba(0,226,114,0.08)', SW: 'rgba(51,78,255,0.06)', SE: 'rgba(254,106,53,0.08)' },
+      qFill: 'rgba(247,247,247,.92)', qFillEmpty: 'rgba(255,255,255,.7)', qStroke: 'rgba(230,230,230,.9)',
+      qText: '#333333', qTextEmpty: '#666666', qOutline: '2px rgba(255,255,255,.9)',
+      frameBottom: 'rgba(204,204,204,.5)', frameWall: 'rgba(230,230,230,.6)',
+      markerLine: 'rgba(51,51,51,.28)', swatch: '#ffffff'
     },
     paper: {
       id: 'paper', name: 'Paper light', desc: 'Warm off-white sheet',
@@ -6651,8 +6774,24 @@ const StatisticoHeader = {
     return this.previewTemplateId || 'night';
   },
 
+  _syncChartSkinToTheme(theme) {
+    const resolved = theme || this.getTheme();
+    const id = resolved === 'light' ? 'hcLight' : 'night';
+    if (window.Highcharts) {
+      try {
+        Highcharts.setOptions({
+          chart: {
+            backgroundColor: resolved === 'light' ? '#ffffff' : 'transparent',
+            style: { fontFamily: this.HC_FONT_FAMILY, fontSize: '1rem' }
+          }
+        });
+      } catch (e) {}
+    }
+    this.applyPreviewTemplate(id, { silent: true, skipStore: true });
+  },
+
   _restorePreviewTemplate() {
-    this.applyPreviewTemplate(this._readStoredPreviewTemplateId(), { silent: true, skipStore: true });
+    this._syncChartSkinToTheme(this.getTheme());
   },
 
   applyPreviewTemplate(id, opts) {
@@ -6666,7 +6805,7 @@ const StatisticoHeader = {
       '--preview-bg', '--preview-tex', '--preview-tex-size', '--preview-tex-opacity',
       '--preview-axis', '--preview-grid', '--preview-legend', '--preview-label', '--preview-ink'
     ];
-    if (tpl.id === 'night') {
+    if (tpl.id === 'night' || tpl.id === 'hcLight') {
       root.removeAttribute('data-preview-tpl');
       root.classList.remove('preview-tpl-light');
       previewVars.forEach((prop) => root.style.removeProperty(prop));
@@ -6700,7 +6839,7 @@ const StatisticoHeader = {
         card.classList.toggle('is-active', card.getAttribute('data-tpl') === tpl.id);
       });
     }
-    if (tpl.id !== 'night') {
+    if (tpl.id !== 'night' && tpl.id !== 'hcLight') {
       requestAnimationFrame(() => this._stampPreviewCanvases());
       setTimeout(() => {
         this._stampPreviewCanvases();
@@ -6749,10 +6888,31 @@ const StatisticoHeader = {
       if (!window.Highcharts || typeof Highcharts.addEvent !== 'function' || !Highcharts.Chart) return false;
       self._hcLoadHooked = true;
       try {
-        Highcharts.setOptions({ chart: { backgroundColor: 'transparent' } });
+        const light = self.getTheme() === 'light';
+        Highcharts.setOptions({
+          chart: {
+            backgroundColor: light ? '#ffffff' : 'transparent',
+            style: {
+              fontFamily: self.HC_FONT_FAMILY,
+              fontSize: '1rem'
+            }
+          },
+          title: { style: { fontSize: '1.2em' } },
+          subtitle: { style: { fontSize: '0.8em' } },
+          legend: { itemStyle: { fontSize: '0.8em' } },
+          tooltip: { style: { fontSize: '0.8em' } },
+          xAxis: {
+            labels: { style: { fontSize: '0.8em' } },
+            title: { style: { fontSize: '0.8em' } }
+          },
+          yAxis: {
+            labels: { style: { fontSize: '0.8em' } },
+            title: { style: { fontSize: '0.8em' } }
+          }
+        });
       } catch (e) {}
       Highcharts.addEvent(Highcharts.Chart, 'load', function () {
-        const tpl = self.getPreviewTemplate();
+        const tpl = self.getPreviewTemplate(self.getTheme() === 'light' ? 'hcLight' : 'night');
         if (tpl.id !== 'night') self._stampPreviewCanvases();
         self._applyPreviewToHighchart(this, tpl);
       });
@@ -6769,9 +6929,12 @@ const StatisticoHeader = {
 
   _applyPreviewToHighchart(chart, tpl) {
     if (!chart || typeof chart.update !== 'function') return;
+    const isLight = !!(tpl && tpl.light);
+    const chartBg = (tpl && tpl.chartBg) || (isLight ? '#ffffff' : 'transparent');
+    const axisColor = tpl.axis;
     const axisPatch = {
-      title: { style: { color: tpl.axis } },
-      labels: { style: { color: tpl.axis } },
+      title: { style: { color: axisColor, fontSize: '0.8em' } },
+      labels: { style: { color: axisColor, fontSize: '0.8em' } },
       gridLineColor: tpl.grid,
       minorGridLineColor: tpl.minorGrid,
       lineColor: tpl.line,
@@ -6779,17 +6942,23 @@ const StatisticoHeader = {
     };
     try {
       chart.update({
-        chart: { backgroundColor: 'transparent', plotBackgroundColor: 'transparent' },
+        chart: {
+          backgroundColor: chartBg,
+          plotBackgroundColor: chartBg,
+          style: { fontFamily: this.HC_FONT_FAMILY, fontSize: '1rem' }
+        },
+        title: { style: { color: tpl.legend, fontSize: '1.2em' } },
+        subtitle: { style: { color: tpl.axis, fontSize: '0.8em' } },
         legend: {
-          itemStyle: { color: tpl.legend },
-          itemHoverStyle: { color: tpl.light ? '#0f172a' : '#fff' },
+          itemStyle: { color: tpl.legend, fontSize: '0.8em' },
+          itemHoverStyle: { color: isLight ? '#000000' : '#fff' },
           itemHiddenStyle: { color: tpl.legendHidden },
           title: { style: { color: tpl.legendTitle } }
         },
         tooltip: {
           backgroundColor: tpl.tooltipBg,
           borderColor: tpl.tooltipBorder,
-          style: { color: tpl.tooltipText }
+          style: { color: tpl.tooltipText, fontSize: '0.8em' }
         },
         xAxis: axisPatch,
         yAxis: axisPatch
@@ -6807,8 +6976,8 @@ const StatisticoHeader = {
     document.querySelectorAll('.js-plotly-plot, .plotly-graph-div').forEach((gd) => {
       try {
         Plotly.relayout(gd, {
-          paper_bgcolor: 'rgba(0,0,0,0)',
-          plot_bgcolor: 'rgba(0,0,0,0)',
+          paper_bgcolor: tpl.light ? (tpl.chartBg || '#ffffff') : 'rgba(0,0,0,0)',
+          plot_bgcolor: tpl.light ? (tpl.chartBg || '#ffffff') : 'rgba(0,0,0,0)',
           'font.color': tpl.axis,
           'xaxis.tickfont.color': tpl.axis,
           'yaxis.tickfont.color': tpl.axis,
@@ -6886,7 +7055,7 @@ const StatisticoHeader = {
     const w = Math.max(320, chart.chartWidth || 800);
     const h = Math.max(240, chart.chartHeight || 500);
     let svg = chart.getSVG({
-      chart: { width: w, height: h, backgroundColor: 'transparent' }
+      chart: { width: w, height: h, backgroundColor: (tpl.chartBg && tpl.chartBg !== 'transparent') ? tpl.chartBg : (tpl.light ? '#ffffff' : 'transparent') }
     });
     if (svg.indexOf('xmlns') === -1) {
       svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');

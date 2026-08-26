@@ -1910,11 +1910,8 @@ const StatisticoHeader = {
     if (!tab) return '';
     const text = this._getUniViewCaption(tab.tabKey);
     if (!text) return '';
-    const name = String(tab.label || '').replace(/</g, '&lt;');
     const body = text.replace(/</g, '&lt;');
-    return '<p class="uni-view-caption" id="uniViewCaption">'
-      + `<span class="uni-view-caption-name">${name}</span>`
-      + '<span class="uni-view-caption-sep" aria-hidden="true">·</span>'
+    return '<p class="view-switcher-desc uni-view-caption" id="uniViewCaption">'
       + `<span class="uni-view-caption-text">${body}</span>`
       + '</p>';
   },
@@ -1959,7 +1956,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260823ai1',
+  _TAB_ASSET_VER: '20260826view2',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2495,27 +2492,27 @@ const StatisticoHeader = {
       '}',
       '',
       '/* Connected workspace tabs — dark inactive, white active panel bridge */',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) {',
       '  --ws-connected-tab-active-h: 56px;',
       '  --ws-connected-tab-inactive-h: calc(var(--ws-connected-tab-active-h) * 0.9);',
       '}',
-      '.ws-mode-bar--connected.ws-mode-bar--attached:not(.uni-view-tabs) {',
+      '.ws-mode-bar--connected.ws-mode-bar--attached:not(.uni-view-tabs):not(.view-switcher-bar) {',
       '  align-items: flex-end !important;',
       '  padding: 10px 16px 0 !important;',
       '  border-bottom: 3px solid #8b5cf6 !important;',
       '  background: var(--surface-1, #1a1f2e) !important;',
       '}',
-      '.ws-shell:has(.ws-mode-bar--connected:not(.uni-view-tabs)) {',
+      '.ws-shell:has(.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar)) {',
       '  border: none !important;',
       '  border-radius: 0 !important;',
       '}',
-      '.ws-shell:has(.ws-mode-bar--connected:not(.uni-view-tabs)) > .ws-body {',
+      '.ws-shell:has(.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar)) > .ws-body {',
       '  background: var(--surface-1, #1a1f2e) !important;',
       '  border: none !important;',
       '  border-radius: 0 !important;',
       '  margin-top: 0 !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-tab-cluster {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-tab-cluster {',
       '  align-items: flex-end !important;',
       '  background: transparent !important;',
       '  border: none !important;',
@@ -2523,7 +2520,7 @@ const StatisticoHeader = {
       '  padding: 0 !important;',
       '  gap: 10px !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab:not(.active) {',
       '  box-sizing: border-box !important;',
       '  height: var(--ws-connected-tab-inactive-h) !important;',
       '  min-height: var(--ws-connected-tab-inactive-h) !important;',
@@ -2537,19 +2534,19 @@ const StatisticoHeader = {
       '  margin-bottom: 0 !important;',
       '  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) .ws-tab-label {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab:not(.active) .ws-tab-label {',
       '  color: rgba(226, 232, 240, 0.92) !important;',
       '  font-size: 12px !important;',
       '  font-weight: 600 !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) .ws-tab-sub {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab:not(.active) .ws-tab-sub {',
       '  color: rgba(148, 163, 184, 0.88) !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab:not(.active) > i {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab:not(.active) > i {',
       '  color: #a78bfa !important;',
       '  opacity: 0.85 !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab.active {',
       '  position: relative !important;',
       '  box-sizing: border-box !important;',
       '  background: #ffffff !important;',
@@ -2566,127 +2563,154 @@ const StatisticoHeader = {
       '  color: #0f172a !important;',
       '  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12) !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active .ws-tab-text {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab.active .ws-tab-text {',
       '  gap: 3px !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active .ws-tab-label {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab.active .ws-tab-label {',
       '  color: #0f172a !important;',
       '  font-size: 14.5px !important;',
       '  font-weight: 800 !important;',
       '  line-height: 1.15 !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active .ws-tab-sub {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab.active .ws-tab-sub {',
       '  color: #475569 !important;',
       '  line-height: 1.15 !important;',
       '  margin-bottom: 0 !important;',
       '}',
-      '.ws-mode-bar--connected:not(.uni-view-tabs) .ws-mode-tab.active > i {',
+      '.ws-mode-bar--connected:not(.uni-view-tabs):not(.view-switcher-bar) .ws-mode-tab.active > i {',
       '  color: #7c3aed !important;',
       '  opacity: 1 !important;',
       '}',
       '',
-      '/* Univariate compact dark rail — lock against leftover connected chrome */',
-      '.uni-view-tabs.ws-mode-bar--connected.ws-mode-bar--attached {',
-      '  align-items: center !important;',
-      '  padding: 8px 16px 0 !important;',
-      '  border-bottom: 1px solid rgba(148, 163, 184, 0.16) !important;',
-      '  background: transparent !important;',
-      '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster {',
+      '/* View switcher — segmented analysis views (sidebar = analyses) */',
+      '.uni-view-tabs.ws-mode-bar--connected.ws-mode-bar--attached,',
+      '.view-switcher-bar.ws-mode-bar--connected.ws-mode-bar--attached {',
       '  align-items: stretch !important;',
-      '  height: 48px !important;',
-      '  max-height: 48px !important;',
-      '  padding: 4px !important;',
-      '  gap: 2px !important;',
-      '  border-radius: 10px !important;',
-      '  background: rgba(15, 18, 28, 0.55) !important;',
-      '  border: 1px solid rgba(148, 163, 184, 0.18) !important;',
-      '  box-shadow: none !important;',
-      '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab {',
-      '  height: 40px !important;',
-      '  min-height: 40px !important;',
-      '  max-height: 40px !important;',
-      '  min-width: 0 !important;',
-      '  margin: 0 !important;',
-      '  padding: 0 14px !important;',
+      '  justify-content: center !important;',
+      '  width: auto !important;',
+      '  max-width: 100% !important;',
+      '  min-height: 0 !important;',
+      '  padding: 0 !important;',
       '  border: none !important;',
-      '  border-radius: 7px !important;',
+      '  background: transparent !important;',
+      '  flex-wrap: nowrap !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-tab-cluster {',
+      '  display: grid !important;',
+      '  grid-auto-flow: column !important;',
+      '  grid-auto-columns: 1fr !important;',
+      '  align-items: stretch !important;',
+      '  width: max-content !important;',
+      '  min-width: min(560px, 100%) !important;',
+      '  max-width: 100% !important;',
+      '  height: auto !important;',
+      '  max-height: none !important;',
+      '  padding: 4px !important;',
+      '  gap: 6px !important;',
+      '  border-radius: 14px !important;',
+      '  background: rgba(8, 12, 22, 0.55) !important;',
+      '  border: 1px solid rgba(148, 163, 184, 0.28) !important;',
+      '  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04) !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab {',
+      '  flex: 1 1 0 !important;',
+      '  height: 46px !important;',
+      '  min-height: 46px !important;',
+      '  max-height: 46px !important;',
+      '  min-width: 132px !important;',
+      '  margin: 0 !important;',
+      '  padding: 0 22px !important;',
+      '  border: 1px solid rgba(148, 163, 184, 0.34) !important;',
+      '  border-radius: 10px !important;',
       '  transform: none !important;',
       '  box-shadow: none !important;',
       '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
-      '  background: transparent !important;',
-      '  background-image: none !important;',
-      '  color: #94a3b8 !important;',
-      '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
-      '  color: #94a3b8 !important;',
-      '  font-size: 13px !important;',
-      '  font-weight: 500 !important;',
-      '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
-      '  color: rgba(148, 163, 184, 0.72) !important;',
-      '  opacity: 1 !important;',
-      '  font-size: 12px !important;',
-      '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active):hover {',
-      '  background: rgba(148, 163, 184, 0.08) !important;',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active),',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
+      '  background: rgba(15, 23, 42, 0.35) !important;',
       '  background-image: none !important;',
       '  color: #cbd5e1 !important;',
       '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active {',
-      '  background: rgba(124, 92, 255, 0.14) !important;',
-      '  background-image: none !important;',
-      '  color: #f1f5f9 !important;',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
+      '  color: #e2e8f0 !important;',
+      '  font-size: 13.5px !important;',
+      '  font-weight: 650 !important;',
       '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
-      '  color: #f1f5f9 !important;',
-      '  font-size: 13px !important;',
-      '  font-weight: 600 !important;',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) > i,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
+      '  color: #a5b4fc !important;',
+      '  opacity: 1 !important;',
+      '  font-size: 14px !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active):hover,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active):hover {',
+      '  background: rgba(124, 92, 255, 0.22) !important;',
+      '  background-image: none !important;',
+      '  border-color: rgba(167, 139, 250, 0.78) !important;',
+      '  color: #ffffff !important;',
+      '  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35) !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active {',
+      '  background: #7c5cff !important;',
+      '  background-image: none !important;',
+      '  border-color: #8b6cff !important;',
+      '  color: #ffffff !important;',
+      '  box-shadow: 0 6px 16px rgba(124, 92, 255, 0.38) !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
+      '  color: #ffffff !important;',
+      '  font-size: 13.5px !important;',
+      '  font-weight: 800 !important;',
       '  line-height: 1 !important;',
       '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active > i {',
-      '  color: #7c5cff !important;',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active > i,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active > i {',
+      '  color: #ffffff !important;',
       '  opacity: 1 !important;',
-      '  font-size: 12px !important;',
+      '  font-size: 14px !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active::after,',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active:not(:last-child)::after {',
-      '  display: block !important;',
-      '  content: "" !important;',
-      '  position: absolute !important;',
-      '  left: 12px !important;',
-      '  right: 12px !important;',
-      '  bottom: 3px !important;',
-      '  height: 2px !important;',
-      '  border-radius: 2px !important;',
-      '  background: #7c5cff !important;',
-      '  pointer-events: none !important;',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active:not(:last-child)::after,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active::after {',
+      '  display: none !important;',
+      '  content: none !important;',
       '}',
-      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab .ws-tab-sub {',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab .ws-tab-sub,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab .ws-tab-sub {',
       '  display: none !important;',
       '}',
-      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster {',
-      '  background: rgba(255, 255, 255, 0.72) !important;',
-      '  border-color: rgba(148, 163, 184, 0.28) !important;',
-      '}',
-      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected.ws-mode-bar--attached {',
-      '  border-bottom-color: rgba(148, 163, 184, 0.28) !important;',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-tab-cluster {',
+      '  background: rgba(255, 255, 255, 0.78) !important;',
+      '  border-color: rgba(15, 23, 42, 0.16) !important;',
       '}',
       'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active),',
-      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
-      '  color: #64748b !important;',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
+      '  background: rgba(255,255,255,0.55) !important;',
+      '  color: #334155 !important;',
       '}',
-      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
-      '  color: rgba(100, 116, 139, 0.72) !important;',
-      '}',
-      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active {',
-      '  background: rgba(124, 92, 255, 0.12) !important;',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
       '  color: #1e293b !important;',
       '}',
-      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
-      '  color: #1e293b !important;',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) > i,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
+      '  color: #6d28d9 !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active {',
+      '  background: #6d28d9 !important;',
+      '  border-color: #5b21b6 !important;',
+      '  color: #ffffff !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
+      '  color: #ffffff !important;',
       '}',
       '',
       '/* Generic chip tabs (non-connected) */',
@@ -2811,6 +2835,7 @@ const StatisticoHeader = {
     if (!viewTabs.length) return false;
     if (activeSection.id === 'group' && this.currentView === 'by-group') return true;
     if (activeSection.id === 'core' && this.currentView === 'boxplot') return true;
+    if (activeSection.id === 'core' && ['histogram', 'cdf', 'percentile'].indexOf(this.currentView) !== -1) return true;
     return viewTabs.some((t) => t.view === this.currentView);
   },
 
@@ -2825,15 +2850,29 @@ const StatisticoHeader = {
     const showTabs = this._shouldShowUnivariateResultsTabs(activeSection);
 
     let stack = document.getElementById('uniResultsViewTabs');
+    const shell = document.querySelector('.statistico-shell');
+    const headerBar = shell && shell.querySelector('.statistico-header');
     if (!showTabs) {
-      if (stack) stack.remove();
+      if (stack) {
+        stack.hidden = true;
+        stack.innerHTML = '';
+      }
+      if (shell) shell.classList.remove('statistico-shell--with-views');
+      if (headerBar) headerBar.classList.remove('statistico-header--with-views');
       return;
     }
 
     if (!stack) {
       stack = document.createElement('div');
       stack.id = 'uniResultsViewTabs';
-      stack.className = 'uni-results-tab-stack';
+      stack.className = 'uni-results-tab-stack view-switcher-host';
+    } else {
+      stack.classList.add('uni-results-tab-stack', 'view-switcher-host');
+    }
+
+    if (headerBar) {
+      if (stack.parentNode !== headerBar) headerBar.appendChild(stack);
+    } else if (!stack.parentNode) {
       const header = document.getElementById('header-container');
       const results = document.getElementById('results-container') || rightCol.querySelector('.results-container');
       if (header) {
@@ -2844,6 +2883,9 @@ const StatisticoHeader = {
         rightCol.insertBefore(stack, rightCol.firstChild);
       }
     }
+    stack.hidden = false;
+    if (shell) shell.classList.add('statistico-shell--with-views');
+    if (headerBar) headerBar.classList.add('statistico-header--with-views');
 
     const activeInPageTab = this.currentView === 'boxplot'
       ? (globalThis.__boxplotActiveTab || 'main')
@@ -2875,13 +2917,15 @@ const StatisticoHeader = {
     const describedBy = captionHtml ? ' aria-describedby="uniViewCaption"' : '';
 
     stack.innerHTML =
-      '<div class="ws-shell ws-shell--view-tabs">'
-      + '<div class="ws-chrome ws-chrome--attached">'
-      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected uni-view-tabs" role="tablist" aria-label="' + ariaLabel + '"' + describedBy + '>'
+      '<div class="view-switcher" role="group" aria-label="' + ariaLabel + '"' + describedBy + '>'
+      + '<div class="view-switcher-row">'
+      + '<span class="view-switcher-kicker">VIEW</span>'
+      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected uni-view-tabs view-switcher-bar" role="tablist" aria-label="' + ariaLabel + '">'
       + tabsHtml
       + '</nav>'
       + captionHtml
-      + '</div></div>';
+      + '</div>'
+      + '</div>';
 
     if (globalThis.StatisticoWorkspaceTabs) {
       try { globalThis.StatisticoWorkspaceTabs.init(); } catch (_e) {}
@@ -2955,6 +2999,7 @@ const StatisticoHeader = {
     if (!nav || !this._isSharedSidebarModule()) return;
     const cfg = this._getSharedSidebarConfig();
     if (!cfg) return;
+    nav.setAttribute('aria-label', 'Analyses');
 
     const groupsHtml = (cfg.groups || []).map((group) => {
       const itemsHtml = (group.items || []).map((item) => this._renderSidebarNavItem(item)).join('');
@@ -2976,7 +3021,10 @@ const StatisticoHeader = {
       <div class="sb-logo">
         <div class="sb-logo-icon" data-statistico-brand-logo></div>
       </div>
-      <div class="sb-body">${groupsHtml}${this._renderSidebarPinnedNav(cfg)}</div>
+      <div class="sb-body">
+        <div class="sb-analyses-kicker">Analyses</div>
+        ${groupsHtml}${this._renderSidebarPinnedNav(cfg)}
+      </div>
     `;
     if (typeof StatisticoBrandLogo !== 'undefined' && StatisticoBrandLogo.mountAll) {
       StatisticoBrandLogo.mountAll(nav);

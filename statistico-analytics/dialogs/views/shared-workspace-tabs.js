@@ -143,6 +143,7 @@
   function onTabActiveChanged() {
     requestAnimationFrame(function() {
       refreshAllIndicators();
+      document.querySelectorAll('.view-switcher').forEach(updateViewSwitcherDescription);
     });
   }
 
@@ -157,7 +158,7 @@
       if (!labelSpan) return;
       var key = getTabKey(btn);
       var titleAttr = btn.getAttribute('title') || '';
-      var skipSub = !!(btn.closest && btn.closest('.uni-view-tabs'));
+      var skipSub = !!(btn.closest && btn.closest('.uni-view-tabs, .view-switcher-bar'));
       var sub = skipSub ? '' : (subtitles[key] || titleAttr);
       if (sub.length > 42) sub = sub.split('.')[0];
       var text = document.createElement('span');
@@ -165,13 +166,85 @@
       text.innerHTML = '<span class="ws-tab-label">' + labelSpan.textContent + '</span>' +
         (sub ? '<span class="ws-tab-sub">' + sub + '</span>' : '');
       labelSpan.replaceWith(text);
-      // The subtitle is now rendered inline next to the label, so a hover
-      // tooltip showing the same string is redundant. Drop it (only when
-      // the title actually duplicates the visible subtitle).
       if (sub && titleAttr && titleAttr.trim().toLowerCase() === sub.trim().toLowerCase()) {
         btn.removeAttribute('title');
       }
     });
+  }
+
+  function getActiveViewDescription(bar) {
+    if (!bar) return '';
+    var active = bar.querySelector('.ws-mode-tab.active') || bar.querySelector('.ws-mode-tab');
+    if (!active) return '';
+    var key = getTabKey(active);
+    var title = (active.getAttribute('title') || '').trim();
+    var subEl = active.querySelector('.ws-tab-sub');
+    var sub = subEl ? subEl.textContent.trim() : '';
+    return title || sub || subtitles[key] || '';
+  }
+
+  function updateViewSwitcherDescription(host) {
+    if (!host) return;
+    var bar = host.querySelector('.view-switcher-bar, .ws-mode-bar');
+    var desc = host.querySelector('.view-switcher-desc');
+    if (!desc) return;
+    var text = getActiveViewDescription(bar);
+    var textEl = desc.querySelector('.uni-view-caption-text') || desc;
+    if (textEl === desc) {
+      desc.textContent = text;
+    } else {
+      textEl.textContent = text;
+    }
+    desc.hidden = !text;
+  }
+
+  function upgradeToViewSwitcher(bar) {
+    if (!bar || !bar.classList || isSlantBar(bar)) return;
+    bar.classList.add('view-switcher-bar', 'uni-view-tabs');
+
+    var existingHost = bar.closest('.view-switcher');
+    if (existingHost) {
+      updateViewSwitcherDescription(existingHost);
+      return;
+    }
+
+    var host = document.createElement('div');
+    host.className = 'view-switcher';
+    host.setAttribute('role', 'group');
+    host.setAttribute('aria-label', bar.getAttribute('aria-label') || 'Views of this analysis');
+
+    var row = document.createElement('div');
+    row.className = 'view-switcher-row';
+
+    var kicker = document.createElement('span');
+    kicker.className = 'view-switcher-kicker';
+    kicker.textContent = 'VIEW';
+
+    var desc = document.createElement('p');
+    desc.className = 'view-switcher-desc uni-view-caption';
+    var descText = document.createElement('span');
+    descText.className = 'uni-view-caption-text';
+    desc.appendChild(descText);
+
+    var parent = bar.parentNode;
+    if (!parent) return;
+    parent.insertBefore(host, bar);
+    row.appendChild(kicker);
+    row.appendChild(bar);
+    row.appendChild(desc);
+    host.appendChild(row);
+    updateViewSwitcherDescription(host);
+  }
+
+  function bindViewSwitcherUpdates() {
+    if (bindViewSwitcherUpdates._bound) return;
+    bindViewSwitcherUpdates._bound = true;
+    document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.view-switcher-bar .ws-mode-tab, .view-switcher .ws-mode-tab');
+      if (!btn) return;
+      var host = btn.closest('.view-switcher');
+      window.setTimeout(function() { updateViewSwitcherDescription(host); }, 0);
+    }, true);
   }
 
   function initWorkspaceTabBars(extraSubtitles) {
@@ -180,9 +253,12 @@
       ensureConnectedBar(bar);
       unwrapClusterIfSlant(bar);
       ensureCluster(bar);
+      upgradeToViewSwitcher(bar);
     });
     enhanceWorkspaceTabs();
+    document.querySelectorAll('.view-switcher').forEach(updateViewSwitcherDescription);
     refreshAllIndicators();
+    bindViewSwitcherUpdates();
 
     if (!initialized) {
       initialized = true;
@@ -204,6 +280,7 @@
     refresh: refreshAllIndicators,
     onActiveChanged: onTabActiveChanged,
     pulseBody: pulseWsBody,
-    setSubtitles: function(map) { Object.assign(subtitles, map); }
+    setSubtitles: function(map) { Object.assign(subtitles, map); },
+    updateViewDescription: function(host) { updateViewSwitcherDescription(host); }
   };
 })(typeof window !== 'undefined' ? window : this);

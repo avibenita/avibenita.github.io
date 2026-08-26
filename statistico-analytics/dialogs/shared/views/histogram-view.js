@@ -134,7 +134,7 @@ function displayHistogramView() {
           <div class="control-frame" id="manualBinsControl">
             <label for="numBins">Bins:</label>
             <span id="binsValue">5</span>
-            <input type="range" id="numBins" min="1" max="30" value="5" step="1" oninput="updateHistogram()">
+            <input type="range" id="numBins" min="1" max="15" value="5" step="1" oninput="updateHistogram()">
           </div>
           <div class="control-frame">
             <label for="showNormalCurve">Normal:</label>
@@ -190,7 +190,7 @@ function createHistogram(animate = false) {
     return;
   }
 
-  const numBins = parseInt(numBinsEl.value);
+  const numBins = Math.max(1, Math.min(15, parseInt(numBinsEl.value, 10) || 5));
   const showNormalCurve = showNormalCurveEl.checked;
   const totalCount = data.length;
   
@@ -451,6 +451,7 @@ function updateBinningMethod() {
       break;
   }
   
+  calculatedBins = Math.max(1, Math.min(15, isFinite(calculatedBins) ? Math.round(calculatedBins) : 5));
   numBinsInput.value = calculatedBins;
   binsValue.textContent = calculatedBins;
   numBinsInput.disabled = true;

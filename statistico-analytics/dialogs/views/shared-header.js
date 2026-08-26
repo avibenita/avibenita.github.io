@@ -2058,7 +2058,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260826theme3',
+  _TAB_ASSET_VER: '20260826light2',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2893,7 +2893,8 @@ const StatisticoHeader = {
       link.rel = 'stylesheet';
     }
     link.href = href;
-    document.head.appendChild(link);
+    const host = document.body || document.head;
+    host.appendChild(link);
   },
 
   _ensureWorkspaceTabAssets() {

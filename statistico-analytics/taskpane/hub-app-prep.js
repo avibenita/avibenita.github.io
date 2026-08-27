@@ -920,6 +920,9 @@ function toggleHubAccordion(sectionId) {
   var head = panel.querySelector(".hub-accordion-head");
   if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
   syncHubExpandAllButton();
+  if (window.StatisticoTooltip && typeof window.StatisticoTooltip.hide === "function") {
+    window.StatisticoTooltip.hide();
+  }
 }
 
 function getHubVisibleSectionIds() {

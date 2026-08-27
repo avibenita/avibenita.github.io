@@ -4,6 +4,35 @@
  * Ribbon entries are declared separately in manifest.xml — see modules.config.json → ribbonMenu.
  */
 
+(function ensureHubAccordionStyles() {
+  var STYLE_ID = "hub-accordion-live-css";
+  var css = [
+    ".hub-accordion-panel{width:100%;box-sizing:border-box;border:1px solid rgba(180,156,255,.32);border-radius:10px;background:#152033;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .12s ease;}",
+    ".hub-accordion-head{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:58px;padding:12px 14px;border:none;background:transparent;color:inherit;text-align:left;cursor:pointer;font-family:inherit;}",
+    ".hub-accordion-panel:hover,.hub-accordion-panel:hover .hub-accordion-head{background:#243556 !important;}",
+    ".hub-accordion-panel:hover{border-color:var(--section-color,#a78bfa) !important;box-shadow:0 0 0 1px var(--section-color,#a78bfa) !important;transform:translateY(-1px);}",
+    ".hub-accordion-icon{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(255,255,255,.07);color:var(--section-color,#cbd5e1);font-size:12px;}",
+    ".hub-accordion-copy{flex:1;min-width:0;}",
+    ".hub-accordion-title{display:block;font-size:11.5px;font-weight:800;color:#fff;letter-spacing:.045em;text-transform:uppercase;line-height:1.2;white-space:nowrap;}",
+    ".hub-accordion-desc{display:-webkit-box;margin-top:3px;font-size:11px;color:#94a3b8;line-height:1.4;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;}",
+    ".hub-accordion-caret{font-size:12px;color:#cbd5e1;flex-shrink:0;width:16px;text-align:center;transition:transform .18s ease,color .16s ease;}",
+    ".hub-accordion-panel.is-open .hub-accordion-caret{transform:rotate(180deg);}",
+    ".hub-accordion-body{display:none !important;padding:0 12px 12px;}",
+    ".hub-accordion-panel.is-open>.hub-accordion-body{display:flex !important;flex-direction:column !important;gap:10px;border-top:1px solid rgba(226,232,240,.1);padding-top:10px;}",
+    ".hub-accordion-body .category-modules{width:100%;display:flex !important;flex-direction:column;gap:8px;}",
+    ".hub-accordion-body .category-module-btn{width:100%;}"
+  ].join("");
+  function apply() {
+    if (document.getElementById(STYLE_ID)) return;
+    var style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = css;
+    (document.head || document.documentElement).appendChild(style);
+  }
+  if (document.head) apply();
+  else document.addEventListener("DOMContentLoaded", apply);
+})();
+
 let MODULES = [];
 let hubConfigDialog = null;
 let hubUnivariateFlowActive = false;
@@ -927,6 +956,9 @@ function toggleHubAccordion(sectionId) {
   var head = panel.querySelector(".hub-accordion-head");
   if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
   syncHubExpandAllButton();
+  if (window.StatisticoTooltip && typeof window.StatisticoTooltip.hide === "function") {
+    window.StatisticoTooltip.hide();
+  }
 }
 
 function getHubVisibleSectionIds() {

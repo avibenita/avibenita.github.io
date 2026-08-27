@@ -2058,7 +2058,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260826light2',
+  _TAB_ASSET_VER: '20260826shade1',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(

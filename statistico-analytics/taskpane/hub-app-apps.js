@@ -21,7 +21,10 @@
     ".hub-accordion-body{display:none;padding:0 12px 12px;height:auto;overflow:visible;}",
     ".hub-accordion-panel.is-open .hub-accordion-body{display:flex !important;flex-direction:column !important;gap:10px;border-top:1px solid rgba(226,232,240,.1);padding-top:10px;height:auto !important;max-height:none !important;overflow:visible !important;}",
     ".hub-accordion-body .category-modules{width:100%;display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;gap:8px;height:auto !important;overflow:visible !important;}",
-    ".hub-accordion-body .category-module-btn{width:100%;display:flex !important;}"
+    ".hub-accordion-body .category-module-btn{width:100%;display:flex !important;}",
+    ".hub-standalone-command{width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:0;}",
+    ".hub-standalone-command .category-modules{width:100%;display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;}",
+    ".hub-standalone-command .category-module-btn{width:100%;max-width:100%;box-sizing:border-box;display:flex !important;}"
   ].join("");
   function apply() {
     var style = document.getElementById(STYLE_ID);

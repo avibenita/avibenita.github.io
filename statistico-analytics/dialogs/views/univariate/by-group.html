@@ -50,9 +50,22 @@
     .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
     .metric strong { font-size:18px; color:var(--accent-1); }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
+    #statsTableWrap.is-capped { max-height:calc(36px + 15 * 33px); }
     table { width:100%; border-collapse:collapse; min-width:1120px; }
     th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; }
     th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
+    #statsTable thead th.sortable {
+      cursor:pointer; user-select:none; white-space:nowrap; transition:background .12s ease, color .12s ease;
+    }
+    #statsTable thead th.sortable:hover, #statsTable thead th.sortable:focus-visible {
+      background:linear-gradient(180deg, color-mix(in srgb, var(--accent-1) 16%, var(--surface-1)) 0%, color-mix(in srgb, var(--accent-1) 24%, var(--surface-2)) 100%);
+      outline:none;
+    }
+    #statsTable thead th.sortable .sort-ico {
+      display:inline-block; margin-left:5px; font-size:11px; opacity:.5; vertical-align:middle;
+      font-family:"Font Awesome 6 Free"; font-weight:900; font-style:normal; text-transform:none;
+    }
+    #statsTable thead th.sort-active .sort-ico { opacity:1; color:var(--accent-1); }
     th:first-child, td:first-child { text-align:left; }
     tbody tr:hover td { background:rgba(129,140,248,.12); }
     .hist-grid { display:grid; grid-template-columns:repeat(4, minmax(180px, 1fr)); gap:10px; }
@@ -127,12 +140,15 @@
     .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
     .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
     .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
-    .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
+    .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
     .group-option small { color:var(--text-secondary); font-weight:500; }
     .level-preview { padding:12px; overflow:auto; min-height:360px; }
     .level-preview.is-hidden { display:none; }
     .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
     .level-placeholder i { display:block; color:var(--accent-1); font-size:28px; margin-bottom:10px; }
+    .level-preview-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; gap:12px; color:var(--text-secondary); font-size:13px; }
+    .level-preview-loading i { color:var(--accent-1); font-size:28px; }
     .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .level-preview-head strong { color:var(--accent-1); font-size:13px; }
     .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
@@ -210,14 +226,9 @@
             <div id="byGroupPanel-stats" class="by-group-panel is-active">
             <section id="tablePanel" class="panel">
               <div class="section-title"><strong>Grouped Statistics</strong><span>Main descriptive statistics by selected group levels</span></div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Group</th><th>N</th><th>Mean</th><th>LCL</th><th>UCL</th><th>Median</th><th>Std Dev</th><th>Variance</th>
-                      <th>Min</th><th>Q1</th><th>Q3</th><th>Max</th><th>Skew</th><th>Kurtosis</th>
-                    </tr>
-                  </thead>
+              <div class="table-wrap" id="statsTableWrap">
+                <table id="statsTable">
+                  <thead id="statsHead"></thead>
                   <tbody id="statsBody"></tbody>
                 </table>
               </div>
@@ -277,8 +288,30 @@
     let analysisIndex = 0;
     let groupIndex = null;
     let groupStats = [];
+    let tableSort = { key: 'group', direction: 'ascending' };
+    const STATS_VISIBLE_ROWS = 15;
+    const STATS_COLUMNS = [
+      { key: 'group', label: 'Group' },
+      { key: 'n', label: 'N' },
+      { key: 'mean', label: 'Mean' },
+      { key: 'lcl', label: 'LCL' },
+      { key: 'ucl', label: 'UCL' },
+      { key: 'median', label: 'Median' },
+      { key: 'stdDev', label: 'Std Dev' },
+      { key: 'variance', label: 'Variance' },
+      { key: 'min', label: 'Min' },
+      { key: 'q1', label: 'Q1' },
+      { key: 'q3', label: 'Q3' },
+      { key: 'max', label: 'Max' },
+      { key: 'skew', label: 'Skew' },
+      { key: 'kurtosis', label: 'Kurtosis' }
+    ];
     let previewGroupIndex = null;
     let previewLevels = [];
+    let previewLoadToken = 0;
+    let previewBusy = false;
+    let groupChoiceNotesToken = 0;
+    const levelCountCache = Object.create(null);
     let boxplotChart = null;
     let activeByGroupTab = 'stats';
     let normGroupResults = [];
@@ -328,7 +361,13 @@
       return value === null || value === undefined || value === '' ? '(blank)' : String(value);
     }
 
+    function invalidateLevelCountCache() {
+      Object.keys(levelCountCache).forEach((key) => { delete levelCountCache[key]; });
+    }
+
     function getLevelCounts(idx) {
+      const cacheKey = String(idx);
+      if (levelCountCache[cacheKey]) return levelCountCache[cacheKey];
       const counts = new Map();
       rows.forEach((row) => {
         const rawValue = rowValue(row, analysisIndex, headers[analysisIndex]);
@@ -337,9 +376,16 @@
         const key = levelKey(rowValue(row, idx, headers[idx]));
         counts.set(key, (counts.get(key) || 0) + 1);
       });
-      return Array.from(counts.entries())
+      const result = Array.from(counts.entries())
         .map(([level, n]) => ({ level, n }))
         .sort((a, b) => String(a.level).localeCompare(String(b.level), undefined, { numeric: true }));
+      levelCountCache[cacheKey] = result;
+      return result;
+    }
+
+    function isValidGroupIndex(idx) {
+      const n = Number(idx);
+      return idx != null && idx !== '' && Number.isInteger(n) && n >= 0 && n < headers.length;
     }
 
     function ensureLevelSelection(idx) {
@@ -356,8 +402,12 @@
     }
 
     function isLevelIncluded(idx, level) {
-      const selection = ensureLevelSelection(idx);
-      return selection[level] !== false;
+      const key = String(idx);
+      const existing = levelSelections[key];
+      if (existing && Object.prototype.hasOwnProperty.call(existing, level)) {
+        return existing[level] !== false;
+      }
+      return ensureLevelSelection(idx)[level] !== false;
     }
 
     function normalizeRows(data) {
@@ -408,38 +458,68 @@
       rows = normalizeRows(payload);
       if (!headers.length || !rows.length) return setEmpty('BY GROUP needs source rows from the workbook range.');
       syncHeaderVariable(rows.length);
-      populateGroupChoices();
+      invalidateLevelCountCache();
       groupIndex = null;
+      populateGroupChoices();
       updateGroupChoiceLabel();
       hideLevelPreview();
       openGroupDialog();
     }
 
+    function groupChoiceNote(idx, levels) {
+      if (idx === analysisIndex) return 'analysis variable';
+      if (!levels) return '…';
+      const n = levels.reduce((sum, item) => sum + item.n, 0);
+      return `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${n}`;
+    }
+
     function populateGroupChoices() {
       const list = document.getElementById('groupDialogList');
       list.innerHTML = headers.map((header, idx) => {
-        const levels = getLevelCounts(idx);
-        const note = idx === analysisIndex ? 'analysis variable' : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((sum, item) => sum + item.n, 0)}`;
         return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
-          <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
+          <span>${escapeHtml(header)}</span><small>${escapeHtml(groupChoiceNote(idx, null))}</small>
         </button>`;
       }).join('');
       refreshGroupDialogSelection();
+      fillGroupChoiceNotes();
+    }
+
+    function fillGroupChoiceNotes() {
+      const token = ++groupChoiceNotesToken;
+      const buttons = Array.from(document.querySelectorAll('#groupDialogList .group-option'));
+      let i = 0;
+      function step() {
+        if (token !== groupChoiceNotesToken) return;
+        if (previewBusy) {
+          setTimeout(step, 32);
+          return;
+        }
+        const btn = buttons[i++];
+        if (!btn) return;
+        const idx = Number(btn.getAttribute('data-group-index'));
+        const small = btn.querySelector('small');
+        if (small) small.textContent = groupChoiceNote(idx, idx === analysisIndex ? null : getLevelCounts(idx));
+        if (i < buttons.length) setTimeout(step, 0);
+      }
+      setTimeout(step, 0);
     }
 
     function updateGroupChoiceLabel() {
-      document.getElementById('groupChoiceLabel').textContent = groupIndex == null
+      document.getElementById('groupChoiceLabel').textContent = !isValidGroupIndex(groupIndex)
         ? 'No grouping column selected'
         : `Group by: ${headers[groupIndex] || 'Group'}`;
     }
 
     function refreshGroupDialogSelection() {
       document.querySelectorAll('.group-option').forEach((btn) => {
-        btn.classList.toggle('is-selected', Number(btn.getAttribute('data-group-index')) === Number(groupIndex));
+        const idx = Number(btn.getAttribute('data-group-index'));
+        btn.classList.toggle('is-selected', isValidGroupIndex(groupIndex) && idx === Number(groupIndex));
       });
     }
 
     function hideLevelPreview() {
+      previewBusy = false;
+      previewLoadToken += 1;
       const preview = document.getElementById('groupLevelPreview');
       const placeholder = document.getElementById('groupLevelPlaceholder');
       if (preview) {
@@ -447,6 +527,28 @@
         preview.innerHTML = '';
       }
       if (placeholder) placeholder.style.display = 'flex';
+    }
+
+    function afterPreviewPaint(fn) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { setTimeout(fn, 0); });
+      });
+    }
+
+    function showLevelPreviewLoading(idx) {
+      previewBusy = true;
+      const preview = document.getElementById('groupLevelPreview');
+      const placeholder = document.getElementById('groupLevelPlaceholder');
+      if (placeholder) placeholder.style.display = 'none';
+      if (!preview) return;
+      preview.classList.remove('is-hidden');
+      const name = escapeHtml(headers[idx] || 'Group');
+      preview.innerHTML =
+        `<div class="level-preview-head"><div><strong>${name}</strong><span>Loading categories…</span></div></div>` +
+        `<div class="level-preview-loading" role="status" aria-live="polite">` +
+          `<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>` +
+          `<span>Loading categories…</span>` +
+        `</div>`;
     }
 
     function renderLevelPreview(idx) {
@@ -477,7 +579,8 @@
           </div>
         `).join('') || '<div class="empty"><i class="fa-solid fa-circle-info"></i>No levels with numeric values.</div>'
       ].join('');
-      preview.innerHTML = html;
+      if (preview) preview.innerHTML = html;
+      previewBusy = false;
     }
 
     function togglePreviewLevel(pos, included) {
@@ -505,7 +608,7 @@
     function openGroupDialog() {
       if (!headers.length) return;
       refreshGroupDialogSelection();
-      if (groupIndex == null) hideLevelPreview();
+      if (!isValidGroupIndex(groupIndex)) hideLevelPreview();
       else renderLevelPreview(groupIndex);
       document.getElementById('groupDialog').classList.add('is-visible');
     }
@@ -515,13 +618,22 @@
     }
 
     function selectGroupColumn(idx, keepDialogOpen) {
+      if (!isValidGroupIndex(idx)) return;
       groupIndex = Number(idx);
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();
-      renderLevelPreview(groupIndex);
+      const token = ++previewLoadToken;
+      showLevelPreviewLoading(groupIndex);
       if (!keepDialogOpen) closeGroupDialog();
-      renderByGroup();
-      registerHeaderActions();
+      afterPreviewPaint(() => {
+        if (token !== previewLoadToken) return;
+        renderLevelPreview(groupIndex);
+        afterPreviewPaint(() => {
+          if (token !== previewLoadToken) return;
+          renderByGroup();
+          registerHeaderActions();
+        });
+      });
     }
 
     function buildGroups() {
@@ -574,6 +686,7 @@
       if (activeByGroupTab === 'stats') {
         renderHistograms();
         requestAnimationFrame(function () {
+          applyStatsTableScrollLimit();
           try {
             document.querySelectorAll('#histGrid .hist-chart').forEach((el) => {
               const chart = Highcharts.charts.find((c) => c && c.renderTo === el);
@@ -591,14 +704,90 @@
     }
     window.switchByGroupTab = switchByGroupTab;
 
+    function statsSortIcon(key) {
+      if (tableSort.key !== key) return 'fa-solid fa-sort';
+      return tableSort.direction === 'ascending' ? 'fa-solid fa-sort-up' : 'fa-solid fa-sort-down';
+    }
+
+    function statsAriaSort(key) {
+      if (tableSort.key !== key) return 'none';
+      return tableSort.direction === 'ascending' ? 'ascending' : 'descending';
+    }
+
+    function requestStatsSort(key) {
+      if (!key) return;
+      if (tableSort.key === key) {
+        tableSort.direction = tableSort.direction === 'ascending' ? 'descending' : 'ascending';
+      } else {
+        tableSort = { key, direction: key === 'group' ? 'ascending' : 'descending' };
+      }
+      renderTable();
+    }
+    window.requestStatsSort = requestStatsSort;
+
+    function getSortedGroupStats() {
+      const rows = groupStats.slice();
+      const dir = tableSort.direction === 'ascending' ? 1 : -1;
+      const key = tableSort.key;
+      rows.sort((a, b) => {
+        if (key === 'group') {
+          return dir * String(a.group).localeCompare(String(b.group), undefined, { numeric: true });
+        }
+        const aVal = Number(a[key]);
+        const bVal = Number(b[key]);
+        const aOk = Number.isFinite(aVal);
+        const bOk = Number.isFinite(bVal);
+        if (!aOk && !bOk) return 0;
+        if (!aOk) return 1;
+        if (!bOk) return -1;
+        return dir * (aVal - bVal);
+      });
+      return rows;
+    }
+
+    function applyStatsTableScrollLimit() {
+      const wrap = document.getElementById('statsTableWrap');
+      if (!wrap) return;
+      const rows = wrap.querySelectorAll('tbody tr');
+      wrap.classList.toggle('is-capped', rows.length > STATS_VISIBLE_ROWS);
+      if (rows.length <= STATS_VISIBLE_ROWS) {
+        wrap.style.maxHeight = '';
+        return;
+      }
+      const panel = document.getElementById('byGroupPanel-stats');
+      const last = rows[STATS_VISIBLE_ROWS - 1];
+      if (!last || (panel && !panel.classList.contains('is-active'))) return;
+      const height = Math.ceil(last.getBoundingClientRect().bottom - wrap.getBoundingClientRect().top + wrap.scrollTop);
+      if (height > 0) wrap.style.maxHeight = `${height}px`;
+    }
+
     function renderTable() {
-      document.getElementById('statsBody').innerHTML = groupStats.map((g) => `
+      const head = document.getElementById('statsHead');
+      const body = document.getElementById('statsBody');
+      if (head) {
+        head.innerHTML = `<tr>${STATS_COLUMNS.map((col) => {
+          const active = tableSort.key === col.key ? ' sort-active' : '';
+          return `<th class="sortable${active}" data-key="${col.key}" scope="col" tabindex="0" role="columnheader" aria-sort="${statsAriaSort(col.key)}" title="Click to sort by ${escapeHtml(col.label)}">${escapeHtml(col.label)} <i class="${statsSortIcon(col.key)} sort-ico" aria-hidden="true"></i></th>`;
+        }).join('')}</tr>`;
+        head.querySelectorAll('th.sortable').forEach((th) => {
+          th.addEventListener('click', () => requestStatsSort(th.getAttribute('data-key')));
+          th.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              requestStatsSort(th.getAttribute('data-key'));
+            }
+          });
+        });
+      }
+      if (!body) return;
+      body.innerHTML = getSortedGroupStats().map((g) => `
         <tr>
           <td>${escapeHtml(g.group)}</td><td>${g.n}</td><td>${fmt(g.mean)}</td><td>${fmt(g.lcl)}</td><td>${fmt(g.ucl)}</td><td>${fmt(g.median)}</td>
           <td>${fmt(g.stdDev)}</td><td>${fmt(g.variance)}</td><td>${fmt(g.min)}</td><td>${fmt(g.q1)}</td>
           <td>${fmt(g.q3)}</td><td>${fmt(g.max)}</td><td>${fmt(g.skew)}</td><td>${fmt(g.kurtosis)}</td>
         </tr>
       `).join('');
+      applyStatsTableScrollLimit();
     }
 
     function histogramSeries(values, globalMin, globalMax, bins) {

@@ -303,6 +303,8 @@
     .level-preview.is-hidden { display:none; }
     .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
     .level-placeholder i { display:block; color:var(--accent-1); font-size:28px; margin-bottom:10px; }
+    .level-preview-loading { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:260px; gap:12px; color:var(--text-secondary); font-size:13px; }
+    .level-preview-loading i { color:var(--accent-1); font-size:28px; }
     .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .level-preview-head strong { color:var(--accent-1); font-size:13px; }
     .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
@@ -415,6 +417,7 @@
     let groupIndex = null;
     let previewGroupIndex = null;
     let previewLevels = [];
+    let previewLoadToken = 0;
     let activeGroups = [];
     let fixedCategoricalInfo = null;
     let displayTerms = [];
@@ -889,9 +892,29 @@
     }
 
     function hideLevelPreview() {
+      previewLoadToken += 1;
       document.getElementById('groupLevelPreview').classList.add('is-hidden');
       document.getElementById('groupLevelPreview').innerHTML = '';
       document.getElementById('groupLevelPlaceholder').style.display = 'flex';
+    }
+
+    function afterPreviewPaint(fn) {
+      requestAnimationFrame(() => { setTimeout(fn, 0); });
+    }
+
+    function showLevelPreviewLoading(idx) {
+      const preview = document.getElementById('groupLevelPreview');
+      const placeholder = document.getElementById('groupLevelPlaceholder');
+      if (placeholder) placeholder.style.display = 'none';
+      if (!preview) return;
+      preview.classList.remove('is-hidden');
+      const name = escapeHtml(sourceHeaders[idx] || 'Group');
+      preview.innerHTML =
+        `<div class="level-preview-head"><div><strong>${name}</strong><span>Loading categories…</span></div></div>` +
+        `<div class="level-preview-loading" role="status" aria-live="polite">` +
+          `<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>` +
+          `<span>Loading categories…</span>` +
+        `</div>`;
     }
 
     function renderLevelPreview(idx) {
@@ -947,9 +970,17 @@
       groupIndex = Number(idx);
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();
-      renderLevelPreview(groupIndex);
+      const token = ++previewLoadToken;
+      showLevelPreviewLoading(groupIndex);
       if (!keepDialogOpen) closeGroupDialog();
-      renderByGroup();
+      afterPreviewPaint(() => {
+        if (token !== previewLoadToken) return;
+        renderLevelPreview(groupIndex);
+        afterPreviewPaint(() => {
+          if (token !== previewLoadToken) return;
+          renderByGroup();
+        });
+      });
     }
 
     function buildIncludedGroups() {

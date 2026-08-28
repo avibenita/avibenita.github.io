@@ -88,8 +88,7 @@ const HUB_CATEGORY_TILES = [
       "Useful first pass before regression or group comparisons"
     ],
     modules: [
-      { id: "univariate", label: "Univariate Analysis", tip: "Distribution summaries, outliers, and normality checks for single variables." },
-      { id: "univariate-workspace", label: "Univariate Workspace", tip: "Focused live-data histogram workspace with only the Distribution view enabled." }
+      { id: "univariate", label: "Univariate Analysis", tip: "Distribution summaries, outliers, and normality checks for single variables." }
     ]
   },
   {
@@ -2779,9 +2778,6 @@ function navigateToModuleCore(id) {
   }
   if (id === "univariate") {
     if (openUnivariateConfigFromHub("univariate", null)) return;
-  }
-  if (id === "univariate-workspace") {
-    if (openUnivariateConfigFromHub("univariate-workspace", "univariate/univariate-workspace.html")) return;
   }
   if (id === "regression") {
     if (openRegressionConfigFromHub()) return;

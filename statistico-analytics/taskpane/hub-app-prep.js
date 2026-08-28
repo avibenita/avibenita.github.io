@@ -847,6 +847,9 @@ function renderCategoryTiles(query) {
     html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
   });
   holder.innerHTML = html;
+  holder.querySelectorAll(".hub-accordion-panel").forEach(function (panel) {
+    applyHubAccordionOpenState(panel, panel.classList.contains("is-open"));
+  });
   if (noResults) noResults.style.display = list.length ? "none" : "block";
   syncAnalyticsAllBar(q);
   placeHubRangeSection();
@@ -909,6 +912,24 @@ function getHubOpenSectionSet() {
   return HUB_OPEN_SECTIONS[ACTIVE_CLUSTER];
 }
 
+function applyHubAccordionOpenState(panel, open) {
+  if (!panel) return;
+  if (open) panel.classList.add("is-open");
+  else panel.classList.remove("is-open");
+  panel.style.setProperty("height", "auto", "important");
+  panel.style.setProperty("max-height", "none", "important");
+  var head = panel.querySelector(".hub-accordion-head");
+  if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+  var body = panel.querySelector(".hub-accordion-body");
+  if (!body) return;
+  body.style.setProperty("display", open ? "flex" : "none", "important");
+  if (open) {
+    body.style.setProperty("flex-direction", "column", "important");
+    body.style.setProperty("height", "auto", "important");
+    body.style.setProperty("overflow", "visible", "important");
+  }
+}
+
 function toggleHubAccordion(sectionId) {
   if (!sectionId) return;
   var openSet = getHubOpenSectionSet();
@@ -916,9 +937,7 @@ function toggleHubAccordion(sectionId) {
   var panel = document.querySelector('.hub-accordion-panel[data-section="' + sectionId + '"]');
   if (!panel) return;
   var open = !!openSet[sectionId];
-  panel.classList.toggle("is-open", open);
-  var head = panel.querySelector(".hub-accordion-head");
-  if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+  applyHubAccordionOpenState(panel, open);
   syncHubExpandAllButton();
   if (window.StatisticoTooltip && typeof window.StatisticoTooltip.hide === "function") {
     window.StatisticoTooltip.hide();
@@ -971,47 +990,14 @@ function toggleHubExpandAll() {
   }
 }
 
-function getAccordionModuleNames(tiles) {
-  var names = [];
-  var seen = {};
-  (tiles || []).forEach(function (c) {
-    var mods = getCategoryModules(c);
-    if (mods.length) {
-      mods.forEach(function (m) {
-        var label = (m && m.label) || "";
-        if (!label || seen[label]) return;
-        seen[label] = true;
-        names.push(label);
-      });
-    } else if (c.title && !seen[c.title]) {
-      seen[c.title] = true;
-      names.push(c.title);
-    }
-  });
-  return names;
-}
-
-function renderHubAccordionPanel(sectionId, tilesHtml, open, tiles) {
+function renderHubAccordionPanel(sectionId, tilesHtml, open) {
   var meta = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_META[sectionId] : ANALYTICS_SECTION_META[sectionId];
   if (!meta) return tilesHtml || "";
-  var names = getAccordionModuleNames(tiles);
-  var tipText = names.length
-    ? meta.label + "\n" + names.map(function (n) { return "| " + n; }).join("\n")
-    : (meta.subtitle || meta.label);
-  var tipHtml =
-    '<span class="st-tt-title">' + escapeHtml(meta.label) + "</span>" +
-    '<span class="st-tt-body">' +
-    (names.length
-      ? names.map(function (n) { return "| " + escapeHtml(n); }).join("<br>")
-      : escapeHtml(meta.subtitle || meta.label)) +
-    "</span>";
   return (
     '<div class="hub-accordion-panel' + (open ? " is-open" : "") + '" data-section="' + escapeHtml(sectionId) + '"' +
     ' style="--section-color:' + escapeHtml(meta.color) + ';">' +
     '<button type="button" class="hub-accordion-head" aria-expanded="' + (open ? "true" : "false") + '"' +
     ' aria-label="' + escapeHtml(meta.label) + '"' +
-    ' data-st-tip="' + escapeHtml(tipText) + '"' +
-    ' data-st-tip-html="' + tipHtml.replace(/"/g, "&quot;") + '"' +
     ' onclick="toggleHubAccordion(\'' + sectionId + '\')">' +
     '<span class="hub-accordion-icon"><i class="fa-solid ' + escapeHtml(meta.icon) + '" aria-hidden="true"></i></span>' +
     '<span class="hub-accordion-copy">' +
@@ -1020,7 +1006,7 @@ function renderHubAccordionPanel(sectionId, tilesHtml, open, tiles) {
     "</span>" +
     '<i class="fa-solid fa-chevron-down hub-accordion-caret" aria-hidden="true"></i>' +
     "</button>" +
-    '<div class="hub-accordion-body">' + (tilesHtml || "") + "</div>" +
+    '<div class="hub-accordion-body" style="display:' + (open ? "flex" : "none") + ' !important;flex-direction:column;">' + (tilesHtml || "") + "</div>" +
     "</div>"
   );
 }

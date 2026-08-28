@@ -7,7 +7,8 @@
 (function ensureHubAccordionStyles() {
   var STYLE_ID = "hub-accordion-live-css";
   var css = [
-    ".hub-accordion-panel{width:100%;box-sizing:border-box;border:1px solid rgba(180,156,255,.32);border-radius:10px;background:#152033;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .12s ease;}",
+    ".category-tiles{display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;gap:10px;align-items:stretch;}",
+    ".hub-accordion-panel{width:100%;flex:0 0 auto;height:auto !important;max-height:none !important;box-sizing:border-box;border:1px solid rgba(180,156,255,.32);border-radius:10px;background:#152033;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .12s ease;}",
     ".hub-accordion-head{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:58px;padding:12px 14px;border:none;background:transparent;color:inherit;text-align:left;cursor:pointer;font-family:inherit;}",
     ".hub-accordion-panel:hover,.hub-accordion-panel:hover .hub-accordion-head{background:#243556 !important;}",
     ".hub-accordion-panel:hover{border-color:var(--section-color,#a78bfa) !important;box-shadow:0 0 0 1px var(--section-color,#a78bfa) !important;transform:translateY(-1px);}",
@@ -17,17 +18,19 @@
     ".hub-accordion-desc{display:-webkit-box;margin-top:3px;font-size:11px;color:#94a3b8;line-height:1.4;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;}",
     ".hub-accordion-caret{font-size:12px;color:#cbd5e1;flex-shrink:0;width:16px;text-align:center;transition:transform .18s ease,color .16s ease;}",
     ".hub-accordion-panel.is-open .hub-accordion-caret{transform:rotate(180deg);}",
-    ".hub-accordion-body{display:none !important;padding:0 12px 12px;}",
-    ".hub-accordion-panel.is-open>.hub-accordion-body{display:flex !important;flex-direction:column !important;gap:10px;border-top:1px solid rgba(226,232,240,.1);padding-top:10px;}",
-    ".hub-accordion-body .category-modules{width:100%;display:flex !important;flex-direction:column;gap:8px;}",
-    ".hub-accordion-body .category-module-btn{width:100%;}"
+    ".hub-accordion-body{display:none;padding:0 12px 12px;height:auto;overflow:visible;}",
+    ".hub-accordion-panel.is-open .hub-accordion-body{display:flex !important;flex-direction:column !important;gap:10px;border-top:1px solid rgba(226,232,240,.1);padding-top:10px;height:auto !important;max-height:none !important;overflow:visible !important;}",
+    ".hub-accordion-body .category-modules{width:100%;display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;gap:8px;height:auto !important;overflow:visible !important;}",
+    ".hub-accordion-body .category-module-btn{width:100%;display:flex !important;}"
   ].join("");
   function apply() {
-    if (document.getElementById(STYLE_ID)) return;
-    var style = document.createElement("style");
-    style.id = STYLE_ID;
+    var style = document.getElementById(STYLE_ID);
+    if (!style) {
+      style = document.createElement("style");
+      style.id = STYLE_ID;
+      (document.head || document.documentElement).appendChild(style);
+    }
     style.textContent = css;
-    (document.head || document.documentElement).appendChild(style);
   }
   if (document.head) apply();
   else document.addEventListener("DOMContentLoaded", apply);
@@ -885,6 +888,9 @@ function renderCategoryTiles(query) {
     }
   }
   holder.innerHTML = html;
+  holder.querySelectorAll(".hub-accordion-panel").forEach(function (panel) {
+    applyHubAccordionOpenState(panel, panel.classList.contains("is-open"));
+  });
   if (noResults) noResults.style.display = list.length ? "none" : "block";
   syncAnalyticsAllBar(q);
   placeHubRangeSection();
@@ -947,6 +953,24 @@ function getHubOpenSectionSet() {
   return HUB_OPEN_SECTIONS[ACTIVE_CLUSTER];
 }
 
+function applyHubAccordionOpenState(panel, open) {
+  if (!panel) return;
+  if (open) panel.classList.add("is-open");
+  else panel.classList.remove("is-open");
+  panel.style.setProperty("height", "auto", "important");
+  panel.style.setProperty("max-height", "none", "important");
+  var head = panel.querySelector(".hub-accordion-head");
+  if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+  var body = panel.querySelector(".hub-accordion-body");
+  if (!body) return;
+  body.style.setProperty("display", open ? "flex" : "none", "important");
+  if (open) {
+    body.style.setProperty("flex-direction", "column", "important");
+    body.style.setProperty("height", "auto", "important");
+    body.style.setProperty("overflow", "visible", "important");
+  }
+}
+
 function toggleHubAccordion(sectionId) {
   if (!sectionId) return;
   var openSet = getHubOpenSectionSet();
@@ -954,9 +978,7 @@ function toggleHubAccordion(sectionId) {
   var panel = document.querySelector('.hub-accordion-panel[data-section="' + sectionId + '"]');
   if (!panel) return;
   var open = !!openSet[sectionId];
-  panel.classList.toggle("is-open", open);
-  var head = panel.querySelector(".hub-accordion-head");
-  if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+  applyHubAccordionOpenState(panel, open);
   if (open && typeof panel.scrollIntoView === "function") {
     try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_e) {
       panel.scrollIntoView(true);
@@ -1063,7 +1085,7 @@ function renderHubAccordionPanel(sectionId, tilesHtml, open, tiles) {
     "</span>" +
     '<i class="fa-solid fa-chevron-down hub-accordion-caret" aria-hidden="true"></i>' +
     "</button>" +
-    '<div class="hub-accordion-body">' + (tilesHtml || "") + "</div>" +
+    '<div class="hub-accordion-body" style="display:' + (open ? "flex" : "none") + ' !important;flex-direction:column;">' + (tilesHtml || "") + "</div>" +
     "</div>"
   );
 }

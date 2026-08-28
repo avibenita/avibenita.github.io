@@ -152,8 +152,21 @@
     .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .level-preview-head strong { color:var(--accent-1); font-size:13px; }
     .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
-    .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:8px; }
+    .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; align-items:center; margin-bottom:8px; }
     .level-actions button { padding:5px 8px; font-size:11px; }
+    .level-keep {
+      display:inline-flex; align-items:center; gap:6px; margin-right:auto;
+      color:var(--text-secondary); font-size:11px; font-weight:700; white-space:nowrap;
+    }
+    .level-keep input[type="number"] {
+      width:58px; padding:5px 7px; font-size:11px; font-weight:600;
+      border:1px solid var(--border); border-radius:8px;
+      background:var(--surface-2); color:var(--text-primary);
+    }
+    .level-keep input[type="number"]:focus {
+      outline:none; border-color:var(--accent-1);
+      box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 40%, transparent);
+    }
     .group-dialog-foot {
       display:flex; justify-content:flex-end; align-items:center; gap:10px;
       padding:14px 18px 16px; border-top:1px solid var(--border);
@@ -308,6 +321,7 @@
     ];
     let previewGroupIndex = null;
     let previewLevels = [];
+    let previewKeepMinN = '';
     let previewLoadToken = 0;
     let previewBusy = false;
     let groupChoiceNotesToken = 0;
@@ -559,13 +573,18 @@
       if (placeholder) placeholder.style.display = 'none';
       ensureLevelSelection(previewGroupIndex);
       previewLevels = getLevelCounts(previewGroupIndex);
-      const selectedCount = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level)).length;
-      const totalN = previewLevels.reduce((sum, item) => sum + item.n, 0);
+      const included = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level));
+      const selectedCount = included.length;
+      const includedN = included.reduce((sum, item) => sum + item.n, 0);
+      const keepValue = previewKeepMinN ? ` value="${escapeHtml(previewKeepMinN)}"` : '';
       const html = [
         `<div class="level-preview-head">
-          <div><strong>${escapeHtml(headers[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${totalN}</span></div>
+          <div><strong>${escapeHtml(headers[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${includedN}</span></div>
         </div>`,
         `<div class="level-actions">
+          <label class="level-keep" title="Keep only levels with at least this many rows">Keep n≥
+            <input type="number" min="1" step="1" inputmode="numeric" placeholder="1"${keepValue} aria-label="Keep levels with n at least" onchange="keepPreviewLevelsByMinN(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();keepPreviewLevelsByMinN(this.value);}" />
+          </label>
           <button type="button" onclick="setAllPreviewLevels(true)">Include all</button>
           <button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button>
         </div>`,
@@ -604,6 +623,21 @@
       }
       renderLevelPreview(previewGroupIndex);
     }
+
+    function keepPreviewLevelsByMinN(raw) {
+      const parsed = parseInt(String(raw).trim(), 10);
+      previewKeepMinN = Number.isFinite(parsed) && parsed > 0 ? String(parsed) : '';
+      if (!previewKeepMinN) return;
+      const minN = Number(previewKeepMinN);
+      const selection = ensureLevelSelection(previewGroupIndex);
+      previewLevels.forEach((item) => { selection[item.level] = item.n >= minN; });
+      if (previewGroupIndex === groupIndex) {
+        renderByGroup();
+        registerHeaderActions();
+      }
+      renderLevelPreview(previewGroupIndex);
+    }
+    window.keepPreviewLevelsByMinN = keepPreviewLevelsByMinN;
 
     function openGroupDialog() {
       if (!headers.length) return;

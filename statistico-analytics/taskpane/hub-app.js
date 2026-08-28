@@ -1029,47 +1029,14 @@ function toggleHubExpandAll() {
   }
 }
 
-function getAccordionModuleNames(tiles) {
-  var names = [];
-  var seen = {};
-  (tiles || []).forEach(function (c) {
-    var mods = getCategoryModules(c);
-    if (mods.length) {
-      mods.forEach(function (m) {
-        var label = (m && m.label) || "";
-        if (!label || seen[label]) return;
-        seen[label] = true;
-        names.push(label);
-      });
-    } else if (c.title && !seen[c.title]) {
-      seen[c.title] = true;
-      names.push(c.title);
-    }
-  });
-  return names;
-}
-
-function renderHubAccordionPanel(sectionId, tilesHtml, open, tiles) {
+function renderHubAccordionPanel(sectionId, tilesHtml, open) {
   var meta = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_META[sectionId] : ANALYTICS_SECTION_META[sectionId];
   if (!meta) return tilesHtml || "";
-  var names = getAccordionModuleNames(tiles);
-  var tipText = names.length
-    ? meta.label + "\n" + names.map(function (n) { return "| " + n; }).join("\n")
-    : (meta.subtitle || meta.label);
-  var tipHtml =
-    '<span class="st-tt-title">' + escapeHtml(meta.label) + "</span>" +
-    '<span class="st-tt-body">' +
-    (names.length
-      ? names.map(function (n) { return "| " + escapeHtml(n); }).join("<br>")
-      : escapeHtml(meta.subtitle || meta.label)) +
-    "</span>";
   return (
     '<div class="hub-accordion-panel' + (open ? " is-open" : "") + '" data-section="' + escapeHtml(sectionId) + '"' +
     ' style="--section-color:' + escapeHtml(meta.color) + ';">' +
     '<button type="button" class="hub-accordion-head" aria-expanded="' + (open ? "true" : "false") + '"' +
     ' aria-label="' + escapeHtml(meta.label) + '"' +
-    ' data-st-tip="' + escapeHtml(tipText) + '"' +
-    ' data-st-tip-html="' + tipHtml.replace(/"/g, "&quot;") + '"' +
     ' onclick="toggleHubAccordion(\'' + sectionId + '\')">' +
     '<span class="hub-accordion-icon"><i class="fa-solid ' + escapeHtml(meta.icon) + '" aria-hidden="true"></i></span>' +
     '<span class="hub-accordion-copy">' +

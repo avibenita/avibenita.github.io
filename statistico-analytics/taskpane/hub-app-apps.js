@@ -971,6 +971,46 @@ function applyHubAccordionOpenState(panel, open) {
   }
 }
 
+function revealHubAccordionPanel(panel) {
+  if (!panel) return;
+  function run() {
+    var scroller = document.getElementById("hubScrollBody");
+    if (!scroller) {
+      var node = panel.parentElement;
+      while (node && node !== document.body) {
+        var oy = window.getComputedStyle(node).overflowY;
+        if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight + 1) {
+          scroller = node;
+          break;
+        }
+        node = node.parentElement;
+      }
+    }
+    if (!scroller) scroller = document.scrollingElement || document.documentElement;
+    var pad = 12;
+    var pRect = panel.getBoundingClientRect();
+    var sRect = scroller.getBoundingClientRect ? scroller.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+    var viewH = sRect.bottom - sRect.top;
+    var delta = 0;
+    if (pRect.height + pad * 2 >= viewH) {
+      delta = pRect.top - sRect.top - pad;
+    } else {
+      if (pRect.bottom > sRect.bottom - pad) delta += pRect.bottom - (sRect.bottom - pad);
+      if (pRect.top - delta < sRect.top + pad) delta -= (sRect.top + pad) - (pRect.top - delta);
+    }
+    if (Math.abs(delta) <= 1) return;
+    if (typeof scroller.scrollBy === "function") {
+      try { scroller.scrollBy({ top: delta, behavior: "smooth" }); return; } catch (_e) {}
+    }
+    scroller.scrollTop += delta;
+  }
+  if (window.requestAnimationFrame) {
+    requestAnimationFrame(function () { requestAnimationFrame(run); });
+  } else {
+    setTimeout(run, 40);
+  }
+}
+
 function toggleHubAccordion(sectionId) {
   if (!sectionId) return;
   var openSet = getHubOpenSectionSet();
@@ -979,11 +1019,7 @@ function toggleHubAccordion(sectionId) {
   if (!panel) return;
   var open = !!openSet[sectionId];
   applyHubAccordionOpenState(panel, open);
-  if (open && typeof panel.scrollIntoView === "function") {
-    try { panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_e) {
-      panel.scrollIntoView(true);
-    }
-  }
+  if (open) revealHubAccordionPanel(panel);
   syncHubExpandAllButton();
   if (window.StatisticoTooltip && typeof window.StatisticoTooltip.hide === "function") {
     window.StatisticoTooltip.hide();

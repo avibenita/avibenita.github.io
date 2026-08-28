@@ -621,6 +621,46 @@
       padding: 12px 16px 18px;
     }
 
+    .checkout-wait{
+      position: fixed;
+      inset: 0;
+      z-index: 14000;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      background: rgba(4, 10, 18, 0.82);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .checkout-wait.is-open{ display: grid; }
+    .checkout-wait-card{
+      width: min(420px, calc(100vw - 40px));
+      padding: 28px 26px 24px;
+      border: 1px solid rgba(255, 165, 120, 0.35);
+      border-radius: 16px;
+      background:
+        radial-gradient(420px 180px at 12% 0%, rgba(255, 165, 120, 0.12), transparent 55%),
+        linear-gradient(165deg, #0f1d31 0%, #0a1321 100%);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+      text-align: center;
+    }
+    .checkout-wait-card i{
+      font-size: 1.6rem;
+      color: rgba(255, 165, 120, 0.95);
+      margin-bottom: 12px;
+    }
+    .checkout-wait-card h2{
+      margin: 0 0 8px;
+      font-size: 1.2rem;
+      color: #ffe8d8;
+    }
+    .checkout-wait-card p{
+      margin: 0;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
     .download-toast{
       position: fixed;
       right: 20px;
@@ -989,7 +1029,7 @@
             Secure checkout issues your license key. Activate from inside EzPaste.
             Transfer to a new machine via deactivate/reactivate. Multi-seat available — contact us.
           </p>
-          <a class="btn btn-warm" id="buyBtn" href="https://ezpaste-license.onrender.com/buy" target="_blank" rel="noopener noreferrer">
+          <a class="btn btn-warm" id="buyBtn" href="https://ezpaste-license.onrender.com/buy" rel="noopener noreferrer">
             <i class="fa-solid fa-cart-shopping"></i> Buy lifetime license — $49
           </a>
           <p class="get-meta">
@@ -1109,14 +1149,77 @@
     <button type="button" class="toast-close" id="downloadToastClose" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
   </div>
 
+  <div class="checkout-wait" id="checkoutWait" aria-hidden="true" role="status" aria-live="polite">
+    <div class="checkout-wait-card">
+      <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+      <h2>Opening secure checkout</h2>
+      <p id="checkoutWaitMsg">Connecting to payment. This can take a few seconds the first time.</p>
+    </div>
+  </div>
+
   <div id="footer-placeholder"></div>
 
   <script src="assets/js/nav-template.js?v=2026-08-19-specialized-tools"></script>
   <script>
     window.EZPASTE_BUY_URL = "https://ezpaste-license.onrender.com/buy";
+    window.EZPASTE_HEALTH_URL = "https://ezpaste-license.onrender.com/health";
     document.addEventListener("DOMContentLoaded", function () {
       var buy = document.getElementById("buyBtn");
       if (buy && window.EZPASTE_BUY_URL) buy.href = window.EZPASTE_BUY_URL;
+
+      var checkoutWait = document.getElementById("checkoutWait");
+      var checkoutWaitMsg = document.getElementById("checkoutWaitMsg");
+      var checkoutOpening = false;
+
+      function showCheckoutWait() {
+        if (!checkoutWait) return;
+        checkoutWait.classList.add("is-open");
+        checkoutWait.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
+
+      function goToCheckout() {
+        window.location.href = window.EZPASTE_BUY_URL;
+      }
+
+      function licenseServerReady() {
+        return fetch(window.EZPASTE_HEALTH_URL, { cache: "no-store" }).then(function (res) {
+          if (!res.ok) throw new Error("not ready");
+          return res.json();
+        }).then(function (data) {
+          if (!data || !data.ok) throw new Error("not ready");
+        });
+      }
+
+      function waitForLicenseServer(timeoutMs) {
+        var started = Date.now();
+        function attempt() {
+          return licenseServerReady().catch(function () {
+            if (Date.now() - started >= timeoutMs) return;
+            return new Promise(function (resolve) { setTimeout(resolve, 1500); }).then(attempt);
+          });
+        }
+        return attempt();
+      }
+
+      // Wake the license server while the visitor reads the page, so Buy is usually instant.
+      licenseServerReady().catch(function () {});
+
+      if (buy) {
+        buy.addEventListener("click", function (event) {
+          if (checkoutOpening) {
+            event.preventDefault();
+            return;
+          }
+          event.preventDefault();
+          checkoutOpening = true;
+          if (checkoutWaitMsg) {
+            checkoutWaitMsg.textContent = "Connecting to payment. This can take a few seconds the first time.";
+          }
+          showCheckoutWait();
+          waitForLicenseServer(60000).then(goToCheckout).catch(goToCheckout);
+        });
+      }
 
       var modal = document.getElementById("faqModal");
       if (modal && modal.parentElement !== document.body) {

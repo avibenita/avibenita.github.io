@@ -47,6 +47,8 @@
 
   var subtitles = Object.assign({}, DEFAULT_SUBTITLES);
   var initialized = false;
+  var VIEW_SWITCHER_KICKER = 'EXPLORE VIEWS';
+  var HINT_STORAGE_PREFIX = 'statistico-view-switcher-seen:';
 
   function getTabKey(btn) {
     return btn.dataset.uniTab || btn.dataset.regTab || btn.dataset.predTab || btn.dataset.vizTab ||
@@ -201,10 +203,14 @@
   function upgradeToViewSwitcher(bar) {
     if (!bar || !bar.classList || isSlantBar(bar)) return;
     bar.classList.add('view-switcher-bar', 'uni-view-tabs');
+    ensureViewSwitcherCtaMarks(bar);
 
     var existingHost = bar.closest('.view-switcher');
     if (existingHost) {
+      var existingKicker = existingHost.querySelector('.view-switcher-kicker');
+      if (existingKicker) existingKicker.textContent = VIEW_SWITCHER_KICKER;
       updateViewSwitcherDescription(existingHost);
+      maybeHintViewSwitcher(existingHost);
       return;
     }
 
@@ -218,7 +224,7 @@
 
     var kicker = document.createElement('span');
     kicker.className = 'view-switcher-kicker';
-    kicker.textContent = 'VIEW';
+    kicker.textContent = VIEW_SWITCHER_KICKER;
 
     var desc = document.createElement('p');
     desc.className = 'view-switcher-desc uni-view-caption';
@@ -234,6 +240,79 @@
     row.appendChild(desc);
     host.appendChild(row);
     updateViewSwitcherDescription(host);
+    maybeHintViewSwitcher(host);
+  }
+
+  function prefersReducedMotion() {
+    try {
+      return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function getViewSwitcherModuleKey() {
+    var moduleName = '';
+    try {
+      if (global.StatisticoHeader && StatisticoHeader.module) {
+        moduleName = String(StatisticoHeader.module);
+      }
+    } catch (e) {}
+    if (!moduleName) {
+      var path = String((location && location.pathname) || '').toLowerCase();
+      var match = path.match(/\/(?:dialogs\/)?views\/([^/]+)/);
+      moduleName = match ? match[1] : 'default';
+    }
+    return HINT_STORAGE_PREFIX + moduleName;
+  }
+
+  function ensureViewSwitcherCtaMarks(bar) {
+    if (!bar) return;
+    Array.prototype.forEach.call(bar.querySelectorAll('.ws-mode-tab'), function(btn) {
+      if (btn.querySelector('.view-switcher-mark')) return;
+      var mark = document.createElement('span');
+      mark.className = 'view-switcher-mark';
+      mark.setAttribute('aria-hidden', 'true');
+      mark.innerHTML = '<i class="fa-solid fa-arrow-right view-switcher-go"></i>'
+        + '<i class="fa-solid fa-check view-switcher-check"></i>';
+      btn.appendChild(mark);
+    });
+  }
+
+  var hintStarted = {};
+
+  function maybeHintViewSwitcher(host) {
+    var key = getViewSwitcherModuleKey();
+    if (hintStarted[key]) return;
+    try {
+      if (localStorage.getItem(key) === '1') return;
+    } catch (e) {}
+    if (prefersReducedMotion()) {
+      try { localStorage.setItem(key, '1'); } catch (e) {}
+      return;
+    }
+    hintStarted[key] = true;
+    window.setTimeout(function() {
+      var liveHost = (host && host.isConnected) ? host : document.querySelector('.view-switcher');
+      if (!liveHost) return;
+      var alts = liveHost.querySelectorAll('.ws-mode-tab:not(.active)');
+      if (!alts.length) return;
+      try { localStorage.setItem(key, '1'); } catch (e) {}
+      Array.prototype.forEach.call(alts, function(btn, i) {
+        btn.classList.add('view-switcher-cta-hint');
+        btn.style.animationDelay = (0.08 + i * 0.12) + 's';
+        var cleared = false;
+        var clearHint = function() {
+          if (cleared) return;
+          cleared = true;
+          btn.classList.remove('view-switcher-cta-hint');
+          btn.style.animationDelay = '';
+          btn.removeEventListener('animationend', clearHint);
+        };
+        btn.addEventListener('animationend', clearHint);
+        window.setTimeout(clearHint, 1600);
+      });
+    }, 450);
   }
 
   function bindViewSwitcherUpdates() {

@@ -114,7 +114,7 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
   const script = document.createElement('script');
   script.id = 'st-tooltip-template-script';
-  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260610b');
+  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20260827tip1');
   script.async = true;
   script.onload = initTooltip;
   document.head.appendChild(script);
@@ -262,17 +262,33 @@ const StatisticoHeader = {
     });
   },
 
+  _themeSwitcherTipText() {
+    const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
+    return `Auto follows your system appearance (currently ${hint}). Light uses the Highcharts palette. Dark keeps the Statistico dark theme.`;
+  },
+
+  _escapeAttr(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  },
+
   _renderThemeSwitcherHtml(extraClass) {
     const pref = this.getThemePreference();
     const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
+    const isSidebar = !!(extraClass && String(extraClass).indexOf('sidebar') !== -1);
     const cls = extraClass ? `hc-theme-switch ${extraClass}` : 'hc-theme-switch';
+    const tip = isSidebar
+      ? ''
+      : ` title="${this._escapeAttr(this._themeSwitcherTipText())}" data-st-tip-pos="top"`;
     return `
-      <div class="${cls}" id="${extraClass ? 'sbThemeSwitch' : 'headerThemeSwitch'}" role="radiogroup" aria-label="Color theme">
-        <button type="button" class="hc-theme-opt" data-theme-pref="auto" aria-pressed="${pref === 'auto' ? 'true' : 'false'}" title="Follow system color scheme">
+      <div class="${cls}" id="${isSidebar ? 'sbThemeSwitch' : 'headerThemeSwitch'}" role="radiogroup" aria-label="Color theme"${tip}>
+        <button type="button" class="hc-theme-opt" data-theme-pref="auto" aria-pressed="${pref === 'auto' ? 'true' : 'false'}" aria-label="Auto, follow system appearance, currently ${hint}">
           Auto <span class="hc-theme-auto-hint">(${hint})</span>
         </button>
-        <button type="button" class="hc-theme-opt" data-theme-pref="light" aria-pressed="${pref === 'light' ? 'true' : 'false'}" title="Highcharts light theme">Light</button>
-        <button type="button" class="hc-theme-opt" data-theme-pref="dark" aria-pressed="${pref === 'dark' ? 'true' : 'false'}" title="Statistico dark theme">Dark</button>
+        <button type="button" class="hc-theme-opt" data-theme-pref="light" aria-pressed="${pref === 'light' ? 'true' : 'false'}" aria-label="Light theme">Light</button>
+        <button type="button" class="hc-theme-opt" data-theme-pref="dark" aria-pressed="${pref === 'dark' ? 'true' : 'false'}" aria-label="Dark theme">Dark</button>
       </div>
     `;
   },
@@ -280,14 +296,33 @@ const StatisticoHeader = {
   _syncThemeSwitcherUI() {
     const pref = this.getThemePreference();
     const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
+    const tip = this._themeSwitcherTipText();
     document.querySelectorAll('.hc-theme-switch').forEach((group) => {
       group.querySelectorAll('[data-theme-pref]').forEach((btn) => {
         btn.setAttribute('aria-pressed', btn.getAttribute('data-theme-pref') === pref ? 'true' : 'false');
+        btn.removeAttribute('title');
+        btn.removeAttribute('data-st-tip');
       });
       group.querySelectorAll('.hc-theme-auto-hint').forEach((el) => {
         el.textContent = `(${hint})`;
       });
+      const autoBtn = group.querySelector('[data-theme-pref="auto"]');
+      if (autoBtn) autoBtn.setAttribute('aria-label', `Auto, follow system appearance, currently ${hint}`);
     });
+    const headerSwitch = document.getElementById('headerThemeSwitch');
+    if (headerSwitch) {
+      headerSwitch.setAttribute('title', tip);
+      headerSwitch.setAttribute('data-st-tip', tip);
+      headerSwitch.setAttribute('data-st-tip-pos', 'top');
+    }
+    const sidebarSwitch = document.getElementById('sbThemeSwitch');
+    if (sidebarSwitch) {
+      sidebarSwitch.removeAttribute('title');
+      sidebarSwitch.removeAttribute('data-st-tip');
+    }
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function' && headerSwitch) {
+      window.StatisticoTooltip.refresh(headerSwitch.parentNode || headerSwitch);
+    }
   },
 
   /**
@@ -2035,10 +2070,15 @@ const StatisticoHeader = {
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
     return `<button type="button" class="ws-mode-tab${active}" role="tab"`
       + ` aria-selected="${opts.active ? 'true' : 'false'}"`
+      + (opts.active ? ' aria-current="true"' : '')
       + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
       + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
       + `<span class="ws-tab-text">`
       + `<span class="ws-tab-label">${opts.label}</span>`
+      + `</span>`
+      + `<span class="view-switcher-mark" aria-hidden="true">`
+      + `<i class="fa-solid fa-arrow-right view-switcher-go"></i>`
+      + `<i class="fa-solid fa-check view-switcher-check"></i>`
       + `</span></button>`;
   },
 
@@ -2058,7 +2098,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260826shade1',
+  _TAB_ASSET_VER: '20260828viewcta',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2684,7 +2724,7 @@ const StatisticoHeader = {
       '  opacity: 1 !important;',
       '}',
       '',
-      '/* View switcher — segmented analysis views (sidebar = analyses) */',
+      '/* View switcher — current state vs actionable alternatives */',
       '.uni-view-tabs.ws-mode-bar--connected.ws-mode-bar--attached,',
       '.view-switcher-bar.ws-mode-bar--connected.ws-mode-bar--attached {',
       '  align-items: stretch !important;',
@@ -2696,6 +2736,9 @@ const StatisticoHeader = {
       '  border: none !important;',
       '  background: transparent !important;',
       '  flex-wrap: nowrap !important;',
+      '}',
+      '.view-switcher-row {',
+      '  gap: 36px !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-tab-cluster {',
@@ -2718,61 +2761,66 @@ const StatisticoHeader = {
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab {',
       '  flex: 1 1 0 !important;',
+      '  box-sizing: border-box !important;',
       '  height: 46px !important;',
       '  min-height: 46px !important;',
       '  max-height: 46px !important;',
       '  min-width: 132px !important;',
       '  margin: 0 !important;',
-      '  padding: 0 22px !important;',
-      '  border: 1px solid rgba(148, 163, 184, 0.34) !important;',
+      '  padding: 0 16px 0 18px !important;',
       '  border-radius: 10px !important;',
-      '  transform: none !important;',
-      '  box-shadow: none !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active),',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
-      '  background: rgba(15, 23, 42, 0.35) !important;',
-      '  background-image: none !important;',
-      '  color: #cbd5e1 !important;',
+      '  background: linear-gradient(180deg, rgba(42, 54, 82, 0.95) 0%, rgba(18, 26, 42, 0.92) 100%) !important;',
+      '  background-image: linear-gradient(180deg, rgba(42, 54, 82, 0.95) 0%, rgba(18, 26, 42, 0.92) 100%) !important;',
+      '  border: 1.5px solid rgba(167, 139, 250, 0.58) !important;',
+      '  color: #f8fafc !important;',
+      '  cursor: pointer !important;',
+      '  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
-      '  color: #e2e8f0 !important;',
+      '  color: #f1f5f9 !important;',
       '  font-size: 13.5px !important;',
       '  font-weight: 650 !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) > i,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
-      '  color: #a5b4fc !important;',
+      '  color: #c4b5fd !important;',
       '  opacity: 1 !important;',
       '  font-size: 14px !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active):hover,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active):hover {',
-      '  background: rgba(124, 92, 255, 0.22) !important;',
-      '  background-image: none !important;',
-      '  border-color: rgba(167, 139, 250, 0.78) !important;',
+      '  background: linear-gradient(180deg, rgba(92, 72, 196, 0.42) 0%, rgba(28, 36, 62, 0.95) 100%) !important;',
+      '  background-image: linear-gradient(180deg, rgba(92, 72, 196, 0.42) 0%, rgba(28, 36, 62, 0.95) 100%) !important;',
+      '  border-color: rgba(196, 181, 253, 0.95) !important;',
       '  color: #ffffff !important;',
-      '  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35) !important;',
+      '  transform: translateY(-2px) !important;',
+      '  box-shadow: 0 10px 22px rgba(124, 92, 255, 0.38), 0 0 0 1px rgba(196, 181, 253, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active {',
-      '  background: #7c5cff !important;',
+      '  background: rgba(124, 92, 255, 0.34) !important;',
       '  background-image: none !important;',
-      '  border-color: #8b6cff !important;',
-      '  color: #ffffff !important;',
-      '  box-shadow: 0 6px 16px rgba(124, 92, 255, 0.38) !important;',
+      '  border: 1px solid rgba(167, 139, 250, 0.46) !important;',
+      '  color: #ede9fe !important;',
+      '  cursor: default !important;',
+      '  font-weight: 650 !important;',
+      '  box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.18) !important;',
+      '  transform: none !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
-      '  color: #ffffff !important;',
+      '  color: #ede9fe !important;',
       '  font-size: 13.5px !important;',
-      '  font-weight: 800 !important;',
+      '  font-weight: 650 !important;',
       '  line-height: 1 !important;',
       '}',
       '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active > i,',
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active > i {',
-      '  color: #ffffff !important;',
+      '  color: #c4b5fd !important;',
       '  opacity: 1 !important;',
       '  font-size: 14px !important;',
       '}',
@@ -2786,6 +2834,24 @@ const StatisticoHeader = {
       '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab .ws-tab-sub {',
       '  display: none !important;',
       '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab .view-switcher-check,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab .view-switcher-check {',
+      '  display: none !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab .view-switcher-go,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab .view-switcher-go {',
+      '  display: inline-flex !important;',
+      '  color: #c4b5fd !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .view-switcher-go,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active .view-switcher-go {',
+      '  display: none !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .view-switcher-check,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active .view-switcher-check {',
+      '  display: inline-flex !important;',
+      '  color: #ddd6fe !important;',
+      '}',
       'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-tab-cluster,',
       'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-tab-cluster {',
       '  background: rgba(255, 255, 255, 0.78) !important;',
@@ -2793,8 +2859,11 @@ const StatisticoHeader = {
       '}',
       'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active),',
       'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
-      '  background: rgba(255,255,255,0.55) !important;',
-      '  color: #334155 !important;',
+      '  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;',
+      '  background-image: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%) !important;',
+      '  border-color: rgba(109, 40, 217, 0.42) !important;',
+      '  color: #1e293b !important;',
+      '  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;',
       '}',
       'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label,',
       'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
@@ -2804,15 +2873,47 @@ const StatisticoHeader = {
       'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) > i {',
       '  color: #6d28d9 !important;',
       '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active):hover,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active):hover {',
+      '  background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%) !important;',
+      '  background-image: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%) !important;',
+      '  border-color: #7c3aed !important;',
+      '  box-shadow: 0 8px 18px rgba(109, 40, 217, 0.22), 0 0 0 1px rgba(124, 58, 237, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;',
+      '}',
       'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active,',
       'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active {',
-      '  background: #6d28d9 !important;',
-      '  border-color: #5b21b6 !important;',
-      '  color: #ffffff !important;',
+      '  background: rgba(109, 40, 217, 0.16) !important;',
+      '  background-image: none !important;',
+      '  border-color: rgba(109, 40, 217, 0.38) !important;',
+      '  color: #4c1d95 !important;',
+      '  box-shadow: inset 0 0 0 1px rgba(109, 40, 217, 0.1) !important;',
       '}',
       'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label,',
       'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active .ws-tab-label {',
-      '  color: #ffffff !important;',
+      '  color: #4c1d95 !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active > i,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active > i {',
+      '  color: #6d28d9 !important;',
+      '}',
+      '@keyframes view-switcher-cta-hint {',
+      '  0% { transform: translateY(0); filter: brightness(1); }',
+      '  40% { transform: translateY(-3px); filter: brightness(1.14); box-shadow: 0 10px 22px rgba(124, 92, 255, 0.42), 0 0 0 1px rgba(196, 181, 253, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18); }',
+      '  100% { transform: translateY(0); filter: brightness(1); }',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.view-switcher-cta-hint:not(.active),',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.view-switcher-cta-hint:not(.active) {',
+      '  animation: view-switcher-cta-hint 0.95s ease-out 1 both;',
+      '}',
+      '@media (prefers-reduced-motion: reduce) {',
+      '  .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.view-switcher-cta-hint:not(.active),',
+      '  .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.view-switcher-cta-hint:not(.active) {',
+      '    animation: none !important;',
+      '  }',
+      '  .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active):hover,',
+      '  .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active):hover {',
+      '    transform: none !important;',
+      '  }',
       '}',
       '',
       '/* Generic chip tabs (non-connected) */',
@@ -3036,7 +3137,7 @@ const StatisticoHeader = {
     stack.innerHTML =
       '<div class="view-switcher" role="group" aria-label="' + ariaLabel + '"' + describedBy + '>'
       + '<div class="view-switcher-row">'
-      + '<span class="view-switcher-kicker">VIEW</span>'
+      + '<span class="view-switcher-kicker">EXPLORE VIEWS</span>'
       + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected uni-view-tabs view-switcher-bar" role="tablist" aria-label="' + ariaLabel + '">'
       + tabsHtml
       + '</nav>'
@@ -6577,7 +6678,7 @@ const StatisticoHeader = {
           <i class="fa-solid fa-image"></i>
           <span class="sb-item-label">Save as PNG</span>
         </button>
-        <div class="sb-theme-switch-wrap" title="Color theme: Auto follows the system, Light matches Highcharts, Dark keeps Statistico dark">
+        <div class="sb-theme-switch-wrap">
           ${this._renderThemeSwitcherHtml('hc-theme-switch--sidebar')}
         </div>
         <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"

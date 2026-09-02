@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260828viewcta" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260828viewcta" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260902distline"></script>
+  <script src="../shared-header.js?v=20260902selectcol"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -54,7 +54,7 @@
     .metric strong { font-size:18px; color:var(--accent-1); }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
     #statsTableWrap.is-capped { max-height:calc(36px + 15 * 33px); }
-    table { width:100%; border-collapse:collapse; min-width:1120px; }
+    table { width:100%; border-collapse:collapse; min-width:1170px; }
     th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; }
     th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
     #statsTable thead th.sortable {
@@ -71,14 +71,26 @@
     #statsTable thead th.sort-active .sort-ico { opacity:1; color:var(--accent-1); }
     th:first-child, td:first-child { text-align:left; }
     tbody tr:hover td { background:rgba(129,140,248,.12); }
+    #statsTable th.select-col, #statsTable td.select-col {
+      width:52px; min-width:52px; text-align:center; padding-left:8px; padding-right:8px;
+    }
+    #statsTable th.group-col, #statsTable td.group-col { text-align:left; }
     #statsTable tbody tr[data-group] { cursor:pointer; }
-    #statsTable tbody tr[data-group] td:first-child {
-      box-shadow:inset 3px 0 0 var(--group-color, transparent);
-    }
     #statsTable tbody tr.is-selected td {
-      background:color-mix(in srgb, var(--group-color, var(--accent-1)) 16%, var(--surface-2));
+      background:rgba(129,140,248,.16);
     }
-    #statsTable tbody tr.is-selected td:first-child { font-weight:800; color:var(--text-primary); }
+    #statsTable tbody tr.is-selected td.group-col { font-weight:800; color:var(--text-primary); }
+    .select-check {
+      width:18px; height:18px; margin:0 auto; box-sizing:border-box;
+      display:inline-flex; align-items:center; justify-content:center;
+      border:2px solid color-mix(in srgb, var(--text-secondary) 50%, var(--border));
+      border-radius:5px; background:transparent; color:transparent;
+      transition:background .14s ease, border-color .14s ease, color .14s ease;
+    }
+    .select-check i { font-size:10px; line-height:1; }
+    #statsTable tbody tr.is-selected .select-check {
+      background:var(--accent-2); border-color:var(--accent-2); color:#fff;
+    }
     .hist-grid { display:grid; grid-template-columns:repeat(4, minmax(180px, 1fr)); gap:10px; }
     .hist-grid.is-hidden { display:none; }
     .hist-card { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; transition:opacity .15s ease, box-shadow .15s ease; }
@@ -269,7 +281,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-uni-bygroup-v7">
+<body data-page-version="20260902-uni-bygroup-v8">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -299,7 +311,7 @@
             </div>
             <div id="byGroupPanel-stats" class="by-group-panel is-active">
             <section id="tablePanel" class="panel">
-              <div class="section-title"><strong>Grouped Statistics</strong><span>Main descriptive statistics by selected group levels</span></div>
+              <div class="section-title"><strong>Grouped Statistics</strong><span>Select a group to emphasize it on the chart</span></div>
               <div class="table-wrap" id="statsTableWrap">
                 <table id="statsTable">
                   <thead id="statsHead"></thead>
@@ -945,10 +957,14 @@
       const head = document.getElementById('statsHead');
       const body = document.getElementById('statsBody');
       if (head) {
-        head.innerHTML = `<tr>${STATS_COLUMNS.map((col) => {
-          const active = tableSort.key === col.key ? ' sort-active' : '';
-          return `<th class="sortable${active}" data-key="${col.key}" scope="col" tabindex="0" role="columnheader" aria-sort="${statsAriaSort(col.key)}" title="Click to sort by ${escapeHtml(col.label)}">${escapeHtml(col.label)} <i class="${statsSortIcon(col.key)} sort-ico" aria-hidden="true"></i></th>`;
-        }).join('')}</tr>`;
+        head.innerHTML = `<tr>
+          <th class="select-col" scope="col" title="Select a group to emphasize its chart line">Select</th>
+          ${STATS_COLUMNS.map((col) => {
+            const active = tableSort.key === col.key ? ' sort-active' : '';
+            const extra = col.key === 'group' ? ' group-col' : '';
+            return `<th class="sortable${active}${extra}" data-key="${col.key}" scope="col" tabindex="0" role="columnheader" aria-sort="${statsAriaSort(col.key)}" title="Click to sort by ${escapeHtml(col.label)}">${escapeHtml(col.label)} <i class="${statsSortIcon(col.key)} sort-ico" aria-hidden="true"></i></th>`;
+          }).join('')}
+        </tr>`;
         head.querySelectorAll('th.sortable').forEach((th) => {
           th.addEventListener('click', () => requestStatsSort(th.getAttribute('data-key')));
           th.addEventListener('keydown', (event) => {
@@ -961,13 +977,18 @@
       }
       if (!body) return;
       if (selectedGroup && !groupStats.some((g) => g.group === selectedGroup)) selectedGroup = null;
-      body.innerHTML = getSortedGroupStats().map((g) => `
-        <tr data-group="${escapeHtml(g.group)}" class="${selectedGroup === g.group ? 'is-selected' : ''}" style="--group-color:${colorForGroup(g.group)}">
-          <td>${escapeHtml(g.group)}</td><td>${g.n}</td><td>${fmt(g.mean)}</td><td>${fmt(g.lcl)}</td><td>${fmt(g.ucl)}</td><td>${fmt(g.median)}</td>
+      body.innerHTML = getSortedGroupStats().map((g) => {
+        const on = selectedGroup === g.group;
+        return `
+        <tr data-group="${escapeHtml(g.group)}" class="${on ? 'is-selected' : ''}" aria-selected="${on ? 'true' : 'false'}">
+          <td class="select-col">
+            <span class="select-check" role="checkbox" aria-checked="${on ? 'true' : 'false'}" aria-label="Emphasize ${escapeHtml(g.group)} on the chart"><i class="fa-solid fa-check"></i></span>
+          </td>
+          <td class="group-col">${escapeHtml(g.group)}</td><td>${g.n}</td><td>${fmt(g.mean)}</td><td>${fmt(g.lcl)}</td><td>${fmt(g.ucl)}</td><td>${fmt(g.median)}</td>
           <td>${fmt(g.stdDev)}</td><td>${fmt(g.variance)}</td><td>${fmt(g.min)}</td><td>${fmt(g.q1)}</td>
           <td>${fmt(g.q3)}</td><td>${fmt(g.max)}</td><td>${fmt(g.skew)}</td><td>${fmt(g.kurtosis)}</td>
-        </tr>
-      `).join('');
+        </tr>`;
+      }).join('');
       body.querySelectorAll('tr[data-group]').forEach((tr) => {
         tr.addEventListener('click', () => {
           const name = tr.getAttribute('data-group');
@@ -1049,7 +1070,11 @@
 
     function syncTableChartSelection() {
       document.querySelectorAll('#statsBody tr[data-group]').forEach((tr) => {
-        tr.classList.toggle('is-selected', tr.getAttribute('data-group') === selectedGroup);
+        const on = tr.getAttribute('data-group') === selectedGroup;
+        tr.classList.toggle('is-selected', on);
+        tr.setAttribute('aria-selected', on ? 'true' : 'false');
+        const box = tr.querySelector('.select-check');
+        if (box) box.setAttribute('aria-checked', on ? 'true' : 'false');
       });
       document.querySelectorAll('#histGrid .hist-card[data-group]').forEach((card) => {
         const match = card.getAttribute('data-group') === selectedGroup;

@@ -1592,7 +1592,7 @@ const StatisticoHeader = {
       cdf: 'Empirical cumulative distribution.',
       percentile: 'Percentile cut points.',
       kernel: 'Smoothed density estimate.',
-      'by-group': 'Compare distributions across groups.',
+      'by-group': 'Compare distributions and statistics across group levels.',
       normality: 'Shapiro-Wilk, Anderson-Darling, and friends.',
       qqplot: 'PP and QQ probability plots.',
       hypothesis: 'One-sample mean / median test.',
@@ -1657,7 +1657,7 @@ const StatisticoHeader = {
         ],
         pinnedNav: {
           items: [
-            { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'Grouped Analysis', description: 'Compare distributions across groups.' }
+            { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'Compare Groups', description: 'Compare distributions and statistics across group levels.' }
           ]
         }
       };
@@ -2098,7 +2098,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260902distline',
+  _TAB_ASSET_VER: '20260902comparegroups',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -9188,7 +9188,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`,
 
-      'by-group-stats': `Controls available: (1) Choose Group button — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Source row filter (header) — limits which rows enter every group; (4) Grouped / Histograms toggle — overlay one line per group, or show separate histograms. Click a table row (or a chart line / legend item) to emphasize that group. The table shows per-group N, mean, CI, spread, and shape statistics; both charts use a shared bin scale for fair comparison.`,
+      'by-group-stats': `Controls available: (1) Choose Group button — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Source row filter (header) — limits which rows enter every group; (4) Grouped / Histograms toggle — overlay one line per group, or show separate histograms; (5) Select checkbox in the statistics table — emphasize that group's line (click again to clear). A chart line or legend item does the same. The table shows per-group N, mean, CI, spread, and shape statistics; both charts use a shared bin scale for fair comparison.`,
 
       'by-group-boxplot': `Controls available: (1) Choose Group — same grouping column as other tabs; (2) Group level filter — subset levels; (3) Source row filter — shared filtered rows. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
 

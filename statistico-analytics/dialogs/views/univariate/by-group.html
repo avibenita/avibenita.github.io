@@ -5,7 +5,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>By Group - Univariate</title>
+  <title>Grouped Analysis - Univariate</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
@@ -14,7 +14,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260828viewcta" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260828viewcta" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260902selectcol"></script>
+  <script src="../shared-header.js?v=20260902comparegroups"></script>
+  <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -35,11 +36,17 @@
     .view-card { height:100%; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.24); }
     .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.04), transparent); }
     .title { display:flex; flex-direction:column; gap:2px; min-width:0; }
-    .title strong { color:var(--accent-1); font-size:14px; letter-spacing:.03em; text-transform:uppercase; }
+    .title strong { color:var(--accent-1); font-size:15px; letter-spacing:0; font-weight:800; }
     .title span { color:var(--text-secondary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
     .control { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; }
-    .group-choice-label { color:var(--text-secondary); font-size:12px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .grouping-compact {
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      color:var(--text-secondary); font-size:12px; font-weight:600; max-width:min(560px, 100%);
+    }
+    .grouping-compact[hidden] { display:none; }
+    #groupingCompactText { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .grouping-change-btn { padding:5px 10px; font-size:11px; font-weight:800; }
     select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
     button { cursor:pointer; font-weight:700; }
     button.active { background:linear-gradient(135deg, var(--accent-2), #6d5dfc); color:#fff; border-color:transparent; }
@@ -48,10 +55,12 @@
     .panel:first-of-type { margin-top:0; }
     .section-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:4px 2px 8px; color:var(--accent-1); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
     .section-title span { color:var(--text-secondary); font-size:11px; font-weight:600; text-transform:none; letter-spacing:0; }
-    .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(120px, 1fr)); gap:10px; margin-bottom:12px; }
-    .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
-    .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
-    .metric strong { font-size:18px; color:var(--accent-1); }
+    .group-list-heading {
+      color:var(--accent-1); font-size:10px; font-weight:800; letter-spacing:.08em;
+      text-transform:uppercase; padding:10px 6px 4px;
+    }
+    .group-list-section + .group-list-section { margin-top:4px; padding-top:4px; border-top:1px solid var(--border); }
+    .group-list-loading, .group-list-empty { padding:28px 12px; text-align:center; color:var(--text-secondary); font-size:12px; line-height:1.45; }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
     #statsTableWrap.is-capped { max-height:calc(36px + 15 * 33px); }
     table { width:100%; border-collapse:collapse; min-width:1170px; }
@@ -178,9 +187,16 @@
     .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
     .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
     .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
-    .group-option:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
+    .group-option:hover:not(:disabled) { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
     .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
-    .group-option small { color:var(--text-secondary); font-weight:500; }
+    .group-option.is-disabled { opacity:.58; cursor:not-allowed; }
+    .group-option.is-disabled:hover { border-color:var(--border); }
+    .group-option-name { font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .group-option small { color:var(--text-secondary); font-weight:600; white-space:nowrap; }
+    .group-option-note.tone-good { color:#34d399; }
+    .group-option-note.tone-caution { color:#fbbf24; }
+    .group-option-note.tone-bad { color:#fb7185; }
+    .group-option-note.tone-muted { color:var(--text-secondary); font-style:italic; font-weight:500; }
     .level-preview { padding:12px; overflow:auto; min-height:360px; }
     .level-preview.is-hidden { display:none; }
     .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
@@ -217,19 +233,23 @@
     }
     .group-dialog-done-btn {
       display:inline-flex; align-items:center; gap:8px;
-      padding:11px 26px; font-size:13px; font-weight:800;
-      letter-spacing:.05em; text-transform:uppercase;
+      padding:11px 22px; font-size:13px; font-weight:800;
+      letter-spacing:.01em;
       border:none; border-radius:10px; color:#fff; cursor:pointer;
       background:linear-gradient(135deg, var(--accent-2) 0%, #6d5dfc 55%, rgb(255,165,120) 100%);
       box-shadow:0 10px 26px rgba(129,140,248,.38), inset 0 1px 0 rgba(255,255,255,.22);
       transition:transform .16s ease, filter .16s ease, box-shadow .16s ease;
     }
-    .group-dialog-done-btn:hover {
+    .group-dialog-done-btn:hover:not(:disabled) {
       filter:brightness(1.07);
       transform:translateY(-1px);
       box-shadow:0 12px 28px rgba(129,140,248,.46), inset 0 1px 0 rgba(255,255,255,.28);
     }
-    .group-dialog-done-btn:active { transform:translateY(0); }
+    .group-dialog-done-btn:active:not(:disabled) { transform:translateY(0); }
+    .group-dialog-done-btn:disabled {
+      opacity:.45; cursor:not-allowed; filter:none; transform:none;
+      box-shadow:none;
+    }
     html[data-theme="light"] .group-dialog-done-btn {
       box-shadow:0 8px 20px rgba(124,58,237,.28), inset 0 1px 0 rgba(255,255,255,.35);
     }
@@ -271,7 +291,7 @@
     @media (max-width: 900px) {
       .toolbar { align-items:flex-start; flex-direction:column; }
       .controls { justify-content:flex-start; }
-      .summary-strip { grid-template-columns:repeat(2, minmax(120px, 1fr)); }
+      .grouping-compact { max-width:100%; }
       .hist-grid { grid-template-columns:repeat(2, minmax(170px, 1fr)); }
       .group-dialog-body { grid-template-columns:1fr; }
       .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
@@ -281,7 +301,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-uni-bygroup-v8">
+<body data-page-version="20260902-uni-bygroup-v9">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -289,26 +309,23 @@
       <section class="view-card">
         <div class="toolbar">
           <div class="title">
-            <strong>Grouped Analysis</strong>
+            <strong id="resultTitle">Grouped Analysis</strong>
             <span id="subtitle">Compare the selected numeric variable across a grouping column.</span>
           </div>
           <div class="controls">
-            <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
-            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
+            <div class="grouping-compact" id="groupingCompact" hidden>
+              <span id="groupingCompactText">Grouping: —</span>
+              <button type="button" class="grouping-change-btn" id="changeGroupBtn" onclick="openGroupDialog()">Change</button>
+            </div>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Compare Groups</button>
           </div>
         </div>
         <div class="content">
           <div id="emptyState" class="empty" style="display:none;">
             <i class="fa-solid fa-layer-group"></i>
-            <div id="emptyText">Run a univariate analysis with source rows, then open BY GROUP.</div>
+            <div id="emptyText">Run a univariate analysis with source rows, then choose Compare Groups.</div>
           </div>
           <div id="mainContent" style="display:none;">
-            <div class="summary-strip">
-              <div class="metric"><label>Variable</label><strong id="metricVariable">-</strong></div>
-              <div class="metric"><label>Grouping Column</label><strong id="metricGroup">-</strong></div>
-              <div class="metric"><label>Groups</label><strong id="metricGroups">0</strong></div>
-              <div class="metric"><label>Rows Used</label><strong id="metricRows">0</strong></div>
-            </div>
             <div id="byGroupPanel-stats" class="by-group-panel is-active">
             <section id="tablePanel" class="panel">
               <div class="section-title"><strong>Grouped Statistics</strong><span>Select a group to emphasize it on the chart</span></div>
@@ -363,8 +380,8 @@
     <div class="group-dialog">
       <div class="group-dialog-head">
         <div>
-          <strong id="groupDialogTitle">Select Grouping Column</strong>
-          <span>Choose the categorical or grouping column used to split the current filtered source rows.</span>
+          <strong id="groupDialogTitle">Choose How to Group the Results</strong>
+          <span>Recommended grouping variables are listed first. Unique identifiers, emails, and the current analysis variable stay visible but cannot be selected.</span>
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close group selection"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -374,7 +391,7 @@
         <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to see its categories and n.</div></div>
       </div>
       <div class="group-dialog-foot">
-        <button type="button" class="group-dialog-done-btn" onclick="closeGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
+        <button type="button" class="group-dialog-done-btn" id="groupDialogConfirmBtn" onclick="closeGroupDialog()" disabled><i class="fa-solid fa-check"></i> Compare Groups</button>
       </div>
     </div>
   </div>
@@ -412,6 +429,7 @@
     let groupSelectionDirty = false;
     let previewBusy = false;
     let groupChoiceNotesToken = 0;
+    const groupColumnMeta = Object.create(null);
     const levelCountCache = Object.create(null);
     let boxplotChart = null;
     let groupedLineChart = null;
@@ -538,6 +556,13 @@
       document.getElementById('emptyState').style.display = 'block';
       document.getElementById('mainContent').style.display = 'none';
       delete window.__byGroupAiContext;
+      if (!isValidGroupIndex(groupIndex)) {
+        const title = document.getElementById('resultTitle');
+        if (title) title.textContent = 'Grouped Analysis';
+        const subtitle = document.getElementById('subtitle');
+        if (subtitle) subtitle.textContent = 'Compare the selected numeric variable across a grouping column.';
+      }
+      updateGroupChoiceLabel();
     }
 
     function getAnalysisVariableName() {
@@ -557,11 +582,11 @@
 
     function initializeFromPayload(data) {
       payload = data || loadStoredPayload();
-      if (!payload) return setEmpty('Run a univariate analysis first, then open BY GROUP.');
+      if (!payload) return setEmpty('Run a univariate analysis first, then choose Compare Groups.');
       headers = (payload.sourceHeaders || payload.headers || []).slice();
       analysisIndex = payload.columnIndex != null ? Number(payload.columnIndex) : 0;
       rows = normalizeRows(payload);
-      if (!headers.length || !rows.length) return setEmpty('BY GROUP needs source rows from the workbook range.');
+      if (!headers.length || !rows.length) return setEmpty('Compare Groups needs source rows from the workbook range.');
       syncHeaderVariable(rows.length);
       invalidateLevelCountCache();
       groupIndex = null;
@@ -571,27 +596,48 @@
       openGroupDialog();
     }
 
-    function groupChoiceNote(idx, levels) {
-      if (idx === analysisIndex) return 'analysis variable';
-      if (!levels) return '…';
-      const n = levels.reduce((sum, item) => sum + item.n, 0);
-      return `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${n}`;
+    function classifyGroupColumn(idx, levels) {
+      const api = window.StatisticoGroupColumnSuitability;
+      const result = api && typeof api.classify === 'function'
+        ? api.classify({
+            name: headers[idx],
+            levels: levels || [],
+            isAnalysisVariable: idx === analysisIndex,
+            rowCount: rows.length
+          })
+        : {
+            bucket: idx === analysisIndex ? 'disabled' : 'other',
+            disabled: idx === analysisIndex,
+            selectable: idx !== analysisIndex,
+            tone: idx === analysisIndex ? 'muted' : 'neutral',
+            indicator: idx === analysisIndex ? 'Current analysis variable' : ((levels && levels.length) ? `${levels.length} groups` : '…')
+          };
+      return Object.assign({ idx: idx, name: headers[idx] }, result);
+    }
+
+    function isGroupColumnDisabled(idx) {
+      if (Number(idx) === Number(analysisIndex)) return true;
+      const meta = groupColumnMeta[String(idx)];
+      return !!(meta && meta.disabled);
+    }
+
+    function updateGroupDialogConfirmState() {
+      const btn = document.getElementById('groupDialogConfirmBtn');
+      if (!btn) return;
+      const ok = isValidGroupIndex(groupIndex) && !isGroupColumnDisabled(groupIndex);
+      btn.disabled = !ok;
     }
 
     function populateGroupChoices() {
       const list = document.getElementById('groupDialogList');
-      list.innerHTML = headers.map((header, idx) => {
-        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
-          <span>${escapeHtml(header)}</span><small>${escapeHtml(groupChoiceNote(idx, null))}</small>
-        </button>`;
-      }).join('');
-      refreshGroupDialogSelection();
+      if (!list) return;
+      list.innerHTML = '<div class="group-list-loading" role="status">Scoring grouping variables…</div>';
+      Object.keys(groupColumnMeta).forEach((key) => { delete groupColumnMeta[key]; });
       fillGroupChoiceNotes();
     }
 
     function fillGroupChoiceNotes() {
       const token = ++groupChoiceNotesToken;
-      const buttons = Array.from(document.querySelectorAll('#groupDialogList .group-option'));
       let i = 0;
       function step() {
         if (token !== groupChoiceNotesToken) return;
@@ -599,27 +645,87 @@
           setTimeout(step, 32);
           return;
         }
-        const btn = buttons[i++];
-        if (!btn) return;
-        const idx = Number(btn.getAttribute('data-group-index'));
-        const small = btn.querySelector('small');
-        if (small) small.textContent = groupChoiceNote(idx, idx === analysisIndex ? null : getLevelCounts(idx));
-        if (i < buttons.length) setTimeout(step, 0);
+        if (i < headers.length) {
+          const idx = i++;
+          const levels = idx === analysisIndex ? [] : getLevelCounts(idx);
+          groupColumnMeta[String(idx)] = classifyGroupColumn(idx, levels);
+          setTimeout(step, 0);
+          return;
+        }
+        if (isValidGroupIndex(groupIndex) && isGroupColumnDisabled(groupIndex)) {
+          groupIndex = null;
+          hideLevelPreview();
+        }
+        renderGroupChoiceList();
       }
       setTimeout(step, 0);
     }
 
+    function renderGroupChoiceList() {
+      const list = document.getElementById('groupDialogList');
+      if (!list) return;
+      const items = headers.map((_, idx) => groupColumnMeta[String(idx)] || classifyGroupColumn(idx, []));
+      const api = window.StatisticoGroupColumnSuitability;
+      const parts = api && typeof api.partition === 'function'
+        ? api.partition(items)
+        : {
+            recommended: items.filter((item) => item.bucket === 'recommended'),
+            other: items.filter((item) => item.bucket !== 'recommended' && item.bucket !== 'disabled'),
+            disabled: items.filter((item) => item.bucket === 'disabled')
+          };
+
+      function optionHtml(meta) {
+        const disabled = meta.disabled;
+        const selected = !disabled && isValidGroupIndex(groupIndex) && Number(groupIndex) === Number(meta.idx);
+        const click = disabled ? '' : ` onclick="selectGroupColumn(${meta.idx}, true)"`;
+        return `<button type="button" class="group-option${disabled ? ' is-disabled' : ''}${selected ? ' is-selected' : ''}" data-group-index="${meta.idx}"${disabled ? ' disabled' : ''}${click}>
+          <span class="group-option-name">${escapeHtml(meta.name || headers[meta.idx] || '')}</span>
+          <small class="group-option-note tone-${escapeHtml(meta.tone || 'neutral')}">${escapeHtml(meta.indicator || '')}</small>
+        </button>`;
+      }
+
+      function sectionHtml(title, rows) {
+        if (!rows.length) return '';
+        return `<div class="group-list-section"><div class="group-list-heading">${escapeHtml(title)}</div>${rows.map(optionHtml).join('')}</div>`;
+      }
+
+      list.innerHTML = [
+        sectionHtml('Recommended grouping variables', parts.recommended),
+        sectionHtml('Other eligible variables', parts.other),
+        sectionHtml('Not recommended', parts.disabled)
+      ].filter(Boolean).join('') || '<div class="group-list-empty">No grouping columns available.</div>';
+      refreshGroupDialogSelection();
+      updateGroupDialogConfirmState();
+    }
+
     function updateGroupChoiceLabel() {
-      document.getElementById('groupChoiceLabel').textContent = !isValidGroupIndex(groupIndex)
-        ? 'No grouping column selected'
-        : `Group by: ${headers[groupIndex] || 'Group'}`;
+      const compact = document.getElementById('groupingCompact');
+      const compactText = document.getElementById('groupingCompactText');
+      const chooseBtn = document.getElementById('chooseGroupBtn');
+      const hasGroup = isValidGroupIndex(groupIndex) && !isGroupColumnDisabled(groupIndex);
+      if (chooseBtn) chooseBtn.style.display = hasGroup ? 'none' : '';
+      if (compact) compact.hidden = !hasGroup;
+      if (!hasGroup) {
+        if (compactText) compactText.textContent = 'Grouping: —';
+        return;
+      }
+      const groupName = headers[groupIndex] || 'Group';
+      const nGroups = groupStats.length;
+      const nRows = groupStats.reduce((sum, g) => sum + g.n, 0);
+      if (compactText) {
+        compactText.textContent = nGroups
+          ? `Grouping: ${groupName} · ${nGroups} group${nGroups === 1 ? '' : 's'} · n = ${nRows}`
+          : `Grouping: ${groupName}`;
+      }
     }
 
     function refreshGroupDialogSelection() {
       document.querySelectorAll('.group-option').forEach((btn) => {
         const idx = Number(btn.getAttribute('data-group-index'));
-        btn.classList.toggle('is-selected', isValidGroupIndex(groupIndex) && idx === Number(groupIndex));
+        const selected = isValidGroupIndex(groupIndex) && idx === Number(groupIndex) && !isGroupColumnDisabled(idx);
+        btn.classList.toggle('is-selected', selected);
       });
+      updateGroupDialogConfirmState();
     }
 
     function hideLevelPreview() {
@@ -674,8 +780,8 @@
           <span class="level-apply-status"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Updating results…</span>
         </div>`,
         `<div class="level-actions">
-          <label class="level-keep" title="Keep only levels with at least this many rows">Keep n≥
-            <input type="number" min="1" step="1" inputmode="numeric" placeholder="1"${keepValue} aria-label="Keep levels with n at least" onchange="keepPreviewLevelsByMinN(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();keepPreviewLevelsByMinN(this.value);}" />
+          <label class="level-keep" title="Keep only levels with at least this many rows">Minimum group size
+            <input type="number" min="1" step="1" inputmode="numeric" placeholder="1"${keepValue} aria-label="Minimum group size" onchange="keepPreviewLevelsByMinN(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();keepPreviewLevelsByMinN(this.value);}" />
           </label>
           <button type="button" onclick="setAllPreviewLevels(true)">Include all</button>
           <button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button>
@@ -744,7 +850,7 @@
     window.togglePreviewLevel = togglePreviewLevel;
 
     // Level clicks must stay instant. The dashboard behind the modal is not
-    // visible, so the expensive grouped redraw waits until Done / close.
+    // visible, so the expensive grouped redraw waits until Compare Groups / close.
     function markGroupSelectionDirty() {
       groupSelectionDirty = true;
     }
@@ -758,7 +864,7 @@
     }
 
     function flushGroupSelectionChange() {
-      if (!isValidGroupIndex(groupIndex)) return;
+      if (!isValidGroupIndex(groupIndex) || isGroupColumnDisabled(groupIndex)) return;
       groupSelectionDirty = false;
       const token = ++applySelectionToken;
       afterPreviewPaint(() => {
@@ -795,7 +901,8 @@
       if (!headers.length) return;
       applySelectionToken += 1;
       refreshGroupDialogSelection();
-      if (!isValidGroupIndex(groupIndex)) hideLevelPreview();
+      updateGroupDialogConfirmState();
+      if (!isValidGroupIndex(groupIndex) || isGroupColumnDisabled(groupIndex)) hideLevelPreview();
       else renderLevelPreview(groupIndex);
       document.getElementById('groupDialog').classList.add('is-visible');
     }
@@ -806,7 +913,7 @@
     }
 
     function selectGroupColumn(idx, keepDialogOpen) {
-      if (!isValidGroupIndex(idx)) return;
+      if (!isValidGroupIndex(idx) || isGroupColumnDisabled(idx)) return;
       groupIndex = Number(idx);
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();
@@ -856,11 +963,14 @@
       if (!groupStats.length) return setEmpty('No numeric values remain after grouping. Choose another grouping column or adjust filters.');
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
-      document.getElementById('metricVariable').textContent = getAnalysisVariableName();
-      document.getElementById('metricGroup').textContent = headers[groupIndex] || 'Group';
-      document.getElementById('metricGroups').textContent = groupStats.length;
-      document.getElementById('metricRows').textContent = groupStats.reduce((sum, g) => sum + g.n, 0);
-      document.getElementById('subtitle').textContent = `${getAnalysisVariableName()} by ${headers[groupIndex] || 'group'} (${rows.length} filtered source rows)`;
+      const varName = getAnalysisVariableName();
+      const groupName = headers[groupIndex] || 'Group';
+      const nGroups = groupStats.length;
+      const nRows = groupStats.reduce((sum, g) => sum + g.n, 0);
+      const title = document.getElementById('resultTitle');
+      if (title) title.textContent = `${varName} grouped by ${groupName}`;
+      document.getElementById('subtitle').textContent = `${nGroups} group${nGroups === 1 ? '' : 's'} · ${nRows} row${nRows === 1 ? '' : 's'}`;
+      updateGroupChoiceLabel();
       renderTable();
       renderGroupBoxplot();
       renderGroupNormality();

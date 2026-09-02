@@ -313,14 +313,13 @@
     .group-dialog-foot { display:flex; justify-content:flex-end; align-items:center; gap:10px; padding:14px 18px 16px; border-top:1px solid var(--border); }
     .group-dialog-done-btn { display:inline-flex; align-items:center; gap:8px; padding:11px 26px; font-size:13px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; border:none; border-radius:10px; color:#fff; cursor:pointer; background:linear-gradient(135deg, var(--accent-2) 0%, #4fc3f7 55%, var(--accent-1) 100%); box-shadow:0 10px 26px rgba(79,195,247,.32); }
     .level-row { position:relative; display:flex; align-items:center; gap:10px; padding:8px 10px; margin-bottom:5px; border:1px solid var(--border); border-radius:8px; background:rgba(15,23,42,.18); color:var(--text-secondary); font-size:12px; font-weight:600; cursor:pointer; user-select:none; transition:border-color .14s ease, background .14s ease, box-shadow .14s ease, color .14s ease, opacity .14s ease; }
-    .level-row .level-check-input { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); clip-path:inset(50%); border:0; white-space:nowrap; -webkit-appearance:none; appearance:none; opacity:0; pointer-events:none; }
     .level-check { width:18px; height:18px; flex:0 0 18px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border:2px solid color-mix(in srgb, var(--text-secondary) 50%, var(--border)); border-radius:5px; background:transparent; color:transparent; transition:background .14s ease, border-color .14s ease, box-shadow .14s ease, color .14s ease; }
     .level-check i { font-size:10px; line-height:1; }
     .level-row:not(.is-included) { opacity:.55; }
     .level-row.is-included { opacity:1; color:var(--text-primary); font-weight:700; border-color:var(--accent-1); background:color-mix(in srgb, var(--accent-1) 16%, rgba(15,23,42,.28)); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 42%, transparent); }
     .level-row.is-included .level-check { background:var(--accent-1); border-color:var(--accent-1); color:#fff; box-shadow:0 0 10px color-mix(in srgb, var(--accent-1) 40%, transparent); }
     .level-row:hover, .level-row:not(.is-included):hover { opacity:1; color:var(--text-primary); border-color:color-mix(in srgb, var(--accent-1) 70%, var(--border)); }
-    .level-row .level-check-input:focus-visible + .level-check { outline:2px solid var(--accent-2); outline-offset:2px; }
+    .level-row:focus-visible { outline:2px solid var(--accent-2); outline-offset:2px; }
     html[data-theme="light"] .level-row { background:#fff; }
     html[data-theme="light"] .level-row.is-included { background:color-mix(in srgb, var(--accent-1) 10%, #fff); }
     .level-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1; }
@@ -332,7 +331,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-reg-bygroup-v7">
+<body data-page-version="20260902-reg-bygroup-v8">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -937,14 +936,43 @@
         `<div class="level-preview-head"><div><strong>${escapeHtml(sourceHeaders[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${totalN}</span></div></div>`,
         `<div class="level-actions"><button type="button" onclick="setAllPreviewLevels(true)">Include all</button><button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button></div>`,
         previewLevels.map((item, pos) => `
-          <label class="level-row${isLevelIncluded(previewGroupIndex, item.level) ? ' is-included' : ''}" data-level-pos="${pos}" title="${escapeHtml(item.level)}">
-            <input class="level-check-input" type="checkbox" ${isLevelIncluded(previewGroupIndex, item.level) ? 'checked' : ''} onchange="togglePreviewLevel(${pos}, this.checked)" />
+          <div class="level-row${isLevelIncluded(previewGroupIndex, item.level) ? ' is-included' : ''}" role="checkbox" tabindex="0" aria-checked="${isLevelIncluded(previewGroupIndex, item.level) ? 'true' : 'false'}" data-level-pos="${pos}" title="${escapeHtml(item.level)}">
             <span class="level-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
             <span class="level-name">${escapeHtml(item.level)}</span>
             <span class="level-n">n=${item.n}</span>
-          </label>
+          </div>
         `).join('')
       ].join('');
+      bindLevelPreviewEvents();
+    }
+
+    // The level rows are rebuilt via innerHTML on every render, so the click
+    // handler lives on the container, which is never replaced.
+    function bindLevelPreviewEvents() {
+      const preview = document.getElementById('groupLevelPreview');
+      if (!preview || preview.dataset.levelEventsBound === '1') return;
+      preview.dataset.levelEventsBound = '1';
+      const rowFrom = (event) => {
+        const el = event.target && event.target.closest ? event.target.closest('.level-row') : null;
+        return el && preview.contains(el) ? el : null;
+      };
+      const toggleRow = (row) => {
+        const pos = Number(row.getAttribute('data-level-pos'));
+        togglePreviewLevel(pos, !row.classList.contains('is-included'));
+      };
+      preview.addEventListener('click', (event) => {
+        const row = rowFrom(event);
+        if (!row) return;
+        event.preventDefault();
+        toggleRow(row);
+      });
+      preview.addEventListener('keydown', (event) => {
+        if (event.key !== ' ' && event.key !== 'Enter' && event.key !== 'Spacebar') return;
+        const row = rowFrom(event);
+        if (!row) return;
+        event.preventDefault();
+        toggleRow(row);
+      });
     }
 
     function updateLevelPreviewSummary() {
@@ -958,15 +986,29 @@
       if (!item) return;
       ensureLevelSelection(previewGroupIndex)[item.level] = !!included;
       const row = document.querySelector(`#groupLevelPreview .level-row[data-level-pos="${pos}"]`);
-      if (row) row.classList.toggle('is-included', !!included);
-      if (previewGroupIndex === groupIndex) renderByGroup();
+      if (row) {
+        row.classList.toggle('is-included', !!included);
+        row.setAttribute('aria-checked', included ? 'true' : 'false');
+      }
       updateLevelPreviewSummary();
+      applyGroupSelectionChange();
+    }
+
+    // Always runs last: a failure while redrawing the results must not leave
+    // the dialog showing stale level selections.
+    function applyGroupSelectionChange() {
+      if (previewGroupIndex !== groupIndex) return;
+      try {
+        renderByGroup();
+      } catch (err) {
+        console.error('[by-group] failed to re-render after a level change:', err);
+      }
     }
 
     function setAllPreviewLevels(included) {
       previewLevels.forEach((item) => { ensureLevelSelection(previewGroupIndex)[item.level] = !!included; });
-      if (previewGroupIndex === groupIndex) renderByGroup();
       renderLevelPreview(previewGroupIndex);
+      applyGroupSelectionChange();
     }
 
     function openGroupDialog() {

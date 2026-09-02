@@ -2036,7 +2036,7 @@ const StatisticoHeader = {
       qqplot: 'Compare sample quantiles against a reference distribution.',
       confidence: 'Interval estimates for the mean or median.',
       hypothesis: 'Test the sample against a reference value.',
-      'by-group-stats': 'Compare descriptive stats and histograms by group.',
+      'by-group-stats': 'Compare descriptive stats and grouped distributions by group.',
       'by-group-boxplot': 'Compare spread and location across groups.',
       'by-group-normality': 'Review tests and NSI by group.'
     };
@@ -2098,7 +2098,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260828viewcta',
+  _TAB_ASSET_VER: '20260902distline',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -9188,7 +9188,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`,
 
-      'by-group-stats': `Controls available: (1) Choose Group button — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Source row filter (header) — limits which rows enter every group. The table shows per-group N, mean, CI, spread, and shape statistics; histograms below use a shared bin scale for fair comparison.`,
+      'by-group-stats': `Controls available: (1) Choose Group button — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Source row filter (header) — limits which rows enter every group; (4) Grouped / Histograms toggle — overlay one line per group, or show separate histograms. Click a table row (or a chart line / legend item) to emphasize that group. The table shows per-group N, mean, CI, spread, and shape statistics; both charts use a shared bin scale for fair comparison.`,
 
       'by-group-boxplot': `Controls available: (1) Choose Group — same grouping column as other tabs; (2) Group level filter — subset levels; (3) Source row filter — shared filtered rows. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
 
@@ -9224,7 +9224,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     let tabBlock = '';
     if (tab === 'stats') {
       tabBlock = [
-        'ACTIVE TAB: Grouped Statistics (descriptive table + per-group histograms)',
+        'ACTIVE TAB: Grouped Statistics (descriptive table + grouped line chart, with optional per-group histograms)',
         `Compare ${ctx.groups.length} groups on ${ctx.variable} split by ${ctx.groupingColumn}.`,
         `Mean spread across groups: ${f(meanSpread)} (${lowest.name}=${f(lowest.mean)} vs ${highest.name}=${f(highest.mean)}).`,
         'Focus READING on whether central tendency, spread, and shape differ meaningfully between named groups — not on a single pooled sample.'

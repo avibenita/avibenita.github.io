@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260828viewcta" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260828viewcta" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260828viewcta"></script>
+  <script src="../shared-header.js?v=20260902distline"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -71,12 +71,35 @@
     #statsTable thead th.sort-active .sort-ico { opacity:1; color:var(--accent-1); }
     th:first-child, td:first-child { text-align:left; }
     tbody tr:hover td { background:rgba(129,140,248,.12); }
+    #statsTable tbody tr[data-group] { cursor:pointer; }
+    #statsTable tbody tr[data-group] td:first-child {
+      box-shadow:inset 3px 0 0 var(--group-color, transparent);
+    }
+    #statsTable tbody tr.is-selected td {
+      background:color-mix(in srgb, var(--group-color, var(--accent-1)) 16%, var(--surface-2));
+    }
+    #statsTable tbody tr.is-selected td:first-child { font-weight:800; color:var(--text-primary); }
     .hist-grid { display:grid; grid-template-columns:repeat(4, minmax(180px, 1fr)); gap:10px; }
-    .hist-card { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+    .hist-grid.is-hidden { display:none; }
+    .hist-card { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; transition:opacity .15s ease, box-shadow .15s ease; }
+    .hist-card.is-dimmed { opacity:.38; }
+    .hist-card.is-selected { box-shadow:inset 3px 0 0 var(--group-color, var(--accent-2)), 0 0 0 1px color-mix(in srgb, var(--group-color, var(--accent-2)) 45%, transparent); }
     .hist-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 9px; border-bottom:1px solid var(--border); color:var(--text-secondary); font-size:10px; }
     .hist-head strong { color:var(--accent-1); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .hist-head span { white-space:nowrap; }
     .hist-chart { height:185px; }
+    .dist-title-right { display:flex; align-items:center; gap:12px; flex-wrap:wrap; text-transform:none; letter-spacing:0; font-weight:600; }
+    .dist-toggle { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2); }
+    .dist-toggle button {
+      margin:0; border:none; border-radius:0; padding:6px 11px; font-size:11px; font-weight:700;
+      background:transparent; color:var(--text-secondary);
+    }
+    .dist-toggle button.active { background:linear-gradient(135deg, var(--accent-2), #6d5dfc); color:#fff; }
+    .grouped-line-wrap {
+      border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:8px 8px 4px;
+    }
+    .grouped-line-wrap.is-hidden { display:none; }
+    #groupedLineChart { height:360px; min-height:280px; }
     .by-group-panel { display:none; min-height:0; }
     .by-group-panel.is-active { display:block; }
     .boxplot-wrap { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:8px; }
@@ -246,7 +269,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-uni-bygroup-v5">
+<body data-page-version="20260902-uni-bygroup-v7">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -285,8 +308,20 @@
               </div>
             </section>
             <section id="histPanel" class="panel">
-              <div class="section-title"><strong>Grouped Histograms</strong><span>Compact distribution view, 4 per row</span></div>
-              <div id="histGrid" class="hist-grid"></div>
+              <div class="section-title">
+                <strong id="distPanelTitle">Grouped distributions</strong>
+                <div class="dist-title-right">
+                  <span id="distPanelHint">One line per group on a shared value scale</span>
+                  <div class="dist-toggle" role="tablist" aria-label="Distribution view">
+                    <button type="button" id="distViewGroupedBtn" class="active" role="tab" aria-selected="true" onclick="setDistView('grouped')">Grouped</button>
+                    <button type="button" id="distViewHistBtn" role="tab" aria-selected="false" onclick="setDistView('histograms')">Histograms</button>
+                  </div>
+                </div>
+              </div>
+              <div id="groupedLineWrap" class="grouped-line-wrap">
+                <div id="groupedLineChart"></div>
+              </div>
+              <div id="histGrid" class="hist-grid is-hidden"></div>
             </section>
             </div>
             <div id="byGroupPanel-boxplot" class="by-group-panel">
@@ -367,6 +402,10 @@
     let groupChoiceNotesToken = 0;
     const levelCountCache = Object.create(null);
     let boxplotChart = null;
+    let groupedLineChart = null;
+    let distView = 'grouped';
+    let selectedGroup = null;
+    const GROUP_LINE_COLORS = ['#818cf8', '#fb923c', '#34d399', '#f472b6', '#38bdf8', '#fbbf24', '#a78bfa', '#fb7185', '#2dd4bf', '#94a3b8'];
     let activeByGroupTab = 'stats';
     let normGroupResults = [];
     const levelSelections = {};
@@ -815,7 +854,7 @@
       renderGroupNormality();
       syncByGroupAiContext();
       switchByGroupTab(activeByGroupTab);
-      if (activeByGroupTab === 'stats') renderHistograms();
+      if (activeByGroupTab === 'stats') renderDistributionPanel();
       if (typeof StatisticoHeader !== 'undefined') {
         syncHeaderVariable(groupStats.reduce((sum, g) => sum + g.n, 0));
         try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
@@ -830,15 +869,10 @@
         panel.classList.toggle('is-active', panel.id === `byGroupPanel-${activeByGroupTab}`);
       });
       if (activeByGroupTab === 'stats') {
-        renderHistograms();
+        renderDistributionPanel();
         requestAnimationFrame(function () {
           applyStatsTableScrollLimit();
-          try {
-            document.querySelectorAll('#histGrid .hist-chart').forEach((el) => {
-              const chart = Highcharts.charts.find((c) => c && c.renderTo === el);
-              if (chart) chart.reflow();
-            });
-          } catch (_e) {}
+          reflowDistributionCharts();
         });
       }
       if (activeByGroupTab === 'boxplot' && boxplotChart) {
@@ -926,13 +960,21 @@
         });
       }
       if (!body) return;
+      if (selectedGroup && !groupStats.some((g) => g.group === selectedGroup)) selectedGroup = null;
       body.innerHTML = getSortedGroupStats().map((g) => `
-        <tr>
+        <tr data-group="${escapeHtml(g.group)}" class="${selectedGroup === g.group ? 'is-selected' : ''}" style="--group-color:${colorForGroup(g.group)}">
           <td>${escapeHtml(g.group)}</td><td>${g.n}</td><td>${fmt(g.mean)}</td><td>${fmt(g.lcl)}</td><td>${fmt(g.ucl)}</td><td>${fmt(g.median)}</td>
           <td>${fmt(g.stdDev)}</td><td>${fmt(g.variance)}</td><td>${fmt(g.min)}</td><td>${fmt(g.q1)}</td>
           <td>${fmt(g.q3)}</td><td>${fmt(g.max)}</td><td>${fmt(g.skew)}</td><td>${fmt(g.kurtosis)}</td>
         </tr>
       `).join('');
+      body.querySelectorAll('tr[data-group]').forEach((tr) => {
+        tr.addEventListener('click', () => {
+          const name = tr.getAttribute('data-group');
+          selectedGroup = selectedGroup === name ? null : name;
+          syncTableChartSelection();
+        });
+      });
       applyStatsTableScrollLimit();
     }
 
@@ -951,17 +993,181 @@
       }));
     }
 
+    function colorForGroup(name) {
+      const idx = groupStats.findIndex((g) => g.group === name);
+      return GROUP_LINE_COLORS[(idx < 0 ? 0 : idx) % GROUP_LINE_COLORS.length];
+    }
+
+    function setDistView(view) {
+      distView = view === 'histograms' ? 'histograms' : 'grouped';
+      const groupedBtn = document.getElementById('distViewGroupedBtn');
+      const histBtn = document.getElementById('distViewHistBtn');
+      if (groupedBtn) {
+        groupedBtn.classList.toggle('active', distView === 'grouped');
+        groupedBtn.setAttribute('aria-selected', distView === 'grouped' ? 'true' : 'false');
+      }
+      if (histBtn) {
+        histBtn.classList.toggle('active', distView === 'histograms');
+        histBtn.setAttribute('aria-selected', distView === 'histograms' ? 'true' : 'false');
+      }
+      const title = document.getElementById('distPanelTitle');
+      const hint = document.getElementById('distPanelHint');
+      if (title) title.textContent = distView === 'histograms' ? 'Grouped histograms' : 'Grouped distributions';
+      if (hint) hint.textContent = distView === 'histograms'
+        ? 'Compact distribution view, 4 per row'
+        : 'One line per group on a shared value scale';
+      renderDistributionPanel();
+    }
+    window.setDistView = setDistView;
+
+    function renderDistributionPanel() {
+      const lineWrap = document.getElementById('groupedLineWrap');
+      const histGrid = document.getElementById('histGrid');
+      if (!lineWrap || !histGrid) return;
+      if (distView === 'histograms') {
+        lineWrap.classList.add('is-hidden');
+        histGrid.classList.remove('is-hidden');
+        renderHistograms();
+      } else {
+        histGrid.classList.add('is-hidden');
+        lineWrap.classList.remove('is-hidden');
+        renderGroupedLineChart();
+      }
+    }
+
+    function reflowDistributionCharts() {
+      try {
+        if (distView === 'grouped' && groupedLineChart) groupedLineChart.reflow();
+        if (distView === 'histograms') {
+          document.querySelectorAll('#histGrid .hist-chart').forEach((el) => {
+            const chart = Highcharts.charts.find((c) => c && c.renderTo === el);
+            if (chart) chart.reflow();
+          });
+        }
+      } catch (_e) {}
+    }
+
+    function syncTableChartSelection() {
+      document.querySelectorAll('#statsBody tr[data-group]').forEach((tr) => {
+        tr.classList.toggle('is-selected', tr.getAttribute('data-group') === selectedGroup);
+      });
+      document.querySelectorAll('#histGrid .hist-card[data-group]').forEach((card) => {
+        const match = card.getAttribute('data-group') === selectedGroup;
+        card.classList.toggle('is-selected', !!selectedGroup && match);
+        card.classList.toggle('is-dimmed', !!selectedGroup && !match);
+      });
+      emphasizeGroupedLine(selectedGroup);
+    }
+
+    function emphasizeGroupedLine(name) {
+      if (!groupedLineChart) return;
+      groupedLineChart.series.forEach((s) => {
+        const isOn = !name || s.name === name;
+        const isSel = s.name === name;
+        s.update({
+          lineWidth: isSel ? 3.6 : 2,
+          opacity: isOn ? 1 : 0.18,
+          zIndex: isSel ? 8 : 1,
+          marker: { enabled: true, radius: isSel ? 5.5 : 3.2, lineWidth: isSel ? 2 : 0 }
+        }, false);
+      });
+      groupedLineChart.redraw();
+    }
+
+    function renderGroupedLineChart() {
+      const el = document.getElementById('groupedLineChart');
+      if (!el || typeof Highcharts === 'undefined' || !groupStats.length) return;
+      if (groupedLineChart) {
+        try { groupedLineChart.destroy(); } catch (_e) {}
+        groupedLineChart = null;
+      }
+      const allValues = groupStats.flatMap((g) => g.values);
+      if (!allValues.length) return;
+      const globalMin = Math.min(...allValues);
+      const globalMax = Math.max(...allValues);
+      const bins = 5;
+      const sample = histogramSeries(groupStats[0].values, globalMin, globalMax, bins);
+      const categories = sample.map((p) => p.name);
+      const series = groupStats.map((g) => ({
+        name: g.group,
+        color: colorForGroup(g.group),
+        data: histogramSeries(g.values, globalMin, globalMax, bins).map((p) => ({ y: p.pct, count: p.y })),
+        lineWidth: selectedGroup === g.group ? 3.6 : 2,
+        opacity: !selectedGroup || selectedGroup === g.group ? 1 : 0.18,
+        zIndex: selectedGroup === g.group ? 8 : 1,
+        marker: { enabled: true, radius: selectedGroup === g.group ? 5.5 : 3.2 }
+      }));
+      groupedLineChart = Highcharts.chart('groupedLineChart', {
+        chart: { type: 'spline', backgroundColor: 'transparent', spacing: [12, 12, 16, 18] },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: {
+          enabled: true,
+          itemStyle: { color: 'var(--text-secondary)', fontWeight: '600', fontSize: '11px' },
+          itemHoverStyle: { color: 'var(--text-primary)' },
+          itemHiddenStyle: { color: 'var(--text-secondary)' }
+        },
+        xAxis: {
+          categories,
+          title: { text: 'Value range', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
+          labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' }, rotation: -25 },
+          lineColor: 'var(--border)',
+          tickLength: 0
+        },
+        yAxis: {
+          min: 0,
+          title: { text: 'Percent of group', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
+          labels: { format: '{value}%', style: { color: 'var(--text-secondary)', fontSize: '10px' } },
+          gridLineColor: 'rgba(148,163,184,.18)'
+        },
+        tooltip: {
+          shared: false,
+          pointFormat: '<b>{series.name}</b><br/>Percent: <b>{point.y:.1f}%</b><br/>Count: <b>{point.count}</b>'
+        },
+        plotOptions: {
+          spline: {
+            cursor: 'pointer',
+            stickyTracking: false,
+            marker: { symbol: 'circle', lineColor: '#fff' }
+          },
+          series: {
+            states: {
+              inactive: { opacity: 0.18 },
+              hover: { lineWidthPlus: 1.4 }
+            },
+            events: {
+              click: function () {
+                selectedGroup = selectedGroup === this.name ? null : this.name;
+                syncTableChartSelection();
+              },
+              legendItemClick: function () {
+                selectedGroup = selectedGroup === this.name ? null : this.name;
+                syncTableChartSelection();
+                return false;
+              }
+            }
+          }
+        },
+        series
+      });
+    }
+
     function renderHistograms() {
       const grid = document.getElementById('histGrid');
+      if (!grid) return;
       grid.innerHTML = '';
       const allValues = groupStats.flatMap((g) => g.values);
+      if (!allValues.length) return;
       const globalMin = Math.min(...allValues);
       const globalMax = Math.max(...allValues);
       const bins = 5;
       groupStats.forEach((g, idx) => {
         const id = `groupHist${idx}`;
         const card = document.createElement('div');
-        card.className = 'hist-card';
+        const isSel = selectedGroup === g.group;
+        card.className = 'hist-card' + (selectedGroup ? (isSel ? ' is-selected' : ' is-dimmed') : '');
+        card.setAttribute('data-group', g.group);
+        card.style.setProperty('--group-color', colorForGroup(g.group));
         card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(g.group)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${id}" class="hist-chart"></div>`;
         grid.appendChild(card);
         Highcharts.chart(id, {
@@ -986,7 +1192,7 @@
           plotOptions: {
             column:{
               borderWidth:0,
-              color:'rgba(129,140,248,.92)',
+              color: colorForGroup(g.group),
               borderRadius:3,
               dataLabels:{
                 enabled:true,

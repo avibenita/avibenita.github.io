@@ -456,6 +456,8 @@
     .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .level-preview-head strong { color:var(--accent-1); font-size:13px; }
     .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
+    .level-preview-head .level-apply-status { display:none; align-items:center; gap:7px; margin-top:0; flex-shrink:0; color:var(--accent-1); font-size:11px; font-weight:700; white-space:nowrap; }
+    .group-dialog.is-applying .level-preview-head .level-apply-status { display:inline-flex; }
     .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-bottom:8px; }
     .level-actions button { padding:5px 8px; font-size:11px; }
     .group-dialog-foot { display:flex; justify-content:flex-end; align-items:center; gap:10px; padding:14px 18px 16px; border-top:1px solid var(--border); }
@@ -479,7 +481,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-bygroup-v11">
+<body data-page-version="20260902-bygroup-v12">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -576,6 +578,7 @@
     let previewGroupIndex = null;
     let previewLevels = [];
     let previewLoadToken = 0;
+    let applySelectionToken = 0;
     let corrType = 'Pearson';
     let tableRows = [];
     let activeGroups = [];
@@ -775,7 +778,7 @@
       const selectedCount = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level)).length;
       const totalN = previewLevels.reduce((sum, item) => sum + item.n, 0);
       document.getElementById('groupLevelPreview').innerHTML = [
-        `<div class="level-preview-head"><div><strong>${escapeHtml(sourceHeaders[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${totalN}</span></div></div>`,
+        `<div class="level-preview-head"><div><strong>${escapeHtml(sourceHeaders[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${totalN}</span></div><span class="level-apply-status"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Updating results…</span></div>`,
         `<div class="level-actions"><button type="button" onclick="setAllPreviewLevels(true)">Include all</button><button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button></div>`,
         previewLevels.map((item, pos) => `
           <div class="level-row${isLevelIncluded(previewGroupIndex, item.level) ? ' is-included' : ''}" role="checkbox" tabindex="0" aria-checked="${isLevelIncluded(previewGroupIndex, item.level) ? 'true' : 'false'}" data-level-pos="${pos}" title="${escapeHtml(item.level)}">
@@ -836,15 +839,27 @@
       applyGroupSelectionChange();
     }
 
-    // Always runs last: a failure while redrawing the results must not leave
-    // the dialog showing stale level selections.
+    // Paint the checkbox first, then redraw results. Rapid clicks coalesce so
+    // only the last selection is applied. A spinner shows while results catch up.
+    function setDialogApplying(on) {
+      const dialog = document.getElementById('groupDialog');
+      if (dialog) dialog.classList.toggle('is-applying', !!on);
+    }
+
     function applyGroupSelectionChange() {
       if (previewGroupIndex !== groupIndex) return;
-      try {
-        renderByGroup();
-      } catch (err) {
-        console.error('[by-group] failed to re-render after a level change:', err);
-      }
+      const token = ++applySelectionToken;
+      setDialogApplying(true);
+      afterPreviewPaint(() => {
+        if (token !== applySelectionToken) return;
+        try {
+          renderByGroup();
+        } catch (err) {
+          console.error('[by-group] failed to re-render after a level change:', err);
+        } finally {
+          if (token === applySelectionToken) setDialogApplying(false);
+        }
+      });
     }
 
     function setAllPreviewLevels(included) {

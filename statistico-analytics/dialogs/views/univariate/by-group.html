@@ -246,7 +246,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-uni-bygroup-v4">
+<body data-page-version="20260902-uni-bygroup-v5">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -362,6 +362,7 @@
     let previewKeepMinN = '';
     let previewLoadToken = 0;
     let applySelectionToken = 0;
+    let groupSelectionDirty = false;
     let previewBusy = false;
     let groupChoiceNotesToken = 0;
     const levelCountCache = Object.create(null);
@@ -687,21 +688,28 @@
         row.setAttribute('aria-checked', included ? 'true' : 'false');
       }
       updateLevelPreviewSummary();
-      applyGroupSelectionChange();
+      markGroupSelectionDirty();
     }
     window.togglePreviewLevel = togglePreviewLevel;
 
-    // Paint the checkbox first, then redraw charts. Rapid clicks coalesce so
-    // only the last selection is applied. A spinner shows while results catch up.
-    function setDialogApplying(on) {
-      const dialog = document.getElementById('groupDialog');
-      if (dialog) dialog.classList.toggle('is-applying', !!on);
+    // Level clicks must stay instant. The dashboard behind the modal is not
+    // visible, so the expensive grouped redraw waits until Done / close.
+    function markGroupSelectionDirty() {
+      groupSelectionDirty = true;
     }
 
-    function applyGroupSelectionChange() {
-      if (previewGroupIndex !== groupIndex) return;
+    function hideGroupDialog() {
+      const dialog = document.getElementById('groupDialog');
+      if (dialog) {
+        dialog.classList.remove('is-visible');
+        dialog.classList.remove('is-applying');
+      }
+    }
+
+    function flushGroupSelectionChange() {
+      if (!isValidGroupIndex(groupIndex)) return;
+      groupSelectionDirty = false;
       const token = ++applySelectionToken;
-      setDialogApplying(true);
       afterPreviewPaint(() => {
         if (token !== applySelectionToken) return;
         try {
@@ -709,8 +717,6 @@
           registerHeaderActions();
         } catch (err) {
           console.error('[by-group] failed to re-render after a level change:', err);
-        } finally {
-          if (token === applySelectionToken) setDialogApplying(false);
         }
       });
     }
@@ -719,7 +725,7 @@
       const selection = ensureLevelSelection(previewGroupIndex);
       previewLevels.forEach((item) => { selection[item.level] = !!included; });
       renderLevelPreview(previewGroupIndex);
-      applyGroupSelectionChange();
+      markGroupSelectionDirty();
     }
 
     function keepPreviewLevelsByMinN(raw) {
@@ -730,12 +736,13 @@
       const selection = ensureLevelSelection(previewGroupIndex);
       previewLevels.forEach((item) => { selection[item.level] = item.n >= minN; });
       renderLevelPreview(previewGroupIndex);
-      applyGroupSelectionChange();
+      markGroupSelectionDirty();
     }
     window.keepPreviewLevelsByMinN = keepPreviewLevelsByMinN;
 
     function openGroupDialog() {
       if (!headers.length) return;
+      applySelectionToken += 1;
       refreshGroupDialogSelection();
       if (!isValidGroupIndex(groupIndex)) hideLevelPreview();
       else renderLevelPreview(groupIndex);
@@ -743,7 +750,8 @@
     }
 
     function closeGroupDialog() {
-      document.getElementById('groupDialog').classList.remove('is-visible');
+      hideGroupDialog();
+      if (groupSelectionDirty) flushGroupSelectionChange();
     }
 
     function selectGroupColumn(idx, keepDialogOpen) {
@@ -753,7 +761,16 @@
       refreshGroupDialogSelection();
       const token = ++previewLoadToken;
       showLevelPreviewLoading(groupIndex);
-      if (!keepDialogOpen) closeGroupDialog();
+      if (keepDialogOpen) {
+        markGroupSelectionDirty();
+        afterPreviewPaint(() => {
+          if (token !== previewLoadToken) return;
+          renderLevelPreview(groupIndex);
+        });
+        return;
+      }
+      hideGroupDialog();
+      groupSelectionDirty = false;
       afterPreviewPaint(() => {
         if (token !== previewLoadToken) return;
         renderLevelPreview(groupIndex);

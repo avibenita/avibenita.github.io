@@ -333,7 +333,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-reg-bygroup-v9">
+<body data-page-version="20260902-reg-bygroup-v10">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -428,6 +428,7 @@
     let previewLevels = [];
     let previewLoadToken = 0;
     let applySelectionToken = 0;
+    let groupSelectionDirty = false;
     let activeGroups = [];
     let fixedCategoricalInfo = null;
     let displayTerms = [];
@@ -994,28 +995,31 @@
         row.setAttribute('aria-checked', included ? 'true' : 'false');
       }
       updateLevelPreviewSummary();
-      applyGroupSelectionChange();
+      markGroupSelectionDirty();
     }
 
-    // Paint the checkbox first, then redraw results. Rapid clicks coalesce so
-    // only the last selection is applied. A spinner shows while results catch up.
-    function setDialogApplying(on) {
+    function markGroupSelectionDirty() {
+      groupSelectionDirty = true;
+    }
+
+    function hideGroupDialog() {
       const dialog = document.getElementById('groupDialog');
-      if (dialog) dialog.classList.toggle('is-applying', !!on);
+      if (dialog) {
+        dialog.classList.remove('is-visible');
+        dialog.classList.remove('is-applying');
+      }
     }
 
-    function applyGroupSelectionChange() {
-      if (previewGroupIndex !== groupIndex) return;
+    function flushGroupSelectionChange() {
+      if (groupIndex == null) return;
+      groupSelectionDirty = false;
       const token = ++applySelectionToken;
-      setDialogApplying(true);
       afterPreviewPaint(() => {
         if (token !== applySelectionToken) return;
         try {
           renderByGroup();
         } catch (err) {
           console.error('[by-group] failed to re-render after a level change:', err);
-        } finally {
-          if (token === applySelectionToken) setDialogApplying(false);
         }
       });
     }
@@ -1023,11 +1027,12 @@
     function setAllPreviewLevels(included) {
       previewLevels.forEach((item) => { ensureLevelSelection(previewGroupIndex)[item.level] = !!included; });
       renderLevelPreview(previewGroupIndex);
-      applyGroupSelectionChange();
+      markGroupSelectionDirty();
     }
 
     function openGroupDialog() {
       if (!sourceHeaders.length) return;
+      applySelectionToken += 1;
       refreshGroupDialogSelection();
       if (groupIndex == null) hideLevelPreview();
       else renderLevelPreview(groupIndex);
@@ -1035,7 +1040,8 @@
     }
 
     function closeGroupDialog() {
-      document.getElementById('groupDialog').classList.remove('is-visible');
+      hideGroupDialog();
+      if (groupSelectionDirty) flushGroupSelectionChange();
     }
 
     function selectGroupColumn(idx, keepDialogOpen) {
@@ -1044,7 +1050,16 @@
       refreshGroupDialogSelection();
       const token = ++previewLoadToken;
       showLevelPreviewLoading(groupIndex);
-      if (!keepDialogOpen) closeGroupDialog();
+      if (keepDialogOpen) {
+        markGroupSelectionDirty();
+        afterPreviewPaint(() => {
+          if (token !== previewLoadToken) return;
+          renderLevelPreview(groupIndex);
+        });
+        return;
+      }
+      hideGroupDialog();
+      groupSelectionDirty = false;
       afterPreviewPaint(() => {
         if (token !== previewLoadToken) return;
         renderLevelPreview(groupIndex);

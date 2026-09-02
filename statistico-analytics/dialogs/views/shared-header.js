@@ -918,6 +918,12 @@ const StatisticoHeader = {
         'Is assumption failure isolated to one group or systemic across groups?',
         'Should analysis proceed with parametric, robust, or non-parametric methods?'
       ],
+      'by-group-similarity': [
+        'Which groups are centered at approximately the same value?',
+        'Do the groups have similar variability?',
+        'After removing location and scale, do the distributions have similar shapes?',
+        'How similar are the groups across location, spread, and shape together?'
+      ],
       'qqplot': [
         'How closely do observed quantiles track the theoretical normal line?',
         'Are deviations mainly in tails, center, or both?',
@@ -1990,11 +1996,12 @@ const StatisticoHeader = {
         icon: 'fa-layer-group',
         views: ['by-group'],
         defaultFile: 'univariate/by-group.html',
-        resultTabLimit: 3,
+        resultTabLimit: 4,
         tabs: [
           { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', inPage: true },
           { tabKey: 'by-group-boxplot', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'boxplot', inPage: true },
-          { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', inPage: true }
+          { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', inPage: true },
+          { tabKey: 'by-group-similarity', label: 'Similarity', icon: 'fa-clone', panel: 'similarity', inPage: true }
         ]
       },
       {
@@ -2038,7 +2045,8 @@ const StatisticoHeader = {
       hypothesis: 'Test the sample against a reference value.',
       'by-group-stats': 'Compare descriptive stats and grouped distributions by group.',
       'by-group-boxplot': 'Compare spread and location across groups.',
-      'by-group-normality': 'Review tests and NSI by group.'
+      'by-group-normality': 'Review tests and NSI by group.',
+      'by-group-similarity': 'Compare groups on location, spread, and shape similarity.'
     };
     return captions[tabKey] || '';
   },
@@ -7546,6 +7554,7 @@ const StatisticoHeader = {
       'by-group-stats': 'Grouped Statistics',
       'by-group-boxplot': 'Grouped Box Plots',
       'by-group-normality': 'Group Normality Analysis',
+      'by-group-similarity': 'Distribution Similarity Profile',
       outliers: 'Outliers',
       normality: 'Tests',
       qqplot: 'PP/QQ',
@@ -9261,7 +9270,9 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       'by-group-boxplot': `Controls available: (1) Compare Groups / Change — same grouping column as other tabs; (2) Group level filter — subset levels; (3) Source row filter — shared filtered rows. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
 
-      'by-group-normality': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`
+      'by-group-normality': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`,
+
+      'by-group-similarity': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Heatmap cells and pairwise table rows — click a pair to open its three-component profile; (3) Most similar / Most distinct KPI cards — jump to those pairs; (4) Raw values / Standardized shape toggle — overlapping kernel densities on the original scale, or after removing mean and SD so only shape remains. Scores are 0–100 descriptive similarity, not p-values.`
     };
   },
 
@@ -9320,12 +9331,30 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
         normLines,
         'Focus READING on each group\'s Verdict and whether groups differ in normality support. Mention Shapiro–Wilk caution when ties are flagged.'
       ].join('\n\n');
+    } else if (tab === 'similarity') {
+      const sim = ctx.similarity || {};
+      const pairLines = (sim.pairs || []).map((p) =>
+        `${p.a}–${p.b}: overall=${f(p.overall, 1)}, location=${f(p.location, 1)}, spread=${f(p.spread, 1)}, shape=${f(p.shape, 1)} (${p.band})`
+      ).join('\n');
+      const similar = sim.mostSimilar;
+      const distinct = sim.mostDistinct;
+      const outlier = sim.mostDifferentGroup;
+      tabBlock = [
+        'ACTIVE TAB: Distribution Similarity Profile (pairwise location / spread / shape, 0–100)',
+        `Group homogeneity: ${f(sim.homogeneity, 1)} (${sim.homogeneityBand || 'n/a'}).`,
+        similar ? `Most similar pair: ${similar.a} vs ${similar.b} = ${f(similar.overall, 1)} (${similar.band}).` : '',
+        distinct ? `Most distinct pair: ${distinct.a} vs ${distinct.b} = ${f(distinct.overall, 1)} (${distinct.band}).` : '',
+        outlier ? `Group most different from the others: ${outlier.group} (mean similarity ${f(outlier.meanSimilarity, 1)}).` : '',
+        pairLines || 'No pairwise scores.',
+        'Focus READING on practical similarity, not significance. Cite the three components when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Distribution Similarity Profile. Do not use good/acceptable/poor; use Very similar / Mostly similar / Mixed similarity / Substantially different.'
+      ].filter(Boolean).join('\n');
     }
 
     const viewNames = {
       stats: 'Grouped Statistics',
       boxplot: 'Grouped Box Plots',
-      normality: 'Group Normality Analysis'
+      normality: 'Group Normality Analysis',
+      similarity: 'Distribution Similarity Profile'
     };
     const viewName = viewNames[tab] || 'Grouped Analysis';
     const controlsDoc = this._viewControlsDoc();
@@ -9337,6 +9366,12 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
         const passes = (gr.tests || []).filter((t) => t.pass && !t.unreliable).length;
         return `${gr.group} (n=${gr.n}): Verdict=${gr.verdict}, NSI=${gr.nsi}, reliable passes=${passes}/${(gr.tests || []).filter((t) => !t.unreliable).length}`;
       }).join('\n');
+      const sim = ctx.similarity || {};
+      const similar = sim.mostSimilar;
+      const distinct = sim.mostDistinct;
+      const simLines = (sim.pairs || []).slice(0, 12).map((p) =>
+        `${p.a}–${p.b}: overall=${f(p.overall, 1)} (L=${f(p.location, 1)}, S=${f(p.spread, 1)}, H=${f(p.shape, 1)}; ${p.band})`
+      ).join('\n');
       return `You are a senior statistician writing a grouped comparison report for "${ctx.variable}" split by "${ctx.groupingColumn}".
 
 GROUPED DATA (${ctx.totalRows} rows across ${ctx.groupCount} groups — do NOT treat as one pooled sample):
@@ -9351,9 +9386,17 @@ ${boxplotLines}
 [ Normality tab ]
 ${normLines || '(Run normality tab to populate)'}
 
+[ Similarity tab — Distribution Similarity Profile ]
+Homogeneity: ${f(sim.homogeneity, 1)} (${sim.homogeneityBand || 'n/a'})
+${similar ? `Most similar: ${similar.a} vs ${similar.b} = ${f(similar.overall, 1)} (${similar.band})` : ''}
+${distinct ? `Most distinct: ${distinct.a} vs ${distinct.b} = ${f(distinct.overall, 1)} (${distinct.band})` : ''}
+${sim.mostDifferentGroup ? `Most different group: ${sim.mostDifferentGroup.group} (mean similarity ${f(sim.mostDifferentGroup.meanSimilarity, 1)})` : ''}
+${simLines || '(Need at least two groups)'}
+
 RULES:
 - Compare groups by name; always cite n per group
 - Do NOT report a single overall mean/SD as if there is one sample
+- Similarity scores are descriptive 0–100 values, not p-values. Do not label them good/poor.
 
 Reply ONLY in this exact format:
 CONCLUSION: [One sentence — main between-group finding]
@@ -9779,7 +9822,7 @@ Always follow the exact output format requested.` },
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
       qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test',
       'by-group-stats':'Grouped Statistics', 'by-group-boxplot':'Grouped Box Plots',
-      'by-group-normality':'Group Normality Analysis', 'by-group':'Grouped Analysis',
+      'by-group-normality':'Group Normality Analysis', 'by-group-similarity':'Distribution Similarity Profile', 'by-group':'Grouped Analysis',
       ...this._correlationViewLabels(),
       ...this._independentViewLabels(),
       ...this._genericModuleViewLabels()

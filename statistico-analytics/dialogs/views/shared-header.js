@@ -2085,6 +2085,9 @@ const StatisticoHeader = {
       + `<span class="ws-tab-text">`
       + `<span class="ws-tab-label">${opts.label}</span>`
       + `</span>`
+      + (opts.tabKey === 'by-group-similarity'
+        ? '<span class="ws-tab-help-i" title="About Similarity" aria-label="About Similarity" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="event.preventDefault(); event.stopPropagation(); if (window.openDspHelp) window.openDspHelp();">i</span>'
+        : '')
       + `<span class="view-switcher-mark" aria-hidden="true">`
       + `<i class="fa-solid fa-arrow-right view-switcher-go"></i>`
       + `<i class="fa-solid fa-check view-switcher-check"></i>`
@@ -2107,7 +2110,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260902tableft',
+  _TAB_ASSET_VER: '20260902dsphelp',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2115,7 +2118,7 @@ const StatisticoHeader = {
       + '#uniResultsViewTabs, .uni-results-tab-stack, .ws-shell--view-tabs,'
       + '.navrow-tabs, .sb-facets'
     ).forEach((n) => n.remove());
-    bodyClone.querySelectorAll('.sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading').forEach((n) => n.remove());
+    bodyClone.querySelectorAll('.sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading, #dspHelpModal').forEach((n) => n.remove());
     bodyClone.querySelectorAll('button, select, input, textarea').forEach((el) => {
       el.setAttribute('disabled', 'disabled');
       el.setAttribute('tabindex', '-1');

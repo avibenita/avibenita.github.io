@@ -312,9 +312,18 @@
     .level-actions button { padding:5px 8px; font-size:11px; }
     .group-dialog-foot { display:flex; justify-content:flex-end; align-items:center; gap:10px; padding:14px 18px 16px; border-top:1px solid var(--border); }
     .group-dialog-done-btn { display:inline-flex; align-items:center; gap:8px; padding:11px 26px; font-size:13px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; border:none; border-radius:10px; color:#fff; cursor:pointer; background:linear-gradient(135deg, var(--accent-2) 0%, #4fc3f7 55%, var(--accent-1) 100%); box-shadow:0 10px 26px rgba(79,195,247,.32); }
-    .level-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 8px; border:1px solid var(--border); border-radius:8px; background:rgba(15,23,42,.22); margin-bottom:5px; color:var(--text-primary); font-size:12px; }
-    .level-row label { display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer; }
-    .level-row input { accent-color:var(--accent-1); }
+    .level-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 8px; border:1px solid var(--border); border-radius:8px; background:rgba(15,23,42,.22); margin-bottom:5px; color:var(--text-primary); font-size:12px; cursor:pointer; transition:border-color .14s ease, background .14s ease; }
+    .level-row:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); background:color-mix(in srgb, var(--accent-1) 12%, rgba(15,23,42,.22)); }
+    .level-row label { display:flex; align-items:center; gap:8px; min-width:0; cursor:pointer; position:relative; }
+    .level-row .level-check-input { position:absolute; opacity:0; width:16px; height:16px; margin:0; cursor:pointer; }
+    .level-check { width:16px; height:16px; flex:0 0 16px; box-sizing:border-box; border:2px solid color-mix(in srgb, var(--accent-1) 42%, var(--border)); border-radius:4px; background:color-mix(in srgb, var(--surface-0) 55%, var(--surface-2)); position:relative; transition:background .14s ease, border-color .14s ease, box-shadow .14s ease, transform .14s ease; }
+    .level-row:hover .level-check { border-color:var(--accent-1); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent-1) 20%, transparent); transform:scale(1.06); }
+    .level-row .level-check-input:checked + .level-check { background:var(--accent-1); border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 30%, transparent), 0 0 10px color-mix(in srgb, var(--accent-1) 28%, transparent); }
+    .level-row .level-check-input:checked + .level-check::after { content:''; position:absolute; left:4px; top:1px; width:5px; height:8px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+    .level-row .level-check-input:focus-visible + .level-check { outline:2px solid var(--accent-2); outline-offset:2px; }
+    html[data-theme="light"] .level-row { background:#fff; }
+    html[data-theme="light"] .level-check { background:#fff; }
+    html[data-theme="light"] .level-row:hover { background:color-mix(in srgb, var(--accent-1) 8%, #fff); }
     .level-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .level-n { color:var(--text-secondary); font-size:11px; white-space:nowrap; }
     @media (max-width: 900px) {
@@ -324,7 +333,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260606-reg-bygroup-v5">
+<body data-page-version="20260902-reg-bygroup-v6">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -931,7 +940,8 @@
         previewLevels.map((item, pos) => `
           <div class="level-row">
             <label title="${escapeHtml(item.level)}">
-              <input type="checkbox" ${isLevelIncluded(previewGroupIndex, item.level) ? 'checked' : ''} onchange="togglePreviewLevel(${pos}, this.checked)" />
+              <input class="level-check-input" type="checkbox" ${isLevelIncluded(previewGroupIndex, item.level) ? 'checked' : ''} onchange="togglePreviewLevel(${pos}, this.checked)" />
+              <span class="level-check" aria-hidden="true"></span>
               <span class="level-name">${escapeHtml(item.level)}</span>
             </label>
             <span class="level-n">n=${item.n}</span>
@@ -940,12 +950,19 @@
       ].join('');
     }
 
+    function updateLevelPreviewSummary() {
+      const selectedCount = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level)).length;
+      const totalN = previewLevels.reduce((sum, item) => sum + item.n, 0);
+      const span = document.querySelector('#groupLevelPreview .level-preview-head span');
+      if (span) span.textContent = `${selectedCount} of ${previewLevels.length} levels included, n=${totalN}`;
+    }
+
     function togglePreviewLevel(pos, included) {
       const item = previewLevels[pos];
       if (!item) return;
       ensureLevelSelection(previewGroupIndex)[item.level] = !!included;
       if (previewGroupIndex === groupIndex) renderByGroup();
-      renderLevelPreview(previewGroupIndex);
+      updateLevelPreviewSummary();
     }
 
     function setAllPreviewLevels(included) {

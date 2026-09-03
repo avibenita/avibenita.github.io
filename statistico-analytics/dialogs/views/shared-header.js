@@ -2109,7 +2109,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260903boxtoggle',
+  _TAB_ASSET_VER: '20260903tabdown',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2758,7 +2758,7 @@ const StatisticoHeader = {
       '  align-items: center !important;',
       '  justify-content: start !important;',
       '  column-gap: 28px !important;',
-      '  row-gap: 6px !important;',
+      '  row-gap: 1cm !important;',
       '  width: 100% !important;',
       '}',
       '.view-switcher-kicker {',

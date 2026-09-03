@@ -2000,7 +2000,7 @@ const StatisticoHeader = {
         tabs: [
           { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', inPage: true },
           { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', inPage: true },
-          { tabKey: 'by-group-similarity', label: 'Similarity', icon: 'fa-clone', panel: 'similarity', inPage: true }
+          { tabKey: 'by-group-similarity', label: 'Similarity Index™', icon: 'fa-clone', panel: 'similarity', inPage: true }
         ]
       },
       {
@@ -2084,7 +2084,7 @@ const StatisticoHeader = {
       + `<span class="ws-tab-label">${opts.label}</span>`
       + `</span>`
       + (opts.tabKey === 'by-group-similarity'
-        ? '<span class="ws-tab-help-i" title="About Similarity" aria-label="About Similarity" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="event.preventDefault(); event.stopPropagation(); if (window.openDspHelp) window.openDspHelp();">i</span>'
+        ? '<span class="ws-tab-help-i" title="About Similarity Index" aria-label="About Similarity Index" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="event.preventDefault(); event.stopPropagation(); if (window.openDspHelp) window.openDspHelp();">i</span>'
         : '')
       + `<span class="view-switcher-mark" aria-hidden="true">`
       + `<i class="fa-solid fa-arrow-right view-switcher-go"></i>`
@@ -7593,7 +7593,7 @@ const StatisticoHeader = {
       'by-group-stats': 'Grouped Statistics',
       'by-group-boxplot': 'Grouped Box Plots',
       'by-group-normality': 'Group Normality Analysis',
-      'by-group-similarity': 'Distribution Similarity Profile',
+      'by-group-similarity': 'Similarity Index™',
       outliers: 'Outliers',
       normality: 'Tests',
       qqplot: 'PP/QQ',
@@ -9379,13 +9379,13 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       const distinct = sim.mostDistinct;
       const outlier = sim.mostDifferentGroup;
       tabBlock = [
-        'ACTIVE TAB: Distribution Similarity Profile (pairwise location / spread / shape, 0–100)',
+        'ACTIVE TAB: Similarity Index™ (pairwise location / spread / shape, 0–100)',
         `Group homogeneity: ${f(sim.homogeneity, 1)} (${sim.homogeneityBand || 'n/a'}).`,
         similar ? `Most similar pair: ${similar.a} vs ${similar.b} = ${f(similar.overall, 1)} (${similar.band}).` : '',
         distinct ? `Most distinct pair: ${distinct.a} vs ${distinct.b} = ${f(distinct.overall, 1)} (${distinct.band}).` : '',
         outlier ? `Group most different from the others: ${outlier.group} (mean similarity ${f(outlier.meanSimilarity, 1)}).` : '',
         pairLines || 'No pairwise scores.',
-        'Focus READING on practical similarity, not significance. Cite the three components when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Distribution Similarity Profile. Do not use good/acceptable/poor; use Very similar / Mostly similar / Mixed similarity / Substantially different.'
+        'Focus READING on practical similarity, not significance. Cite the three components when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Index™. Do not use good/acceptable/poor; use Very similar / Mostly similar / Mixed similarity / Substantially different.'
       ].filter(Boolean).join('\n');
     }
 
@@ -9393,7 +9393,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       stats: 'Grouped Statistics',
       boxplot: 'Grouped Box Plots',
       normality: 'Group Normality Analysis',
-      similarity: 'Distribution Similarity Profile'
+      similarity: 'Similarity Index™'
     };
     const viewName = viewNames[tab] || 'Grouped Analysis';
     const controlsDoc = this._viewControlsDoc();
@@ -9425,7 +9425,7 @@ ${boxplotLines}
 [ Normality tab ]
 ${normLines || '(Run normality tab to populate)'}
 
-[ Similarity tab — Distribution Similarity Profile ]
+[ Similarity Index™ ]
 Homogeneity: ${f(sim.homogeneity, 1)} (${sim.homogeneityBand || 'n/a'})
 ${similar ? `Most similar: ${similar.a} vs ${similar.b} = ${f(similar.overall, 1)} (${similar.band})` : ''}
 ${distinct ? `Most distinct: ${distinct.a} vs ${distinct.b} = ${f(distinct.overall, 1)} (${distinct.band})` : ''}
@@ -9861,7 +9861,7 @@ Always follow the exact output format requested.` },
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
       qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test',
       'by-group-stats':'Grouped Statistics', 'by-group-boxplot':'Grouped Box Plots',
-      'by-group-normality':'Group Normality Analysis', 'by-group-similarity':'Distribution Similarity Profile', 'by-group':'Grouped Analysis',
+      'by-group-normality':'Group Normality Analysis', 'by-group-similarity':'Similarity Index™', 'by-group':'Grouped Analysis',
       ...this._correlationViewLabels(),
       ...this._independentViewLabels(),
       ...this._genericModuleViewLabels()

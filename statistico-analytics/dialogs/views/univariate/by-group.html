@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260828viewcta" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260828viewcta" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260902dsphelp"></script>
+  <script src="../shared-header.js?v=20260903boxtoggle"></script>
   <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <script src="../../shared/distribution-similarity.js?v=20260902dsp"></script>
@@ -125,6 +125,7 @@
     .by-group-panel { display:none; min-height:0; }
     .by-group-panel.is-active { display:block; }
     .boxplot-wrap { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:8px; }
+    .boxplot-wrap.is-hidden { display:none; }
     #groupBoxplotChart { height:420px; min-height:320px; }
     .norm-table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
     .norm-table { width:100%; border-collapse:collapse; min-width:720px; }
@@ -421,7 +422,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-uni-bygroup-v11">
+<body data-page-version="20260903-uni-bygroup-v12">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -464,6 +465,7 @@
                   <div class="dist-toggle" role="tablist" aria-label="Distribution view">
                     <button type="button" id="distViewGroupedBtn" class="active" role="tab" aria-selected="true" onclick="setDistView('grouped')">Grouped</button>
                     <button type="button" id="distViewHistBtn" role="tab" aria-selected="false" onclick="setDistView('histograms')">Histograms</button>
+                    <button type="button" id="distViewBoxplotBtn" role="tab" aria-selected="false" onclick="setDistView('boxplot')">Boxplots</button>
                   </div>
                 </div>
               </div>
@@ -471,13 +473,8 @@
                 <div id="groupedLineChart"></div>
               </div>
               <div id="histGrid" class="hist-grid is-hidden"></div>
+              <div id="boxplotWrap" class="boxplot-wrap is-hidden"><div id="groupBoxplotChart"></div></div>
             </section>
-            </div>
-            <div id="byGroupPanel-boxplot" class="by-group-panel">
-              <section class="panel">
-                <div class="section-title"><strong>Grouped Box Plots</strong><span>One chart — compare spread and quartiles across groups</span></div>
-                <div class="boxplot-wrap"><div id="groupBoxplotChart"></div></div>
-              </section>
             </div>
             <div id="byGroupPanel-normality" class="by-group-panel">
               <section class="panel">
@@ -1210,6 +1207,11 @@
     }
 
     function switchByGroupTab(tab) {
+      if (tab === 'boxplot') {
+        distView = 'boxplot';
+        syncDistToggle();
+        tab = 'stats';
+      }
       activeByGroupTab = tab || 'stats';
       window.__byGroupActiveTab = activeByGroupTab;
       if (window.__byGroupAiContext) window.__byGroupAiContext.activeTab = activeByGroupTab;
@@ -1222,9 +1224,6 @@
           applyStatsTableScrollLimit();
           reflowDistributionCharts();
         });
-      }
-      if (activeByGroupTab === 'boxplot' && boxplotChart) {
-        try { boxplotChart.reflow(); } catch (_e) {}
       }
       if (activeByGroupTab === 'normality') {
         renderNormMiniHistograms(normGroupResults);
@@ -1358,10 +1357,20 @@
       return GROUP_LINE_COLORS[(idx < 0 ? 0 : idx) % GROUP_LINE_COLORS.length];
     }
 
-    function setDistView(view) {
-      distView = view === 'histograms' ? 'histograms' : 'grouped';
+    function distViewMeta(view) {
+      if (view === 'histograms') {
+        return { title: 'Grouped histograms', hint: 'Compact distribution view, 4 per row' };
+      }
+      if (view === 'boxplot') {
+        return { title: 'Grouped box plots', hint: 'One chart — compare spread and quartiles across groups' };
+      }
+      return { title: 'Grouped distributions', hint: 'One line per group on a shared value scale' };
+    }
+
+    function syncDistToggle() {
       const groupedBtn = document.getElementById('distViewGroupedBtn');
       const histBtn = document.getElementById('distViewHistBtn');
+      const boxBtn = document.getElementById('distViewBoxplotBtn');
       if (groupedBtn) {
         groupedBtn.classList.toggle('active', distView === 'grouped');
         groupedBtn.setAttribute('aria-selected', distView === 'grouped' ? 'true' : 'false');
@@ -1370,12 +1379,20 @@
         histBtn.classList.toggle('active', distView === 'histograms');
         histBtn.setAttribute('aria-selected', distView === 'histograms' ? 'true' : 'false');
       }
+      if (boxBtn) {
+        boxBtn.classList.toggle('active', distView === 'boxplot');
+        boxBtn.setAttribute('aria-selected', distView === 'boxplot' ? 'true' : 'false');
+      }
+      const meta = distViewMeta(distView);
       const title = document.getElementById('distPanelTitle');
       const hint = document.getElementById('distPanelHint');
-      if (title) title.textContent = distView === 'histograms' ? 'Grouped histograms' : 'Grouped distributions';
-      if (hint) hint.textContent = distView === 'histograms'
-        ? 'Compact distribution view, 4 per row'
-        : 'One line per group on a shared value scale';
+      if (title) title.textContent = meta.title;
+      if (hint) hint.textContent = meta.hint;
+    }
+
+    function setDistView(view) {
+      distView = (view === 'histograms' || view === 'boxplot') ? view : 'grouped';
+      syncDistToggle();
       renderDistributionPanel();
     }
     window.setDistView = setDistView;
@@ -1383,21 +1400,20 @@
     function renderDistributionPanel() {
       const lineWrap = document.getElementById('groupedLineWrap');
       const histGrid = document.getElementById('histGrid');
-      if (!lineWrap || !histGrid) return;
-      if (distView === 'histograms') {
-        lineWrap.classList.add('is-hidden');
-        histGrid.classList.remove('is-hidden');
-        renderHistograms();
-      } else {
-        histGrid.classList.add('is-hidden');
-        lineWrap.classList.remove('is-hidden');
-        renderGroupedLineChart();
-      }
+      const boxWrap = document.getElementById('boxplotWrap');
+      if (!lineWrap || !histGrid || !boxWrap) return;
+      lineWrap.classList.toggle('is-hidden', distView !== 'grouped');
+      histGrid.classList.toggle('is-hidden', distView !== 'histograms');
+      boxWrap.classList.toggle('is-hidden', distView !== 'boxplot');
+      if (distView === 'histograms') renderHistograms();
+      else if (distView === 'boxplot') renderGroupBoxplot();
+      else renderGroupedLineChart();
     }
 
     function reflowDistributionCharts() {
       try {
         if (distView === 'grouped' && groupedLineChart) groupedLineChart.reflow();
+        if (distView === 'boxplot' && boxplotChart) boxplotChart.reflow();
         if (distView === 'histograms') {
           document.querySelectorAll('#histGrid .hist-chart').forEach((el) => {
             const chart = Highcharts.charts.find((c) => c && c.renderTo === el);

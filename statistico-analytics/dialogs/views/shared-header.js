@@ -1996,10 +1996,9 @@ const StatisticoHeader = {
         icon: 'fa-layer-group',
         views: ['by-group'],
         defaultFile: 'univariate/by-group.html',
-        resultTabLimit: 4,
+        resultTabLimit: 3,
         tabs: [
           { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', inPage: true },
-          { tabKey: 'by-group-boxplot', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'boxplot', inPage: true },
           { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', inPage: true },
           { tabKey: 'by-group-similarity', label: 'Similarity', icon: 'fa-clone', panel: 'similarity', inPage: true }
         ]
@@ -2043,8 +2042,7 @@ const StatisticoHeader = {
       qqplot: 'Compare sample quantiles against a reference distribution.',
       confidence: 'Interval estimates for the mean or median.',
       hypothesis: 'Test the sample against a reference value.',
-      'by-group-stats': 'Compare descriptive stats and grouped distributions by group.',
-      'by-group-boxplot': 'Compare spread and location across groups.',
+      'by-group-stats': 'Compare group stats and switch among overlay, histograms, and box plots.',
       'by-group-normality': 'Review tests and NSI by group.',
       'by-group-similarity': 'Compare groups on location, spread, and shape similarity.'
     };
@@ -2095,9 +2093,10 @@ const StatisticoHeader = {
   },
 
   setByGroupResultsTab(panel) {
-    globalThis.__byGroupActiveTab = panel || 'stats';
     if (typeof globalThis.switchByGroupTab === 'function') {
       globalThis.switchByGroupTab(panel);
+    } else {
+      globalThis.__byGroupActiveTab = panel === 'boxplot' ? 'stats' : (panel || 'stats');
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
@@ -2110,7 +2109,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260903tabdim',
+  _TAB_ASSET_VER: '20260903boxtoggle',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -9306,9 +9305,9 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`,
 
-      'by-group-stats': `Controls available: (1) Compare Groups / Change — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Minimum group size — keep only levels with at least n rows; (4) Source row filter (header) — limits which rows enter every group; (5) Grouped / Histograms toggle — overlay one line per group, or show separate histograms; (6) Select checkbox in the statistics table — emphasize that group's line (click again to clear). A chart line or legend item does the same. The table shows per-group N, mean, CI, spread, and shape statistics; both charts use a shared bin scale for fair comparison.`,
+      'by-group-stats': `Controls available: (1) Compare Groups / Change — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Minimum group size — keep only levels with at least n rows; (4) Source row filter (header) — limits which rows enter every group; (5) Grouped / Histograms / Boxplots toggle — overlay one line per group, show separate histograms, or compare quartiles on one box plot; (6) Select checkbox in the statistics table — emphasize that group's line (click again to clear). A chart line or legend item does the same. The table shows per-group N, mean, CI, spread, and shape statistics; overlay and histogram views use a shared bin scale for fair comparison.`,
 
-      'by-group-boxplot': `Controls available: (1) Compare Groups / Change — same grouping column as other tabs; (2) Group level filter — subset levels; (3) Source row filter — shared filtered rows. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
+      'by-group-boxplot': `Controls available: Boxplots now live on the Statistics tab. Use the Grouped / Histograms / Boxplots toggle. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
 
       'by-group-normality': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`,
 
@@ -9344,7 +9343,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     let tabBlock = '';
     if (tab === 'stats') {
       tabBlock = [
-        'ACTIVE TAB: Grouped Statistics (descriptive table + grouped line chart, with optional per-group histograms)',
+        'ACTIVE TAB: Grouped Statistics (descriptive table + Grouped / Histograms / Boxplots chart toggle)',
         `Compare ${ctx.groups.length} groups on ${ctx.variable} split by ${ctx.groupingColumn}.`,
         `Mean spread across groups: ${f(meanSpread)} (${lowest.name}=${f(lowest.mean)} vs ${highest.name}=${f(highest.mean)}).`,
         'Focus READING on whether central tendency, spread, and shape differ meaningfully between named groups — not on a single pooled sample.'
@@ -9420,7 +9419,7 @@ ${groupStatsBlock}
 [ Statistics tab ]
 Mean spread: ${f(meanSpread)} (${lowest.name}=${f(lowest.mean)} vs ${highest.name}=${f(highest.mean)})
 
-[ Box plot tab ]
+[ Box plots — Statistics chart toggle ]
 ${boxplotLines}
 
 [ Normality tab ]

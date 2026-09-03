@@ -215,6 +215,12 @@
     .group-dialog.is-applying .level-preview-head .level-apply-status { display:inline-flex; }
     .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; align-items:center; margin-bottom:8px; }
     .level-actions button { padding:5px 8px; font-size:11px; }
+    .level-actions .level-apply-btn {
+      padding:5px 12px; font-size:11px; font-weight:800; letter-spacing:.02em;
+      color:#0c1624; border:none; border-radius:8px; cursor:pointer;
+      background:var(--accent-1);
+    }
+    .level-actions .level-apply-btn:hover { filter:brightness(1.08); }
     .level-keep {
       display:inline-flex; align-items:center; gap:6px; margin-right:auto;
       color:var(--text-secondary); font-size:11px; font-weight:700; white-space:nowrap;
@@ -422,7 +428,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260903-uni-bygroup-v14">
+<body data-page-version="20260903-uni-bygroup-v15">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -635,7 +641,8 @@
     ];
     let previewGroupIndex = null;
     let previewLevels = [];
-    let previewKeepMinN = '';
+    const DEFAULT_MIN_GROUP_N = 5;
+    let previewKeepMinN = String(DEFAULT_MIN_GROUP_N);
     let previewLoadToken = 0;
     let applySelectionToken = 0;
     let groupSelectionDirty = false;
@@ -727,12 +734,20 @@
       return idx != null && idx !== '' && Number.isInteger(n) && n >= 0 && n < headers.length;
     }
 
+    function currentMinGroupN() {
+      const parsed = parseInt(String(previewKeepMinN).trim(), 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MIN_GROUP_N;
+    }
+
     function ensureLevelSelection(idx) {
       const key = String(idx);
       const levels = getLevelCounts(idx);
       if (!levelSelections[key]) levelSelections[key] = {};
+      const minN = currentMinGroupN();
       levels.forEach((item) => {
-        if (levelSelections[key][item.level] === undefined) levelSelections[key][item.level] = true;
+        if (levelSelections[key][item.level] === undefined) {
+          levelSelections[key][item.level] = item.n >= minN;
+        }
       });
       Object.keys(levelSelections[key]).forEach((level) => {
         if (!levels.some((item) => item.level === level)) delete levelSelections[key][level];
@@ -995,7 +1010,7 @@
       const included = previewLevels.filter((item) => isLevelIncluded(previewGroupIndex, item.level));
       const selectedCount = included.length;
       const includedN = included.reduce((sum, item) => sum + item.n, 0);
-      const keepValue = previewKeepMinN ? ` value="${escapeHtml(previewKeepMinN)}"` : '';
+      const keepValue = ` value="${escapeHtml(String(currentMinGroupN()))}"`;
       const html = [
         `<div class="level-preview-head">
           <div><strong>${escapeHtml(headers[previewGroupIndex] || 'Group')}</strong><span>${selectedCount} of ${previewLevels.length} levels included, n=${includedN}</span></div>
@@ -1003,8 +1018,9 @@
         </div>`,
         `<div class="level-actions">
           <label class="level-keep" title="Keep only levels with at least this many rows">Minimum group size
-            <input type="number" min="1" step="1" inputmode="numeric" placeholder="1"${keepValue} aria-label="Minimum group size" onchange="keepPreviewLevelsByMinN(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();keepPreviewLevelsByMinN(this.value);}" />
+            <input type="number" min="1" step="1" inputmode="numeric" placeholder="${DEFAULT_MIN_GROUP_N}"${keepValue} aria-label="Minimum group size" onkeydown="if(event.key==='Enter'){event.preventDefault();applyPreviewMinGroupSize();}" />
           </label>
+          <button type="button" class="level-apply-btn" onclick="applyPreviewMinGroupSize()">Apply</button>
           <button type="button" onclick="setAllPreviewLevels(true)">Include all</button>
           <button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button>
         </div>`,
@@ -1109,15 +1125,20 @@
 
     function keepPreviewLevelsByMinN(raw) {
       const parsed = parseInt(String(raw).trim(), 10);
-      previewKeepMinN = Number.isFinite(parsed) && parsed > 0 ? String(parsed) : '';
-      if (!previewKeepMinN) return;
-      const minN = Number(previewKeepMinN);
+      previewKeepMinN = Number.isFinite(parsed) && parsed > 0 ? String(parsed) : String(DEFAULT_MIN_GROUP_N);
+      const minN = currentMinGroupN();
       const selection = ensureLevelSelection(previewGroupIndex);
       previewLevels.forEach((item) => { selection[item.level] = item.n >= minN; });
       renderLevelPreview(previewGroupIndex);
       markGroupSelectionDirty();
     }
+
+    function applyPreviewMinGroupSize() {
+      const input = document.querySelector('#groupLevelPreview .level-keep input');
+      keepPreviewLevelsByMinN(input ? input.value : previewKeepMinN);
+    }
     window.keepPreviewLevelsByMinN = keepPreviewLevelsByMinN;
+    window.applyPreviewMinGroupSize = applyPreviewMinGroupSize;
 
     function openGroupDialog() {
       if (!headers.length) return;

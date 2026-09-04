@@ -115,6 +115,8 @@ const CASES = [
   ['site navigation', [
     ['how do i install', 'how-it-works'],
     ['why not spss', 'why-another-package'],
+    ['spss syntax', 'reusable-workflows'],
+    ['minitab macros', 'reusable-workflows'],
     ['pricing', 'faq'],
     ['contact', 'contact'],
     ['all calculators', 'index-Calculators'],

@@ -11,6 +11,7 @@ function getNavLinks() {
     terms: '/Statistico-Website/terms-and-conditions.html',
     why: '/Statistico-Website/why-another-package.html',
     how: '/Statistico-Website/how-it-works.html',
+    workflows: '/Statistico-Website/reusable-workflows.html',
     calculators: '/Statistico-Website/index-Calculators.html',
     analytics: '/Statistico-Website/index-Analytics.html',
     addins: '/Statistico-Website/index-Addins.html',
@@ -1600,6 +1601,8 @@ body {
 .section-head h2,
 .why-section h2,
 .why-closing h2,
+.rw-section h2,
+.rw-closing h2,
 .hiw-section-title,
 .legal-section h2,
 .contact-card h2 {
@@ -1610,6 +1613,8 @@ body {
 
 .why-section p,
 .why-closing p,
+.rw-section p,
+.rw-closing p,
 .section-head p,
 .about-panel p,
 .contact-card p,
@@ -1936,6 +1941,7 @@ const FOOTER_TEMPLATE = `
         <h4>Resources</h4>
         <a href="/Statistico-Website/why-another-package.html" id="footer-link-why">The Paradigm</a>
         <a href="/Statistico-Website/how-it-works.html" id="footer-link-how">How It Works</a>
+        <a href="/Statistico-Website/reusable-workflows.html" id="footer-link-workflows">Reusable Workflows</a>
         <a href="/Statistico-Website/faq.html" id="footer-link-faq">FAQ</a>
       </div>
       <div class="footer-section">
@@ -2080,6 +2086,7 @@ const FOOTER_TEMPLATE = `
     const footerCalculatorsLink = document.getElementById('footer-link-calculators');
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerHowLink = document.getElementById('footer-link-how');
+    const footerWorkflowsLink = document.getElementById('footer-link-workflows');
     const footerFaqLink = document.getElementById('footer-link-faq');
     const footerAboutLink = document.getElementById('footer-link-about');
     const footerContactLink = document.getElementById('footer-link-contact');
@@ -2090,6 +2097,7 @@ const FOOTER_TEMPLATE = `
     if (footerCalculatorsLink) footerCalculatorsLink.href = links.calculators;
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerHowLink) footerHowLink.href = links.how;
+    if (footerWorkflowsLink) footerWorkflowsLink.href = links.workflows;
     if (footerFaqLink) footerFaqLink.href = links.faq;
     if (footerAboutLink) footerAboutLink.href = links.about;
     if (footerContactLink) footerContactLink.href = links.contact;
@@ -2189,6 +2197,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'why';
     } else if (currentFile === 'how-it-works.html') {
       activePage = 'how';
+    } else if (currentFile === 'reusable-workflows.html') {
+      activePage = 'how';
     } else if (currentFile === 'faq.html') {
       activePage = 'faq';
     } else if (currentFile === 'index-Calculators.html' || currentPath.indexOf('/calculators/') >= 0) {
@@ -2228,6 +2238,7 @@ function trailIconForLabel(label) {
   if (t === 'ezpaste' || t.indexOf('ezpaste') === 0) return 'fa-bullseye';
   if (t === 'the paradigm') return 'fa-lightbulb';
   if (t === 'how it works') return 'fa-route';
+  if (t === 'reusable workflows' || t.indexOf('workflow') >= 0) return 'fa-rotate';
   if (t === 'faq') return 'fa-circle-question';
   if (t === 'about' || t === 'about us') return 'fa-building';
   if (t === 'contact') return 'fa-envelope';
@@ -2416,6 +2427,13 @@ function resolveTrailCrumbs() {
     return [
       { label: 'Statistico', href: links.home },
       { label: 'How It Works' }
+    ];
+  }
+
+  if (file === 'reusable-workflows.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Reusable Workflows' }
     ];
   }
 

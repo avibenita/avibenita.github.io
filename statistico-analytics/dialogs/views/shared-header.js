@@ -1592,6 +1592,7 @@ const StatisticoHeader = {
       reliability: 'Evaluate internal consistency.',
       'descriptive-stats': 'Summarize variables and distributions.',
       'correlation-by-group': 'Compare pairwise r across group levels.',
+      'correlation-by-group-similarity': 'Compare groups on correlation pattern, strength, and sign similarity.',
       'regression-by-group': 'Compare coefficients and residual normality across group levels.',
       histogram: 'Frequency view of the distribution.',
       boxplot: 'Quartiles, whiskers, and outliers.',
@@ -7617,6 +7618,10 @@ const StatisticoHeader = {
       const tab = globalThis.__byGroupActiveTab || 'stats';
       return `by-group-${tab}`;
     }
+    if (this.module === 'correlations' && this.currentView === 'correlation-by-group') {
+      const tab = globalThis.__corrByGroupActiveTab || 'table';
+      return tab === 'similarity' ? 'correlation-by-group-similarity' : 'correlation-by-group';
+    }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
     if (this.module === 'meta-analysis') {
@@ -8393,7 +8398,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
         prompt = window.buildFactorSuitabilityAiPrompt();
       } else {
         prompt = this.module === 'correlations'
-          ? this._buildCorrelationStructuredPrompt(this.currentView, 'per-view')
+          ? this._buildCorrelationStructuredPrompt(viewKey, 'per-view')
           : this.module === 'univariate'
             ? this._buildStructuredPrompt(viewKey, 'per-view')
             : this._buildGenericInsightGuidePrompt(viewKey);
@@ -9018,6 +9023,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       'taylor-diagram': 'Taylor Diagram',
       'descriptive-stats': 'Descriptives',
       'correlation-by-group': 'By Group',
+      'correlation-by-group-similarity': 'Similarity Index™',
       correlations: 'Correlations'
     };
   },
@@ -9480,7 +9486,8 @@ READING: [1–2 sentences comparing the named groups using exact per-group numbe
       reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
-      'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group and a sparkline of group-specific correlations.'
+      'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group, a sparkline of group-specific correlations, and a Group Profile chart of how other variables associate with an anchor across group levels.',
+      'correlation-by-group-similarity': 'Similarity Index™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. Click heatmap cells or table rows for the three-component profile; click a congruence point to open that pair’s scatter.'
     };
   },
 
@@ -9525,7 +9532,10 @@ RULES:
 - Explain this current view first, but use the broader results as context.
 - Be practical and concise.
 - Do not overclaim causality.
-- Mention exact values when they clarify the reading.
+- Mention exact values when they clarify the reading.${view === 'correlation-by-group-similarity' ? `
+- Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed.
+- Do not call this a published coefficient — it is Statistico's Similarity Index™.
+- Use Very similar / Mostly similar / Mixed similarity / Substantially different.` : ''}
 
 Reply ONLY in this exact format:
 ABOUT: [2-3 sentences explaining what this view answers]

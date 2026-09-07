@@ -30,11 +30,26 @@
     .right-col { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
     .view-wrap { flex:1; min-height:0; padding:12px; box-sizing:border-box; overflow:hidden; }
     .view-card { height:100%; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.24); }
-    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.04), transparent); flex-wrap:wrap; }
+    .toolbar {
+      display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+      align-items:center; gap:12px; padding:12px 14px;
+      border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+    }
+    .toolbar-center { justify-self:center; }
+    .profile-open-btn {
+      display:inline-flex; align-items:center; gap:9px; padding:10px 22px;
+      font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+      border:none; border-radius:10px; color:#102033; cursor:pointer;
+      background:linear-gradient(135deg, var(--accent-1) 0%, #ffb347 52%, var(--accent-2) 100%);
+      box-shadow:0 8px 22px rgba(255,165,120,.34);
+    }
+    .profile-open-btn:hover { transform:translateY(-1px); }
+    .profile-open-btn:disabled { opacity:.42; cursor:not-allowed; transform:none; box-shadow:none; }
     .title { display:flex; flex-direction:column; gap:2px; min-width:0; }
     .title strong { color:var(--accent-1); font-size:14px; letter-spacing:.03em; text-transform:uppercase; }
     .title span { color:var(--text-secondary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-self:end; }
     .control { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; }
     .group-choice-label { color:var(--text-secondary); font-size:12px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
@@ -45,8 +60,7 @@
       flex:1; min-height:0; display:none; flex-direction:column; gap:10px;
     }
     .r-profile-card {
-      flex:0 0 auto; margin:0; border:1px solid var(--border); border-radius:12px; overflow:hidden;
-      background:var(--surface-2);
+      border:none; border-radius:0; overflow:visible; background:transparent;
     }
     .r-profile-head {
       display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
@@ -67,8 +81,8 @@
     .r-profile-legend-item:hover { color:var(--text-primary); }
     .r-profile-legend-item.is-off { opacity:.4; }
     .r-profile-legend-swatch { width:18px; height:0; border-top:3px solid var(--accent-2); border-radius:999px; }
-    .r-profile-chart { overflow-x:auto; overflow-y:hidden; padding:2px 8px 6px; }
-    .r-profile-svg { display:block; width:100%; max-width:860px; height:188px; min-width:0; }
+    .r-profile-chart { overflow-x:auto; overflow-y:hidden; padding:6px 12px 14px; }
+    .r-profile-svg { display:block; width:100%; height:320px; min-width:0; }
     .r-profile-svg .scatter-bg { fill:rgba(0,0,0,.16); stroke:var(--border); stroke-width:1; }
     html[data-theme="light"] .r-profile-svg .scatter-bg { fill:rgba(15,23,42,.03); }
     .r-profile-band-pos { fill:rgba(52,211,153,.07); }
@@ -205,6 +219,7 @@
     .scatter-view-toggle input:focus-visible + .scatter-toggle-ui { outline:2px solid var(--accent-2); outline-offset:2px; }
     .scatter-view-toggle:has(input:checked) { color:var(--text-primary); }
     .scatter-dialog-body { padding:14px 16px 18px; overflow:auto; }
+    .profile-dialog { width:min(1080px, 96vw); }
     .scatter-combined-wrap { display:block; }
     .scatter-combined-panel {
       border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface-2);
@@ -560,12 +575,15 @@
     .level-n { color:var(--text-secondary); font-size:11px; white-space:nowrap; margin-left:auto; }
     @media (max-width: 900px) {
       .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
+      .toolbar { grid-template-columns:1fr; }
+      .toolbar-center, .controls { justify-self:stretch; }
+      .profile-open-btn { width:100%; justify-content:center; }
       .group-dialog-body { grid-template-columns:1fr; }
       .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
     }
   </style>
 </head>
-<body data-page-version="20260907-bygroup-v20">
+<body data-page-version="20260907-bygroup-v21">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -575,6 +593,11 @@
           <div class="title">
             <strong>Correlations by Group</strong>
             <span id="subtitle">Compare pairwise r across group levels.</span>
+          </div>
+          <div class="toolbar-center">
+            <button id="openProfileBtn" class="profile-open-btn" type="button" onclick="openProfilePopup()" disabled>
+              <i class="fa-solid fa-chart-line"></i> Group Profile
+            </button>
           </div>
           <div class="controls">
             <label class="control" for="corrTypeSelect">Type
@@ -604,19 +627,6 @@
                 <thead id="corrByGroupHead"></thead>
                 <tbody id="corrByGroupBody"></tbody>
               </table>
-            </div>
-            <div class="r-profile-card" id="rProfileCard">
-              <div class="r-profile-head">
-                <div>
-                  <strong>Group correlation profile</strong>
-                  <span id="rProfileSubtitle">Each X tick is a variable. Y is r with the profiled variable. Lines are group levels — Overall is omitted.</span>
-                </div>
-                <label class="r-profile-anchor" for="profileAnchorSelect">Profile of
-                  <select id="profileAnchorSelect" onchange="onProfileAnchorChange(this.value)"></select>
-                </label>
-              </div>
-              <div class="r-profile-legend" id="rProfileLegend"></div>
-              <div class="r-profile-chart" id="rProfileChart"></div>
             </div>
           </div>
         </div>
@@ -662,6 +672,27 @@
       </div>
       <div class="scatter-dialog-body">
         <div class="scatter-panel-grid" id="scatterPanels"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scatter-dialog-overlay" id="profileDialog" role="dialog" aria-modal="true" aria-labelledby="profileDialogTitle">
+    <div class="scatter-dialog profile-dialog">
+      <div class="scatter-dialog-head">
+        <div>
+          <strong id="profileDialogTitle">Group correlation profile</strong>
+          <span id="rProfileSubtitle">Each X tick is a variable. Y is r with the profiled variable. Lines are group levels — Overall is omitted.</span>
+        </div>
+        <button class="scatter-dialog-close" type="button" onclick="closeProfilePopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="r-profile-card" id="rProfileCard">
+        <div class="r-profile-head">
+          <div class="r-profile-legend" id="rProfileLegend"></div>
+          <label class="r-profile-anchor" for="profileAnchorSelect">Profile of
+            <select id="profileAnchorSelect" onchange="onProfileAnchorChange(this.value)"></select>
+          </label>
+        </div>
+        <div class="r-profile-chart" id="rProfileChart"></div>
       </div>
     </div>
   </div>
@@ -789,6 +820,13 @@
       document.getElementById('emptyState').style.display = 'block';
       document.getElementById('emptyState').innerHTML = `<i class="fa-solid fa-sitemap"></i>${escapeHtml(message)}`;
       document.getElementById('mainContent').style.display = 'none';
+      closeProfilePopup();
+      syncProfileButton(false);
+    }
+
+    function syncProfileButton(enabled) {
+      const btn = document.getElementById('openProfileBtn');
+      if (btn) btn.disabled = !enabled;
     }
 
     function populateGroupChoices() {
@@ -1530,6 +1568,22 @@
       renderRProfile();
     }
 
+    function isProfilePopupOpen() {
+      const dialog = document.getElementById('profileDialog');
+      return !!(dialog && dialog.classList.contains('is-visible'));
+    }
+
+    function openProfilePopup() {
+      if (!activeGroups.length) return;
+      document.getElementById('profileDialog').classList.add('is-visible');
+      renderRProfile();
+    }
+
+    function closeProfilePopup() {
+      const dialog = document.getElementById('profileDialog');
+      if (dialog) dialog.classList.remove('is-visible');
+    }
+
     function shortVarName(name, max) {
       const s = String(name || '');
       const limit = max || 16;
@@ -1602,10 +1656,10 @@
 
       const yMin = -1;
       const yMax = 1;
-      const pad = { l: 48, r: 12, t: 10, b: 54 };
+      const pad = { l: 52, r: 16, t: 14, b: 62 };
       const n = items.length;
-      const plotW = Math.max(420, n * 58);
-      const plotH = 118;
+      const plotW = Math.max(640, n * 72);
+      const plotH = 210;
       const w = pad.l + plotW + pad.r;
       const h = pad.t + plotH + pad.b;
       const sx = (i) => (n <= 1 ? pad.l + plotW / 2 : pad.l + (i / (n - 1)) * plotW);
@@ -1884,7 +1938,7 @@
       renderTableBody();
       bindChartButtons();
       syncCategoryRowHeight();
-      renderRProfile();
+      if (isProfilePopupOpen()) renderRProfile();
       const metric = document.getElementById('metricPairs');
       if (metric) metric.textContent = String(getFilteredRows().length);
       if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
@@ -1921,6 +1975,7 @@
       if (pairVarFilter && !analysisHeaders.includes(pairVarFilter)) pairVarFilter = '';
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'flex';
+      syncProfileButton(true);
       document.getElementById('metricPairs').textContent = getFilteredRows().length;
       document.getElementById('metricGroups').textContent = activeGroups.length;
       document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
@@ -2087,16 +2142,23 @@
     window.onCorrTypeChange = onCorrTypeChange;
     window.onPairVarFilterChange = onPairVarFilterChange;
     window.onProfileAnchorChange = onProfileAnchorChange;
+    window.openProfilePopup = openProfilePopup;
+    window.closeProfilePopup = closeProfilePopup;
 
     window.openScatterPopup = openScatterPopup;
     window.closeScatterPopup = closeScatterPopup;
     window.toggleScatterCombinedView = toggleScatterCombinedView;
 
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeScatterPopup();
+      if (event.key !== 'Escape') return;
+      closeScatterPopup();
+      closeProfilePopup();
     });
     document.getElementById('scatterDialog').addEventListener('click', (event) => {
       if (event.target.id === 'scatterDialog') closeScatterPopup();
+    });
+    document.getElementById('profileDialog').addEventListener('click', (event) => {
+      if (event.target.id === 'profileDialog') closeProfilePopup();
     });
   </script>
 </body>

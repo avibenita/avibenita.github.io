@@ -117,23 +117,40 @@
     .scatter-view-toggle {
       display:inline-flex; align-items:center; gap:10px; cursor:pointer;
       color:var(--text-secondary); font-size:13px; font-weight:650; user-select:none;
+      position:relative;
     }
-    .scatter-view-toggle input { position:absolute; opacity:0; width:0; height:0; }
+    /* Hide the native checkbox — it looks idle/greyed-out in Excel WebView. */
+    .scatter-view-toggle input {
+      position:absolute;
+      width:1px; height:1px; padding:0; margin:-1px;
+      overflow:hidden; clip:rect(0, 0, 0, 0); white-space:nowrap; border:0;
+      appearance:none; -webkit-appearance:none; opacity:0; pointer-events:none;
+    }
     .scatter-toggle-ui {
-      width:42px; height:24px; border-radius:999px; position:relative;
-      background:var(--border); transition:background .15s ease;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+      width:42px; height:24px; flex:0 0 42px; border-radius:999px; position:relative;
+      background:color-mix(in srgb, var(--text-secondary) 32%, var(--surface-2));
+      transition:background .15s ease, box-shadow .15s ease;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);
     }
     .scatter-toggle-ui::after {
       content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
       background:#fff; transition:transform .15s ease;
       box-shadow:0 1px 4px rgba(0,0,0,.28);
     }
+    .scatter-view-toggle:hover { color:var(--text-primary); }
+    .scatter-view-toggle:hover .scatter-toggle-ui {
+      background:color-mix(in srgb, var(--accent-2) 36%, var(--surface-2));
+      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 55%, transparent);
+    }
     .scatter-view-toggle input:checked + .scatter-toggle-ui {
       background:linear-gradient(135deg, var(--accent-2), color-mix(in srgb, var(--accent-1) 55%, var(--accent-2)));
+      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 40%, transparent);
     }
     .scatter-view-toggle input:checked + .scatter-toggle-ui::after { transform:translateX(18px); }
+    .scatter-view-toggle:focus-visible { outline:none; }
+    .scatter-view-toggle:focus-visible .scatter-toggle-ui,
     .scatter-view-toggle input:focus-visible + .scatter-toggle-ui { outline:2px solid var(--accent-2); outline-offset:2px; }
+    .scatter-view-toggle:has(input:checked) { color:var(--text-primary); }
     .scatter-dialog-body { padding:14px 16px 18px; overflow:auto; }
     .scatter-combined-wrap { display:block; }
     .scatter-combined-panel {
@@ -481,7 +498,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260902-bygroup-v13">
+<body data-page-version="20260907-bygroup-v14">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -557,8 +574,8 @@
         <button class="scatter-dialog-close" type="button" onclick="closeScatterPopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="scatter-dialog-toolbar">
-        <label class="scatter-view-toggle" for="scatterCombinedToggle">
-          <input type="checkbox" id="scatterCombinedToggle" onchange="toggleScatterCombinedView(this.checked)" />
+        <label class="scatter-view-toggle" for="scatterCombinedToggle" tabindex="0" role="switch" aria-checked="false">
+          <input type="checkbox" id="scatterCombinedToggle" tabindex="-1" />
           <span class="scatter-toggle-ui" aria-hidden="true"></span>
           <span>All curves in one chart</span>
         </label>
@@ -1181,6 +1198,8 @@
       const toggle = document.getElementById('scatterCombinedToggle');
       if (!container) return;
       if (toggle) toggle.checked = !!combined;
+      const label = document.querySelector('.scatter-view-toggle');
+      if (label) label.setAttribute('aria-checked', combined ? 'true' : 'false');
       if (combined) {
         container.className = 'scatter-combined-wrap';
         container.innerHTML = buildCombinedScatterChart(panels, varA, varB);
@@ -1193,6 +1212,24 @@
     function toggleScatterCombinedView(checked) {
       scatterPopupState.combined = !!checked;
       renderScatterDialogContent();
+    }
+
+    function bindScatterCombinedToggle() {
+      const label = document.querySelector('.scatter-view-toggle');
+      const input = document.getElementById('scatterCombinedToggle');
+      if (!label || !input || label.dataset.bound === '1') return;
+      label.dataset.bound = '1';
+      label.addEventListener('click', (event) => {
+        event.preventDefault();
+        input.checked = !input.checked;
+        toggleScatterCombinedView(input.checked);
+      });
+      label.addEventListener('keydown', (event) => {
+        if (event.key !== ' ' && event.key !== 'Enter' && event.key !== 'Spacebar') return;
+        event.preventDefault();
+        input.checked = !input.checked;
+        toggleScatterCombinedView(input.checked);
+      });
     }
 
     function openScatterPopup(varA, varB) {
@@ -1674,6 +1711,7 @@
 
     function boot() {
       console.log('[by-group] boot', document.body && document.body.getAttribute('data-page-version'));
+      bindScatterCombinedToggle();
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('correlation-by-group', 'Correlations by Group', 0, 'correlations');
         StatisticoHeader.initSidebarPage();

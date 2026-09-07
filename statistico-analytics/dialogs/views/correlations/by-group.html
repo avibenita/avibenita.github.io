@@ -41,6 +41,56 @@
     button { cursor:pointer; font-weight:700; }
     .content { flex:1; min-height:0; overflow:auto; padding:12px; }
     .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(110px, 1fr)); gap:10px; margin-bottom:12px; }
+    .r-profile-card {
+      margin-bottom:12px; border:1px solid var(--border); border-radius:12px; overflow:hidden;
+      background:var(--surface-2);
+    }
+    .r-profile-head {
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      padding:12px 14px 8px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+    }
+    .r-profile-head strong { display:block; color:var(--accent-1); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
+    .r-profile-head span { display:block; color:var(--text-secondary); font-size:12px; margin-top:3px; line-height:1.4; }
+    .r-profile-anchor { display:flex; align-items:center; gap:8px; color:var(--text-secondary); font-size:12px; font-weight:700; }
+    .r-profile-legend {
+      display:flex; flex-wrap:wrap; gap:8px 14px; padding:8px 14px 2px;
+    }
+    .r-profile-legend-item {
+      display:inline-flex; align-items:center; gap:7px; margin:0; padding:3px 2px;
+      border:none; background:transparent; cursor:pointer; font:inherit;
+      color:var(--text-secondary); font-size:12px; font-weight:700; border-radius:6px;
+    }
+    .r-profile-legend-item:hover { color:var(--text-primary); }
+    .r-profile-legend-item.is-off { opacity:.4; }
+    .r-profile-legend-swatch { width:22px; height:0; border-top:3px solid var(--accent-2); border-radius:999px; }
+    .r-profile-chart { overflow:auto; padding:4px 8px 10px; }
+    .r-profile-svg { display:block; min-width:560px; width:100%; height:auto; }
+    .r-profile-svg .scatter-bg { fill:rgba(0,0,0,.16); stroke:var(--border); stroke-width:1; }
+    html[data-theme="light"] .r-profile-svg .scatter-bg { fill:rgba(15,23,42,.03); }
+    .r-profile-band-pos { fill:rgba(52,211,153,.07); }
+    .r-profile-band-neg { fill:rgba(251,113,133,.07); }
+    html[data-theme="light"] .r-profile-band-pos { fill:rgba(21,128,61,.06); }
+    html[data-theme="light"] .r-profile-band-neg { fill:rgba(190,18,60,.06); }
+    .r-profile-svg .scatter-grid { stroke:var(--border); stroke-width:1; opacity:.5; }
+    .r-profile-zero { stroke:rgba(255,255,255,.42); stroke-width:1.4; stroke-dasharray:4 4; }
+    html[data-theme="light"] .r-profile-zero { stroke:rgba(15,23,42,.35); }
+    .r-profile-ribbon { fill:rgba(120,200,255,.14); stroke:none; pointer-events:none; }
+    .r-profile-line { fill:none; stroke-width:2.4; stroke-linejoin:round; stroke-linecap:round; pointer-events:none; }
+    .r-profile-dot { stroke:#0c1624; stroke-width:1.2; cursor:pointer; }
+    html[data-theme="light"] .r-profile-dot { stroke:#fff; }
+    .r-profile-dot:hover { stroke:#fff; stroke-width:2; }
+    .r-profile-svg .scatter-tick {
+      fill:var(--text-secondary); font-size:10px; font-weight:650;
+      font-variant-numeric:tabular-nums; font-family:"Segoe UI", Tahoma, sans-serif;
+    }
+    .r-profile-svg .scatter-tick-y { text-anchor:end; }
+    .r-profile-svg .scatter-tick-x { text-anchor:end; }
+    .r-profile-svg .scatter-axis-label {
+      fill:var(--text-primary); font-size:11px; font-weight:800; text-anchor:middle;
+      font-family:"Segoe UI", Tahoma, sans-serif;
+    }
+    .r-profile-empty { color:var(--text-secondary); font-size:13px; padding:28px; text-align:center; }
     .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
     .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
     .metric strong { font-size:18px; color:var(--accent-1); }
@@ -512,7 +562,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260907-bygroup-v17">
+<body data-page-version="20260907-bygroup-v18">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -545,6 +595,19 @@
               <div class="metric"><label>Groups</label><strong id="metricGroups">—</strong></div>
               <div class="metric"><label>Group column</label><strong id="metricGroupCol" style="font-size:14px;">—</strong></div>
               <div class="metric"><label>Filtered rows</label><strong id="metricRows">—</strong></div>
+            </div>
+            <div class="r-profile-card" id="rProfileCard">
+              <div class="r-profile-head">
+                <div>
+                  <strong>Group correlation profile</strong>
+                  <span id="rProfileSubtitle">Each X tick is a variable. Y is r with the profiled variable. Lines are group levels — Overall is omitted.</span>
+                </div>
+                <label class="r-profile-anchor" for="profileAnchorSelect">Profile of
+                  <select id="profileAnchorSelect" onchange="onProfileAnchorChange(this.value)"></select>
+                </label>
+              </div>
+              <div class="r-profile-legend" id="rProfileLegend"></div>
+              <div class="r-profile-chart" id="rProfileChart"></div>
             </div>
             <div class="table-wrap">
               <table id="corrByGroupTable">
@@ -616,6 +679,8 @@
     let activeGroups = [];
     let sortConfig = { key: 'pair', direction: 'ascending' };
     let pairVarFilter = '';
+    let profileAnchor = '';
+    let profileHiddenGroups = {};
     const levelSelections = {};
     let scatterPopupState = { panels: [], varA: '', varB: '', combined: false, hiddenKeys: { overall: true } };
     const scatterGroupColors = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635'];
@@ -1452,8 +1517,185 @@
 
     function onPairVarFilterChange(value) {
       pairVarFilter = value || '';
+      if (pairVarFilter) profileAnchor = pairVarFilter;
       renderTable();
       registerHeaderActions();
+    }
+
+    function onProfileAnchorChange(value) {
+      profileAnchor = value || (analysisHeaders[0] || '');
+      renderRProfile();
+    }
+
+    function shortVarName(name, max) {
+      const s = String(name || '');
+      const limit = max || 16;
+      return s.length > limit ? `${s.slice(0, limit - 1)}…` : s;
+    }
+
+    function ensureProfileAnchor() {
+      if (profileAnchor && analysisHeaders.includes(profileAnchor)) return profileAnchor;
+      if (pairVarFilter && analysisHeaders.includes(pairVarFilter)) {
+        profileAnchor = pairVarFilter;
+        return profileAnchor;
+      }
+      profileAnchor = analysisHeaders[0] || '';
+      return profileAnchor;
+    }
+
+    function getProfileRows() {
+      const anchor = ensureProfileAnchor();
+      if (!anchor) return [];
+      return tableRows
+        .filter((row) => row.varA === anchor || row.varB === anchor)
+        .map((row) => ({
+          varA: row.varA,
+          varB: row.varB,
+          xLabel: row.varA === anchor ? row.varB : row.varA,
+          groupResults: row.groupResults
+        }))
+        .sort((a, b) => String(a.xLabel).localeCompare(String(b.xLabel), undefined, { numeric: true }));
+    }
+
+    function renderRProfile() {
+      const chart = document.getElementById('rProfileChart');
+      const legendEl = document.getElementById('rProfileLegend');
+      const select = document.getElementById('profileAnchorSelect');
+      const subtitle = document.getElementById('rProfileSubtitle');
+      if (!chart || !legendEl) return;
+      const anchor = ensureProfileAnchor();
+      if (select) {
+        select.innerHTML = analysisHeaders.map((name) => {
+          const selected = name === anchor ? ' selected' : '';
+          return `<option value="${escapeHtml(name)}"${selected}>${escapeHtml(name)}</option>`;
+        }).join('');
+      }
+      const items = getProfileRows();
+      const groups = activeGroups || [];
+      if (subtitle) {
+        subtitle.textContent = groups.length
+          ? `Each X tick is a variable. Y is ${corrType} r with ${anchor || 'the profiled variable'}. Lines are group levels — Overall is omitted.`
+          : 'Choose a grouping column to plot r-profiles by category.';
+      }
+      legendEl.innerHTML = groups.map((g, i) => {
+        const color = scatterGroupColors[i % scatterGroupColors.length];
+        const hidden = !!profileHiddenGroups[String(g.group)];
+        return `<button type="button" class="r-profile-legend-item${hidden ? ' is-off' : ''}" data-profile-group="${escapeHtml(String(g.group))}" aria-pressed="${hidden ? 'false' : 'true'}" title="${hidden ? 'Show' : 'Hide'} ${escapeHtml(String(g.group))}">
+          <span class="r-profile-legend-swatch" style="border-top-color:${color}"></span>
+          <span>${escapeHtml(String(g.group))}</span>
+        </button>`;
+      }).join('');
+      legendEl.onclick = (event) => {
+        const btn = event.target.closest('[data-profile-group]');
+        if (!btn) return;
+        const key = btn.getAttribute('data-profile-group');
+        profileHiddenGroups[key] = !profileHiddenGroups[key];
+        renderRProfile();
+      };
+      if (!items.length || !groups.length) {
+        chart.innerHTML = '<div class="r-profile-empty">No group correlations to profile yet.</div>';
+        return;
+      }
+
+      const yMin = -1;
+      const yMax = 1;
+      const pad = { l: 58, r: 18, t: 16, b: 82 };
+      const n = items.length;
+      const plotW = Math.max(520, n * 76);
+      const plotH = 196;
+      const w = pad.l + plotW + pad.r;
+      const h = pad.t + plotH + pad.b;
+      const sx = (i) => (n <= 1 ? pad.l + plotW / 2 : pad.l + (i / (n - 1)) * plotW);
+      const sy = (r) => pad.t + plotH - ((r - yMin) / (yMax - yMin)) * plotH;
+      const yTicks = [-1, -0.5, 0, 0.5, 1];
+      const zeroY = sy(0);
+
+      let chrome = `<rect class="scatter-bg" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${plotH}" rx="4" />`;
+      chrome += `<rect class="r-profile-band-pos" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${(zeroY - pad.t).toFixed(1)}" />`;
+      chrome += `<rect class="r-profile-band-neg" x="${pad.l}" y="${zeroY.toFixed(1)}" width="${plotW}" height="${(pad.t + plotH - zeroY).toFixed(1)}" />`;
+      yTicks.forEach((v) => {
+        const y = sy(v);
+        chrome += `<line class="scatter-grid" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${y.toFixed(1)}" />`;
+        chrome += `<text class="scatter-tick scatter-tick-y" x="${(pad.l - 8).toFixed(1)}" y="${(y + 3.5).toFixed(1)}">${v === 0 ? '0' : String(v)}</text>`;
+      });
+      chrome += `<line class="r-profile-zero" x1="${pad.l}" y1="${zeroY.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${zeroY.toFixed(1)}" />`;
+      items.forEach((item, i) => {
+        const x = sx(i);
+        chrome += `<line class="scatter-grid" x1="${x.toFixed(1)}" y1="${pad.t}" x2="${x.toFixed(1)}" y2="${(pad.t + plotH).toFixed(1)}" />`;
+        const labelY = pad.t + plotH + 12;
+        chrome += `<text class="scatter-tick scatter-tick-x" x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" transform="rotate(-36 ${x.toFixed(1)} ${labelY.toFixed(1)})" title="${escapeHtml(item.xLabel)}">${escapeHtml(shortVarName(item.xLabel, 18))}</text>`;
+      });
+
+      const visibleGroups = groups.map((g, i) => ({ g, i, color: scatterGroupColors[i % scatterGroupColors.length] }))
+        .filter((item) => !profileHiddenGroups[String(item.g.group)]);
+
+      let ribbon = '';
+      if (visibleGroups.length >= 2) {
+        const highs = [];
+        const lows = [];
+        items.forEach((item) => {
+          const vals = visibleGroups
+            .map(({ i }) => item.groupResults[i] && item.groupResults[i].r)
+            .filter(Number.isFinite);
+          highs.push(vals.length ? Math.max(...vals) : 0);
+          lows.push(vals.length ? Math.min(...vals) : 0);
+        });
+        let d = `M ${sx(0).toFixed(1)} ${sy(highs[0]).toFixed(1)}`;
+        items.forEach((_, i) => { d += ` L ${sx(i).toFixed(1)} ${sy(highs[i]).toFixed(1)}`; });
+        for (let i = items.length - 1; i >= 0; i--) d += ` L ${sx(i).toFixed(1)} ${sy(lows[i]).toFixed(1)}`;
+        d += ' Z';
+        ribbon = `<path class="r-profile-ribbon" d="${d}" />`;
+      }
+
+      let series = '';
+      visibleGroups.forEach(({ i, color, g }) => {
+        const pts = items.map((item, xIdx) => {
+          const r = item.groupResults[i] && item.groupResults[i].r;
+          return Number.isFinite(r) ? [sx(xIdx), sy(r), r, item] : null;
+        });
+        const segs = [];
+        let run = [];
+        pts.forEach((pt) => {
+          if (pt) run.push(pt);
+          else {
+            if (run.length) segs.push(run);
+            run = [];
+          }
+        });
+        if (run.length) segs.push(run);
+        segs.forEach((seg) => {
+          if (seg.length < 2) return;
+          const d = seg.map((pt, idx) => `${idx ? 'L' : 'M'} ${pt[0].toFixed(1)} ${pt[1].toFixed(1)}`).join(' ');
+          series += `<path class="r-profile-line" d="${d}" style="stroke:${color}" />`;
+        });
+        pts.forEach((pt) => {
+          if (!pt) return;
+          const item = pt[3];
+          const gr = item.groupResults[i];
+          const tip = `${escapeHtml(String(g.group))} · ${escapeHtml(anchor)} vs ${escapeHtml(item.xLabel)}<br>r = ${fmtR(gr.r)}, p = ${formatP(gr.p)} (n=${gr.n})`;
+          series += `<circle class="r-profile-dot" style="fill:${color}" cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="5" data-var-a="${escapeHtml(item.varA)}" data-var-b="${escapeHtml(item.varB)}" data-st-tip-html="${tipAttr(tip)}" />`;
+        });
+      });
+
+      const xNameY = h - 10;
+      const yNameX = 13;
+      const yNameY = pad.t + plotH / 2;
+      const labels = `
+        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${xNameY}">Variable</text>
+        <text class="scatter-axis-label" x="${yNameX}" y="${yNameY.toFixed(1)}" transform="rotate(-90 ${yNameX} ${yNameY.toFixed(1)})">Correlation (r)</text>
+      `;
+
+      chart.innerHTML = `<svg class="r-profile-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Group correlation profile">
+        ${chrome}${ribbon}${series}${labels}
+      </svg>`;
+      chart.onclick = (event) => {
+        const hit = event.target.closest('[data-var-a]');
+        if (!hit) return;
+        openScatterPopup(hit.getAttribute('data-var-a'), hit.getAttribute('data-var-b'));
+      };
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(chart);
+      }
     }
 
     function getFilteredRows() {
@@ -1639,6 +1881,7 @@
       renderTableBody();
       bindChartButtons();
       syncCategoryRowHeight();
+      renderRProfile();
       const metric = document.getElementById('metricPairs');
       if (metric) metric.textContent = String(getFilteredRows().length);
       if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
@@ -1840,6 +2083,7 @@
     window.setAllPreviewLevels = setAllPreviewLevels;
     window.onCorrTypeChange = onCorrTypeChange;
     window.onPairVarFilterChange = onPairVarFilterChange;
+    window.onProfileAnchorChange = onProfileAnchorChange;
 
     window.openScatterPopup = openScatterPopup;
     window.closeScatterPopup = closeScatterPopup;

@@ -167,7 +167,12 @@
     .scatter-legend-item {
       display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:700;
       color:var(--text-secondary); font-variant-numeric:tabular-nums;
+      margin:0; padding:4px 2px; border:none; background:transparent; cursor:pointer;
+      font-family:inherit; border-radius:6px;
     }
+    .scatter-legend-item:hover { color:var(--text-primary); }
+    .scatter-legend-item.is-off { opacity:.42; }
+    .scatter-legend-item.is-off .scatter-legend-swatch { border-top-style:dashed; }
     .scatter-legend-swatch {
       width:22px; height:0; border-top:3px solid var(--accent-2); border-radius:999px;
     }
@@ -507,7 +512,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260907-bygroup-v15">
+<body data-page-version="20260907-bygroup-v16">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -612,7 +617,7 @@
     let sortConfig = { key: 'pair', direction: 'ascending' };
     let pairVarFilter = '';
     const levelSelections = {};
-    let scatterPopupState = { panels: [], varA: '', varB: '', combined: false };
+    let scatterPopupState = { panels: [], varA: '', varB: '', combined: false, hiddenKeys: { overall: true } };
     const scatterGroupColors = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635'];
 
     function decimalDigits(autoDefault) {
@@ -1151,6 +1156,33 @@
       return `<line class="scatter-fit${extraClass || ''}"${colorAttr} x1="${sx(x1).toFixed(1)}" y1="${sy(y1).toFixed(1)}" x2="${sx(x2).toFixed(1)}" y2="${sy(y2).toFixed(1)}" />`;
     }
 
+    function scatterSeriesKey(panel, idx) {
+      return panel.variant === 'overall' ? 'overall' : `group:${idx}`;
+    }
+
+    function isScatterSeriesHidden(panel, idx) {
+      const hidden = scatterPopupState.hiddenKeys || {};
+      return !!hidden[scatterSeriesKey(panel, idx)];
+    }
+
+    function toggleScatterSeries(key) {
+      if (!key) return;
+      const hidden = Object.assign({ overall: true }, scatterPopupState.hiddenKeys || {});
+      hidden[key] = !hidden[key];
+      scatterPopupState.hiddenKeys = hidden;
+      renderScatterDialogContent();
+    }
+
+    function bindScatterLegend() {
+      const legend = document.querySelector('.scatter-legend');
+      if (!legend) return;
+      legend.onclick = (event) => {
+        const btn = event.target.closest('[data-series-key]');
+        if (!btn) return;
+        toggleScatterSeries(btn.getAttribute('data-series-key'));
+      };
+    }
+
     function scatterPanelColor(panel, groupIdx) {
       if (panel.variant === 'overall') return 'rgb(255,165,120)';
       return scatterGroupColors[groupIdx % scatterGroupColors.length];
@@ -1194,9 +1226,11 @@
         return '<div class="scatter-empty">Not enough valid pairs to plot combined curves</div>';
       }
 
+      const visible = panels.filter((panel, idx) => panel.points.length && !isScatterSeriesHidden(panel, idx));
+      const domainPanels = visible.length ? visible : withPoints;
       const allXs = [];
       const allYs = [];
-      withPoints.forEach((panel) => {
+      domainPanels.forEach((panel) => {
         panel.points.forEach(([x, y]) => { allXs.push(x); allYs.push(y); });
       });
       const xRange = paddedRange(allXs);
@@ -1211,19 +1245,23 @@
       let dots = '';
       const legend = [];
       let groupIdx = 0;
-      panels.forEach((panel) => {
+      panels.forEach((panel, idx) => {
         if (!panel.points.length) return;
         const color = scatterPanelColor(panel, groupIdx);
         if (panel.variant !== 'overall') groupIdx += 1;
-        const fit = computeLinearFit(panel.points);
-        lines += buildFitLineSvg(sx, sy, fit, xRange, ' scatter-fit-combined', color);
-        panel.points.forEach(([x, y]) => {
-          dots += `<circle class="scatter-dot scatter-dot-combined" fill="${color}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.2" />`;
-        });
-        legend.push(`<span class="scatter-legend-item${panel.variant === 'overall' ? ' overall' : ''}">
+        const hidden = isScatterSeriesHidden(panel, idx);
+        const key = scatterSeriesKey(panel, idx);
+        if (!hidden) {
+          const fit = computeLinearFit(panel.points);
+          lines += buildFitLineSvg(sx, sy, fit, xRange, ' scatter-fit-combined', color);
+          panel.points.forEach(([x, y]) => {
+            dots += `<circle class="scatter-dot scatter-dot-combined" fill="${color}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.2" />`;
+          });
+        }
+        legend.push(`<button type="button" class="scatter-legend-item${panel.variant === 'overall' ? ' overall' : ''}${hidden ? ' is-off' : ''}" data-series-key="${escapeHtml(key)}" aria-pressed="${hidden ? 'false' : 'true'}" title="${hidden ? 'Show' : 'Hide'} ${escapeHtml(panel.label)}">
           <span class="scatter-legend-swatch" style="border-top-color:${color}"></span>
           <span>${escapeHtml(panel.label)} · r=${fmtR(panel.stats.r)} · n=${panel.stats.n}</span>
-        </span>`);
+        </button>`);
       });
 
       const svg = `<svg class="scatter-svg scatter-combined-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Combined regression curves">
@@ -1251,6 +1289,7 @@
       if (combined) {
         container.className = 'scatter-combined-wrap';
         container.innerHTML = buildCombinedScatterChart(panels, varA, varB);
+        bindScatterLegend();
       } else {
         container.className = 'scatter-panel-grid';
         container.innerHTML = panels.map((panel) => buildScatterPanel(panel, varA, varB)).join('');
@@ -1297,7 +1336,13 @@
           variant: 'group'
         });
       });
-      scatterPopupState = { panels, varA, varB, combined: scatterPopupState.combined };
+      scatterPopupState = {
+        panels,
+        varA,
+        varB,
+        combined: scatterPopupState.combined,
+        hiddenKeys: { overall: true }
+      };
       document.getElementById('scatterDialogTitle').textContent = `${varA} vs ${varB}`;
       document.getElementById('scatterDialogSubtitle').textContent =
         `${corrType} scatter plots · grouped by ${sourceHeaders[groupIndex] || 'group'}`;

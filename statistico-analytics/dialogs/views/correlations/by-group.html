@@ -205,14 +205,23 @@
     .scatter-svg .scatter-bg { fill:rgba(0,0,0,.16); stroke:var(--border); stroke-width:1; }
     html[data-theme="light"] .scatter-svg .scatter-bg { fill:rgba(15,23,42,.03); }
     .scatter-svg .scatter-grid { stroke:var(--border); stroke-width:1; opacity:.55; }
+    .scatter-svg .scatter-tick-mark { stroke:var(--text-secondary); stroke-width:1; opacity:.8; }
     .scatter-svg .scatter-dot { fill:color-mix(in srgb, var(--accent-2) 82%, #fff); opacity:.88; }
     .scatter-panel-overall .scatter-svg .scatter-dot { fill:color-mix(in srgb, var(--accent-1) 82%, #fff); }
     .scatter-svg .scatter-fit { stroke:var(--accent-1); stroke-width:2; opacity:.85; pointer-events:none; }
     .scatter-panel-group .scatter-svg .scatter-fit { stroke:var(--accent-2); }
     .scatter-svg .scatter-axis-label {
-      fill:var(--text-secondary); font-size:10px; font-weight:700; text-anchor:middle;
+      fill:var(--text-primary); font-size:11px; font-weight:800; letter-spacing:.02em; text-anchor:middle;
+      font-family:"Segoe UI", Tahoma, sans-serif;
     }
     .scatter-svg .scatter-axis-label.scatter-axis-y { text-anchor:middle; }
+    .scatter-svg .scatter-tick {
+      fill:var(--text-secondary); font-size:10px; font-weight:650;
+      font-variant-numeric:tabular-nums;
+      font-family:"Segoe UI", Tahoma, sans-serif;
+    }
+    .scatter-svg .scatter-tick-x { text-anchor:middle; }
+    .scatter-svg .scatter-tick-y { text-anchor:end; }
     .scatter-empty {
       min-height:180px; display:flex; align-items:center; justify-content:center;
       color:var(--text-secondary); font-size:13px; padding:20px; text-align:center;
@@ -498,7 +507,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260907-bygroup-v14">
+<body data-page-version="20260907-bygroup-v15">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -1078,15 +1087,58 @@
       return { sx, sy, plotW, plotH };
     }
 
-    function buildGridSvg(pad, plotW, plotH) {
-      let grid = '';
-      for (let i = 0; i <= 4; i++) {
-        const gx = pad.l + (plotW * i) / 4;
-        const gy = pad.t + (plotH * i) / 4;
-        grid += `<line class="scatter-grid" x1="${gx.toFixed(1)}" y1="${pad.t}" x2="${gx.toFixed(1)}" y2="${(pad.t + plotH).toFixed(1)}" />`;
-        grid += `<line class="scatter-grid" x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${gy.toFixed(1)}" />`;
+    function ticksInRange(min, max, count) {
+      const span = max - min;
+      if (!Number.isFinite(span) || span <= 0) return [min, max].filter(Number.isFinite);
+      const rawStep = span / Math.max(1, (count || 4));
+      const exp = Math.floor(Math.log10(rawStep));
+      const pow = Math.pow(10, exp);
+      const frac = rawStep / pow;
+      const step = (frac <= 1 ? 1 : frac <= 2 ? 2 : frac <= 5 ? 5 : 10) * pow;
+      const start = Math.ceil((min - step * 1e-9) / step) * step;
+      const ticks = [];
+      for (let v = start; v <= max + step * 1e-9; v += step) {
+        ticks.push(Number(v.toPrecision(12)));
+        if (ticks.length > 10) break;
       }
-      return grid;
+      return ticks.length ? ticks : [min, max];
+    }
+
+    function formatAxisTick(value) {
+      if (!Number.isFinite(value)) return '';
+      const abs = Math.abs(value);
+      if (abs !== 0 && (abs < 0.001 || abs >= 1e6)) {
+        return value.toExponential(1).replace('e+', 'e');
+      }
+      if (Math.abs(value - Math.round(value)) < 1e-9) return String(Math.round(value));
+      const digits = abs >= 100 ? 1 : abs >= 10 ? 2 : 3;
+      return value.toFixed(digits).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+    }
+
+    function buildAxisChromeSvg(sx, sy, pad, plotW, plotH, xRange, yRange, xLabel, yLabel, tickCount) {
+      const xTicks = ticksInRange(xRange.min, xRange.max, tickCount);
+      const yTicks = ticksInRange(yRange.min, yRange.max, tickCount);
+      const plotBottom = pad.t + plotH;
+      const plotRight = pad.l + plotW;
+      let chrome = '';
+      xTicks.forEach((v) => {
+        const x = sx(v);
+        chrome += `<line class="scatter-grid" x1="${x.toFixed(1)}" y1="${pad.t}" x2="${x.toFixed(1)}" y2="${plotBottom.toFixed(1)}" />`;
+        chrome += `<line class="scatter-tick-mark" x1="${x.toFixed(1)}" y1="${plotBottom.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(plotBottom + 5).toFixed(1)}" />`;
+        chrome += `<text class="scatter-tick scatter-tick-x" x="${x.toFixed(1)}" y="${(plotBottom + 16).toFixed(1)}">${escapeHtml(formatAxisTick(v))}</text>`;
+      });
+      yTicks.forEach((v) => {
+        const y = sy(v);
+        chrome += `<line class="scatter-grid" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${plotRight.toFixed(1)}" y2="${y.toFixed(1)}" />`;
+        chrome += `<line class="scatter-tick-mark" x1="${(pad.l - 5).toFixed(1)}" y1="${y.toFixed(1)}" x2="${pad.l.toFixed(1)}" y2="${y.toFixed(1)}" />`;
+        chrome += `<text class="scatter-tick scatter-tick-y" x="${(pad.l - 8).toFixed(1)}" y="${(y + 3.5).toFixed(1)}">${escapeHtml(formatAxisTick(v))}</text>`;
+      });
+      const xNameY = pad.t + plotH + pad.b - 7;
+      const yNameX = 12;
+      const yNameY = pad.t + plotH / 2;
+      chrome += `<text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${xNameY.toFixed(1)}">${escapeHtml(xLabel)}</text>`;
+      chrome += `<text class="scatter-axis-label scatter-axis-y" x="${yNameX}" y="${yNameY.toFixed(1)}" transform="rotate(-90 ${yNameX} ${yNameY.toFixed(1)})">${escapeHtml(yLabel)}</text>`;
+      return chrome;
     }
 
     function buildFitLineSvg(sx, sy, fit, xRange, extraClass, strokeColor) {
@@ -1114,15 +1166,15 @@
         return `<div class="scatter-panel scatter-panel-${variant}">${head}<div class="scatter-empty">Not enough valid pairs</div></div>`;
       }
 
-      const w = 280;
-      const h = 210;
-      const pad = { l: 48, r: 16, t: 16, b: 40 };
+      const w = 300;
+      const h = 236;
+      const pad = { l: 64, r: 14, t: 14, b: 52 };
       const xs = points.map((p) => p[0]);
       const ys = points.map((p) => p[1]);
       const xRange = paddedRange(xs);
       const yRange = paddedRange(ys);
       const { sx, sy, plotW, plotH } = buildPlotScales(xRange, yRange, w, h, pad);
-      const grid = buildGridSvg(pad, plotW, plotH);
+      const axes = buildAxisChromeSvg(sx, sy, pad, plotW, plotH, xRange, yRange, xLabel, yLabel, 4);
       const fitLine = buildFitLineSvg(sx, sy, computeLinearFit(points), xRange, '', null);
       const dots = points.map(([x, y]) =>
         `<circle class="scatter-dot" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.6" />`
@@ -1130,9 +1182,7 @@
 
       const svg = `<svg class="scatter-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(label)} scatter">
         <rect class="scatter-bg" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${plotH}" rx="4" />
-        ${grid}${fitLine}${dots}
-        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 10}">${escapeHtml(xLabel)}</text>
-        <text class="scatter-axis-label scatter-axis-y" x="14" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 14 ${(pad.t + plotH / 2).toFixed(1)})">${escapeHtml(yLabel)}</text>
+        ${axes}${fitLine}${dots}
       </svg>`;
 
       return `<div class="scatter-panel scatter-panel-${variant}">${head}${svg}</div>`;
@@ -1152,10 +1202,10 @@
       const xRange = paddedRange(allXs);
       const yRange = paddedRange(allYs);
       const w = 920;
-      const h = 360;
-      const pad = { l: 54, r: 20, t: 18, b: 44 };
+      const h = 392;
+      const pad = { l: 78, r: 20, t: 16, b: 58 };
       const { sx, sy, plotW, plotH } = buildPlotScales(xRange, yRange, w, h, pad);
-      const grid = buildGridSvg(pad, plotW, plotH);
+      const axes = buildAxisChromeSvg(sx, sy, pad, plotW, plotH, xRange, yRange, xLabel, yLabel, 5);
 
       let lines = '';
       let dots = '';
@@ -1176,11 +1226,9 @@
         </span>`);
       });
 
-      const svg = `<svg class="scatter-combined-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Combined regression curves">
+      const svg = `<svg class="scatter-svg scatter-combined-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Combined regression curves">
         <rect class="scatter-bg" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${plotH}" rx="4" />
-        ${grid}${lines}${dots}
-        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 12}">${escapeHtml(xLabel)}</text>
-        <text class="scatter-axis-label scatter-axis-y" x="16" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 16 ${(pad.t + plotH / 2).toFixed(1)})">${escapeHtml(yLabel)}</text>
+        ${axes}${lines}${dots}
       </svg>`;
 
       return `<div class="scatter-combined-panel">

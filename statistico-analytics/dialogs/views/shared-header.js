@@ -2117,7 +2117,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260908bygrouptabs',
+  _TAB_ASSET_VER: '20260908corrn5',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

@@ -2110,7 +2110,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260903tabclose',
+  _TAB_ASSET_VER: '20260908contentdown',
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -2765,6 +2765,9 @@ const StatisticoHeader = {
       '.view-switcher-kicker {',
       '  grid-area: kicker !important;',
       '  justify-self: start !important;',
+      '}',
+      '.statistico-shell.statistico-shell--with-views {',
+      '  margin-bottom: 1cm !important;',
       '}',
       '.view-switcher-row > .ws-mode-bar,',
       '.view-switcher-row > .view-switcher-bar {',

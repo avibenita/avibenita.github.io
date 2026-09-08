@@ -2001,7 +2001,7 @@ const StatisticoHeader = {
         tabs: [
           { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', inPage: true },
           { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', inPage: true },
-          { tabKey: 'by-group-similarity', label: 'Similarity Index™', icon: 'fa-clone', panel: 'similarity', inPage: true }
+          { tabKey: 'by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', inPage: true }
         ]
       },
       {
@@ -2043,9 +2043,9 @@ const StatisticoHeader = {
       qqplot: 'Compare sample quantiles against a reference distribution.',
       confidence: 'Interval estimates for the mean or median.',
       hypothesis: 'Test the sample against a reference value.',
-      'by-group-stats': 'Compare group stats and switch among overlay, histograms, and box plots.',
-      'by-group-normality': 'Review tests and NSI by group.',
-      'by-group-similarity': 'Compare groups on location, spread, and shape similarity.'
+      'by-group-stats': 'Compare centres, spread and distributions across groups.',
+      'by-group-normality': 'Examine distribution shape and normality strength within each group.',
+      'by-group-similarity': 'See how closely groups resemble one another in location, spread and shape.'
     };
     return captions[tabKey] || '';
   },
@@ -2075,7 +2075,8 @@ const StatisticoHeader = {
       onclick = ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"`;
     }
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
-    return `<button type="button" class="ws-mode-tab${active}" role="tab"`
+    const isSimProfile = opts.tabKey === 'by-group-similarity';
+    return `<button type="button" class="ws-mode-tab${active}${isSimProfile ? ' ws-tab--sim-profile' : ''}" role="tab"`
       + ` aria-selected="${opts.active ? 'true' : 'false'}"`
       + (opts.active ? ' aria-current="true"' : '')
       + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
@@ -2083,21 +2084,23 @@ const StatisticoHeader = {
       + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
       + `<span class="ws-tab-text">`
       + `<span class="ws-tab-label">${opts.label}</span>`
+      + (isSimProfile ? '<span class="ws-tab-badge" title="Statistico original">STATISTICO</span>' : '')
       + `</span>`
-      + (opts.tabKey === 'by-group-similarity'
-        ? '<span class="ws-tab-help-i" title="About Similarity Index" aria-label="About Similarity Index" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="event.preventDefault(); event.stopPropagation(); if (window.openDspHelp) window.openDspHelp();">i</span>'
+      + (isSimProfile
+        ? '<span class="ws-tab-help-i" title="About Similarity Profile" aria-label="About Similarity Profile" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="event.preventDefault(); event.stopPropagation(); if (window.openDspHelp) window.openDspHelp();">i</span>'
         : '')
       + `<span class="view-switcher-mark" aria-hidden="true">`
-      + `<i class="fa-solid fa-arrow-right view-switcher-go"></i>`
       + `<i class="fa-solid fa-check view-switcher-check"></i>`
       + `</span></button>`;
   },
 
   setByGroupResultsTab(panel) {
+    const next = panel === 'boxplot' ? 'stats' : (panel || 'stats');
+    if (next === 'similarity') this._markSimilarityProfileSeen();
     if (typeof globalThis.switchByGroupTab === 'function') {
       globalThis.switchByGroupTab(panel);
     } else {
-      globalThis.__byGroupActiveTab = panel === 'boxplot' ? 'stats' : (panel || 'stats');
+      globalThis.__byGroupActiveTab = next;
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
@@ -2110,7 +2113,45 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260908contentdown',
+  _TAB_ASSET_VER: '20260908tabinvite',
+  _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
+  _lastViewSwitcherGlowKey: null,
+
+  _hasSeenSimilarityProfile() {
+    try { return localStorage.getItem(this._SIM_PROFILE_SEEN_KEY) === '1'; } catch (_e) { return true; }
+  },
+
+  _markSimilarityProfileSeen() {
+    try { localStorage.setItem(this._SIM_PROFILE_SEEN_KEY, '1'); } catch (_e) {}
+  },
+
+  _maybeInviteSimilarityProfile() {
+    if (this.currentView !== 'by-group') return;
+    const tab = document.querySelector('[data-uni-tab="by-group-similarity"]');
+    if (!tab || tab.classList.contains('active')) {
+      if (tab && tab.classList.contains('active')) this._markSimilarityProfileSeen();
+      return;
+    }
+    if (this._hasSeenSimilarityProfile()) return;
+    tab.classList.add('ws-tab-invite');
+  },
+
+  _decorateViewSwitcherInviteAndGlow() {
+    const activeBtn = document.querySelector('.uni-view-tabs .ws-mode-tab.active, .view-switcher-bar .ws-mode-tab.active');
+    const key = activeBtn ? activeBtn.getAttribute('data-uni-tab') : '';
+    if (activeBtn && key && key !== this._lastViewSwitcherGlowKey) {
+      this._lastViewSwitcherGlowKey = key;
+      const reduce = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!reduce) {
+        activeBtn.classList.add('view-switcher-just-selected');
+        window.setTimeout(() => {
+          if (activeBtn.isConnected) activeBtn.classList.remove('view-switcher-just-selected');
+        }, 1300);
+      }
+    }
+    this._maybeInviteSimilarityProfile();
+  },
 
   _prepareExportSnapshotBody(bodyClone) {
     bodyClone.querySelectorAll(
@@ -3036,6 +3077,96 @@ const StatisticoHeader = {
       '  }',
       '}',
       '',
+      '/* Invitation pass: parallel views, brief glow, Similarity Profile cue */',
+      '.view-switcher-desc, .view-switcher-row .uni-view-caption {',
+      '  max-width: 420px !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active),',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
+      '  opacity: 1 !important;',
+      '  border: 1px solid rgba(196, 181, 253, 0.62) !important;',
+      '  color: #f8fafc !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
+      '  color: #f8fafc !important;',
+      '  font-weight: 700 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active {',
+      '  box-shadow: 0 0 8px rgba(124, 92, 255, 0.22), inset 0 0 0 1px rgba(167, 139, 250, 0.16) !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active .view-switcher-glow,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active .view-switcher-glow {',
+      '  display: none !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow {',
+      '  display: block !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow::before,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow::before {',
+      '  opacity: 0.55 !important;',
+      '  animation: view-switcher-rotate-glow 1.15s linear 1 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow::after,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow::after {',
+      '  animation: view-switcher-pulse-inner 1.15s ease-out 1 !important;',
+      '}',
+      '.uni-view-tabs.ws-mode-bar--connected .ws-mode-tab .view-switcher-go,',
+      '.view-switcher-bar.ws-mode-bar--connected .ws-mode-tab .view-switcher-go {',
+      '  display: none !important;',
+      '}',
+      '.ws-mode-tab.ws-tab--sim-profile {',
+      '  min-width: max-content !important;',
+      '}',
+      '.ws-tab-badge {',
+      '  display: inline-flex !important;',
+      '  align-items: center !important;',
+      '  margin-left: 6px !important;',
+      '  padding: 2px 6px !important;',
+      '  border-radius: 999px !important;',
+      '  font-size: 8px !important;',
+      '  font-weight: 800 !important;',
+      '  letter-spacing: .1em !important;',
+      '  line-height: 1 !important;',
+      '  color: #082f49 !important;',
+      '  background: linear-gradient(180deg, #a5f3fc 0%, #22d3ee 100%) !important;',
+      '  box-shadow: 0 0 0 1px rgba(103, 232, 249, 0.35) !important;',
+      '  white-space: nowrap !important;',
+      '}',
+      '.ws-mode-tab.ws-tab-invite:not(.active) {',
+      '  border-color: rgba(103, 232, 249, 0.78) !important;',
+      '  box-shadow: 0 0 10px rgba(103, 232, 249, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;',
+      '  animation: ws-tab-invite-shimmer 1.6s ease-out 1 both !important;',
+      '}',
+      '@keyframes ws-tab-invite-shimmer {',
+      '  0% { box-shadow: 0 0 0 0 rgba(103, 232, 249, 0); }',
+      '  40% { box-shadow: 0 0 14px rgba(103, 232, 249, 0.42), 0 0 0 1px rgba(103, 232, 249, 0.7); }',
+      '  100% { box-shadow: 0 0 8px rgba(103, 232, 249, 0.18); }',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active),',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) {',
+      '  opacity: 1 !important;',
+      '  border-color: rgba(109, 40, 217, 0.52) !important;',
+      '  color: #0f172a !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab:not(.active) .ws-tab-label {',
+      '  color: #0f172a !important;',
+      '}',
+      'html[data-theme="light"] .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active,',
+      'html[data-theme="light"] .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab.active {',
+      '  box-shadow: 0 0 6px rgba(109, 40, 217, 0.16), inset 0 0 0 1px rgba(109, 40, 217, 0.1) !important;',
+      '}',
+      '@media (prefers-reduced-motion: reduce) {',
+      '  .ws-mode-tab.ws-tab-invite:not(.active),',
+      '  .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow::before,',
+      '  .uni-view-tabs.ws-mode-bar--connected .ws-mode-tab.active.view-switcher-just-selected .view-switcher-glow::after {',
+      '    animation: none !important;',
+      '  }',
+      '}',
+      '',
       '/* Generic chip tabs (non-connected) */',
       '.ws-mode-bar--attached:not(.ws-mode-bar--slant):not(.ws-mode-bar--connected) .ws-mode-tab:not(.active),',
       '.ws-mode-bar:not(.ws-mode-bar--slant):not(.ws-mode-bar--connected) .ws-mode-tab:not(.active) {',
@@ -3269,6 +3400,7 @@ const StatisticoHeader = {
       try { globalThis.StatisticoWorkspaceTabs.init(); } catch (_e) {}
     }
     this._ensurePlainTabUnderlineStyles();
+    this._decorateViewSwitcherInviteAndGlow();
   },
 
   _renderSidebarNavItem(item) {
@@ -7597,7 +7729,7 @@ const StatisticoHeader = {
       'by-group-stats': 'Grouped Statistics',
       'by-group-boxplot': 'Grouped Box Plots',
       'by-group-normality': 'Group Normality Analysis',
-      'by-group-similarity': 'Similarity Index™',
+      'by-group-similarity': 'Similarity Profile™',
       outliers: 'Outliers',
       normality: 'Tests',
       qqplot: 'PP/QQ',
@@ -9388,13 +9520,13 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       const distinct = sim.mostDistinct;
       const outlier = sim.mostDifferentGroup;
       tabBlock = [
-        'ACTIVE TAB: Similarity Index™ (pairwise location / spread / shape, 0–100)',
+        'ACTIVE TAB: Similarity Profile™ (pairwise location / spread / shape, 0–100)',
         `Group homogeneity: ${f(sim.homogeneity, 1)} (${sim.homogeneityBand || 'n/a'}).`,
         similar ? `Most similar pair: ${similar.a} vs ${similar.b} = ${f(similar.overall, 1)} (${similar.band}).` : '',
         distinct ? `Most distinct pair: ${distinct.a} vs ${distinct.b} = ${f(distinct.overall, 1)} (${distinct.band}).` : '',
         outlier ? `Group most different from the others: ${outlier.group} (mean similarity ${f(outlier.meanSimilarity, 1)}).` : '',
         pairLines || 'No pairwise scores.',
-        'Focus READING on practical similarity, not significance. Cite the three components when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Index™. Do not use good/acceptable/poor; use Very similar / Mostly similar / Mixed similarity / Substantially different.'
+        'Focus READING on practical similarity, not significance. Cite the three components when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Do not use good/acceptable/poor; use Very similar / Mostly similar / Mixed similarity / Substantially different.'
       ].filter(Boolean).join('\n');
     }
 
@@ -9402,7 +9534,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       stats: 'Grouped Statistics',
       boxplot: 'Grouped Box Plots',
       normality: 'Group Normality Analysis',
-      similarity: 'Similarity Index™'
+      similarity: 'Similarity Profile™'
     };
     const viewName = viewNames[tab] || 'Grouped Analysis';
     const controlsDoc = this._viewControlsDoc();
@@ -9434,7 +9566,7 @@ ${boxplotLines}
 [ Normality tab ]
 ${normLines || '(Run normality tab to populate)'}
 
-[ Similarity Index™ ]
+[ Similarity Profile™ ]
 Homogeneity: ${f(sim.homogeneity, 1)} (${sim.homogeneityBand || 'n/a'})
 ${similar ? `Most similar: ${similar.a} vs ${similar.b} = ${f(similar.overall, 1)} (${similar.band})` : ''}
 ${distinct ? `Most distinct: ${distinct.a} vs ${distinct.b} = ${f(distinct.overall, 1)} (${distinct.band})` : ''}
@@ -9874,7 +10006,7 @@ Always follow the exact output format requested.` },
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
       qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test',
       'by-group-stats':'Grouped Statistics', 'by-group-boxplot':'Grouped Box Plots',
-      'by-group-normality':'Group Normality Analysis', 'by-group-similarity':'Similarity Index™', 'by-group':'Grouped Analysis',
+      'by-group-normality':'Group Normality Analysis', 'by-group-similarity':'Similarity Profile™', 'by-group':'Grouped Analysis',
       ...this._correlationViewLabels(),
       ...this._independentViewLabels(),
       ...this._genericModuleViewLabels()

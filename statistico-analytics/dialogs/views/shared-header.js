@@ -1592,7 +1592,8 @@ const StatisticoHeader = {
       reliability: 'Evaluate internal consistency.',
       'descriptive-stats': 'Summarize variables and distributions.',
       'correlation-by-group': 'Compare pairwise r across group levels.',
-      'correlation-by-group-similarity': 'Compare groups on correlation pattern, strength, and sign similarity.',
+      'correlation-by-group-profile': 'See how other variables associate with an anchor across groups.',
+      'correlation-by-group-similarity': 'See how closely groups resemble one another in correlation pattern, strength and sign.',
       'regression-by-group': 'Compare coefficients and residual normality across group levels.',
       histogram: 'Frequency view of the distribution.',
       boxplot: 'Quartiles, whiskers, and outliers.',
@@ -2052,7 +2053,7 @@ const StatisticoHeader = {
 
   _buildUniViewCaptionHtml(tab) {
     if (!tab) return '';
-    const text = this._getUniViewCaption(tab.tabKey);
+    const text = (tab && tab.caption) || this._getUniViewCaption(tab.tabKey);
     if (!text) return '';
     const body = text.replace(/</g, '&lt;');
     return '<p class="view-switcher-desc uni-view-caption" id="uniViewCaption">'
@@ -2066,6 +2067,8 @@ const StatisticoHeader = {
     if (opts.inPage && opts.panel) {
       if (opts.tabKey && opts.tabKey.indexOf('boxplot-') === 0) {
         onclick = ` onclick="StatisticoHeader.setBoxplotResultsTab('${opts.panel}')"`;
+      } else if (opts.explore) {
+        onclick = ` onclick="StatisticoHeader.setExploreViewPanel('${opts.panel}')"`;
       } else {
         onclick = ` onclick="StatisticoHeader.setByGroupResultsTab('${opts.panel}')"`;
       }
@@ -2075,8 +2078,9 @@ const StatisticoHeader = {
       onclick = ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"`;
     }
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
-    const isSimProfile = opts.tabKey === 'by-group-similarity';
-    return `<button type="button" class="ws-mode-tab${active}${isSimProfile ? ' ws-tab--sim-profile' : ''}" role="tab"`
+    const showBadge = !!opts.badge;
+    const showHelp = !!opts.help;
+    return `<button type="button" class="ws-mode-tab${active}${showBadge ? ' ws-tab--sim-profile' : ''}" role="tab"`
       + ` aria-selected="${opts.active ? 'true' : 'false'}"`
       + (opts.active ? ' aria-current="true"' : '')
       + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
@@ -2084,9 +2088,9 @@ const StatisticoHeader = {
       + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
       + `<span class="ws-tab-text">`
       + `<span class="ws-tab-label">${opts.label}</span>`
-      + (isSimProfile ? '<span class="ws-tab-badge" title="Statistico original">STATISTICO</span>' : '')
+      + (showBadge ? `<span class="ws-tab-badge" title="Statistico original">${String(opts.badge).replace(/</g, '&lt;')}</span>` : '')
       + `</span>`
-      + (isSimProfile
+      + (showHelp
         ? '<span class="ws-tab-help-i" title="About Similarity Profile" aria-label="About Similarity Profile" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="event.preventDefault(); event.stopPropagation(); if (window.openDspHelp) window.openDspHelp();">i</span>'
         : '')
       + `<span class="view-switcher-mark" aria-hidden="true">`
@@ -2113,26 +2117,29 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260908tabinvite',
+  _TAB_ASSET_VER: '20260908bygrouptabs',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
-  _hasSeenSimilarityProfile() {
-    try { return localStorage.getItem(this._SIM_PROFILE_SEEN_KEY) === '1'; } catch (_e) { return true; }
+  _hasSeenSimilarityProfile(seenKey) {
+    const key = seenKey || this._SIM_PROFILE_SEEN_KEY;
+    try { return localStorage.getItem(key) === '1'; } catch (_e) { return true; }
   },
 
-  _markSimilarityProfileSeen() {
-    try { localStorage.setItem(this._SIM_PROFILE_SEEN_KEY, '1'); } catch (_e) {}
+  _markSimilarityProfileSeen(seenKey) {
+    const key = seenKey || this._SIM_PROFILE_SEEN_KEY;
+    try { localStorage.setItem(key, '1'); } catch (_e) {}
   },
 
   _maybeInviteSimilarityProfile() {
-    if (this.currentView !== 'by-group') return;
-    const tab = document.querySelector('[data-uni-tab="by-group-similarity"]');
+    const cfg = this._getByGroupExploreConfig();
+    if (!cfg || !cfg.inviteTabKey) return;
+    const tab = document.querySelector(`[data-uni-tab="${cfg.inviteTabKey}"]`);
     if (!tab || tab.classList.contains('active')) {
-      if (tab && tab.classList.contains('active')) this._markSimilarityProfileSeen();
+      if (tab && tab.classList.contains('active')) this._markSimilarityProfileSeen(cfg.seenKey);
       return;
     }
-    if (this._hasSeenSimilarityProfile()) return;
+    if (this._hasSeenSimilarityProfile(cfg.seenKey)) return;
     tab.classList.add('ws-tab-invite');
   },
 
@@ -3120,6 +3127,24 @@ const StatisticoHeader = {
       '.ws-mode-tab.ws-tab--sim-profile {',
       '  min-width: max-content !important;',
       '}',
+      '.ws-tab-help-i {',
+      '  display: inline-flex !important;',
+      '  align-items: center !important;',
+      '  justify-content: center !important;',
+      '  width: 16px !important;',
+      '  height: 16px !important;',
+      '  margin-left: 6px !important;',
+      '  padding: 0 !important;',
+      '  flex-shrink: 0 !important;',
+      '  border: 1px solid rgba(120, 200, 255, 0.45) !important;',
+      '  border-radius: 999px !important;',
+      '  color: #78c8ff !important;',
+      '  background: rgba(120, 200, 255, 0.08) !important;',
+      '  font-size: 10px !important;',
+      '  font-weight: 700 !important;',
+      '  line-height: 1 !important;',
+      '  cursor: pointer !important;',
+      '}',
       '.ws-tab-badge {',
       '  display: inline-flex !important;',
       '  align-items: center !important;',
@@ -3308,8 +3333,147 @@ const StatisticoHeader = {
     return viewTabs.some((t) => t.view === this.currentView);
   },
 
+  _getByGroupExploreConfig() {
+    // Shared EXPLORE VIEWS contract for By Group pages. Add a module block here
+    // (regression-by-group, etc.) to reuse the same header tabs, captions, and
+    // Similarity Profile™ invite without copying the bar markup.
+    if (this.module === 'univariate' && this.currentView === 'by-group') {
+      return {
+        ariaLabel: 'Grouped analysis views',
+        inviteTabKey: 'by-group-similarity',
+        seenKey: 'statistico.bygroup.similarityProfile.seen',
+        getActive: () => globalThis.__byGroupActiveTab || 'stats',
+        onSelect: (panel) => this.setByGroupResultsTab(panel),
+        tabs: [
+          { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', caption: 'Compare centres, spread and distributions across groups.' },
+          { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', caption: 'Examine distribution shape and normality strength within each group.' },
+          { tabKey: 'by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in location, spread and shape.', badge: 'STATISTICO', help: true }
+        ]
+      };
+    }
+    if (this.module === 'correlations' && this.currentView === 'correlation-by-group') {
+      return {
+        ariaLabel: 'Correlations by group views',
+        inviteTabKey: 'correlation-by-group-similarity',
+        seenKey: 'statistico.corr.similarityProfile.seen',
+        getActive: () => globalThis.__corrByGroupActiveTab || 'table',
+        onSelect: (panel) => this.setCorrByGroupResultsTab(panel),
+        tabs: [
+          { tabKey: 'correlation-by-group-table', label: 'Grouped r', icon: 'fa-table', panel: 'table', caption: 'Compare pairwise correlations across group levels.' },
+          { tabKey: 'correlation-by-group-profile', label: 'Group Profile', icon: 'fa-chart-line', panel: 'profile', caption: 'See how other variables associate with an anchor across groups.' },
+          { tabKey: 'correlation-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in correlation pattern, strength and sign.', badge: 'STATISTICO', help: true }
+        ]
+      };
+    }
+    return null;
+  },
+
+  setExploreViewPanel(panel) {
+    const cfg = this._getByGroupExploreConfig();
+    if (!cfg || typeof cfg.onSelect !== 'function') return;
+    cfg.onSelect(panel);
+  },
+
+  setCorrByGroupResultsTab(panel) {
+    const cfg = this._getByGroupExploreConfig();
+    if (cfg && panel === 'similarity') this._markSimilarityProfileSeen(cfg.seenKey);
+    if (typeof globalThis.showCorrByGroupPanel === 'function') {
+      globalThis.showCorrByGroupPanel(panel);
+    } else {
+      globalThis.__corrByGroupActiveTab = panel || 'table';
+    }
+    try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+  },
+
+  _hideExploreViewBar() {
+    const stack = document.getElementById('uniResultsViewTabs');
+    const shell = document.querySelector('.statistico-shell');
+    const headerBar = shell && shell.querySelector('.statistico-header');
+    if (stack) {
+      stack.hidden = true;
+      stack.innerHTML = '';
+    }
+    if (shell) shell.classList.remove('statistico-shell--with-views');
+    if (headerBar) headerBar.classList.remove('statistico-header--with-views');
+  },
+
+  _mountExploreViewBar() {
+    const rightCol = document.querySelector('.right-col');
+    if (!rightCol) return null;
+    let stack = document.getElementById('uniResultsViewTabs');
+    const shell = document.querySelector('.statistico-shell');
+    const headerBar = shell && shell.querySelector('.statistico-header');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.id = 'uniResultsViewTabs';
+      stack.className = 'uni-results-tab-stack view-switcher-host';
+    } else {
+      stack.classList.add('uni-results-tab-stack', 'view-switcher-host');
+    }
+    if (headerBar) {
+      if (stack.parentNode !== headerBar) headerBar.appendChild(stack);
+    } else if (!stack.parentNode) {
+      const header = document.getElementById('header-container');
+      const results = document.getElementById('results-container') || rightCol.querySelector('.results-container');
+      if (header) header.insertAdjacentElement('afterend', stack);
+      else if (results) results.insertAdjacentElement('beforebegin', stack);
+      else rightCol.insertBefore(stack, rightCol.firstChild);
+    }
+    stack.hidden = false;
+    if (shell) shell.classList.add('statistico-shell--with-views');
+    if (headerBar) headerBar.classList.add('statistico-header--with-views');
+    return stack;
+  },
+
+  _paintExploreViewBar(cfg) {
+    this._ensureWorkspaceTabAssets();
+    const stack = this._mountExploreViewBar();
+    if (!stack || !cfg) return;
+    const activePanel = typeof cfg.getActive === 'function' ? cfg.getActive() : '';
+    const viewTabs = cfg.tabs || [];
+    const tabsHtml = viewTabs.map((t) => this._buildUniWsTabBtn({
+      tabKey: t.tabKey,
+      label: t.label,
+      icon: t.icon,
+      active: t.panel === activePanel,
+      inPage: true,
+      explore: true,
+      panel: t.panel,
+      title: t.caption || this._getUniViewCaption(t.tabKey),
+      badge: t.badge,
+      help: t.help
+    })).join('');
+    const activeTab = viewTabs.find((t) => t.panel === activePanel) || viewTabs[0];
+    const captionHtml = this._buildUniViewCaptionHtml(activeTab);
+    const ariaLabel = cfg.ariaLabel || 'Explore views';
+    const describedBy = captionHtml ? ' aria-describedby="uniViewCaption"' : '';
+    stack.innerHTML =
+      '<div class="view-switcher" role="group" aria-label="' + ariaLabel + '"' + describedBy + '>'
+      + '<div class="view-switcher-row">'
+      + '<span class="view-switcher-kicker">EXPLORE VIEWS</span>'
+      + '<nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected uni-view-tabs view-switcher-bar" role="tablist" aria-label="' + ariaLabel + '">'
+      + tabsHtml
+      + '</nav>'
+      + captionHtml
+      + '</div>'
+      + '</div>';
+    if (globalThis.StatisticoWorkspaceTabs) {
+      try { globalThis.StatisticoWorkspaceTabs.init(); } catch (_e) {}
+    }
+    this._ensurePlainTabUnderlineStyles();
+    this._decorateViewSwitcherInviteAndGlow();
+  },
+
   _renderUnivariateResultsTabs() {
-    if (this.module !== 'univariate') return;
+    const byGroup = this._getByGroupExploreConfig();
+    if (byGroup) {
+      this._paintExploreViewBar(byGroup);
+      return;
+    }
+    if (this.module !== 'univariate') {
+      this._hideExploreViewBar();
+      return;
+    }
     this._ensureUnivariateWorkspaceTabAssets();
     const rightCol = document.querySelector('.right-col');
     if (!rightCol) return;
@@ -7755,7 +7919,9 @@ const StatisticoHeader = {
     }
     if (this.module === 'correlations' && this.currentView === 'correlation-by-group') {
       const tab = globalThis.__corrByGroupActiveTab || 'table';
-      return tab === 'similarity' ? 'correlation-by-group-similarity' : 'correlation-by-group';
+      if (tab === 'similarity') return 'correlation-by-group-similarity';
+      if (tab === 'profile') return 'correlation-by-group-profile';
+      return 'correlation-by-group';
     }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
@@ -9158,7 +9324,8 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       'taylor-diagram': 'Taylor Diagram',
       'descriptive-stats': 'Descriptives',
       'correlation-by-group': 'By Group',
-      'correlation-by-group-similarity': 'Similarity Index™',
+      'correlation-by-group-profile': 'Group Profile',
+      'correlation-by-group-similarity': 'Similarity Profile™',
       correlations: 'Correlations'
     };
   },
@@ -9621,8 +9788,9 @@ READING: [1–2 sentences comparing the named groups using exact per-group numbe
       reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
-      'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group, a sparkline of group-specific correlations, and a Group Profile chart of how other variables associate with an anchor across group levels.',
-      'correlation-by-group-similarity': 'Similarity Index™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. Click heatmap cells or table rows for the three-component profile; click a congruence point to open that pair’s scatter.'
+      'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group and a sparkline of group-specific correlations.',
+      'correlation-by-group-profile': 'Group Profile plots r between a chosen anchor variable and every other variable, one line per group level (Overall omitted). Use it to see which associations stay stable or reverse across groups.',
+      'correlation-by-group-similarity': 'Similarity Profile™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. Click heatmap cells or table rows for the three-component profile; click a congruence point to open that pair’s scatter.'
     };
   },
 
@@ -9669,7 +9837,7 @@ RULES:
 - Do not overclaim causality.
 - Mention exact values when they clarify the reading.${view === 'correlation-by-group-similarity' ? `
 - Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed.
-- Do not call this a published coefficient — it is Statistico's Similarity Index™.
+- Do not call this a published coefficient — it is Statistico's Similarity Profile™.
 - Use Very similar / Mostly similar / Mixed similarity / Substantially different.` : ''}
 
 Reply ONLY in this exact format:

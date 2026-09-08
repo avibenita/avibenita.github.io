@@ -14,11 +14,11 @@
     }
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
-  <link rel="stylesheet" href="../shared-header.css?v=20260828viewcta"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260908ctgroup"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260828viewcta"></script>
+  <script src="../shared-header.js?v=20260908ctgroup"></script>
   <script src="contingency-engine.js?v=20260814ct8"></script>
-  <script src="contingency-sample-data.js?v=20260814ct8"></script>
+  <script src="contingency-sample-data.js?v=20260908ctgroup"></script>
   <style>
     :root {
       --surface-0:#070b14; --surface-1:#1e2638; --surface-2:#2a3348; --border:#4b556e;
@@ -383,39 +383,7 @@
 </head>
 <body>
   <div class="sb-layout">
-    <nav class="sb-nav" id="sidebarNav">
-      <div class="sb-logo"><div class="sb-logo-icon" data-statistico-brand-logo></div></div>
-      <div class="sb-header">
-        <i class="fa-solid fa-bars-staggered sb-menu-icon"></i>
-        <span class="sb-menu-title">Menu</span>
-        <button class="sb-toggle-btn" onclick="StatisticoHeader.toggleSidebar()" title="Collapse / expand">
-          <i class="fa-solid fa-chevron-left"></i>
-        </button>
-      </div>
-      <div class="sb-body">
-        <div class="sb-group">
-          <div class="sb-group-title">Results</div>
-          <div class="sb-items-rail">
-            <button class="sb-item active" onclick="switchTab('overview')" data-tab="overview">
-              <i class="fa-solid fa-chart-bar sb-item-icon"></i>
-              <span class="sb-item-copy"><span class="sb-item-label">Overview</span><span class="sb-item-description">N, χ², p, Cramér’s V, and tests.</span></span>
-            </button>
-            <button class="sb-item" onclick="switchTab('table')" data-tab="table">
-              <i class="fa-solid fa-table sb-item-icon"></i>
-              <span class="sb-item-copy"><span class="sb-item-label">Contingency Table</span><span class="sb-item-description">Counts, percents, adjusted residuals.</span></span>
-            </button>
-            <button class="sb-item" onclick="switchTab('diagnostics')" data-tab="diagnostics">
-              <i class="fa-solid fa-stethoscope sb-item-icon"></i>
-              <span class="sb-item-copy"><span class="sb-item-label">Diagnostics &amp; Visualization</span><span class="sb-item-description">Residual map, expected-count checks, and charts.</span></span>
-            </button>
-            <button class="sb-item" onclick="switchTab('twobytwo')" data-tab="twobytwo" id="tab2x2Btn">
-              <i class="fa-solid fa-border-all sb-item-icon"></i>
-              <span class="sb-item-copy"><span class="sb-item-label">2×2 Measures</span><span class="sb-item-description">Odds ratio, risk ratio, RD.</span></span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <nav class="sb-nav" id="sidebarNav"></nav>
     <div class="right-col">
       <div id="header-container"></div>
       <div class="ct-context-bar" id="ctContext">
@@ -625,6 +593,11 @@
       diagnostics: 'Diagnostics & Visualization',
       twobytwo: '2×2 Measures'
     };
+    try {
+      var bootTab = new URLSearchParams(window.location.search).get('tab');
+      if (bootTab) activeTab = bootTab;
+    } catch (_tabErr) {}
+    window.__contingencyActiveTab = activeTab;
     var MEASURES = [
       { id: 'observed', label: 'Observed counts', short: 'Count' },
       { id: 'expected', label: 'Expected counts', short: 'Exp.' },
@@ -1025,11 +998,43 @@
       }
     }
 
+    function persistContingencyNav(extra) {
+      var nav = {};
+      try { nav = JSON.parse(sessionStorage.getItem('contingencyNavData') || '{}') || {}; } catch (_e) { nav = {}; }
+      if (extra && typeof extra === 'object') {
+        Object.keys(extra).forEach(function (key) { nav[key] = extra[key]; });
+      }
+      if (bundle && bundle.analyzable !== false) {
+        nav.spec = {
+          rowVar: bundle.rowVar,
+          colVar: bundle.colVar,
+          weightVar: bundle.weightVar || null,
+          missing: bundle.missingMode,
+          confidence: bundle.confidence,
+          rowLevels: bundle.rowLabels,
+          colLevels: bundle.colLabels
+        };
+        nav.rowVar = bundle.rowVar;
+        nav.colVar = bundle.colVar;
+        nav.is2x2 = bundle.nRows === 2 && bundle.nCols === 2;
+      }
+      window.contingencyNavData = nav;
+      try { sessionStorage.setItem('contingencyNavData', JSON.stringify(nav)); } catch (_e2) {}
+    }
+
+    function refreshSharedSidebar() {
+      window.__contingencyIs2x2 = !!(bundle && bundle.nRows === 2 && bundle.nCols === 2);
+      if (typeof StatisticoHeader === 'undefined') return;
+      try { StatisticoHeader._renderSharedSidebar(); } catch (_e) {}
+      try { StatisticoHeader._bindCollapsibleSidebarGroups(); } catch (_e2) {}
+    }
+
     function switchTab(name) {
       if (name === 'tests') name = 'overview';
       if (name === 'viz' || name === 'visualization') name = 'diagnostics';
       if (name === 'twobytwo' && !(bundle && bundle.nRows === 2 && bundle.nCols === 2)) name = 'overview';
       activeTab = name;
+      window.__contingencyActiveTab = name;
       document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
       var el = document.getElementById('tab-' + name);
       if (el) el.classList.add('active');
@@ -1045,6 +1050,7 @@
         setTimeout(function () { if (vizChart && vizChart.reflow) vizChart.reflow(); }, 40);
       }
     }
+    window.switchTab = switchTab;
 
     function setWarn(id, text) {
       var w = document.getElementById(id);
@@ -1577,7 +1583,7 @@
       var ww = document.getElementById('ctxWeightWrap');
       if (bundle.weightVar) { ww.style.display = ''; document.getElementById('ctxWeight').textContent = bundle.weightVar; }
       else ww.style.display = 'none';
-      document.getElementById('tab2x2Btn').style.display = (bundle.nRows === 2 && bundle.nCols === 2) ? '' : 'none';
+      refreshSharedSidebar();
       renderOverview();
       renderMeasureBar();
       renderTable();
@@ -1615,6 +1621,7 @@
       vizUnweightedCache = null;
       vizWeighted = !!b.weightVar;
       renderAll();
+      persistContingencyNav();
       switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
     }
 
@@ -1825,7 +1832,7 @@
       StatisticoHeader.init('contingency', '', 0, 'contingency');
       StatisticoHeader.registerActions(ctActions());
       StatisticoHeader.initSidebarPage();
-      StatisticoHeader.updateTitle('Overview');
+      StatisticoHeader.updateTitle(TITLE_MAP[activeTab] || 'Overview');
       if (StatisticoHeader._mountSidebarUtilities) StatisticoHeader._mountSidebarUtilities();
     }
 
@@ -1844,9 +1851,17 @@
         try { stored = JSON.parse(sessionStorage.getItem('contingencyBundle') || 'null'); } catch (_e) {}
         if (stored && (stored.analyzable || stored.error)) {
           showBundle(stored);
+          try {
+            var nav = JSON.parse(sessionStorage.getItem('contingencyNavData') || '{}') || {};
+            if ((!nav.headers || !nav.headers.length) && typeof StatisticoContingencySamples !== 'undefined') {
+              var fallback = StatisticoContingencySamples.defaultPayload();
+              persistContingencyNav({ headers: fallback.headers, rows: fallback.rows });
+            }
+          } catch (_storedNav) {}
           return;
         }
         var ex = StatisticoContingencySamples.defaultPayload();
+        persistContingencyNav({ headers: ex.headers, rows: ex.rows });
         showBundle(StatisticoContingency.analyze(ex.headers, ex.rows, { rowVar: ex.headers[0], colVar: ex.headers[1], confidence: 0.95 }));
         return;
       }
@@ -1860,6 +1875,12 @@
             try {
               var msg = JSON.parse(arg.message || '{}');
               if (msg.type === 'CONTINGENCY_BUNDLE' && msg.payload) showBundle(msg.payload);
+              if (msg.type === 'CONTINGENCY_SOURCE' && msg.payload) {
+                persistContingencyNav({
+                  headers: msg.payload.headers || [],
+                  rows: msg.payload.rows || []
+                });
+              }
               if (msg.type === 'CONTINGENCY_VIEW_DATA' && msg.payload) {
                 if (bundle) applyViewData(msg.payload);
                 else pendingViewData = msg.payload;

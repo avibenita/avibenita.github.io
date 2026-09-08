@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Grouped Analysis - Frequencies &amp; Crosstabs</title>
+  <script>
+    if (!/(?:^|[?&])embed=1(?:&|$)/.test(window.location.search)) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></scr' + 'ipt>');
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260908ctgroup" />
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260908ctgroup" />
+  <script src="../shared-brand-logo.js?v=20260716cover"></script>
+  <script src="../shared-header.js?v=20260908ctgroup"></script>
+  <script src="contingency-engine.js?v=20260814ct8"></script>
+  <script src="contingency-sample-data.js?v=20260908ctgroup"></script>
+  <style>
+    :root {
+      --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
+      --accent-1:rgb(255,165,120); --accent-2:#78c8ff; --text-primary:#fff; --text-secondary:rgba(255,255,255,.78);
+      --pos:#34d399; --neg:#fb7185; --accent-ct:#c4b5fd;
+    }
+    :root[data-theme="light"] {
+      --surface-0:#eef0f4; --surface-1:#fff; --surface-2:#f3f4f6; --border:#cbd5e1;
+      --accent-1:#2563eb; --accent-2:#1d4ed8; --text-primary:#111827; --text-secondary:#374151;
+      --pos:#15803d; --neg:#be123c; --accent-ct:#6d28d9;
+    }
+    html, body { height:100%; margin:0; overflow:hidden; }
+    body { background:var(--surface-0); color:var(--text-primary); font-family:"Segoe UI", Tahoma, sans-serif; display:flex; flex-direction:column; }
+    .right-col { flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; }
+    .view-wrap { flex:1; min-height:0; padding:12px; box-sizing:border-box; overflow:hidden; }
+    .view-card { height:100%; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.24); }
+    .toolbar {
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px; padding:12px 14px; border-bottom:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+    }
+    .title { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .title strong { color:var(--accent-1); font-size:14px; letter-spacing:.03em; text-transform:uppercase; }
+    .title span { color:var(--text-secondary); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+    .group-choice-label { color:var(--text-secondary); font-size:12px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
+    button { cursor:pointer; font-weight:700; }
+    .content { flex:1; min-height:0; overflow:hidden; padding:12px; display:flex; flex-direction:column; }
+    .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(110px, 1fr)); gap:10px; flex:0 0 auto; }
+    .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+    .metric label { display:block; color:var(--accent-1); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    .metric strong { display:block; margin-top:4px; font-size:18px; }
+    #mainContent { flex:1; min-height:0; display:none; flex-direction:column; gap:10px; }
+    .ct-bg-panel { display:none; flex:1; min-height:0; flex-direction:column; gap:10px; overflow:hidden; }
+    .ct-bg-panel.is-active { display:flex; }
+    .table-wrap { flex:1; min-height:0; overflow:auto; border:1px solid var(--border); border-radius:10px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; }
+    th { position:sticky; top:0; background:var(--surface-2); color:var(--text-secondary); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+    td.num { font-variant-numeric:tabular-nums; font-weight:700; text-align:right; }
+    .sig { color:var(--pos); }
+    .ns { color:var(--text-secondary); }
+    .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--text-secondary); text-align:center; padding:24px; }
+    .empty i { font-size:28px; color:var(--accent-1); }
+    .section-title { display:flex; flex-direction:column; gap:2px; }
+    .section-title strong { font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--accent-ct); }
+    .section-title span { font-size:12px; color:var(--text-secondary); }
+    .group-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .group-chip { border-radius:999px; padding:5px 10px; font-size:11px; }
+    .group-chip.is-on { border-color:var(--accent-1); color:var(--text-primary); background:color-mix(in srgb, var(--accent-1) 18%, var(--surface-2)); }
+    .ct-grid th.stub, .ct-grid td.stub { font-weight:800; }
+    .spark { display:inline-flex; gap:2px; align-items:flex-end; height:16px; }
+    .spark span { display:block; width:4px; border-radius:1px; background:var(--accent-ct); min-height:2px; }
+    .group-dialog-overlay { display:none; position:fixed; inset:0; z-index:8000; background:rgba(2,6,23,.62); align-items:center; justify-content:center; padding:16px; }
+    .group-dialog-overlay.is-visible { display:flex; }
+    .group-dialog { width:min(920px,96vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .group-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border); }
+    .group-dialog-head strong { display:block; color:var(--accent-1); font-size:15px; margin-bottom:4px; }
+    .group-dialog-head span { color:var(--text-secondary); font-size:12px; line-height:1.4; }
+    .group-dialog-close { width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
+    .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
+    .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
+    .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
+    .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option small { color:var(--text-secondary); font-weight:500; }
+    .level-preview { padding:12px; overflow:auto; min-height:360px; }
+    .level-preview.is-hidden { display:none; }
+    .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; }
+    .level-preview-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
+    .level-preview-head strong { color:var(--accent-1); font-size:13px; }
+    .level-preview-head span { display:block; color:var(--text-secondary); font-size:11px; margin-top:3px; }
+    .level-preview-head .level-apply-status { display:none; align-items:center; gap:7px; color:var(--accent-1); font-size:11px; font-weight:700; }
+    .group-dialog.is-applying .level-preview-head .level-apply-status { display:inline-flex; }
+    .level-actions { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; align-items:center; margin-bottom:8px; }
+    .level-actions button { padding:5px 8px; font-size:11px; }
+    .level-actions .level-apply-btn { padding:5px 12px; font-weight:800; color:#0c1624; border:none; background:var(--accent-1); }
+    .level-keep { display:inline-flex; align-items:center; gap:6px; margin-right:auto; color:var(--text-secondary); font-size:11px; font-weight:700; }
+    .level-keep input[type="number"] { width:58px; padding:5px 7px; font-size:11px; }
+    .group-dialog-foot { display:flex; justify-content:flex-end; gap:10px; padding:14px 18px 16px; border-top:1px solid var(--border); }
+    .group-dialog-done-btn { padding:11px 22px; font-weight:800; border:none; border-radius:10px; color:#fff; background:linear-gradient(135deg, var(--accent-2) 0%, #6d5dfc 55%, var(--accent-1) 100%); }
+    .level-row { display:flex; align-items:center; gap:10px; padding:8px 10px; margin-bottom:5px; border:1px solid var(--border); border-radius:8px; color:var(--text-secondary); font-size:12px; cursor:pointer; }
+    .level-check { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--border); border-radius:5px; }
+    .level-row:not(.is-included) { opacity:.55; }
+    .level-row.is-included { opacity:1; color:var(--text-primary); font-weight:700; border-color:var(--accent-1); }
+    .level-row.is-included .level-check { background:var(--accent-1); border-color:var(--accent-1); color:#fff; }
+    .level-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1; }
+    .level-n { font-size:11px; margin-left:auto; white-space:nowrap; }
+    @media (max-width: 900px) {
+      .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
+      .group-dialog-body { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body data-page-version="20260908-ctgroup-v1">
+  <nav class="sb-nav" id="sidebarNav"></nav>
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div class="view-wrap">
+      <section class="view-card">
+        <div class="toolbar">
+          <div class="title">
+            <strong>Grouped Analysis</strong>
+            <span id="subtitle">Compare the same crosstab across group levels.</span>
+          </div>
+          <div class="controls">
+            <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
+          </div>
+        </div>
+        <div class="content">
+          <div id="emptyState" class="empty">
+            <i class="fa-solid fa-layer-group"></i>
+            Run Frequencies &amp; Crosstabs, then choose a grouping column to compare association across levels.
+          </div>
+          <div id="mainContent">
+            <div class="summary-strip">
+              <div class="metric"><label>Rows × columns</label><strong id="metricShape">—</strong></div>
+              <div class="metric"><label>Groups</label><strong id="metricGroups">—</strong></div>
+              <div class="metric"><label>Group column</label><strong id="metricGroupCol" style="font-size:14px;">—</strong></div>
+              <div class="metric"><label>Filtered rows</label><strong id="metricRows">—</strong></div>
+            </div>
+            <div class="ct-bg-panel is-active" id="ctByGroupPanel-association">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Group</th>
+                      <th class="num">n</th>
+                      <th class="num">χ²</th>
+                      <th class="num">df</th>
+                      <th class="num">p</th>
+                      <th class="num">V</th>
+                      <th>Reading</th>
+                      <th>Pattern</th>
+                    </tr>
+                  </thead>
+                  <tbody id="assocBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="ct-bg-panel" id="ctByGroupPanel-table">
+              <div class="section-title">
+                <strong>Observed counts</strong>
+                <span>Same row × column table, one group at a time. Overall uses the included levels only.</span>
+              </div>
+              <div class="group-chips" id="tableGroupChips"></div>
+              <div class="table-wrap" id="crosstabWrap"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="group-dialog-overlay" id="groupDialog" role="dialog" aria-modal="true" aria-labelledby="groupDialogTitle">
+    <div class="group-dialog">
+      <div class="group-dialog-head">
+        <div>
+          <strong id="groupDialogTitle">Select Grouping Column</strong>
+          <span>Choose a third categorical column to split the same crosstab. Row, column, and weight variables are excluded.</span>
+        </div>
+        <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="group-dialog-body">
+        <div class="group-dialog-list" id="groupDialogList"></div>
+        <div class="level-preview is-hidden" id="groupLevelPreview"></div>
+        <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to preview its levels and n.</div></div>
+      </div>
+      <div class="group-dialog-foot">
+        <button type="button" class="group-dialog-done-btn" onclick="confirmGroupDialog()"><i class="fa-solid fa-check"></i> Compare Groups</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var sourceHeaders = [];
+    var sourceRows = [];
+    var spec = {};
+    var groupIndex = null;
+    var previewGroupIndex = null;
+    var previewLevels = [];
+    var DEFAULT_MIN_GROUP_N = 5;
+    var previewKeepMinN = String(DEFAULT_MIN_GROUP_N);
+    var previewLoadToken = 0;
+    var applySelectionToken = 0;
+    var groupSelectionDirty = false;
+    var levelSelections = {};
+    var groupResults = [];
+    var tableGroupKey = 'overall';
+    var ctByGroupPanel = 'association';
+    window.__contingencyByGroupActiveTab = 'association';
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function rowValue(row, idx) {
+      if (!row) return '';
+      return Array.isArray(row) ? row[idx] : row[sourceHeaders[idx]];
+    }
+
+    function levelKey(value) {
+      if (value == null || String(value).trim() === '') return '(blank)';
+      return String(value);
+    }
+
+    function currentMinGroupN() {
+      var parsed = parseInt(String(previewKeepMinN).trim(), 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MIN_GROUP_N;
+    }
+
+    function isAnalysisHeader(header) {
+      var h = String(header || '');
+      return h === String(spec.rowVar || '') || h === String(spec.colVar || '') || (spec.weightVar && h === String(spec.weightVar));
+    }
+
+    function getLevelCounts(idx) {
+      var counts = new Map();
+      sourceRows.forEach(function (row) {
+        var key = levelKey(rowValue(row, idx));
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      return Array.from(counts.entries())
+        .map(function (entry) { return { level: entry[0], n: entry[1] }; })
+        .sort(function (a, b) { return String(a.level).localeCompare(String(b.level), undefined, { numeric: true }); });
+    }
+
+    function ensureLevelSelection(idx) {
+      var key = String(idx);
+      var levels = getLevelCounts(idx);
+      if (!levelSelections[key]) levelSelections[key] = {};
+      var minN = currentMinGroupN();
+      levels.forEach(function (item) {
+        if (levelSelections[key][item.level] === undefined) {
+          levelSelections[key][item.level] = item.n >= minN;
+        }
+      });
+      Object.keys(levelSelections[key]).forEach(function (level) {
+        if (!levels.some(function (item) { return item.level === level; })) delete levelSelections[key][level];
+      });
+      return levelSelections[key];
+    }
+
+    function isLevelIncluded(idx, level) {
+      var existing = levelSelections[String(idx)];
+      if (existing && Object.prototype.hasOwnProperty.call(existing, level)) return existing[level] !== false;
+      return ensureLevelSelection(idx)[level] !== false;
+    }
+
+    function isValidGroupIndex(idx) {
+      var n = Number(idx);
+      return idx != null && idx !== '' && Number.isInteger(n) && n >= 0 && n < sourceHeaders.length && !isAnalysisHeader(sourceHeaders[n]);
+    }
+
+    function findDefaultGroupIndex() {
+      var bestIdx = null;
+      var bestLevels = Infinity;
+      sourceHeaders.forEach(function (header, idx) {
+        if (isAnalysisHeader(header)) return;
+        var nLevels = getLevelCounts(idx).length;
+        if (nLevels < 2 || nLevels > 40) return;
+        if (nLevels < bestLevels) { bestLevels = nLevels; bestIdx = idx; }
+      });
+      return bestIdx;
+    }
+
+    function fmtP(p) {
+      if (!Number.isFinite(p)) return '—';
+      if (p < 0.001) return '< .001';
+      return p.toFixed(3).replace(/^0/, '');
+    }
+
+    function fmtNum(v, d) {
+      return Number.isFinite(v) ? Number(v).toFixed(d) : '—';
+    }
+
+    function reading(result) {
+      if (!result || !result.analyzable) return result && result.error ? result.error : 'Not analyzable';
+      var p = result.tests && result.tests.pearson && result.tests.pearson.p;
+      var v = result.tests && result.tests.cramersV;
+      var assoc = Number.isFinite(p) && p < 0.05;
+      if (!Number.isFinite(v)) return assoc ? 'Association' : 'No clear association';
+      var strength = v < 0.1 ? 'negligible' : v < 0.3 ? 'weak' : v < 0.5 ? 'moderate' : 'strong';
+      return (assoc ? 'Associated' : 'Not significant') + ' · ' + strength + ' V';
+    }
+
+    function analyzeRows(rows) {
+      if (typeof StatisticoContingency === 'undefined') return { analyzable: false, error: 'Engine not loaded.' };
+      return StatisticoContingency.analyze(sourceHeaders, rows, spec);
+    }
+
+    function includedRows() {
+      if (!isValidGroupIndex(groupIndex)) return sourceRows.slice();
+      return sourceRows.filter(function (row) {
+        return isLevelIncluded(groupIndex, levelKey(rowValue(row, groupIndex)));
+      });
+    }
+
+    function rowsForLevel(level) {
+      return sourceRows.filter(function (row) {
+        return levelKey(rowValue(row, groupIndex)) === level;
+      });
+    }
+
+    function setEmpty(message) {
+      document.getElementById('emptyState').style.display = 'flex';
+      document.getElementById('emptyState').innerHTML = '<i class="fa-solid fa-layer-group"></i>' + escapeHtml(message);
+      document.getElementById('mainContent').style.display = 'none';
+    }
+
+    function updateGroupChoiceLabel() {
+      document.getElementById('groupChoiceLabel').textContent = !isValidGroupIndex(groupIndex)
+        ? 'No grouping column selected'
+        : 'Group by: ' + (sourceHeaders[groupIndex] || 'Group');
+    }
+
+    function populateGroupChoices() {
+      var list = document.getElementById('groupDialogList');
+      var options = sourceHeaders.map(function (header, idx) {
+        if (isAnalysisHeader(header)) return '';
+        var levels = getLevelCounts(idx);
+        var note = levels.length + ' level' + (levels.length === 1 ? '' : 's') + ', n=' + levels.reduce(function (s, item) { return s + item.n; }, 0);
+        return '<button type="button" class="group-option" data-group-index="' + idx + '" onclick="selectGroupColumn(' + idx + ', true)">' +
+          '<span>' + escapeHtml(header) + '</span><small>' + escapeHtml(note) + '</small></button>';
+      }).join('');
+      list.innerHTML = options || '<div class="empty" style="min-height:160px;"><i class="fa-solid fa-circle-info"></i>No extra columns available to group by.</div>';
+      refreshGroupDialogSelection();
+    }
+
+    function refreshGroupDialogSelection() {
+      document.querySelectorAll('.group-option').forEach(function (btn) {
+        var idx = Number(btn.getAttribute('data-group-index'));
+        btn.classList.toggle('is-selected', isValidGroupIndex(groupIndex) && idx === Number(groupIndex));
+      });
+    }
+
+    function hideLevelPreview() {
+      previewLoadToken += 1;
+      document.getElementById('groupLevelPreview').classList.add('is-hidden');
+      document.getElementById('groupLevelPreview').innerHTML = '';
+      document.getElementById('groupLevelPlaceholder').style.display = 'flex';
+    }
+
+    function afterPreviewPaint(fn) {
+      requestAnimationFrame(function () { setTimeout(fn, 0); });
+    }
+
+    function renderLevelPreview(idx) {
+      previewGroupIndex = Number(idx);
+      document.getElementById('groupLevelPreview').classList.remove('is-hidden');
+      document.getElementById('groupLevelPlaceholder').style.display = 'none';
+      ensureLevelSelection(previewGroupIndex);
+      previewLevels = getLevelCounts(previewGroupIndex);
+      var included = previewLevels.filter(function (item) { return isLevelIncluded(previewGroupIndex, item.level); });
+      var keepValue = ' value="' + escapeHtml(String(currentMinGroupN())) + '"';
+      document.getElementById('groupLevelPreview').innerHTML = [
+        '<div class="level-preview-head"><div><strong>' + escapeHtml(sourceHeaders[previewGroupIndex] || 'Group') + '</strong><span>' + included.length + ' of ' + previewLevels.length + ' levels included, n=' + included.reduce(function (s, item) { return s + item.n; }, 0) + '</span></div><span class="level-apply-status"><i class="fa-solid fa-spinner fa-spin"></i> Updating results…</span></div>',
+        '<div class="level-actions"><label class="level-keep" title="Keep only levels with at least this many rows">Minimum group size<input type="number" min="1" step="1" inputmode="numeric" placeholder="' + DEFAULT_MIN_GROUP_N + '"' + keepValue + ' aria-label="Minimum group size" onkeydown="if(event.key===\'Enter\'){event.preventDefault();applyPreviewMinGroupSize();}" /></label><button type="button" class="level-apply-btn" onclick="applyPreviewMinGroupSize()">Apply</button><button type="button" onclick="setAllPreviewLevels(true)">Include all</button><button type="button" onclick="setAllPreviewLevels(false)">Exclude all</button></div>',
+        previewLevels.map(function (item, pos) {
+          return '<div class="level-row' + (isLevelIncluded(previewGroupIndex, item.level) ? ' is-included' : '') + '" role="checkbox" tabindex="0" data-level-pos="' + pos + '"><span class="level-check"><i class="fa-solid fa-check"></i></span><span class="level-name">' + escapeHtml(item.level) + '</span><span class="level-n">n=' + item.n + '</span></div>';
+        }).join('')
+      ].join('');
+      bindLevelPreviewEvents();
+    }
+
+    function bindLevelPreviewEvents() {
+      var preview = document.getElementById('groupLevelPreview');
+      if (!preview || preview.dataset.levelEventsBound === '1') return;
+      preview.dataset.levelEventsBound = '1';
+      preview.addEventListener('click', function (event) {
+        var row = event.target.closest && event.target.closest('.level-row');
+        if (!row || !preview.contains(row)) return;
+        event.preventDefault();
+        var pos = Number(row.getAttribute('data-level-pos'));
+        togglePreviewLevel(pos, !row.classList.contains('is-included'));
+      });
+    }
+
+    function togglePreviewLevel(pos, included) {
+      var item = previewLevels[pos];
+      if (!item) return;
+      ensureLevelSelection(previewGroupIndex)[item.level] = !!included;
+      var row = document.querySelector('#groupLevelPreview .level-row[data-level-pos="' + pos + '"]');
+      if (row) row.classList.toggle('is-included', !!included);
+      renderLevelPreview(previewGroupIndex);
+      groupSelectionDirty = true;
+    }
+
+    function setAllPreviewLevels(included) {
+      var selection = ensureLevelSelection(previewGroupIndex);
+      previewLevels.forEach(function (item) { selection[item.level] = !!included; });
+      renderLevelPreview(previewGroupIndex);
+      groupSelectionDirty = true;
+    }
+
+    function keepPreviewLevelsByMinN(raw) {
+      var parsed = parseInt(String(raw).trim(), 10);
+      previewKeepMinN = Number.isFinite(parsed) && parsed > 0 ? String(parsed) : String(DEFAULT_MIN_GROUP_N);
+      var minN = currentMinGroupN();
+      var selection = ensureLevelSelection(previewGroupIndex);
+      previewLevels.forEach(function (item) { selection[item.level] = item.n >= minN; });
+      renderLevelPreview(previewGroupIndex);
+      groupSelectionDirty = true;
+    }
+
+    function applyPreviewMinGroupSize() {
+      var input = document.querySelector('#groupLevelPreview .level-keep input');
+      keepPreviewLevelsByMinN(input ? input.value : previewKeepMinN);
+    }
+
+    function openGroupDialog() {
+      if (!sourceHeaders.length) return;
+      populateGroupChoices();
+      if (!isValidGroupIndex(groupIndex)) {
+        var fallback = findDefaultGroupIndex();
+        if (isValidGroupIndex(fallback)) groupIndex = Number(fallback);
+      }
+      updateGroupChoiceLabel();
+      refreshGroupDialogSelection();
+      if (isValidGroupIndex(groupIndex)) renderLevelPreview(groupIndex);
+      else hideLevelPreview();
+      document.getElementById('groupDialog').classList.add('is-visible');
+    }
+
+    function hideGroupDialog() {
+      document.getElementById('groupDialog').classList.remove('is-visible');
+    }
+
+    function closeGroupDialog() {
+      hideGroupDialog();
+      if (groupSelectionDirty) renderByGroup();
+      groupSelectionDirty = false;
+    }
+
+    function confirmGroupDialog() {
+      var idx = isValidGroupIndex(groupIndex) ? Number(groupIndex) : previewGroupIndex;
+      if (!isValidGroupIndex(idx)) idx = findDefaultGroupIndex();
+      if (!isValidGroupIndex(idx)) return;
+      selectGroupColumn(idx, false);
+    }
+
+    function selectGroupColumn(idx, keepDialogOpen) {
+      if (!isValidGroupIndex(idx)) return;
+      groupIndex = Number(idx);
+      updateGroupChoiceLabel();
+      refreshGroupDialogSelection();
+      if (keepDialogOpen) {
+        renderLevelPreview(groupIndex);
+        groupSelectionDirty = true;
+        return;
+      }
+      hideGroupDialog();
+      groupSelectionDirty = false;
+      renderByGroup();
+    }
+
+    function sparkHtml(values) {
+      var max = Math.max.apply(null, values.concat([0.001]));
+      return '<span class="spark">' + values.map(function (v) {
+        var h = Math.max(2, Math.round(16 * (Number(v) || 0) / max));
+        return '<span style="height:' + h + 'px"></span>';
+      }).join('') + '</span>';
+    }
+
+    function showContingencyByGroupPanel(panel) {
+      ctByGroupPanel = panel === 'table' ? 'table' : 'association';
+      window.__contingencyByGroupActiveTab = ctByGroupPanel;
+      document.querySelectorAll('.ct-bg-panel').forEach(function (el) {
+        el.classList.toggle('is-active', el.id === 'ctByGroupPanel-' + ctByGroupPanel);
+      });
+      if (ctByGroupPanel === 'table') renderCrosstab();
+    }
+
+    function renderCrosstab() {
+      var wrap = document.getElementById('crosstabWrap');
+      var chips = document.getElementById('tableGroupChips');
+      var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
+      chips.innerHTML = groupResults.map(function (item) {
+        return '<button type="button" class="group-chip' + (item.key === (current && current.key) ? ' is-on' : '') + '" onclick="selectTableGroup(\'' + encodeURIComponent(item.key) + '\')">' + escapeHtml(item.label) + '</button>';
+      }).join('');
+      if (!current || !current.result || !current.result.analyzable) {
+        wrap.innerHTML = '<div class="empty"><i class="fa-solid fa-table"></i>No table for this group.</div>';
+        return;
+      }
+      var res = current.result;
+      var head = '<tr><th class="stub">' + escapeHtml(res.rowVar || '') + ' \\ ' + escapeHtml(res.colVar || '') + '</th>' +
+        res.colLabels.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') + '<th>Total</th></tr>';
+      var body = res.rowLabels.map(function (r, i) {
+        var tot = (res.rowTotals && res.rowTotals[i]) || 0;
+        return '<tr><td class="stub">' + escapeHtml(r) + '</td>' +
+          res.observed[i].map(function (n) { return '<td class="num">' + n + '</td>'; }).join('') +
+          '<td class="num">' + tot + '</td></tr>';
+      }).join('');
+      var foot = '<tr><td class="stub">Total</td>' +
+        (res.colTotals || []).map(function (n) { return '<td class="num">' + n + '</td>'; }).join('') +
+        '<td class="num">' + (res.N || 0) + '</td></tr>';
+      wrap.innerHTML = '<table class="ct-grid"><thead>' + head + '</thead><tbody>' + body + foot + '</tbody></table>';
+    }
+
+    function selectTableGroup(encodedKey) {
+      tableGroupKey = decodeURIComponent(encodedKey);
+      renderCrosstab();
+    }
+
+    function renderByGroup() {
+      if (!spec.rowVar || !spec.colVar) {
+        setEmpty('Run Frequencies & Crosstabs first, then open Compare Groups.');
+        return;
+      }
+      if (!sourceHeaders.length) {
+        setEmpty('The original sheet was not available. Re-run the analysis, then open Compare Groups.');
+        return;
+      }
+      var candidates = sourceHeaders.filter(function (h) { return !isAnalysisHeader(h); });
+      if (!candidates.length) {
+        setEmpty('Compare Groups needs a third column (for example site, sex, or wave) besides the row and column variables.');
+        return;
+      }
+      if (!isValidGroupIndex(groupIndex)) {
+        var fallback = findDefaultGroupIndex();
+        if (isValidGroupIndex(fallback)) groupIndex = Number(fallback);
+      }
+      if (!isValidGroupIndex(groupIndex)) {
+        setEmpty('Choose a grouping column with at least two levels.');
+        populateGroupChoices();
+        return;
+      }
+      ensureLevelSelection(groupIndex);
+      var levels = getLevelCounts(groupIndex).filter(function (item) { return isLevelIncluded(groupIndex, item.level); });
+      if (!levels.length) {
+        setEmpty('No group levels remain after the minimum-n filter. Lower the threshold or include more levels.');
+        document.getElementById('mainContent').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'flex';
+        return;
+      }
+      var overallRows = includedRows();
+      var overall = analyzeRows(overallRows);
+      groupResults = [{ key: 'overall', label: 'Overall', n: overallRows.length, result: overall }].concat(levels.map(function (item) {
+        var rows = rowsForLevel(item.level);
+        return { key: item.level, label: item.level, n: rows.length, result: analyzeRows(rows) };
+      }));
+      var vValues = groupResults.slice(1).map(function (item) {
+        return item.result && item.result.tests ? item.result.tests.cramersV : 0;
+      });
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'flex';
+      document.getElementById('metricShape').textContent = overall.analyzable ? (overall.nRows + ' × ' + overall.nCols) : '—';
+      document.getElementById('metricGroups').textContent = String(levels.length);
+      document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
+      document.getElementById('metricRows').textContent = String(overallRows.length);
+      document.getElementById('subtitle').textContent = (spec.rowVar || 'Rows') + ' × ' + (spec.colVar || 'Columns') + ' · By ' + sourceHeaders[groupIndex];
+      document.getElementById('assocBody').innerHTML = groupResults.map(function (item) {
+        var res = item.result || {};
+        var tests = res.tests || {};
+        var pearson = tests.pearson || {};
+        var pClass = Number.isFinite(pearson.p) && pearson.p < 0.05 ? 'sig' : 'ns';
+        var warn = res.diagnostics && res.diagnostics.assumptionWarning ? ' title="' + escapeHtml(res.diagnostics.assumptionWarning) + '"' : '';
+        return '<tr' + warn + '><td>' + escapeHtml(item.label) + '</td>' +
+          '<td class="num">' + (res.N != null ? res.N : item.n) + '</td>' +
+          '<td class="num">' + fmtNum(pearson.stat, 2) + '</td>' +
+          '<td class="num">' + (Number.isFinite(pearson.df) ? pearson.df : '—') + '</td>' +
+          '<td class="num ' + pClass + '">' + fmtP(pearson.p) + '</td>' +
+          '<td class="num">' + fmtNum(tests.cramersV, 3) + '</td>' +
+          '<td>' + escapeHtml(reading(res)) + '</td>' +
+          '<td>' + (item.key === 'overall' ? sparkHtml(vValues) : '') + '</td></tr>';
+      }).join('');
+      if (!groupResults.some(function (item) { return item.key === tableGroupKey; })) tableGroupKey = 'overall';
+      renderCrosstab();
+      showContingencyByGroupPanel(ctByGroupPanel);
+      if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
+        StatisticoHeader.updateVariable((spec.rowVar || '') + ' × ' + (spec.colVar || ''), overallRows.length);
+      }
+    }
+
+    function loadNavData() {
+      var nav = window.contingencyNavData;
+      if (!nav) {
+        try { nav = JSON.parse(sessionStorage.getItem('contingencyNavData') || 'null'); } catch (_e) { nav = null; }
+      }
+      if (nav && Array.isArray(nav.headers) && Array.isArray(nav.rows)) {
+        sourceHeaders = nav.headers.slice();
+        sourceRows = nav.rows.map(function (row) { return Array.isArray(row) ? row.slice() : row; });
+        spec = nav.spec || {};
+        window.contingencyNavData = nav;
+        window.__contingencyIs2x2 = !!(nav.is2x2 || (nav.bundle && nav.bundle.nRows === 2 && nav.bundle.nCols === 2));
+        return true;
+      }
+      try {
+        var bundle = JSON.parse(sessionStorage.getItem('contingencyBundle') || 'null');
+        if (bundle && bundle.source && bundle.source.headers) {
+          sourceHeaders = bundle.source.headers.slice();
+          sourceRows = (bundle.source.rows || []).slice();
+          spec = {
+            rowVar: bundle.rowVar,
+            colVar: bundle.colVar,
+            weightVar: bundle.weightVar,
+            missing: bundle.missingMode,
+            confidence: bundle.confidence,
+            rowLevels: bundle.rowLabels,
+            colLevels: bundle.colLabels
+          };
+          window.__contingencyIs2x2 = bundle.nRows === 2 && bundle.nCols === 2;
+          return true;
+        }
+      } catch (_e2) {}
+      return false;
+    }
+
+    function bootDemoFallback() {
+      if (typeof StatisticoContingencySamples === 'undefined') return false;
+      var q = (location.search || '').toLowerCase();
+      if (q.indexOf('demo=1') < 0 && q.indexOf('embed=1') < 0 && sourceHeaders.length) return false;
+      var ex = StatisticoContingencySamples.defaultPayload();
+      sourceHeaders = ex.headers.slice();
+      sourceRows = ex.rows.map(function (r) { return r.slice(); });
+      spec = { rowVar: ex.headers[0], colVar: ex.headers[1], confidence: 0.95 };
+      window.__contingencyIs2x2 = true;
+      window.contingencyNavData = { headers: sourceHeaders, rows: sourceRows, spec: spec };
+      try { sessionStorage.setItem('contingencyNavData', JSON.stringify(window.contingencyNavData)); } catch (_e) {}
+      return true;
+    }
+
+    function startBridge() {
+      if (typeof Office === 'undefined' || !Office.onReady) return;
+      Office.onReady(function () {
+        try {
+          Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+            try {
+              var msg = JSON.parse(arg.message || '{}');
+              if (msg.type === 'CONTINGENCY_SOURCE' && msg.payload && msg.payload.headers) {
+                sourceHeaders = msg.payload.headers.slice();
+                sourceRows = (msg.payload.rows || []).slice();
+                window.contingencyNavData = Object.assign({}, window.contingencyNavData || {}, {
+                  headers: sourceHeaders,
+                  rows: sourceRows,
+                  spec: spec
+                });
+                try { sessionStorage.setItem('contingencyNavData', JSON.stringify(window.contingencyNavData)); } catch (_e) {}
+                populateGroupChoices();
+                if (!isValidGroupIndex(groupIndex)) {
+                  var fallback = findDefaultGroupIndex();
+                  if (isValidGroupIndex(fallback)) groupIndex = Number(fallback);
+                }
+                updateGroupChoiceLabel();
+                if (isValidGroupIndex(groupIndex)) renderByGroup();
+              }
+              if (msg.type === 'CONTINGENCY_BUNDLE' && msg.payload && msg.payload.rowVar) {
+                spec = {
+                  rowVar: msg.payload.rowVar,
+                  colVar: msg.payload.colVar,
+                  weightVar: msg.payload.weightVar || null,
+                  missing: msg.payload.missingMode,
+                  confidence: msg.payload.confidence,
+                  rowLevels: msg.payload.rowLabels,
+                  colLevels: msg.payload.colLabels
+                };
+                window.__contingencyIs2x2 = msg.payload.nRows === 2 && msg.payload.nCols === 2;
+              }
+            } catch (_parse) {}
+          });
+          if (!sourceHeaders.length) {
+            Office.context.ui.messageParent(JSON.stringify({ action: 'requestData' }));
+          }
+        } catch (_bridge) {}
+      });
+    }
+
+    function boot() {
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.init('contingency-by-group', 'Grouped Analysis', 0, 'contingency');
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Grouped Analysis');
+      }
+      var ok = loadNavData() || bootDemoFallback();
+      startBridge();
+      if (!ok) {
+        setEmpty('Run Frequencies & Crosstabs first, then open Compare Groups.');
+        return;
+      }
+      populateGroupChoices();
+      if (!isValidGroupIndex(groupIndex)) {
+        var fallback = findDefaultGroupIndex();
+        if (isValidGroupIndex(fallback)) groupIndex = Number(fallback);
+      }
+      updateGroupChoiceLabel();
+      if (isValidGroupIndex(groupIndex)) renderByGroup();
+      else setEmpty('Choose a grouping column with at least two levels.');
+    }
+
+    window.openGroupDialog = openGroupDialog;
+    window.closeGroupDialog = closeGroupDialog;
+    window.confirmGroupDialog = confirmGroupDialog;
+    window.selectGroupColumn = selectGroupColumn;
+    window.setAllPreviewLevels = setAllPreviewLevels;
+    window.applyPreviewMinGroupSize = applyPreviewMinGroupSize;
+    window.showContingencyByGroupPanel = showContingencyByGroupPanel;
+    window.selectTableGroup = selectTableGroup;
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+    else boot();
+  </script>
+</body>
+</html>

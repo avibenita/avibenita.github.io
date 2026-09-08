@@ -8,14 +8,14 @@
     assoc2x2: {
       id: 'assoc2x2',
       title: '2×2 with a clear association',
-      description: 'Treatment × Response. Expected χ² = 16.67, df = 1, V = 0.408, OR = 6.',
-      headers: ['Treatment', 'Response'],
+      description: 'Treatment × Response. Expected χ² = 16.67, df = 1, V = 0.408, OR = 6. Site is available for Compare Groups.',
+      headers: ['Treatment', 'Response', 'Site'],
       rows: (function () {
         var r = [], i;
-        for (i = 0; i < 30; i++) r.push(['Drug', 'Improved']);
-        for (i = 0; i < 10; i++) r.push(['Drug', 'No change']);
-        for (i = 0; i < 20; i++) r.push(['Placebo', 'Improved']);
-        for (i = 0; i < 40; i++) r.push(['Placebo', 'No change']);
+        for (i = 0; i < 30; i++) r.push(['Drug', 'Improved', i < 20 ? 'North' : 'South']);
+        for (i = 0; i < 10; i++) r.push(['Drug', 'No change', i < 4 ? 'North' : 'South']);
+        for (i = 0; i < 20; i++) r.push(['Placebo', 'Improved', i < 8 ? 'North' : 'South']);
+        for (i = 0; i < 40; i++) r.push(['Placebo', 'No change', i < 12 ? 'North' : 'South']);
         return r;
       })()
     },

@@ -706,7 +706,8 @@ const StatisticoHeader = {
       'model-structure': 'Model Structure',
       // Meta-analysis
       'meta-analysis': 'Meta-Analysis',
-      'contingency': 'Contingency Tables'
+      'contingency': 'Contingency Tables',
+      'contingency-by-group': 'Grouped Analysis'
     };
 
     const moduleNames = {
@@ -1394,7 +1395,7 @@ const StatisticoHeader = {
   },
 
   _isSharedSidebarModule() {
-    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression'].includes(this.module);
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency'].includes(this.module);
   },
 
   _sidebarGroupKey(title) {
@@ -1696,6 +1697,55 @@ const StatisticoHeader = {
         pinnedNav: {
           items: [
             { type: 'navigate', view: 'correlation-by-group', file: 'correlations/by-group.html', icon: 'fa-sitemap', label: 'By Group', description: 'Compare pairwise r across group levels with pattern sparklines.' }
+          ]
+        }
+      };
+    }
+
+    if (this.module === 'contingency') {
+      const onByGroup = this.currentView === 'contingency-by-group';
+      const activeTab = globalThis.__contingencyActiveTab || 'overview';
+      const resultsFile = 'contingency/contingency-results.html';
+      const resultItem = (tab, icon, label, description) => {
+        if (onByGroup) {
+          return {
+            type: 'navigate',
+            file: resultsFile + '?tab=' + encodeURIComponent(tab),
+            icon,
+            label,
+            description
+          };
+        }
+        return {
+          type: 'tab',
+          tab,
+          icon,
+          label,
+          description,
+          active: activeTab === tab
+        };
+      };
+      const resultItems = [
+        resultItem('overview', 'fa-chart-bar', 'Overview', 'N, χ², p, Cramér’s V, and tests.'),
+        resultItem('table', 'fa-table', 'Contingency Table', 'Counts, percents, adjusted residuals.'),
+        resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics & Visualization', 'Residual map, expected-count checks, and charts.')
+      ];
+      if (globalThis.__contingencyIs2x2) {
+        resultItems.push(resultItem('twobytwo', 'fa-border-all', '2×2 Measures', 'Odds ratio, risk ratio, RD.'));
+      }
+      return {
+        logoIcon: 'fa-table-cells-large',
+        logoSub: 'Frequencies',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Results',
+            items: resultItems
+          }
+        ],
+        pinnedNav: {
+          items: [
+            { type: 'navigate', view: 'contingency-by-group', file: 'contingency/by-group.html', icon: 'fa-layer-group', label: 'Compare Groups', description: 'Compare the same crosstab across group levels.' }
           ]
         }
       };
@@ -2117,7 +2167,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260908corrn5',
+  _TAB_ASSET_VER: '20260908ctgroup',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -3365,6 +3415,17 @@ const StatisticoHeader = {
         ]
       };
     }
+    if (this.module === 'contingency' && this.currentView === 'contingency-by-group') {
+      return {
+        ariaLabel: 'Frequencies by group views',
+        getActive: () => globalThis.__contingencyByGroupActiveTab || 'association',
+        onSelect: (panel) => this.setContingencyByGroupResultsTab(panel),
+        tabs: [
+          { tabKey: 'contingency-by-group-association', label: 'Association', icon: 'fa-table', panel: 'association', caption: 'Compare χ², p and Cramér’s V for the same crosstab across group levels.' },
+          { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', caption: 'Inspect observed counts for Overall or a selected group.' }
+        ]
+      };
+    }
     return null;
   },
 
@@ -3381,6 +3442,15 @@ const StatisticoHeader = {
       globalThis.showCorrByGroupPanel(panel);
     } else {
       globalThis.__corrByGroupActiveTab = panel || 'table';
+    }
+    try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+  },
+
+  setContingencyByGroupResultsTab(panel) {
+    if (typeof globalThis.showContingencyByGroupPanel === 'function') {
+      globalThis.showContingencyByGroupPanel(panel);
+    } else {
+      globalThis.__contingencyByGroupActiveTab = panel || 'association';
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
@@ -3788,6 +3858,13 @@ const StatisticoHeader = {
       this._syncRegressionNavStorage();
       if (this.module === 'univariate') {
         this._syncLiveDataToStorage();
+      }
+      if (this.module === 'contingency') {
+        try {
+          if (window.contingencyNavData) {
+            sessionStorage.setItem('contingencyNavData', JSON.stringify(window.contingencyNavData));
+          }
+        } catch (_ctNav) {}
       }
     } catch (e) {
       console.warn('Navigation storage sync failed; continuing navigation.', e);
@@ -7923,6 +8000,10 @@ const StatisticoHeader = {
       if (tab === 'profile') return 'correlation-by-group-profile';
       return 'correlation-by-group';
     }
+    if (this.module === 'contingency' && this.currentView === 'contingency-by-group') {
+      const tab = globalThis.__contingencyByGroupActiveTab || 'association';
+      return tab === 'table' ? 'contingency-by-group-table' : 'contingency-by-group';
+    }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
     if (this.module === 'meta-analysis') {
@@ -7998,6 +8079,9 @@ const StatisticoHeader = {
       'contingency-table': 'Contingency Table',
       'contingency-diagnostics': 'Diagnostics & Visualization',
       'contingency-twobytwo': '2×2 Measures',
+      'contingency-by-group': 'Grouped Analysis',
+      'contingency-by-group-association': 'Association by Group',
+      'contingency-by-group-table': 'Tables by Group',
       'segmentation-overview': 'Overview',
       'segmentation-groups': 'Group Comparison',
       'segmentation-change': 'Change',

@@ -170,6 +170,21 @@ function sendContingencyBundle() {
       } catch (_e3) {}
     }, 300);
   }
+  var source = payload && payload.source;
+  if (!source) {
+    try { source = JSON.parse(sessionStorage.getItem('contingencySource') || 'null'); } catch (_e4) { source = null; }
+  }
+  if (source && source.headers && source.rows) {
+    setTimeout(function () {
+      if (!contingencyResultsDialog) return;
+      try {
+        contingencyResultsDialog.messageChild(JSON.stringify({
+          type: 'CONTINGENCY_SOURCE',
+          payload: { headers: source.headers, rows: source.rows }
+        }));
+      } catch (_e5) {}
+    }, 80);
+  }
 }
 
 (function (hubKey, fn) {

@@ -55,10 +55,36 @@
     .ct-bg-panel { display:none; flex:1; min-height:0; flex-direction:column; gap:10px; overflow:hidden; }
     .ct-bg-panel.is-active { display:flex; }
     .table-wrap { flex:1; min-height:0; overflow:auto; border:1px solid var(--border); border-radius:10px; }
-    table { width:100%; border-collapse:collapse; font-size:12px; }
-    th, td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:left; }
-    th { position:sticky; top:0; background:var(--surface-2); color:var(--text-secondary); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
-    td.num { font-variant-numeric:tabular-nums; font-weight:700; text-align:right; }
+    table { width:100%; border-collapse:collapse; font-size:14.5px; }
+    th, td { padding:11px 14px; border-bottom:1px solid var(--border); text-align:left; vertical-align:middle; }
+    th { position:sticky; top:0; background:var(--surface-2); color:var(--text-secondary); font-size:12px; letter-spacing:.04em; text-transform:uppercase; font-weight:800; }
+    th.num, td.num { font-variant-numeric:tabular-nums; font-weight:700; text-align:right; }
+    .assoc-table { width:100%; border-collapse:separate; border-spacing:0; }
+    .assoc-table th.group-col, .assoc-table td.group-col { text-align:left; min-width:120px; }
+    .assoc-table th.read-col, .assoc-table td.read-col { text-align:left; min-width:180px; }
+    .assoc-table th.strength-col, .assoc-table td.strength-col { text-align:left; min-width:168px; width:22%; }
+    .assoc-table th.num { min-width:64px; }
+    .assoc-table tr.assoc-overall td {
+      background:color-mix(in srgb, var(--accent-1) 14%, var(--surface-2));
+      color:var(--text-primary); font-weight:800;
+      border-bottom:2px solid color-mix(in srgb, var(--accent-1) 70%, var(--border));
+    }
+    .assoc-table tr.assoc-overall td.group-col { color:var(--accent-1); }
+    .assoc-table tr.assoc-split td {
+      padding:8px 14px 6px; font-size:11px; font-weight:800; letter-spacing:.08em;
+      text-transform:uppercase; color:var(--accent-ct); background:rgba(0,0,0,.18);
+      border-bottom:1px solid var(--border);
+    }
+    .assoc-table tr.assoc-level td.group-col { padding-left:26px; }
+    .v-bar { display:flex; align-items:center; min-width:0; }
+    .v-bar-track {
+      flex:1; min-width:88px; height:12px; border-radius:999px; overflow:hidden;
+      background:rgba(255,255,255,.08); border:1px solid var(--border);
+    }
+    html[data-theme="light"] .v-bar-track { background:#e2e8f0; }
+    .v-bar-fill { display:block; height:100%; border-radius:999px; background:var(--accent-ct); }
+    tr.assoc-overall .v-bar-fill { background:var(--accent-1); }
+    .th-sub { display:block; margin-top:2px; font-size:10px; font-weight:700; letter-spacing:.02em; text-transform:none; color:var(--text-secondary); opacity:.9; }
     .sig { color:var(--pos); }
     .ns { color:var(--text-secondary); }
     .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--text-secondary); text-align:center; padding:24px; }
@@ -69,9 +95,9 @@
     .group-chips { display:flex; flex-wrap:wrap; gap:6px; }
     .group-chip { border-radius:999px; padding:5px 10px; font-size:11px; }
     .group-chip.is-on { border-color:var(--accent-1); color:var(--text-primary); background:color-mix(in srgb, var(--accent-1) 18%, var(--surface-2)); }
-    .ct-grid th.stub, .ct-grid td.stub { font-weight:800; }
-    .spark { display:inline-flex; gap:2px; align-items:flex-end; height:16px; }
-    .spark span { display:block; width:4px; border-radius:1px; background:var(--accent-ct); min-height:2px; }
+    .ct-grid { font-size:14.5px; }
+    .ct-grid th, .ct-grid td { text-align:right; }
+    .ct-grid th.stub, .ct-grid td.stub { text-align:left; font-weight:800; }
     .group-dialog-overlay { display:none; position:fixed; inset:0; z-index:8000; background:rgba(2,6,23,.62); align-items:center; justify-content:center; padding:16px; }
     .group-dialog-overlay.is-visible { display:flex; }
     .group-dialog { width:min(920px,96vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
@@ -112,7 +138,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260908-ctgroup-v1">
+<body data-page-version="20260908-ctgroup-v2">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -142,17 +168,17 @@
             </div>
             <div class="ct-bg-panel is-active" id="ctByGroupPanel-association">
               <div class="table-wrap">
-                <table>
+                <table class="assoc-table">
                   <thead>
                     <tr>
-                      <th>Group</th>
+                      <th class="group-col">Group</th>
                       <th class="num">n</th>
                       <th class="num">χ²</th>
                       <th class="num">df</th>
                       <th class="num">p</th>
                       <th class="num">V</th>
-                      <th>Reading</th>
-                      <th>Pattern</th>
+                      <th class="read-col">Reading</th>
+                      <th class="strength-col">Strength<span class="th-sub">Cramér’s V, 0–1</span></th>
                     </tr>
                   </thead>
                   <tbody id="assocBody"></tbody>
@@ -476,12 +502,14 @@
       renderByGroup();
     }
 
-    function sparkHtml(values) {
-      var max = Math.max.apply(null, values.concat([0.001]));
-      return '<span class="spark">' + values.map(function (v) {
-        var h = Math.max(2, Math.round(16 * (Number(v) || 0) / max));
-        return '<span style="height:' + h + 'px"></span>';
-      }).join('') + '</span>';
+    function strengthHtml(v) {
+      var n = Number(v);
+      var pct = Number.isFinite(n) ? Math.max(0, Math.min(100, n * 100)) : 0;
+      var label = Number.isFinite(n) ? n.toFixed(3) : '—';
+      var title = Number.isFinite(n)
+        ? 'Cramér’s V = ' + label + ' (0 = no association, 1 = complete association)'
+        : 'Cramér’s V not available';
+      return '<div class="v-bar" title="' + escapeHtml(title) + '"><span class="v-bar-track"><span class="v-bar-fill" style="width:' + pct.toFixed(1) + '%"></span></span></div>';
     }
 
     function showContingencyByGroupPanel(panel) {
@@ -561,9 +589,6 @@
         var rows = rowsForLevel(item.level);
         return { key: item.level, label: item.level, n: rows.length, result: analyzeRows(rows) };
       }));
-      var vValues = groupResults.slice(1).map(function (item) {
-        return item.result && item.result.tests ? item.result.tests.cramersV : 0;
-      });
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'flex';
       document.getElementById('metricShape').textContent = overall.analyzable ? (overall.nRows + ' × ' + overall.nCols) : '—';
@@ -571,21 +596,28 @@
       document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
       document.getElementById('metricRows').textContent = String(overallRows.length);
       document.getElementById('subtitle').textContent = (spec.rowVar || 'Rows') + ' × ' + (spec.colVar || 'Columns') + ' · By ' + sourceHeaders[groupIndex];
-      document.getElementById('assocBody').innerHTML = groupResults.map(function (item) {
+      var groupName = sourceHeaders[groupIndex] || 'group';
+      var rowsHtml = groupResults.map(function (item) {
         var res = item.result || {};
         var tests = res.tests || {};
         var pearson = tests.pearson || {};
         var pClass = Number.isFinite(pearson.p) && pearson.p < 0.05 ? 'sig' : 'ns';
         var warn = res.diagnostics && res.diagnostics.assumptionWarning ? ' title="' + escapeHtml(res.diagnostics.assumptionWarning) + '"' : '';
-        return '<tr' + warn + '><td>' + escapeHtml(item.label) + '</td>' +
+        var rowClass = item.key === 'overall' ? 'assoc-overall' : 'assoc-level';
+        return '<tr class="' + rowClass + '"' + warn + '>' +
+          '<td class="group-col">' + escapeHtml(item.label) + '</td>' +
           '<td class="num">' + (res.N != null ? res.N : item.n) + '</td>' +
           '<td class="num">' + fmtNum(pearson.stat, 2) + '</td>' +
           '<td class="num">' + (Number.isFinite(pearson.df) ? pearson.df : '—') + '</td>' +
           '<td class="num ' + pClass + '">' + fmtP(pearson.p) + '</td>' +
           '<td class="num">' + fmtNum(tests.cramersV, 3) + '</td>' +
-          '<td>' + escapeHtml(reading(res)) + '</td>' +
-          '<td>' + (item.key === 'overall' ? sparkHtml(vValues) : '') + '</td></tr>';
-      }).join('');
+          '<td class="read-col">' + escapeHtml(reading(res)) + '</td>' +
+          '<td class="strength-col">' + strengthHtml(tests.cramersV) + '</td></tr>';
+      });
+      if (rowsHtml.length > 1) {
+        rowsHtml.splice(1, 0, '<tr class="assoc-split"><td colspan="8">Levels of ' + escapeHtml(groupName) + '</td></tr>');
+      }
+      document.getElementById('assocBody').innerHTML = rowsHtml.join('');
       if (!groupResults.some(function (item) { return item.key === tableGroupKey; })) tableGroupKey = 'overall';
       renderCrosstab();
       showContingencyByGroupPanel(ctByGroupPanel);

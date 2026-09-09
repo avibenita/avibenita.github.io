@@ -1745,7 +1745,7 @@ const StatisticoHeader = {
         ],
         pinnedNav: {
           items: [
-            { type: 'navigate', view: 'contingency-by-group', file: 'contingency/by-group.html', icon: 'fa-layer-group', label: 'Compare Groups', description: 'Compare the same crosstab across group levels.' }
+            { type: 'navigate', view: 'contingency-by-group', file: 'contingency/by-group.html', icon: 'fa-layer-group', label: 'By Group', description: 'Examine the same association separately within each group.' }
           ]
         }
       };
@@ -2167,7 +2167,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260908ctgroup',
+  _TAB_ASSET_VER: '20260909ctexplore',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -3421,8 +3421,8 @@ const StatisticoHeader = {
         getActive: () => globalThis.__contingencyByGroupActiveTab || 'association',
         onSelect: (panel) => this.setContingencyByGroupResultsTab(panel),
         tabs: [
-          { tabKey: 'contingency-by-group-association', label: 'Association', icon: 'fa-table', panel: 'association', caption: 'Compare χ², p and Cramér’s V for the same crosstab across group levels.' },
-          { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', caption: 'Inspect observed counts for Overall or a selected group.' }
+          { tabKey: 'contingency-by-group-association', label: 'Association table', icon: 'fa-table', panel: 'association', caption: 'Examine the same association separately within each group. χ², p and V are not a test of whether groups differ.' },
+          { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', caption: 'Inspect observed counts for one group at a time. Overall uses all included levels.' }
         ]
       };
     }
@@ -8080,7 +8080,7 @@ const StatisticoHeader = {
       'contingency-diagnostics': 'Diagnostics & Visualization',
       'contingency-twobytwo': '2×2 Measures',
       'contingency-by-group': 'Grouped Analysis',
-      'contingency-by-group-association': 'Association by Group',
+      'contingency-by-group-association': 'Association table',
       'contingency-by-group-table': 'Tables by Group',
       'segmentation-overview': 'Overview',
       'segmentation-groups': 'Group Comparison',
@@ -8258,6 +8258,10 @@ const StatisticoHeader = {
       'anova-diagnostics': 'Check residual assumptions, variance homogeneity, and influential patterns.',
       'anova-visuals': 'Use group plots to compare means, spread, intervals, and outliers visually.',
       'anova-report': 'Use report wording to verify the statistical story is coherent and complete.',
+      'contingency-by-group':
+        'This view examines the same row×column association separately within each grouping level, plus an Overall row for the included levels. χ², p, and Cramér’s V in each row describe that group only. They are not a test of whether the association differs between groups. Evidence is “association detected” vs “not detected” at α = 0.05. The expected-count check flags sparse cells that can make the χ² approximation unreliable in a subgroup even when Overall is acceptable. Strength bars are a descriptive comparison of V (0–1), not a homogeneity test.',
+      'contingency-by-group-table':
+        'Inspect the observed-count table for one group at a time. Total eligible N is all included levels; the displayed group n is that table’s total. Pills choose which table is shown. This is not a test of interaction or of difference between associations.',
 
       // Regression — workspace sub-views (chart-aware so the AI explanation
       // matches what the user actually sees, not the coefficients table).

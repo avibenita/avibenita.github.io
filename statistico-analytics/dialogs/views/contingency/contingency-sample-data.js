@@ -8,7 +8,7 @@
     assoc2x2: {
       id: 'assoc2x2',
       title: '2×2 with a clear association',
-      description: 'Treatment × Response. Expected χ² = 16.67, df = 1, V = 0.408, OR = 6. Site is available for Compare Groups.',
+      description: 'Treatment × Response. Expected χ² = 16.67, df = 1, V = 0.408, OR = 6. Site is available for By Group.',
       headers: ['Treatment', 'Response', 'Site'],
       rows: (function () {
         var r = [], i;

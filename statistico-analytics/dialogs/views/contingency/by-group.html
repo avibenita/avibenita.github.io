@@ -12,12 +12,12 @@
     }
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260908ctgroup" />
-  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260908ctgroup" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260909ctexplore" />
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260909ctexplore" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260908ctgroup"></script>
+  <script src="../shared-header.js?v=20260909ctexplore"></script>
   <script src="contingency-engine.js?v=20260814ct8"></script>
-  <script src="contingency-sample-data.js?v=20260908ctgroup"></script>
+  <script src="contingency-sample-data.js?v=20260909ctexplore"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -47,10 +47,13 @@
     select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
     button { cursor:pointer; font-weight:700; }
     .content { flex:1; min-height:0; overflow:hidden; padding:12px; display:flex; flex-direction:column; }
-    .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(110px, 1fr)); gap:10px; flex:0 0 auto; }
+    .summary-strip { display:grid; grid-template-columns:repeat(2, minmax(140px, 1fr)); gap:10px; flex:0 0 auto; }
+    .summary-strip.is-tables { grid-template-columns:repeat(3, minmax(140px, 1fr)); }
     .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
     .metric label { display:block; color:var(--accent-1); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
     .metric strong { display:block; margin-top:4px; font-size:18px; }
+    #metricSelectedWrap { display:none; }
+    .summary-strip.is-tables #metricSelectedWrap { display:block; }
     #mainContent { flex:1; min-height:0; display:none; flex-direction:column; gap:10px; }
     .ct-bg-panel { display:none; flex:1; min-height:0; flex-direction:column; gap:10px; overflow:hidden; }
     .ct-bg-panel.is-active { display:flex; }
@@ -61,8 +64,9 @@
     th.num, td.num { font-variant-numeric:tabular-nums; font-weight:700; text-align:right; }
     .assoc-table { width:100%; border-collapse:separate; border-spacing:0; }
     .assoc-table th.group-col, .assoc-table td.group-col { text-align:left; min-width:120px; }
-    .assoc-table th.read-col, .assoc-table td.read-col { text-align:left; min-width:180px; }
-    .assoc-table th.strength-col, .assoc-table td.strength-col { text-align:left; min-width:168px; width:22%; }
+    .assoc-table th.evidence-col, .assoc-table td.evidence-col { text-align:left; min-width:150px; }
+    .assoc-table th.check-col, .assoc-table td.check-col { text-align:left; min-width:168px; }
+    .assoc-table th.strength-col, .assoc-table td.strength-col { text-align:left; min-width:168px; width:18%; }
     .assoc-table th.num { min-width:64px; }
     .assoc-table tr.assoc-overall td {
       background:color-mix(in srgb, var(--accent-1) 14%, var(--surface-2));
@@ -85,6 +89,17 @@
     .v-bar-fill { display:block; height:100%; border-radius:999px; background:var(--accent-ct); }
     tr.assoc-overall .v-bar-fill { background:var(--accent-1); }
     .th-sub { display:block; margin-top:2px; font-size:10px; font-weight:700; letter-spacing:.02em; text-transform:none; color:var(--text-secondary); opacity:.9; }
+    .check-ok { color:var(--pos); font-weight:700; }
+    .check-caution { color:#fbbf24; font-weight:700; }
+    .check-bad { color:var(--neg); font-weight:700; }
+    .assoc-note {
+      flex:0 0 auto; margin:0; padding:2px 2px 0;
+      color:var(--text-secondary); font-size:12px; line-height:1.45;
+    }
+    .displayed-group {
+      color:var(--text-primary); font-size:13px; font-weight:700;
+    }
+    .displayed-group span { color:var(--text-secondary); font-weight:600; }
     .sig { color:var(--pos); }
     .ns { color:var(--text-secondary); }
     .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:var(--text-secondary); text-align:center; padding:24px; }
@@ -93,8 +108,9 @@
     .section-title strong { font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--accent-ct); }
     .section-title span { font-size:12px; color:var(--text-secondary); }
     .group-chips { display:flex; flex-wrap:wrap; gap:6px; }
-    .group-chip { border-radius:999px; padding:5px 10px; font-size:11px; }
+    .group-chip { border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700; }
     .group-chip.is-on { border-color:var(--accent-1); color:var(--text-primary); background:color-mix(in srgb, var(--accent-1) 18%, var(--surface-2)); }
+    .choose-group-btn.is-change { font-weight:700; }
     .ct-grid { font-size:14.5px; }
     .ct-grid th, .ct-grid td { text-align:right; }
     .ct-grid th.stub, .ct-grid td.stub { text-align:left; font-weight:800; }
@@ -134,11 +150,12 @@
     .level-n { font-size:11px; margin-left:auto; white-space:nowrap; }
     @media (max-width: 900px) {
       .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
+      .summary-strip.is-tables { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
       .group-dialog-body { grid-template-columns:1fr; }
     }
   </style>
 </head>
-<body data-page-version="20260908-ctgroup-v2">
+<body data-page-version="20260909-ctexplore-v1">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -147,24 +164,23 @@
         <div class="toolbar">
           <div class="title">
             <strong>Grouped Analysis</strong>
-            <span id="subtitle">Compare the same crosstab across group levels.</span>
+            <span id="subtitle">Examine the same association separately within each group.</span>
           </div>
           <div class="controls">
             <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
-            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
+            <button id="chooseGroupBtn" class="choose-group-btn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Grouping column</button>
           </div>
         </div>
         <div class="content">
           <div id="emptyState" class="empty">
             <i class="fa-solid fa-layer-group"></i>
-            Run Frequencies &amp; Crosstabs, then choose a grouping column to compare association across levels.
+            Run Frequencies &amp; Crosstabs, then choose a grouping column to examine the association within each group.
           </div>
           <div id="mainContent">
-            <div class="summary-strip">
-              <div class="metric"><label>Rows × columns</label><strong id="metricShape">—</strong></div>
-              <div class="metric"><label>Groups</label><strong id="metricGroups">—</strong></div>
-              <div class="metric"><label>Group column</label><strong id="metricGroupCol" style="font-size:14px;">—</strong></div>
-              <div class="metric"><label>Filtered rows</label><strong id="metricRows">—</strong></div>
+            <div class="summary-strip" id="summaryStrip">
+              <div class="metric"><label>Table dimensions</label><strong id="metricShape">—</strong></div>
+              <div class="metric"><label>Total eligible N</label><strong id="metricRows">—</strong></div>
+              <div class="metric" id="metricSelectedWrap"><label>Selected group N</label><strong id="metricSelected">—</strong></div>
             </div>
             <div class="ct-bg-panel is-active" id="ctByGroupPanel-association">
               <div class="table-wrap">
@@ -176,19 +192,21 @@
                       <th class="num">χ²</th>
                       <th class="num">df</th>
                       <th class="num">p</th>
-                      <th class="num">V</th>
-                      <th class="read-col">Reading</th>
-                      <th class="strength-col">Strength<span class="th-sub">Cramér’s V, 0–1</span></th>
+                      <th class="num">Cramér’s V</th>
+                      <th class="evidence-col">Evidence</th>
+                      <th class="check-col">Expected-count check</th>
+                      <th class="strength-col">Descriptive comparison<span class="th-sub">Cramér’s V, 0–1 · not a test of difference</span></th>
                     </tr>
                   </thead>
                   <tbody id="assocBody"></tbody>
                 </table>
               </div>
+              <p class="assoc-note">Each row examines the same association within that group. Separate χ², p, and V values do not test whether the association differs between groups.</p>
             </div>
             <div class="ct-bg-panel" id="ctByGroupPanel-table">
               <div class="section-title">
                 <strong>Observed counts</strong>
-                <span>Same row × column table, one group at a time. Overall uses the included levels only.</span>
+                <span id="displayedGroupLine" class="displayed-group">Select a group to display its table.</span>
               </div>
               <div class="group-chips" id="tableGroupChips"></div>
               <div class="table-wrap" id="crosstabWrap"></div>
@@ -204,7 +222,7 @@
       <div class="group-dialog-head">
         <div>
           <strong id="groupDialogTitle">Select Grouping Column</strong>
-          <span>Choose a third categorical column to split the same crosstab. Row, column, and weight variables are excluded.</span>
+          <span>Choose a third categorical column. The association is examined separately within each level — this is not a test of difference between groups.</span>
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -214,7 +232,7 @@
         <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to preview its levels and n.</div></div>
       </div>
       <div class="group-dialog-foot">
-        <button type="button" class="group-dialog-done-btn" onclick="confirmGroupDialog()"><i class="fa-solid fa-check"></i> Compare Groups</button>
+        <button type="button" class="group-dialog-done-btn" onclick="confirmGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
       </div>
     </div>
   </div>
@@ -322,14 +340,23 @@
       return Number.isFinite(v) ? Number(v).toFixed(d) : '—';
     }
 
-    function reading(result) {
-      if (!result || !result.analyzable) return result && result.error ? result.error : 'Not analyzable';
+    function evidenceLabel(result) {
+      if (!result || !result.analyzable) return { text: 'Not analyzable', cls: 'ns' };
       var p = result.tests && result.tests.pearson && result.tests.pearson.p;
-      var v = result.tests && result.tests.cramersV;
-      var assoc = Number.isFinite(p) && p < 0.05;
-      if (!Number.isFinite(v)) return assoc ? 'Association' : 'No clear association';
-      var strength = v < 0.1 ? 'negligible' : v < 0.3 ? 'weak' : v < 0.5 ? 'moderate' : 'strong';
-      return (assoc ? 'Associated' : 'Not significant') + ' · ' + strength + ' V';
+      if (!Number.isFinite(p)) return { text: 'Not analyzable', cls: 'ns' };
+      if (p < 0.05) return { text: 'Association detected', cls: 'sig' };
+      return { text: 'Association not detected', cls: 'ns' };
+    }
+
+    function expectedCountCheck(result) {
+      if (!result || !result.analyzable) return { text: '—', cls: 'ns', title: result && result.error ? result.error : '' };
+      var d = result.diagnostics || {};
+      var nLt5 = Number(d.nExpectedBelow5) || 0;
+      var title = d.assumptionWarning || '';
+      if (d.assumptionWarning) return { text: 'Approximation unreliable', cls: 'check-bad', title: title };
+      if (nLt5 === 1) return { text: '1 cell below 5', cls: 'check-caution', title: 'One expected count is below 5.' };
+      if (nLt5 > 1) return { text: nLt5 + ' cells below 5', cls: 'check-caution', title: nLt5 + ' expected counts are below 5.' };
+      return { text: 'Acceptable', cls: 'check-ok', title: 'No expected counts below 5.' };
     }
 
     function analyzeRows(rows) {
@@ -357,9 +384,17 @@
     }
 
     function updateGroupChoiceLabel() {
-      document.getElementById('groupChoiceLabel').textContent = !isValidGroupIndex(groupIndex)
-        ? 'No grouping column selected'
-        : 'Group by: ' + (sourceHeaders[groupIndex] || 'Group');
+      var hasGroup = isValidGroupIndex(groupIndex);
+      var btn = document.getElementById('chooseGroupBtn');
+      document.getElementById('groupChoiceLabel').textContent = hasGroup
+        ? 'Grouped by ' + (sourceHeaders[groupIndex] || 'Group')
+        : 'No grouping column selected';
+      if (btn) {
+        btn.classList.toggle('is-change', hasGroup);
+        btn.innerHTML = hasGroup
+          ? '<i class="fa-solid fa-pen"></i> Change'
+          : '<i class="fa-solid fa-layer-group"></i> Grouping column';
+      }
     }
 
     function populateGroupChoices() {
@@ -507,9 +542,30 @@
       var pct = Number.isFinite(n) ? Math.max(0, Math.min(100, n * 100)) : 0;
       var label = Number.isFinite(n) ? n.toFixed(3) : '—';
       var title = Number.isFinite(n)
-        ? 'Cramér’s V = ' + label + ' (0 = no association, 1 = complete association)'
+        ? 'Descriptive Cramér’s V = ' + label + ' (0 = none, 1 = complete). Not a test of difference between groups.'
         : 'Cramér’s V not available';
       return '<div class="v-bar" title="' + escapeHtml(title) + '"><span class="v-bar-track"><span class="v-bar-fill" style="width:' + pct.toFixed(1) + '%"></span></span></div>';
+    }
+
+    function resultN(item) {
+      if (item && item.result && item.result.N != null) return item.result.N;
+      return item && item.n != null ? item.n : '—';
+    }
+
+    function updateSummaryCards() {
+      var strip = document.getElementById('summaryStrip');
+      if (strip) strip.classList.toggle('is-tables', ctByGroupPanel === 'table');
+      var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
+      var selectedEl = document.getElementById('metricSelected');
+      if (selectedEl) selectedEl.textContent = current ? String(resultN(current)) : '—';
+      var line = document.getElementById('displayedGroupLine');
+      if (line) {
+        if (!current) {
+          line.textContent = 'Select a group to display its table.';
+        } else {
+          line.innerHTML = 'Displayed group: ' + escapeHtml(current.label) + ' <span>· n = ' + escapeHtml(String(resultN(current))) + '</span>';
+        }
+      }
     }
 
     function showContingencyByGroupPanel(panel) {
@@ -518,6 +574,7 @@
       document.querySelectorAll('.ct-bg-panel').forEach(function (el) {
         el.classList.toggle('is-active', el.id === 'ctByGroupPanel-' + ctByGroupPanel);
       });
+      updateSummaryCards();
       if (ctByGroupPanel === 'table') renderCrosstab();
     }
 
@@ -526,8 +583,9 @@
       var chips = document.getElementById('tableGroupChips');
       var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
       chips.innerHTML = groupResults.map(function (item) {
-        return '<button type="button" class="group-chip' + (item.key === (current && current.key) ? ' is-on' : '') + '" onclick="selectTableGroup(\'' + encodeURIComponent(item.key) + '\')">' + escapeHtml(item.label) + '</button>';
+        return '<button type="button" class="group-chip' + (item.key === (current && current.key) ? ' is-on' : '') + '" onclick="selectTableGroup(\'' + encodeURIComponent(item.key) + '\')">' + escapeHtml(item.label) + ' · ' + escapeHtml(String(resultN(item))) + '</button>';
       }).join('');
+      updateSummaryCards();
       if (!current || !current.result || !current.result.analyzable) {
         wrap.innerHTML = '<div class="empty"><i class="fa-solid fa-table"></i>No table for this group.</div>';
         return;
@@ -554,16 +612,16 @@
 
     function renderByGroup() {
       if (!spec.rowVar || !spec.colVar) {
-        setEmpty('Run Frequencies & Crosstabs first, then open Compare Groups.');
+        setEmpty('Run Frequencies & Crosstabs first, then open By Group.');
         return;
       }
       if (!sourceHeaders.length) {
-        setEmpty('The original sheet was not available. Re-run the analysis, then open Compare Groups.');
+        setEmpty('The original sheet was not available. Re-run the analysis, then open By Group.');
         return;
       }
       var candidates = sourceHeaders.filter(function (h) { return !isAnalysisHeader(h); });
       if (!candidates.length) {
-        setEmpty('Compare Groups needs a third column (for example site, sex, or wave) besides the row and column variables.');
+        setEmpty('By Group needs a third column (for example site, sex, or wave) besides the row and column variables.');
         return;
       }
       if (!isValidGroupIndex(groupIndex)) {
@@ -592,33 +650,35 @@
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'flex';
       document.getElementById('metricShape').textContent = overall.analyzable ? (overall.nRows + ' × ' + overall.nCols) : '—';
-      document.getElementById('metricGroups').textContent = String(levels.length);
-      document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
-      document.getElementById('metricRows').textContent = String(overallRows.length);
-      document.getElementById('subtitle').textContent = (spec.rowVar || 'Rows') + ' × ' + (spec.colVar || 'Columns') + ' · By ' + sourceHeaders[groupIndex];
+      document.getElementById('metricRows').textContent = String(overall.analyzable && overall.N != null ? overall.N : overallRows.length);
+      document.getElementById('subtitle').textContent = (spec.rowVar || 'Rows') + ' × ' + (spec.colVar || 'Columns') + ' within ' + sourceHeaders[groupIndex];
       var groupName = sourceHeaders[groupIndex] || 'group';
       var rowsHtml = groupResults.map(function (item) {
         var res = item.result || {};
         var tests = res.tests || {};
         var pearson = tests.pearson || {};
         var pClass = Number.isFinite(pearson.p) && pearson.p < 0.05 ? 'sig' : 'ns';
-        var warn = res.diagnostics && res.diagnostics.assumptionWarning ? ' title="' + escapeHtml(res.diagnostics.assumptionWarning) + '"' : '';
+        var evidence = evidenceLabel(res);
+        var check = expectedCountCheck(res);
+        var warn = check.title ? ' title="' + escapeHtml(check.title) + '"' : '';
         var rowClass = item.key === 'overall' ? 'assoc-overall' : 'assoc-level';
         return '<tr class="' + rowClass + '"' + warn + '>' +
           '<td class="group-col">' + escapeHtml(item.label) + '</td>' +
-          '<td class="num">' + (res.N != null ? res.N : item.n) + '</td>' +
+          '<td class="num">' + resultN(item) + '</td>' +
           '<td class="num">' + fmtNum(pearson.stat, 2) + '</td>' +
           '<td class="num">' + (Number.isFinite(pearson.df) ? pearson.df : '—') + '</td>' +
           '<td class="num ' + pClass + '">' + fmtP(pearson.p) + '</td>' +
           '<td class="num">' + fmtNum(tests.cramersV, 3) + '</td>' +
-          '<td class="read-col">' + escapeHtml(reading(res)) + '</td>' +
+          '<td class="evidence-col ' + evidence.cls + '">' + escapeHtml(evidence.text) + '</td>' +
+          '<td class="check-col ' + check.cls + '">' + escapeHtml(check.text) + '</td>' +
           '<td class="strength-col">' + strengthHtml(tests.cramersV) + '</td></tr>';
       });
       if (rowsHtml.length > 1) {
-        rowsHtml.splice(1, 0, '<tr class="assoc-split"><td colspan="8">Levels of ' + escapeHtml(groupName) + '</td></tr>');
+        rowsHtml.splice(1, 0, '<tr class="assoc-split"><td colspan="9">Levels of ' + escapeHtml(groupName) + '</td></tr>');
       }
       document.getElementById('assocBody').innerHTML = rowsHtml.join('');
       if (!groupResults.some(function (item) { return item.key === tableGroupKey; })) tableGroupKey = 'overall';
+      updateSummaryCards();
       renderCrosstab();
       showContingencyByGroupPanel(ctByGroupPanel);
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
@@ -728,7 +788,7 @@
       var ok = loadNavData() || bootDemoFallback();
       startBridge();
       if (!ok) {
-        setEmpty('Run Frequencies & Crosstabs first, then open Compare Groups.');
+        setEmpty('Run Frequencies & Crosstabs first, then open By Group.');
         return;
       }
       populateGroupChoices();

@@ -2167,7 +2167,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260909ctfacet',
+  _TAB_ASSET_VER: '20260909ctsim',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -2216,7 +2216,7 @@ const StatisticoHeader = {
       + '#uniResultsViewTabs, .uni-results-tab-stack, .ws-shell--view-tabs,'
       + '.navrow-tabs, .sb-facets'
     ).forEach((n) => n.remove());
-    bodyClone.querySelectorAll('.sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading, #dspHelpModal').forEach((n) => n.remove());
+    bodyClone.querySelectorAll('.sb-ai-float-btn, .sb-ai-overlay, .loading-overlay, #dialogLoading, #dspHelpModal, #ctSimHelpModal, #corrSimHelpModal').forEach((n) => n.remove());
     bodyClone.querySelectorAll('button, select, input, textarea').forEach((el) => {
       el.setAttribute('disabled', 'disabled');
       el.setAttribute('tabindex', '-1');
@@ -3418,12 +3418,15 @@ const StatisticoHeader = {
     if (this.module === 'contingency' && this.currentView === 'contingency-by-group') {
       return {
         ariaLabel: 'Frequencies by group views',
+        inviteTabKey: 'contingency-by-group-similarity',
+        seenKey: 'statistico.contingency.similarityProfile.seen',
         getActive: () => globalThis.__contingencyByGroupActiveTab || 'association',
         onSelect: (panel) => this.setContingencyByGroupResultsTab(panel),
         tabs: [
           { tabKey: 'contingency-by-group-association', label: 'Association table', icon: 'fa-table', panel: 'association', caption: 'Examine the same association separately within each group. χ², p and V are not a test of whether groups differ.' },
           { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', caption: 'Compare all groups in one table, or inspect a single group. Column % is the comparison default.' },
-          { tabKey: 'contingency-by-group-chart', label: 'Chart', icon: 'fa-chart-column', panel: 'chart', caption: 'Faceted 100% stacked distributions and residual heat maps with shared scales. Descriptive only.' }
+          { tabKey: 'contingency-by-group-chart', label: 'Chart', icon: 'fa-chart-column', panel: 'chart', caption: 'Faceted 100% stacked distributions and residual heat maps with shared scales. Descriptive only.' },
+          { tabKey: 'contingency-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in association pattern, strength and residual sign.', badge: 'STATISTICO', help: true }
         ]
       };
     }
@@ -3448,6 +3451,8 @@ const StatisticoHeader = {
   },
 
   setContingencyByGroupResultsTab(panel) {
+    const cfg = this._getByGroupExploreConfig();
+    if (cfg && panel === 'similarity') this._markSimilarityProfileSeen(cfg.seenKey);
     if (typeof globalThis.showContingencyByGroupPanel === 'function') {
       globalThis.showContingencyByGroupPanel(panel);
     } else {
@@ -8005,6 +8010,7 @@ const StatisticoHeader = {
       const tab = globalThis.__contingencyByGroupActiveTab || 'association';
       if (tab === 'table') return 'contingency-by-group-table';
       if (tab === 'chart') return 'contingency-by-group-chart';
+      if (tab === 'similarity') return 'contingency-by-group-similarity';
       return 'contingency-by-group';
     }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
@@ -8086,6 +8092,7 @@ const StatisticoHeader = {
       'contingency-by-group-association': 'Association table',
       'contingency-by-group-table': 'Tables by Group',
       'contingency-by-group-chart': 'Charts by Group',
+      'contingency-by-group-similarity': 'Similarity Profile™',
       'segmentation-overview': 'Overview',
       'segmentation-groups': 'Group Comparison',
       'segmentation-change': 'Change',
@@ -8268,6 +8275,8 @@ const StatisticoHeader = {
         'All groups together places each grouping level side by side under a two-level header (row variable × column variable within each level). Column % is the comparison default because groups and column categories can differ in size. Count, Row %, and adjusted residuals are also available. Pills switch between the combined table, Overall, and a single level. Combined comparison is the default for 2–3 levels, optional with horizontal scrolling for 4–6, and hidden above 6. This remains descriptive — it is not a test that associations differ between groups.',
       'contingency-by-group-chart':
         'Distribution shows one 100% stacked bar panel per grouping level, with identical 0–100% scales. Within a panel, column-variable categories sit side by side and row-variable levels are stacked segments, so you can compare composition across both grouping and treatment. Association pattern shows adjusted-residual heat maps for the same levels on one shared colour scale. Neither chart tests whether associations differ between groups.',
+      'contingency-by-group-similarity':
+        'Similarity Profile™ compares group association structures (Overall omitted) on pattern (Tucker congruence of aligned adjusted residuals), strength (Cramér’s V ratio), and residual-sign agreement. Scores are 0–100 descriptive similarity, not a homogeneity or interaction test. Click heatmap cells or table rows for the three-component profile. 90–100 Very similar, 75–89 Mostly similar, 50–74 Mixed similarity, below 50 Substantially different.',
 
       // Regression — workspace sub-views (chart-aware so the AI explanation
       // matches what the user actually sees, not the coefficients table).

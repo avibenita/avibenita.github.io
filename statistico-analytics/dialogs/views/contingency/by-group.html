@@ -12,12 +12,13 @@
     }
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260909ctfacet" />
-  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260909ctfacet" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260909ctsim" />
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260909ctsim" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260909ctfacet"></script>
+  <script src="../shared-header.js?v=20260909ctsim"></script>
   <script src="contingency-engine.js?v=20260814ct8"></script>
-  <script src="contingency-sample-data.js?v=20260909ctfacet"></script>
+  <script src="contingency-sample-data.js?v=20260909ctsim"></script>
+  <script src="../../shared/contingency-similarity.js?v=20260909ctsim"></script>
   <script src="../shared/vendor/highcharts/highcharts.js"></script>
   <style>
     :root {
@@ -159,6 +160,115 @@
     .heat-table { width:100%; font-size:13px; }
     .heat-table th, .heat-table td { text-align:center; padding:8px 8px; }
     .heat-table th.stub, .heat-table td.stub { text-align:left; font-weight:800; }
+    #ctByGroupPanel-similarity.is-active { display:block; overflow:auto; }
+    .dsp-kpis { display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom:12px; }
+    .dsp-kpi {
+      width:100%; box-sizing:border-box;
+      background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; cursor:pointer;
+      text-align:left; color:inherit;
+    }
+    .dsp-kpi:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
+    .dsp-kpi.is-active { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 40%, transparent); }
+    .dsp-kpi:disabled { opacity:.5; cursor:not-allowed; }
+    .dsp-kpi-label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .dsp-kpi-value { color:var(--accent-1); font-size:22px; font-weight:800; margin-top:4px; line-height:1.1; }
+    .dsp-kpi-note { color:var(--text-secondary); font-size:11px; margin-top:4px; line-height:1.35; }
+    .dsp-split { display:grid; grid-template-columns:minmax(280px, 1.1fr) minmax(280px, 0.9fr); gap:12px; align-items:start; }
+    .dsp-card { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:10px; min-width:0; }
+    .dsp-subhead { color:var(--accent-1); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin:0 0 8px; }
+    .dsp-heat-wrap { overflow:auto; max-height:min(420px, 52vh); }
+    .dsp-heat { border-collapse:collapse; font-size:11px; min-width:100%; }
+    .dsp-heat th, .dsp-heat td { padding:6px 7px; text-align:center; border:1px solid var(--border); white-space:nowrap; }
+    .dsp-heat th { position:sticky; top:0; z-index:1; background:var(--surface-1); color:var(--accent-1); font-size:10px; }
+    .dsp-heat th:first-child, .dsp-heat td:first-child { text-align:left; position:sticky; left:0; z-index:2; background:var(--surface-1); font-weight:700; }
+    .dsp-heat td[data-a] { cursor:pointer; font-weight:700; }
+    .dsp-heat td.is-selected { outline:2px solid var(--accent-1); outline-offset:-2px; }
+    .dsp-legend { display:flex; align-items:center; gap:8px; margin-top:8px; color:var(--text-secondary); font-size:10px; }
+    .dsp-legend-bar {
+      flex:1; height:8px; border-radius:99px;
+      background:linear-gradient(90deg, rgba(251,113,133,.55), rgba(251,191,36,.55), rgba(45,212,191,.75));
+    }
+    .dsp-bars { display:flex; flex-direction:column; gap:8px; margin:8px 0 12px; }
+    .dsp-bar-row { display:grid; grid-template-columns:84px 1fr 42px; gap:8px; align-items:center; font-size:12px; }
+    .dsp-bar-track { height:8px; border-radius:99px; background:rgba(148,163,184,.18); overflow:hidden; }
+    .dsp-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, var(--accent-2), var(--accent-1)); }
+    .dsp-band { font-size:12px; font-weight:700; }
+    .dsp-band--very { color:#34d399; }
+    .dsp-band--mostly { color:#38bdf8; }
+    .dsp-band--mixed { color:#fbbf24; }
+    .dsp-band--different { color:#fb7185; }
+    .dsp-band--na { color:var(--text-secondary); }
+    .dsp-footnote { display:block; margin-top:8px; color:var(--text-secondary); font-size:11px; line-height:1.45; }
+    .dsp-info-btn {
+      width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center;
+      margin-left:6px; vertical-align:middle; padding:0;
+      border:1px solid rgba(120,200,255,.45); border-radius:999px;
+      color:var(--accent-2); background:rgba(120,200,255,.08);
+      font-size:10px; font-weight:700; cursor:pointer; text-transform:none; letter-spacing:0;
+    }
+    .dsp-help-modal {
+      display:none; position:fixed; inset:0; z-index:2147483300;
+      align-items:center; justify-content:center; padding:16px;
+      background:rgba(3,7,18,.64); backdrop-filter:blur(3px);
+    }
+    .dsp-help-modal.is-open { display:flex; }
+    .dsp-help-box {
+      width:min(640px, 96vw); max-height:min(86vh, 760px); overflow:auto;
+      background:var(--surface-1); border:1px solid var(--border); color:var(--text-primary);
+      border-radius:14px; padding:22px 24px 20px; position:relative;
+      box-shadow:0 24px 70px rgba(0,0,0,.42);
+    }
+    .dsp-help-close {
+      position:absolute; top:12px; right:12px; width:30px; height:30px;
+      display:flex; align-items:center; justify-content:center; padding:0;
+      border-radius:8px; background:var(--surface-2); border:1px solid var(--border);
+      color:var(--text-secondary); cursor:pointer; font-size:14px;
+    }
+    .dsp-help-box h3 { margin:0 12px 6px 0; font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px; }
+    .dsp-help-box h3 i { color:var(--accent-1); }
+    .dsp-help-sub { margin:0 0 12px; font-size:13px; color:var(--text-secondary); line-height:1.45; }
+    .dsp-help-callout {
+      margin:0 0 14px; padding:10px 12px; border-radius:10px;
+      background:color-mix(in srgb, var(--accent-1) 12%, var(--surface-2));
+      border:1px solid color-mix(in srgb, var(--accent-1) 38%, var(--border));
+      color:var(--text-primary); font-size:13px; line-height:1.5;
+    }
+    .dsp-help-callout strong { color:var(--accent-1); }
+    .dsp-help-rule { display:grid; grid-template-columns:34px 1fr; gap:0 12px; padding:12px 0; border-top:1px solid var(--border); }
+    .dsp-help-icon {
+      width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+      background:color-mix(in srgb, var(--accent-2) 16%, var(--surface-2)); color:var(--accent-2); font-size:14px;
+    }
+    .dsp-help-rule h4 { margin:0 0 4px; font-size:13.5px; }
+    .dsp-help-rule p { margin:0; font-size:13px; line-height:1.55; color:var(--text-secondary); }
+    .dsp-pair-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); max-height:calc(36px + 12 * 33px); }
+    .dsp-pair-table { width:100%; border-collapse:collapse; min-width:640px; }
+    .dsp-pair-table th, .dsp-pair-table td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; }
+    .dsp-pair-table th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
+    .dsp-pair-table th:first-child, .dsp-pair-table td:first-child { text-align:left; }
+    .dsp-pair-table tbody tr { cursor:pointer; }
+    .dsp-pair-table tbody tr:hover td { background:rgba(129,140,248,.12); }
+    .dsp-pair-table tbody tr.is-selected td { background:rgba(129,140,248,.16); }
+    .dsp-score { font-weight:800; }
+    .ct-sim-svg { display:block; width:100%; max-width:420px; height:auto; }
+    .ct-sim-svg .scatter-bg { fill:rgba(0,0,0,.16); stroke:var(--border); stroke-width:1; }
+    html[data-theme="light"] .ct-sim-svg .scatter-bg { fill:rgba(15,23,42,.03); }
+    .ct-sim-svg .scatter-grid { stroke:var(--border); stroke-width:1; opacity:.5; }
+    .ct-sim-svg .scatter-tick {
+      fill:var(--text-secondary); font-size:10px; font-weight:650;
+      font-variant-numeric:tabular-nums;
+    }
+    .ct-sim-svg .scatter-tick-y { text-anchor:end; }
+    .ct-sim-svg .scatter-axis-label {
+      fill:var(--text-primary); font-size:11px; font-weight:800; text-anchor:middle;
+    }
+    .ct-sim-svg .sim-diag { stroke:rgba(255,255,255,.42); stroke-width:1.4; stroke-dasharray:4 4; }
+    html[data-theme="light"] .ct-sim-svg .sim-diag { stroke:rgba(15,23,42,.35); }
+    .ct-sim-svg .sim-dot { stroke:#0c1624; stroke-width:1; }
+    html[data-theme="light"] .ct-sim-svg .sim-dot { stroke:#fff; }
+    @media (max-width: 980px) {
+      .dsp-kpis, .dsp-split { grid-template-columns:1fr; }
+    }
     .group-dialog-overlay { display:none; position:fixed; inset:0; z-index:8000; background:rgba(2,6,23,.62); align-items:center; justify-content:center; padding:16px; }
     .group-dialog-overlay.is-visible { display:flex; }
     .group-dialog { width:min(920px,96vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
@@ -200,7 +310,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260909-ctfacet-v1">
+<body data-page-version="20260909-ctsim-v1">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -270,6 +380,48 @@
               <div class="facet-grid" id="chartCanvas"></div>
               <p class="assoc-note" id="chartNote">Each panel uses the same scale so group levels can be compared visually. This is not a test that associations differ between groups.</p>
             </div>
+            <div class="ct-bg-panel" id="ctByGroupPanel-similarity">
+              <div class="section-title">
+                <strong>Similarity Profile™<button type="button" class="dsp-info-btn" onclick="openCtSimHelp()" aria-label="About Similarity Profile">i</button></strong>
+                <span>How similar groups are in association pattern, strength, and residual sign — a description, not a significance test</span>
+              </div>
+              <div id="ctSimEmpty" class="empty" style="display:none;">
+                <i class="fa-solid fa-clone"></i>
+                Similarity Profile needs at least two group levels with analyzable tables. Overall is omitted.
+              </div>
+              <div id="ctSimMain" style="display:none;">
+                <div class="dsp-kpis" id="ctSimKpis"></div>
+                <div class="dsp-split">
+                  <div class="dsp-card">
+                    <div class="dsp-subhead">Overall pairwise similarity</div>
+                    <div class="dsp-heat-wrap" id="ctSimHeatWrap"></div>
+                    <div class="dsp-legend"><span>0</span><div class="dsp-legend-bar" aria-hidden="true"></div><span>100</span></div>
+                  </div>
+                  <div class="dsp-card">
+                    <div class="dsp-subhead" id="ctSimProfileTitle">Pair profile</div>
+                    <div id="ctSimProfileBody"></div>
+                    <div id="ctSimChart"></div>
+                  </div>
+                </div>
+                <div class="section-title" style="margin-top:14px;"><strong>Pairwise scores</strong><span>Click a row or heatmap cell to open the three-component profile</span></div>
+                <div class="dsp-pair-wrap">
+                  <table class="dsp-pair-table" id="ctSimPairTable">
+                    <thead>
+                      <tr>
+                        <th>Groups</th>
+                        <th>Overall</th>
+                        <th>Pattern</th>
+                        <th>Strength</th>
+                        <th>Sign</th>
+                        <th>Reading</th>
+                      </tr>
+                    </thead>
+                    <tbody id="ctSimPairBody"></tbody>
+                  </table>
+                </div>
+                <em class="dsp-footnote">90–100 Very similar · 75–89 Mostly similar · 50–74 Mixed similarity · below 50 Substantially different. Combined score uses a geometric mean so one weak component is not hidden by two strong ones. This is not a test that associations differ between groups.</em>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -296,6 +448,54 @@
     </div>
   </div>
 
+  <div class="dsp-help-modal" id="ctSimHelpModal" role="dialog" aria-modal="true" aria-labelledby="ctSimHelpTitle">
+    <div class="dsp-help-box">
+      <button type="button" class="dsp-help-close" onclick="closeCtSimHelp()" aria-label="Close help">✕</button>
+      <h3 id="ctSimHelpTitle"><i class="fa-solid fa-clone"></i> Similarity Profile™</h3>
+      <p class="dsp-help-sub">How to read Similarity Profile™ for frequencies and crosstabs by group.</p>
+      <div class="dsp-help-callout">
+        This is a <strong>practical, non-academic approach original to Statistico</strong>.
+        It is not a published coefficient, not a p-value, and not a substitute for a homogeneity or interaction test.
+        Use it to describe how alike group association structures look in applied work.
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-lightbulb"></i></div>
+        <div>
+          <h4>What it is for</h4>
+          <p>After you split the same row×column table by a grouping column, Similarity Profile™ asks: which groups share the same association structure, and which stand apart? It compares every pair of group levels (Overall omitted) on pattern, strength, and residual sign, then rates them from 0 to 100.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-sliders"></i></div>
+        <div>
+          <h4>The three components</h4>
+          <p><b>Pattern</b> — do the same cells stand out? Tucker congruence of aligned adjusted residuals.<br>
+          <b>Strength</b> — is Cramér’s V similar across groups?<br>
+          <b>Sign</b> — do cells agree on over- vs under-representation (or both stay near independence, |residual| &lt; 1)?<br>
+          <b>Overall</b> combines the three with a geometric mean, so one weak component is not hidden by two strong ones.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-ruler"></i></div>
+        <div>
+          <h4>How to read the scores</h4>
+          <p><b>90–100</b> Very similar<br>
+          <b>75–89</b> Mostly similar<br>
+          <b>50–74</b> Mixed similarity<br>
+          <b>Below 50</b> Substantially different<br>
+          Click a heatmap cell or table row to see why a pair scored that way. The scatter plots each cell’s adjusted residual in one group against the other; the diagonal is a perfect match.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-ban"></i></div>
+        <div>
+          <h4>What it is not</h4>
+          <p>It does not test whether the association differs significantly between groups. Treat these scores as an effect-size style description of practical similarity, designed here for Statistico.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     var sourceHeaders = [];
     var sourceRows = [];
@@ -315,6 +515,8 @@
     var chartMode = 'distribution';
     var facetCharts = [];
     var chartRenderToken = 0;
+    var ctSimProfile = null;
+    var selectedCtSimPair = null;
     var ctByGroupPanel = 'association';
     window.__contingencyByGroupActiveTab = 'association';
     var TABLE_MEASURES = [
@@ -793,7 +995,8 @@
     }
 
     function showContingencyByGroupPanel(panel) {
-      ctByGroupPanel = panel === 'table' || panel === 'chart' ? panel : 'association';
+      var allowed = { association: 1, table: 1, chart: 1, similarity: 1 };
+      ctByGroupPanel = allowed[panel] ? panel : 'association';
       window.__contingencyByGroupActiveTab = ctByGroupPanel;
       document.querySelectorAll('.ct-bg-panel').forEach(function (el) {
         el.classList.toggle('is-active', el.id === 'ctByGroupPanel-' + ctByGroupPanel);
@@ -801,6 +1004,7 @@
       updateSummaryCards();
       if (ctByGroupPanel === 'table') renderCrosstab();
       if (ctByGroupPanel === 'chart') renderCharts();
+      if (ctByGroupPanel === 'similarity') renderCtSimilarity();
     }
 
     function renderMeasureChips() {
@@ -1071,6 +1275,286 @@
       renderCharts();
     }
 
+    function openCtSimHelp() {
+      var modal = document.getElementById('ctSimHelpModal');
+      if (modal) modal.classList.add('is-open');
+    }
+
+    function closeCtSimHelp() {
+      var modal = document.getElementById('ctSimHelpModal');
+      if (modal) modal.classList.remove('is-open');
+    }
+
+    function simPairKey(a, b) {
+      return String(a) + '\u0000' + String(b);
+    }
+
+    function dspFmt(score) {
+      return Number.isFinite(score) ? score.toFixed(1) : '—';
+    }
+
+    function dspScoreColor(score) {
+      if (!Number.isFinite(score)) return 'transparent';
+      var t = Math.max(0, Math.min(100, score)) / 100;
+      if (t < 0.5) {
+        var u = t / 0.5;
+        var g = Math.round(113 + (191 - 113) * u);
+        var b = Math.round(133 + (36 - 133) * u);
+        return 'rgba(251,' + g + ',' + b + ',' + (0.16 + t * 0.42).toFixed(2) + ')';
+      }
+      var u2 = (t - 0.5) / 0.5;
+      var r = Math.round(251 + (45 - 251) * u2);
+      var g2 = Math.round(191 + (212 - 191) * u2);
+      var b2 = Math.round(36 + (191 - 36) * u2);
+      return 'rgba(' + r + ',' + g2 + ',' + b2 + ',' + (0.2 + t * 0.4).toFixed(2) + ')';
+    }
+
+    function cellLabelList(frame) {
+      var labels = [];
+      (frame.rowLabels || []).forEach(function (r) {
+        (frame.colLabels || []).forEach(function (c) {
+          labels.push(r + ' × ' + c);
+        });
+      });
+      return labels;
+    }
+
+    function flattenResiduals(res, frame) {
+      return (frame.rowLabels || []).reduce(function (acc, r) {
+        (frame.colLabels || []).forEach(function (c) {
+          var v = cellMeasure(res, 'residual', r, c);
+          acc.push(Number.isFinite(v) ? v : NaN);
+        });
+        return acc;
+      }, []);
+    }
+
+    function buildCtSimGroups() {
+      var frame = canonicalFrame();
+      var labels = cellLabelList(frame);
+      return includedLevelItems().map(function (item) {
+        var res = item.result || {};
+        var v = res.tests && Number.isFinite(res.tests.cramersV) ? res.tests.cramersV : NaN;
+        return {
+          group: item.label,
+          n: resultN(item),
+          v: v,
+          residuals: flattenResiduals(res, frame),
+          labels: labels
+        };
+      });
+    }
+
+    function findCtSimPair(a, b) {
+      if (!ctSimProfile) return null;
+      return ctSimProfile.pairs.find(function (p) {
+        return (p.a === a && p.b === b) || (p.a === b && p.b === a);
+      }) || null;
+    }
+
+    function selectCtSimPair(a, b) {
+      var pair = findCtSimPair(a, b);
+      selectedCtSimPair = pair ? { a: pair.a, b: pair.b } : null;
+      renderCtSimKpis();
+      renderCtSimHeatmap();
+      renderCtSimPairTable();
+      renderCtSimProfile();
+    }
+
+    function renderCtSimilarity() {
+      var empty = document.getElementById('ctSimEmpty');
+      var main = document.getElementById('ctSimMain');
+      if (!empty || !main) return;
+      if (typeof StatisticoContingencySimilarity === 'undefined') {
+        ctSimProfile = null;
+        empty.style.display = 'flex';
+        main.style.display = 'none';
+        return;
+      }
+      ctSimProfile = StatisticoContingencySimilarity.buildProfile(buildCtSimGroups());
+      if (!ctSimProfile.usablePairCount) {
+        selectedCtSimPair = null;
+        empty.style.display = 'flex';
+        main.style.display = 'none';
+        return;
+      }
+      empty.style.display = 'none';
+      main.style.display = 'block';
+      if (selectedCtSimPair && !findCtSimPair(selectedCtSimPair.a, selectedCtSimPair.b)) selectedCtSimPair = null;
+      if (!selectedCtSimPair && ctSimProfile.mostSimilar) {
+        selectedCtSimPair = { a: ctSimProfile.mostSimilar.a, b: ctSimProfile.mostSimilar.b };
+      }
+      renderCtSimKpis();
+      renderCtSimHeatmap();
+      renderCtSimPairTable();
+      renderCtSimProfile();
+    }
+
+    function renderCtSimKpis() {
+      var host = document.getElementById('ctSimKpis');
+      if (!host || !ctSimProfile) return;
+      var similar = ctSimProfile.mostSimilar;
+      var distinct = ctSimProfile.mostDistinct;
+      var homo = ctSimProfile.homogeneity;
+      var outlier = ctSimProfile.mostDifferentGroup;
+      var selectedKey = selectedCtSimPair ? simPairKey(selectedCtSimPair.a, selectedCtSimPair.b) : '';
+      var similarKey = similar ? simPairKey(similar.a, similar.b) : '';
+      var distinctKey = distinct ? simPairKey(distinct.a, distinct.b) : '';
+      host.innerHTML = [
+        '<button type="button" class="dsp-kpi' + (similar && selectedKey === similarKey ? ' is-active' : '') + '" data-kpi="similar"' + (similar ? '' : ' disabled') + '>' +
+          '<div class="dsp-kpi-label">Most similar pair</div>' +
+          '<div class="dsp-kpi-value">' + (similar ? dspFmt(similar.overall) : '—') + '</div>' +
+          '<div class="dsp-kpi-note">' + (similar ? escapeHtml(similar.a) + ' · ' + escapeHtml(similar.b) : 'Need two groups') + '</div>' +
+        '</button>',
+        '<button type="button" class="dsp-kpi' + (distinct && selectedKey === distinctKey ? ' is-active' : '') + '" data-kpi="distinct"' + (distinct ? '' : ' disabled') + '>' +
+          '<div class="dsp-kpi-label">Most distinct pair</div>' +
+          '<div class="dsp-kpi-value">' + (distinct ? dspFmt(distinct.overall) : '—') + '</div>' +
+          '<div class="dsp-kpi-note">' + (distinct ? escapeHtml(distinct.a) + ' · ' + escapeHtml(distinct.b) : 'Need two groups') + '</div>' +
+        '</button>',
+        '<div class="dsp-kpi" style="cursor:default;">' +
+          '<div class="dsp-kpi-label">Group homogeneity</div>' +
+          '<div class="dsp-kpi-value">' + dspFmt(homo) + '</div>' +
+          '<div class="dsp-kpi-note">' + escapeHtml((ctSimProfile.homogeneityBand && ctSimProfile.homogeneityBand.label) || 'Across all pairs') + '</div>' +
+        '</div>',
+        '<div class="dsp-kpi" style="cursor:default;">' +
+          '<div class="dsp-kpi-label">Most different group</div>' +
+          '<div class="dsp-kpi-value">' + (outlier ? escapeHtml(String(outlier.group)) : '—') + '</div>' +
+          '<div class="dsp-kpi-note">' + (outlier ? 'mean similarity ' + dspFmt(outlier.meanSimilarity) : 'Need two groups') + '</div>' +
+        '</div>'
+      ].join('');
+      var similarBtn = host.querySelector('[data-kpi="similar"]');
+      var distinctBtn = host.querySelector('[data-kpi="distinct"]');
+      if (similarBtn && similar) similarBtn.onclick = function () { selectCtSimPair(similar.a, similar.b); };
+      if (distinctBtn && distinct) distinctBtn.onclick = function () { selectCtSimPair(distinct.a, distinct.b); };
+    }
+
+    function renderCtSimHeatmap() {
+      var wrap = document.getElementById('ctSimHeatWrap');
+      if (!wrap || !ctSimProfile) return;
+      var names = ctSimProfile.groups || [];
+      var html = '<table class="dsp-heat"><thead><tr><th></th>';
+      names.forEach(function (name) {
+        var label = String(name);
+        html += '<th title="' + escapeHtml(label) + '">' + escapeHtml(label.length > 12 ? label.slice(0, 11) + '…' : label) + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+      names.forEach(function (rowName, r) {
+        var rowLabel = String(rowName);
+        html += '<tr><th title="' + escapeHtml(rowLabel) + '">' + escapeHtml(rowLabel.length > 14 ? rowLabel.slice(0, 13) + '…' : rowLabel) + '</th>';
+        names.forEach(function (colName, c) {
+          if (r === c) {
+            html += '<td style="opacity:.4;">—</td>';
+            return;
+          }
+          var cell = ctSimProfile.matrix[r][c];
+          var score = cell && cell.overall;
+          var selected = selectedCtSimPair && ((selectedCtSimPair.a === rowName && selectedCtSimPair.b === colName) || (selectedCtSimPair.a === colName && selectedCtSimPair.b === rowName));
+          html += '<td data-a="' + escapeHtml(rowName) + '" data-b="' + escapeHtml(colName) + '" class="' + (selected ? 'is-selected' : '') + '" style="background:' + dspScoreColor(score) + ';" title="' + escapeHtml(rowName) + ' vs ' + escapeHtml(colName) + '">' + dspFmt(score) + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+      wrap.querySelectorAll('td[data-a]').forEach(function (td) {
+        td.onclick = function () { selectCtSimPair(td.getAttribute('data-a'), td.getAttribute('data-b')); };
+      });
+    }
+
+    function renderCtSimPairTable() {
+      var body = document.getElementById('ctSimPairBody');
+      if (!body || !ctSimProfile) return;
+      var rows = ctSimProfile.pairs.slice().sort(function (a, b) { return (b.overallRaw || -1) - (a.overallRaw || -1); });
+      var selectedKey = selectedCtSimPair ? simPairKey(selectedCtSimPair.a, selectedCtSimPair.b) : '';
+      body.innerHTML = rows.map(function (p) {
+        var on = selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a);
+        return '<tr data-a="' + escapeHtml(p.a) + '" data-b="' + escapeHtml(p.b) + '" class="' + (on ? 'is-selected' : '') + '">' +
+          '<td>' + escapeHtml(p.a) + ' – ' + escapeHtml(p.b) + '</td>' +
+          '<td class="dsp-score">' + dspFmt(p.overall) + '</td>' +
+          '<td>' + dspFmt(p.pattern) + '</td>' +
+          '<td>' + dspFmt(p.strength) + '</td>' +
+          '<td>' + dspFmt(p.sign) + '</td>' +
+          '<td class="dsp-band dsp-band--' + p.bandKey + '">' + escapeHtml(p.band) + '</td></tr>';
+      }).join('');
+      body.querySelectorAll('tr[data-a]').forEach(function (tr) {
+        tr.onclick = function () { selectCtSimPair(tr.getAttribute('data-a'), tr.getAttribute('data-b')); };
+      });
+    }
+
+    function dspBar(label, score) {
+      var width = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
+      return '<div class="dsp-bar-row"><span>' + escapeHtml(label) + '</span><div class="dsp-bar-track"><div class="dsp-bar-fill" style="width:' + width + '%"></div></div><strong>' + dspFmt(score) + '</strong></div>';
+    }
+
+    function renderCtSimProfile() {
+      var title = document.getElementById('ctSimProfileTitle');
+      var body = document.getElementById('ctSimProfileBody');
+      if (!title || !body) return;
+      var pair = selectedCtSimPair ? findCtSimPair(selectedCtSimPair.a, selectedCtSimPair.b) : null;
+      if (!pair) {
+        title.textContent = 'Pair profile';
+        body.innerHTML = '<div class="dsp-kpi-note">Select a heatmap cell or table row.</div>';
+        renderCtSimCongruence(null);
+        return;
+      }
+      title.textContent = pair.a + ' vs ' + pair.b;
+      body.innerHTML =
+        '<div class="dsp-band dsp-band--' + pair.bandKey + '">Overall ' + dspFmt(pair.overall) + ' · ' + escapeHtml(pair.band) + '</div>' +
+        '<div class="dsp-bars">' + dspBar('Pattern', pair.pattern) + dspBar('Strength', pair.strength) + dspBar('Sign', pair.sign) + '</div>' +
+        '<div class="dsp-kpi-note">n=' + escapeHtml(String(pair.nA)) + ' vs n=' + escapeHtml(String(pair.nB)) +
+        ' · V=' + fmtNum(pair.vA, 3) + ' vs ' + fmtNum(pair.vB, 3) +
+        ' · ' + pair.cellCount + ' aligned cells. Each point is one cell’s adjusted residual in both groups; the diagonal is a perfect match.</div>';
+      renderCtSimCongruence(pair);
+    }
+
+    function renderCtSimCongruence(pair) {
+      var el = document.getElementById('ctSimChart');
+      if (!el) return;
+      if (!pair || !pair.rA || !pair.rA.length) {
+        el.innerHTML = '';
+        return;
+      }
+      var maxAbs = 2;
+      pair.rA.forEach(function (x, i) {
+        maxAbs = Math.max(maxAbs, Math.abs(x), Math.abs(pair.rB[i]));
+      });
+      var lim = Math.ceil(maxAbs);
+      var w = 420;
+      var h = 240;
+      var pad = { l: 46, r: 14, t: 12, b: 40 };
+      var plotW = w - pad.l - pad.r;
+      var plotH = h - pad.t - pad.b;
+      function sx(v) { return pad.l + ((v + lim) / (2 * lim)) * plotW; }
+      function sy(v) { return pad.t + plotH - ((v + lim) / (2 * lim)) * plotH; }
+      var ticks = [];
+      var t;
+      for (t = -lim; t <= lim; t++) ticks.push(t);
+      var chrome = '<rect class="scatter-bg" x="' + pad.l + '" y="' + pad.t + '" width="' + plotW + '" height="' + plotH + '" rx="4" />';
+      ticks.forEach(function (v) {
+        var x = sx(v);
+        var y = sy(v);
+        chrome += '<line class="scatter-grid" x1="' + x.toFixed(1) + '" y1="' + pad.t + '" x2="' + x.toFixed(1) + '" y2="' + (pad.t + plotH).toFixed(1) + '" />';
+        chrome += '<line class="scatter-grid" x1="' + pad.l + '" y1="' + y.toFixed(1) + '" x2="' + (pad.l + plotW).toFixed(1) + '" y2="' + y.toFixed(1) + '" />';
+        chrome += '<text class="scatter-tick" style="text-anchor:middle" x="' + x.toFixed(1) + '" y="' + (pad.t + plotH + 14).toFixed(1) + '">' + v + '</text>';
+        chrome += '<text class="scatter-tick scatter-tick-y" x="' + (pad.l - 6).toFixed(1) + '" y="' + (y + 3.5).toFixed(1) + '">' + v + '</text>';
+      });
+      chrome += '<line class="sim-diag" x1="' + sx(-lim).toFixed(1) + '" y1="' + sy(-lim).toFixed(1) + '" x2="' + sx(lim).toFixed(1) + '" y2="' + sy(lim).toFixed(1) + '" />';
+      var colorA = VIZ_COLORS[0];
+      var names = ctSimProfile && ctSimProfile.groups ? ctSimProfile.groups : [];
+      var gi = names.indexOf(pair.a);
+      if (gi >= 0) colorA = VIZ_COLORS[gi % VIZ_COLORS.length];
+      var dots = '';
+      pair.rA.forEach(function (x, i) {
+        var y = pair.rB[i];
+        var label = (pair.labels && pair.labels[pair.index[i]]) || ('cell ' + (i + 1));
+        var tip = escapeHtml(label) + ' · ' + escapeHtml(pair.a) + ' ' + fmtNum(x, 2) + ' · ' + escapeHtml(pair.b) + ' ' + fmtNum(y, 2);
+        dots += '<circle class="sim-dot" style="fill:' + colorA + '" cx="' + sx(x).toFixed(1) + '" cy="' + sy(y).toFixed(1) + '" r="3.6"><title>' + tip + '</title></circle>';
+      });
+      el.innerHTML = '<svg class="ct-sim-svg" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Residual congruence scatter">' +
+        chrome + dots +
+        '<text class="scatter-axis-label" x="' + (pad.l + plotW / 2).toFixed(1) + '" y="' + (h - 8) + '">' + escapeHtml(pair.a) + ' residual</text>' +
+        '<text class="scatter-axis-label" x="12" y="' + (pad.t + plotH / 2).toFixed(1) + '" transform="rotate(-90 12 ' + (pad.t + plotH / 2).toFixed(1) + ')">' + escapeHtml(pair.b) + ' residual</text></svg>';
+    }
+
     function renderByGroup() {
       if (!spec.rowVar || !spec.colVar) {
         setEmpty('Run Frequencies & Crosstabs first, then open By Group.');
@@ -1145,6 +1629,7 @@
       updateSummaryCards();
       renderCrosstab();
       if (ctByGroupPanel === 'chart') renderCharts();
+      renderCtSimilarity();
       showContingencyByGroupPanel(ctByGroupPanel);
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
         StatisticoHeader.updateVariable((spec.rowVar || '') + ' × ' + (spec.colVar || ''), overallRows.length);
@@ -1276,6 +1761,9 @@
     window.selectTableGroup = selectTableGroup;
     window.selectTableMeasure = selectTableMeasure;
     window.selectChartMode = selectChartMode;
+    window.openCtSimHelp = openCtSimHelp;
+    window.closeCtSimHelp = closeCtSimHelp;
+    window.openDspHelp = openCtSimHelp;
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
     else boot();

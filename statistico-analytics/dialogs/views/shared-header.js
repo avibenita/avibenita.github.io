@@ -2167,7 +2167,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260909ctexplore',
+  _TAB_ASSET_VER: '20260909ctfacet',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -3422,7 +3422,8 @@ const StatisticoHeader = {
         onSelect: (panel) => this.setContingencyByGroupResultsTab(panel),
         tabs: [
           { tabKey: 'contingency-by-group-association', label: 'Association table', icon: 'fa-table', panel: 'association', caption: 'Examine the same association separately within each group. χ², p and V are not a test of whether groups differ.' },
-          { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', caption: 'Inspect observed counts for one group at a time. Overall uses all included levels.' }
+          { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', caption: 'Compare all groups in one table, or inspect a single group. Column % is the comparison default.' },
+          { tabKey: 'contingency-by-group-chart', label: 'Chart', icon: 'fa-chart-column', panel: 'chart', caption: 'Faceted 100% stacked distributions and residual heat maps with shared scales. Descriptive only.' }
         ]
       };
     }
@@ -8002,7 +8003,9 @@ const StatisticoHeader = {
     }
     if (this.module === 'contingency' && this.currentView === 'contingency-by-group') {
       const tab = globalThis.__contingencyByGroupActiveTab || 'association';
-      return tab === 'table' ? 'contingency-by-group-table' : 'contingency-by-group';
+      if (tab === 'table') return 'contingency-by-group-table';
+      if (tab === 'chart') return 'contingency-by-group-chart';
+      return 'contingency-by-group';
     }
     if (this.module === 'univariate' || this.module === 'correlations') return this.currentView;
     if (this.module === 'independent') return `independent-${this._getIndependentActiveTab()}`;
@@ -8082,6 +8085,7 @@ const StatisticoHeader = {
       'contingency-by-group': 'Grouped Analysis',
       'contingency-by-group-association': 'Association table',
       'contingency-by-group-table': 'Tables by Group',
+      'contingency-by-group-chart': 'Charts by Group',
       'segmentation-overview': 'Overview',
       'segmentation-groups': 'Group Comparison',
       'segmentation-change': 'Change',
@@ -8261,7 +8265,9 @@ const StatisticoHeader = {
       'contingency-by-group':
         'This view examines the same row×column association separately within each grouping level, plus an Overall row for the included levels. χ², p, and Cramér’s V in each row describe that group only. They are not a test of whether the association differs between groups. Evidence is “association detected” vs “not detected” at α = 0.05. The expected-count check flags sparse cells that can make the χ² approximation unreliable in a subgroup even when Overall is acceptable. Strength bars are a descriptive comparison of V (0–1), not a homogeneity test.',
       'contingency-by-group-table':
-        'Inspect the observed-count table for one group at a time. Total eligible N is all included levels; the displayed group n is that table’s total. Pills choose which table is shown. This is not a test of interaction or of difference between associations.',
+        'All groups together places each grouping level side by side under a two-level header (row variable × column variable within each level). Column % is the comparison default because groups and column categories can differ in size. Count, Row %, and adjusted residuals are also available. Pills switch between the combined table, Overall, and a single level. Combined comparison is the default for 2–3 levels, optional with horizontal scrolling for 4–6, and hidden above 6. This remains descriptive — it is not a test that associations differ between groups.',
+      'contingency-by-group-chart':
+        'Distribution shows one 100% stacked bar panel per grouping level, with identical 0–100% scales. Within a panel, column-variable categories sit side by side and row-variable levels are stacked segments, so you can compare composition across both grouping and treatment. Association pattern shows adjusted-residual heat maps for the same levels on one shared colour scale. Neither chart tests whether associations differ between groups.',
 
       // Regression — workspace sub-views (chart-aware so the AI explanation
       // matches what the user actually sees, not the coefficients table).

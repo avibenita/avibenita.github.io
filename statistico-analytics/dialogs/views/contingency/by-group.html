@@ -12,12 +12,13 @@
     }
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260909ctexplore" />
-  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260909ctexplore" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260909ctfacet" />
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260909ctfacet" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260909ctexplore"></script>
+  <script src="../shared-header.js?v=20260909ctfacet"></script>
   <script src="contingency-engine.js?v=20260814ct8"></script>
-  <script src="contingency-sample-data.js?v=20260909ctexplore"></script>
+  <script src="contingency-sample-data.js?v=20260909ctfacet"></script>
+  <script src="../shared/vendor/highcharts/highcharts.js"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -114,6 +115,50 @@
     .ct-grid { font-size:14.5px; }
     .ct-grid th, .ct-grid td { text-align:right; }
     .ct-grid th.stub, .ct-grid td.stub { text-align:left; font-weight:800; }
+    .table-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+    .measure-chips { display:flex; flex-wrap:wrap; gap:6px; }
+    .measure-chip { border-radius:8px; padding:6px 11px; font-size:12px; font-weight:700; }
+    .measure-chip.is-on { border-color:var(--accent-ct); color:var(--text-primary); background:color-mix(in srgb, var(--accent-ct) 18%, var(--surface-2)); }
+    .table-wrap.is-wide { overflow-x:auto; }
+    .ct-combined { --cat-row-h:40px; width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; }
+    .ct-combined thead th { white-space:nowrap; }
+    .ct-combined th.stub, .ct-combined td.stub {
+      position:sticky; left:0; z-index:3; text-align:left; background:var(--surface-1);
+      box-shadow:1px 0 0 var(--border);
+    }
+    .ct-combined thead th.stub { z-index:6; background:var(--surface-2); }
+    .ct-combined tr.group-category-row th { top:0; z-index:5; text-align:center; text-transform:none; letter-spacing:.02em; }
+    .ct-combined tr.group-metric-row th { top:var(--cat-row-h); z-index:4; font-size:11px; }
+    .ct-combined .block-end { border-right:2px solid color-mix(in srgb, var(--accent-ct) 60%, var(--border)); }
+    .ct-combined td.total-col, .ct-combined th.total-col { color:var(--text-secondary); }
+    .ct-combined tr.total-row td { font-weight:800; background:rgba(0,0,0,.16); }
+    .ct-combined td.resid { font-variant-numeric:tabular-nums; }
+    .facet-grid {
+      flex:1; min-height:0; overflow:auto; display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+      gap:12px; align-items:stretch;
+    }
+    .facet-card {
+      display:flex; flex-direction:column; min-height:280px;
+      background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:8px 10px 6px;
+    }
+    .facet-card h4 { margin:0 0 4px; font-size:13px; color:var(--accent-1); }
+    .facet-card h4 span { color:var(--text-secondary); font-weight:600; font-size:12px; }
+    .facet-chart { flex:1; min-height:240px; }
+    .chart-legend, .resid-scale-row {
+      display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
+      color:var(--text-secondary); font-size:12px; font-weight:700;
+    }
+    .legend-item { display:inline-flex; align-items:center; gap:6px; }
+    .legend-item i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+    .resid-scale { display:flex; align-items:center; gap:8px; }
+    .resid-scale-bar {
+      width:160px; height:10px; border-radius:999px; border:1px solid var(--border);
+      background:linear-gradient(90deg, rgba(37,99,235,.75), rgba(255,255,255,.08) 50%, rgba(234,88,12,.75));
+    }
+    .heat-table { width:100%; font-size:13px; }
+    .heat-table th, .heat-table td { text-align:center; padding:8px 8px; }
+    .heat-table th.stub, .heat-table td.stub { text-align:left; font-weight:800; }
     .group-dialog-overlay { display:none; position:fixed; inset:0; z-index:8000; background:rgba(2,6,23,.62); align-items:center; justify-content:center; padding:16px; }
     .group-dialog-overlay.is-visible { display:flex; }
     .group-dialog { width:min(920px,96vw); max-height:86vh; display:flex; flex-direction:column; background:var(--surface-1); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
@@ -155,7 +200,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260909-ctexplore-v1">
+<body data-page-version="20260909-ctfacet-v1">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -205,11 +250,25 @@
             </div>
             <div class="ct-bg-panel" id="ctByGroupPanel-table">
               <div class="section-title">
-                <strong>Observed counts</strong>
-                <span id="displayedGroupLine" class="displayed-group">Select a group to display its table.</span>
+                <strong id="tableSectionTitle">Compare groups</strong>
+                <span id="displayedGroupLine" class="displayed-group">Select a display to inspect counts or percents.</span>
+              </div>
+              <div class="table-toolbar">
+                <div class="measure-chips" id="tableMeasureChips"></div>
               </div>
               <div class="group-chips" id="tableGroupChips"></div>
               <div class="table-wrap" id="crosstabWrap"></div>
+              <p class="assoc-note">Column % is the comparison default because groups and column categories can differ in size. Combined tables and single-group tables are descriptive — they do not test whether associations differ between groups.</p>
+            </div>
+            <div class="ct-bg-panel" id="ctByGroupPanel-chart">
+              <div class="section-title">
+                <strong id="chartSectionTitle">Distribution</strong>
+                <span id="chartCaption" class="displayed-group">One panel per group, identical scales.</span>
+              </div>
+              <div class="group-chips" id="chartModeChips"></div>
+              <div class="chart-legend" id="chartLegend"></div>
+              <div class="facet-grid" id="chartCanvas"></div>
+              <p class="assoc-note" id="chartNote">Each panel uses the same scale so group levels can be compared visually. This is not a test that associations differ between groups.</p>
             </div>
           </div>
         </div>
@@ -251,9 +310,20 @@
     var groupSelectionDirty = false;
     var levelSelections = {};
     var groupResults = [];
-    var tableGroupKey = 'overall';
+    var tableGroupKey = null;
+    var tableMeasure = 'colPct';
+    var chartMode = 'distribution';
+    var facetCharts = [];
+    var chartRenderToken = 0;
     var ctByGroupPanel = 'association';
     window.__contingencyByGroupActiveTab = 'association';
+    var TABLE_MEASURES = [
+      { id: 'count', label: 'Count' },
+      { id: 'colPct', label: 'Column %' },
+      { id: 'rowPct', label: 'Row %' },
+      { id: 'residual', label: 'Adjusted residual' }
+    ];
+    var VIZ_COLORS = ['#8b5cf6','#22d3ee','#fb923c','#34d399','#f472b6','#60a5fa','#fbbf24','#c084fc','#2dd4bf','#f87171','#a3e635','#38bdf8'];
 
     function escapeHtml(value) {
       return String(value == null ? '' : value)
@@ -552,62 +622,453 @@
       return item && item.n != null ? item.n : '—';
     }
 
+    function includedLevelItems() {
+      return groupResults.filter(function (item) { return item.key !== 'overall'; });
+    }
+
+    function combinedAllowed() {
+      var n = includedLevelItems().length;
+      return n >= 2 && n <= 6;
+    }
+
+    function combinedIsDefault() {
+      var n = includedLevelItems().length;
+      return n >= 2 && n <= 3;
+    }
+
+    function resolveTableGroupKey() {
+      var allowTogether = combinedAllowed();
+      if (tableGroupKey === 'together') {
+        if (!allowTogether) tableGroupKey = 'overall';
+        return;
+      }
+      if (tableGroupKey == null || !groupResults.some(function (item) { return item.key === tableGroupKey; })) {
+        tableGroupKey = combinedIsDefault() ? 'together' : 'overall';
+        if (tableGroupKey === 'together' && !allowTogether) tableGroupKey = 'overall';
+      }
+    }
+
+    function measureLabel(id) {
+      var found = TABLE_MEASURES.find(function (m) { return m.id === id; });
+      return found ? found.label : id;
+    }
+
+    function canonicalFrame() {
+      var overall = groupResults.find(function (item) { return item.key === 'overall'; });
+      var src = overall && overall.result && overall.result.analyzable ? overall.result : null;
+      if (!src) {
+        var first = includedLevelItems().find(function (item) { return item.result && item.result.analyzable; });
+        src = first && first.result;
+      }
+      return {
+        rowVar: (src && src.rowVar) || spec.rowVar || 'Rows',
+        colVar: (src && src.colVar) || spec.colVar || 'Columns',
+        rowLabels: src && src.rowLabels ? src.rowLabels.slice() : [],
+        colLabels: src && src.colLabels ? src.colLabels.slice() : []
+      };
+    }
+
+    function labelIndex(labels, name) {
+      return (labels || []).indexOf(name);
+    }
+
+    function cellMeasure(res, measure, rowLabel, colLabel) {
+      if (!res || !res.analyzable) return null;
+      var i = labelIndex(res.rowLabels, rowLabel);
+      var j = labelIndex(res.colLabels, colLabel);
+      if (i < 0 || j < 0) return null;
+      var matrix = measure === 'count' ? res.observed
+        : measure === 'colPct' ? res.colPct
+        : measure === 'rowPct' ? res.rowPct
+        : res.stdResiduals;
+      var v = matrix && matrix[i] && matrix[i][j];
+      return Number.isFinite(v) ? v : null;
+    }
+
+    function rowTotalMeasure(res, measure, rowLabel) {
+      if (!res || !res.analyzable) return null;
+      var i = labelIndex(res.rowLabels, rowLabel);
+      if (i < 0) return null;
+      var n = res.rowTotals && res.rowTotals[i];
+      if (measure === 'count') return Number.isFinite(n) ? n : null;
+      if (measure === 'rowPct') return Number.isFinite(n) && n > 0 ? 100 : null;
+      if (measure === 'colPct') return Number.isFinite(n) && res.N > 0 ? 100 * n / res.N : null;
+      return null;
+    }
+
+    function colTotalMeasure(res, measure, colLabel) {
+      if (!res || !res.analyzable) return null;
+      var j = labelIndex(res.colLabels, colLabel);
+      if (j < 0) return null;
+      var n = res.colTotals && res.colTotals[j];
+      if (measure === 'count') return Number.isFinite(n) ? n : null;
+      if (measure === 'colPct') return Number.isFinite(n) && n > 0 ? 100 : null;
+      if (measure === 'rowPct') return Number.isFinite(n) && res.N > 0 ? 100 * n / res.N : null;
+      return null;
+    }
+
+    function grandMeasure(res, measure) {
+      if (!res || !res.analyzable) return null;
+      if (measure === 'count') return Number.isFinite(res.N) ? res.N : null;
+      if (measure === 'colPct' || measure === 'rowPct') return 100;
+      return null;
+    }
+
+    function fmtCount(v) {
+      if (!Number.isFinite(v)) return '—';
+      return Math.abs(v - Math.round(v)) < 1e-6 ? String(Math.round(v)) : v.toFixed(1);
+    }
+
+    function formatMeasure(measure, v) {
+      if (!Number.isFinite(v)) return '—';
+      if (measure === 'count') return fmtCount(v);
+      if (measure === 'colPct' || measure === 'rowPct') return v.toFixed(1) + '%';
+      return v.toFixed(2);
+    }
+
+    function sharedResidMax(items) {
+      var maxAbs = 0;
+      (items || []).forEach(function (item) {
+        var mat = item && item.result && item.result.stdResiduals;
+        if (!mat) return;
+        mat.forEach(function (row) {
+          (row || []).forEach(function (v) {
+            if (Number.isFinite(v)) maxAbs = Math.max(maxAbs, Math.abs(v));
+          });
+        });
+      });
+      return Math.max(2, maxAbs || 0);
+    }
+
+    function residColor(sr, maxAbs) {
+      if (!Number.isFinite(sr)) return 'transparent';
+      var den = maxAbs > 0 ? maxAbs : 3;
+      var t = Math.max(-1, Math.min(1, sr / den));
+      if (t >= 0) return 'rgba(234,88,12,' + (0.12 + 0.55 * t) + ')';
+      return 'rgba(37,99,235,' + (0.12 + 0.55 * (-t)) + ')';
+    }
+
+    function cellInk(bg) {
+      var m = /,\s*([0-9.]+)\s*\)/.exec(bg || '');
+      var a = m ? Number(m[1]) : 0;
+      return a >= 0.34 ? '#ffffff' : 'var(--text-primary)';
+    }
+
+    function measureCellHtml(measure, v, maxAbs, extraClass) {
+      var cls = 'num' + (extraClass ? ' ' + extraClass : '');
+      if (measure !== 'residual') return '<td class="' + cls + '">' + formatMeasure(measure, v) + '</td>';
+      if (!Number.isFinite(v)) return '<td class="' + cls + '">—</td>';
+      var bg = residColor(v, maxAbs);
+      return '<td class="' + cls + ' resid" style="background:' + bg + ';color:' + cellInk(bg) + '">' + formatMeasure(measure, v) + '</td>';
+    }
+
+    function displayedNForTogether() {
+      var overall = groupResults.find(function (item) { return item.key === 'overall'; });
+      return overall ? resultN(overall) : '—';
+    }
+
     function updateSummaryCards() {
       var strip = document.getElementById('summaryStrip');
       if (strip) strip.classList.toggle('is-tables', ctByGroupPanel === 'table');
-      var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
       var selectedEl = document.getElementById('metricSelected');
-      if (selectedEl) selectedEl.textContent = current ? String(resultN(current)) : '—';
       var line = document.getElementById('displayedGroupLine');
-      if (line) {
-        if (!current) {
-          line.textContent = 'Select a group to display its table.';
-        } else {
-          line.innerHTML = 'Displayed group: ' + escapeHtml(current.label) + ' <span>· n = ' + escapeHtml(String(resultN(current))) + '</span>';
+      var title = document.getElementById('tableSectionTitle');
+      var together = tableGroupKey === 'together';
+      if (together) {
+        if (selectedEl) selectedEl.textContent = String(displayedNForTogether());
+        if (title) title.textContent = 'Compare groups';
+        if (line) {
+          var nLevels = includedLevelItems().length;
+          line.innerHTML = 'All groups together <span>· ' + nLevels + ' levels · ' + escapeHtml(measureLabel(tableMeasure)) + ' · n = ' + escapeHtml(String(displayedNForTogether())) + '</span>';
         }
+        return;
+      }
+      var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
+      if (selectedEl) selectedEl.textContent = current ? String(resultN(current)) : '—';
+      if (title) title.textContent = 'Single group';
+      if (line) {
+        if (!current) line.textContent = 'Select a group to display its table.';
+        else line.innerHTML = 'Displayed group: ' + escapeHtml(current.label) + ' <span>· ' + escapeHtml(measureLabel(tableMeasure)) + ' · n = ' + escapeHtml(String(resultN(current))) + '</span>';
       }
     }
 
     function showContingencyByGroupPanel(panel) {
-      ctByGroupPanel = panel === 'table' ? 'table' : 'association';
+      ctByGroupPanel = panel === 'table' || panel === 'chart' ? panel : 'association';
       window.__contingencyByGroupActiveTab = ctByGroupPanel;
       document.querySelectorAll('.ct-bg-panel').forEach(function (el) {
         el.classList.toggle('is-active', el.id === 'ctByGroupPanel-' + ctByGroupPanel);
       });
       updateSummaryCards();
       if (ctByGroupPanel === 'table') renderCrosstab();
+      if (ctByGroupPanel === 'chart') renderCharts();
+    }
+
+    function renderMeasureChips() {
+      var host = document.getElementById('tableMeasureChips');
+      if (!host) return;
+      host.innerHTML = TABLE_MEASURES.map(function (m) {
+        return '<button type="button" class="measure-chip' + (m.id === tableMeasure ? ' is-on' : '') + '" onclick="selectTableMeasure(\'' + m.id + '\')">' + escapeHtml(m.label) + '</button>';
+      }).join('');
+    }
+
+    function renderGroupChips() {
+      var chips = document.getElementById('tableGroupChips');
+      if (!chips) return;
+      var parts = [];
+      if (combinedAllowed()) {
+        parts.push('<button type="button" class="group-chip' + (tableGroupKey === 'together' ? ' is-on' : '') + '" onclick="selectTableGroup(\'' + encodeURIComponent('together') + '\')">All groups together</button>');
+      }
+      groupResults.forEach(function (item) {
+        parts.push('<button type="button" class="group-chip' + (item.key === tableGroupKey ? ' is-on' : '') + '" onclick="selectTableGroup(\'' + encodeURIComponent(item.key) + '\')">' + escapeHtml(item.label) + ' · ' + escapeHtml(String(resultN(item))) + '</button>');
+      });
+      chips.innerHTML = parts.join('');
+    }
+
+    function renderSingleCrosstab(item, wrap) {
+      if (!item || !item.result || !item.result.analyzable) {
+        wrap.innerHTML = '<div class="empty"><i class="fa-solid fa-table"></i>No table for this group.</div>';
+        return;
+      }
+      var res = item.result;
+      var maxAbs = sharedResidMax([item]);
+      var head = '<tr><th class="stub">' + escapeHtml(res.rowVar || '') + ' \\ ' + escapeHtml(res.colVar || '') + '</th>' +
+        res.colLabels.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') + '<th class="total-col">Total</th></tr>';
+      var body = res.rowLabels.map(function (r) {
+        return '<tr><td class="stub">' + escapeHtml(r) + '</td>' +
+          res.colLabels.map(function (c) { return measureCellHtml(tableMeasure, cellMeasure(res, tableMeasure, r, c), maxAbs); }).join('') +
+          measureCellHtml(tableMeasure, rowTotalMeasure(res, tableMeasure, r), maxAbs, 'total-col') + '</tr>';
+      }).join('');
+      var foot = '<tr class="total-row"><td class="stub">Total</td>' +
+        res.colLabels.map(function (c) { return measureCellHtml(tableMeasure, colTotalMeasure(res, tableMeasure, c), maxAbs, 'total-col'); }).join('') +
+        measureCellHtml(tableMeasure, grandMeasure(res, tableMeasure), maxAbs, 'total-col') + '</tr>';
+      wrap.classList.remove('is-wide');
+      wrap.innerHTML = '<table class="ct-grid"><thead>' + head + '</thead><tbody>' + body + foot + '</tbody></table>';
+    }
+
+    function renderCombinedCrosstab(wrap) {
+      var levels = includedLevelItems();
+      var frame = canonicalFrame();
+      var groupName = isValidGroupIndex(groupIndex) ? sourceHeaders[groupIndex] : 'Group';
+      if (!levels.length || !frame.rowLabels.length || !frame.colLabels.length) {
+        wrap.innerHTML = '<div class="empty"><i class="fa-solid fa-table"></i>No combined table for these groups.</div>';
+        return;
+      }
+      var maxAbs = sharedResidMax(levels);
+      var colSpan = frame.colLabels.length + 1;
+      var cat = ['<tr class="group-category-row"><th class="stub" rowspan="2">' + escapeHtml(frame.rowVar) + '</th>'];
+      levels.forEach(function (item, idx) {
+        var end = idx === levels.length - 1 ? '' : ' block-end';
+        cat.push('<th class="' + end + '" colspan="' + colSpan + '">' + escapeHtml(groupName) + ': ' + escapeHtml(item.label) + '</th>');
+      });
+      cat.push('</tr>');
+      var met = ['<tr class="group-metric-row">'];
+      levels.forEach(function (item, idx) {
+        frame.colLabels.forEach(function (c) { met.push('<th>' + escapeHtml(c) + '</th>'); });
+        met.push('<th class="total-col' + (idx === levels.length - 1 ? '' : ' block-end') + '">Total</th>');
+      });
+      met.push('</tr>');
+      var body = frame.rowLabels.map(function (r) {
+        var row = ['<tr><td class="stub">' + escapeHtml(r) + '</td>'];
+        levels.forEach(function (item, idx) {
+          var res = item.result;
+          frame.colLabels.forEach(function (c) {
+            row.push(measureCellHtml(tableMeasure, cellMeasure(res, tableMeasure, r, c), maxAbs));
+          });
+          row.push(measureCellHtml(tableMeasure, rowTotalMeasure(res, tableMeasure, r), maxAbs, 'total-col' + (idx === levels.length - 1 ? '' : ' block-end')));
+        });
+        row.push('</tr>');
+        return row.join('');
+      }).join('');
+      var foot = ['<tr class="total-row"><td class="stub">Total</td>'];
+      levels.forEach(function (item, idx) {
+        var res = item.result;
+        frame.colLabels.forEach(function (c) {
+          foot.push(measureCellHtml(tableMeasure, colTotalMeasure(res, tableMeasure, c), maxAbs, 'total-col'));
+        });
+        foot.push(measureCellHtml(tableMeasure, grandMeasure(res, tableMeasure), maxAbs, 'total-col' + (idx === levels.length - 1 ? '' : ' block-end')));
+      });
+      foot.push('</tr>');
+      wrap.classList.toggle('is-wide', levels.length >= 4);
+      wrap.innerHTML = '<table class="ct-grid ct-combined"><thead>' + cat.join('') + met.join('') + '</thead><tbody>' + body + foot.join('') + '</tbody></table>';
     }
 
     function renderCrosstab() {
       var wrap = document.getElementById('crosstabWrap');
-      var chips = document.getElementById('tableGroupChips');
-      var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
-      chips.innerHTML = groupResults.map(function (item) {
-        return '<button type="button" class="group-chip' + (item.key === (current && current.key) ? ' is-on' : '') + '" onclick="selectTableGroup(\'' + encodeURIComponent(item.key) + '\')">' + escapeHtml(item.label) + ' · ' + escapeHtml(String(resultN(item))) + '</button>';
-      }).join('');
+      resolveTableGroupKey();
+      renderMeasureChips();
+      renderGroupChips();
       updateSummaryCards();
-      if (!current || !current.result || !current.result.analyzable) {
-        wrap.innerHTML = '<div class="empty"><i class="fa-solid fa-table"></i>No table for this group.</div>';
+      if (!wrap) return;
+      if (tableGroupKey === 'together') {
+        renderCombinedCrosstab(wrap);
         return;
       }
-      var res = current.result;
-      var head = '<tr><th class="stub">' + escapeHtml(res.rowVar || '') + ' \\ ' + escapeHtml(res.colVar || '') + '</th>' +
-        res.colLabels.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') + '<th>Total</th></tr>';
-      var body = res.rowLabels.map(function (r, i) {
-        var tot = (res.rowTotals && res.rowTotals[i]) || 0;
-        return '<tr><td class="stub">' + escapeHtml(r) + '</td>' +
-          res.observed[i].map(function (n) { return '<td class="num">' + n + '</td>'; }).join('') +
-          '<td class="num">' + tot + '</td></tr>';
-      }).join('');
-      var foot = '<tr><td class="stub">Total</td>' +
-        (res.colTotals || []).map(function (n) { return '<td class="num">' + n + '</td>'; }).join('') +
-        '<td class="num">' + (res.N || 0) + '</td></tr>';
-      wrap.innerHTML = '<table class="ct-grid"><thead>' + head + '</thead><tbody>' + body + foot + '</tbody></table>';
+      var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
+      renderSingleCrosstab(current, wrap);
     }
 
     function selectTableGroup(encodedKey) {
       tableGroupKey = decodeURIComponent(encodedKey);
       renderCrosstab();
+    }
+
+    function selectTableMeasure(id) {
+      tableMeasure = id;
+      renderCrosstab();
+    }
+
+    function destroyFacetCharts() {
+      (facetCharts || []).forEach(function (ch) {
+        try { ch.destroy(); } catch (_e) {}
+      });
+      facetCharts = [];
+    }
+
+    function isLightCanvas() {
+      return document.documentElement.getAttribute('data-theme') === 'light' ||
+        document.documentElement.getAttribute('data-preview-tpl') === 'light';
+    }
+
+    function renderChartModeChips() {
+      var host = document.getElementById('chartModeChips');
+      if (!host) return;
+      var modes = [
+        { id: 'distribution', label: 'Distribution' },
+        { id: 'residuals', label: 'Association pattern' }
+      ];
+      host.innerHTML = modes.map(function (m) {
+        return '<button type="button" class="group-chip' + (chartMode === m.id ? ' is-on' : '') + '" onclick="selectChartMode(\'' + m.id + '\')">' + escapeHtml(m.label) + '</button>';
+      }).join('');
+    }
+
+    function renderDistributionCharts(levels, frame) {
+      var canvas = document.getElementById('chartCanvas');
+      var legend = document.getElementById('chartLegend');
+      var title = document.getElementById('chartSectionTitle');
+      var cap = document.getElementById('chartCaption');
+      var note = document.getElementById('chartNote');
+      if (title) title.textContent = 'Distribution';
+      if (cap) cap.innerHTML = '100% stacked ' + escapeHtml(frame.rowVar) + ' within ' + escapeHtml(frame.colVar) + ' <span>· one panel per group · identical 0–100% scales</span>';
+      if (note) note.textContent = 'Each panel shows how ' + frame.rowVar + ' is distributed within ' + frame.colVar + ' for that group. Identical scales support visual comparison. This is not a test that associations differ between groups.';
+      if (legend) {
+        legend.innerHTML = frame.rowLabels.map(function (lab, i) {
+          return '<span class="legend-item"><i style="background:' + VIZ_COLORS[i % VIZ_COLORS.length] + '"></i>' + escapeHtml(lab) + '</span>';
+        }).join('');
+      }
+      canvas.innerHTML = levels.map(function (item, idx) {
+        return '<div class="facet-card"><h4>' + escapeHtml(item.label) + ' <span>· n = ' + escapeHtml(String(resultN(item))) + '</span></h4><div class="facet-chart" id="ctFacetChart-' + idx + '"></div></div>';
+      }).join('');
+      if (typeof Highcharts === 'undefined') {
+        canvas.innerHTML = '<div class="empty"><i class="fa-solid fa-chart-column"></i>Charts could not load.</div>';
+        return;
+      }
+      var token = chartRenderToken;
+      var light = isLightCanvas();
+      var axis = light ? '#3f2a1c' : '#e2e8f0';
+      var grid = light ? 'rgba(92,64,48,.22)' : 'rgba(148,163,184,.18)';
+      requestAnimationFrame(function () {
+        if (token !== chartRenderToken) return;
+        levels.forEach(function (item, idx) {
+          var res = item.result;
+          if (!res || !res.analyzable) return;
+          var host = document.getElementById('ctFacetChart-' + idx);
+          if (!host) return;
+          var series = frame.rowLabels.map(function (rowLab, si) {
+            return {
+              name: rowLab,
+              color: VIZ_COLORS[si % VIZ_COLORS.length],
+              data: frame.colLabels.map(function (colLab) {
+                var v = cellMeasure(res, 'count', rowLab, colLab);
+                return Number.isFinite(v) ? v : 0;
+              })
+            };
+          });
+          var ch = Highcharts.chart(host, {
+            chart: { type: 'column', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI, sans-serif' }, animation: { duration: 220 } },
+            title: { text: '' },
+            credits: { enabled: false },
+            legend: { enabled: false },
+            xAxis: {
+              categories: frame.colLabels,
+              title: { text: frame.colVar, style: { color: axis } },
+              labels: { style: { color: axis, fontSize: '11px', fontWeight: '700' } },
+              lineColor: grid
+            },
+            yAxis: {
+              min: 0,
+              max: 100,
+              endOnTick: true,
+              title: { text: 'Column %', style: { color: axis } },
+              labels: { format: '{value}%', style: { color: axis } },
+              gridLineColor: grid
+            },
+            tooltip: {
+              backgroundColor: light ? 'rgba(255,248,230,.96)' : 'rgba(15,23,42,.95)',
+              style: { color: light ? '#1c1917' : '#e2e8f0' },
+              pointFormat: '<span style="color:{series.color}">\u25CF</span> {series.name}: <b>{point.percentage:.1f}%</b><br/>'
+            },
+            plotOptions: {
+              column: { stacking: 'percent', borderWidth: 0, groupPadding: 0.12, pointPadding: 0.05 }
+            },
+            series: series
+          });
+          facetCharts.push(ch);
+        });
+        if (window.StatisticoHeader && typeof StatisticoHeader.applyPreviewTemplate === 'function') {
+          StatisticoHeader.applyPreviewTemplate(StatisticoHeader.previewTemplateId, { silent: true });
+        }
+      });
+    }
+
+    function renderResidualHeatmaps(levels, frame) {
+      var canvas = document.getElementById('chartCanvas');
+      var legend = document.getElementById('chartLegend');
+      var title = document.getElementById('chartSectionTitle');
+      var cap = document.getElementById('chartCaption');
+      var note = document.getElementById('chartNote');
+      var maxAbs = sharedResidMax(levels);
+      if (title) title.textContent = 'Association pattern';
+      if (cap) cap.innerHTML = 'Adjusted residuals for ' + escapeHtml(frame.rowVar) + ' × ' + escapeHtml(frame.colVar) + ' <span>· shared colour scale ±' + maxAbs.toFixed(1) + '</span>';
+      if (note) note.textContent = 'All panels use the same colour scale. Stronger colour means a larger departure from independence within that group. This is not a test that associations differ between groups.';
+      if (legend) {
+        legend.innerHTML = '<div class="resid-scale"><span>−' + maxAbs.toFixed(1) + '</span><div class="resid-scale-bar" title="Shared residual scale"></div><span>+' + maxAbs.toFixed(1) + '</span></div>';
+      }
+      canvas.innerHTML = levels.map(function (item) {
+        var res = item.result;
+        var table = '<table class="heat-table"><thead><tr><th class="stub"></th>' +
+          frame.colLabels.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+        frame.rowLabels.forEach(function (r) {
+          table += '<tr><td class="stub">' + escapeHtml(r) + '</td>';
+          frame.colLabels.forEach(function (c) {
+            var v = cellMeasure(res, 'residual', r, c);
+            var bg = residColor(v, maxAbs);
+            table += '<td style="background:' + bg + ';color:' + cellInk(bg) + '">' + formatMeasure('residual', v) + '</td>';
+          });
+          table += '</tr>';
+        });
+        table += '</tbody></table>';
+        return '<div class="facet-card"><h4>' + escapeHtml(item.label) + ' <span>· n = ' + escapeHtml(String(resultN(item))) + '</span></h4>' + table + '</div>';
+      }).join('');
+    }
+
+    function renderCharts() {
+      chartRenderToken += 1;
+      destroyFacetCharts();
+      renderChartModeChips();
+      var levels = includedLevelItems();
+      var frame = canonicalFrame();
+      var canvas = document.getElementById('chartCanvas');
+      if (!levels.length || !frame.rowLabels.length) {
+        if (canvas) canvas.innerHTML = '<div class="empty"><i class="fa-solid fa-chart-column"></i>No group levels to chart.</div>';
+        return;
+      }
+      if (chartMode === 'residuals') renderResidualHeatmaps(levels, frame);
+      else renderDistributionCharts(levels, frame);
+    }
+
+    function selectChartMode(id) {
+      chartMode = id === 'residuals' ? 'residuals' : 'distribution';
+      renderCharts();
     }
 
     function renderByGroup() {
@@ -677,9 +1138,13 @@
         rowsHtml.splice(1, 0, '<tr class="assoc-split"><td colspan="9">Levels of ' + escapeHtml(groupName) + '</td></tr>');
       }
       document.getElementById('assocBody').innerHTML = rowsHtml.join('');
-      if (!groupResults.some(function (item) { return item.key === tableGroupKey; })) tableGroupKey = 'overall';
+      if (tableGroupKey !== 'together' && !groupResults.some(function (item) { return item.key === tableGroupKey; })) {
+        tableGroupKey = null;
+      }
+      resolveTableGroupKey();
       updateSummaryCards();
       renderCrosstab();
+      if (ctByGroupPanel === 'chart') renderCharts();
       showContingencyByGroupPanel(ctByGroupPanel);
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
         StatisticoHeader.updateVariable((spec.rowVar || '') + ' × ' + (spec.colVar || ''), overallRows.length);
@@ -809,6 +1274,8 @@
     window.applyPreviewMinGroupSize = applyPreviewMinGroupSize;
     window.showContingencyByGroupPanel = showContingencyByGroupPanel;
     window.selectTableGroup = selectTableGroup;
+    window.selectTableMeasure = selectTableMeasure;
+    window.selectChartMode = selectChartMode;
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
     else boot();

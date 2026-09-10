@@ -58,7 +58,7 @@
       background:var(--cfg-surface2);
     }
     .map-grid { grid-template-columns:minmax(0,1fr) 1fr 64px 26px; }
-    .range-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 64px 26px; }
+    .range-grid { grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 72px 26px; }
     .rc-card {
       background:var(--cfg-surface); border:1px solid var(--cfg-border);
       border-radius:10px; padding:10px 12px 12px; margin-top:10px;
@@ -658,7 +658,8 @@
     var STATE = {
       headers: [], rows: [], address: '', sheetName: '', sheetNames: [],
       recipe: [], selected: {}, mapping: null, conditions: [], preview: null, tab: 'check',
-      unnamed: {}, previewedKey: null, recodeExtra: false, scan: null
+      unnamed: {}, previewedKey: null, recodeExtra: false, scan: null,
+      lastRecodeAutoName: '', lastRecodeSource: ''
     };
     var OP_META = {
       defineMissing: {
@@ -859,10 +860,10 @@
         qs('recodeSource').value = iss.variable;
         STATE.selected = {};
         STATE.selected[iss.variable] = true;
-        if (!(qs('recodeName').value || '').trim()) qs('recodeName').value = iss.variable + '_recode';
         fillRecodeSource();
         qs('recodeSource').value = iss.variable;
-        if (qs('recodeName')) qs('recodeName').value = iss.variable + '_recode';
+        syncRecodeOutput(iss.variable, true);
+        STATE.lastRecodeSource = iss.variable;
       }
       setTab('configure');
       updateAffected();
@@ -1084,13 +1085,38 @@
       if (cur && STATE.headers.indexOf(cur) >= 0) sel.value = cur;
       STATE.selected = {};
       if (sel.value) STATE.selected[sel.value] = true;
-      if (!(qs('recodeName').value || '').trim() && sel.value) qs('recodeName').value = sel.value + '_recode';
+      syncRecodeOutput(sel.value, sel.value !== STATE.lastRecodeSource);
+      STATE.lastRecodeSource = sel.value;
     }
-    function hintSplitExtent() {
+    function autoRecodeName(src) {
+      var s = String(src || '').trim() || 'var';
+      return s + '_recode';
+    }
+    function syncRecodeOutput(src, force) {
+      if (!src) return;
+      var nameEl = qs('recodeName');
+      var auto = autoRecodeName(src);
+      var cur = nameEl ? (nameEl.value || '').trim() : '';
+      if (nameEl && (force || !cur || cur === STATE.lastRecodeAutoName || /_recode$/i.test(cur))) {
+        nameEl.value = auto;
+        STATE.lastRecodeAutoName = auto;
+      }
+      fillSplitExtent(!!force);
+      updateRecodeRowCounts();
+    }
+    function fillSplitExtent(force) {
+      var fromEl = qs('splitFrom');
+      var toEl = qs('splitTo');
+      if (!fromEl || !toEl) return;
       var ext = sourceExtent();
       if (!ext) return;
-      if (qs('splitFrom').value === '') qs('splitFrom').setAttribute('placeholder', 'e.g. ' + ext.min);
-      if (qs('splitTo').value === '') qs('splitTo').setAttribute('placeholder', 'e.g. ' + ext.max);
+      fromEl.setAttribute('placeholder', String(ext.min));
+      toEl.setAttribute('placeholder', String(ext.max));
+      if (force || fromEl.value === '') fromEl.value = ext.min;
+      if (force || toEl.value === '') toEl.value = ext.max;
+    }
+    function hintSplitExtent() {
+      fillSplitExtent(true);
     }
     function sourceExtent() {
       var col = qs('recodeSource').value;
@@ -1098,10 +1124,12 @@
       if (i < 0) return null;
       var lo = Infinity, hi = -Infinity;
       STATE.rows.forEach(function (row) {
-        var n = Number(row[i]);
-        if (isFinite(n)) { if (n < lo) lo = n; if (n > hi) hi = n; }
+        var n = recodeAsNumber(row[i]);
+        if (n == null) return;
+        if (n < lo) lo = n;
+        if (n > hi) hi = n;
       });
-      return isFinite(lo) ? { min: lo, max: hi } : null;
+      return isFinite(lo) ? { min: roundNice(lo), max: roundNice(hi) } : null;
     }
     function roundNice(n) {
       if (Math.abs(n - Math.round(n)) < 1e-9) return Math.round(n);
@@ -1787,13 +1815,13 @@
     qs('recodeSource').addEventListener('change', function () {
       STATE.selected = {};
       if (this.value) STATE.selected[this.value] = true;
-      if (!(qs('recodeName').value || '').trim() && this.value) qs('recodeName').value = this.value + '_recode';
-      hintSplitExtent();
+      syncRecodeOutput(this.value, true);
+      STATE.lastRecodeSource = this.value;
       updateAffected();
     });
     qs('recodeOtherwise').addEventListener('change', syncRecodeMethod);
     qs('recodeMethods').addEventListener('change', function () {
-      if (recodeMethod() === 'equal') hintSplitExtent();
+      if (recodeMethod() === 'equal' || recodeMethod() === 'ranges') fillSplitExtent(true);
       syncRecodeMethod();
       updateAffected();
     });

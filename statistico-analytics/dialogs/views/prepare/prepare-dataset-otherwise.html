@@ -57,8 +57,8 @@
       border:1px solid var(--cfg-border); border-radius:8px; padding:6px;
       background:var(--cfg-surface2);
     }
-    .map-grid { grid-template-columns:1fr 1fr 26px; }
-    .range-grid { grid-template-columns:1fr 1fr 1fr 26px; }
+    .map-grid { grid-template-columns:1fr 1fr 48px 26px; }
+    .range-grid { grid-template-columns:1fr 1fr 1fr 48px 26px; }
     .rc-card {
       background:var(--cfg-surface); border:1px solid var(--cfg-border);
       border-radius:10px; padding:10px 12px 12px; margin-top:10px;
@@ -90,6 +90,11 @@
       color:#cdd6e0; opacity:1; -webkit-text-fill-color:#cdd6e0;
     }
     .grid-hd { font-size:9.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); }
+    .grid-n {
+      font-size:11px; font-weight:800; color:var(--prep-acc); text-align:right;
+      font-variant-numeric:tabular-nums; padding-right:2px;
+    }
+    .grid-n.is-empty { color:var(--cfg-text3); font-weight:600; }
     .grid-x { background:none; border:none; color:var(--cfg-text3); cursor:pointer; font-size:14px; line-height:1; padding:2px 0; }
     .grid-add { background:none; border:none; color:var(--prep-acc); font-size:11px; font-weight:700; cursor:pointer; padding:4px 0 0; text-align:left; }
     .split-row { display:flex; flex-wrap:wrap; gap:6px; align-items:flex-end; margin-top:6px; }
@@ -358,6 +363,7 @@
                   <div class="map-grid" id="recodeMapGrid">
                     <div class="grid-hd">Original value</div>
                     <div class="grid-hd">New value</div>
+                    <div class="grid-hd" title="Observations matching this rule">n</div>
                     <div></div>
                   </div>
                   <button type="button" class="grid-add" id="btnAddMap">Add value mapping</button>
@@ -385,6 +391,7 @@
                     <div class="grid-hd">From</div>
                     <div class="grid-hd">To</div>
                     <div class="grid-hd">New value</div>
+                    <div class="grid-hd" title="Observations in this range">n</div>
                     <div></div>
                   </div>
                   <button type="button" class="grid-add" id="btnAddRange">Add numeric range</button>
@@ -738,13 +745,16 @@
       return String(raw || '').split(/[,;]+/).map(function (x) { return x.trim(); }).filter(Boolean);
     }
     var recodeSeq = 1;
+    var skipRecodeCount = false;
     function addMapRow(from, to) {
       var id = String(recodeSeq++);
       var grid = qs('recodeMapGrid');
       grid.insertAdjacentHTML('beforeend',
         '<input class="fld map-from" data-map="' + id + '" placeholder="e.g. 1" value="' + esc(from || '') + '" />' +
         '<input class="fld map-to" data-map="' + id + '" placeholder="e.g. Yes" value="' + esc(to || '') + '" />' +
+        '<span class="grid-n is-empty" data-map="' + id + '" title="Observations matching this rule">—</span>' +
         '<button type="button" class="grid-x" data-del-map="' + id + '" title="Remove" aria-label="Remove">×</button>');
+      if (!skipRecodeCount) updateRecodeRowCounts();
     }
     function addRangeRow(from, to, code) {
       var id = String(recodeSeq++);
@@ -753,7 +763,9 @@
         '<input class="fld range-from" data-range="' + id + '" type="number" placeholder="e.g. 0" value="' + esc(from == null ? '' : from) + '" />' +
         '<input class="fld range-to" data-range="' + id + '" type="number" placeholder="e.g. 17" value="' + esc(to == null ? '' : to) + '" />' +
         '<input class="fld range-code" data-range="' + id + '" placeholder="e.g. child" value="' + esc(code || '') + '" />' +
+        '<span class="grid-n is-empty" data-range="' + id + '" title="Observations in this range">—</span>' +
         '<button type="button" class="grid-x" data-del-range="' + id + '" title="Remove" aria-label="Remove">×</button>');
+      if (!skipRecodeCount) updateRecodeRowCounts();
     }
     function clearRangeRows() {
       qs('recodeRangeGrid').querySelectorAll('[data-range], [data-del-range]').forEach(function (el) { el.remove(); });
@@ -782,6 +794,86 @@
         ranges.push({ min: min, max: max, to: code });
       });
       return ranges;
+    }
+    function recodeCellKey(v) {
+      if (v == null || v === '') return '';
+      if (typeof v === 'number' && isFinite(v)) return String(v);
+      return String(v);
+    }
+    function recodeAsNumber(v) {
+      if (typeof v === 'number' && isFinite(v)) return v;
+      if (typeof v === 'boolean') return v ? 1 : 0;
+      if (typeof v === 'string') {
+        var s = v.trim().replace(/,/g, '');
+        if (s === '') return null;
+        var n = Number(s);
+        return isFinite(n) ? n : null;
+      }
+      return null;
+    }
+    function setRecodeN(el, n, ready) {
+      if (!el) return;
+      if (!ready) {
+        el.textContent = '—';
+        el.classList.add('is-empty');
+        return;
+      }
+      el.textContent = String(n);
+      el.classList.remove('is-empty');
+    }
+    function updateRecodeRowCounts() {
+      var mapGrid = qs('recodeMapGrid');
+      var rangeGrid = qs('recodeRangeGrid');
+      if (!mapGrid || !rangeGrid) return;
+      var srcEl = qs('recodeSource');
+      var col = srcEl ? srcEl.value : '';
+      var i = col ? STATE.headers.indexOf(col) : -1;
+      var rows = STATE.rows || [];
+      mapGrid.querySelectorAll('.map-from').forEach(function (fromEl) {
+        var id = fromEl.getAttribute('data-map');
+        var nEl = mapGrid.querySelector('span.grid-n[data-map="' + id + '"]');
+        var from = (fromEl.value || '').trim();
+        if (!from || i < 0) {
+          setRecodeN(nEl, 0, false);
+          return;
+        }
+        var n = 0;
+        for (var r = 0; r < rows.length; r++) {
+          var v = rows[r][i];
+          var key = recodeCellKey(v);
+          if (key === from || String(v) === from) n++;
+        }
+        setRecodeN(nEl, n, true);
+      });
+      var rangeRules = [];
+      rangeGrid.querySelectorAll('.range-from').forEach(function (fromEl) {
+        var id = fromEl.getAttribute('data-range');
+        var toEl = rangeGrid.querySelector('.range-to[data-range="' + id + '"]');
+        var nEl = rangeGrid.querySelector('span.grid-n[data-range="' + id + '"]');
+        var min = Number(fromEl.value);
+        var max = Number(toEl && toEl.value);
+        var ready = fromEl.value !== '' && toEl && toEl.value !== '' && isFinite(min) && isFinite(max);
+        rangeRules.push({ nEl: nEl, min: min, max: max, ready: ready, count: 0 });
+      });
+      if (i < 0) {
+        rangeRules.forEach(function (rule) { setRecodeN(rule.nEl, 0, false); });
+        return;
+      }
+      for (var r = 0; r < rows.length; r++) {
+        var num = recodeAsNumber(rows[r][i]);
+        if (num == null) continue;
+        for (var k = 0; k < rangeRules.length; k++) {
+          var rule = rangeRules[k];
+          if (!rule.ready) continue;
+          if (num >= rule.min && num <= rule.max) {
+            rule.count++;
+            break;
+          }
+        }
+      }
+      rangeRules.forEach(function (rule) {
+        setRecodeN(rule.nEl, rule.count, rule.ready);
+      });
     }
     function fillRecodeSource() {
       var sel = qs('recodeSource');
@@ -834,12 +926,14 @@
       if (!isFinite(n) || n < 2) n = 2;
       qs('splitN').value = n;
       var step = (hi - lo) / n;
+      skipRecodeCount = true;
       clearRangeRows();
       for (var i = 0; i < n; i++) {
         var a = roundNice(lo + i * step);
         var b = roundNice(i === n - 1 ? hi : lo + (i + 1) * step);
         addRangeRow(a, b, String(i + 1));
       }
+      skipRecodeCount = false;
       syncRecodeMethod();
       updateAffected();
     }
@@ -1097,6 +1191,7 @@
         qs('formulaMsg').textContent = vf.ok ? 'Formula is valid.' : (vf.error || '');
         qs('formulaMsg').style.color = vf.ok ? 'var(--prep-acc)' : '#f97316';
       }
+      if (currentOp() === 'recode') updateRecodeRowCounts();
       renderImpact();
       STATE.preview = null;
       STATE.previewedKey = null;

@@ -63,7 +63,7 @@
     .results-container { flex:1; min-height:0; overflow-y:auto; padding:10px; display:block; }
     .tab-panel { display:none; flex-direction:column; gap:10px; height:auto; min-height:0; flex:none; }
     .tab-panel.active { display:flex; }
-    .card { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:14px 16px; height:auto; min-height:0; flex:none; }
+    .card { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:14px 16px; height:auto; min-height:0; flex:none; overflow:visible; }
     .card-title { font-size:13px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
     .card-title-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
     .card-title-row .card-title { margin-bottom:0; flex:1; }
@@ -142,23 +142,20 @@
     }
     :root[data-theme="light"] .info-icon { background:rgba(109,40,217,.12); border-color:rgba(109,40,217,.35); color:#6d28d9; }
     .info-icon .tip {
-      display:none; position:absolute; right:22px; top:50%; transform:translateY(-50%);
-      width:280px; background:rgba(10,15,30,.97); border:1px solid rgba(139,92,246,.4);
+      display:none; position:fixed; left:0; top:0;
+      width:max-content; max-width:min(360px, calc(100vw - 16px));
+      background:rgba(10,15,30,.97); border:1px solid rgba(139,92,246,.4);
       border-radius:8px; padding:10px 12px; font-size:11.5px; font-weight:400; color:#dbeafe;
-      z-index:40; line-height:1.45; text-align:left;
+      z-index:10050; line-height:1.45; text-align:left; text-transform:none; letter-spacing:0;
+      white-space:normal; pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,.45);
     }
     :root[data-theme="light"] .info-icon .tip { background:#fff; color:#1e293b; border-color:#c4b5fd; }
-    .info-icon:hover .tip { display:block; }
+    .info-icon:hover .tip, .info-icon:focus .tip, .info-icon:focus-within .tip { display:block; }
     .info-icon .tip b { color:#fff; }
+    .info-icon.kpi-info .tip b:first-child { display:block; margin-bottom:4px; }
     :root[data-theme="light"] .info-icon .tip b { color:#0f172a; }
     .info-icon.kpi-info { width:16px; height:16px; font-size:10px; }
-    .info-icon.kpi-info .tip {
-      right:auto; left:0; top:calc(100% + 8px); transform:none; width:260px;
-      text-transform:none; letter-spacing:0; font-weight:400;
-    }
-    .kpi:last-child .info-icon.kpi-info .tip { left:auto; right:0; }
     table.ct .info-icon.kpi-info { margin-left:6px; vertical-align:middle; }
-    table.ct .info-icon.kpi-info .tip { left:0; right:auto; top:calc(100% + 8px); transform:none; }
     .ws-mode-hint { font-size:11px; color:var(--text-muted); margin-left:4px; }
     .cell-legend {
       display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
@@ -392,6 +389,8 @@
         <span class="ct-kv">Columns: <strong id="ctxCol">—</strong></span>
         <span class="config-sep"></span>
         <span class="ct-kv">N = <strong id="ctxN">—</strong></span>
+        <span class="config-sep" id="ctxCasesSep" style="display:none;"></span>
+        <span class="ct-kv" id="ctxCasesWrap" style="display:none;">n = <strong id="ctxCases">—</strong></span>
         <span class="config-sep"></span>
         <span class="ct-kv" id="ctxWeightWrap" style="display:none;">Weight: <strong id="ctxWeight">—</strong></span>
       </div>
@@ -666,6 +665,16 @@
       d = d == null ? 2 : d;
       if (Math.abs(x - Math.round(x)) < 1e-9 && d <= 2) return String(Math.round(x));
       return Number(x).toFixed(d);
+    }
+    function fmtAnalysisN(x) {
+      if (!isFinite(x)) return '—';
+      if (Math.abs(x - Math.round(x)) < 1e-6) return String(Math.round(x));
+      return String(Number(x.toFixed(2)));
+    }
+    function caseCount(b) {
+      if (!b) return NaN;
+      var n = Number(b.usedRows);
+      return isFinite(n) ? n : NaN;
     }
     function fmtFixed(x, d) {
       if (!isFinite(x)) return '—';
@@ -1060,7 +1069,57 @@
     }
 
     function infoTip(title, text) {
-      return '<span class="info-icon kpi-info" tabindex="0" aria-label="' + esc(title) + '">i<span class="tip"><b>' + esc(title) + '</b><br>' + text + '</span></span>';
+      return '<span class="info-icon kpi-info" tabindex="0" aria-label="' + esc(title) + '">i<span class="tip"><b>' + esc(title) + '</b>' + text + '</span></span>';
+    }
+
+    function placeInfoTip(icon) {
+      var tip = icon && icon.querySelector ? icon.querySelector('.tip') : null;
+      if (!tip) return;
+      tip.style.visibility = 'hidden';
+      tip.style.display = 'block';
+      var rect = icon.getBoundingClientRect();
+      var tw = tip.offsetWidth || 280;
+      var th = tip.offsetHeight || 80;
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      var left = Math.max(8, Math.min(rect.left, vw - tw - 8));
+      if (left + tw > vw - 8) left = Math.max(8, rect.right - tw);
+      var top = rect.bottom + 8;
+      if (top + th > vh - 8) top = Math.max(8, rect.top - th - 8);
+      tip.style.left = left + 'px';
+      tip.style.top = top + 'px';
+      tip.style.visibility = 'visible';
+    }
+
+    function hideInfoTip(icon) {
+      var tip = icon && icon.querySelector ? icon.querySelector('.tip') : null;
+      if (tip) {
+        tip.style.display = '';
+        tip.style.visibility = '';
+        tip.style.left = '';
+        tip.style.top = '';
+      }
+    }
+
+    function bindInfoTips() {
+      document.addEventListener('mouseover', function (e) {
+        var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+        if (icon) placeInfoTip(icon);
+      });
+      document.addEventListener('mouseout', function (e) {
+        var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+        if (!icon) return;
+        if (e.relatedTarget && icon.contains(e.relatedTarget)) return;
+        hideInfoTip(icon);
+      });
+      document.addEventListener('focusin', function (e) {
+        var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+        if (icon) placeInfoTip(icon);
+      });
+      document.addEventListener('focusout', function (e) {
+        var icon = e.target && e.target.closest ? e.target.closest('.info-icon') : null;
+        if (icon) hideInfoTip(icon);
+      });
     }
 
     function kpi(k, v, tip) {
@@ -1071,7 +1130,9 @@
       var r = bundle;
       var p = r.tests.pearson;
       qsHtml('overviewKpis', [
-        kpi('N', fmtN(r.N, 0)),
+        kpi('N', fmtAnalysisN(r.N), r.weightVar
+          ? 'Weighted total (sum of ' + esc(r.weightVar) + '). Unweighted n = ' + fmtAnalysisN(caseCount(r)) + ' cases.'
+          : 'Number of observations in the table.'),
         kpi('Pearson χ²', fmtN(p.stat, 2), 'Tests whether row and column variables are independent. Large values mean the counts differ from what independence would predict.'),
         kpi('df', String(p.df), 'Degrees of freedom = (rows − 1) × (columns − 1). The chi-square curve used for the p-value has this df.'),
         kpi('p-value', fmtP(p.p), 'Probability of a χ² at least this large if the variables were independent. Small p (e.g. &lt; 0.05) is evidence of association.'),
@@ -1314,7 +1375,7 @@
       var t = bundle.tests;
       var rows = [
         ['Pearson chi-square', fmtN(t.pearson.stat, 3), t.pearson.df, fmtP(t.pearson.p),
-          'Compares each cell with its expected count under independence. Sum of (O − E)² / E.'],
+          'Compares each cell with its expected count under independence. Statistic = Σ (O − E)<sup>2</sup> / E.'],
         ['Likelihood-ratio chi-square', fmtN(t.likelihoodRatio.stat, 3), t.likelihoodRatio.df, fmtP(t.likelihoodRatio.p),
           'G² from the likelihood of the independence model. Usually close to Pearson χ²; a large gap can flag sparse cells.']
       ];
@@ -1579,7 +1640,18 @@
       if (!bundle || !bundle.analyzable) return;
       document.getElementById('ctxRow').textContent = bundle.rowVar || '—';
       document.getElementById('ctxCol').textContent = bundle.colVar || '—';
-      document.getElementById('ctxN').textContent = fmtN(bundle.N, 0);
+      document.getElementById('ctxN').textContent = fmtAnalysisN(bundle.N);
+      var cases = caseCount(bundle);
+      var casesWrap = document.getElementById('ctxCasesWrap');
+      var casesSep = document.getElementById('ctxCasesSep');
+      if (bundle.weightVar && isFinite(cases)) {
+        casesWrap.style.display = '';
+        casesSep.style.display = '';
+        document.getElementById('ctxCases').textContent = fmtAnalysisN(cases);
+      } else {
+        casesWrap.style.display = 'none';
+        casesSep.style.display = 'none';
+      }
       var ww = document.getElementById('ctxWeightWrap');
       if (bundle.weightVar) { ww.style.display = ''; document.getElementById('ctxWeight').textContent = bundle.weightVar; }
       else ww.style.display = 'none';
@@ -1592,7 +1664,8 @@
       bindVizControls();
       if (activeTab === 'diagnostics') renderVizChart();
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
-        StatisticoHeader.updateVariable((bundle.rowVar || '') + ' × ' + (bundle.colVar || ''), bundle.N);
+        var headerN = (bundle.weightVar && isFinite(cases)) ? cases : bundle.N;
+        StatisticoHeader.updateVariable((bundle.rowVar || '') + ' × ' + (bundle.colVar || ''), headerN);
       }
     }
 
@@ -1688,7 +1761,7 @@
           ? '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>'
           : '<h1>Contingency Tables Report</h1>' +
             '<p class="meta"><strong>' + escR(bundle.rowVar) + ' × ' + escR(bundle.colVar) +
-            '</strong> &nbsp;·&nbsp; N = ' + escR(fmtN(bundle.N, 0)) +
+            '</strong> &nbsp;·&nbsp; N = ' + escR(fmtAnalysisN(bundle.N)) +
             ' &nbsp;·&nbsp; ' + escR(new Date().toLocaleString()) + '</p>' +
             '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>';
         var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>' +
@@ -1895,6 +1968,7 @@
 
     document.addEventListener('DOMContentLoaded', function () {
       try { bootHeader(); } catch (_e) {}
+      bindInfoTips();
       startBridge();
       bindVizControls();
       var modal = document.getElementById('diagHelpModal');

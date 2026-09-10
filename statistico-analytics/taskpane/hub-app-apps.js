@@ -590,7 +590,7 @@ let HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
     name: "Statistical Analysis",
-    tagline: "Core statistical modeling, comparisons, and discovery tools",
+    tagline: "Models, tests and diagnostics",
     color: "#c4b5fd",
     colorDark: "#6d28d9",
     icon: "fa-chart-line",
@@ -600,7 +600,7 @@ let HUB_CLUSTER_META = {
   tools: {
     eyebrow: "Statistico flagship",
     name: "Specialized Tools",
-    tagline: "Goal-oriented planning, reporting, and operational workflows",
+    tagline: "Data preparation, calculators and reporting",
     color: "#f4b183",
     colorDark: "#8a4f1c",
     icon: "fa-toolbox",
@@ -1393,7 +1393,7 @@ function loadHubScopeConfigIfAny() {
 
 function syncClusterHeader() {
   var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
-  var tabAccent = ACTIVE_CLUSTER === "tools" ? "#F4C84A" : "#b49cff";
+  var tabAccent = ACTIVE_CLUSTER === "tools" ? "#e0b63d" : "#8d80c8";
   document.documentElement.setAttribute("data-hub-cluster", ACTIVE_CLUSTER);
   document.documentElement.style.setProperty("--hub-tab-accent", tabAccent);
   document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
@@ -1402,6 +1402,7 @@ function syncClusterHeader() {
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
     var active = btn.getAttribute("data-cluster") === ACTIVE_CLUSTER;
     btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
     if (active) btn.setAttribute("aria-current", "page");
     else btn.removeAttribute("aria-current");
   });

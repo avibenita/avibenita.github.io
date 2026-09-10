@@ -53,6 +53,35 @@ describe('Statistico Prepare Data engine', () => {
     expect(scan.issues.find((i) => i.kind === 'empty_rows').affected).toBe(3);
   });
 
+  test('text ID column with unique values is one identifier finding, not one row per value', () => {
+    const headers = ['ID', 'Group'];
+    const data = [];
+    for (let i = 1; i <= 40; i++) data.push(['ID' + i, i <= 38 ? 'A' : 'B']);
+    const scan = Prep.scanQuality(headers, data);
+    const idSmall = scan.issues.filter((i) => i.variable === 'ID' && i.kind === 'small_category');
+    const ident = scan.issues.filter((i) => i.kind === 'identifier' && i.variable === 'ID');
+    expect(idSmall.length).toBe(0);
+    expect(ident.length).toBe(1);
+    expect(ident[0].affected).toBe(40);
+    expect(ident[0].inspect[0].value).toMatch(/40 unique values out of 40/);
+  });
+
+  test('genuine rare categories emit one aggregated finding per variable', () => {
+    const headers = ['Sex'];
+    const data = [];
+    for (let i = 0; i < 95; i++) data.push(['Male']);
+    data.push(['Other']);
+    data.push(['Other']);
+    data.push(['Female']);
+    data.push(['Female']);
+    data.push(['Female']);
+    const scan = Prep.scanQuality(headers, data);
+    const small = scan.issues.filter((i) => i.kind === 'small_category');
+    expect(small.length).toBe(1);
+    expect(small[0].inspect.length).toBe(2);
+    expect(small[0].fixOp).toBe('recode');
+  });
+
   test('blank trailing columns are reported as information', () => {
     const headers = ['A', 'B', ''];
     const data = [

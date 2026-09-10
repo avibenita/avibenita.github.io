@@ -14,6 +14,8 @@
   var NEAR_CONSTANT_SHARE = 0.95;
   var SMALL_CATEGORY_N = 5;
   var SMALL_CATEGORY_SHARE = 0.05;
+  var ID_UNIQUE_SHARE = 0.8;
+  var ID_UNIQUE_MIN = 8;
   var PREVIEW_ROW_CAP = 40;
   var EXCEL_NAME_MAX = 31;
 
@@ -123,7 +125,20 @@
   }
 
   function looksLikeIdHeader(name) {
-    return /^(id|subject|case|respondent|participant|record)$/i.test(String(name || '').trim());
+    var s = String(name || '').trim().replace(/[\s-]+/g, '_');
+    if (!s) return false;
+    if (/^(id|subject|case|respondent|participant|record|rowid|row_id)$/i.test(s)) return true;
+    if (/(^|_)(id|subject|participant|respondent)(_|$)/i.test(s)) return true;
+    return false;
+  }
+
+  function isProbableIdentifier(p) {
+    if (!p || p.valid < 2) return false;
+    var share = p.unique / Math.max(1, p.valid);
+    if (looksLikeIdHeader(p.name) && (share >= 0.5 || p.unique === p.valid)) return true;
+    var mostlyText = p.text > 0 && p.text >= p.numeric;
+    if (mostlyText && p.unique >= ID_UNIQUE_MIN && share >= ID_UNIQUE_SHARE) return true;
+    return false;
   }
 
   function looksLikeTimeHeader(name) {
@@ -406,8 +421,9 @@
           issue: 'Mixed numeric and text values',
           affected: p.text,
           severity: 'required',
-          suggested: 'Recode text codes or split the variable before numeric analyses.',
+          suggested: 'Review and recode text codes, or split the variable before numeric analyses.',
           kind: 'mixed_type',
+          fixOp: 'recode',
           inspect: Object.keys(p.freq).filter(function (k) { return asNumber(k) == null; }).slice(0, 8)
             .map(function (k) { return { row: '', value: k + ' (' + p.freq[k] + ')' }; })
         });
@@ -452,21 +468,36 @@
           inspect: g.variants.map(function (v) { return { row: '', value: v }; })
         });
       });
-      if (p.text > 0 && p.numeric === 0 && p.unique >= 2) {
-        Object.keys(p.freq).forEach(function (k) {
-          if (p.freq[k] > 0 && p.freq[k] < SMALL_CATEGORY_N && p.freq[k] / Math.max(1, p.valid) < SMALL_CATEGORY_SHARE) {
-            issues.push({
-              id: 'small-cat-' + col + '-' + k,
-              variable: p.name,
-              issue: 'Very small category',
-              affected: p.freq[k],
-              severity: 'information',
-              suggested: 'Small cells weaken chi-square and logistic models. Consider recoding after review.',
-              kind: 'small_category',
-              inspect: [{ row: '', value: k + ' (n=' + p.freq[k] + ')' }]
-            });
-          }
+      if (isProbableIdentifier(p)) {
+        issues.push({
+          id: 'identifier-' + col,
+          variable: p.name,
+          issue: 'Identifier variable',
+          affected: p.unique,
+          severity: 'information',
+          suggested: 'This variable appears to be an identifier. It is excluded from category-size checks.',
+          kind: 'identifier',
+          unique: p.unique,
+          valid: p.valid,
+          inspect: [{ row: '', value: p.unique + ' unique values out of ' + p.valid + ' cases' }]
         });
+      } else if (p.text > 0 && p.numeric === 0 && p.unique >= 2) {
+        var rares = Object.keys(p.freq).filter(function (k) {
+          return p.freq[k] > 0 && p.freq[k] < SMALL_CATEGORY_N && p.freq[k] / Math.max(1, p.valid) < SMALL_CATEGORY_SHARE;
+        });
+        if (rares.length) {
+          issues.push({
+            id: 'small-cat-' + col,
+            variable: p.name,
+            issue: rares.length === 1 ? 'Very small category' : 'Very small categories',
+            affected: rares.reduce(function (s, k) { return s + p.freq[k]; }, 0),
+            severity: 'information',
+            suggested: 'Small cells weaken chi-square and logistic models. Consider recoding after review.',
+            kind: 'small_category',
+            fixOp: 'recode',
+            inspect: rares.slice(0, 12).map(function (k) { return { row: '', value: k + ' (n=' + p.freq[k] + ')' }; })
+          });
+        }
       }
       if (looksLikeDateHeader(p.name) || (p.text > 0 && p.values.some(function (v) { return parseLooseDate(v); }))) {
         var badDates = 0;

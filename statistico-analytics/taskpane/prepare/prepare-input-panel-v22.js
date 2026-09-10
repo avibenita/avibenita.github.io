@@ -55,9 +55,11 @@ function buildPreparePayload(extra) {
 
 function sendPrepareDialogData(dialog, type, extra) {
   if (!dialog) return;
+  extra = extra || {};
   listWorksheetNames().then(function (names) {
-    var payload = buildPreparePayload(extra || {});
+    var payload = buildPreparePayload(extra);
     payload.sheetNames = names || [];
+    payload.startTab = extra.startTab || (extra.intent && extra.intent.tab) || 'check';
     dialog.messageChild(JSON.stringify({ type: type, payload: payload }));
   });
 }
@@ -65,17 +67,16 @@ function sendPrepareDialogData(dialog, type, extra) {
 var prepareDialog = null;
 
 function openPrepareBuilder(kind) {
-  var moduleId = kind === 'quality' ? 'prepare-quality' : 'prepare-dataset';
-  var path = kind === 'quality' ? 'prepare/prepare-quality-v4.html' : 'prepare/prepare-dataset-n.html';
-  var dataType = kind === 'quality' ? 'PREPARE_QUALITY_DATA' : 'PREPARE_DATASET_DATA';
-  if (typeof setSelectedModuleCard === 'function') setSelectedModuleCard(moduleId, true);
+  var startTab = kind === 'dataset' ? 'configure' : 'check';
+  var moduleId = 'prepare-data';
+  var path = 'prepare/prepare-dataset-n.html';
+  var dataType = 'PREPARE_DATASET_DATA';
+  if (typeof setSelectedModuleCard === 'function') setSelectedModuleCard('prepare-data', true);
   var url = getPrepareDialogsBaseUrl() + path + '?v=' + Date.now();
   var opts = (typeof DIALOG_SIZES !== 'undefined' && DIALOG_SIZES.REGRESSION_BUILDER)
     ? DIALOG_SIZES.REGRESSION_BUILDER
     : { height: 74, width: 30, displayInIframe: false };
-  if (kind !== 'quality') {
-    opts = { height: opts.height || 74, width: 38, displayInIframe: opts.displayInIframe === true };
-  }
+  opts = { height: opts.height || 74, width: 38, displayInIframe: opts.displayInIframe === true };
 
   Office.context.ui.displayDialogAsync(url, opts, function (result) {
     if (result.status === Office.AsyncResultStatus.Failed) {
@@ -88,7 +89,7 @@ function openPrepareBuilder(kind) {
     prepareDialog = result.value;
     var dlg = prepareDialog;
     if (window.HubResultsBridge) HubResultsBridge.registerDialog(dlg);
-    var send = function () { sendPrepareDialogData(dlg, dataType, { keepIntent: false }); };
+    var send = function () { sendPrepareDialogData(dlg, dataType, { keepIntent: false, startTab: startTab }); };
     setTimeout(send, 550);
     dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
       var msg = {};
@@ -203,11 +204,21 @@ function runPrepareDatasetFromHub() {
   return true;
 }
 
+function runPrepareDataFromHub() {
+  loadPrepareEngine(function (err) {
+    if (err) { try { window.alert(err.message); } catch (e) {} return; }
+    openPrepareBuilder('check');
+  });
+  return true;
+}
+
 window.StatisticoHubResults = window.StatisticoHubResults || {};
+window.StatisticoHubResults['prepare-data'] = runPrepareDataFromHub;
 window.StatisticoHubResults['prepare-quality'] = runPrepareQualityFromHub;
 window.StatisticoHubResults['prepare-dataset'] = runPrepareDatasetFromHub;
 window.StatisticoPrepareWrite = {
   writeSheet: writePreparedWorksheet,
   openQuality: runPrepareQualityFromHub,
-  openDataset: runPrepareDatasetFromHub
+  openDataset: runPrepareDatasetFromHub,
+  openCheckPrepare: runPrepareDataFromHub
 };

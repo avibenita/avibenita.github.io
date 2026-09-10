@@ -559,47 +559,26 @@ const TOOLS_CATEGORY_TILES = [
 ];
 const PREPARE_CATEGORY_TILES = [
   {
-    id: "prepare-quality",
+    id: "prepare-data",
     section: "Prepare Data",
     sectionId: "prepare",
-    sectionSubtitle: "Rewrite variables, cases, and table shape for the analysis you intend to run",
-    title: "Data Quality",
-    icon: "fa-magnifying-glass-chart",
+    sectionSubtitle: "Check the Active Range, then recode, compute, filter, and reshape for analysis",
+    title: "Check & Prepare Data",
+    icon: "fa-broom",
     accent: "#14b8a6",
     accentDark: "#0f766e",
     color: "#14b8a6",
     colorDark: "#0f766e",
-    subtitle: "Find missing values, inconsistent categories, duplicates and structural problems before analysis.",
-    desc: "Scan the Active Range for missing values, inconsistent categories, duplicates, and structural problems that commonly weaken statistical analysis. Suggested corrections are never applied automatically.",
+    subtitle: "Scan for data-quality issues, then prepare a new worksheet without changing the source.",
+    desc: "One utility: scan the Active Range, inspect findings, then recode, compute, reverse-score, filter, and reshape. Suggested corrections are never applied automatically. The original range is never overwritten.",
     info: [
-      "Scan the selected Excel range without changing the source worksheet",
-      "Missing values, mixed types, duplicates, and inconsistent labels",
-      "Suggested actions can be added to a preparation recipe",
-      "Does not replace analysis-level trimming or transformations"
+      "Data Check runs automatically when the dialog opens",
+      "Fix opens the matching Prepare operation with the variable already selected",
+      "Preview and Recipe stay in the same dialog",
+      "Writes a new Prepared_Data worksheet; analysis-level transforms stay in each analysis dialog"
     ],
     modules: [
-      { id: "prepare-quality", label: "Scan data quality", tip: "Inspect missing values, duplicates, mixed types, and inconsistent categories." }
-    ]
-  },
-  {
-    id: "prepare-dataset",
-    sectionId: "prepare",
-    title: "Prepare Dataset",
-    icon: "fa-table-columns",
-    accent: "#14b8a6",
-    accentDark: "#0f766e",
-    color: "#0d9488",
-    colorDark: "#0f766e",
-    subtitle: "Recode, compute, filter and reshape data while preserving the original worksheet.",
-    desc: "Build a reusable preparation recipe — recode, compute, reverse-score, composite scores, filter, and reshape — then write a new Prepared_Data worksheet. The original range is never overwritten.",
-    info: [
-      "Persistent dataset operations: missing codes, recode, compute, reverse-score, composites",
-      "Filter cases, flag duplicates, and reshape wide data to long",
-      "Preview changes before creating a new worksheet",
-      "Leaves analysis-level transforms (ln, z-score, trim) inside each analysis dialog"
-    ],
-    modules: [
-      { id: "prepare-dataset", label: "Prepare dataset", tip: "Recode, compute, filter, and reshape into a new worksheet." }
+      { id: "prepare-data", label: "Check & Prepare Data", tip: "Scan the Active Range, then recode, compute, filter, and reshape into a new worksheet." }
     ]
   }
 ];
@@ -640,7 +619,7 @@ var TOOLS_SECTION_META = {
   prepare: {
     id: "prepare",
     label: "Data Preparation",
-    subtitle: "Clean, recode, and transform your data for analysis.",
+    subtitle: "Check issues, then recode and prepare a new worksheet.",
     icon: "fa-broom",
     color: "#14b8a6",
     colorDark: "#0f766e"
@@ -2752,29 +2731,27 @@ function dismissAllHubDialogs() {
   return hadOpen;
 }
 
-function openPrepareQualityFromHub() {
+function openPrepareDataFromHub(kind) {
   if (window.HubResultsBridge && typeof HubResultsBridge.open === "function") {
-    HubResultsBridge.open("prepare-quality", 80);
+    var key = kind === "prepare-dataset" ? "prepare-dataset" : (kind === "prepare-quality" ? "prepare-quality" : "prepare-data");
+    HubResultsBridge.open(key, 80);
     return true;
   }
   return false;
 }
 
+function openPrepareQualityFromHub() {
+  return openPrepareDataFromHub("prepare-quality");
+}
+
 function openPrepareDatasetFromHub() {
-  if (window.HubResultsBridge && typeof HubResultsBridge.open === "function") {
-    HubResultsBridge.open("prepare-dataset", 80);
-    return true;
-  }
-  return false;
+  return openPrepareDataFromHub("prepare-dataset");
 }
 
 function navigateToModuleCore(id) {
   var gr = getGlobalRangePayload();
-  if (id === "prepare-quality") {
-    if (openPrepareQualityFromHub()) return;
-  }
-  if (id === "prepare-dataset") {
-    if (openPrepareDatasetFromHub()) return;
+  if (id === "prepare-data" || id === "prepare-quality" || id === "prepare-dataset") {
+    if (openPrepareDataFromHub(id)) return;
   }
   if (id === "univariate") {
     if (openUnivariateConfigFromHub("univariate", null)) return;

@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260909ctsim" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260909ctsim"></script>
-  <script src="contingency-engine.js?v=20260814ct8"></script>
+  <script src="contingency-engine.js?v=20260911freq1"></script>
   <script src="contingency-sample-data.js?v=20260909ctsim"></script>
   <script src="../../shared/contingency-similarity.js?v=20260909ctsim"></script>
   <script src="../shared/vendor/highcharts/highcharts.js"></script>
@@ -334,8 +334,8 @@
           <div id="mainContent">
             <div class="summary-strip" id="summaryStrip">
               <div class="metric"><label>Table dimensions</label><strong id="metricShape">—</strong></div>
-              <div class="metric"><label>Total eligible N</label><strong id="metricRows">—</strong></div>
-              <div class="metric" id="metricSelectedWrap"><label>Selected group N</label><strong id="metricSelected">—</strong></div>
+              <div class="metric"><label id="metricRowsLabel">Total eligible N</label><strong id="metricRows">—</strong></div>
+              <div class="metric" id="metricSelectedWrap"><label id="metricSelectedLabel">Selected group N</label><strong id="metricSelected">—</strong></div>
             </div>
             <div class="ct-bg-panel is-active" id="ctByGroupPanel-association">
               <div class="table-wrap">
@@ -343,7 +343,8 @@
                   <thead>
                     <tr>
                       <th class="group-col">Group</th>
-                      <th class="num">n</th>
+                      <th class="num" id="assocNHead">n</th>
+                      <th class="num" id="assocRowsHead" style="display:none;">Input rows</th>
                       <th class="num">χ²</th>
                       <th class="num">df</th>
                       <th class="num">p</th>
@@ -549,7 +550,8 @@
 
     function isAnalysisHeader(header) {
       var h = String(header || '');
-      return h === String(spec.rowVar || '') || h === String(spec.colVar || '') || (spec.weightVar && h === String(spec.weightVar));
+      var freq = spec.frequencyColumn || spec.freqVar || spec.weightVar;
+      return h === String(spec.rowVar || '') || h === String(spec.colVar || '') || (freq && h === String(freq));
     }
 
     function getLevelCounts(idx) {
@@ -819,9 +821,31 @@
       return '<div class="v-bar" title="' + escapeHtml(title) + '"><span class="v-bar-track"><span class="v-bar-fill" style="width:' + pct.toFixed(1) + '%"></span></span></div>';
     }
 
+    function freqActive() {
+      return !!(spec.frequencyColumn || spec.freqVar || spec.weightVar);
+    }
+
+    function representedNOf(result) {
+      if (!result) return NaN;
+      if (Number.isFinite(result.representedN)) return result.representedN;
+      return Number(result.N);
+    }
+
+    function inputRowCountOf(item) {
+      if (item && item.result && Number.isFinite(item.result.inputRowCount)) return item.result.inputRowCount;
+      if (item && item.n != null) return item.n;
+      return NaN;
+    }
+
+    function fmtInt(x) {
+      if (!Number.isFinite(x)) return '—';
+      return Math.round(x).toLocaleString('en-US');
+    }
+
     function resultN(item) {
-      if (item && item.result && item.result.N != null) return item.result.N;
-      return item && item.n != null ? item.n : '—';
+      var n = item && item.result ? representedNOf(item.result) : NaN;
+      if (Number.isFinite(n)) return fmtInt(n);
+      return item && item.n != null ? fmtInt(item.n) : '—';
     }
 
     function includedLevelItems() {
@@ -1588,16 +1612,33 @@
       }
       var overallRows = includedRows();
       var overall = analyzeRows(overallRows);
+      if (overall && overall.analyzable === false && overall.error && /frequency\/count column/.test(overall.error)) {
+        setEmpty(overall.error);
+        return;
+      }
       groupResults = [{ key: 'overall', label: 'Overall', n: overallRows.length, result: overall }].concat(levels.map(function (item) {
         var rows = rowsForLevel(item.level);
         return { key: item.level, label: item.level, n: rows.length, result: analyzeRows(rows) };
       }));
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'flex';
+      var usingFreq = freqActive();
+      var nHead = document.getElementById('assocNHead');
+      var rowsHead = document.getElementById('assocRowsHead');
+      if (nHead) nHead.textContent = usingFreq ? 'Cases' : 'n';
+      if (rowsHead) rowsHead.style.display = usingFreq ? '' : 'none';
+      var rowsLabel = document.getElementById('metricRowsLabel');
+      if (rowsLabel) rowsLabel.textContent = usingFreq ? 'Cases represented' : 'Total eligible N';
+      var selLabel = document.getElementById('metricSelectedLabel');
+      if (selLabel) selLabel.textContent = usingFreq ? 'Selected group cases' : 'Selected group N';
       document.getElementById('metricShape').textContent = overall.analyzable ? (overall.nRows + ' × ' + overall.nCols) : '—';
-      document.getElementById('metricRows').textContent = String(overall.analyzable && overall.N != null ? overall.N : overallRows.length);
-      document.getElementById('subtitle').textContent = (spec.rowVar || 'Rows') + ' × ' + (spec.colVar || 'Columns') + ' within ' + sourceHeaders[groupIndex];
+      document.getElementById('metricRows').textContent = overall.analyzable
+        ? fmtInt(representedNOf(overall))
+        : fmtInt(overallRows.length);
+      document.getElementById('subtitle').textContent = (spec.rowVar || 'Rows') + ' × ' + (spec.colVar || 'Columns') + ' within ' + sourceHeaders[groupIndex] +
+        (usingFreq ? ' · Frequency: ' + (spec.frequencyColumn || spec.freqVar || spec.weightVar) : '');
       var groupName = sourceHeaders[groupIndex] || 'group';
+      var colSpan = usingFreq ? 10 : 9;
       var rowsHtml = groupResults.map(function (item) {
         var res = item.result || {};
         var tests = res.tests || {};
@@ -1610,6 +1651,7 @@
         return '<tr class="' + rowClass + '"' + warn + '>' +
           '<td class="group-col">' + escapeHtml(item.label) + '</td>' +
           '<td class="num">' + resultN(item) + '</td>' +
+          (usingFreq ? '<td class="num">' + fmtInt(inputRowCountOf(item)) + '</td>' : '') +
           '<td class="num">' + fmtNum(pearson.stat, 2) + '</td>' +
           '<td class="num">' + (Number.isFinite(pearson.df) ? pearson.df : '—') + '</td>' +
           '<td class="num ' + pClass + '">' + fmtP(pearson.p) + '</td>' +
@@ -1619,7 +1661,7 @@
           '<td class="strength-col">' + strengthHtml(tests.cramersV) + '</td></tr>';
       });
       if (rowsHtml.length > 1) {
-        rowsHtml.splice(1, 0, '<tr class="assoc-split"><td colspan="9">Levels of ' + escapeHtml(groupName) + '</td></tr>');
+        rowsHtml.splice(1, 0, '<tr class="assoc-split"><td colspan="' + colSpan + '">Levels of ' + escapeHtml(groupName) + '</td></tr>');
       }
       document.getElementById('assocBody').innerHTML = rowsHtml.join('');
       if (tableGroupKey !== 'together' && !groupResults.some(function (item) { return item.key === tableGroupKey; })) {
@@ -1632,7 +1674,7 @@
       renderCtSimilarity();
       showContingencyByGroupPanel(ctByGroupPanel);
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
-        StatisticoHeader.updateVariable((spec.rowVar || '') + ' × ' + (spec.colVar || ''), overallRows.length);
+        StatisticoHeader.updateVariable((spec.rowVar || '') + ' × ' + (spec.colVar || ''), representedNOf(overall));
       }
     }
 
@@ -1657,7 +1699,8 @@
           spec = {
             rowVar: bundle.rowVar,
             colVar: bundle.colVar,
-            weightVar: bundle.weightVar,
+            frequencyColumn: bundle.frequencyColumn || bundle.weightVar || null,
+            weightVar: bundle.frequencyColumn || bundle.weightVar || null,
             missing: bundle.missingMode,
             confidence: bundle.confidence,
             rowLevels: bundle.rowLabels,
@@ -1712,7 +1755,8 @@
                 spec = {
                   rowVar: msg.payload.rowVar,
                   colVar: msg.payload.colVar,
-                  weightVar: msg.payload.weightVar || null,
+                  frequencyColumn: msg.payload.frequencyColumn || msg.payload.weightVar || null,
+                  weightVar: msg.payload.frequencyColumn || msg.payload.weightVar || null,
                   missing: msg.payload.missingMode,
                   confidence: msg.payload.confidence,
                   rowLevels: msg.payload.rowLabels,

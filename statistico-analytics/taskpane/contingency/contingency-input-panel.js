@@ -138,7 +138,8 @@ function slimContingencyBundle(bundle) {
 function contingencyViewPayload(bundle) {
   if (!bundle || typeof bundle !== 'object') return null;
   var headers = bundle.viewHeaders || [bundle.rowVar, bundle.colVar].filter(Boolean);
-  if (bundle.weightVar && headers.indexOf(bundle.weightVar) < 0) headers = headers.concat([bundle.weightVar]);
+  var freqName = bundle.frequencyColumn || bundle.weightVar;
+  if (freqName && headers.indexOf(freqName) < 0) headers = headers.concat([freqName]);
   return {
     headers: headers,
     allRows: Array.isArray(bundle.allViewRows) ? bundle.allViewRows : [],

@@ -17,8 +17,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260909ctsim"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260909ctsim"></script>
-  <script src="contingency-engine.js?v=20260814ct8"></script>
-  <script src="contingency-sample-data.js?v=20260909ctsim"></script>
+  <script src="contingency-engine.js?v=20260911freq1"></script>
+  <script src="contingency-sample-data.js?v=20260911freq1"></script>
   <style>
     :root {
       --surface-0:#070b14; --surface-1:#1e2638; --surface-2:#2a3348; --border:#4b556e;
@@ -388,11 +388,11 @@
         <span class="config-sep"></span>
         <span class="ct-kv">Columns: <strong id="ctxCol">—</strong></span>
         <span class="config-sep"></span>
-        <span class="ct-kv">N = <strong id="ctxN">—</strong></span>
+        <span class="ct-kv" id="ctxNWrap">N = <strong id="ctxN">—</strong></span>
         <span class="config-sep" id="ctxCasesSep" style="display:none;"></span>
-        <span class="ct-kv" id="ctxCasesWrap" style="display:none;">n = <strong id="ctxCases">—</strong></span>
-        <span class="config-sep"></span>
-        <span class="ct-kv" id="ctxWeightWrap" style="display:none;">Weight: <strong id="ctxWeight">—</strong></span>
+        <span class="ct-kv" id="ctxCasesWrap" style="display:none;">Input rows: <strong id="ctxCases">—</strong></span>
+        <span class="config-sep" id="ctxFreqSep" style="display:none;"></span>
+        <span class="ct-kv" id="ctxWeightWrap" style="display:none;">Frequency: <strong id="ctxWeight">—</strong></span>
       </div>
       <div class="results-container" data-preview-canvas>
         <div id="loadingState" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading contingency results…</div>
@@ -457,8 +457,8 @@
               </label>
               <label id="vizWeightLabel">Counts
                 <div class="viz-seg" id="vizWeightSeg">
-                  <button type="button" data-w="1">Weighted</button>
-                  <button type="button" data-w="0">Unweighted</button>
+                  <button type="button" data-w="1">Frequency counts</button>
+                  <button type="button" data-w="0">Input rows</button>
                 </div>
               </label>
               <label class="viz-check"><input type="checkbox" id="vizLabels"> Data labels</label>
@@ -668,13 +668,29 @@
     }
     function fmtAnalysisN(x) {
       if (!isFinite(x)) return '—';
-      if (Math.abs(x - Math.round(x)) < 1e-6) return String(Math.round(x));
-      return String(Number(x.toFixed(2)));
+      return Math.round(x).toLocaleString('en-US');
     }
     function caseCount(b) {
       if (!b) return NaN;
       var n = Number(b.usedRows);
       return isFinite(n) ? n : NaN;
+    }
+    function freqCol(b) {
+      return (b && (b.frequencyColumn || b.weightVar)) || null;
+    }
+    function representedNOf(b) {
+      if (!b) return NaN;
+      if (isFinite(b.representedN)) return b.representedN;
+      return b.N;
+    }
+    function inputRowCountOf(b) {
+      if (!b) return NaN;
+      if (isFinite(b.inputRowCount)) return b.inputRowCount;
+      return caseCount(b);
+    }
+    function fmtCount(x) {
+      if (!isFinite(x)) return '—';
+      return Math.round(x).toLocaleString('en-US');
     }
     function fmtFixed(x, d) {
       if (!isFinite(x)) return '—';
@@ -685,7 +701,7 @@
     }
     function cellValue(r, i, j, id) {
       id = id || (measureList()[0] && measureList()[0].id);
-      if (id === 'observed') return fmtN(r.observed[i][j], 2);
+      if (id === 'observed') return fmtCount(r.observed[i][j]);
       if (id === 'expected') return fmtN(r.expected[i][j], 2);
       if (id === 'rowPct') return fmtN(r.rowPct[i][j], 1) + '%';
       if (id === 'colPct') return fmtN(r.colPct[i][j], 1) + '%';
@@ -698,15 +714,18 @@
         if (id === 'rowPct') return '100%';
         if (id === 'colPct') return '';
         if (id === 'totPct') return fmtN(100 * r.rowTotals[idx] / r.N, 1) + '%';
+        if (id === 'observed') return fmtCount(r.rowTotals[idx]);
         return fmtN(r.rowTotals[idx], 2);
       }
       if (kind === 'col') {
         if (id === 'colPct') return '100%';
         if (id === 'rowPct') return '';
         if (id === 'totPct') return fmtN(100 * r.colTotals[idx] / r.N, 1) + '%';
+        if (id === 'observed') return fmtCount(r.colTotals[idx]);
         return fmtN(r.colTotals[idx], 2);
       }
       if (id === 'rowPct' || id === 'colPct' || id === 'totPct') return '100%';
+      if (id === 'observed') return fmtCount(r.N);
       return fmtN(r.N, 2);
     }
     function stackHtml(lines) {
@@ -851,7 +870,7 @@
     }
     function vizSourceBundle() {
       if (!bundle) return null;
-      if (vizWeighted || !bundle.weightVar) return bundle;
+      if (vizWeighted || !freqCol(bundle)) return bundle;
       if (vizUnweightedCache) return vizUnweightedCache;
       var rows = bundle.usedViewRows || [];
       if (!rows.length) return bundle;
@@ -925,21 +944,21 @@
         };
       });
       var yTitle = vizMetricLabel(metric);
-      if (!vizWeighted && bundle.weightVar) yTitle += ' (unweighted)';
+      if (!vizWeighted && freqCol(bundle)) yTitle += ' (input rows)';
       var cap = document.getElementById('vizCaption');
       if (cap) {
         cap.textContent = (src.rowVar || 'Rows') + ' as series · X = ' + (src.colVar || 'columns') +
-          (bundle.weightVar ? (vizWeighted ? ' · weighted by ' + bundle.weightVar : ' · unweighted (each case = 1)') : '');
+          (freqCol(bundle) ? (vizWeighted ? ' · Frequency: ' + freqCol(bundle) : ' · one case per input row') : '');
       }
       var wLabel = document.getElementById('vizWeightLabel');
-      if (wLabel) wLabel.style.display = bundle.weightVar ? '' : 'none';
-      var canUnweight = !!(bundle.weightVar && (bundle.usedViewRows || []).length);
+      if (wLabel) wLabel.style.display = freqCol(bundle) ? '' : 'none';
+      var canUnweight = !!(freqCol(bundle) && (bundle.usedViewRows || []).length);
       document.querySelectorAll('#vizWeightSeg button').forEach(function (b) {
         var isW = b.getAttribute('data-w') === '1';
         b.classList.toggle('active', isW === !!vizWeighted);
         if (!isW) {
           b.disabled = !canUnweight;
-          b.title = canUnweight ? 'Each case counts as 1, ignoring the weight variable.' : 'Unweighted counts need the source cases.';
+          b.title = canUnweight ? 'Each input row counts as 1, ignoring the frequency column.' : 'Input-row counts need the source cases.';
         }
       });
       var light = isLightCanvas();
@@ -979,7 +998,7 @@
           shared: hcType === 'line' || hcType === 'spline' || hcType === 'area',
           backgroundColor: light ? 'rgba(255,248,230,.96)' : 'rgba(15,23,42,.95)',
           style: { color: light ? '#1c1917' : '#e2e8f0' },
-          valueDecimals: metric === 'observed' ? 1 : (pctMetric ? 1 : 2),
+          valueDecimals: metric === 'observed' ? 0 : (pctMetric ? 1 : 2),
           valueSuffix: pctMetric && stacking !== 'percent' ? '%' : ''
         },
         plotOptions: {
@@ -1017,7 +1036,8 @@
         nav.spec = {
           rowVar: bundle.rowVar,
           colVar: bundle.colVar,
-          weightVar: bundle.weightVar || null,
+          frequencyColumn: freqCol(bundle),
+          weightVar: freqCol(bundle),
           missing: bundle.missingMode,
           confidence: bundle.confidence,
           rowLevels: bundle.rowLabels,
@@ -1130,9 +1150,10 @@
       var r = bundle;
       var p = r.tests.pearson;
       qsHtml('overviewKpis', [
-        kpi('N', fmtAnalysisN(r.N), r.weightVar
-          ? 'Weighted total (sum of ' + esc(r.weightVar) + '). Unweighted n = ' + fmtAnalysisN(caseCount(r)) + ' cases.'
-          : 'Number of observations in the table.'),
+        freqCol(r)
+          ? kpi('Cases represented', fmtAnalysisN(representedNOf(r)), 'Sum of the aggregated frequency column “' + esc(freqCol(r)) + '”. Input rows = ' + fmtAnalysisN(inputRowCountOf(r)) + '.')
+          : kpi('N', fmtAnalysisN(representedNOf(r)), 'Number of observations in the table.'),
+        freqCol(r) ? kpi('Input rows', fmtAnalysisN(inputRowCountOf(r)), 'Excel rows included after missing-value and category filters.') : '',
         kpi('Pearson χ²', fmtN(p.stat, 2), 'Tests whether row and column variables are independent. Large values mean the counts differ from what independence would predict.'),
         kpi('df', String(p.df), 'Degrees of freedom = (rows − 1) × (columns − 1). The chi-square curve used for the p-value has this df.'),
         kpi('p-value', fmtP(p.p), 'Probability of a χ² at least this large if the variables were independent. Small p (e.g. &lt; 0.05) is evidence of association.'),
@@ -1142,6 +1163,7 @@
       var interp = r.interpretation || {};
       var html = '<p>' + esc(interp.summary || '') + '</p>';
       (interp.details || []).forEach(function (d) { html += '<p>' + esc(d) + '</p>'; });
+      if (r.frequencyNote) html += '<p>' + esc(r.frequencyNote) + '</p>';
       qsHtml('overviewInterp', html);
       renderTests();
     }
@@ -1363,7 +1385,7 @@
 
     function tip(r, i, j) {
       return r.rowLabels[i] + ' × ' + r.colLabels[j] +
-        ' | Observed ' + fmtN(r.observed[i][j], 2) +
+        ' | Observed ' + fmtCount(r.observed[i][j]) +
         ' | Expected ' + fmtN(r.expected[i][j], 2) +
         ' | Row ' + fmtN(r.rowPct[i][j], 1) + '%' +
         ' | Col ' + fmtN(r.colPct[i][j], 1) + '%' +
@@ -1392,6 +1414,9 @@
         html += '<tr><td class="stub">' + esc(row[0]) + infoTip(row[0], row[4]) + '</td><td>' + esc(row[1]) + '</td><td>' + esc(String(row[2])) + '</td><td>' + esc(row[3]) + '</td></tr>';
       });
       html += '</tbody></table>';
+      if (bundle.frequencyNote) {
+        html += '<p class="muted" style="margin-top:10px;">' + esc(bundle.frequencyNote) + '</p>';
+      }
       qsHtml('testsWrap', html);
     }
 
@@ -1584,7 +1609,7 @@
           var sr = r.stdResiduals[i][j];
           var bg = residColor(sr);
           html += '<div class="heat-cell" style="background:' + bg + ';color:' + cellInk(bg) + '" title="' + tip(r, i, j) + '">' +
-            '<div class="hv">' + fmtN(sr, 2) + '</div><div>' + fmtN(r.observed[i][j], 1) + ' / ' + fmtN(r.expected[i][j], 1) + '</div></div>';
+            '<div class="hv">' + fmtN(sr, 2) + '</div><div>' + fmtCount(r.observed[i][j]) + ' / ' + fmtN(r.expected[i][j], 2) + '</div></div>';
         });
       });
       html += '</div>';
@@ -1640,21 +1665,33 @@
       if (!bundle || !bundle.analyzable) return;
       document.getElementById('ctxRow').textContent = bundle.rowVar || '—';
       document.getElementById('ctxCol').textContent = bundle.colVar || '—';
-      document.getElementById('ctxN').textContent = fmtAnalysisN(bundle.N);
-      var cases = caseCount(bundle);
+      var represented = representedNOf(bundle);
+      var inputRows = inputRowCountOf(bundle);
+      var nWrap = document.getElementById('ctxNWrap');
+      if (nWrap) {
+        nWrap.childNodes[0].nodeValue = freqCol(bundle) ? 'Cases represented: ' : 'N = ';
+      }
+      document.getElementById('ctxN').textContent = fmtAnalysisN(represented);
       var casesWrap = document.getElementById('ctxCasesWrap');
       var casesSep = document.getElementById('ctxCasesSep');
-      if (bundle.weightVar && isFinite(cases)) {
+      if (freqCol(bundle) && isFinite(inputRows)) {
         casesWrap.style.display = '';
         casesSep.style.display = '';
-        document.getElementById('ctxCases').textContent = fmtAnalysisN(cases);
+        document.getElementById('ctxCases').textContent = fmtAnalysisN(inputRows);
       } else {
         casesWrap.style.display = 'none';
         casesSep.style.display = 'none';
       }
       var ww = document.getElementById('ctxWeightWrap');
-      if (bundle.weightVar) { ww.style.display = ''; document.getElementById('ctxWeight').textContent = bundle.weightVar; }
-      else ww.style.display = 'none';
+      var freqSep = document.getElementById('ctxFreqSep');
+      if (freqCol(bundle)) {
+        ww.style.display = '';
+        if (freqSep) freqSep.style.display = '';
+        document.getElementById('ctxWeight').textContent = freqCol(bundle);
+      } else {
+        ww.style.display = 'none';
+        if (freqSep) freqSep.style.display = 'none';
+      }
       refreshSharedSidebar();
       renderOverview();
       renderMeasureBar();
@@ -1664,8 +1701,7 @@
       bindVizControls();
       if (activeTab === 'diagnostics') renderVizChart();
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateVariable) {
-        var headerN = (bundle.weightVar && isFinite(cases)) ? cases : bundle.N;
-        StatisticoHeader.updateVariable((bundle.rowVar || '') + ' × ' + (bundle.colVar || ''), headerN);
+        StatisticoHeader.updateVariable((bundle.rowVar || '') + ' × ' + (bundle.colVar || ''), represented);
       }
     }
 
@@ -1692,7 +1728,7 @@
       rowSortDir = 0;
       colOrderLabels = (b.colLabels || []).slice();
       vizUnweightedCache = null;
-      vizWeighted = !!b.weightVar;
+      vizWeighted = !!freqCol(b);
       renderAll();
       persistContingencyNav();
       switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
@@ -1761,7 +1797,13 @@
           ? '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>'
           : '<h1>Contingency Tables Report</h1>' +
             '<p class="meta"><strong>' + escR(bundle.rowVar) + ' × ' + escR(bundle.colVar) +
-            '</strong> &nbsp;·&nbsp; N = ' + escR(fmtAnalysisN(bundle.N)) +
+            '</strong> &nbsp;·&nbsp; ' +
+            (freqCol(bundle)
+              ? 'Cases represented: ' + escR(fmtAnalysisN(representedNOf(bundle))) +
+                ' &nbsp;·&nbsp; Input rows: ' + escR(fmtAnalysisN(inputRowCountOf(bundle))) +
+                ' &nbsp;·&nbsp; Frequency: ' + escR(freqCol(bundle))
+              : 'N = ' + escR(fmtAnalysisN(representedNOf(bundle)))) +
+            (bundle.frequencyNote ? '<br>' + escR(bundle.frequencyNote) : '') +
             ' &nbsp;·&nbsp; ' + escR(new Date().toLocaleString()) + '</p>' +
             '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>';
         var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>' +
@@ -1824,7 +1866,7 @@
       var rLabs = b.rowLabels || [];
       var cLabs = b.colLabels || [];
       var obs = b.observed || [];
-      var weighted = !!b.weightVar;
+      var weighted = !!freqCol(b);
       for (var i = 0; i < rLabs.length; i++) {
         for (var j = 0; j < cLabs.length; j++) {
           var n = Number(obs[i] && obs[i][j]) || 0;
@@ -1849,7 +1891,7 @@
       var headers = (bundle.viewHeaders && bundle.viewHeaders.length)
         ? bundle.viewHeaders.slice()
         : [bundle.rowVar, bundle.colVar].filter(Boolean);
-      if (bundle.weightVar && headers.indexOf(bundle.weightVar) < 0) headers.push(bundle.weightVar);
+      if (freqCol(bundle) && headers.indexOf(freqCol(bundle)) < 0) headers.push(freqCol(bundle));
       var allRows = asRowList(bundle.allViewRows);
       var usedRows = asRowList(bundle.usedViewRows);
       if ((!allRows || !usedRows) && bundle.source && bundle.source.headers && bundle.source.rows && window.StatisticoContingency) {
@@ -1857,7 +1899,8 @@
           var rebuilt = StatisticoContingency.analyze(bundle.source.headers, bundle.source.rows, {
             rowVar: bundle.rowVar,
             colVar: bundle.colVar,
-            weightVar: bundle.weightVar,
+            frequencyColumn: freqCol(bundle),
+            weightVar: freqCol(bundle),
             missing: bundle.missingMode,
             rowLevels: bundle.rowLevels,
             colLevels: bundle.colLevels,
@@ -1873,7 +1916,7 @@
       var noticeParts = [];
       if (bundle.dropped && bundle.dropped.missing) noticeParts.push(bundle.dropped.missing + ' missing');
       if (bundle.dropped && bundle.dropped.level) noticeParts.push(bundle.dropped.level + ' excluded by category filter');
-      if (bundle.dropped && bundle.dropped.weight) noticeParts.push(bundle.dropped.weight + ' invalid weight');
+      if (bundle.frequencyNote) noticeParts.push(bundle.frequencyNote);
       return {
         headers: headers,
         allRows: allRows || [],
@@ -1882,6 +1925,40 @@
         notice: noticeParts.length ? ('Dropped: ' + noticeParts.join(', ') + '.') : null
       };
     }
+
+    function buildAIPayload() {
+      if (!bundle) return null;
+      var tests = bundle.tests || {};
+      return {
+        rowVar: bundle.rowVar,
+        colVar: bundle.colVar,
+        inputRowCount: bundle.inputRowCount,
+        representedN: isFinite(bundle.representedN) ? bundle.representedN : bundle.N,
+        frequencyColumn: freqCol(bundle),
+        frequencyWeightingApplied: !!bundle.frequencyWeightingApplied,
+        weightType: bundle.frequencyWeightingApplied ? 'frequency' : null,
+        frequencyNote: bundle.frequencyNote || null,
+        originalExcelRows: bundle.originalExcelRows,
+        excludedMissing: bundle.excludedMissing,
+        eligibleInputRows: bundle.eligibleInputRows,
+        nRows: bundle.nRows,
+        nCols: bundle.nCols,
+        observed: bundle.observed,
+        expected: bundle.expected,
+        tests: {
+          pearson: tests.pearson || null,
+          likelihoodRatio: tests.likelihoodRatio || null,
+          fisher: tests.fisher || null,
+          cramersV: tests.cramersV,
+          phi: tests.phi,
+          contingencyC: tests.contingencyC
+        },
+        diagnostics: bundle.diagnostics || null,
+        measures2x2: bundle.measures2x2 || null,
+        interpretation: bundle.interpretation || null
+      };
+    }
+    window.buildAIPayload = buildAIPayload;
 
     function ctActions() {
       return {

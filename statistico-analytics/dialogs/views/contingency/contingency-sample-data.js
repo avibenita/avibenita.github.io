@@ -70,8 +70,8 @@
     },
     weighted: {
       id: 'weighted',
-      title: 'Weighted frequency dataset',
-      description: 'Same association as the 2×2 example, stored as frequency weights.',
+      title: 'Aggregated frequency dataset',
+      description: 'Same association as the 2×2 example, stored as aggregated frequency counts.',
       headers: ['Treatment', 'Response', 'Freq'],
       rows: [
         ['Drug', 'Improved', 30],

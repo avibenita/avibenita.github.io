@@ -13,6 +13,7 @@
   var MAX_LEVELS = 50;
   var NUMERIC_WARN_LEVELS = 20;
   var EPS = 1e-12;
+  var MAX_REPRESENTED_N = 9007199254740991; // Number.MAX_SAFE_INTEGER
 
   function isMissing(v) {
     if (v === null || v === undefined) return true;
@@ -54,10 +55,88 @@
     return stripMarkup(v).trim();
   }
 
-  function toWeight(v) {
-    if (isMissing(v)) return NaN;
-    var n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
-    return isFinite(n) ? n : NaN;
+  function isIntegerCount(value) {
+    return Number.isFinite(value) &&
+      value >= 0 &&
+      Math.abs(value - Math.round(value)) < 1e-9;
+  }
+
+  function parseFrequency(v) {
+    if (isMissing(v)) return { ok: false, reason: 'missing', value: v };
+    var n;
+    if (typeof v === 'number') {
+      n = v;
+    } else if (typeof v === 'boolean') {
+      return { ok: false, reason: 'nonnumeric', value: v };
+    } else {
+      var s = String(v).trim().replace(/,/g, '');
+      if (!s) return { ok: false, reason: 'missing', value: v };
+      if (!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(s)) {
+        return { ok: false, reason: 'nonnumeric', value: v };
+      }
+      n = Number(s);
+    }
+    if (n === Infinity || n === -Infinity) return { ok: false, reason: 'infinite', value: n };
+    if (!Number.isFinite(n)) return { ok: false, reason: 'nonnumeric', value: v };
+    if (n < 0) return { ok: false, reason: 'negative', value: n };
+    if (!isIntegerCount(n)) return { ok: false, reason: 'noninteger', value: n };
+    var count = Math.round(n);
+    if (count > MAX_REPRESENTED_N) return { ok: false, reason: 'overflow', value: n };
+    return { ok: true, value: count };
+  }
+
+  function resolveFrequencyColumn(spec) {
+    if (!spec) return null;
+    return spec.frequencyColumn || spec.freqVar || spec.weightVar || null;
+  }
+
+  function frequencyReasonText(reason) {
+    if (reason === 'missing') return 'contains missing values';
+    if (reason === 'negative') return 'contains negative values';
+    if (reason === 'nonnumeric') return 'contains nonnumeric values';
+    if (reason === 'infinite') return 'contains infinite values';
+    if (reason === 'noninteger') return 'contains non-integer values';
+    if (reason === 'zeros') return 'contains only zeros';
+    if (reason === 'overflow') return 'exceeds the safe numeric limit';
+    return 'is not a valid frequency/count column';
+  }
+
+  function formatFrequencyError(columnName, reason, excelRow, value) {
+    var extra = '';
+    if (excelRow != null && reason !== 'zeros') {
+      extra = ' (Excel row ' + excelRow;
+      if (value !== undefined && value !== null && String(value) !== '') extra += ', value ' + String(value);
+      extra += ')';
+    }
+    return '“' + columnName + '” cannot be used as a frequency/count column because it ' +
+      frequencyReasonText(reason) + extra +
+      '. Select a column containing nonnegative integer counts, or leave the frequency field empty to analyze one case per row.';
+  }
+
+  function frequencyErrorResult(columnName, reason, excelRow, value) {
+    return {
+      error: formatFrequencyError(columnName, reason, excelRow, value),
+      analyzable: false,
+      frequencyColumn: columnName,
+      frequencyWeightingApplied: false,
+      weightType: null,
+      inputRowCount: 0,
+      representedN: 0,
+      originalExcelRows: null,
+      excludedMissing: 0,
+      eligibleInputRows: 0
+    };
+  }
+
+  function isFrequencyCandidateColumn(headers, rows, j) {
+    var seen = 0;
+    for (var i = 0; i < (rows || []).length; i++) {
+      var v = rows[i] ? rows[i][j] : null;
+      if (isMissing(v)) continue;
+      if (!parseFrequency(v).ok) return false;
+      seen++;
+    }
+    return seen > 0;
   }
 
   function viewCell(v) {
@@ -224,6 +303,7 @@
       levels: levels,
       nLevels: levels.length,
       numeric: looksNumericSeries(rows.map(function (r) { return r ? r[j] : null; })),
+      frequencyCandidate: isFrequencyCandidateColumn(headers, rows, j),
       categoricalOk: levels.length >= 2 && levels.length <= MAX_LEVELS
     };
   }
@@ -243,7 +323,7 @@
   function fisherExact2x2(a, b, c, d) {
     var aa = Math.round(a), bb = Math.round(b), cc = Math.round(c), dd = Math.round(d);
     if (Math.abs(a - aa) > 1e-6 || Math.abs(b - bb) > 1e-6 || Math.abs(c - cc) > 1e-6 || Math.abs(d - dd) > 1e-6) {
-      return { available: false, reason: "Fisher's exact test requires integer cell counts. Weighted frequencies produced non-integer counts." };
+      return { available: false, reason: "Fisher's exact test requires integer cell counts." };
     }
     a = aa; b = bb; c = cc; d = dd;
     var n1 = a + b, n2 = c + d, n = a + c, N = a + b + c + d;
@@ -421,7 +501,7 @@
     }
 
     if (!(N > 0)) {
-      return { error: 'No observations remain after applying missing-value and weight rules.', analyzable: false };
+      return { error: 'No observations remain after applying missing-value and frequency rules.', analyzable: false };
     }
     if (nRows < 2 || nCols < 2) {
       return {
@@ -588,7 +668,16 @@
     var next = analyzeCounts(obs, rows, cols, { confidence: result.confidence });
     next.rowVar = result.rowVar;
     next.colVar = result.colVar;
-    next.weightVar = result.weightVar;
+    next.weightVar = result.frequencyColumn || result.weightVar || null;
+    next.frequencyColumn = result.frequencyColumn || next.weightVar;
+    next.frequencyWeightingApplied = !!result.frequencyWeightingApplied;
+    next.weightType = result.weightType || (next.frequencyColumn ? 'frequency' : null);
+    next.inputRowCount = result.inputRowCount;
+    next.representedN = result.representedN;
+    next.originalExcelRows = result.originalExcelRows;
+    next.excludedMissing = result.excludedMissing;
+    next.eligibleInputRows = result.eligibleInputRows;
+    next.frequencyNote = result.frequencyNote;
     next.missingMode = result.missingMode;
     next.dropped = result.dropped;
     next.warnings = result.warnings;
@@ -608,7 +697,7 @@
     var warnings = [];
     var rowName = spec.rowVar;
     var colName = spec.colVar;
-    var weightName = spec.weightVar || spec.freqVar || null;
+    var freqName = resolveFrequencyColumn(spec);
     var missingMode = spec.missing === 'category' || spec.missingMode === 'category' ? 'category' : 'exclude';
     var confidence = spec.confidence != null ? spec.confidence : 0.95;
 
@@ -630,10 +719,18 @@
 
     var ri = colIndex(headers, rowName);
     var ci = colIndex(headers, colName);
-    var wi = weightName ? colIndex(headers, weightName) : -1;
+    var fi = freqName ? colIndex(headers, freqName) : -1;
     if (ri < 0) return { error: 'Row variable “' + rowName + '” was not found in the data.', analyzable: false };
     if (ci < 0) return { error: 'Column variable “' + colName + '” was not found in the data.', analyzable: false };
-    if (weightName && wi < 0) return { error: 'Frequency/weight variable “' + weightName + '” was not found in the data.', analyzable: false };
+    if (freqName && fi < 0) {
+      return {
+        error: 'Frequency/count column “' + freqName + '” was not found in the data.',
+        analyzable: false,
+        frequencyColumn: String(freqName),
+        frequencyWeightingApplied: false,
+        weightType: null
+      };
+    }
 
     var rowProf = profileColumn(headers, rows, ri);
     var colProf = profileColumn(headers, rows, ci);
@@ -654,12 +751,13 @@
     var rowOrder = [];
     var colOrder = [];
     var droppedMissing = 0;
-    var droppedWeight = 0;
     var droppedLevel = 0;
     var used = 0;
+    var representedN = 0;
     var sourceN = rows.length;
+    var freqDisplayName = fi >= 0 ? String(headers[fi]) : null;
     var viewHeaders = [rowProf.name, colProf.name];
-    if (wi >= 0) viewHeaders.push(String(headers[wi]));
+    if (fi >= 0) viewHeaders.push(freqDisplayName);
     var allViewRows = [];
     var usedViewRows = [];
 
@@ -668,7 +766,7 @@
       var rv = row[ri];
       var cv = row[ci];
       var viewRow = [viewCell(rv), viewCell(cv)];
-      if (wi >= 0) viewRow.push(viewCell(row[wi]));
+      if (fi >= 0) viewRow.push(viewCell(row[fi]));
       allViewRows.push(viewRow);
       var rowMiss = isMissing(rv);
       var colMiss = isMissing(cv);
@@ -682,10 +780,17 @@
       if (rowAllow && !rowAllow[rl]) { droppedLevel++; continue; }
       if (colAllow && !colAllow[cl]) { droppedLevel++; continue; }
       var w = 1;
-      if (wi >= 0) {
-        w = toWeight(row[wi]);
-        if (!(w > 0) || !isFinite(w)) { droppedWeight++; continue; }
+      if (fi >= 0) {
+        var parsed = parseFrequency(row[fi]);
+        if (!parsed.ok) {
+          return frequencyErrorResult(freqDisplayName, parsed.reason, r + 2, parsed.value);
+        }
+        w = parsed.value;
       }
+      if (representedN + w > MAX_REPRESENTED_N || !Number.isFinite(representedN + w)) {
+        return frequencyErrorResult(freqDisplayName || 'Frequency', 'overflow', r + 2, w);
+      }
+      representedN += w;
       if (rowOrder.indexOf(rl) < 0) rowOrder.push(rl);
       if (colOrder.indexOf(cl) < 0) colOrder.push(cl);
       var key = rl + '\u0000' + cl;
@@ -694,8 +799,8 @@
       usedViewRows.push(viewRow);
     }
 
-    if (wi >= 0 && droppedWeight) {
-      warnings.push(droppedWeight + ' row' + (droppedWeight === 1 ? '' : 's') + ' dropped because the frequency/weight was missing or not positive.');
+    if (fi >= 0 && used > 0 && representedN === 0) {
+      return frequencyErrorResult(freqDisplayName, 'zeros');
     }
     if (missingMode === 'exclude' && droppedMissing) {
       warnings.push(droppedMissing + ' row' + (droppedMissing === 1 ? '' : 's') + ' dropped because the row or column value was missing.');
@@ -713,9 +818,19 @@
     var result = analyzeCounts(observed, rowOrder, colOrder, { confidence: confidence });
     result.rowVar = rowProf.name;
     result.colVar = colProf.name;
-    result.weightVar = wi >= 0 ? String(headers[wi]) : null;
+    result.frequencyColumn = freqDisplayName;
+    result.frequencyWeightingApplied = fi >= 0;
+    result.weightType = fi >= 0 ? 'frequency' : null;
+    result.inputRowCount = used;
+    result.representedN = fi >= 0 ? representedN : used;
+    result.originalExcelRows = sourceN;
+    result.excludedMissing = droppedMissing;
+    result.eligibleInputRows = used;
+    result.frequencyNote = fi >= 0
+      ? 'Frequency counts were applied. Each input row may represent multiple identical observations.'
+      : null;
     result.missingMode = missingMode;
-    result.dropped = { missing: droppedMissing, weight: droppedWeight, level: droppedLevel };
+    result.dropped = { missing: droppedMissing, level: droppedLevel };
     result.rowLevels = rowOrder.slice();
     result.colLevels = colOrder.slice();
     result.viewHeaders = viewHeaders;
@@ -733,6 +848,7 @@
 
   return {
     MAX_LEVELS: MAX_LEVELS,
+    MAX_REPRESENTED_N: MAX_REPRESENTED_N,
     profileData: profileData,
     profileColumn: profileColumn,
     analyze: analyze,
@@ -742,6 +858,11 @@
     chiSquareUpperP: chiSquareUpperP,
     zCrit: zCrit,
     isMissing: isMissing,
-    catLabel: catLabel
+    catLabel: catLabel,
+    isIntegerCount: isIntegerCount,
+    parseFrequency: parseFrequency,
+    resolveFrequencyColumn: resolveFrequencyColumn,
+    isFrequencyCandidateColumn: isFrequencyCandidateColumn,
+    formatFrequencyError: formatFrequencyError
   };
 });

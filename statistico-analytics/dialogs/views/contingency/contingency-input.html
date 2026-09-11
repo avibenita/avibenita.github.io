@@ -22,8 +22,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260814ct2"></script>
-  <script src="contingency-sample-data.js?v=20260909ctexplore"></script>
-  <script src="contingency-engine.js?v=20260814ct8"></script>
+  <script src="contingency-sample-data.js?v=20260911freq1"></script>
+  <script src="contingency-engine.js?v=20260911freq1"></script>
   <style>
     :root { --ct-acc: #8b5cf6; --ct-row: #38bdf8; --ct-col: #a78bfa; --ct-w: #34d399; }
     [data-theme="light"] { --ct-acc: #6d28d9; --ct-row: #0369a1; --ct-col: #6d28d9; --ct-w: #047857; }
@@ -54,6 +54,31 @@
     .reg-zone-card.zone-row { border-color:rgba(56,189,248,.35); }
     .reg-zone-card.zone-col { border-color:rgba(167,139,250,.35); }
     .reg-zone-card.zone-w { border-color:rgba(52,211,153,.35); }
+    .ct-advanced {
+      border:1px solid var(--cfg-border); border-radius:8px; background:var(--cfg-surface);
+      padding:0;
+    }
+    .ct-advanced > summary {
+      cursor:pointer; list-style:none; padding:8px 10px; font-size:11px; font-weight:800;
+      text-transform:uppercase; letter-spacing:.04em; color:var(--cfg-text3);
+    }
+    .ct-advanced > summary::-webkit-details-marker { display:none; }
+    .ct-advanced > summary::before { content:'▸ '; color:var(--ct-acc); }
+    .ct-advanced[open] > summary::before { content:'▾ '; }
+    .ct-advanced-body { padding:0 10px 10px; }
+    .ct-freq-label { display:block; font-size:11.5px; font-weight:700; color:var(--cfg-text); margin-bottom:4px; }
+    .ct-freq-help { margin:0 0 8px; font-size:11px; color:var(--cfg-text3); line-height:1.4; }
+    .ct-freq-select {
+      width:100%; padding:7px 8px; border-radius:7px; border:1px solid var(--cfg-border);
+      background:var(--cfg-surface2,#1c2333); color:var(--cfg-text); font-size:12px;
+    }
+    [data-theme="light"] .ct-freq-select { background:#fff; }
+    .ct-freq-status {
+      display:none; margin-top:6px; padding:6px 9px; border-radius:7px;
+      border:1px solid rgba(52,211,153,.35); background:rgba(52,211,153,.08);
+      color:var(--ct-w); font-size:11.5px; font-weight:700;
+    }
+    .ct-freq-status.show { display:block; }
     .reg-zone-head { display:flex; align-items:center; gap:7px; padding:6px 8px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--cfg-border); }
     .reg-zone-card.zone-row .reg-zone-head { background:rgba(56,189,248,.08); color:var(--ct-row); }
     .reg-zone-card.zone-col .reg-zone-head { background:rgba(167,139,250,.08); color:var(--ct-col); }
@@ -158,13 +183,18 @@
               </div>
               <div class="reg-zone-body" id="zone-col"></div>
             </div>
-            <div class="reg-zone-card zone-w zone-empty" data-zone="weight">
-              <div class="reg-zone-head"><span class="dot"></span> Frequency / weight
-                <span class="info-icon">i<span class="tip">Optional. Use when each row is already a count. Non-positive or missing weights are dropped.</span></span>
-              </div>
-              <div class="reg-zone-body" id="zone-weight"></div>
-            </div>
           </div>
+          <details class="ct-advanced" id="ctAdvanced">
+            <summary>Advanced options</summary>
+            <div class="ct-advanced-body">
+              <label class="ct-freq-label" for="freqSelect">Aggregated frequency column (optional)</label>
+              <p class="ct-freq-help">Use this only when each Excel row represents an aggregated number of identical cases. Each value states how many cases the row represents.</p>
+              <select id="freqSelect" class="ct-freq-select">
+                <option value="">None — one case per row</option>
+              </select>
+            </div>
+          </details>
+          <div class="ct-freq-status" id="freqStatus">Aggregated data · Frequency column: <strong id="freqStatusName">—</strong></div>
           <div class="opt-grid">
             <div class="opt-card">
               <h4>Missing values</h4>
@@ -236,7 +266,7 @@
     window.STORAGE_KEY = STORAGE_KEY;
     var _headers = [], _rows = [], _address = '';
     var profiles = [];
-    var assign = { row: null, col: null, weight: null };
+    var assign = { row: null, col: null, frequency: null };
     var levelSets = {};
     var pendingCat = null;
     var missingMode = 'exclude';
@@ -260,7 +290,7 @@
     }
 
     function usedNames() {
-      return [assign.row, assign.col, assign.weight].filter(Boolean);
+      return [assign.row, assign.col, assign.frequency].filter(Boolean);
     }
 
     function renderVariables() {
@@ -368,8 +398,48 @@
 
     function requestAssign(zone, name) {
       if (!name) { setAssign(zone, null); return; }
-      if (zone === 'weight') { setAssign(zone, name); return; }
+      if (zone === 'frequency') { setAssign(zone, name); return; }
       showCatModal(zone, name, assign[zone] === name);
+    }
+
+    function savedFrequencyName(spec) {
+      if (!spec) return null;
+      return spec.frequencyColumn || spec.freqVar || spec.weightVar || null;
+    }
+
+    function frequencyCandidates() {
+      return profiles.filter(function (p) {
+        if (p.name === assign.row || p.name === assign.col) return false;
+        if (p.frequencyCandidate) return true;
+        return assign.frequency && p.name === assign.frequency;
+      });
+    }
+
+    function renderFrequencySelect() {
+      var sel = qs('freqSelect');
+      if (!sel) return;
+      var current = assign.frequency;
+      var opts = frequencyCandidates();
+      sel.innerHTML = '<option value="">None — one case per row</option>';
+      opts.forEach(function (p) {
+        var opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = p.name + (p.frequencyCandidate ? '' : ' (not a count column)');
+        sel.appendChild(opt);
+      });
+      if (current && opts.every(function (p) { return p.name !== current; })) {
+        var extra = document.createElement('option');
+        extra.value = current;
+        extra.textContent = current + ' (not a count column)';
+        sel.appendChild(extra);
+      }
+      sel.value = current || '';
+      var status = qs('freqStatus');
+      var nameEl = qs('freqStatusName');
+      if (status) status.classList.toggle('show', !!current);
+      if (nameEl) nameEl.textContent = current || '—';
+      var adv = qs('ctAdvanced');
+      if (adv && current) adv.open = true;
     }
 
     function showCatModal(zone, varName, isEdit) {
@@ -484,7 +554,7 @@
         : 'Drag a column onto a role, or click a column then click a role';
       renderZone('row', 'row', selectedVar ? 'Click to use as row' : 'Drop or click the row variable');
       renderZone('col', 'col', selectedVar ? 'Click to use as column' : 'Drop or click the column variable');
-      renderZone('weight', 'w', selectedVar ? 'Click to use as weight' : 'Optional frequency / weight');
+      renderFrequencySelect();
       document.querySelectorAll('.reg-zone-card').forEach(function (card) {
         card.classList.toggle('await-click', !!selectedVar);
       });
@@ -492,7 +562,7 @@
       qs('btnRun').disabled = !ok;
       qs('btnSaveConfig').disabled = !ok;
       qs('modelSummary').innerHTML = ok
-        ? '<strong>' + assign.row + '</strong> × <strong>' + assign.col + '</strong>' + (assign.weight ? ' (weighted by ' + assign.weight + ')' : '')
+        ? '<strong>' + assign.row + '</strong> × <strong>' + assign.col + '</strong>' + (assign.frequency ? ' · Frequency: ' + assign.frequency : '')
         : pickHint;
       qs('runHint').textContent = ok ? 'Ready to analyze the association' : (selectedVar ? 'Now click Row or Column' : 'Assign row and column variables');
       var warn = [];
@@ -515,7 +585,7 @@
       return {
         rowVar: assign.row,
         colVar: assign.col,
-        weightVar: assign.weight || null,
+        frequencyColumn: assign.frequency || null,
         missing: missingMode,
         confidence: confidence,
         rowLevels: assign.row && levelSets[assign.row] ? levelSets[assign.row].slice() : null,
@@ -560,7 +630,7 @@
       if (saved) {
         assign.row = saved.rowVar || null;
         assign.col = saved.colVar || null;
-        assign.weight = saved.weightVar || null;
+        assign.frequency = savedFrequencyName(saved);
         levelSets = {};
         if (saved.rowVar && saved.rowLevels) levelSets[saved.rowVar] = saved.rowLevels.slice();
         if (saved.colVar && saved.colLevels) levelSets[saved.colVar] = saved.colLevels.slice();
@@ -570,8 +640,10 @@
       } else if (window.__CT_WEB_DEMO__ && !assign.row && profiles.length >= 2) {
         assign.row = profiles[0].name;
         assign.col = profiles[1].name;
-        var freq = profiles.find(function (x) { return /^(freq|frequency|weight|n|count)$/i.test(x.name); });
-        if (freq && freq.name !== assign.row && freq.name !== assign.col) assign.weight = freq.name;
+        var freq = profiles.find(function (x) {
+          return x.frequencyCandidate && /^(freq|frequency|count)$/i.test(x.name);
+        });
+        if (freq && freq.name !== assign.row && freq.name !== assign.col) assign.frequency = freq.name;
       }
       refresh();
     }
@@ -613,15 +685,15 @@
         card.addEventListener('drop', onDrop);
         card.addEventListener('click', function (e) {
           if (e.target && e.target.dataset && e.target.dataset.clear) {
-            var map = { row: 'row', col: 'col', w: 'weight' };
+            var map = { row: 'row', col: 'col' };
             setAssign(map[e.target.dataset.clear] || zone, null);
             return;
           }
           if (e.target && e.target.closest && e.target.closest('[data-edit]')) {
             var editKind = e.target.closest('[data-edit]').getAttribute('data-edit');
-            var zmap = { row: 'row', col: 'col', w: 'weight' };
+            var zmap = { row: 'row', col: 'col' };
             var z = zmap[editKind] || zone;
-            if (assign[z] && z !== 'weight') showCatModal(z, assign[z], true);
+            if (assign[z]) showCatModal(z, assign[z], true);
             return;
           }
           if (selectedVar) requestAssign(zone, selectedVar);
@@ -682,7 +754,7 @@
           if (!s) return;
           assign.row = s.rowVar || null;
           assign.col = s.colVar || null;
-          assign.weight = s.weightVar || null;
+          assign.frequency = savedFrequencyName(s);
           levelSets = {};
           if (s.rowVar && s.rowLevels) levelSets[s.rowVar] = s.rowLevels.slice();
           if (s.colVar && s.colLevels) levelSets[s.colVar] = s.colLevels.slice();
@@ -700,6 +772,10 @@
       });
       bindZones();
       wireCatModal();
+      qs('freqSelect').addEventListener('change', function () {
+        assign.frequency = qs('freqSelect').value || null;
+        refresh();
+      });
       if (window.__CT_WEB_DEMO__ && window.StatisticoContingencySamples) {
         document.body.classList.add('cfg-embed');
         var row = qs('demoRow');

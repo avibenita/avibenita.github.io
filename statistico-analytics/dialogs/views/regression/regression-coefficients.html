@@ -3519,7 +3519,6 @@
       background: rgba(255,255,255,.04);
       color: var(--text-primary);
       font-size: 14px;
-      font-weight: 650;
       font-weight: 600;
       cursor: pointer;
       letter-spacing: 0.01em;
@@ -3845,6 +3844,50 @@
     }
     .predictions-container .scenarios-tip i { opacity: .7; }
     .predictions-container .scenarios-tip span i.fa-play { color: var(--text-secondary); }
+
+    .pred-profile {
+      margin: 0 0 12px;
+      padding: 10px 12px 6px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: transparent;
+    }
+    .pred-profile-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px 16px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+    .pred-profile-copy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; min-width: 0; }
+    .pred-profile-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .pred-profile-held {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .pred-profile-axes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pred-profile-axis {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .pred-profile-axis:hover { color: var(--text-primary); border-color: rgba(148,163,184,.45); }
+    .pred-profile-axis.is-active {
+      color: #6ee7b7;
+      border-color: rgba(52,211,153,.45);
+      background: rgba(52,211,153,.1);
+    }
+    .pred-profile-chart { height: 220px; min-height: 180px; }
 
     /* Light theme parity */
     :root[data-theme="light"] .predictions-container .prediction-inputs,
@@ -4449,6 +4492,17 @@
                   <canvas id="predictionChart" width="400" height="90"></canvas>
                 </div>
               </div>
+            </div>
+
+            <div class="pred-profile" id="predProfilePanel" hidden>
+              <div class="pred-profile-head">
+                <div class="pred-profile-copy">
+                  <span class="pred-profile-title" id="predProfileTitle">Predicted response</span>
+                  <span class="pred-profile-held" id="predProfileHeld"></span>
+                </div>
+                <div id="predProfileAxes" class="pred-profile-axes" hidden></div>
+              </div>
+              <div id="predProfileChart" class="pred-profile-chart"></div>
             </div>
 
             <!-- Scenarios Comparison Table -->
@@ -5238,6 +5292,8 @@
       numericVars: [],
       categoricalVars: [],
       categoricalLevels: {},
+      numericRanges: {},
+      profileVar: null,
       stats: {},
       savedScenarios: [],
       currentInputs: {}
@@ -8957,6 +9013,10 @@ ${sectionsHtml}
 
       predictionData.numericVars = xnVars;
       predictionData.categoricalVars = xcVars;
+      if (window._predProfileChart) {
+        try { window._predProfileChart.destroy(); } catch (_e) {}
+        window._predProfileChart = null;
+      }
 
       // Calculate ranges for numeric variables
       const numericRanges = {};
@@ -8974,6 +9034,10 @@ ${sectionsHtml}
           }
         }
       });
+      predictionData.numericRanges = numericRanges;
+      if (!predictionData.profileVar || !xnVars.includes(predictionData.profileVar)) {
+        predictionData.profileVar = xnVars[0] || null;
+      }
 
       // Get categorical levels
       xcVars.forEach(varName => {
@@ -9059,6 +9123,7 @@ ${sectionsHtml}
           if (valueDisplay) {
             valueDisplay.textContent = parseFloat(this.value).toFixed(2);
           }
+          predictionData.profileVar = varName;
           try {
             updatePrediction();
           } catch (err) {
@@ -9147,6 +9212,11 @@ ${sectionsHtml}
       } catch (err) {
         console.error('drawPredictionVisualization failed:', err);
       }
+      try {
+        updatePredictionProfileChart();
+      } catch (err) {
+        console.error('updatePredictionProfileChart failed:', err);
+      }
     }
     // Expose on window so inline handlers (legacy) and other modules can call it.
     window.updatePrediction = updatePrediction;
@@ -9212,6 +9282,143 @@ ${sectionsHtml}
         pi_lower: prediction - t_crit * se_pred,
         pi_upper: prediction + t_crit * se_pred
       };
+    }
+
+    function selectPredProfileVar(varName) {
+      if (!varName || !(predictionData.numericVars || []).includes(varName)) return;
+      predictionData.profileVar = varName;
+      updatePredictionProfileChart();
+    }
+    window.selectPredProfileVar = selectPredProfileVar;
+
+    function updatePredictionProfileChart() {
+      const panel = document.getElementById('predProfilePanel');
+      const mount = document.getElementById('predProfileChart');
+      const vars = predictionData.numericVars || [];
+      if (!panel || !mount || !vars.length || typeof Highcharts === 'undefined') {
+        if (panel) panel.hidden = true;
+        return;
+      }
+      const focal = (predictionData.profileVar && vars.includes(predictionData.profileVar))
+        ? predictionData.profileVar
+        : vars[0];
+      predictionData.profileVar = focal;
+      const range = (predictionData.numericRanges || {})[focal];
+      if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max === range.min) {
+        panel.hidden = true;
+        return;
+      }
+
+      const yVar = window.globalYVar || 'Y';
+      const steps = 36;
+      const mean = [];
+      const ci = [];
+      const pi = [];
+      for (let s = 0; s <= steps; s++) {
+        const x = range.min + (range.max - range.min) * (s / steps);
+        const inputs = Object.assign({}, predictionData.currentInputs);
+        inputs[focal] = x;
+        const p = calculatePrediction(inputs);
+        if (!p || !Number.isFinite(p.value)) continue;
+        mean.push([x, p.value]);
+        ci.push([x, p.ci_lower, p.ci_upper]);
+        pi.push([x, p.pi_lower, p.pi_upper]);
+      }
+      const curP = calculatePrediction(predictionData.currentInputs);
+      const curX = predictionData.currentInputs[focal];
+      if (!curP || !Number.isFinite(curP.value) || !mean.length) {
+        panel.hidden = true;
+        return;
+      }
+
+      const others = vars.filter((v) => v !== focal).map((v) => {
+        const val = predictionData.currentInputs[v];
+        return `${v} held at ${Number.isFinite(val) ? Number(val).toFixed(2) : val}`;
+      });
+      const titleEl = document.getElementById('predProfileTitle');
+      const heldEl = document.getElementById('predProfileHeld');
+      if (titleEl) titleEl.textContent = `Predicted ${yVar}: ${curP.value.toFixed(2)}`;
+      if (heldEl) heldEl.textContent = others.length ? others.join(' · ') : '';
+
+      const axes = document.getElementById('predProfileAxes');
+      if (axes) {
+        if (vars.length < 2) {
+          axes.hidden = true;
+          axes.innerHTML = '';
+        } else {
+          axes.hidden = false;
+          axes.innerHTML = vars.map((v) =>
+            `<button type="button" class="pred-profile-axis${v === focal ? ' is-active' : ''}" data-pred-axis="${encodeURIComponent(v)}">${v}</button>`
+          ).join('');
+          if (axes.dataset.bound !== '1') {
+            axes.dataset.bound = '1';
+            axes.addEventListener('click', (e) => {
+              const btn = e.target && e.target.closest ? e.target.closest('[data-pred-axis]') : null;
+              if (!btn) return;
+              selectPredProfileVar(decodeURIComponent(btn.getAttribute('data-pred-axis')));
+            });
+          }
+        }
+      }
+
+      panel.hidden = false;
+      const th = _resChartTheme();
+      const plotLine = {
+        id: 'pred-current-x',
+        value: curX,
+        color: 'rgba(148,163,184,.45)',
+        dashStyle: 'Dot',
+        width: 1,
+        zIndex: 5
+      };
+      const series = [
+        { name: '95% individual PI', data: pi },
+        { name: '95% mean CI', data: ci },
+        { name: 'Predicted mean', data: mean },
+        { name: 'Current scenario', data: [[curX, curP.value]] }
+      ];
+
+      if (window._predProfileChart) {
+        window._predProfileChart.series.forEach((s, i) => {
+          if (series[i]) s.setData(series[i].data, false);
+        });
+        window._predProfileChart.xAxis[0].setTitle({ text: focal }, false);
+        window._predProfileChart.yAxis[0].setTitle({ text: 'Predicted ' + yVar }, false);
+        try { window._predProfileChart.xAxis[0].removePlotLine('pred-current-x'); } catch (_e) {}
+        window._predProfileChart.xAxis[0].addPlotLine(plotLine);
+        window._predProfileChart.redraw();
+        return;
+      }
+
+      window._predProfileChart = Highcharts.chart('predProfileChart', {
+        chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [8, 8, 8, 8] },
+        title: { text: null },
+        xAxis: {
+          title: { text: focal, style: { color: th.textColor } },
+          gridLineColor: th.gridLine,
+          labels: { style: { color: th.axisText } },
+          plotLines: [plotLine]
+        },
+        yAxis: {
+          title: { text: 'Predicted ' + yVar, style: { color: th.textColor } },
+          gridLineColor: th.gridLine,
+          labels: { style: { color: th.axisText } }
+        },
+        legend: {
+          enabled: true,
+          itemStyle: { color: th.textColor, fontSize: '10px', fontWeight: '500' },
+          itemHoverStyle: { color: th.textColor }
+        },
+        tooltip: { backgroundColor: th.bgTooltip, borderColor: th.borderTooltip, style: { color: th.textColor }, shared: true },
+        plotOptions: { series: { animation: false } },
+        series: [
+          { name: '95% individual PI', type: 'arearange', data: pi, color: 'rgba(147,197,253,.55)', fillOpacity: 0.22, lineWidth: 0, marker: { enabled: false }, zIndex: 1 },
+          { name: '95% mean CI', type: 'arearange', data: ci, color: 'rgba(251,191,36,.7)', fillOpacity: 0.28, lineWidth: 0, marker: { enabled: false }, zIndex: 2 },
+          { name: 'Predicted mean', type: 'line', data: mean, color: '#2dd4bf', lineWidth: 2, marker: { enabled: false }, zIndex: 3 },
+          { name: 'Current scenario', type: 'scatter', data: [[curX, curP.value]], color: '#fb923c', marker: { radius: 6, lineColor: '#fff', lineWidth: 1.5 }, zIndex: 4 }
+        ],
+        credits: { enabled: false }
+      });
     }
 
     /**

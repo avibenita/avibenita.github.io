@@ -3460,6 +3460,115 @@
     :root[data-theme="light"] .regression-table td.pvalue-warning { color: #b45309; }
     :root[data-theme="light"] .regression-table td.pvalue-bad     { color: #64748b; }
 
+    /* ── Visualization: inviting X-axis picker ── */
+    .mv-axis-picker {
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px 16px 15px;
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, rgba(120,200,255,.08) 0%, rgba(255,255,255,.02) 100%),
+        var(--surface-1, #1a1f2e);
+      border: 1px solid rgba(120,200,255,.28);
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.2),
+        inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .mv-axis-picker-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .mv-axis-picker-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    .mv-axis-picker-title i {
+      color: var(--accent-2);
+      font-size: 14px;
+    }
+    .mv-axis-picker-hint {
+      margin: 0;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+    #modelVizCbRow.mv-axis-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .mv-axis-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,.32);
+      background: rgba(255,255,255,.04);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 650;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.01em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      transition: transform .15s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
+    }
+    .mv-axis-pill i { font-size: 12px; color: var(--text-muted); }
+    .mv-axis-pill:hover {
+      transform: translateY(-1px);
+      border-color: rgba(120,200,255,.55);
+      background: rgba(120,200,255,.12);
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(0,0,0,.18);
+    }
+    .mv-axis-pill:hover i { color: var(--accent-2); }
+    .mv-axis-pill.is-active {
+      border-color: rgba(52,211,153,.7);
+      background: linear-gradient(180deg, rgba(52,211,153,.28) 0%, rgba(52,211,153,.12) 100%);
+      color: #ecfdf5;
+      box-shadow:
+        0 8px 18px rgba(16,185,129,.18),
+        inset 0 1px 0 rgba(255,255,255,.12);
+    }
+    .mv-axis-pill.is-active i { color: #6ee7b7; }
+    .mv-axis-pill:focus-visible {
+      outline: 2px solid var(--accent-2);
+      outline-offset: 2px;
+    }
+    :root[data-theme="light"] .mv-axis-picker {
+      background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%);
+      border-color: rgba(37,99,235,.22);
+      box-shadow: 0 8px 18px rgba(15,23,42,.06), inset 0 1px 0 #fff;
+    }
+    :root[data-theme="light"] .mv-axis-pill {
+      background: #fff;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+    :root[data-theme="light"] .mv-axis-pill:hover {
+      background: #eff6ff;
+      border-color: #60a5fa;
+      color: #0f172a;
+    }
+    :root[data-theme="light"] .mv-axis-pill.is-active {
+      background: linear-gradient(180deg, #d1fae5 0%, #ecfdf5 100%);
+      border-color: #34d399;
+      color: #065f46;
+    }
+
     /* ── Predictions / Scenario Engine: calm minimalistic overrides ── */
     .predictions-container { padding: 4px 0 0; }
 
@@ -4415,9 +4524,12 @@
             <div id="modelVizContent" style="display:none;flex-direction:column;flex:1;min-height:0;gap:9px;">
 
               <!-- ROW 1 · X-axis selector -->
-              <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <span style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);">X axis</span>
-                <div id="modelVizCbRow" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+              <div class="mv-axis-picker">
+                <div class="mv-axis-picker-head">
+                  <p class="mv-axis-picker-title"><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i> Choose the X-axis predictor</p>
+                  <p class="mv-axis-picker-hint">Click a variable — the chart updates instantly</p>
+                </div>
+                <div id="modelVizCbRow" class="mv-axis-options" role="group" aria-label="X-axis predictor"></div>
               </div>
 
               <!-- ROW 2 · Selected-predictor stat strip (not global fit — see Overview) -->
@@ -11511,8 +11623,11 @@ ${sectionsHtml}
       // Build radio-pill row
       const cbRow = document.getElementById('modelVizCbRow');
       cbRow.innerHTML = xnVars.map((v, i) => `
-        <button id="mvpill${i}" onclick="onModelVizSelect(${i})"
-          style="${_mvPillStyle(i === 0)}">${v}</button>`).join('');
+        <button type="button" id="mvpill${i}" class="mv-axis-pill${i === 0 ? ' is-active' : ''}"
+          onclick="onModelVizSelect(${i})" aria-pressed="${i === 0 ? 'true' : 'false'}">
+          <i class="fa-solid ${i === 0 ? 'fa-check' : 'fa-chart-line'}" aria-hidden="true"></i>
+          <span>${v}</span>
+        </button>`).join('');
 
       // Reveal content
       document.getElementById('modelVizLoading').style.display = 'none';
@@ -11521,19 +11636,17 @@ ${sectionsHtml}
       _mvRefresh();
     }
 
-    function _mvPillStyle(active) {
-      return active
-        ? 'padding:5px 13px;border-radius:999px;border:1px solid #34D399;background:rgba(52,211,153,0.18);color:#6ee7b7;font-size:11.5px;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:0.02em;'
-        : 'padding:5px 13px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:11.5px;font-weight:500;cursor:pointer;transition:all .18s;letter-spacing:0.02em;';
-    }
-
     function onModelVizSelect(idx) {
       const xnVars = window.globalXnVars || [];
       _mvSelectedIdx = idx;
-      // Update pill styles
       xnVars.forEach((_, i) => {
         const btn = document.getElementById('mvpill' + i);
-        if (btn) btn.style.cssText = _mvPillStyle(i === idx);
+        if (!btn) return;
+        const active = i === idx;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = 'fa-solid ' + (active ? 'fa-check' : 'fa-chart-line');
       });
       _mvRefresh();
     }

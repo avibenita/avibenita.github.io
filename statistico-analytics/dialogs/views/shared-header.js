@@ -124,6 +124,16 @@ if (typeof window !== 'undefined' && typeof window.switchTab !== 'function') {
   window.switchTab = function switchSharedSidebarTab(tab) {
     if (!tab) return;
 
+    // Standalone pages (e.g. Regression by Group) have no in-page tab panels.
+    // Send the user back to the host results page with the requested tab.
+    if (typeof StatisticoHeader !== 'undefined'
+        && StatisticoHeader.module === 'regression'
+        && StatisticoHeader.currentView === 'regression-by-group'
+        && typeof StatisticoHeader.navigateTo === 'function') {
+      StatisticoHeader.navigateTo('regression/regression-coefficients.html?regTab=' + encodeURIComponent(tab));
+      return;
+    }
+
     const tabTitles = {
       explore: 'Descriptives',
       trajectories: 'Trajectories',
@@ -1783,6 +1793,26 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'regression') {
+      const onByGroup = this.currentView === 'regression-by-group';
+      const resultsFile = 'regression/regression-coefficients.html';
+      const resultItem = (tab, opts) => {
+        const item = {
+          id: opts.id,
+          icon: opts.icon,
+          label: opts.label,
+          description: opts.description
+        };
+        if (onByGroup) {
+          item.type = 'navigate';
+          item.file = resultsFile + '?regTab=' + encodeURIComponent(tab);
+          return item;
+        }
+        item.type = 'tab';
+        item.tab = tab;
+        if (opts.navTab) item.navTab = opts.navTab;
+        if (opts.active) item.active = true;
+        return item;
+      };
       return {
         logoIcon: 'fa-chart-line',
         logoSub: 'Regression',
@@ -1791,19 +1821,19 @@ const StatisticoHeader = {
           {
             title: 'Model',
             items: [
-              { type: 'tab', tab: 'results-overview', navTab: 'model-results', id: 'modelResultsNavBtn', icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Overview & technical specification', active: true },
-              { type: 'tab', tab: 'ix-summary', navTab: 'interactions', id: 'interactionsNavBtn', icon: 'fa-arrows-split-up-and-left', label: 'Interactions', description: 'Moderation, plots & tests' },
-              { type: 'tab', tab: 'pred-overview', navTab: 'predictions', icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' },
-              { type: 'tab', tab: 'viz-partial', navTab: 'visualization', icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & unique contribution' },
-              { type: 'tab', tab: 'diag-overview', navTab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' },
-              { type: 'tab', tab: 'power', navTab: 'power', id: 'regPowerNavBtn', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' }
+              resultItem('results-overview', { navTab: 'model-results', id: 'modelResultsNavBtn', icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Overview & technical specification', active: true }),
+              resultItem('ix-summary', { navTab: 'interactions', id: 'interactionsNavBtn', icon: 'fa-arrows-split-up-and-left', label: 'Interactions', description: 'Moderation, plots & tests' }),
+              resultItem('pred-overview', { navTab: 'predictions', icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' }),
+              resultItem('viz-partial', { navTab: 'visualization', icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & unique contribution' }),
+              resultItem('diag-overview', { navTab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' }),
+              resultItem('power', { navTab: 'power', id: 'regPowerNavBtn', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' })
             ]
           },
           {
             title: 'Descriptives',
             items: [
-              { type: 'tab', tab: 'correlations', icon: 'fa-diagram-project', label: 'Correlations', description: 'Pairwise r among variables' },
-              { type: 'tab', tab: 'descriptive', icon: 'fa-chart-column', label: 'Descriptives', description: 'Mean, SD, skew & missingness' }
+              resultItem('correlations', { icon: 'fa-diagram-project', label: 'Correlations', description: 'Pairwise r among variables' }),
+              resultItem('descriptive', { icon: 'fa-chart-column', label: 'Descriptives', description: 'Mean, SD, skew & missingness' })
             ]
           }
         ],
@@ -7088,11 +7118,13 @@ const StatisticoHeader = {
     this._ensureRegressionAncovaNav(nav);
     this._ensureRegressionPowerNav(nav);
     this._ensureAnovaPowerNav(nav);
-    if (this.module === 'regression' && nav && !document.getElementById('regSidebarScrollHint')) {
+    if (this.module === 'regression' && this.currentView !== 'regression-by-group'
+        && nav && !document.getElementById('regSidebarScrollHint')) {
       const hint = document.createElement('div');
       hint.id = 'regSidebarScrollHint';
       hint.className = 'sb-scroll-hint';
       hint.setAttribute('aria-hidden', 'true');
+      hint.style.pointerEvents = 'none';
       hint.innerHTML = '<i class="fa-solid fa-chevron-down"></i><span>More items below</span>';
       nav.appendChild(hint);
     }

@@ -1329,8 +1329,17 @@
     .res-dist-summary-table td:first-child { text-align:left; padding-right:10px; color:var(--text-muted); font-size:11.5px; }
     .res-dist-summary-table td:last-child { text-align:right; font-weight:600; color:var(--text-primary); }
     .res-dist-summary-table tr.res-section-head td { font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--accent-2); border-bottom:2px solid var(--border); padding-top:10px; }
-    .res-plots-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:15px; }
-    @media(max-width:1600px){ .res-plots-grid{ grid-template-columns:repeat(2,1fr); } }
+    .res-plots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 16px 20px;
+      margin-bottom: 0;
+      min-height: 0;
+    }
+    @media (max-width: 800px) {
+      .res-plots-grid { grid-template-columns: 1fr; grid-template-rows: none; }
+    }
     .res-plot-card { background:var(--surface-1); border:1px solid var(--border); border-radius:8px; padding:12px; box-shadow:0 4px 20px rgba(0,0,0,.3); min-width:0; }
     .res-plot-title { font-size:13px; font-weight:600; color:var(--accent-2); margin-bottom:6px; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .res-plot-desc  { font-size:10px; color:var(--text-muted); margin-bottom:10px; font-style:italic; line-height:1.3; }
@@ -2136,7 +2145,11 @@
       display: flex;
       flex-direction: column;
     }
-    #tab-res-plots .ws-body,
+    #tab-res-plots .ws-body {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
     #tab-res-influential .ws-body {
       overflow-y: auto;
       scrollbar-width: none;
@@ -2147,12 +2160,33 @@
       display: none;
     }
     #tab-residuals .ws-body > .res-workspace,
-    #tab-res-plots .ws-body > .res-workspace,
     #tab-res-influential .ws-body > .res-workspace {
       flex: none;
       min-height: auto;
       overflow: visible;
       padding: 0;
+    }
+    #tab-res-plots .ws-body > .res-workspace {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #tab-res-plots .res-plots-grid {
+      flex: 1;
+      min-height: 0;
+    }
+    #tab-res-plots .res-plot-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    #tab-res-plots .res-chart-container {
+      flex: 1 1 auto;
+      min-height: 240px;
+      height: auto;
     }
     #tab-residuals #residualsPanel {
       flex: 1;
@@ -8148,6 +8182,17 @@ ${sectionsHtml}
       const obsData=d.leverage.map((l,i)=>({x:l,y:d.standardized[i],name:`Obs ${i+1}`,cookD:d.cooksD[i],color:d.cooksD[i]>1?'rgba(239,68,68,.9)':d.cooksD[i]>0.5?'rgba(245,158,11,.8)':'rgba(120,200,255,.6)',marker:{radius:d.cooksD[i]>0.5?7:4}}));
       Highcharts.chart('resChart4',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Leverage',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'Std Residuals',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},plotLines:[{value:0,color:'rgba(255,165,120,.6)',width:2,zIndex:4}]},legend:{enabled:true,itemStyle:{color:'#fff'}},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){if(this.series.name==='Observations'){return`<b>${this.point.name}</b><br>Leverage: ${this.x.toFixed(4)}<br>Std Res: ${this.y.toFixed(2)}<br>Cook's D: ${this.point.cookD.toFixed(4)}`;}return false;}},series:[{name:"Cook's D=0.5",type:'line',data:c05p.concat(c05n.reverse()),color:'#f59e0b',dashStyle:'ShortDash',marker:{enabled:false},enableMouseTracking:false,lineWidth:2},{name:"Cook's D=1.0",type:'line',data:c10p.concat(c10n.reverse()),color:'#ef4444',dashStyle:'ShortDash',marker:{enabled:false},enableMouseTracking:false,lineWidth:2},{name:'Observations',type:'scatter',data:obsData,zIndex:3}],credits:{enabled:false}});
       window.resPlotsLoaded = true;
+      setTimeout(function () {
+        ['resChart1', 'resChart2', 'resChart3', 'resChart4'].forEach(function (id) {
+          const el = document.getElementById(id);
+          if (!el || typeof Highcharts === 'undefined') return;
+          Highcharts.charts.forEach(function (chart) {
+            if (chart && chart.renderTo === el) {
+              try { chart.reflow(); } catch (_e) {}
+            }
+          });
+        });
+      }, 80);
     }
 
     // ── Influential Obs tab ───────────────────────────────────────

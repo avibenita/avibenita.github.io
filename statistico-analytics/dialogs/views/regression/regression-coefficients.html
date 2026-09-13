@@ -3846,6 +3846,8 @@
     .predictions-container .scenarios-tip span i.fa-play { color: var(--text-secondary); }
 
     .pred-profile {
+      width: 75vw;
+      max-width: 100%;
       margin: 0 0 12px;
       padding: 10px 12px 6px;
       border: 1px solid var(--border);
@@ -9387,29 +9389,50 @@ ${sectionsHtml}
         try { window._predProfileChart.xAxis[0].removePlotLine('pred-current-x'); } catch (_e) {}
         window._predProfileChart.xAxis[0].addPlotLine(plotLine);
         window._predProfileChart.redraw();
+        window._predProfileChart.reflow();
         return;
       }
 
+      const fmtNum = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(2) : '–');
       window._predProfileChart = Highcharts.chart('predProfileChart', {
         chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [8, 8, 8, 8] },
         title: { text: null },
         xAxis: {
           title: { text: focal, style: { color: th.textColor } },
           gridLineColor: th.gridLine,
-          labels: { style: { color: th.axisText } },
+          labels: { style: { color: th.axisText }, format: '{value:.1f}' },
           plotLines: [plotLine]
         },
         yAxis: {
           title: { text: 'Predicted ' + yVar, style: { color: th.textColor } },
           gridLineColor: th.gridLine,
-          labels: { style: { color: th.axisText } }
+          labels: { style: { color: th.axisText }, format: '{value:.1f}' }
         },
         legend: {
           enabled: true,
           itemStyle: { color: th.textColor, fontSize: '10px', fontWeight: '500' },
           itemHoverStyle: { color: th.textColor }
         },
-        tooltip: { backgroundColor: th.bgTooltip, borderColor: th.borderTooltip, style: { color: th.textColor }, shared: true },
+        tooltip: {
+          backgroundColor: th.bgTooltip,
+          borderColor: th.borderTooltip,
+          style: { color: th.textColor },
+          shared: true,
+          valueDecimals: 2,
+          formatter: function() {
+            let html = '<span style="font-size:11px">' + fmtNum(this.x) + '</span>';
+            (this.points || []).forEach((p) => {
+              const low = p.point && p.point.low;
+              const high = p.point && p.point.high;
+              if (low != null && high != null) {
+                html += '<br/><span style="color:' + p.color + '">\u25CF</span> ' + p.series.name + ': <b>' + fmtNum(low) + ' – ' + fmtNum(high) + '</b>';
+              } else {
+                html += '<br/><span style="color:' + p.color + '">\u25CF</span> ' + p.series.name + ': <b>' + fmtNum(p.y) + '</b>';
+              }
+            });
+            return html;
+          }
+        },
         plotOptions: { series: { animation: false } },
         series: [
           { name: '95% individual PI', type: 'arearange', data: pi, color: 'rgba(147,197,253,.55)', fillOpacity: 0.22, lineWidth: 0, marker: { enabled: false }, zIndex: 1 },

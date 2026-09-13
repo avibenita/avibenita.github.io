@@ -97,6 +97,7 @@
   }
 
   var _customTimer = null;
+  var _assumeTimer = null;
 
   var CHIPS = [
     { pct: '80',     key: 'req80',     fallback: 'powReq80'      },
@@ -106,14 +107,44 @@
     { pct: 'Custom', key: 'reqCustom', fallback: 'customRequiredN' }
   ];
 
+  function _parseTargetPower(raw) {
+    var v = parseFloat(raw);
+    if (!isFinite(v)) return NaN;
+    if (v > 1) v = v / 100;
+    return v;
+  }
+
   function _formatTargetLabel(pct) {
     if (pct === 'Custom') {
       var inp = document.getElementById('customPowerInput');
-      var v = inp ? parseFloat(inp.value) : NaN;
+      var v = _parseTargetPower(inp && inp.value);
       if (isFinite(v)) return Math.round(v * 100) + '%';
       return 'Custom';
     }
     return pct + '%';
+  }
+
+  function _effectWordFromShell() {
+    var shell = document.getElementById('pwstd-shell');
+    var variant = shell && shell.getAttribute('data-variant');
+    if (variant === 'mixed') return 'partial η²';
+    if (variant === 'anova') return 'η²';
+    return 'R²';
+  }
+
+  function _updateHeroTargetLabels() {
+    var t = window.StatisticoPowerTemplate && typeof window.StatisticoPowerTemplate.getSelectedTargetPower === 'function'
+      ? window.StatisticoPowerTemplate.getSelectedTargetPower()
+      : { pct: '85%' };
+    var pct = t.pct || '85%';
+    var shell = document.getElementById('pwstd-shell');
+    var variant = shell && shell.getAttribute('data-variant');
+    var nWord = variant === 'mixed' ? 'subjects' : 'N';
+    var effectWord = _effectWordFromShell();
+    var req = document.getElementById('pwstd-hero-req-label');
+    var det = document.getElementById('pwstd-hero-det-label');
+    if (req) req.textContent = 'Required ' + nWord + ' at ' + pct + ' power';
+    if (det) det.textContent = 'Detectable ' + effectWord + ' at ' + pct + ' power';
   }
 
   function _updatePlanningCard(pct, n) {
@@ -237,16 +268,9 @@
       ? 'Required subjects, achieved power, and detectable effect'
       : 'Required N, achieved power, and detectable effect');
     var customHandler = esc(o.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()');
-    var effectMetricLabel = o.effectMetric || 'Observed R²';
-    var effectSizeMetricLabel = o.effectSizeMetric || "Effect Size f²";
-    var sampleSizeLabel = o.sampleSizeLabel || (variant === 'anova' ? 'Total Sample N' : 'Current N');
-    var sampleSizeTip = o.sampleSizeTip || (variant === 'anova'
-      ? 'Total sample size: all observations across all groups combined (N = n₁ + n₂ + …), not per-group n.'
-      : 'Total number of observations (rows) used in the analysis.');
-    var metricsHtml = variant === 'mixed'
-      ? buildMixedMetricsHtml(ids)
-      : buildDefaultMetricsHtml(ids, effectMetricLabel, effectSizeMetricLabel, sampleSizeLabel, sampleSizeTip);
-    var metricsRowClass = variant === 'mixed' ? 'pwstd-metrics-row pwstd-metrics-row--mixed' : 'pwstd-metrics-row';
+    var assumeEffectName = variant === 'mixed' ? 'partial η²' : (variant === 'anova' ? 'η²' : 'R²');
+    var assumePLabel = variant === 'mixed' ? 'df₁' : (variant === 'anova' ? 'Groups' : 'Predictors');
+    var assumeNLabel = variant === 'mixed' ? 'Subjects' : 'N';
     var designChip = variant === 'mixed'
       ? '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Design</span><span class="pwstd-meta-v" id="powDesignPattern">—</span></span>\n'
       : '';
@@ -266,8 +290,9 @@
           + '  <div class="pwstd-chip-label">Custom</div>'
           + '  <div class="pwstd-chip-custom-ctrl" onclick="event.stopPropagation()">'
           + '    <input class="pwstd-select pwstd-chip-input" type="number" id="' + id(ids,'customInput','customPowerInput') + '"'
-          + ' min="0.5" max="0.99" step="0.01" value="0.85"'
+          + ' min="50" max="99" step="1" value="85"'
           + ' oninput="window.StatisticoPowerTemplate._onCustomInput()" onclick="event.stopPropagation()">'
+          + '    <span class="pwstd-chip-pct">%</span>'
           + '    <button type="button" class="pwstd-chip-btn" onclick="event.stopPropagation();' + customHandler + '" title="Recalculate">'
           + '      <i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i>'
           + '    </button>'
@@ -290,40 +315,40 @@
     var planningHeadHtml = variant === 'mixed'
       ? labelWithTip('Sample Size Planning', 'Required subjects for each power target. Sub-counts show approximate total observations (subjects × measurements per subject).')
       : 'Sample Size Planning';
-    var detectableCardHtml = variant === 'mixed'
-      ? buildMixedDetectableHtml()
-      : buildDefaultDetectableHtml();
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260913a">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260913b">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">' + esc(subtitle) + '</p>',
-      '    <div class="pwstd-header-meta">',
-      '      <div class="pwstd-task-bar" role="group" aria-label="Power analysis task">',
-      '        <span class="pwstd-task-label">Task</span>',
-      '        <select class="pwstd-select pwstd-select--task" id="' + id(ids,'taskMode','powTaskMode') + '" onchange="window.StatisticoPowerTemplate._onTaskChange(this.value)">',
-      '          <option value="fromN">Power from N</option>',
-      '          <option value="requiredN">Required N</option>',
-      '          <option value="detectable">Detectable effect</option>',
-      '        </select>',
-      '      </div>',
-      '      <div class="pwstd-meta-strip">',
-      '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Analysis</span><span class="pwstd-meta-v" id="' + id(ids,'design','powDesignType') + '">Linear regression</span></span>',
-      designChip,
-      '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Target</span><span class="pwstd-meta-v" id="' + id(ids,'target','powTargetWhat') + '">Global model R²</span></span>',
-      '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Effect</span><span class="pwstd-meta-v" id="' + id(ids,'effectSource','powEffectSource') + '">Observed R²</span></span>',
-      '        <span class="pwstd-meta-chip"><span class="pwstd-meta-k">Alpha</span><span class="pwstd-meta-v" id="' + id(ids,'alpha','powAlpha') + '">0.050</span></span>',
-      '      </div>',
+      '    <div class="pwstd-assume-row" id="pwstd-assume-row">',
+      '      <span class="pwstd-assume-item"><span class="pwstd-assume-k">Analysis</span><span class="pwstd-assume-v" id="' + id(ids,'design','powDesignType') + '">Linear regression</span></span>',
+      designChip ? designChip.replace('pwstd-meta-chip', 'pwstd-assume-item').replace('pwstd-meta-k', 'pwstd-assume-k').replace('pwstd-meta-v', 'pwstd-assume-v') : '',
+      '      <span class="pwstd-assume-item"><span class="pwstd-assume-k">' + assumeNLabel + '</span><span class="pwstd-assume-v" id="' + id(ids,'sampleSize','powSampleSize') + '">—</span></span>',
+      '      <label class="pwstd-assume-item pwstd-assume-item--edit">',
+      '        <span class="pwstd-assume-k" id="pwstd-assume-effect-label">Assumed ' + assumeEffectName + '</span>',
+      '        <input class="pwstd-assume-input" type="number" id="pwstd-assume-effect" min="0.001" max="0.999" step="0.001" value="" title="Effect used for planning. The observed value is shown as a reference.">',
+      '      </label>',
+      '      <span class="pwstd-assume-item"><span class="pwstd-assume-k" id="pwstd-assume-obs-label">Observed ' + assumeEffectName + '</span><span class="pwstd-assume-v" id="pwstd-assume-obs">—</span></span>',
+      '      <span class="pwstd-assume-item"><span class="pwstd-assume-k" id="pwstd-assume-p-label">' + assumePLabel + '</span><span class="pwstd-assume-v" id="pwstd-assume-p">—</span></span>',
+      '      <span class="pwstd-assume-item"><span class="pwstd-assume-k">α</span><span class="pwstd-assume-v" id="' + id(ids,'alpha','powAlpha') + '">0.050</span></span>',
       '    </div>',
       '  </header>',
-      '  <div class="pwstd-exec pwstd-exec--neutral" id="pwstd-exec-summary">' + esc(o.emptySummary || 'Run analysis to populate power results.') + '</div>',
-      '  <div class="pwstd-metrics-band">',
-      '    <div class="' + metricsRowClass + '">',
-      metricsHtml,
+      '  <div class="pwstd-hero" id="pwstd-hero">',
+      '    <div class="pwstd-hero-card">',
+      '      <div class="pwstd-hero-label" id="pwstd-hero-power-label">Power assuming ' + assumeEffectName + '</div>',
+      '      <div class="pwstd-hero-value" id="' + id(ids,'observed','powObserved') + '">—</div>',
       '    </div>',
-      detectableCardHtml,
+      '    <div class="pwstd-hero-card">',
+      '      <div class="pwstd-hero-label" id="pwstd-hero-req-label">Required ' + (variant === 'mixed' ? 'subjects' : 'N') + ' at 85% power</div>',
+      '      <div class="pwstd-hero-value" id="' + id(ids,'requiredN','powRequired') + '">—</div>',
+      '    </div>',
+      '    <div class="pwstd-hero-card">',
+      '      <div class="pwstd-hero-label" id="pwstd-hero-det-label">Detectable ' + assumeEffectName + ' at 85% power</div>',
+      '      <div class="pwstd-hero-value" id="pwstd-r2-detectable">—</div>',
+      '    </div>',
       '  </div>',
+      '  <div class="pwstd-exec pwstd-exec--neutral" id="pwstd-exec-summary">' + esc(o.emptySummary || 'Run analysis to populate power results.') + '</div>',
       variant === 'mixed' ? buildMixedDesignAssumptionsHtml() : '',
       '  <div class="pwstd-grid pwstd-grid--workspace">',
       '    <div class="pwstd-card pwstd-card--planning pwstd-card--primary" id="pwstd-card-planning">',
@@ -333,7 +358,6 @@
       '        <span id="' + id(ids,'customStatus','customPowerStatus') + '" class="pwstd-custom-status"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
       '        <span id="pwstd-selected-target" hidden aria-hidden="true"></span>',
       '        <span id="pwstd-reqN-label" hidden aria-hidden="true"></span>',
-      '        <span id="' + id(ids,'requiredN','powRequired') + '" hidden aria-hidden="true"></span>',
       '        <span id="' + id(ids,'partialEta','powPartialEta') + '" hidden aria-hidden="true"></span>',
       '        <p class="pwstd-planning-summary" id="pwstd-planning-summary">Select a target power to see required sample size.</p>',
       '        <div class="pwstd-for-detectable">',
@@ -347,7 +371,10 @@
       '      </div>',
       '    </div>',
       '    <div class="pwstd-card pwstd-card--curve">',
-      '      <div class="pwstd-card-h">Power Curve</div>',
+      '      <div class="pwstd-card-h pwstd-card-h--curve">',
+      '        <span>Power Curve</span>',
+      '        <button type="button" class="pwstd-curve-zoom" id="pwstd-curve-zoom">Show current N</button>',
+      '      </div>',
       '      <div class="pwstd-card-b pwstd-curve-wrap">',
       '        <div class="pwstd-curve-interactive">',
       '          <svg id="pwstd-power-curve-svg" class="pwstd-power-curve" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Power versus sample size curve"></svg>',
@@ -369,6 +396,7 @@
       '    </button>',
       '    <div class="pwstd-card-b pwstd-card-b--technicals" id="pwstd-tech-panel-body" hidden>',
       '      <p class="pwstd-tech-note" id="pwstd-tech-note">Power is calculated using the exact noncentral F distribution for the fixed-model regression test.</p>',
+      '      <p class="pwstd-tech-engine" id="' + id(ids,'engineNote','powEngineNote') + '">Exact noncentral F — λ = N·f², f² = R²/(1−R²). Post-hoc power is descriptive; use Required N or Detectable R² for planning.</p>',
       '      <div class="pwstd-row pwstd-row--formula"><span class="pwstd-label">df formulas</span><span class="pwstd-value pwstd-value--formula" id="' + id(ids,'dfFormula','powDfFormula') + '">df1=p · df2=N−p−1</span></div>',
       '      <div class="pwstd-row"><span class="pwstd-label">Noncentrality λ</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outLambda','powOutLambda') + '">—</span></div>',
       '      <div class="pwstd-row"><span class="pwstd-label">df1</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outDf1','powOutDf1') + '">—</span></div>',
@@ -378,15 +406,14 @@
       '      <div class="pwstd-row"><span class="pwstd-label">Actual power</span><span class="pwstd-value pwstd-value--mono" id="' + id(ids,'outPower','powOutPower') + '">—</span></div>',
       '    </div>',
       '  </div>',
-      '  <div class="pwstd-band pwstd-band--recommend" id="' + id(ids,'status','powStatusMessage') + '">Run analysis to populate power results.</div>',
-      '  <div class="pwstd-engine"><i class="fa-solid fa-calculator"></i> <span id="' + id(ids,'engineNote','powEngineNote') + '">Exact noncentral F — post-hoc power is descriptive; use Required N or Detectable R² for planning.</span></div>',
       '</div>'
     ].join('\n');
 
-    _syncTaskUI('fromN');
     _updateDfFormulaLabel(o);
     _applyVariant(o);
     _syncDefaultChip();
+    _updateHeroTargetLabels();
+    _bindAssumeEffect();
     _initTermTips(container);
   }
 
@@ -668,6 +695,26 @@
     }
   }
 
+  function _bindAssumeEffect() {
+    var inp = document.getElementById('pwstd-assume-effect');
+    if (!inp || inp.dataset.pwBound) return;
+    inp.dataset.pwBound = '1';
+    inp.addEventListener('input', function () {
+      clearTimeout(_assumeTimer);
+      _assumeTimer = setTimeout(function () {
+        if (typeof window.StatisticoPowerTemplate._recalcFn === 'function') {
+          window.StatisticoPowerTemplate._recalcFn();
+        }
+      }, 350);
+    });
+    inp.addEventListener('change', function () {
+      clearTimeout(_assumeTimer);
+      if (typeof window.StatisticoPowerTemplate._recalcFn === 'function') {
+        window.StatisticoPowerTemplate._recalcFn();
+      }
+    });
+  }
+
   function _onChipClick(chipEl) {
     document.querySelectorAll('.pwstd-chip--selectable').forEach(function(c){
       c.classList.remove('pwstd-chip--selected');
@@ -680,12 +727,15 @@
     var n       = valEl ? valEl.textContent : '...';
 
     _updatePlanningCard(pct, n);
+    _updateHeroTargetLabels();
 
-    if (typeof window.StatisticoPowerTemplate._updatePlanningSummaryFn === 'function') {
+    if (typeof window.StatisticoPowerTemplate._recalcFn === 'function') {
+      window.StatisticoPowerTemplate._recalcFn();
+    } else if (typeof window.StatisticoPowerTemplate._updatePlanningSummaryFn === 'function') {
       window.StatisticoPowerTemplate._updatePlanningSummaryFn();
     }
 
-    if (pct === 'Custom') {
+    if (pct === 'Custom' && typeof window.StatisticoPowerTemplate._recalcFn !== 'function') {
       var inp = document.getElementById('customPowerInput');
       if (inp) inp.focus();
       window.StatisticoPowerTemplate.runCustomCompute();
@@ -832,14 +882,15 @@
     _recalcFn: null,
     _computeDetectable: null,
     _updatePlanningSummaryFn: null,
+    parseTargetPower: _parseTargetPower,
     getSelectedTargetPower: function() {
       var chip = document.querySelector('.pwstd-chip--selected');
       if (!chip) return { pct: '85%', power: 0.85 };
       var pct = chip.getAttribute('data-pct');
       if (pct === 'Custom') {
         var inp = document.getElementById('customPowerInput');
-        var v = inp ? parseFloat(inp.value) : 0.85;
-        if (!isFinite(v)) v = 0.85;
+        var v = _parseTargetPower(inp && inp.value);
+        if (!isFinite(v) || v < 0.5 || v > 0.99) v = 0.85;
         return { pct: Math.round(v * 100) + '%', power: v };
       }
       return { pct: pct + '%', power: parseInt(pct, 10) / 100 };

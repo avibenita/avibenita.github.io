@@ -21,6 +21,35 @@
     return v / (1 - v);
   }
 
+  function formatPowerPct(p) {
+    if (!isFinite(p)) return '—';
+    if (p >= 0.999) return '>99.9%';
+    if (p <= 0.001) return '<0.1%';
+    return (p * 100).toFixed(1) + '%';
+  }
+
+  function parseTargetPower(raw) {
+    if (global.StatisticoPowerTemplate && typeof global.StatisticoPowerTemplate.parseTargetPower === 'function') {
+      return global.StatisticoPowerTemplate.parseTargetPower(raw);
+    }
+    var v = parseFloat(raw);
+    if (!isFinite(v)) return NaN;
+    if (v > 1) v = v / 100;
+    return v;
+  }
+
+  function readAssumedEffect(observed) {
+    var inp = document.getElementById('pwstd-assume-effect');
+    if (!inp) return observed;
+    if (inp.value === '' || inp.value == null) {
+      if (isFinite(observed) && observed > 0 && observed < 1) inp.value = observed.toFixed(3);
+      return observed;
+    }
+    var v = parseFloat(inp.value);
+    if (!isFinite(v) || v <= 0 || v >= 1) return observed;
+    return v;
+  }
+
   function cohenMagnitude(f2) {
     if (!isFinite(f2) || f2 <= 0) return '';
     if (f2 < 0.02) return 'negligible';
@@ -66,16 +95,19 @@
     if (!f2 || f2 <= 0 || !df1 || df1 < 1) return 0;
     var nMin = Math.max(minN, df2AtN(minN) >= 1 ? minN : minN + 1);
     var nMax = 5000;
-    for (var iter = 0; iter < 60; iter++) {
+    var best = 0;
+    for (var iter = 0; iter < 60 && nMin <= nMax; iter++) {
       var n = Math.floor((nMin + nMax) / 2);
       var df2 = df2AtN(n);
       if (df2 < 1) { nMin = n + 1; continue; }
-      var power = powerAtF2(n, df1, df2, f2, alpha);
-      if (Math.abs(power - targetPower) < 0.005) return n;
-      if (power < targetPower) nMin = n + 1;
-      else nMax = n - 1;
+      if (powerAtF2(n, df1, df2, f2, alpha) >= targetPower) {
+        best = n;
+        nMax = n - 1;
+      } else {
+        nMin = n + 1;
+      }
     }
-    return Math.max(nMin, 1);
+    return best || nMin;
   }
 
   function estimateDetectableF2(n, df1, minN, df2AtN, targetPower, alpha) {
@@ -123,8 +155,18 @@
     var cfg = config || {};
 
     function getContext(source) {
-      if (typeof cfg.getContext === 'function') return cfg.getContext(source);
-      return null;
+      var ctx = typeof cfg.getContext === 'function' ? cfg.getContext(source) : null;
+      if (!ctx) return null;
+      if (!isFinite(ctx.observedEffect)) ctx.observedEffect = ctx.effect;
+      var assumed = readAssumedEffect(ctx.observedEffect);
+      if (isFinite(assumed) && assumed > 0 && assumed < 1) {
+        ctx.effect = assumed;
+        ctx.f2 = f2FromEffect(assumed);
+        if (cfg.variant === 'anova' || isFinite(ctx.cohenF)) {
+          ctx.cohenF = Math.sqrt(ctx.f2);
+        }
+      }
+      return ctx;
     }
 
     function df2AtN(ctx, n) {
@@ -134,7 +176,7 @@
 
     function minN(ctx) {
       if (typeof cfg.minN === 'function') return cfg.minN(ctx);
-      return Math.max(ctx.df1 + 2, 8);
+      return Math.max(ctx.df1 + 2, 5);
     }
 
     function observedPower(ctx) {
@@ -162,6 +204,9 @@
       if (labels.design) powSetText('powDesignType', labels.design);
       if (labels.target) powSetText('powTargetWhat', labels.target);
       if (labels.effectSource) powSetText('powEffectSource', labels.effectSource);
+      if (labels.assumedEffect) powSetText('pwstd-assume-effect-label', labels.assumedEffect);
+      if (labels.observedEffect) powSetText('pwstd-assume-obs-label', labels.observedEffect);
+      if (labels.countLabel) powSetText('pwstd-assume-p-label', labels.countLabel);
       if (cfg.variant === 'mixed') return;
       var metric = document.getElementById('pwstd-metric-effect-label');
       if (metric && labels.effectMetric) metric.textContent = labels.effectMetric;
@@ -197,6 +242,33 @@
       }
     }
 
+    function updateHeroLabels(ctx, target) {
+      var pct = (target && target.pct) || '85%';
+      var effectName = (ctx && (ctx.effectName || cfg.effectName)) || 'R²';
+      var nWord = cfg.variant === 'mixed' ? 'subjects' : 'N';
+      var powerLbl = document.getElementById('pwstd-hero-power-label');
+      if (powerLbl && ctx && isFinite(ctx.effect)) {
+        powerLbl.textContent = 'Power assuming ' + effectName + ' = ' + ctx.effect.toFixed(3);
+      }
+      var reqLbl = document.getElementById('pwstd-hero-req-label');
+      if (reqLbl) reqLbl.textContent = 'Required ' + nWord + ' at ' + pct + ' power';
+      var detLbl = document.getElementById('pwstd-hero-det-label');
+      if (detLbl) detLbl.textContent = 'Detectable ' + effectName + ' at ' + pct + ' power';
+    }
+
+    function updateAssumptionsRow(ctx) {
+      if (!ctx) {
+        powSetText('pwstd-assume-obs', '—');
+        powSetText('pwstd-assume-p', '—');
+        return;
+      }
+      var observed = isFinite(ctx.observedEffect) ? ctx.observedEffect : ctx.effect;
+      powSetText('pwstd-assume-obs', isFinite(observed) ? observed.toFixed(3) : '—');
+      if (cfg.variant === 'anova' && ctx.k) powSetText('pwstd-assume-p', String(ctx.k));
+      else if (cfg.variant === 'mixed') powSetText('pwstd-assume-p', String(ctx.df1));
+      else powSetText('pwstd-assume-p', String(ctx.p != null ? ctx.p : ctx.df1));
+    }
+
     function formatEffectSize(ctx) {
       if (cfg.variant === 'anova') {
         var f = isFinite(ctx.cohenF) ? ctx.cohenF : (ctx.f2 > 0 ? Math.sqrt(ctx.f2) : NaN);
@@ -225,23 +297,14 @@
         el.className = 'pwstd-exec pwstd-exec--neutral';
         return;
       }
-      var pct = (power * 100).toFixed(1);
-      var mag = cohenMagnitude(ctx.f2);
+      var pct = formatPowerPct(power);
       var effectName = ctx.effectName || cfg.effectName || 'effect';
-      var cls = 'pwstd-exec--neutral';
-      var text;
-      if (power >= 0.80) {
-        cls = 'pwstd-exec--success';
-        text = 'Current sample size is adequate for the observed effect. Achieved power is ' + pct + '% with n = ' + ctx.n + ', α = ' + ctx.alpha.toFixed(2) + ', and observed ' + effectName + ' = ' + ctx.effect.toFixed(3) + '.';
-      } else if (power >= 0.70) {
-        cls = 'pwstd-exec--warning';
-        text = 'Power is borderline (' + pct + '%) for the observed ' + effectName + ' with n = ' + ctx.n + '. Consider increasing sample size.';
-      } else {
-        cls = 'pwstd-exec--error';
-        text = 'Current sample size appears underpowered (' + pct + '%) for the observed ' + effectName + ' with n = ' + ctx.n + ' (f² = ' + ctx.f2.toFixed(3) + (mag ? ', ' + mag : '') + ').';
-      }
+      var nLabel = cfg.variant === 'mixed' ? 'subjects' : 'N';
+      var text = 'Power assuming ' + effectName + ' = ' + ctx.effect.toFixed(3) + ' is ' + pct
+        + ' at ' + nLabel + ' = ' + ctx.n + ' and α = ' + ctx.alpha.toFixed(2)
+        + '. Power calculated from the fitted (or assumed) effect does not independently establish study adequacy — use Required N and Detectable ' + effectName + ' for planning.';
       el.textContent = text;
-      el.className = 'pwstd-exec ' + cls;
+      el.className = 'pwstd-exec pwstd-exec--neutral';
     }
 
     function updatePlanningSummary(ctx) {
@@ -259,10 +322,7 @@
         el.textContent = 'Select a target power to see required sample size.';
         return;
       }
-      var gap = ctx.n >= reqN
-        ? 'Current N = ' + ctx.n + ' meets or exceeds this target.'
-        : 'Current N = ' + ctx.n + ' is below this target by ' + (reqN - ctx.n) + ' observations.';
-      el.textContent = 'For ' + target.pct + ' power, approximately ' + reqN + ' observations are required. ' + gap;
+      el.textContent = 'Required N at ' + target.pct + ' power is ' + reqN + ' (current N = ' + ctx.n + ').';
     }
 
     function updateEffectCompare(ctx, detectableEffectVal, targetPower) {
@@ -271,23 +331,12 @@
       var insightEl = document.getElementById('pwstd-r2-insight');
       var interpretEl = document.getElementById('pwstd-det-interpret');
       var block = document.getElementById('pwstd-r2-compare');
-      if (obsEl) obsEl.textContent = ctx ? ctx.effect.toFixed(3) : '—';
+      var observed = ctx && isFinite(ctx.observedEffect) ? ctx.observedEffect : (ctx && ctx.effect);
+      if (obsEl) obsEl.textContent = isFinite(observed) ? observed.toFixed(3) : '—';
       if (detEl) detEl.textContent = isFinite(detectableEffectVal) ? detectableEffectVal.toFixed(3) : '—';
-      if (block) block.hidden = !ctx || !isFinite(detectableEffectVal);
-      var tp = isFinite(targetPower) ? targetPower : 0.80;
-      var effectName = (ctx && ctx.effectName) || cfg.effectName || 'effect';
-      if (interpretEl && ctx && isFinite(detectableEffectVal)) {
-        interpretEl.textContent = 'With total N=' + ctx.n + ', the study can reliably detect (at ' + Math.round(tp * 100) + '% power) ' + effectName + ' values of at least ' + detectableEffectVal.toFixed(3) + '.';
-      }
-      if (insightEl && ctx && isFinite(detectableEffectVal)) {
-        if (ctx.effect > detectableEffectVal + 0.001) {
-          insightEl.textContent = 'Observed ' + effectName + ' exceeds the detectable threshold — sufficient power to detect this effect.';
-        } else if (Math.abs(ctx.effect - detectableEffectVal) <= 0.001) {
-          insightEl.textContent = 'Observed ' + effectName + ' is near the detectable threshold — power is borderline for this effect size.';
-        } else {
-          insightEl.textContent = 'Observed ' + effectName + ' is below the detectable threshold — this effect may be too small to detect reliably at this sample size.';
-        }
-      }
+      if (block) block.hidden = true;
+      if (interpretEl) interpretEl.textContent = '';
+      if (insightEl) insightEl.textContent = '';
     }
 
     function updateOutputParams(ctx, power) {
@@ -305,7 +354,7 @@
       powSetText('powOutDf1', String(ctx.df1));
       powSetText('powOutDf2', String(ctx.df2));
       powSetText('powOutN', String(ctx.n));
-      powSetText('powOutPower', isFinite(power) ? (power * 100).toFixed(1) + '%' : '—');
+      powSetText('powOutPower', formatPowerPct(power));
       if (cfg.variant === 'anova' && isFinite(ctx.cohenF)) {
         powSetText('powOutPillaiV', ctx.cohenF.toFixed(4));
       } else {
@@ -412,7 +461,7 @@
         hover.querySelector('.pwstd-curve-crosshair-v').setAttribute('y2', plotB.toFixed(1));
         hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cx', x.toFixed(1));
         hover.querySelector('.pwstd-curve-hover-dot').setAttribute('cy', y.toFixed(1));
-        tooltip.innerHTML = '<strong>' + (cfg.curveXAxisLabel || 'N') + ' = ' + n + '</strong>Power = ' + (power * 100).toFixed(1) + '%'
+        tooltip.innerHTML = '<strong>' + (cfg.curveXAxisLabel || 'N') + ' = ' + n + '</strong>Power = ' + formatPowerPct(power)
           + (typeof cfg.formatCurveTooltip === 'function' ? cfg.formatCurveTooltip(data.ctx, n, power) : '');
         tooltip.hidden = false;
         var wrapRect = wrap.getBoundingClientRect();
@@ -438,8 +487,13 @@
 
       var target = targetPower || 0.85;
       var lo = minN(ctx);
-      var req95 = computeRequiredN(ctx, 0.95) || ctx.n;
-      var maxN = Math.max(ctx.n + 15, req95 + 10, lo + 20);
+      var req95 = computeRequiredN(ctx, 0.95) || selectedReqN || lo;
+      var zoomFull = svg.dataset.zoomFull === '1';
+      var focusN = selectedReqN || req95 || lo;
+      var maxN = zoomFull
+        ? Math.max(ctx.n + 15, req95 + 10, lo + 20)
+        : Math.max(Math.ceil(Math.max(req95, focusN) * 3.5), lo + 24, 36);
+      var currentOnScale = ctx.n >= lo && ctx.n <= maxN;
       var step = Math.max(1, Math.floor((maxN - lo) / 80));
       var points = [];
       for (var n = lo; n <= maxN; n += step) {
@@ -452,7 +506,7 @@
         if (df2Last >= 1) points.push({ n: maxN, power: powerAtF2(maxN, ctx.df1, df2Last, ctx.f2, ctx.alpha) });
       }
 
-      var W = 640, H = 200, pad = { l: 56, r: 34, t: 20, b: 40 };
+      var W = 640, H = 200, pad = { l: 56, r: 52, t: 20, b: 40 };
       var plotW = W - pad.l - pad.r;
       var plotH = H - pad.t - pad.b;
       var xScale = function (n) { return pad.l + ((n - lo) / (maxN - lo)) * plotW; };
@@ -483,12 +537,14 @@
       parts.push('<line x1="' + pad.l + '" y1="' + (pad.t + plotH) + '" x2="' + (pad.l + plotW) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');
       parts.push('<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');
       parts.push('<line x1="' + pad.l + '" y1="' + tgtY.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + tgtY.toFixed(1) + '" stroke="rgb(255,215,0)" stroke-dasharray="6 4" stroke-width="1.5"/>');
-      parts.push('<text x="' + (pad.l + plotW + 2) + '" y="' + (tgtY + 4).toFixed(1) + '" fill="rgb(255,215,0)" font-size="10" font-weight="700">Target ' + fmtPct(target) + '</text>');
+      parts.push('<text x="' + (pad.l + plotW + 2) + '" y="' + (tgtY + 4).toFixed(1) + '" fill="rgb(255,215,0)" font-size="10" font-weight="700">Target: ' + fmtPct(target) + '</text>');
       parts.push('<path d="' + path.trim() + '" fill="none" stroke="#78c8ff" stroke-width="2.5"/>');
-      parts.push('<line x1="' + curX.toFixed(1) + '" y1="' + pad.t + '" x2="' + curX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgb(255,165,120)" stroke-width="2"/>');
-      parts.push('<circle cx="' + curX.toFixed(1) + '" cy="' + curY.toFixed(1) + '" r="5" fill="rgb(255,165,120)" stroke="#fff" stroke-width="1.5"/>');
-      parts.push('<text x="' + curX.toFixed(1) + '" y="' + (pad.t - 6) + '" text-anchor="middle" fill="rgb(255,165,120)" font-size="10" font-weight="700">Current ' + (cfg.curveCurrentLabel || 'N') + '=' + ctx.n + ' (' + fmtPct(curPower) + ')</text>');
-      if (reqX) {
+      if (currentOnScale) {
+        parts.push('<line x1="' + curX.toFixed(1) + '" y1="' + pad.t + '" x2="' + curX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgb(255,165,120)" stroke-width="2"/>');
+        parts.push('<circle cx="' + curX.toFixed(1) + '" cy="' + curY.toFixed(1) + '" r="5" fill="rgb(255,165,120)" stroke="#fff" stroke-width="1.5"/>');
+        parts.push('<text x="' + curX.toFixed(1) + '" y="' + (pad.t - 6) + '" text-anchor="middle" fill="rgb(255,165,120)" font-size="10" font-weight="700">Current ' + (cfg.curveCurrentLabel || 'N') + '=' + ctx.n + ' (' + formatPowerPct(curPower) + ')</text>');
+      }
+      if (reqX && selectedReqN >= lo && selectedReqN <= maxN) {
         parts.push('<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="5" fill="rgb(255,215,0)" stroke="#fff" stroke-width="1.5"/>');
         parts.push('<text x="' + reqX.toFixed(1) + '" y="' + (tgtY - 8).toFixed(1) + '" text-anchor="middle" fill="rgb(255,215,0)" font-size="10" font-weight="700">Required ' + (cfg.curveCurrentLabel || 'N') + '=' + selectedReqN + '</text>');
       }
@@ -498,9 +554,16 @@
       svg.classList.add('pwstd-power-curve--ready');
       bindCurveInteraction(svg);
       if (note) {
-        note.textContent = typeof cfg.formatCurveNote === 'function'
+        var baseNote = typeof cfg.formatCurveNote === 'function'
           ? cfg.formatCurveNote(ctx)
           : (cfg.curveNote || 'Exact noncentral F curve at fixed f² and α — hover to read power at any N.');
+        note.textContent = currentOnScale
+          ? baseNote
+          : 'Current ' + (cfg.curveCurrentLabel || 'N') + ' = ' + ctx.n + ' is off-scale. Use Show current N to include it.';
+      }
+      var zoomBtn = document.getElementById('pwstd-curve-zoom');
+      if (zoomBtn) {
+        zoomBtn.textContent = zoomFull ? 'Zoom near required N' : 'Show current N';
       }
       if (tooltip) tooltip.hidden = true;
     }
@@ -511,6 +574,7 @@
         ['powObserved', 'powEffectSize', 'powSampleSize', 'powPartialEta', 'powRequired', 'pwstd-metric-r2', 'powReq80', 'powReq85', 'powReq90', 'powReq95'].forEach(function (id) { powSetText(id, '—'); });
         updateOutputParams(null);
         updateEffectCompare(null);
+        updateAssumptionsRow(null);
         updateExecutiveSummary(null);
         updatePlanningSummary(null);
         renderCurve(null);
@@ -519,13 +583,13 @@
       }
 
       updateMetaLabels(ctx);
+      updateAssumptionsRow(ctx);
       var targetInput = document.getElementById('powDetectableTarget');
-      var detectTargetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
+      var detectTargetPower = targetInput ? (parseTargetPower(targetInput.value) || 0.80) : 0.80;
       var targetSel = global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.getSelectedTargetPower
         ? global.StatisticoPowerTemplate.getSelectedTargetPower()
         : { pct: '85%', power: 0.85 };
       var power = observedPower(ctx);
-      var mag = cfg.variant === 'anova' ? cohenFMagnitude(ctx.cohenF) : cohenMagnitude(ctx.f2);
       var reqMap = {
         '80': computeRequiredN(ctx, 0.80),
         '85': computeRequiredN(ctx, 0.85),
@@ -533,14 +597,15 @@
         '95': computeRequiredN(ctx, 0.95)
       };
       var detectable = detectableEffect(ctx, targetSel.power);
+      var reqNAtTarget = computeRequiredN(ctx, targetSel.power);
 
-      powSetText('powObserved', (power * 100).toFixed(1) + '%');
+      powSetText('powObserved', formatPowerPct(power));
       powSetText('powEffectSize', formatEffectSize(ctx));
       powSetText('powSampleSize', String(ctx.n));
       powSetText('powPartialEta', ctx.effect.toFixed(4));
       powSetText('pwstd-metric-r2', ctx.effect.toFixed(3));
       powSetText('powAlpha', ctx.alpha.toFixed(3));
-      powSetText('powRequired', reqMap['85'] || '—');
+      powSetText('powRequired', reqNAtTarget || '—');
       powSetText('powReq80', reqMap['80'] || '—');
       powSetText('powReq85', reqMap['85'] || '—');
       powSetText('powReq90', reqMap['90'] || '—');
@@ -548,7 +613,7 @@
 
       var customInput = document.getElementById('customPowerInput');
       if (customInput) {
-        var customTarget = parseFloat(customInput.value);
+        var customTarget = parseTargetPower(customInput.value);
         if (isFinite(customTarget) && customTarget >= 0.5 && customTarget <= 0.99) {
           var customReq = computeRequiredN(ctx, customTarget);
           var customEl = document.getElementById('customRequiredN');
@@ -559,8 +624,7 @@
         }
       }
 
-      var reqNAtTarget = computeRequiredN(ctx, targetSel.power);
-
+      updateHeroLabels(ctx, targetSel);
       updateExecutiveSummary(ctx, power);
       updatePlanningSummary(ctx);
       updateStatus(ctx, power, reqMap);
@@ -594,7 +658,7 @@
     function calculateCustomPower() {
       var customPowerInput = document.getElementById('customPowerInput');
       var customRequiredN = document.getElementById('customRequiredN');
-      var targetPower = parseFloat(customPowerInput && customPowerInput.value);
+      var targetPower = parseTargetPower(customPowerInput && customPowerInput.value);
       if (isNaN(targetPower) || targetPower < 0.5 || targetPower > 0.99) {
         if (customRequiredN) {
           customRequiredN.textContent = 'Invalid';
@@ -643,7 +707,7 @@
     function calculateDetectableEffect() {
       var ctx = getContext();
       var targetInput = document.getElementById('powDetectableTarget');
-      var targetPower = targetInput ? (parseFloat(targetInput.value) || 0.80) : 0.80;
+      var targetPower = targetInput ? (parseTargetPower(targetInput.value) || 0.80) : 0.80;
       if (isNaN(targetPower) || targetPower < 0.5 || targetPower > 0.99) {
         powSetText('powMinDetectableF', 'Invalid');
         powSetText('powMinDetectableEta', '—');
@@ -695,6 +759,18 @@
         detTarget.dataset.powBound = '1';
         detTarget.addEventListener('input', function () { calculate(mountOpts.getSource ? mountOpts.getSource() : undefined); });
         detTarget.addEventListener('change', function () { calculate(mountOpts.getSource ? mountOpts.getSource() : undefined); });
+      }
+      var zoomBtn = document.getElementById('pwstd-curve-zoom');
+      if (zoomBtn && !zoomBtn.dataset.powBound) {
+        zoomBtn.dataset.powBound = '1';
+        zoomBtn.addEventListener('click', function () {
+          var svg = document.getElementById('pwstd-power-curve-svg');
+          if (!svg) return;
+          svg.dataset.zoomFull = svg.dataset.zoomFull === '1' ? '0' : '1';
+          if (typeof global.StatisticoPowerTemplate._updatePlanningSummaryFn === 'function') {
+            global.StatisticoPowerTemplate._updatePlanningSummaryFn();
+          }
+        });
       }
       calculate(mountOpts.getSource ? mountOpts.getSource() : undefined);
       return engine;
@@ -907,6 +983,9 @@
         effectMetric: 'Observed ε²',
         effectSizeMetric: "Cohen's f (approx.)",
         planningEffect: 'ε² used for planning',
+        assumedEffect: 'Assumed ε²',
+        observedEffect: 'Observed ε²',
+        countLabel: 'Groups',
         detectableObserved: 'Observed ε²',
         detectableThreshold: 'Detectable ε²',
         minDetectableF: "Min detectable Cohen's f",
@@ -916,12 +995,15 @@
     return {
       design: 'Independent Means · Parametric',
       target: ctx.isTwoGroup ? 'Two-group mean difference' : 'One-way ANOVA omnibus',
-      effectSource: 'Observed η²',
-      effectMetric: 'Observed η²',
-      effectSizeMetric: "Cohen's f",
-      planningEffect: 'η² used for planning',
-      detectableObserved: 'Observed η²',
-      detectableThreshold: 'Detectable η²',
+        effectSource: 'Observed η²',
+        effectMetric: 'Observed η²',
+        effectSizeMetric: "Cohen's f",
+        planningEffect: 'η² used for planning',
+        assumedEffect: 'Assumed η²',
+        observedEffect: 'Observed η²',
+        countLabel: 'Groups',
+        detectableObserved: 'Observed η²',
+        detectableThreshold: 'Detectable η²',
       minDetectableF: "Min detectable Cohen's f",
       gpowerField: "Cohen's f (G*Power)"
     };
@@ -929,29 +1011,15 @@
 
   function independentExecutiveSummary(ctx, power) {
     if (!ctx) return null;
-    var pct = (power * 100).toFixed(1);
     var effectName = ctx.effectName || 'effect';
-    var cls = 'pwstd-exec--neutral';
-    var text;
     var testPart = ctx.testLabel ? (' for the ' + ctx.testLabel + ' test') : '';
-    var nPart = 'total N = ' + ctx.n + ' (all ' + ctx.k + ' groups combined)';
-    if (power >= 0.80) {
-      cls = 'pwstd-exec--success';
-      text = 'Current sample size is adequate' + testPart + '. Achieved power is ' + pct + '% with ' + nPart
-        + ', α = ' + ctx.alpha.toFixed(3) + ', and observed ' + effectName + ' = ' + ctx.effect.toFixed(3) + '.';
-    } else if (power >= 0.70) {
-      cls = 'pwstd-exec--warning';
-      text = 'Power is borderline (' + pct + '%)' + testPart + ' for observed ' + effectName + ' = ' + ctx.effect.toFixed(3)
-        + ' with ' + nPart + '. Consider increasing sample size.';
-    } else {
-      var f = isFinite(ctx.cohenF) ? ctx.cohenF : Math.sqrt(ctx.f2);
-      text = 'Current sample size appears underpowered (' + pct + '%)' + testPart + ' with ' + nPart
-        + ' (' + effectName + ' = ' + ctx.effect.toFixed(3) + ", Cohen's f = " + f.toFixed(3) + ').';
-    }
+    var text = 'Power assuming ' + effectName + ' = ' + ctx.effect.toFixed(3) + ' is ' + formatPowerPct(power)
+      + testPart + ' at total N = ' + ctx.n + ' (all ' + ctx.k + ' groups combined) and α = ' + ctx.alpha.toFixed(3)
+      + '. Power calculated from the fitted (or assumed) effect does not independently establish study adequacy — use Required N and Detectable ' + effectName + ' for planning.';
     if (ctx.isNonparametric) {
       text += ' Rank-based planning uses a Cohen\'s f approximation mapped from ε².';
     }
-    return { text: text, className: cls };
+    return { text: text, className: 'pwstd-exec--neutral' };
   }
 
   function independentPlanningSummary(ctx) {
@@ -960,13 +1028,10 @@
       : { pct: '85%', power: 0.85 };
     var reqN = estimateRequiredN(ctx.f2, ctx.df1, Math.max(ctx.k + 1, 8), function (n) { return n - ctx.k; }, target.power, ctx.alpha);
     if (!reqN) return 'Select a target power to see required sample size.';
-    var gap = ctx.n >= reqN
-      ? 'Current total N = ' + ctx.n + ' meets or exceeds this target.'
-      : 'Current total N = ' + ctx.n + ' is below this target by ' + (reqN - ctx.n) + ' observations.';
     var effectName = ctx.isNonparametric ? 'ε²' : 'η²';
-    return 'For ' + target.pct + ' power (' + (ctx.testLabel || 'omnibus test') + ', ' + effectName + ' = '
-      + ctx.effect.toFixed(3) + '), approximately ' + reqN + ' total observations (summed across all ' + ctx.k
-      + ' groups) are required. ' + gap;
+    return 'Required N at ' + target.pct + ' power is ' + reqN
+      + ' (' + (ctx.testLabel || 'omnibus test') + ', ' + effectName + ' = ' + ctx.effect.toFixed(3)
+      + ', current total N = ' + ctx.n + ' across ' + ctx.k + ' groups).';
   }
 
   function independentEngineNote(ctx) {
@@ -1128,30 +1193,17 @@
   }
 
   function mixedExecutiveSummary(ctx, power) {
-    var pct = (power * 100).toFixed(1);
     var measRounded = isFinite(ctx.measurementsPerSubject) ? Math.round(ctx.measurementsPerSubject) : null;
     var measTxt = measRounded
       ? 'approximately ' + measRounded + ' repeated measurements per subject'
       : 'the current repeated-measures structure';
-    var cls = 'pwstd-exec--neutral';
-    var lead;
-    if (power >= 0.80 && ctx.converged !== false) {
-      cls = 'pwstd-exec--success';
-      lead = 'The current design is adequately powered.';
-    } else if (power >= 0.70) {
-      cls = 'pwstd-exec--warning';
-      lead = 'The current design is borderline for conventional power targets.';
-    } else {
-      cls = 'pwstd-exec--error';
-      lead = 'The current design appears underpowered for the observed effect.';
-    }
-    var text = lead + ' Based on ' + ctx.subjects + ' subjects and ' + measTxt
-      + ', the estimated power to detect ' + ctx.targetEffectName + ' is ' + pct + '%'
-      + (power >= 0.80 ? ', exceeding the conventional 80% target.' : (power >= 0.70 ? ', slightly below the 80% target.' : ', below the conventional 80% target.'));
+    var text = 'Power assuming partial η² = ' + ctx.effect.toFixed(3) + ' is ' + formatPowerPct(power)
+      + ' for ' + ctx.targetEffectName + ' with ' + ctx.subjects + ' subjects and ' + measTxt
+      + '. Power calculated from the fitted (or assumed) effect does not independently establish design adequacy — use required subjects and detectable partial η² for planning.';
     if (ctx.subjects < 30) {
-      text += ' Small number of subjects may produce unstable mixed-model estimates.';
+      text += ' Small subject counts can produce unstable mixed-model estimates.';
     }
-    return { text: text, className: cls };
+    return { text: text, className: 'pwstd-exec--neutral' };
   }
 
   function mixedPlanningSummary(ctx) {
@@ -1166,12 +1218,9 @@
     var iccPart = formatMixedIcc(ctx);
     iccPart = iccPart === 'Not estimated' ? '' : ' and ICC = ' + iccPart;
     var obsPart = isFinite(ctx.measurementsPerSubject) ? ' (' + Math.round(req * ctx.measurementsPerSubject) + ' total observations)' : '';
-    var gap = ctx.subjects >= req
-      ? ' Current design meets this target.'
-      : ' Current design is short by ' + (req - ctx.subjects) + ' subjects.';
-    return 'For ' + target.pct + ' power, approximately ' + req + ' subjects are required'
+    return 'Required subjects at ' + target.pct + ' power: ' + req
       + (meas !== '—' ? ', assuming ' + meas + ' repeated measurements per subject' : '')
-      + iccPart + obsPart + '.' + gap;
+      + iccPart + obsPart + ' (current subjects = ' + ctx.subjects + ').';
   }
 
   function mixedStatus(ctx, power, reqMap) {
@@ -1212,11 +1261,14 @@
           effectSource: 'Observed R²',
           effectMetric: 'Observed R²',
           planningEffect: 'R² used',
+          assumedEffect: 'Assumed R²',
+          observedEffect: 'Observed R²',
+          countLabel: 'Predictors',
           detectableObserved: 'Observed R²',
           detectableThreshold: 'Detectable R²'
         },
         getContext: function (source) { return regressionContext(source); },
-        minN: function (ctx) { return Math.max(ctx.df1 + (ctx.withIntercept ? 3 : 2), 8); },
+        minN: function (ctx) { return Math.max(ctx.df1 + (ctx.withIntercept ? 2 : 1), 5); },
         df2AtN: function (ctx, n) { return ctx.withIntercept ? (n - ctx.p - 1) : (n - ctx.p); },
         engineNote: function (ctx) {
           return 'Exact noncentral F (G*Power fixed regression): λ=N·f², f²=R²/(1−R²), df1=' + ctx.p + ', df2=N−' + ctx.p + (ctx.withIntercept ? '−1' : '') + ' — computed in browser via jStat.';
@@ -1236,6 +1288,9 @@
           effectMetric: 'Observed η²',
           effectSizeMetric: "Cohen's f",
           planningEffect: 'η² used',
+          assumedEffect: 'Assumed η²',
+          observedEffect: 'Observed η²',
+          countLabel: 'Groups',
           detectableObserved: 'Observed η²',
           detectableThreshold: 'Detectable η²',
           minDetectableF: "Min detectable Cohen's f",
@@ -1266,6 +1321,9 @@
           effectMetric: 'Observed η²',
           effectSizeMetric: "Cohen's f",
           planningEffect: 'η² used',
+          assumedEffect: 'Assumed η²',
+          observedEffect: 'Observed η²',
+          countLabel: 'Groups',
           detectableObserved: 'Observed η²',
           detectableThreshold: 'Detectable η²',
           minDetectableF: "Min detectable Cohen's f",
@@ -1317,6 +1375,9 @@
           effectSource: 'Observed estimate',
           effectMetric: 'Partial η²',
           planningEffect: 'Partial η² used',
+          assumedEffect: 'Assumed partial η²',
+          observedEffect: 'Observed partial η²',
+          countLabel: 'df₁',
           detectableObserved: 'Observed partial η²',
           detectableThreshold: 'Minimum detectable partial η²',
           effectSizeMetric: "Cohen's f²",
@@ -1364,19 +1425,7 @@
           var targetEl = document.getElementById('powTargetWhat');
           if (targetEl) targetEl.textContent = ctx.targetEffectName;
           var insightEl = document.getElementById('pwstd-r2-insight');
-          if (insightEl && ctx) {
-            var detEl = document.getElementById('pwstd-r2-detectable');
-            var det = detEl ? parseFloat(detEl.textContent) : NaN;
-            if (isFinite(det)) {
-              if (ctx.effect > det + 0.001) {
-                insightEl.textContent = 'Observed partial η² (f² = ' + ctx.f2.toFixed(2) + ') exceeds the minimum detectable threshold — the current design is above the planning threshold.';
-              } else if (Math.abs(ctx.effect - det) <= 0.001) {
-                insightEl.textContent = 'Observed effect is near the minimum detectable threshold — power is borderline for this effect size.';
-              } else {
-                insightEl.textContent = 'Minimum detectable partial η² at current design: ' + det.toFixed(3) + '. Observed partial η² = ' + ctx.effect.toFixed(3) + '.';
-              }
-            }
-          }
+          if (insightEl) insightEl.textContent = '';
         },
         engineNote: function (ctx) {
           return 'Approximate method: noncentral F using Type III F=' + ctx.F.toFixed(2)

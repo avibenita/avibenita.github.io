@@ -3593,7 +3593,7 @@
       display: grid;
       grid-template-columns: minmax(300px, 36%) minmax(0, 1fr);
       gap: 14px;
-      align-items: stretch;
+      align-items: start;
       margin-bottom: 12px;
     }
     .pred-scenario-left {
@@ -3992,8 +3992,8 @@
       display: flex;
       flex-direction: column;
       min-width: 0;
-      height: 100%;
-      min-height: 520px;
+      height: auto;
+      min-height: 0;
       margin: 0;
       padding: 14px 16px 8px;
       border-radius: 12px;
@@ -4054,8 +4054,10 @@
       background: rgba(52,211,153,.1);
     }
     .pred-profile-chart {
-      flex: 1 1 auto;
-      min-height: 440px;
+      flex: none;
+      height: 420px;
+      min-height: 420px;
+      max-height: 420px;
     }
 
     .predictions-container .scenarios-header {
@@ -5564,6 +5566,8 @@
       categoricalLevels: {},
       numericRanges: {},
       profileVar: null,
+      profileYVar: null,
+      profileYExtent: null,
       stats: {},
       savedScenarios: [],
       currentInputs: {}
@@ -5954,7 +5958,7 @@
           window.predictionsLoaded = true;
         } else if (window._predProfileChart) {
           setTimeout(function() {
-            try { window._predProfileChart.setSize(null, _predProfileChartHeight(), false); } catch (_e) {}
+            try { window._predProfileChart.setSize(null, PRED_PROFILE_CHART_H, false); } catch (_e) {}
           }, 80);
         }
       } else if (tabName === 'pred-overview' && !window.predOverviewLoaded) {
@@ -9369,6 +9373,8 @@ ${sectionsHtml}
         try { window._predProfileChart.destroy(); } catch (_e) {}
         window._predProfileChart = null;
       }
+      predictionData.profileYExtent = null;
+      predictionData.profileYVar = null;
 
       // Calculate ranges for numeric variables
       const numericRanges = {};
@@ -9652,19 +9658,32 @@ ${sectionsHtml}
     }
     window.selectPredProfileVar = selectPredProfileVar;
 
-    function _predProfileChartHeight() {
-      const mount = document.getElementById('predProfileChart');
-      const panel = document.getElementById('predProfilePanel');
-      if (!mount) return 440;
-      if (panel) {
-        const head = panel.querySelector('.pred-profile-head');
-        const styles = window.getComputedStyle(panel);
-        const padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
-        const headH = head ? head.offsetHeight + 8 : 40;
-        const available = Math.round(panel.clientHeight - padY - headH);
-        if (available > 0) return Math.max(440, available);
+    const PRED_PROFILE_CHART_H = 420;
+
+    function _predProfileYRange(mean, ci, pi, focal) {
+      let lo = Infinity;
+      let hi = -Infinity;
+      const visit = (v) => {
+        if (typeof v === 'number' && Number.isFinite(v)) {
+          if (v < lo) lo = v;
+          if (v > hi) hi = v;
+        }
+      };
+      (mean || []).forEach((p) => visit(p[1]));
+      (ci || []).forEach((p) => { visit(p[1]); visit(p[2]); });
+      (pi || []).forEach((p) => { visit(p[1]); visit(p[2]); });
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+      const pad = Math.max((hi - lo) * 0.18, 4);
+      let min = lo - pad;
+      let max = hi + pad;
+      if (predictionData.profileYVar !== focal || !predictionData.profileYExtent) {
+        predictionData.profileYExtent = [min, max];
+        predictionData.profileYVar = focal;
+      } else {
+        predictionData.profileYExtent[0] = Math.min(predictionData.profileYExtent[0], min);
+        predictionData.profileYExtent[1] = Math.max(predictionData.profileYExtent[1], max);
       }
-      return Math.max(440, Math.round(mount.clientHeight || 0));
+      return { min: predictionData.profileYExtent[0], max: predictionData.profileYExtent[1] };
     }
 
     function updatePredictionProfileChart() {
@@ -9756,6 +9775,7 @@ ${sectionsHtml}
         { name: 'Predicted mean', data: mean },
         { name: 'Current scenario', data: [[curX, curP.value]] }
       ];
+      const yRange = _predProfileYRange(mean, ci, pi, focal);
       const axisCommon = {
         gridLineWidth: 1,
         gridLineColor: gridColor,
@@ -9764,30 +9784,27 @@ ${sectionsHtml}
         tickColor: axisLine,
         tickLength: 6
       };
-      const chartH = _predProfileChartHeight();
 
       if (window._predProfileChart) {
         window._predProfileChart.series.forEach((s, i) => {
           if (series[i]) s.setData(series[i].data, false);
         });
-        window._predProfileChart.xAxis[0].update(Object.assign({
-          title: { text: focal, style: { color: th.textColor } },
-          labels: { style: { color: th.axisText }, format: '{value:.1f}' }
-        }, axisCommon), false);
-        window._predProfileChart.yAxis[0].update(Object.assign({
+        window._predProfileChart.xAxis[0].setTitle({ text: focal }, false);
+        window._predProfileChart.yAxis[0].update({
           title: { text: 'Predicted ' + yVar, style: { color: th.textColor } },
-          labels: { style: { color: th.axisText }, format: '{value:.1f}' }
-        }, axisCommon), false);
+          min: yRange ? yRange.min : undefined,
+          max: yRange ? yRange.max : undefined,
+          tickAmount: 6
+        }, false);
         try { window._predProfileChart.xAxis[0].removePlotLine('pred-current-x'); } catch (_e) {}
         window._predProfileChart.xAxis[0].addPlotLine(plotLine);
-        window._predProfileChart.setSize(null, chartH, false);
         window._predProfileChart.redraw();
         return;
       }
 
       const fmtNum = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(2) : '–');
       window._predProfileChart = Highcharts.chart('predProfileChart', {
-        chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [8, 10, 6, 6], height: chartH },
+        chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [8, 10, 6, 6], height: PRED_PROFILE_CHART_H },
         title: { text: null },
         xAxis: Object.assign({
           title: { text: focal, style: { color: th.textColor } },
@@ -9796,7 +9813,10 @@ ${sectionsHtml}
         }, axisCommon),
         yAxis: Object.assign({
           title: { text: 'Predicted ' + yVar, style: { color: th.textColor } },
-          labels: { style: { color: th.axisText }, format: '{value:.1f}' }
+          labels: { style: { color: th.axisText }, format: '{value:.1f}' },
+          min: yRange ? yRange.min : undefined,
+          max: yRange ? yRange.max : undefined,
+          tickAmount: 6
         }, axisCommon),
         legend: {
           enabled: true,
@@ -9832,10 +9852,6 @@ ${sectionsHtml}
         ],
         credits: { enabled: false }
       });
-      setTimeout(function() {
-        if (!window._predProfileChart) return;
-        try { window._predProfileChart.setSize(null, _predProfileChartHeight(), false); } catch (_e) {}
-      }, 60);
     }
 
     /**

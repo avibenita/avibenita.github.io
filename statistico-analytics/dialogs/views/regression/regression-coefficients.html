@@ -3588,6 +3588,25 @@
       text-transform: none;
     }
 
+    /* Two-column workspace: inputs + prediction left, chart right */
+    .pred-scenario-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 36%) minmax(0, 1fr);
+      gap: 14px;
+      align-items: stretch;
+      margin-bottom: 12px;
+    }
+    .pred-scenario-left {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+      min-height: 0;
+    }
+    @media (max-width: 1100px) {
+      .pred-scenario-grid { grid-template-columns: 1fr; }
+    }
+
     /* Input panel + scenarios panel: flat card, soft border, no accent stripes */
     .predictions-container .prediction-inputs,
     .predictions-container .scenarios-section {
@@ -3597,11 +3616,14 @@
       box-shadow: none !important;
       padding: 12px 14px !important;
     }
-    .predictions-container .prediction-inputs { max-height: 440px; }
+    .predictions-container .prediction-inputs {
+      flex: 1 1 auto;
+      max-height: none;
+      min-height: 0;
+    }
 
     /* Section headers — quiet uppercase muted label, no thick accent underline */
-    .predictions-container .inputs-header,
-    .predictions-container .scenarios-header {
+    .predictions-container .inputs-header {
       border-bottom: 1px solid rgba(148,163,184,.12) !important;
       color: var(--text-muted) !important;
       font-size: 0.7rem !important;
@@ -3611,12 +3633,7 @@
       padding-bottom: 8px !important;
       margin-bottom: 10px !important;
     }
-    .predictions-container .inputs-header i,
-    .predictions-container .scenarios-header i { opacity: .7; margin-right: 4px; }
-    .predictions-container .scenarios-header > div > div {
-      text-transform: none;
-      letter-spacing: 0;
-    }
+    .predictions-container .inputs-header i { opacity: .7; margin-right: 4px; }
 
     /* Input groups: drop nested cards, use thin separators */
     .predictions-container .input-group {
@@ -3845,14 +3862,38 @@
     .predictions-container .scenarios-tip i { opacity: .7; }
     .predictions-container .scenarios-tip span i.fa-play { color: var(--text-secondary); }
 
+    .pred-profile[hidden] {
+      display: flex !important;
+      visibility: hidden;
+      pointer-events: none;
+    }
     .pred-profile {
-      width: 75vw;
-      max-width: 100%;
-      margin: 0 0 12px;
-      padding: 10px 12px 6px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: transparent;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 460px;
+      margin: 0;
+      padding: 16px 18px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,.22);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,.015) 100%),
+        var(--surface-1, #1a1f2e);
+      box-shadow:
+        0 12px 28px rgba(0,0,0,.28),
+        0 2px 6px rgba(0,0,0,.18),
+        inset 0 1px 0 rgba(255,255,255,.1);
+    }
+    .pred-profile::before {
+      content: '';
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: 0;
+      height: 2px;
+      border-radius: 0 0 2px 2px;
+      background: linear-gradient(90deg, #2dd4bf, rgba(251,146,60,.85));
     }
     .pred-profile-head {
       display: flex;
@@ -3860,12 +3901,14 @@
       justify-content: space-between;
       gap: 10px 16px;
       flex-wrap: wrap;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
+      flex-shrink: 0;
     }
     .pred-profile-copy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; min-width: 0; }
     .pred-profile-title {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 700;
+      letter-spacing: -0.01em;
       color: var(--text-primary);
     }
     .pred-profile-held {
@@ -3889,7 +3932,86 @@
       border-color: rgba(52,211,153,.45);
       background: rgba(52,211,153,.1);
     }
-    .pred-profile-chart { height: 220px; min-height: 180px; }
+    .pred-profile-chart {
+      flex: 1 1 auto;
+      min-height: 360px;
+      height: 380px;
+    }
+
+    .predictions-container .scenarios-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: none !important;
+      color: var(--text-muted) !important;
+      font-size: 0.7rem !important;
+      font-weight: 600 !important;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding-bottom: 0 !important;
+      margin-bottom: 0 !important;
+    }
+    .predictions-container .scenarios-header i { opacity: .7; margin-right: 4px; }
+    .scenarios-disclosure {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .scenarios-disclosure:hover .scenarios-disclosure-title { color: var(--text-primary); }
+    .scenarios-chevron {
+      flex-shrink: 0;
+      width: 14px;
+      font-size: 11px;
+      transition: transform .18s ease;
+    }
+    .scenarios-section.is-open .scenarios-chevron { transform: rotate(90deg); }
+    .scenarios-disclosure-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .scenarios-disclosure-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .scenarios-disclosure-hint {
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+    .scenarios-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 16px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: rgba(148,163,184,.16);
+      color: var(--text-secondary);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    .scenarios-section.is-open .scenarios-header {
+      border-bottom: 1px solid rgba(148,163,184,.12) !important;
+      padding-bottom: 8px !important;
+      margin-bottom: 10px !important;
+    }
+    .scenarios-body { padding-top: 2px; }
 
     /* Light theme parity */
     :root[data-theme="light"] .predictions-container .prediction-inputs,
@@ -3897,6 +4019,15 @@
     :root[data-theme="light"] .predictions-container .output-card,
     :root[data-theme="light"] .predictions-container .prediction-viz {
       background: var(--surface-1) !important;
+    }
+    :root[data-theme="light"] .pred-profile {
+      background:
+        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border-color: rgba(148,163,184,.28);
+      box-shadow:
+        0 10px 22px rgba(15,23,42,.08),
+        0 1px 3px rgba(15,23,42,.06),
+        inset 0 1px 0 rgba(255,255,255,.95);
     }
 
     /* ── Diagnostics (Overview / Plots / Influence): minimalistic ── */
@@ -4435,114 +4566,116 @@
               </div>
             </div>
 
-            <!-- Main Prediction Layout -->
-            <div class="prediction-layout">
-              
-              <!-- Left Panel: Input Controls -->
-              <div class="prediction-inputs">
-                <div class="inputs-header">
-                  <i class="fa-solid fa-sliders"></i> Input Variables
-                  <button class="reset-btn" onclick="resetToMeanValues()">
-                    <i class="fa-solid fa-rotate-left"></i> Reset to Means
-                  </button>
-                </div>
-                <div id="predictionInputsContainer">
-                  <!-- Dynamic inputs will be generated here -->
-                </div>
-              </div>
-
-              <!-- Right Panel: Prediction Output -->
-              <div class="prediction-output">
-                <div class="output-card main-prediction">
-                  <div class="output-label">Predicted <span id="predictedVariableName">Value</span></div>
-                  <div class="output-value" id="predictedValue">-</div>
-                  <div class="output-sublabel">Point Estimate</div>
-                </div>
-
-                <div class="intervals-container">
-                  <div class="output-card interval-card">
-                    <div class="interval-label">
-                      <i class="fa-solid fa-chart-area"></i> 95% Confidence Interval
-                      <span class="tooltip-icon">
-                        ?
-                        <span class="tooltip-text">
-                          <strong>Confidence Interval:</strong> Range where the <em>average</em> predicted value for this combination of inputs is likely to fall. Narrower interval = more confident about the mean prediction.
-                        </span>
-                      </span>
-                    </div>
-                    <div class="interval-range" id="confidenceInterval">-</div>
-                    <div class="interval-desc">Mean prediction uncertainty</div>
+            <div class="pred-scenario-grid">
+              <div class="pred-scenario-left">
+                <div class="prediction-inputs">
+                  <div class="inputs-header">
+                    <i class="fa-solid fa-sliders"></i> Input Variables
+                    <button class="reset-btn" onclick="resetToMeanValues()">
+                      <i class="fa-solid fa-rotate-left"></i> Reset to Means
+                    </button>
                   </div>
-
-                  <div class="output-card interval-card">
-                    <div class="interval-label">
-                      <i class="fa-solid fa-chart-scatter"></i> 95% Prediction Interval
-                      <span class="tooltip-icon">
-                        ?
-                        <span class="tooltip-text">
-                          <strong>Prediction Interval:</strong> Range where a <em>single future observation</em> is likely to fall. Wider than confidence interval because it accounts for both uncertainty in the mean AND individual variation.
-                        </span>
-                      </span>
-                    </div>
-                    <div class="interval-range" id="predictionInterval">-</div>
-                    <div class="interval-desc">Individual prediction range</div>
+                  <div id="predictionInputsContainer">
+                    <!-- Dynamic inputs will be generated here -->
                   </div>
                 </div>
 
-                <!-- Prediction Visualization -->
-                <div class="prediction-viz">
-                  <canvas id="predictionChart" width="400" height="90"></canvas>
+                <div class="prediction-output">
+                  <div class="output-card main-prediction">
+                    <div class="output-label">Predicted <span id="predictedVariableName">Value</span></div>
+                    <div class="output-value" id="predictedValue">-</div>
+                    <div class="output-sublabel">Point Estimate</div>
+                  </div>
+
+                  <div class="intervals-container">
+                    <div class="output-card interval-card">
+                      <div class="interval-label">
+                        <i class="fa-solid fa-chart-area"></i> 95% Confidence Interval
+                        <span class="tooltip-icon">
+                          ?
+                          <span class="tooltip-text">
+                            <strong>Confidence Interval:</strong> Range where the <em>average</em> predicted value for this combination of inputs is likely to fall. Narrower interval = more confident about the mean prediction.
+                          </span>
+                        </span>
+                      </div>
+                      <div class="interval-range" id="confidenceInterval">-</div>
+                      <div class="interval-desc">Mean prediction uncertainty</div>
+                    </div>
+
+                    <div class="output-card interval-card">
+                      <div class="interval-label">
+                        <i class="fa-solid fa-chart-scatter"></i> 95% Prediction Interval
+                        <span class="tooltip-icon">
+                          ?
+                          <span class="tooltip-text">
+                            <strong>Prediction Interval:</strong> Range where a <em>single future observation</em> is likely to fall. Wider than confidence interval because it accounts for both uncertainty in the mean AND individual variation.
+                          </span>
+                        </span>
+                      </div>
+                      <div class="interval-range" id="predictionInterval">-</div>
+                      <div class="interval-desc">Individual prediction range</div>
+                    </div>
+                  </div>
+
+                  <div class="prediction-viz">
+                    <canvas id="predictionChart" width="400" height="90"></canvas>
+                  </div>
                 </div>
+              </div>
+
+              <div class="pred-profile" id="predProfilePanel" hidden>
+                <div class="pred-profile-head">
+                  <div class="pred-profile-copy">
+                    <span class="pred-profile-title" id="predProfileTitle">Predicted response</span>
+                    <span class="pred-profile-held" id="predProfileHeld"></span>
+                  </div>
+                  <div id="predProfileAxes" class="pred-profile-axes" hidden></div>
+                </div>
+                <div id="predProfileChart" class="pred-profile-chart"></div>
               </div>
             </div>
 
-            <div class="pred-profile" id="predProfilePanel" hidden>
-              <div class="pred-profile-head">
-                <div class="pred-profile-copy">
-                  <span class="pred-profile-title" id="predProfileTitle">Predicted response</span>
-                  <span class="pred-profile-held" id="predProfileHeld"></span>
-                </div>
-                <div id="predProfileAxes" class="pred-profile-axes" hidden></div>
-              </div>
-              <div id="predProfileChart" class="pred-profile-chart"></div>
-            </div>
-
-            <!-- Scenarios Comparison Table -->
             <div class="scenarios-section">
               <div class="scenarios-header">
-                <div>
-                  <i class="fa-solid fa-table"></i> Saved Scenarios
-                  <div style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted); margin-top: 2px;">
-                    Save and compare different input combinations
-                  </div>
-                </div>
-                <button class="save-scenario-btn" onclick="saveCurrentScenario()">
+                <button type="button" class="scenarios-disclosure" id="toggleScenariosBtn" aria-expanded="false" aria-controls="scenariosPanelBody" onclick="toggleScenariosPanel()">
+                  <i class="fa-solid fa-chevron-right scenarios-chevron" aria-hidden="true"></i>
+                  <span class="scenarios-disclosure-copy">
+                    <span class="scenarios-disclosure-title">
+                      <i class="fa-solid fa-table"></i> Saved Scenarios
+                      <span class="scenarios-count" id="scenariosCount">0</span>
+                    </span>
+                    <span class="scenarios-disclosure-hint">Save and compare different input combinations</span>
+                  </span>
+                </button>
+                <button class="save-scenario-btn" type="button" onclick="saveCurrentScenario()">
                   <i class="fa-solid fa-bookmark"></i> Save Current
                 </button>
               </div>
-              <div class="scenarios-table-container">
-                <table class="scenarios-table" id="scenariosTable">
-                  <thead>
-                    <tr>
-                      <th>Scenario</th>
-                      <th>Predicted Value</th>
-                      <th>95% CI</th>
-                      <th>95% PI</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="scenariosTableBody">
-                    <tr class="no-scenarios">
-                      <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                        <i class="fa-solid fa-info-circle"></i> No scenarios saved yet. 
-                        <br><span style="font-size: 0.85rem;">Adjust sliders above, then click "Save Current" to bookmark this combination.</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="scenarios-tip" style="margin-top: 8px; padding: 8px 0 0; font-size: 0.78rem; color: var(--text-muted);">
-                <i class="fa-solid fa-info-circle"></i> <strong>Tip:</strong> Click <span><i class="fa-solid fa-play"></i> Apply</span> to instantly restore slider values from any saved scenario.
+              <div class="scenarios-body collapsible-content is-collapsed" id="scenariosPanelBody">
+                <div class="scenarios-table-container">
+                  <table class="scenarios-table" id="scenariosTable">
+                    <thead>
+                      <tr>
+                        <th>Scenario</th>
+                        <th>Predicted Value</th>
+                        <th>95% CI</th>
+                        <th>95% PI</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="scenariosTableBody">
+                      <tr class="no-scenarios">
+                        <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                          <i class="fa-solid fa-info-circle"></i> No scenarios saved yet.
+                          <br><span style="font-size: 0.85rem;">Adjust sliders above, then click "Save Current" to bookmark this combination.</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="scenarios-tip">
+                  <i class="fa-solid fa-info-circle"></i> <strong>Tip:</strong> Click <span><i class="fa-solid fa-play"></i> Apply</span> to instantly restore slider values from any saved scenario.
+                </div>
               </div>
             </div>
 
@@ -5680,9 +5813,13 @@
         loadDescriptiveTab();
       } else if (tabName === 'power') {
         refreshRegressionPowerAnalysis();
-      } else if (tabName === 'pred-scenario' && !window.predictionsLoaded) {
-        initializePredictions();
-        window.predictionsLoaded = true;
+      } else if (tabName === 'pred-scenario') {
+        if (!window.predictionsLoaded) {
+          initializePredictions();
+          window.predictionsLoaded = true;
+        } else if (window._predProfileChart) {
+          setTimeout(function() { try { window._predProfileChart.reflow(); } catch (_e) {} }, 80);
+        }
       } else if (tabName === 'pred-overview' && !window.predOverviewLoaded) {
         loadPredOverviewTab();
       } else if (tabName === 'ancova' && !window.ancovaLoaded) {
@@ -9364,6 +9501,11 @@ ${sectionsHtml}
       }
 
       panel.hidden = false;
+      requestAnimationFrame(function() {
+        if (window._predProfileChart) {
+          try { window._predProfileChart.reflow(); } catch (_e) {}
+        }
+      });
       const th = _resChartTheme();
       const plotLine = {
         id: 'pred-current-x',
@@ -9395,7 +9537,7 @@ ${sectionsHtml}
 
       const fmtNum = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(2) : '–');
       window._predProfileChart = Highcharts.chart('predProfileChart', {
-        chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [8, 8, 8, 8] },
+        chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [12, 12, 10, 8], height: 380 },
         title: { text: null },
         xAxis: {
           title: { text: focal, style: { color: th.textColor } },
@@ -9442,6 +9584,11 @@ ${sectionsHtml}
         ],
         credits: { enabled: false }
       });
+      setTimeout(function() {
+        if (window._predProfileChart) {
+          try { window._predProfileChart.reflow(); } catch (_e) {}
+        }
+      }, 60);
     }
 
     /**
@@ -9581,13 +9728,37 @@ ${sectionsHtml}
 
       // Update table
       updateScenariosTable();
+      setScenariosExpanded(true);
     }
 
     /**
      * Update scenarios comparison table
      */
+    function syncScenariosCount() {
+      const countEl = document.getElementById('scenariosCount');
+      if (countEl) countEl.textContent = String((predictionData.savedScenarios || []).length);
+    }
+
+    function setScenariosExpanded(open) {
+      const body = document.getElementById('scenariosPanelBody');
+      const btn = document.getElementById('toggleScenariosBtn');
+      const section = body && body.closest ? body.closest('.scenarios-section') : null;
+      if (!body) return;
+      body.classList.toggle('is-collapsed', !open);
+      if (section) section.classList.toggle('is-open', !!open);
+      if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    function toggleScenariosPanel() {
+      const body = document.getElementById('scenariosPanelBody');
+      const isOpen = !!(body && !body.classList.contains('is-collapsed'));
+      setScenariosExpanded(!isOpen);
+    }
+    window.toggleScenariosPanel = toggleScenariosPanel;
+
     function updateScenariosTable() {
       const tbody = document.getElementById('scenariosTableBody');
+      syncScenariosCount();
       
       if (predictionData.savedScenarios.length === 0) {
         tbody.innerHTML = `

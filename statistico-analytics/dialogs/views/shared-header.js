@@ -1628,6 +1628,8 @@ const StatisticoHeader = {
       'correlation-by-group-profile': 'See how other variables associate with an anchor across groups.',
       'correlation-by-group-similarity': 'See how closely groups resemble one another in correlation pattern, strength and sign.',
       'regression-by-group': 'Compare coefficients and residual normality across group levels.',
+      'regression-by-group-coefficients': 'Compare coefficients and residual normality across group levels.',
+      'regression-by-group-similarity': 'See how closely groups resemble one another in coefficient pattern, strength and sign.',
       histogram: 'Frequency view of the distribution.',
       boxplot: 'Quartiles, whiskers, and outliers.',
       cdf: 'Empirical cumulative distribution.',
@@ -3465,6 +3467,19 @@ const StatisticoHeader = {
         ]
       };
     }
+    if (this.module === 'regression' && this.currentView === 'regression-by-group') {
+      return {
+        ariaLabel: 'Regression by group views',
+        inviteTabKey: 'regression-by-group-similarity',
+        seenKey: 'statistico.reg.similarityProfile.seen',
+        getActive: () => globalThis.__regByGroupActiveTab || 'coefficients',
+        onSelect: (panel) => this.setRegByGroupResultsTab(panel),
+        tabs: [
+          { tabKey: 'regression-by-group-coefficients', label: 'Coefficients', icon: 'fa-table', panel: 'coefficients', caption: 'Compare coefficients and residual normality across group levels.' },
+          { tabKey: 'regression-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in coefficient pattern, strength and sign.', badge: 'STATISTICO', help: true }
+        ]
+      };
+    }
     if (this.module === 'contingency' && this.currentView === 'contingency-by-group') {
       return {
         ariaLabel: 'Frequencies by group views',
@@ -3496,6 +3511,17 @@ const StatisticoHeader = {
       globalThis.showCorrByGroupPanel(panel);
     } else {
       globalThis.__corrByGroupActiveTab = panel || 'table';
+    }
+    try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+  },
+
+  setRegByGroupResultsTab(panel) {
+    const cfg = this._getByGroupExploreConfig();
+    if (cfg && panel === 'similarity') this._markSimilarityProfileSeen(cfg.seenKey);
+    if (typeof globalThis.showRegByGroupPanel === 'function') {
+      globalThis.showRegByGroupPanel(panel);
+    } else {
+      globalThis.__regByGroupActiveTab = panel || 'coefficients';
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
@@ -8070,6 +8096,11 @@ const StatisticoHeader = {
       if (tab === 'profile') return 'correlation-by-group-profile';
       return 'correlation-by-group';
     }
+    if (this.module === 'regression' && this.currentView === 'regression-by-group') {
+      const tab = globalThis.__regByGroupActiveTab || 'coefficients';
+      if (tab === 'similarity') return 'regression-by-group-similarity';
+      return 'regression-by-group';
+    }
     if (this.module === 'contingency' && this.currentView === 'contingency-by-group') {
       const tab = globalThis.__contingencyByGroupActiveTab || 'association';
       if (tab === 'table') return 'contingency-by-group-table';
@@ -8157,6 +8188,9 @@ const StatisticoHeader = {
       'contingency-by-group-table': 'Tables by Group',
       'contingency-by-group-chart': 'Charts by Group',
       'contingency-by-group-similarity': 'Similarity Profile™',
+      'regression-by-group': 'Regression by Group',
+      'regression-by-group-coefficients': 'Coefficients',
+      'regression-by-group-similarity': 'Similarity Profile™',
       'segmentation-overview': 'Overview',
       'segmentation-groups': 'Group Comparison',
       'segmentation-change': 'Change',
@@ -8341,6 +8375,12 @@ const StatisticoHeader = {
         'Distribution shows one 100% stacked bar panel per grouping level, with identical 0–100% scales. Within a panel, column-variable categories sit side by side and row-variable levels are stacked segments, so you can compare composition across both grouping and treatment. Association pattern shows adjusted-residual heat maps for the same levels on one shared colour scale. Neither chart tests whether associations differ between groups.',
       'contingency-by-group-similarity':
         'Similarity Profile™ compares group association structures (Overall omitted) on pattern (Tucker congruence of aligned adjusted residuals), strength (Cramér’s V ratio), and residual-sign agreement. Scores are 0–100 descriptive similarity, not a homogeneity or interaction test. Click heatmap cells or table rows for the three-component profile. 90–100 Very similar, 75–89 Mostly similar, 50–74 Mixed similarity, below 50 Substantially different.',
+      'regression-by-group':
+        'Compare the same regression specification across grouping levels: coefficient table (β, 95% CI, p), model-consistency strip, residual-normality chips, and per-group R² / RMSE. Overall is the pooled fit; group columns are separate OLS fits. Stability flags sign reversals and coefficient spread. This is not a Chow or interaction test.',
+      'regression-by-group-coefficients':
+        'Compare the same regression specification across grouping levels: coefficient table (β, 95% CI, p), model-consistency strip, residual-normality chips, and per-group R² / RMSE. Overall is the pooled fit; group columns are separate OLS fits. Stability flags sign reversals and coefficient spread. This is not a Chow or interaction test.',
+      'regression-by-group-similarity':
+        'Similarity Profile™ compares group coefficient structures (Overall omitted; intercept omitted) on pattern (Tucker congruence of aligned β-vectors), strength (mean |β| ratio), and sign agreement. Scores are 0–100 descriptive similarity, not a Chow, interaction, or coefficient-difference test. Click heatmap cells or table rows for the three-component profile. 90–100 Very similar, 75–89 Mostly similar, 50–74 Mixed similarity, below 50 Substantially different. Terms that do not vary inside a group are skipped.',
 
       // Regression — workspace sub-views (chart-aware so the AI explanation
       // matches what the user actually sees, not the coefficients table).
@@ -8498,6 +8538,8 @@ const StatisticoHeader = {
         'This is an interaction plot with predicted lines at representative moderator levels. Describe whether the lines diverge, are parallel, or cross — not the coefficient table.',
       'regression-ancova-viz':
         'This view shows adjusted means with CI, an adjusted mean difference, and group regression lines. Describe the visual story (parallelism, gap between groups) — not coefficient values.',
+      'regression-by-group-similarity':
+        'This is Similarity Profile™: a heatmap and pairwise table of 0–100 descriptive scores (pattern / strength / sign) comparing aligned β-vectors across groups. Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different. Do not treat Overall as a group, and do not invent a Chow or interaction test.',
       'logistic-predictive-performance-roc-thresholds':
         'This is an ROC curve with a threshold slider. Describe the curve shape, AUC band, and the trade-off the slider exposes — not coefficient inference.',
       'logistic-predictive-performance-calibration':

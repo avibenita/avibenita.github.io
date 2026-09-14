@@ -10,8 +10,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
   <link rel="stylesheet" href="../shared-header.css?v=20260914w75b" />
+  <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260914regsim2" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260912bygroupnav"></script>
+  <script src="../shared-header.js?v=20260914regsim2"></script>
+  <script src="../../shared/regression-similarity.js?v=20260914regsim2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260524a"></script>
@@ -42,7 +44,110 @@
     .group-choice-label { color:var(--text-secondary); font-size:12px; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     select, button { border:1px solid var(--border); border-radius:8px; background:var(--surface-2); color:var(--text-primary); padding:7px 10px; font-size:12px; }
     button { cursor:pointer; font-weight:700; }
-    .content { flex:1; min-height:0; overflow:auto; padding:12px; }
+    .content { flex:1; min-height:0; overflow:hidden; padding:12px; display:flex; flex-direction:column; }
+    #mainContent { flex:1; min-height:0; display:none; flex-direction:column; }
+    .reg-bg-panel { display:none; flex:1; min-height:0; overflow:auto; }
+    .reg-bg-panel.is-active { display:block; }
+    #regByGroupPanel-similarity.is-active { display:block; overflow:auto; }
+    .section-title { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 0 10px; }
+    .section-title strong { color:var(--accent-1); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
+    .section-title span { color:var(--text-secondary); font-size:12px; }
+    .dsp-kpis { display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom:12px; }
+    .dsp-kpi {
+      text-align:left; border:1px solid var(--border); border-radius:10px; background:var(--surface-2);
+      padding:10px 12px; cursor:pointer; color:inherit;
+    }
+    .dsp-kpi:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
+    .dsp-kpi.is-active { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 40%, transparent); }
+    .dsp-kpi:disabled { opacity:.5; cursor:not-allowed; }
+    .dsp-kpi-label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .dsp-kpi-value { color:var(--accent-1); font-size:22px; font-weight:800; margin-top:4px; line-height:1.1; }
+    .dsp-kpi-note { color:var(--text-secondary); font-size:11px; margin-top:4px; line-height:1.35; }
+    .dsp-split { display:grid; grid-template-columns:minmax(280px, 1.1fr) minmax(280px, 0.9fr); gap:12px; align-items:start; }
+    .dsp-card { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:10px; min-width:0; }
+    .dsp-subhead { color:var(--accent-1); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin:0 0 8px; }
+    .dsp-heat-wrap { overflow:auto; max-height:min(420px, 52vh); }
+    .dsp-heat { border-collapse:collapse; font-size:11px; min-width:100%; }
+    .dsp-heat th, .dsp-heat td { padding:6px 7px; text-align:center; border:1px solid var(--border); white-space:nowrap; }
+    .dsp-heat th { position:sticky; top:0; z-index:1; background:var(--surface-1); color:var(--accent-1); font-size:10px; }
+    .dsp-heat th:first-child, .dsp-heat td:first-child { text-align:left; position:sticky; left:0; z-index:2; background:var(--surface-1); font-weight:700; }
+    .dsp-heat td[data-a] { cursor:pointer; font-weight:700; }
+    .dsp-heat td.is-selected { outline:2px solid var(--accent-1); outline-offset:-2px; }
+    .dsp-legend { display:flex; align-items:center; gap:8px; margin-top:8px; color:var(--text-secondary); font-size:10px; }
+    .dsp-legend-bar { flex:1; height:8px; border-radius:99px; background:linear-gradient(90deg, rgba(251,113,133,.55), rgba(251,191,36,.55), rgba(45,212,191,.75)); }
+    .dsp-bars { display:flex; flex-direction:column; gap:8px; margin:8px 0 12px; }
+    .dsp-bar-row { display:grid; grid-template-columns:84px 1fr 42px; gap:8px; align-items:center; font-size:12px; }
+    .dsp-bar-track { height:8px; border-radius:99px; background:rgba(148,163,184,.18); overflow:hidden; }
+    .dsp-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, var(--accent-2), var(--accent-1)); }
+    .dsp-band { font-size:12px; font-weight:700; }
+    .dsp-band--very { color:#34d399; }
+    .dsp-band--mostly { color:#38bdf8; }
+    .dsp-band--mixed { color:#fbbf24; }
+    .dsp-band--different { color:#fb7185; }
+    .dsp-band--na { color:var(--text-secondary); }
+    .dsp-footnote { display:block; margin-top:8px; color:var(--text-secondary); font-size:11px; line-height:1.45; }
+    .dsp-info-btn {
+      width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center;
+      margin-left:6px; vertical-align:middle; padding:0;
+      border:1px solid rgba(120,200,255,.45); border-radius:999px;
+      color:var(--accent-2); background:rgba(120,200,255,.08);
+      font-size:10px; font-weight:700; cursor:pointer; text-transform:none; letter-spacing:0;
+    }
+    .dsp-help-modal {
+      display:none; position:fixed; inset:0; z-index:2147483300;
+      align-items:center; justify-content:center; padding:16px;
+      background:rgba(3,7,18,.64); backdrop-filter:blur(3px);
+    }
+    .dsp-help-modal.is-open { display:flex; }
+    .dsp-help-box {
+      width:min(640px, 96vw); max-height:min(86vh, 760px); overflow:auto;
+      background:var(--surface-1); border:1px solid var(--border); color:var(--text-primary);
+      border-radius:14px; padding:22px 24px 20px; position:relative;
+      box-shadow:0 24px 70px rgba(0,0,0,.42);
+    }
+    .dsp-help-close {
+      position:absolute; top:12px; right:12px; width:30px; height:30px;
+      display:flex; align-items:center; justify-content:center; padding:0;
+      border-radius:8px; background:var(--surface-2); border:1px solid var(--border);
+      color:var(--text-secondary); cursor:pointer; font-size:14px;
+    }
+    .dsp-help-box h3 { margin:0 12px 6px 0; font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px; }
+    .dsp-help-box h3 i { color:var(--accent-1); }
+    .dsp-help-sub { margin:0 0 12px; font-size:13px; color:var(--text-secondary); line-height:1.45; }
+    .dsp-help-callout {
+      padding:10px 12px; border-radius:8px; margin-bottom:8px;
+      background:color-mix(in srgb, var(--accent-1) 10%, var(--surface-2));
+      border:1px solid color-mix(in srgb, var(--accent-1) 28%, var(--border));
+      font-size:13px; line-height:1.5;
+    }
+    .dsp-help-callout strong { color:var(--accent-1); }
+    .dsp-help-rule { display:grid; grid-template-columns:34px 1fr; gap:0 12px; padding:12px 0; border-top:1px solid var(--border); }
+    .dsp-help-icon {
+      width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+      background:var(--surface-2); color:var(--accent-1);
+    }
+    .dsp-help-rule h4 { margin:0 0 4px; font-size:13.5px; }
+    .dsp-help-rule p { margin:0; font-size:13px; line-height:1.55; color:var(--text-secondary); }
+    .dsp-pair-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); max-height:calc(36px + 12 * 33px); }
+    .dsp-pair-table { width:100%; border-collapse:collapse; min-width:640px; }
+    .dsp-pair-table th, .dsp-pair-table td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; }
+    .dsp-pair-table th { position:sticky; top:0; z-index:2; background:var(--surface-1); color:var(--accent-1); text-transform:uppercase; font-size:10px; letter-spacing:.08em; }
+    .dsp-pair-table th:first-child, .dsp-pair-table td:first-child { text-align:left; }
+    .dsp-pair-table tbody tr { cursor:pointer; }
+    .dsp-pair-table tbody tr:hover td { background:rgba(129,140,248,.12); }
+    .dsp-pair-table tbody tr.is-selected td { background:rgba(129,140,248,.16); }
+    .dsp-score { font-weight:800; }
+    .reg-sim-svg { display:block; width:100%; height:240px; }
+    .reg-sim-svg .scatter-bg { fill:rgba(0,0,0,.16); stroke:var(--border); }
+    html[data-theme="light"] .reg-sim-svg .scatter-bg { fill:rgba(15,23,42,.03); }
+    .reg-sim-svg .scatter-grid { stroke:var(--border); stroke-width:1; opacity:.5; }
+    .reg-sim-svg .scatter-tick { fill:var(--text-secondary); font-size:10px; font-variant-numeric:tabular-nums; }
+    .reg-sim-svg .scatter-tick-y { text-anchor:end; }
+    .reg-sim-svg .scatter-axis-label { fill:var(--text-primary); font-size:11px; font-weight:800; }
+    .reg-sim-svg .r-profile-zero { stroke:rgba(255,255,255,.42); stroke-width:1.4; stroke-dasharray:4 4; }
+    html[data-theme="light"] .reg-sim-svg .r-profile-zero { stroke:rgba(15,23,42,.35); }
+    .reg-sim-svg .r-profile-dot { stroke:#0c1624; stroke-width:1; }
+    html[data-theme="light"] .reg-sim-svg .r-profile-dot { stroke:#fff; }
     .summary-strip { display:grid; grid-template-columns:repeat(4, minmax(110px, 1fr)); gap:10px; margin-bottom:12px; }
     .metric { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px; }
     .metric label { display:block; color:var(--text-secondary); font-size:10px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
@@ -330,10 +435,12 @@
       .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
       .group-dialog-body { grid-template-columns:1fr; }
       .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
+      .dsp-kpis { grid-template-columns:repeat(2, minmax(140px, 1fr)); }
+      .dsp-split { grid-template-columns:1fr; }
     }
   </style>
 </head>
-<body data-page-version="20260902-reg-bygroup-v10">
+<body data-page-version="20260914-reg-bygroup-v12">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -355,6 +462,7 @@
             Run a regression analysis, then choose a grouping column to compare model parameters across levels.
           </div>
           <div id="mainContent" style="display:none;">
+            <div class="reg-bg-panel is-active" id="regByGroupPanel-coefficients">
             <div class="summary-strip">
               <div class="metric"><label>Predictors</label><strong id="metricPredictors">—</strong></div>
               <div class="metric"><label>Groups</label><strong id="metricGroups">—</strong></div>
@@ -392,6 +500,49 @@
                 <tbody id="regByGroupBody"></tbody>
               </table>
             </div>
+            </div>
+            <div class="reg-bg-panel" id="regByGroupPanel-similarity">
+              <div class="section-title">
+                <strong>Similarity Profile™<button type="button" class="dsp-info-btn" onclick="openRegSimHelp()" aria-label="About Similarity Profile">i</button></strong>
+                <span>How similar groups are in coefficient pattern, strength, and sign — a description, not a significance test</span>
+              </div>
+              <div id="regSimEmpty" class="empty" style="display:none;">
+                <i class="fa-solid fa-clone"></i>
+                Similarity Profile needs at least two groups with overlapping estimated coefficients.
+              </div>
+              <div id="regSimMain" style="display:none;">
+                <div class="dsp-kpis" id="regSimKpis"></div>
+                <div class="dsp-split">
+                  <div class="dsp-card">
+                    <div class="dsp-subhead">Overall pairwise similarity</div>
+                    <div class="dsp-heat-wrap" id="regSimHeatWrap"></div>
+                    <div class="dsp-legend"><span>0</span><div class="dsp-legend-bar" aria-hidden="true"></div><span>100</span></div>
+                  </div>
+                  <div class="dsp-card">
+                    <div class="dsp-subhead" id="regSimProfileTitle">Pair profile</div>
+                    <div id="regSimProfileBody"></div>
+                    <div id="regSimChart"></div>
+                  </div>
+                </div>
+                <div class="section-title" style="margin-top:14px;"><strong>Pairwise scores</strong><span>Click a row or heatmap cell to open the three-component profile</span></div>
+                <div class="dsp-pair-wrap">
+                  <table class="dsp-pair-table" id="regSimPairTable">
+                    <thead>
+                      <tr>
+                        <th>Groups</th>
+                        <th>Overall</th>
+                        <th>Pattern</th>
+                        <th>Strength</th>
+                        <th>Sign</th>
+                        <th>Reading</th>
+                      </tr>
+                    </thead>
+                    <tbody id="regSimPairBody"></tbody>
+                  </table>
+                </div>
+                <em class="dsp-footnote">90–100 Very similar · 75–89 Mostly similar · 50–74 Mixed similarity · below 50 Substantially different. Combined score uses a geometric mean so one weak component is not hidden by two strong ones. Intercept is omitted; terms that do not vary inside a group are skipped.</em>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -418,6 +569,54 @@
     </div>
   </div>
 
+  <div class="dsp-help-modal" id="regSimHelpModal" role="dialog" aria-modal="true" aria-labelledby="regSimHelpTitle">
+    <div class="dsp-help-box">
+      <button type="button" class="dsp-help-close" onclick="closeRegSimHelp()" aria-label="Close help">✕</button>
+      <h3 id="regSimHelpTitle"><i class="fa-solid fa-clone"></i> Similarity Profile™</h3>
+      <p class="dsp-help-sub">How to read Similarity Profile™ for regression coefficients by group.</p>
+      <div class="dsp-help-callout">
+        This is a <strong>practical, non-academic approach original to Statistico</strong>.
+        It is not a published coefficient, not a p-value, and not a substitute for a Chow test or interaction test.
+        Use it to describe how alike group coefficient structures look in applied work.
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-lightbulb"></i></div>
+        <div>
+          <h4>What it is for</h4>
+          <p>After you split the same regression by a grouping column, Similarity Profile™ asks: which groups share the same coefficient structure, and which stand apart? It compares every pair of groups (Overall omitted) on pattern, strength, and sign, then rates them from 0 to 100.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-sliders"></i></div>
+        <div>
+          <h4>The three components</h4>
+          <p><b>Pattern</b> — do the same predictors pull in the same relative directions? Tucker congruence of the aligned β-vectors (intercept omitted).<br>
+          <b>Strength</b> — are coefficients similarly large in magnitude (mean |β|)?<br>
+          <b>Sign</b> — do predictors agree on direction?<br>
+          <b>Overall</b> combines the three with a geometric mean, so one weak component is not hidden by two strong ones.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-ruler"></i></div>
+        <div>
+          <h4>How to read the scores</h4>
+          <p><b>90–100</b> Very similar<br>
+          <b>75–89</b> Mostly similar<br>
+          <b>50–74</b> Mixed similarity<br>
+          <b>Below 50</b> Substantially different<br>
+          Click a heatmap cell or table row to see why a pair scored that way. The scatter plots each predictor’s β in one group against the other; the diagonal is a perfect match.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-ban"></i></div>
+        <div>
+          <h4>What it is not</h4>
+          <p>It does not test whether two regressions differ significantly. Treat these scores as an effect-size style description of practical similarity, designed here for Statistico. Terms that do not vary inside a group are skipped.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     let regressionPayload = null;
     let modelSpec = null;
@@ -435,7 +634,12 @@
     let tableRows = [];
     let overallFit = null;
     let sortConfig = { key: 'term', direction: 'ascending' };
+    let regByGroupPanel = 'coefficients';
+    window.__regByGroupActiveTab = 'coefficients';
+    let regSimProfile = null;
+    let selectedRegSimPair = null;
     const levelSelections = {};
+    const REG_SIM_COLORS = ['#78c8ff', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#fb923c'];
 
     function decimalDigits(autoDefault) {
       const fallback = Number.isFinite(autoDefault) ? autoDefault : 3;
@@ -1339,6 +1543,321 @@
       }
     }
 
+    function showRegByGroupPanel(panel) {
+      const allowed = { coefficients: true, similarity: true };
+      regByGroupPanel = allowed[panel] ? panel : 'coefficients';
+      window.__regByGroupActiveTab = regByGroupPanel;
+      document.querySelectorAll('.reg-bg-panel').forEach((el) => {
+        const name = (el.id || '').replace('regByGroupPanel-', '');
+        el.classList.toggle('is-active', name === regByGroupPanel);
+      });
+      if (regByGroupPanel === 'similarity') renderRegSimilarity();
+    }
+
+    function openRegSimHelp() {
+      const modal = document.getElementById('regSimHelpModal');
+      if (modal) modal.classList.add('is-open');
+    }
+
+    function closeRegSimHelp() {
+      const modal = document.getElementById('regSimHelpModal');
+      if (modal) modal.classList.remove('is-open');
+    }
+
+    function simPairKey(a, b) {
+      return `${a}\u0000${b}`;
+    }
+
+    function dspFmt(score) {
+      return Number.isFinite(score) ? score.toFixed(1) : '—';
+    }
+
+    function dspScoreColor(score) {
+      if (!Number.isFinite(score)) return 'transparent';
+      const t = Math.max(0, Math.min(100, score)) / 100;
+      if (t < 0.5) {
+        const u = t / 0.5;
+        const g = Math.round(113 + (191 - 113) * u);
+        const b = Math.round(133 + (36 - 133) * u);
+        return `rgba(251,${g},${b},${(0.16 + t * 0.42).toFixed(2)})`;
+      }
+      const u = (t - 0.5) / 0.5;
+      const r = Math.round(251 + (45 - 251) * u);
+      const g = Math.round(191 + (212 - 191) * u);
+      const b = Math.round(36 + (191 - 36) * u);
+      return `rgba(${r},${g},${b},${(0.2 + t * 0.4).toFixed(2)})`;
+    }
+
+    function predictorRows() {
+      return (tableRows || []).filter((row) => row.term !== 'Intercept');
+    }
+
+    function buildRegSimGroups() {
+      const rows = predictorRows();
+      return (activeGroups || []).map((g, i) => ({
+        group: g.group,
+        n: g.n,
+        r: rows.map((row) => {
+          const gr = row.groupCoefs && row.groupCoefs[i];
+          return gr && Number.isFinite(gr.beta) ? gr.beta : NaN;
+        })
+      }));
+    }
+
+    function findRegSimPair(a, b) {
+      if (!regSimProfile) return null;
+      return regSimProfile.pairs.find((p) => (p.a === a && p.b === b) || (p.a === b && p.b === a)) || null;
+    }
+
+    function selectRegSimPair(a, b) {
+      const pair = findRegSimPair(a, b);
+      selectedRegSimPair = pair ? { a: pair.a, b: pair.b } : null;
+      renderRegSimKpis();
+      renderRegSimHeatmap();
+      renderRegSimPairTable();
+      renderRegSimProfile();
+    }
+
+    function renderRegSimilarity() {
+      const empty = document.getElementById('regSimEmpty');
+      const main = document.getElementById('regSimMain');
+      if (!empty || !main) return;
+      if (typeof StatisticoRegressionSimilarity === 'undefined') {
+        regSimProfile = null;
+        empty.style.display = 'block';
+        main.style.display = 'none';
+        return;
+      }
+      const groups = buildRegSimGroups();
+      regSimProfile = StatisticoRegressionSimilarity.buildProfile(groups);
+      if (!regSimProfile.usablePairCount) {
+        selectedRegSimPair = null;
+        empty.style.display = 'block';
+        main.style.display = 'none';
+        return;
+      }
+      empty.style.display = 'none';
+      main.style.display = 'block';
+      if (selectedRegSimPair && !findRegSimPair(selectedRegSimPair.a, selectedRegSimPair.b)) selectedRegSimPair = null;
+      if (!selectedRegSimPair && regSimProfile.mostSimilar) {
+        selectedRegSimPair = { a: regSimProfile.mostSimilar.a, b: regSimProfile.mostSimilar.b };
+      }
+      renderRegSimKpis();
+      renderRegSimHeatmap();
+      renderRegSimPairTable();
+      renderRegSimProfile();
+    }
+
+    function renderRegSimKpis() {
+      const host = document.getElementById('regSimKpis');
+      if (!host || !regSimProfile) return;
+      const similar = regSimProfile.mostSimilar;
+      const distinct = regSimProfile.mostDistinct;
+      const homo = regSimProfile.homogeneity;
+      const outlier = regSimProfile.mostDifferentGroup;
+      const selectedKey = selectedRegSimPair ? simPairKey(selectedRegSimPair.a, selectedRegSimPair.b) : '';
+      const similarKey = similar ? simPairKey(similar.a, similar.b) : '';
+      const distinctKey = distinct ? simPairKey(distinct.a, distinct.b) : '';
+      host.innerHTML = [
+        `<button type="button" class="dsp-kpi${similar && selectedKey === similarKey ? ' is-active' : ''}" data-kpi="similar" ${similar ? '' : 'disabled'}>
+          <div class="dsp-kpi-label">Most similar pair</div>
+          <div class="dsp-kpi-value">${similar ? dspFmt(similar.overall) : '—'}</div>
+          <div class="dsp-kpi-note">${similar ? `${escapeHtml(similar.a)} · ${escapeHtml(similar.b)}` : 'Need two groups'}</div>
+        </button>`,
+        `<button type="button" class="dsp-kpi${distinct && selectedKey === distinctKey ? ' is-active' : ''}" data-kpi="distinct" ${distinct ? '' : 'disabled'}>
+          <div class="dsp-kpi-label">Most distinct pair</div>
+          <div class="dsp-kpi-value">${distinct ? dspFmt(distinct.overall) : '—'}</div>
+          <div class="dsp-kpi-note">${distinct ? `${escapeHtml(distinct.a)} · ${escapeHtml(distinct.b)}` : 'Need two groups'}</div>
+        </button>`,
+        `<div class="dsp-kpi" style="cursor:default;">
+          <div class="dsp-kpi-label">Group homogeneity</div>
+          <div class="dsp-kpi-value">${dspFmt(homo)}</div>
+          <div class="dsp-kpi-note">${escapeHtml((regSimProfile.homogeneityBand && regSimProfile.homogeneityBand.label) || 'Across all pairs')}</div>
+        </div>`,
+        `<div class="dsp-kpi" style="cursor:default;">
+          <div class="dsp-kpi-label">Most different group</div>
+          <div class="dsp-kpi-value">${outlier ? escapeHtml(String(outlier.group)) : '—'}</div>
+          <div class="dsp-kpi-note">${outlier ? `mean similarity ${dspFmt(outlier.meanSimilarity)}` : 'Need two groups'}</div>
+        </div>`
+      ].join('');
+      const similarBtn = host.querySelector('[data-kpi="similar"]');
+      const distinctBtn = host.querySelector('[data-kpi="distinct"]');
+      if (similarBtn && similar) similarBtn.addEventListener('click', () => selectRegSimPair(similar.a, similar.b));
+      if (distinctBtn && distinct) distinctBtn.addEventListener('click', () => selectRegSimPair(distinct.a, distinct.b));
+    }
+
+    function renderRegSimHeatmap() {
+      const wrap = document.getElementById('regSimHeatWrap');
+      if (!wrap || !regSimProfile) return;
+      const names = regSimProfile.groups || [];
+      let html = '<table class="dsp-heat"><thead><tr><th></th>';
+      names.forEach((name) => {
+        const label = String(name);
+        html += `<th title="${escapeHtml(label)}">${escapeHtml(label.length > 12 ? `${label.slice(0, 11)}…` : label)}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+      names.forEach((rowName, r) => {
+        const rowLabel = String(rowName);
+        html += `<tr><th title="${escapeHtml(rowLabel)}">${escapeHtml(rowLabel.length > 14 ? `${rowLabel.slice(0, 13)}…` : rowLabel)}</th>`;
+        names.forEach((colName, c) => {
+          if (r === c) {
+            html += '<td style="opacity:.4;">—</td>';
+            return;
+          }
+          const cell = regSimProfile.matrix[r][c];
+          const score = cell && cell.overall;
+          const selected = selectedRegSimPair && ((selectedRegSimPair.a === rowName && selectedRegSimPair.b === colName) || (selectedRegSimPair.a === colName && selectedRegSimPair.b === rowName));
+          html += `<td data-a="${escapeHtml(rowName)}" data-b="${escapeHtml(colName)}" class="${selected ? 'is-selected' : ''}" style="background:${dspScoreColor(score)};" title="${escapeHtml(rowName)} vs ${escapeHtml(colName)}">${dspFmt(score)}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+      wrap.querySelectorAll('td[data-a]').forEach((td) => {
+        td.addEventListener('click', () => selectRegSimPair(td.getAttribute('data-a'), td.getAttribute('data-b')));
+      });
+    }
+
+    function renderRegSimPairTable() {
+      const body = document.getElementById('regSimPairBody');
+      if (!body || !regSimProfile) return;
+      const rows = regSimProfile.pairs.slice().sort((a, b) => (b.overallRaw || -1) - (a.overallRaw || -1));
+      const selectedKey = selectedRegSimPair ? simPairKey(selectedRegSimPair.a, selectedRegSimPair.b) : '';
+      body.innerHTML = rows.map((p) => {
+        const on = selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a);
+        return `<tr data-a="${escapeHtml(p.a)}" data-b="${escapeHtml(p.b)}" class="${on ? 'is-selected' : ''}">
+          <td>${escapeHtml(p.a)} – ${escapeHtml(p.b)}</td>
+          <td class="dsp-score">${dspFmt(p.overall)}</td>
+          <td>${dspFmt(p.pattern)}</td>
+          <td>${dspFmt(p.strength)}</td>
+          <td>${dspFmt(p.sign)}</td>
+          <td class="dsp-band dsp-band--${p.bandKey}">${escapeHtml(p.band)}</td>
+        </tr>`;
+      }).join('');
+      body.querySelectorAll('tr[data-a]').forEach((tr) => {
+        tr.addEventListener('click', () => selectRegSimPair(tr.getAttribute('data-a'), tr.getAttribute('data-b')));
+      });
+    }
+
+    function dspBar(label, score) {
+      const width = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
+      return `<div class="dsp-bar-row"><span>${escapeHtml(label)}</span><div class="dsp-bar-track"><div class="dsp-bar-fill" style="width:${width}%;"></div></div><strong>${dspFmt(score)}</strong></div>`;
+    }
+
+    function renderRegSimProfile() {
+      const title = document.getElementById('regSimProfileTitle');
+      const body = document.getElementById('regSimProfileBody');
+      if (!title || !body) return;
+      const pair = selectedRegSimPair ? findRegSimPair(selectedRegSimPair.a, selectedRegSimPair.b) : null;
+      if (!pair) {
+        title.textContent = 'Pair profile';
+        body.innerHTML = '<div class="dsp-kpi-note">Select a heatmap cell or table row.</div>';
+        renderRegSimCongruence(null);
+        return;
+      }
+      title.textContent = `${pair.a} vs ${pair.b}`;
+      body.innerHTML = `
+        <div class="dsp-band dsp-band--${pair.bandKey}">Overall ${dspFmt(pair.overall)} · ${escapeHtml(pair.band)}</div>
+        <div class="dsp-bars">
+          ${dspBar('Pattern', pair.pattern)}
+          ${dspBar('Strength', pair.strength)}
+          ${dspBar('Sign', pair.sign)}
+        </div>
+        <div class="dsp-kpi-note">n=${pair.nA} vs n=${pair.nB} · ${pair.pairCount} overlapping coefficients. Each point is one predictor’s β in both groups; the diagonal is a perfect match. Intercept omitted.</div>
+      `;
+      renderRegSimCongruence(pair);
+    }
+
+    function betaAxisLimits(values) {
+      let min = Infinity;
+      let max = -Infinity;
+      values.forEach((v) => {
+        if (Number.isFinite(v)) {
+          min = Math.min(min, v);
+          max = Math.max(max, v);
+        }
+      });
+      if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: -1, max: 1 };
+      if (min === max) {
+        const pad = Math.max(Math.abs(min) * 0.25, 1);
+        return { min: min - pad, max: max + pad };
+      }
+      const pad = (max - min) * 0.08;
+      return { min: min - pad, max: max + pad };
+    }
+
+    function niceBetaTicks(min, max) {
+      const span = max - min || 1;
+      const raw = span / 4;
+      const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+      const residual = raw / mag;
+      const step = residual >= 5 ? 5 * mag : residual >= 2 ? 2 * mag : mag;
+      const start = Math.floor(min / step) * step;
+      const ticks = [];
+      for (let v = start; v <= max + step * 0.501; v += step) {
+        ticks.push(Number(v.toPrecision(8)));
+        if (ticks.length > 8) break;
+      }
+      return ticks;
+    }
+
+    function fmtTick(v) {
+      const abs = Math.abs(v);
+      if (abs >= 100) return v.toFixed(0);
+      if (abs >= 10) return v.toFixed(1);
+      if (abs >= 1) return v.toFixed(2);
+      return v.toFixed(3);
+    }
+
+    function renderRegSimCongruence(pair) {
+      const el = document.getElementById('regSimChart');
+      if (!el) return;
+      if (!pair || !pair.rA || !pair.rA.length) {
+        el.innerHTML = '';
+        return;
+      }
+      const values = pair.rA.concat(pair.rB);
+      const lim = betaAxisLimits(values);
+      const w = 420;
+      const h = 240;
+      const pad = { l: 52, r: 14, t: 12, b: 40 };
+      const plotW = w - pad.l - pad.r;
+      const plotH = h - pad.t - pad.b;
+      const span = lim.max - lim.min || 1;
+      const sx = (v) => pad.l + ((v - lim.min) / span) * plotW;
+      const sy = (v) => pad.t + plotH - ((v - lim.min) / span) * plotH;
+      const ticks = niceBetaTicks(lim.min, lim.max);
+      let chrome = `<rect class="scatter-bg" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${plotH}" rx="4" />`;
+      ticks.forEach((v) => {
+        const x = sx(v);
+        const y = sy(v);
+        chrome += `<line class="scatter-grid" x1="${x.toFixed(1)}" y1="${pad.t}" x2="${x.toFixed(1)}" y2="${(pad.t + plotH).toFixed(1)}" />`;
+        chrome += `<line class="scatter-grid" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${y.toFixed(1)}" />`;
+        chrome += `<text class="scatter-tick" style="text-anchor:middle" x="${x.toFixed(1)}" y="${(pad.t + plotH + 14).toFixed(1)}">${fmtTick(v)}</text>`;
+        chrome += `<text class="scatter-tick scatter-tick-y" x="${(pad.l - 6).toFixed(1)}" y="${(y + 3.5).toFixed(1)}">${fmtTick(v)}</text>`;
+      });
+      chrome += `<line class="r-profile-zero" x1="${sx(lim.min).toFixed(1)}" y1="${sy(lim.min).toFixed(1)}" x2="${sx(lim.max).toFixed(1)}" y2="${sy(lim.max).toFixed(1)}" />`;
+      const gi = Math.max(0, (regSimProfile.groups || []).findIndex((name) => String(name) === String(pair.a)));
+      const colorA = REG_SIM_COLORS[gi % REG_SIM_COLORS.length];
+      const pred = predictorRows();
+      let dots = '';
+      pair.rA.forEach((x, i) => {
+        const y = pair.rB[i];
+        const row = pred[pair.index[i]];
+        const label = row ? row.term : `term ${i + 1}`;
+        const tip = `${escapeHtml(label)}<br>${escapeHtml(pair.a)} β=${fmt(x)} · ${escapeHtml(pair.b)} β=${fmt(y)}`;
+        dots += `<circle class="r-profile-dot" style="fill:${colorA}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.6" data-st-tip-html="${tipAttr(tip)}" />`;
+      });
+      el.innerHTML = `<svg class="reg-sim-svg scatter-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Coefficient congruence scatter">
+        ${chrome}${dots}
+        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 8}">${escapeHtml(pair.a)} β</text>
+        <text class="scatter-axis-label" x="12" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 12 ${(pad.t + plotH / 2).toFixed(1)})">${escapeHtml(pair.b)} β</text>
+      </svg>`;
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(el);
+      }
+    }
+
     function renderByGroup() {
       if (groupIndex == null) return setEmpty('Choose a grouping column to compare regression parameters across levels.');
       activeGroups = buildIncludedGroups();
@@ -1371,7 +1890,7 @@
       const consistencySummary = computeModelConsistency(tableRows, overallFit, groupFits);
 
       document.getElementById('emptyState').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
+      document.getElementById('mainContent').style.display = 'flex';
       document.getElementById('metricPredictors').textContent = displayTerms.length;
       document.getElementById('metricGroups').textContent = activeGroups.length;
       document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
@@ -1386,8 +1905,11 @@
       renderAssumptionStrip(overallFit, groupFits);
       renderFitStrip(overallFit, groupFits);
       renderTable();
+      renderRegSimilarity();
       registerHeaderActions(groupFits);
       syncHeaderSample();
+      showRegByGroupPanel(regByGroupPanel);
+      try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
     }
 
     function syncHeaderSample() {
@@ -1526,9 +2048,19 @@
     window.selectGroupColumn = selectGroupColumn;
     window.togglePreviewLevel = togglePreviewLevel;
     window.setAllPreviewLevels = setAllPreviewLevels;
+    window.showRegByGroupPanel = showRegByGroupPanel;
+    window.openRegSimHelp = openRegSimHelp;
+    window.closeRegSimHelp = closeRegSimHelp;
+    window.openDspHelp = openRegSimHelp;
 
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeGroupDialog();
+      if (event.key !== 'Escape') return;
+      const help = document.getElementById('regSimHelpModal');
+      if (help && help.classList.contains('is-open')) {
+        closeRegSimHelp();
+        return;
+      }
+      closeGroupDialog();
     });
   </script>
 </body>

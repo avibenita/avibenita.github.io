@@ -361,20 +361,42 @@ const StatisticoHeader = {
 
     /* ── Inject CSS variables directly so they beat page-level :root {} ── */
     if (theme === 'light') {
-      root.style.setProperty('--surface-0',      '#ffffff');
-      root.style.setProperty('--surface-1',      '#ffffff');
-      root.style.setProperty('--surface-2',      '#f7f7f7');
-      root.style.setProperty('--border',         '#e6e6e6');
-      root.style.setProperty('--accent-1',       '#2caffe');
-      root.style.setProperty('--accent-2',       '#544fc5');
-      root.style.setProperty('--text-primary',   '#000000');
-      root.style.setProperty('--text-secondary', '#333333');
-      root.style.setProperty('--text-muted',     '#666666');
-      root.style.setProperty('--panel-shadow',   'none');
-      root.style.setProperty('--success',        '#06b535');
-      root.style.setProperty('--warning',        '#fe6a35');
-      root.style.setProperty('--danger',         '#f21313');
-      root.style.setProperty('--header-color',   '#333333');
+      /* Banking-dashboard light scheme (ZoomCharts / Okeh Dono Efasa):
+         cool canvas, white cards, navy header bars, teal KPIs, dark ink. */
+      root.style.setProperty('--bank-canvas',    '#E8EEF4');
+      root.style.setProperty('--bank-card',      '#FFFFFF');
+      root.style.setProperty('--bank-well',      '#F4F7FA');
+      root.style.setProperty('--bank-navy',      '#0D2137');
+      root.style.setProperty('--bank-navy-mid',  '#16324F');
+      root.style.setProperty('--bank-teal',      '#0E8A8A');
+      root.style.setProperty('--bank-teal-soft', '#E6F4F4');
+      root.style.setProperty('--bank-gold',      '#C48A0A');
+      root.style.setProperty('--bank-ink',       '#0D2137');
+      root.style.setProperty('--bank-ink-2',     '#2C3E50');
+      root.style.setProperty('--bank-muted',     '#4A5D70');
+      root.style.setProperty('--bank-border',    '#C5D0DC');
+      root.style.setProperty('--surface-0',      '#E8EEF4');
+      root.style.setProperty('--surface-1',      '#FFFFFF');
+      root.style.setProperty('--surface-2',      '#F4F7FA');
+      root.style.setProperty('--border',         '#C5D0DC');
+      root.style.setProperty('--accent-1',       '#0E8A8A');
+      root.style.setProperty('--accent-2',       '#0D2137');
+      root.style.setProperty('--text-primary',   '#0D2137');
+      root.style.setProperty('--text-secondary', '#2C3E50');
+      root.style.setProperty('--text-muted',     '#4A5D70');
+      root.style.setProperty('--text-1',         '#0D2137');
+      root.style.setProperty('--text-2',         '#2C3E50');
+      root.style.setProperty('--text-3',         '#4A5D70');
+      root.style.setProperty('--bg-0',           '#E8EEF4');
+      root.style.setProperty('--bg-1',           '#FFFFFF');
+      root.style.setProperty('--bg-2',           '#F4F7FA');
+      root.style.setProperty('--ink',            '#0D2137');
+      root.style.setProperty('--panel-shadow',   '0 2px 8px rgba(13, 33, 55, 0.08)');
+      root.style.setProperty('--success',        '#0F7A4A');
+      root.style.setProperty('--warning',        '#C48A0A');
+      root.style.setProperty('--danger',         '#C0392B');
+      root.style.setProperty('--header-color',   '#0D2137');
+      root.style.setProperty('--header-bar',     '#0D2137');
       root.style.setProperty('--highcharts-background-color', '#ffffff');
     } else {
       root.style.setProperty('--surface-0',      '#0f1115');

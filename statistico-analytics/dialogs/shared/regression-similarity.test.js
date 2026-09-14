@@ -90,7 +90,18 @@ describe('Regression Similarity Index', () => {
     expect(aligned.index).toEqual([0, 3]);
   });
 
-  test('buildProfile reports most similar, most distinct, and homogeneity', () => {
+  test('same-band pairs are not ranked as most similar vs most distinct', () => {
+    const g0 = group('high', BASE, 61);
+    const g1 = group('low', BASE.map((v) => v * 0.97), 59);
+    const profile = RSI.buildProfile([g0, g1]);
+    expect(profile.usablePairCount).toBe(1);
+    expect(profile.rangeContrast).toBe(false);
+    expect(profile.mostDistinct).toBeNull();
+    expect(profile.mostDifferentGroup).toBeNull();
+    expect(profile.mostSimilar.bandKey).toBe('very');
+  });
+
+  test('buildProfile names extremes only when ranges differ', () => {
     const g0 = group('high', BASE, 61);
     const g1 = group('low', BASE.map((v) => v * 0.95), 59);
     const gOther = group('other', [1.2, -8.5, 4.0, -12.2], 40);
@@ -98,8 +109,9 @@ describe('Regression Similarity Index', () => {
     expect(profile.usablePairCount).toBe(3);
     expect(profile.mostSimilar.a).toBe('high');
     expect(profile.mostSimilar.b).toBe('low');
-    expect(profile.mostSimilar.overall).toBeGreaterThan(90);
-    expect(profile.mostDistinct.overall).toBeLessThan(profile.mostSimilar.overall);
+    expect(profile.mostSimilar.bandKey).toBe('very');
+    expect(profile.rangeContrast).toBe(true);
+    expect(RSI.bandRank(profile.mostDistinct.bandKey)).toBeLessThan(RSI.bandRank(profile.mostSimilar.bandKey));
     expect(profile.homogeneity).toBeGreaterThan(0);
     expect(profile.mostDifferentGroup.group).toBe('other');
   });

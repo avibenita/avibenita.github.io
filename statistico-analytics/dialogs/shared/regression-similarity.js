@@ -109,6 +109,14 @@
     return { key: 'different', label: 'Substantially different' };
   }
 
+  function bandRank(key) {
+    if (key === 'very') return 3;
+    if (key === 'mostly') return 2;
+    if (key === 'mixed') return 1;
+    if (key === 'different') return 0;
+    return -1;
+  }
+
   function usableGroup(g) {
     if (!g || !Array.isArray(g.r)) return false;
     var k = 0;
@@ -183,13 +191,20 @@
     var usablePairs = pairs.filter(function (p) { return p.usable; });
     var overalls = usablePairs.map(function (p) { return p.overallRaw; });
     var homogeneity = geometricMean(overalls);
-    var mostSimilar = null;
-    var mostDistinct = null;
+    var maxRank = -1;
+    var minRank = 4;
     for (i = 0; i < usablePairs.length; i++) {
-      var p = usablePairs[i];
-      if (!mostSimilar || p.overallRaw > mostSimilar.overallRaw) mostSimilar = p;
-      if (!mostDistinct || p.overallRaw < mostDistinct.overallRaw) mostDistinct = p;
+      var rank = bandRank(usablePairs[i].bandKey);
+      if (rank > maxRank) maxRank = rank;
+      if (rank >= 0 && rank < minRank) minRank = rank;
     }
+    var rangeContrast = maxRank > minRank && minRank >= 0;
+    var mostSimilarPairs = usablePairs.filter(function (p) { return bandRank(p.bandKey) === maxRank; });
+    var mostDistinctPairs = rangeContrast
+      ? usablePairs.filter(function (p) { return bandRank(p.bandKey) === minRank; })
+      : [];
+    var mostSimilar = mostSimilarPairs[0] || null;
+    var mostDistinct = mostDistinctPairs[0] || null;
 
     var groupMeans = list.map(function (g) {
       var name = groupName(g);
@@ -203,17 +218,30 @@
       var meanSim = scores.length
         ? scores.reduce(function (s, v) { return s + v; }, 0) / scores.length
         : null;
-      return { group: name, n: g.n, meanSimilarity: round1(meanSim), meanSimilarityRaw: meanSim };
+      var meanBand = bandFor(meanSim);
+      return {
+        group: name,
+        n: g.n,
+        meanSimilarity: round1(meanSim),
+        meanSimilarityRaw: meanSim,
+        meanBand: meanBand,
+        meanBandKey: meanBand.key
+      };
     });
 
-    var mostDifferentGroup = null;
+    var groupMaxRank = -1;
+    var groupMinRank = 4;
     for (i = 0; i < groupMeans.length; i++) {
-      var gm = groupMeans[i];
-      if (!finite(gm.meanSimilarityRaw)) continue;
-      if (!mostDifferentGroup || gm.meanSimilarityRaw < mostDifferentGroup.meanSimilarityRaw) {
-        mostDifferentGroup = gm;
-      }
+      var gRank = bandRank(groupMeans[i].meanBandKey);
+      if (gRank < 0) continue;
+      if (gRank > groupMaxRank) groupMaxRank = gRank;
+      if (gRank < groupMinRank) groupMinRank = gRank;
     }
+    var groupRangeContrast = groupMaxRank > groupMinRank && groupMinRank >= 0;
+    var mostDifferentGroups = groupRangeContrast
+      ? groupMeans.filter(function (gm) { return bandRank(gm.meanBandKey) === groupMinRank; })
+      : [];
+    var mostDifferentGroup = mostDifferentGroups[0] || null;
 
     var matrix = names.map(function (rowName) {
       return names.map(function (colName) {
@@ -231,7 +259,12 @@
       homogeneityBand: bandFor(homogeneity),
       mostSimilar: mostSimilar,
       mostDistinct: mostDistinct,
+      mostSimilarPairs: mostSimilarPairs,
+      mostDistinctPairs: mostDistinctPairs,
+      rangeContrast: rangeContrast,
       mostDifferentGroup: mostDifferentGroup,
+      mostDifferentGroups: mostDifferentGroups,
+      groupRangeContrast: groupRangeContrast,
       groupMeans: groupMeans,
       pairCount: pairs.length,
       usablePairCount: usablePairs.length
@@ -247,6 +280,7 @@
     signScore: signScore,
     overallScore: overallScore,
     bandFor: bandFor,
+    bandRank: bandRank,
     comparePair: comparePair,
     buildProfile: buildProfile
   };

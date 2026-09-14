@@ -279,28 +279,9 @@
       ? function (valueId) { return '  <div class="pwstd-chip-sub" id="' + valueId + 'Sub"></div>'; }
       : function () { return ''; };
 
-    var chipHtml = CHIPS.map(function(c){
+    var presetChipHtml = CHIPS.filter(function (c) { return c.pct !== 'Custom'; }).map(function(c){
       var valueId = id(ids, c.key, c.fallback);
       var isDefault = c.pct === '85';
-      if (c.pct === 'Custom') {
-        return ''
-          + '<div class="pwstd-chip pwstd-chip--selectable pwstd-chip--custom" data-pct="Custom" data-value-id="' + valueId + '"'
-          + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
-          + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
-          + '  <div class="pwstd-chip-label">Custom</div>'
-          + '  <div class="pwstd-chip-custom-ctrl" onclick="event.stopPropagation()">'
-          + '    <input class="pwstd-select pwstd-chip-input" type="number" id="' + id(ids,'customInput','customPowerInput') + '"'
-          + ' min="50" max="99" step="1" value="85"'
-          + ' oninput="window.StatisticoPowerTemplate._onCustomInput()" onclick="event.stopPropagation()">'
-          + '    <span class="pwstd-chip-pct">%</span>'
-          + '    <button type="button" class="pwstd-chip-btn" onclick="event.stopPropagation();' + customHandler + '" title="Recalculate">'
-          + '      <i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i>'
-          + '    </button>'
-          + '  </div>'
-          + '  <div class="pwstd-chip-value" id="' + valueId + '">--</div>'
-          + chipSubHtml(valueId)
-          + '</div>';
-      }
       return ''
         + '<div class="pwstd-chip pwstd-chip--selectable' + (isDefault ? ' pwstd-chip--selected' : '') + '"'
         + ' data-pct="' + c.pct + '" data-value-id="' + valueId + '"'
@@ -311,13 +292,32 @@
         + chipSubHtml(valueId)
         + '</div>';
     }).join('\n');
+    var customChip = CHIPS.filter(function (c) { return c.pct === 'Custom'; })[0];
+    var customValueId = id(ids, customChip.key, customChip.fallback);
+    var customChipHtml = ''
+      + '<div class="pwstd-chip pwstd-chip--selectable pwstd-chip--custom" data-pct="Custom" data-value-id="' + customValueId + '"'
+      + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
+      + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
+      + '  <div class="pwstd-chip-label">Custom</div>'
+      + '  <div class="pwstd-chip-custom-ctrl" onclick="event.stopPropagation()">'
+      + '    <input class="pwstd-select pwstd-chip-input" type="number" id="' + id(ids,'customInput','customPowerInput') + '"'
+      + ' min="50" max="99" step="1" value="85"'
+      + ' oninput="window.StatisticoPowerTemplate._onCustomInput()" onclick="event.stopPropagation()">'
+      + '    <span class="pwstd-chip-pct">%</span>'
+      + '    <button type="button" class="pwstd-chip-btn" onclick="event.stopPropagation();' + customHandler + '" title="Recalculate">'
+      + '      <i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i>'
+      + '    </button>'
+      + '  </div>'
+      + '  <div class="pwstd-chip-value" id="' + customValueId + '">--</div>'
+      + chipSubHtml(customValueId)
+      + '</div>';
 
     var planningHeadHtml = variant === 'mixed'
       ? labelWithTip('Sample Size Planning', 'Required subjects for each power target. Sub-counts show approximate total observations (subjects × measurements per subject).')
       : 'Sample Size Planning';
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260913b">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260913c">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">' + esc(subtitle) + '</p>',
@@ -354,7 +354,8 @@
       '    <div class="pwstd-card pwstd-card--planning pwstd-card--primary" id="pwstd-card-planning">',
       '      <div class="pwstd-card-h" id="pwstd-head-planning">' + planningHeadHtml + '</div>',
       '      <div class="pwstd-card-b">',
-      '        <div class="pwstd-targets">' + chipHtml + '</div>',
+      '        <div class="pwstd-targets">' + presetChipHtml + '</div>',
+      '        <div class="pwstd-targets-custom">' + customChipHtml + '</div>',
       '        <span id="' + id(ids,'customStatus','customPowerStatus') + '" class="pwstd-custom-status"><i class="fa-solid fa-spinner fa-spin"></i> Calculating...</span>',
       '        <span id="pwstd-selected-target" hidden aria-hidden="true"></span>',
       '        <span id="pwstd-reqN-label" hidden aria-hidden="true"></span>',
@@ -373,11 +374,11 @@
       '    <div class="pwstd-card pwstd-card--curve">',
       '      <div class="pwstd-card-h pwstd-card-h--curve">',
       '        <span>Power Curve</span>',
-      '        <button type="button" class="pwstd-curve-zoom" id="pwstd-curve-zoom">Show current N</button>',
+      '        <button type="button" class="pwstd-curve-zoom" id="pwstd-curve-zoom">Zoom near current N</button>',
       '      </div>',
       '      <div class="pwstd-card-b pwstd-curve-wrap">',
       '        <div class="pwstd-curve-interactive">',
-      '          <svg id="pwstd-power-curve-svg" class="pwstd-power-curve" viewBox="0 0 640 200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Power versus sample size curve"></svg>',
+      '          <svg id="pwstd-power-curve-svg" class="pwstd-power-curve" viewBox="0 0 640 150" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Power versus sample size curve"></svg>',
       '          <div id="pwstd-curve-tooltip" class="pwstd-curve-tooltip" hidden></div>',
       '        </div>',
       '        <p class="pwstd-curve-note" id="pwstd-curve-note">Exact noncentral F curve at fixed f² and α — hover to read power at any N.</p>',
@@ -882,6 +883,7 @@
     _recalcFn: null,
     _computeDetectable: null,
     _updatePlanningSummaryFn: null,
+    initTermTips: _initTermTips,
     parseTargetPower: _parseTargetPower,
     getSelectedTargetPower: function() {
       var chip = document.querySelector('.pwstd-chip--selected');

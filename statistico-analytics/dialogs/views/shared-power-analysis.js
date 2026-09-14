@@ -281,14 +281,34 @@
       return ctx.f2.toFixed(3) + (mag ? ' — ' + mag.charAt(0).toUpperCase() + mag.slice(1) : '');
     }
 
-    function updateExecutiveSummary(ctx, power) {
+    function renderExecBanner(el, shortText, note) {
+      el.className = 'pwstd-exec pwstd-exec--neutral';
+      el.textContent = '';
+      var textEl = document.createElement('span');
+      textEl.className = 'pwstd-exec-text';
+      textEl.textContent = shortText;
+      el.appendChild(textEl);
+      if (!note) return;
+      var help = document.createElement('span');
+      help.className = 'pwstd-term-help';
+      help.setAttribute('role', 'note');
+      help.setAttribute('aria-label', note);
+      help.innerHTML = '<i class="fa-regular fa-circle-question" aria-hidden="true"></i><span class="pwstd-term-tip"></span>';
+      help.querySelector('.pwstd-term-tip').textContent = note;
+      el.appendChild(help);
+      if (global.StatisticoPowerTemplate && typeof global.StatisticoPowerTemplate.initTermTips === 'function') {
+        global.StatisticoPowerTemplate.initTermTips(el);
+      }
+    }
+
+    function updateExecutiveSummary(ctx, power, reqN, target) {
       var el = document.getElementById('pwstd-exec-summary');
       if (!el) return;
+      var targetInfo = target || { pct: '85%', power: 0.85 };
       if (typeof cfg.formatExecutiveSummary === 'function') {
-        var custom = cfg.formatExecutiveSummary(ctx, power);
+        var custom = cfg.formatExecutiveSummary(ctx, power, reqN, targetInfo);
         if (custom) {
-          el.textContent = custom.text || '';
-          el.className = 'pwstd-exec ' + (custom.className || 'pwstd-exec--neutral');
+          renderExecBanner(el, custom.text || '', custom.note || '');
           return;
         }
       }
@@ -300,11 +320,14 @@
       var pct = formatPowerPct(power);
       var effectName = ctx.effectName || cfg.effectName || 'effect';
       var nLabel = cfg.variant === 'mixed' ? 'subjects' : 'N';
-      var text = 'Power assuming ' + effectName + ' = ' + ctx.effect.toFixed(3) + ' is ' + pct
-        + ' at ' + nLabel + ' = ' + ctx.n + ' and α = ' + ctx.alpha.toFixed(2)
-        + '. Power calculated from the fitted (or assumed) effect does not independently establish study adequacy — use Required N and Detectable ' + effectName + ' for planning.';
-      el.textContent = text;
-      el.className = 'pwstd-exec pwstd-exec--neutral';
+      var reqPart = reqN
+        ? '; required ' + nLabel + ' is ' + reqN + ' for ' + targetInfo.pct + ' power.'
+        : '.';
+      var short = 'Power is ' + pct + ' at ' + nLabel + ' = ' + ctx.n + reqPart;
+      var note = 'Power calculated from the fitted (or assumed) ' + effectName
+        + ' does not independently establish study adequacy. Use Required N and Detectable '
+        + effectName + ' for planning.';
+      renderExecBanner(el, short, note);
     }
 
     function updatePlanningSummary(ctx) {
@@ -488,11 +511,11 @@
       var target = targetPower || 0.85;
       var lo = minN(ctx);
       var req95 = computeRequiredN(ctx, 0.95) || selectedReqN || lo;
-      var zoomFull = svg.dataset.zoomFull === '1';
+      var zoomCurrent = svg.dataset.zoomMode === 'current';
       var focusN = selectedReqN || req95 || lo;
-      var maxN = zoomFull
-        ? Math.max(ctx.n + 15, req95 + 10, lo + 20)
-        : Math.max(Math.ceil(Math.max(req95, focusN) * 3.5), lo + 24, 36);
+      var maxN = zoomCurrent
+        ? Math.max(Math.ceil(ctx.n * 4), ctx.n + 50, lo + 24, 40)
+        : Math.max(Math.ceil(focusN * 2), lo + 24, 40);
       var currentOnScale = ctx.n >= lo && ctx.n <= maxN;
       var step = Math.max(1, Math.floor((maxN - lo) / 80));
       var points = [];
@@ -506,7 +529,7 @@
         if (df2Last >= 1) points.push({ n: maxN, power: powerAtF2(maxN, ctx.df1, df2Last, ctx.f2, ctx.alpha) });
       }
 
-      var W = 640, H = 200, pad = { l: 56, r: 52, t: 20, b: 40 };
+      var W = 640, H = 150, pad = { l: 48, r: 52, t: 16, b: 32 };
       var plotW = W - pad.l - pad.r;
       var plotH = H - pad.t - pad.b;
       var xScale = function (n) { return pad.l + ((n - lo) / (maxN - lo)) * plotW; };
@@ -559,11 +582,11 @@
           : (cfg.curveNote || 'Exact noncentral F curve at fixed f² and α — hover to read power at any N.');
         note.textContent = currentOnScale
           ? baseNote
-          : 'Current ' + (cfg.curveCurrentLabel || 'N') + ' = ' + ctx.n + ' is off-scale. Use Show current N to include it.';
+          : 'Current ' + (cfg.curveCurrentLabel || 'N') + ' = ' + ctx.n + ' is off-scale. Use Zoom near current N to include it.';
       }
       var zoomBtn = document.getElementById('pwstd-curve-zoom');
       if (zoomBtn) {
-        zoomBtn.textContent = zoomFull ? 'Zoom near required N' : 'Show current N';
+        zoomBtn.textContent = zoomCurrent ? 'Zoom near required N' : 'Zoom near current N';
       }
       if (tooltip) tooltip.hidden = true;
     }
@@ -625,7 +648,7 @@
       }
 
       updateHeroLabels(ctx, targetSel);
-      updateExecutiveSummary(ctx, power);
+      updateExecutiveSummary(ctx, power, reqNAtTarget, targetSel);
       updatePlanningSummary(ctx);
       updateStatus(ctx, power, reqMap);
 
@@ -766,7 +789,7 @@
         zoomBtn.addEventListener('click', function () {
           var svg = document.getElementById('pwstd-power-curve-svg');
           if (!svg) return;
-          svg.dataset.zoomFull = svg.dataset.zoomFull === '1' ? '0' : '1';
+          svg.dataset.zoomMode = svg.dataset.zoomMode === 'current' ? 'required' : 'current';
           if (typeof global.StatisticoPowerTemplate._updatePlanningSummaryFn === 'function') {
             global.StatisticoPowerTemplate._updatePlanningSummaryFn();
           }
@@ -1009,17 +1032,20 @@
     };
   }
 
-  function independentExecutiveSummary(ctx, power) {
+  function independentExecutiveSummary(ctx, power, reqN, target) {
     if (!ctx) return null;
     var effectName = ctx.effectName || 'effect';
-    var testPart = ctx.testLabel ? (' for the ' + ctx.testLabel + ' test') : '';
-    var text = 'Power assuming ' + effectName + ' = ' + ctx.effect.toFixed(3) + ' is ' + formatPowerPct(power)
-      + testPart + ' at total N = ' + ctx.n + ' (all ' + ctx.k + ' groups combined) and α = ' + ctx.alpha.toFixed(3)
-      + '. Power calculated from the fitted (or assumed) effect does not independently establish study adequacy — use Required N and Detectable ' + effectName + ' for planning.';
+    var targetInfo = target || { pct: '85%' };
+    var reqPart = reqN ? '; required N is ' + reqN + ' for ' + targetInfo.pct + ' power.' : '.';
+    var text = 'Power is ' + formatPowerPct(power) + ' at N = ' + ctx.n + reqPart;
+    var note = 'Power calculated from the fitted (or assumed) ' + effectName
+      + (ctx.testLabel ? ' for the ' + ctx.testLabel + ' test' : '')
+      + ' does not independently establish study adequacy. Use Required N and Detectable '
+      + effectName + ' for planning.';
     if (ctx.isNonparametric) {
-      text += ' Rank-based planning uses a Cohen\'s f approximation mapped from ε².';
+      note += ' Rank-based planning uses a Cohen\'s f approximation mapped from ε².';
     }
-    return { text: text, className: 'pwstd-exec--neutral' };
+    return { text: text, note: note, className: 'pwstd-exec--neutral' };
   }
 
   function independentPlanningSummary(ctx) {
@@ -1192,18 +1218,17 @@
     };
   }
 
-  function mixedExecutiveSummary(ctx, power) {
-    var measRounded = isFinite(ctx.measurementsPerSubject) ? Math.round(ctx.measurementsPerSubject) : null;
-    var measTxt = measRounded
-      ? 'approximately ' + measRounded + ' repeated measurements per subject'
-      : 'the current repeated-measures structure';
-    var text = 'Power assuming partial η² = ' + ctx.effect.toFixed(3) + ' is ' + formatPowerPct(power)
-      + ' for ' + ctx.targetEffectName + ' with ' + ctx.subjects + ' subjects and ' + measTxt
-      + '. Power calculated from the fitted (or assumed) effect does not independently establish design adequacy — use required subjects and detectable partial η² for planning.';
+  function mixedExecutiveSummary(ctx, power, reqN, target) {
+    var targetInfo = target || { pct: '85%' };
+    var reqPart = reqN ? '; required subjects are ' + reqN + ' for ' + targetInfo.pct + ' power.' : '.';
+    var text = 'Power is ' + formatPowerPct(power) + ' at ' + ctx.subjects + ' subjects' + reqPart;
+    var note = 'Power calculated from the fitted (or assumed) partial η² for '
+      + ctx.targetEffectName
+      + ' does not independently establish design adequacy. Use required subjects and detectable partial η² for planning.';
     if (ctx.subjects < 30) {
-      text += ' Small subject counts can produce unstable mixed-model estimates.';
+      note += ' Small subject counts can produce unstable mixed-model estimates.';
     }
-    return { text: text, className: 'pwstd-exec--neutral' };
+    return { text: text, note: note, className: 'pwstd-exec--neutral' };
   }
 
   function mixedPlanningSummary(ctx) {

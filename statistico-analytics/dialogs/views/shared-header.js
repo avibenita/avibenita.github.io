@@ -7286,7 +7286,7 @@ const StatisticoHeader = {
       id: 'hcLight', name: 'Highcharts light', desc: 'Official Highcharts light canvas',
       light: true, wrapBg: '#ffffff', pngBg: '#ffffff', chartBg: '#ffffff',
       textureKind: 'none', cssTexture: 'none', texSize: '24px 24px', texOpacity: '0',
-      axis: '#333333', grid: '#e6e6e6', grid3d: '#cccccc',
+      axis: '#2C3E50', grid: '#D8E0E8', grid3d: '#C5D0DC',
       minorGrid: '#f2f2f2', line: '#cccccc',
       legend: '#333333', legendTitle: '#000000', legendHidden: '#999999', label: '#333333',
       tooltipBg: '#f7f7f7', tooltipBorder: '#cccccc', tooltipText: '#333333',
@@ -7438,6 +7438,18 @@ const StatisticoHeader = {
           chart: {
             backgroundColor: resolved === 'light' ? '#ffffff' : 'transparent',
             style: { fontFamily: this.HC_FONT_FAMILY, fontSize: '1rem' }
+          },
+          xAxis: {
+            labels: { style: { color: resolved === 'light' ? '#2C3E50' : '#94a3b8', textOutline: 'none' } },
+            title: { style: { color: resolved === 'light' ? '#2C3E50' : '#94a3b8' } },
+            gridLineColor: resolved === 'light' ? '#D8E0E8' : 'rgba(148,163,184,.15)',
+            lineColor: resolved === 'light' ? '#C5D0DC' : 'rgba(148,163,184,.35)',
+            tickColor: resolved === 'light' ? '#C5D0DC' : 'rgba(148,163,184,.35)'
+          },
+          yAxis: {
+            labels: { style: { color: resolved === 'light' ? '#2C3E50' : '#94a3b8', textOutline: 'none' } },
+            title: { style: { color: resolved === 'light' ? '#2C3E50' : '#94a3b8' } },
+            gridLineColor: resolved === 'light' ? '#D8E0E8' : 'rgba(148,163,184,.15)'
           }
         });
       } catch (e) {}
@@ -7557,12 +7569,12 @@ const StatisticoHeader = {
           legend: { itemStyle: { fontSize: '0.8em' } },
           tooltip: { style: { fontSize: '0.8em' } },
           xAxis: {
-            labels: { style: { fontSize: '0.8em' } },
-            title: { style: { fontSize: '0.8em' } }
+            labels: { style: { fontSize: '0.8em', color: light ? '#2C3E50' : '#94a3b8', textOutline: 'none' } },
+            title: { style: { fontSize: '0.8em', color: light ? '#2C3E50' : '#94a3b8' } }
           },
           yAxis: {
-            labels: { style: { fontSize: '0.8em' } },
-            title: { style: { fontSize: '0.8em' } }
+            labels: { style: { fontSize: '0.8em', color: light ? '#2C3E50' : '#94a3b8', textOutline: 'none' } },
+            title: { style: { fontSize: '0.8em', color: light ? '#2C3E50' : '#94a3b8' } }
           }
         });
       } catch (e) {}
@@ -7589,7 +7601,7 @@ const StatisticoHeader = {
     const axisColor = tpl.axis;
     const axisPatch = {
       title: { style: { color: axisColor, fontSize: '0.8em' } },
-      labels: { style: { color: axisColor, fontSize: '0.8em' } },
+      labels: { style: { color: axisColor, fontSize: '0.8em', textOutline: 'none' } },
       gridLineColor: tpl.grid,
       minorGridLineColor: tpl.minorGrid,
       lineColor: tpl.line,

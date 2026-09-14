@@ -535,6 +535,22 @@
       var xScale = function (n) { return pad.l + ((n - lo) / (maxN - lo)) * plotW; };
       var yScale = function (p) { return pad.t + plotH - (p * plotH); };
       var fmtPct = function (p) { return Math.round(p * 100) + '%'; };
+      var light = document.documentElement.getAttribute('data-theme') === 'light';
+      var skin = light ? {
+        axis: '#2C3E50',
+        grid: '#D8E0E8',
+        axisLine: '#C5D0DC',
+        curve: '#0E8A8A',
+        current: '#C48A0A',
+        target: '#C48A0A'
+      } : {
+        axis: 'rgba(255,255,255,.55)',
+        grid: 'rgba(255,255,255,.08)',
+        axisLine: 'rgba(255,255,255,.28)',
+        curve: '#78c8ff',
+        current: 'rgb(255,165,120)',
+        target: 'rgb(255,215,0)'
+      };
       var path = '';
       points.forEach(function (pt, i) {
         path += (i === 0 ? 'M' : 'L') + xScale(pt.n).toFixed(1) + ' ' + yScale(pt.power).toFixed(1) + ' ';
@@ -548,30 +564,30 @@
       var parts = ['<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="transparent"/>'];
       [0, 0.2, 0.4, 0.6, 0.8, 1].forEach(function (p) {
         var y = yScale(p);
-        parts.push('<line x1="' + pad.l + '" y1="' + y.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + y.toFixed(1) + '" stroke="rgba(255,255,255,.08)" stroke-width="1"/>');
-        parts.push('<text x="' + (pad.l - 8) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">' + fmtPct(p) + '</text>');
+        parts.push('<line x1="' + pad.l + '" y1="' + y.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + y.toFixed(1) + '" stroke="' + skin.grid + '" stroke-width="1"/>');
+        parts.push('<text class="pwstd-axis-tick" x="' + (pad.l - 8) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" fill="' + skin.axis + '" font-size="12" font-weight="700">' + fmtPct(p) + '</text>');
       });
       var xStep = powerCurveNiceStep(lo, maxN, 5);
       for (var tickN = Math.ceil(lo / xStep) * xStep; tickN <= maxN; tickN += xStep) {
         var x = xScale(tickN);
-        parts.push('<line x1="' + x.toFixed(1) + '" y1="' + pad.t + '" x2="' + x.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.06)" stroke-width="1"/>');
-        parts.push('<text x="' + x.toFixed(1) + '" y="' + (pad.t + plotH + 18) + '" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">' + tickN + '</text>');
+        parts.push('<line x1="' + x.toFixed(1) + '" y1="' + pad.t + '" x2="' + x.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="' + skin.grid + '" stroke-width="1"/>');
+        parts.push('<text class="pwstd-axis-tick" x="' + x.toFixed(1) + '" y="' + (pad.t + plotH + 18) + '" text-anchor="middle" fill="' + skin.axis + '" font-size="12" font-weight="700">' + tickN + '</text>');
       }
-      parts.push('<line x1="' + pad.l + '" y1="' + (pad.t + plotH) + '" x2="' + (pad.l + plotW) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');
-      parts.push('<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');
-      parts.push('<line x1="' + pad.l + '" y1="' + tgtY.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + tgtY.toFixed(1) + '" stroke="rgb(255,215,0)" stroke-dasharray="6 4" stroke-width="1.5"/>');
-      parts.push('<text x="' + (pad.l + plotW + 2) + '" y="' + (tgtY + 4).toFixed(1) + '" fill="rgb(255,215,0)" font-size="10" font-weight="700">Target: ' + fmtPct(target) + '</text>');
-      parts.push('<path d="' + path.trim() + '" fill="none" stroke="#78c8ff" stroke-width="2.5"/>');
+      parts.push('<line x1="' + pad.l + '" y1="' + (pad.t + plotH) + '" x2="' + (pad.l + plotW) + '" y2="' + (pad.t + plotH) + '" stroke="' + skin.axisLine + '" stroke-width="1.2"/>');
+      parts.push('<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (pad.t + plotH) + '" stroke="' + skin.axisLine + '" stroke-width="1.2"/>');
+      parts.push('<line x1="' + pad.l + '" y1="' + tgtY.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + tgtY.toFixed(1) + '" stroke="' + skin.target + '" stroke-dasharray="6 4" stroke-width="1.5"/>');
+      parts.push('<text x="' + (pad.l + plotW + 2) + '" y="' + (tgtY + 4).toFixed(1) + '" fill="' + skin.target + '" font-size="10" font-weight="700">Target: ' + fmtPct(target) + '</text>');
+      parts.push('<path d="' + path.trim() + '" fill="none" stroke="' + skin.curve + '" stroke-width="2.5"/>');
       if (currentOnScale) {
-        parts.push('<line x1="' + curX.toFixed(1) + '" y1="' + pad.t + '" x2="' + curX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgb(255,165,120)" stroke-width="2"/>');
-        parts.push('<circle cx="' + curX.toFixed(1) + '" cy="' + curY.toFixed(1) + '" r="5" fill="rgb(255,165,120)" stroke="#fff" stroke-width="1.5"/>');
-        parts.push('<text x="' + curX.toFixed(1) + '" y="' + (pad.t - 6) + '" text-anchor="middle" fill="rgb(255,165,120)" font-size="10" font-weight="700">Current ' + (cfg.curveCurrentLabel || 'N') + '=' + ctx.n + ' (' + formatPowerPct(curPower) + ')</text>');
+        parts.push('<line x1="' + curX.toFixed(1) + '" y1="' + pad.t + '" x2="' + curX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="' + skin.current + '" stroke-width="2"/>');
+        parts.push('<circle cx="' + curX.toFixed(1) + '" cy="' + curY.toFixed(1) + '" r="5" fill="' + skin.current + '" stroke="#fff" stroke-width="1.5"/>');
+        parts.push('<text x="' + curX.toFixed(1) + '" y="' + (pad.t - 6) + '" text-anchor="middle" fill="' + skin.current + '" font-size="10" font-weight="700">Current ' + (cfg.curveCurrentLabel || 'N') + '=' + ctx.n + ' (' + formatPowerPct(curPower) + ')</text>');
       }
       if (reqX && selectedReqN >= lo && selectedReqN <= maxN) {
-        parts.push('<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="5" fill="rgb(255,215,0)" stroke="#fff" stroke-width="1.5"/>');
-        parts.push('<text x="' + reqX.toFixed(1) + '" y="' + (tgtY - 8).toFixed(1) + '" text-anchor="middle" fill="rgb(255,215,0)" font-size="10" font-weight="700">Required ' + (cfg.curveCurrentLabel || 'N') + '=' + selectedReqN + '</text>');
+        parts.push('<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="5" fill="' + skin.target + '" stroke="#fff" stroke-width="1.5"/>');
+        parts.push('<text x="' + reqX.toFixed(1) + '" y="' + (tgtY - 8).toFixed(1) + '" text-anchor="middle" fill="' + skin.target + '" font-size="10" font-weight="700">Required ' + (cfg.curveCurrentLabel || 'N') + '=' + selectedReqN + '</text>');
       }
-      parts.push('<text x="' + (pad.l + plotW / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">' + (cfg.curveXAxisLabel || 'Sample size (N)') + '</text>');
+      parts.push('<text class="pwstd-axis-tick" x="' + (pad.l + plotW / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" fill="' + skin.axis + '" font-size="12" font-weight="700">' + (cfg.curveXAxisLabel || 'Sample size (N)') + '</text>');
       svg.innerHTML = parts.join('');
       svg._pwCurve = { points: points, minN: lo, maxN: maxN, pad: pad, W: W, H: H, plotW: plotW, plotH: plotH, ctx: ctx };
       svg.classList.add('pwstd-power-curve--ready');
@@ -796,6 +812,13 @@
         });
       }
       calculate(mountOpts.getSource ? mountOpts.getSource() : undefined);
+      if (!global.StatisticoPowerAnalysis._themeBound) {
+        global.StatisticoPowerAnalysis._themeBound = true;
+        document.addEventListener('statistico-theme-changed', function () {
+          var recalc = global.StatisticoPowerTemplate && global.StatisticoPowerTemplate._recalcFn;
+          if (typeof recalc === 'function') recalc();
+        });
+      }
       return engine;
     }
 

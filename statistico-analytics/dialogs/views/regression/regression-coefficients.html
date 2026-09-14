@@ -2112,7 +2112,17 @@
     }
     .ix-overview-panel.chart-panel {
       padding: 0;
-      background: inherit;
+      overflow: hidden;
+      min-height: 340px;
+    }
+    .ix-overview-panel .chart-panel-b {
+      min-height: 280px;
+    }
+    #tab-ix-summary #ixPreviewPlotContainer {
+      flex: 0 0 260px !important;
+      height: 260px !important;
+      min-height: 260px !important;
+      width: 100% !important;
     }
     .chart-panel.res-dist-panel,
     .chart-panel.res-hist-panel {
@@ -2460,7 +2470,7 @@
       font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
       color: var(--text-muted); margin-bottom: 8px;
     }
-    #ixPreviewPlotContainer { height: 220px; min-height: 180px; }
+    #ixPreviewPlotContainer { height: 260px; min-height: 260px; width: 100%; }
     .ix-conclusion {
       margin-top: 10px; padding: 10px 12px; border-radius: 8px;
       background: rgba(232,118,58,.08); border-left: 3px solid var(--accent-1);
@@ -10854,9 +10864,26 @@ ${sectionsHtml}
       const prev = window._ixPlotCompact;
       window._ixPlotCompact = true;
       try {
+        container.style.height = '260px';
+        container.style.minHeight = '260px';
+        container.style.width = '100%';
         _renderInteractionPlotInContainer(container);
+        setTimeout(function () {
+          const el = document.getElementById('ixPreviewPlotContainer');
+          if (!el || typeof Highcharts === 'undefined') return;
+          const w = (el.parentElement && el.parentElement.clientWidth) || el.clientWidth;
+          Highcharts.charts.forEach(function (chart) {
+            if (chart && chart.renderTo === el) {
+              try {
+                if (w > 40) chart.setSize(w, 260, false);
+                else chart.reflow();
+              } catch (_e) {}
+            }
+          });
+        }, 80);
       } catch (e) {
         console.warn('Interaction preview failed:', e);
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Could not render preview.</div>';
       } finally {
         window._ixPlotCompact = prev;
       }
@@ -11156,7 +11183,10 @@ ${sectionsHtml}
       const numVar = ix.var1;
       const catVar = ix.var2 || (ixi.v2Cat && ixi.v2Cat.name);
       const catInfo = ixi.v2Cat || ixi.v1Cat;
-      if (!catInfo) return;
+      if (!catInfo) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Preview not available for this term type.</div>';
+        return;
+      }
       const numIdx = headers.indexOf(numVar);
       const numVals = rows.map(r => parseFloat(r[numIdx])).filter(x => !isNaN(x));
       const xMin = Math.min(...numVals), xMax = Math.max(...numVals);
@@ -11228,7 +11258,7 @@ ${sectionsHtml}
       });
 
       Highcharts.chart(container, {
-        chart: { backgroundColor: 'transparent', animation: false, height: window._ixPlotCompact ? 210 : null },
+        chart: { backgroundColor: 'transparent', animation: false, height: window._ixPlotCompact ? 260 : null },
         title: window._ixPlotCompact ? { text: null } : { text: `${numVar} \u00D7 ${catVar}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
         subtitle: window._ixPlotCompact ? { text: null } : {
           text: 'Predicted ' + yVar + ' (other covariates at mean)' + (showCI ? ' · shaded = 95% CI' : ''),
@@ -11321,7 +11351,7 @@ ${sectionsHtml}
       });
 
       Highcharts.chart(container, {
-        chart: { backgroundColor: 'transparent', animation: false, height: window._ixPlotCompact ? 210 : null },
+        chart: { backgroundColor: 'transparent', animation: false, height: window._ixPlotCompact ? 260 : null },
         title: window._ixPlotCompact ? { text: null } : { text: `${ix.var1} \u00D7 ${ix.var2}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
         subtitle: window._ixPlotCompact ? { text: null } : {
           text: 'Predicted ' + yVar + ' at three levels of ' + ix.var2 + (showCI ? ' · shaded = 95% CI' : ''),

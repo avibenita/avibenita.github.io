@@ -9,7 +9,7 @@
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260914w75" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260914w75b" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260912bygroupnav"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -748,9 +748,28 @@
       };
     }
 
+    function dropNonvaryingCategoricals(catInfo, rows) {
+      if (!Array.isArray(catInfo) || !rows) return catInfo;
+      return catInfo.filter((c) => getUniqueCategories(rows, c.index).length >= 2);
+    }
+
+    function groupingIsModelPredictor() {
+      const name = sourceHeaders[groupIndex];
+      if (!name || !modelSpec) return false;
+      return (modelSpec.xc || []).includes(name) || (modelSpec.xn || []).includes(name);
+    }
+
     function fitRegression(rows, categoricalInfoOverride) {
       const built = buildRegressionMatrices(rows, sourceHeaders, modelSpec, categoricalInfoOverride);
-      if (!built || built.yVector.length <= built.paramCount) return null;
+      if (!built) return { results: null, n: (rows && rows.length) || 0, failReason: 'Could not build the design matrix.' };
+      if (built.yVector.length <= built.paramCount) {
+        return {
+          results: null,
+          n: built.yVector.length,
+          displayNames: built.displayNames,
+          failReason: `Need n > ${built.paramCount} (have ${built.yVector.length})`
+        };
+      }
       try {
         const results = computeOLS(built.xMatrix, built.yVector, built.includeIntercept, 0.05);
         return {
@@ -761,7 +780,12 @@
           residuals: results.residuals || []
         };
       } catch (_err) {
-        return null;
+        return {
+          results: null,
+          n: built.yVector.length,
+          displayNames: built.displayNames,
+          failReason: 'Design matrix is singular (a predictor does not vary in this group).'
+        };
       }
     }
 
@@ -1084,9 +1108,16 @@
         .sort((a, b) => String(a.group).localeCompare(String(b.group), undefined, { numeric: true }));
     }
 
-    function extractCoef(fit, termIndex) {
+    function extractCoef(fit, termIndexOrName) {
       if (!fit || !fit.results) {
         return { beta: NaN, se: NaN, p: NaN, ciLower: NaN, ciUpper: NaN, n: fit ? fit.n : NaN };
+      }
+      let termIndex = termIndexOrName;
+      if (typeof termIndexOrName === 'string') {
+        termIndex = (fit.displayNames || []).indexOf(termIndexOrName);
+        if (termIndex < 0) {
+          return { beta: NaN, se: NaN, p: NaN, ciLower: NaN, ciUpper: NaN, n: fit.n };
+        }
       }
       const r = fit.results;
       return {
@@ -1108,16 +1139,20 @@
         .concat(groups.map((g) => ({ label: String(g.group), fit: g.fit, type: 'group' })));
 
       strip.style.display = 'block';
+      const groupNote = groupingIsModelPredictor()
+        ? ` · ${sourceHeaders[groupIndex]} omitted within groups (grouping variable is constant inside each level)`
+        : '';
       document.getElementById('fitStripSubtitle').textContent =
-        `Same model specification · dummy coding fixed from overall sample · α = 0.05 for Shapiro–Wilk on residuals`;
+        `Same model specification · dummy coding fixed from overall sample · α = 0.05 for Shapiro–Wilk on residuals${groupNote}`;
 
       cards.innerHTML = entries.map((entry) => {
         const fit = entry.fit;
         const cardType = entry.type === 'overall' ? 'fit-card-overall' : 'fit-card-group';
         if (!fit || !fit.results) {
+          const why = (fit && fit.failReason) ? fit.failReason : 'Insufficient n';
           return `<div class="fit-card ${cardType}">
             <div class="fit-card-label" title="${escapeHtml(entry.label)}">${escapeHtml(entry.label)}</div>
-            <div class="fit-metrics"><span>Status<strong>Insufficient n</strong></span></div>
+            <div class="fit-metrics"><span>Status<strong>${escapeHtml(why)}</strong></span></div>
           </div>`;
         }
         const norm = residualNormality(fit.residuals);
@@ -1319,7 +1354,7 @@
       const groupFits = activeGroups.map((g) => ({
         group: g.group,
         n: g.n,
-        fit: fitRegression(g.rows, fixedCategoricalInfo)
+        fit: fitRegression(g.rows, dropNonvaryingCategoricals(fixedCategoricalInfo, g.rows))
       }));
 
       tableRows = displayTerms.map((term, termIndex) => {
@@ -1327,7 +1362,7 @@
         const groupCoefs = groupFits.map((gf) => ({
           group: gf.group,
           n: gf.n,
-          ...extractCoef(gf.fit, termIndex)
+          ...extractCoef(gf.fit, term)
         }));
         const stability = computeTermStability(groupCoefs, term);
         return { term, overall, groupCoefs, stability };

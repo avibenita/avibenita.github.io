@@ -529,7 +529,7 @@
         if (df2Last >= 1) points.push({ n: maxN, power: powerAtF2(maxN, ctx.df1, df2Last, ctx.f2, ctx.alpha) });
       }
 
-      var W = 640, H = 150, pad = { l: 48, r: 52, t: 16, b: 32 };
+      var W = 640, H = 300, pad = { l: 52, r: 56, t: 24, b: 40 };
       var plotW = W - pad.l - pad.r;
       var plotH = H - pad.t - pad.b;
       var xScale = function (n) { return pad.l + ((n - lo) / (maxN - lo)) * plotW; };
@@ -549,13 +549,13 @@
       [0, 0.2, 0.4, 0.6, 0.8, 1].forEach(function (p) {
         var y = yScale(p);
         parts.push('<line x1="' + pad.l + '" y1="' + y.toFixed(1) + '" x2="' + (pad.l + plotW) + '" y2="' + y.toFixed(1) + '" stroke="rgba(255,255,255,.08)" stroke-width="1"/>');
-        parts.push('<text x="' + (pad.l - 8) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,.55)" font-size="10" font-weight="600">' + fmtPct(p) + '</text>');
+        parts.push('<text x="' + (pad.l - 8) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">' + fmtPct(p) + '</text>');
       });
       var xStep = powerCurveNiceStep(lo, maxN, 5);
       for (var tickN = Math.ceil(lo / xStep) * xStep; tickN <= maxN; tickN += xStep) {
         var x = xScale(tickN);
         parts.push('<line x1="' + x.toFixed(1) + '" y1="' + pad.t + '" x2="' + x.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.06)" stroke-width="1"/>');
-        parts.push('<text x="' + x.toFixed(1) + '" y="' + (pad.t + plotH + 16) + '" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="10" font-weight="600">' + tickN + '</text>');
+        parts.push('<text x="' + x.toFixed(1) + '" y="' + (pad.t + plotH + 18) + '" text-anchor="middle" fill="rgba(255,255,255,.55)" font-size="11" font-weight="600">' + tickN + '</text>');
       }
       parts.push('<line x1="' + pad.l + '" y1="' + (pad.t + plotH) + '" x2="' + (pad.l + plotW) + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');
       parts.push('<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (pad.t + plotH) + '" stroke="rgba(255,255,255,.28)" stroke-width="1.2"/>');

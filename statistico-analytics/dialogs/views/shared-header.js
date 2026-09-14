@@ -8380,7 +8380,7 @@ const StatisticoHeader = {
       'regression-by-group-coefficients':
         'Compare the same regression specification across grouping levels: coefficient table (β, 95% CI, p), model-consistency strip, residual-normality chips, and per-group R² / RMSE. Overall is the pooled fit; group columns are separate OLS fits. Stability flags sign reversals and coefficient spread. This is not a Chow or interaction test.',
       'regression-by-group-similarity':
-        'Similarity Profile™ compares group coefficient structures (Overall omitted; intercept omitted) on pattern (Tucker congruence of aligned β-vectors), strength (mean |β| ratio), and sign agreement. Scores are 0–100 descriptive similarity, not a Chow, interaction, or coefficient-difference test. Click heatmap cells or table rows for the three-component profile. 90–100 Very similar, 75–89 Mostly similar, 50–74 Mixed similarity, below 50 Substantially different. Terms that do not vary inside a group are skipped.',
+        'Similarity Profile™ compares group coefficient structures (Overall omitted; intercept omitted) on pattern (Tucker congruence of aligned β-vectors), strength (mean |β| ratio), and sign agreement. Scores are 0–100 descriptive similarity, not a Chow, interaction, or coefficient-difference test. Click a pairwise table row for the three-component profile. 90–100 Very similar, 75–89 Mostly similar, 50–74 Mixed similarity, below 50 Substantially different. Terms that do not vary inside a group are skipped.',
 
       // Regression — workspace sub-views (chart-aware so the AI explanation
       // matches what the user actually sees, not the coefficients table).
@@ -8539,7 +8539,7 @@ const StatisticoHeader = {
       'regression-ancova-viz':
         'This view shows adjusted means with CI, an adjusted mean difference, and group regression lines. Describe the visual story (parallelism, gap between groups) — not coefficient values.',
       'regression-by-group-similarity':
-        'This is Similarity Profile™: a heatmap and pairwise table of 0–100 descriptive scores (pattern / strength / sign) comparing aligned β-vectors across groups. Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different. Do not treat Overall as a group, and do not invent a Chow or interaction test.',
+        'This is Similarity Profile™: a pairwise table grouped by the four gauge ranges, plus a pair profile of 0–100 descriptive scores (pattern / strength / sign) comparing aligned β-vectors across groups. Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different. Do not treat Overall as a group, and do not invent a Chow or interaction test.',
       'logistic-predictive-performance-roc-thresholds':
         'This is an ROC curve with a threshold slider. Describe the curve shape, AUC band, and the trade-off the slider exposes — not coefficient inference.',
       'logistic-predictive-performance-calibration':

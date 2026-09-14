@@ -12,8 +12,8 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260914w75b" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260914regsim2" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260914regsim5"></script>
-  <script src="../../shared/regression-similarity.js?v=20260914regsim5"></script>
+  <script src="../shared-header.js?v=20260914regsim6"></script>
+  <script src="../../shared/regression-similarity.js?v=20260914regsim6"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260524a"></script>
@@ -79,7 +79,8 @@
     .dsp-homo-gauge .homo-track { fill:none; stroke:rgba(148,163,184,.16); stroke-width:18; stroke-linecap:butt; }
     html[data-theme="light"] .dsp-homo-gauge .homo-track { stroke:rgba(15,23,42,.08); }
     .dsp-homo-gauge .homo-seg { fill:none; stroke-width:18; stroke-linecap:butt; }
-    .dsp-homo-gauge .homo-fill { fill:none; stroke-width:6; stroke-linecap:round; }
+    .dsp-homo-gauge .homo-arrow { stroke:#0c1624; stroke-width:1.8; stroke-linejoin:round; }
+    html[data-theme="light"] .dsp-homo-gauge .homo-arrow { stroke:#fff; }
     .dsp-homo-gauge .homo-tick { stroke:var(--text-secondary); stroke-width:1.4; opacity:.55; }
     .dsp-homo-gauge .homo-tick-lbl { fill:var(--text-secondary); font-size:9px; font-weight:700; font-family:"Segoe UI", Tahoma, sans-serif; }
     .dsp-homo-gauge .homo-zone-lbl { font-size:9px; font-weight:800; letter-spacing:.04em; font-family:"Segoe UI", Tahoma, sans-serif; }
@@ -493,7 +494,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260914-reg-bygroup-v15">
+<body data-page-version="20260914-reg-bygroup-v16">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -693,6 +694,7 @@
     window.__regByGroupActiveTab = 'coefficients';
     let regSimProfile = null;
     let selectedRegSimPair = null;
+    let homoGaugePlayed = false;
     const levelSelections = {};
     const REG_SIM_COLORS = ['#78c8ff', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#fb923c'];
 
@@ -1688,8 +1690,6 @@
       const startX = cx - r;
       const startY = cy;
       const trackD = `M ${startX} ${startY} A ${r} ${r} 0 0 1 ${cx + r} ${startY}`;
-      const totalLen = Math.PI * r;
-      const t = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) / 100 : 0;
       const fillColor = dspBandColor(bandKey);
       const angle = (v) => -Math.PI + (v / 100) * Math.PI;
       const pt = (v, rr) => {
@@ -1724,21 +1724,51 @@
       }).join('');
       const left = pt(0, r);
       const right = pt(100, r);
-      const needle = pt(t * 100, r - 2);
       const scoreText = Number.isFinite(score) ? score.toFixed(1) : '—';
       return `<svg class="dsp-homo-gauge" viewBox="0 0 380 220" role="img" aria-label="Group homogeneity ${scoreText} out of 100, higher means more similar">
         <path class="homo-track" d="${trackD}"/>
         ${segs}
-        <path class="homo-fill" d="${trackD}" stroke="${fillColor}" stroke-dasharray="${totalLen.toFixed(2)}" stroke-dashoffset="${(totalLen * (1 - t)).toFixed(2)}"/>
         ${tickMarks}
         ${zoneLabels}
-        <line x1="${cx}" y1="${cy}" x2="${needle.x.toFixed(1)}" y2="${needle.y.toFixed(1)}" stroke="${fillColor}" stroke-width="2.6" stroke-linecap="round"/>
-        <circle cx="${cx}" cy="${cy}" r="5" fill="${fillColor}"/>
-        <text class="homo-score" text-anchor="middle" x="${cx}" y="${cy - 34}" fill="${fillColor}">${scoreText}</text>
+        <g id="regHomoNeedle" transform="rotate(-180 ${cx} ${cy})">
+          <polygon class="homo-arrow" fill="${fillColor}" points="${cx + 14},${cy - 7} ${cx + 62},${cy - 7} ${cx + 62},${cy - 18} ${cx + 104},${cy} ${cx + 62},${cy + 18} ${cx + 62},${cy + 7} ${cx + 14},${cy + 7}"/>
+          <circle class="homo-arrow" cx="${cx}" cy="${cy}" r="11" fill="${fillColor}"/>
+        </g>
+        <text class="homo-score" id="regHomoScore" text-anchor="middle" x="${cx}" y="${cy - 34}" fill="${fillColor}">0.0</text>
         <text class="homo-score-unit" text-anchor="middle" x="${cx}" y="${cy - 16}">OVERALL INDEX · 0–100</text>
         <text class="homo-end-lbl" text-anchor="start" x="${(left.x - 8).toFixed(1)}" y="${(left.y + 22).toFixed(1)}">Less similar</text>
         <text class="homo-end-lbl" text-anchor="end" x="${(right.x + 8).toFixed(1)}" y="${(right.y + 22).toFixed(1)}">More similar</text>
       </svg>`;
+    }
+
+    function animateHomoGauge(targetScore) {
+      const needle = document.getElementById('regHomoNeedle');
+      const scoreEl = document.getElementById('regHomoScore');
+      if (!needle) return;
+      const cx = 190;
+      const cy = 158;
+      const dest = Number.isFinite(targetScore) ? Math.max(0, Math.min(100, targetScore)) : 0;
+      const toDeg = (v) => -180 + (v / 100) * 180;
+      const apply = (v) => {
+        needle.setAttribute('transform', `rotate(${toDeg(v).toFixed(2)} ${cx} ${cy})`);
+        if (scoreEl) scoreEl.textContent = v.toFixed(1);
+      };
+      if (homoGaugePlayed) {
+        apply(dest);
+        return;
+      }
+      homoGaugePlayed = true;
+      apply(0);
+      const duration = 1200;
+      let startTs = null;
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+      const step = (ts) => {
+        if (!startTs) startTs = ts;
+        const p = easeOutCubic(Math.min((ts - startTs) / duration, 1));
+        apply(p * dest);
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
     }
 
     function predictorRows() {
@@ -1791,6 +1821,7 @@
       }
       empty.style.display = 'none';
       main.style.display = 'block';
+      homoGaugePlayed = false;
       if (selectedRegSimPair && !findRegSimPair(selectedRegSimPair.a, selectedRegSimPair.b)) selectedRegSimPair = null;
       if (!selectedRegSimPair && regSimProfile.mostSimilar) {
         selectedRegSimPair = { a: regSimProfile.mostSimilar.a, b: regSimProfile.mostSimilar.b };
@@ -1873,6 +1904,7 @@
       const distinctBtn = host.querySelector('[data-kpi="distinct"]');
       if (similarBtn && similar) similarBtn.addEventListener('click', () => selectRegSimPair(similar.a, similar.b));
       if (distinctBtn && distinct) distinctBtn.addEventListener('click', () => selectRegSimPair(distinct.a, distinct.b));
+      animateHomoGauge(homo);
     }
 
     function renderRegSimHeatmap() {

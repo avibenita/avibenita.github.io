@@ -279,6 +279,7 @@
       ? function (valueId) { return '  <div class="pwstd-chip-sub" id="' + valueId + 'Sub"></div>'; }
       : function () { return ''; };
 
+    var reqMetricLabel = variant === 'mixed' ? 'Required subjects' : 'Required N';
     var presetChipHtml = CHIPS.filter(function (c) { return c.pct !== 'Custom'; }).map(function(c){
       var valueId = id(ids, c.key, c.fallback);
       var isDefault = c.pct === '85';
@@ -287,7 +288,8 @@
         + ' data-pct="' + c.pct + '" data-value-id="' + valueId + '"'
         + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
         + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
-        + '  <div class="pwstd-chip-label">' + c.pct + '%</div>'
+        + '  <div class="pwstd-chip-label">' + c.pct + '% power</div>'
+        + '  <div class="pwstd-chip-metric">' + reqMetricLabel + '</div>'
         + '  <div class="pwstd-chip-value" id="' + valueId + '">...</div>'
         + chipSubHtml(valueId)
         + '</div>';
@@ -298,7 +300,7 @@
       + '<div class="pwstd-chip pwstd-chip--selectable pwstd-chip--custom" data-pct="Custom" data-value-id="' + customValueId + '"'
       + ' onclick="window.StatisticoPowerTemplate._onChipClick(this)">'
       + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
-      + '  <div class="pwstd-chip-label">Custom</div>'
+      + '  <div class="pwstd-chip-label">Custom power</div>'
       + '  <div class="pwstd-chip-custom-ctrl" onclick="event.stopPropagation()">'
       + '    <input class="pwstd-select pwstd-chip-input" type="number" id="' + id(ids,'customInput','customPowerInput') + '"'
       + ' min="50" max="99" step="1" value="85"'
@@ -308,6 +310,7 @@
       + '      <i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i>'
       + '    </button>'
       + '  </div>'
+      + '  <div class="pwstd-chip-metric">' + reqMetricLabel + '</div>'
       + '  <div class="pwstd-chip-value" id="' + customValueId + '">--</div>'
       + chipSubHtml(customValueId)
       + '</div>';
@@ -317,7 +320,7 @@
       : 'Sample Size Planning';
 
     container.innerHTML = [
-      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260913d">',
+      '<div class="pwstd-shell pwstd-shell--analysis pwstd-mode-fromN" id="pwstd-shell" data-pwstd-version="20260913e">',
       '  <header class="pwstd-page-header">',
       '    <h2 class="pwstd-title"><i class="fa-solid fa-bolt"></i> ' + esc(title) + '</h2>',
       '    <p class="pwstd-subtitle">' + esc(subtitle) + '</p>',

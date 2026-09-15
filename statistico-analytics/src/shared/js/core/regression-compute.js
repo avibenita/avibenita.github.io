@@ -99,6 +99,7 @@ function computeOLS(X, Y, includeIntercept = true, alpha = 0.05, computeVIFFlag 
         alpha: alpha,
         residuals: residuals,
         Y_fit: Y_fit,
+        XtX_inv: XtX_inv,
         VIF: VIF
     };
 }

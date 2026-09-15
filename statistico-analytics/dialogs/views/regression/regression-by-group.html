@@ -14,11 +14,13 @@
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260915regsim8"></script>
   <script src="../../shared/regression-similarity.js?v=20260914regsim6"></script>
+  <script src="../../shared/regression-pred-labels.js?v=20260915pred1"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260524a"></script>
-  <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <script src="../../../src/shared/js/core/regression-compute.js?v=20260915xtx"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts-more.js"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -108,7 +110,14 @@
       border:1px solid var(--border); border-radius:12px; background:var(--surface-2);
       padding:6px 8px 6px; min-width:0; display:flex; flex-direction:column; gap:4px;
     }
-    .dsp-chart-head { display:flex; flex-direction:column; gap:2px; }
+    .dsp-chart-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .dsp-ci-toggle { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:11px; cursor:pointer; }
+    .dsp-pred-typical {
+      grid-column:1 / -1; border-radius:8px; padding:6px 8px;
+      background:var(--surface-1); border:1px solid var(--border);
+    }
+    .dsp-pred-typical .dsp-pred-kicker { color:var(--text-secondary); }
+    .dsp-typical-row { margin-top:4px; color:var(--text-primary); font-size:12px; line-height:1.4; }
     .dsp-pred-controls { display:grid; grid-template-columns:minmax(150px, .85fr) minmax(190px, 1.15fr); gap:8px; align-items:stretch; }
     .dsp-pred-controls.is-axis-only { grid-template-columns:1fr; }
     .dsp-pred-vary, .dsp-pred-hold { border-radius:8px; padding:6px 8px; min-width:0; }
@@ -125,7 +134,7 @@
     .dsp-pred-hold .dsp-pred-kicker { color:var(--accent-2); }
     .dsp-pred-field { display:flex; flex-direction:column; gap:3px; min-width:0; }
     .dsp-pred-field + .dsp-pred-field { margin-top:6px; }
-    .dsp-pred-field label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    .dsp-pred-field label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; display:flex; align-items:center; gap:6px; }
     .dsp-pred-field input, .dsp-pred-field select {
       background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border);
       border-radius:8px; padding:5px 8px; font-size:12px; width:100%; box-sizing:border-box;
@@ -539,7 +548,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v29">
+<body data-page-version="20260915-reg-bygroup-v30">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -615,6 +624,7 @@
                   <div class="dsp-chart-panel">
                     <div class="dsp-chart-head">
                       <div class="dsp-subhead">Predicted response</div>
+                      <label class="dsp-ci-toggle"><input type="checkbox" id="regSimCiToggle" checked> 95% CI for the mean</label>
                       <div class="dsp-subhead-note" id="regSimChartNote" hidden></div>
                     </div>
                     <div class="dsp-pred-controls" id="regSimPredControls"></div>
@@ -754,6 +764,8 @@
     let regSimCharts = [];
     let predXVar = null;
     let predHeld = {};
+    let predCatReason = {};
+    let predShowCI = true;
     const MAX_GROUP_LEVELS = 7;
     const GROUP_CHART_COLORS = ['#5B9BD5', '#ED7D31', '#70AD47', '#FFC000', '#9B59B6', '#4472C4', '#FF6B6B', '#4ECDC4'];
     const levelSelections = {};
@@ -1915,10 +1927,36 @@
       regSimCharts = [];
     }
 
-    function numericColStats(name) {
+    function groupingColumnName() {
+      return groupIndex == null ? '' : (sourceHeaders[groupIndex] || '');
+    }
+
+    function predLabels() {
+      return window.StatisticoRegressionPredLabels || {};
+    }
+
+    function isLinkedToGrouping(name) {
+      return typeof predLabels().isLinkedToGrouping === 'function'
+        ? predLabels().isLinkedToGrouping(name, groupingColumnName())
+        : false;
+    }
+
+    function prettyPredictor(name) {
+      return typeof predLabels().prettyPredictor === 'function'
+        ? predLabels().prettyPredictor(name)
+        : String(name || '');
+    }
+
+    function prettyGroupLabel(raw) {
+      return typeof predLabels().prettyGroupLabel === 'function'
+        ? predLabels().prettyGroupLabel(raw, groupingColumnName())
+        : String(raw == null ? '' : raw);
+    }
+
+    function numericColStats(name, rows) {
       const idx = sourceHeaders.indexOf(name);
       if (idx < 0) return null;
-      const vals = sourceRows
+      const vals = (rows || sourceRows)
         .map((row) => parseFloat(rowValue(row, idx, name)))
         .filter((v) => Number.isFinite(v))
         .sort((a, b) => a - b);
@@ -1950,45 +1988,161 @@
       return Number(clamped.toFixed(decimals));
     }
 
-    function modalCategory(info) {
-      if (!info || !info.categories || !info.categories.length) return '';
+    function formatHoldNum(val, stats) {
+      if (!Number.isFinite(Number(val))) return '—';
+      const n = Number(val);
+      if (stats && stats.integerish) return String(Math.round(n));
+      return Number.isInteger(n) ? String(n) : n.toFixed(1);
+    }
+
+    function categoriesInRows(info, rows) {
+      const set = new Set();
+      (rows || []).forEach((row) => {
+        const raw = rowValue(row, info.index, info.name);
+        if (raw === null || raw === undefined || raw === '') return;
+        set.add(String(raw));
+      });
+      return set;
+    }
+
+    function sharedCategories(info) {
+      if (!info || !info.categories) return [];
+      const groups = activeGroups || [];
+      if (!groups.length) return info.categories.slice();
+      let shared = null;
+      groups.forEach((g) => {
+        const set = categoriesInRows(info, g.rows);
+        shared = shared == null ? set : new Set([...shared].filter((c) => set.has(c)));
+      });
+      return info.categories.filter((c) => shared && shared.has(String(c)));
+    }
+
+    function modalCategoryAmong(info, allowed, rows) {
+      const allow = new Set((allowed && allowed.length ? allowed : (info && info.categories) || []).map(String));
+      if (!allow.size) return '';
       const counts = {};
-      sourceRows.forEach((row) => {
+      (rows || sourceRows).forEach((row) => {
         const raw = rowValue(row, info.index, info.name);
         if (raw === null || raw === undefined || raw === '') return;
         const key = String(raw);
+        if (!allow.has(key)) return;
         counts[key] = (counts[key] || 0) + 1;
       });
-      return info.categories.slice().sort((a, b) => (counts[b] || 0) - (counts[a] || 0))[0];
+      return [...allow].sort((a, b) => (counts[b] || 0) - (counts[a] || 0) || String(a).localeCompare(String(b)))[0] || '';
+    }
+
+    function modalCategory(info) {
+      return modalCategoryAmong(info, info && info.categories, sourceRows);
+    }
+
+    function catHoldTip(info, value, reason) {
+      const label = prettyPredictor(info.name);
+      if (reason === 'most-frequent-shared-reference') {
+        return `${label} is held at “${value}”, the most frequent category that appears in every group (also the model’s reference category). Mean or median defaults apply only to numeric fields.`;
+      }
+      if (reason === 'reference') {
+        return `${label} is held at “${value}”, the model’s reference category. Mean or median defaults apply only to numeric fields.`;
+      }
+      if (reason === 'user') {
+        return `${label} is a category, held at “${value}” for every group. Mean or median defaults apply only to numeric fields.`;
+      }
+      return `${label} is held at “${value}”, the most frequent category that appears in every group. Mean or median defaults apply only to numeric fields.`;
+    }
+
+    function numericHoldTip(name) {
+      return `${prettyPredictor(name)} is held at a typical sample value (rounded median). Edit it to compare another level.`;
+    }
+
+    function sharedNumericNames() {
+      return [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])]
+        .filter((name) => name !== predXVar && !isLinkedToGrouping(name));
+    }
+
+    function linkedHoldNumericNames() {
+      return [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])]
+        .filter((name) => name !== predXVar && isLinkedToGrouping(name));
+    }
+
+    function sharedCategoricalInfos() {
+      return (fixedCategoricalInfo || []).filter((info) => !isLinkedToGrouping(info.name) && sharedCategories(info).length > 0);
+    }
+
+    function groupSpecificCategoricalInfos() {
+      return (fixedCategoricalInfo || []).filter((info) => isLinkedToGrouping(info.name) || sharedCategories(info).length === 0);
     }
 
     function ensurePredDefaults() {
       const xn = [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])];
       if (!predXVar || !xn.includes(predXVar)) predXVar = xn[0] || null;
       xn.forEach((name) => {
-        if (predHeld[name] == null) {
-          predHeld[name] = logicalHoldValue(numericColStats(name));
-        }
+        if (isLinkedToGrouping(name)) return;
+        if (predHeld[name] == null) predHeld[name] = logicalHoldValue(numericColStats(name));
       });
       (fixedCategoricalInfo || []).forEach((info) => {
-        if (predHeld[info.name] == null) predHeld[info.name] = modalCategory(info);
+        if (isLinkedToGrouping(info.name)) return;
+        const shared = sharedCategories(info);
+        if (!shared.length) return;
+        if (predHeld[info.name] == null || !shared.map(String).includes(String(predHeld[info.name]))) {
+          const modal = modalCategoryAmong(info, shared, sourceRows);
+          const ref = String(info.categories[0] || '');
+          predHeld[info.name] = modal || ref;
+          predCatReason[info.name] = modal && modal === ref ? 'most-frequent-shared-reference' : 'most-frequent-shared';
+        }
       });
     }
 
-    function currentNumericValues() {
+    function numericValuesForGroup(groupRows) {
       const values = {};
       [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])].forEach((name) => {
-        values[name] = Number(predHeld[name]);
+        if (isLinkedToGrouping(name) && name !== predXVar) {
+          values[name] = logicalHoldValue(numericColStats(name, groupRows));
+        } else {
+          values[name] = Number(predHeld[name]);
+        }
       });
       return values;
     }
 
-    function currentCatValues() {
+    function catValuesForGroup(groupRows) {
       const values = {};
       (fixedCategoricalInfo || []).forEach((info) => {
+        if (isLinkedToGrouping(info.name)) {
+          values[info.name] = groupRows && groupRows.length
+            ? String(rowValue(groupRows[0], info.index, info.name) ?? '')
+            : predHeld[info.name];
+          return;
+        }
+        const shared = sharedCategories(info);
+        if (!shared.length) {
+          const local = [...categoriesInRows(info, groupRows)];
+          values[info.name] = modalCategoryAmong(info, local, groupRows);
+          return;
+        }
         values[info.name] = predHeld[info.name];
       });
       return values;
+    }
+
+    function typicalProfileRows() {
+      const linkedXn = linkedHoldNumericNames();
+      const groupCats = groupSpecificCategoricalInfos().filter((info) => info.name !== groupingColumnName());
+      if (!linkedXn.length && !groupCats.length) return [];
+      return (activeGroups || []).map((g) => {
+        const parts = [];
+        linkedXn.forEach((name) => {
+          const stats = numericColStats(name, g.rows);
+          parts.push(`${prettyPredictor(name)} = ${formatHoldNum(logicalHoldValue(stats), stats)}`);
+        });
+        groupCats.forEach((info) => {
+          if (info.name === groupingColumnName()) {
+            parts.push(`${prettyPredictor(info.name)} = ${prettyGroupLabel(g.group)}`);
+            return;
+          }
+          const local = [...categoriesInRows(info, g.rows)];
+          parts.push(`${prettyPredictor(info.name)} = ${modalCategoryAmong(info, local, g.rows) || '—'}`);
+        });
+        return { group: g.group, text: parts.join(' · ') };
+      }).filter((row) => row.text);
     }
 
     function buildDesignVector(numericValues, catValues, catInfo) {
@@ -2056,6 +2210,82 @@
       return yhat;
     }
 
+    function designToX0(fit, design) {
+      const labels = fit.displayNames || [];
+      return labels.map((name) => {
+        if (name === 'Intercept') return 1;
+        const j = design.names.indexOf(name);
+        return j >= 0 && Number.isFinite(design.values[j]) ? design.values[j] : 0;
+      });
+    }
+
+    function meanCriticalT(df) {
+      if (typeof tInverse === 'function') {
+        const t = tInverse(0.025, df);
+        if (Number.isFinite(t)) return t;
+      }
+      if (typeof jStat !== 'undefined' && jStat.studentt && typeof jStat.studentt.inv === 'function') {
+        const t = jStat.studentt.inv(0.975, df);
+        if (Number.isFinite(t)) return t;
+      }
+      return 1.96;
+    }
+
+    function predictMeanWithCI(fit, design) {
+      const yhat = predictFromFit(fit, design);
+      const res = fit && fit.results;
+      if (!Number.isFinite(yhat) || !res || !res.XtX_inv || !Number.isFinite(res.MSE) || !Number.isFinite(res.df)) {
+        return { yhat, lo: NaN, hi: NaN };
+      }
+      const x0 = designToX0(fit, design);
+      const inv = res.XtX_inv;
+      if (!inv || inv.length !== x0.length) return { yhat, lo: NaN, hi: NaN };
+      let quad = 0;
+      for (let i = 0; i < x0.length; i++) {
+        let inner = 0;
+        const row = inv[i];
+        if (!row) return { yhat, lo: NaN, hi: NaN };
+        for (let j = 0; j < x0.length; j++) inner += Number(row[j]) * x0[j];
+        quad += x0[i] * inner;
+      }
+      if (!(quad >= 0) || !Number.isFinite(quad)) return { yhat, lo: NaN, hi: NaN };
+      const se = Math.sqrt(res.MSE * quad);
+      const tcrit = meanCriticalT(res.df);
+      return { yhat, lo: yhat - tcrit * se, hi: yhat + tcrit * se };
+    }
+
+    function xGridForGroup(groupRows, fallbackStats) {
+      let min = fallbackStats.min;
+      let max = fallbackStats.max;
+      if (isLinkedToGrouping(predXVar) && groupRows) {
+        const local = numericColStats(predXVar, groupRows);
+        if (local) {
+          min = local.min;
+          max = local.max;
+        }
+      }
+      if (min === max) {
+        const pad = Math.max(Math.abs(min) * 0.1, 1);
+        min -= pad;
+        max += pad;
+      }
+      const steps = 40;
+      return Array.from({ length: steps + 1 }, (_, i) => min + ((max - min) * i) / steps);
+    }
+
+    function bindCiToggle() {
+      const el = document.getElementById('regSimCiToggle');
+      if (!el) return;
+      if (!el.dataset.bound) {
+        el.dataset.bound = '1';
+        el.addEventListener('change', () => {
+          predShowCI = !!el.checked;
+          renderRegSimCharts();
+        });
+      }
+      el.checked = predShowCI;
+    }
+
     function renderRegSimGauge() {
       const host = document.getElementById('regSimGaugeCard');
       if (!host || !regSimProfile) return;
@@ -2079,44 +2309,62 @@
       }
       host.hidden = false;
       ensurePredDefaults();
-      const yName = (modelSpec && modelSpec.y) || 'the response';
+      const yName = prettyPredictor((modelSpec && modelSpec.y) || 'the response');
+      const axisName = prettyPredictor(predXVar || xn[0]);
       const axisField = xn.length > 1
-        ? `<div class="dsp-pred-field"><label for="regSimPredX">Predictor on the axis</label>
-            <select id="regSimPredX">${xn.map((name) => `<option value="${escapeHtml(name)}"${name === predXVar ? ' selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select>
+        ? `<div class="dsp-pred-field"><label for="regSimPredX">X-axis predictor</label>
+            <select id="regSimPredX">${xn.map((name) => `<option value="${escapeHtml(name)}"${name === predXVar ? ' selected' : ''}>${escapeHtml(prettyPredictor(name))}</option>`).join('')}</select>
           </div>`
-        : `<div class="dsp-pred-field"><label>Predictor on the axis</label>
-            <input type="text" value="${escapeHtml(predXVar || xn[0])}" readonly></div>`;
-      const holdNames = xn.filter((name) => name !== predXVar);
-      const holdNumerics = holdNames.map((name) => {
+        : `<div class="dsp-pred-field"><label>X-axis predictor</label>
+            <input type="text" value="${escapeHtml(axisName)}" readonly></div>`;
+      const holdNumerics = sharedNumericNames().map((name) => {
         const stats = numericColStats(name);
         const val = Number.isFinite(Number(predHeld[name])) ? Number(predHeld[name]) : logicalHoldValue(stats);
         const step = stats && stats.integerish ? '1' : '0.1';
-        const shown = Number.isInteger(val) ? String(val) : Number(val).toFixed(1);
-        return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(name)}">${escapeHtml(name)}</label>
-          <input id="regSimHold-${escapeHtml(name)}" data-hold-num="${escapeHtml(name)}" type="number" step="${step}" value="${shown}"></div>`;
+        const tip = numericHoldTip(name);
+        return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(name)}">${escapeHtml(prettyPredictor(name))}
+            <button type="button" class="dsp-info-btn" title="${tipAttr(tip)}" data-st-tip="${tipAttr(tip)}" aria-label="About ${escapeHtml(prettyPredictor(name))}">i</button>
+          </label>
+          <input id="regSimHold-${escapeHtml(name)}" data-hold-num="${escapeHtml(name)}" type="number" step="${step}" value="${formatHoldNum(val, stats)}"></div>`;
       }).join('');
-      const holdCats = (fixedCategoricalInfo || []).map((info) => {
-        const current = predHeld[info.name] ?? modalCategory(info);
-        return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(info.name)}">${escapeHtml(info.name)}</label>
+      const holdCats = sharedCategoricalInfos().map((info) => {
+        const shared = sharedCategories(info);
+        const current = shared.includes(String(predHeld[info.name])) ? predHeld[info.name] : (shared[0] || '');
+        const tip = catHoldTip(info, current, predCatReason[info.name] || 'most-frequent-shared');
+        return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(info.name)}">${escapeHtml(prettyPredictor(info.name))}
+            <button type="button" class="dsp-info-btn" title="${tipAttr(tip)}" data-st-tip="${tipAttr(tip)}" aria-label="About ${escapeHtml(prettyPredictor(info.name))}">i</button>
+          </label>
           <select id="regSimHold-${escapeHtml(info.name)}" data-hold-cat="${escapeHtml(info.name)}">
-            ${info.categories.map((cat) => `<option value="${escapeHtml(cat)}"${cat === current ? ' selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
+            ${shared.map((cat) => `<option value="${escapeHtml(cat)}"${String(cat) === String(current) ? ' selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
           </select></div>`;
       }).join('');
+      const typical = typicalProfileRows();
+      const typicalHtml = typical.length
+        ? `<div class="dsp-pred-typical">
+            <div class="dsp-pred-kicker">Typical group profiles
+              <button type="button" class="dsp-info-btn" title="${tipAttr('Predictors linked to the grouping variable use each group’s own median or category, not one shared value.')}" data-st-tip="${tipAttr('Predictors linked to the grouping variable use each group’s own median or category, not one shared value.')}" aria-label="About typical group profiles">i</button>
+            </div>
+            ${typical.map((row) => `<div class="dsp-typical-row"><strong>${escapeHtml(prettyGroupLabel(row.group))}</strong> · ${escapeHtml(row.text)}</div>`).join('')}
+          </div>`
+        : '';
       const hasHold = !!(holdNumerics || holdCats);
       host.classList.toggle('is-axis-only', !hasHold);
-      const holdTip = `Every group uses this same value, so the lines show only how predicted ${yName} changes with ${predXVar || 'the axis predictor'}. It starts at a typical sample value (rounded median). Edit it to compare another level.`;
+      const holdTip = typical.length
+        ? `Shared settings are the same for every group, so the lines compare how predicted ${yName} changes with ${axisName}. Predictors linked to the grouping variable are not shared — they appear under Typical group profiles.`
+        : `These values are the same for every group, so the lines compare how predicted ${yName} changes with ${axisName}. Numeric fields start at a rounded sample median. Categories start at the most frequent level that appears in every group.`;
       host.innerHTML = `
         <div class="dsp-pred-vary">
-          <div class="dsp-pred-kicker">Varies across the chart</div>
+          <div class="dsp-pred-kicker">X-axis predictor</div>
           ${axisField}
         </div>
         ${hasHold ? `<div class="dsp-pred-hold">
-          <div class="dsp-pred-kicker">Held constant for every group
-            <button type="button" class="dsp-info-btn" id="regSimHoldHelpBtn" title="${tipAttr(holdTip)}" data-st-tip="${tipAttr(holdTip)}" aria-label="About held values" aria-expanded="false">i</button>
+          <div class="dsp-pred-kicker">Shared predictor settings
+            <button type="button" class="dsp-info-btn" id="regSimHoldHelpBtn" title="${tipAttr(holdTip)}" data-st-tip="${tipAttr(holdTip)}" aria-label="About shared settings" aria-expanded="false">i</button>
           </div>
           <div class="dsp-hold-tip" id="regSimHoldHelpPop">${escapeHtml(holdTip)}</div>
           ${holdNumerics}${holdCats}
-        </div>` : ''}`;
+        </div>` : ''}
+        ${typicalHtml}`;
       const xEl = document.getElementById('regSimPredX');
       if (xEl) xEl.addEventListener('change', () => {
         predXVar = xEl.value;
@@ -2131,6 +2379,7 @@
       host.querySelectorAll('[data-hold-cat]').forEach((select) => {
         select.addEventListener('change', () => {
           predHeld[select.getAttribute('data-hold-cat')] = select.value;
+          predCatReason[select.getAttribute('data-hold-cat')] = 'user';
           renderRegSimCharts();
         });
       });
@@ -2150,14 +2399,23 @@
     }
 
     function renderRegSimCharts() {
-      const note = document.getElementById('regSimChartNote');
       const host = document.getElementById('regSimChartHost');
       if (!host) return;
       destroyRegSimCharts();
       const groupCol = sourceHeaders[groupIndex] || 'Group';
       const yName = (modelSpec && modelSpec.y) || 'Y';
-      if (note) note.textContent = `Each line is that group’s fitted ${yName}. One predictor varies on the axis; any others stay at one shared value for every group.`;
+      bindCiToggle();
       renderRegSimPredControls();
+      const foot = document.getElementById('regSimChartFoot');
+      if (foot) {
+        const typical = typicalProfileRows();
+        const bits = [];
+        if (typical.length) bits.push('Typical group profiles use each group’s own median for predictors linked to the grouping variable.');
+        else bits.push('Fitted mean lines, not a significance test.');
+        if (isLinkedToGrouping(predXVar)) bits.push(`Each line is drawn only across that group’s observed range of ${prettyPredictor(predXVar)}.`);
+        if (predShowCI) bits.push('Shaded bands are 95% confidence intervals for the mean response, not prediction intervals.');
+        foot.textContent = bits.join(' ');
+      }
       renderPredictedChart(host, groupCol, yName);
     }
 
@@ -2174,37 +2432,53 @@
       }
       const stats = numericColStats(predXVar);
       if (!stats) {
-        host.innerHTML = `<div class="dsp-kpi-note">No numeric values for ${escapeHtml(predXVar)}.</div>`;
+        host.innerHTML = `<div class="dsp-kpi-note">No numeric values for ${escapeHtml(prettyPredictor(predXVar))}.</div>`;
         return;
       }
-      let min = stats.min;
-      let max = stats.max;
-      if (min === max) {
-        const pad = Math.max(Math.abs(min) * 0.1, 1);
-        min -= pad;
-        max += pad;
-      }
-      const steps = 40;
-      const xs = Array.from({ length: steps + 1 }, (_, i) => min + ((max - min) * i) / steps);
-      const catValues = currentCatValues();
-      const series = (activeGroupFits || []).map((gf, i) => {
-        if (!gf.fit || !gf.fit.results) return null;
-        const catInfo = dropNonvaryingCategoricals(fixedCategoricalInfo, (activeGroups[i] && activeGroups[i].rows) || []);
-        const data = xs.map((x) => {
-          const numericValues = currentNumericValues();
+      const canBand = predShowCI && Highcharts.seriesTypes && Highcharts.seriesTypes.arearange;
+      const series = [];
+      (activeGroupFits || []).forEach((gf, i) => {
+        if (!gf.fit || !gf.fit.results) return;
+        const groupRows = (activeGroups[i] && activeGroups[i].rows) || [];
+        const catInfo = dropNonvaryingCategoricals(fixedCategoricalInfo, groupRows);
+        const catValues = catValuesForGroup(groupRows);
+        const xs = xGridForGroup(groupRows, stats);
+        const color = groupChartColor(i);
+        const label = `${prettyGroupLabel(gf.group)} (n=${gf.n})`;
+        const lineData = [];
+        const bandData = [];
+        xs.forEach((x) => {
+          const numericValues = numericValuesForGroup(groupRows);
           numericValues[predXVar] = x;
-          const yhat = predictFromFit(gf.fit, buildDesignVector(numericValues, catValues, catInfo));
-          return Number.isFinite(yhat) ? { x, y: yhat } : null;
-        }).filter(Boolean);
-        return {
+          const pred = predictMeanWithCI(gf.fit, buildDesignVector(numericValues, catValues, catInfo));
+          if (!Number.isFinite(pred.yhat)) return;
+          lineData.push({ x, y: pred.yhat, low: pred.lo, high: pred.hi });
+          if (Number.isFinite(pred.lo) && Number.isFinite(pred.hi)) bandData.push([x, pred.lo, pred.hi]);
+        });
+        if (canBand && bandData.length) {
+          series.push({
+            type: 'arearange',
+            name: `${label} 95% CI`,
+            color,
+            data: bandData,
+            fillOpacity: 0.18,
+            lineWidth: 0,
+            marker: { enabled: false },
+            enableMouseTracking: false,
+            showInLegend: false,
+            zIndex: 0
+          });
+        }
+        series.push({
           type: 'line',
-          name: `${gf.group} (n=${gf.n})`,
-          color: groupChartColor(i),
-          data,
+          name: label,
+          color,
+          data: lineData,
           marker: { enabled: false },
-          lineWidth: 2
-        };
-      }).filter(Boolean);
+          lineWidth: 2,
+          zIndex: 1
+        });
+      });
       if (!series.length) {
         host.innerHTML = '<div class="dsp-kpi-note">No group models could be used to predict the response.</div>';
         return;
@@ -2231,14 +2505,14 @@
           itemHoverStyle: { color: th.text }
         },
         xAxis: {
-          title: { text: predXVar, style: { color: th.muted, fontSize: '11px' } },
+          title: { text: prettyPredictor(predXVar), style: { color: th.muted, fontSize: '11px' } },
           gridLineColor: th.grid,
           lineColor: th.line,
           tickColor: th.line,
           labels: { style: { color: th.muted, fontSize: '11px' } }
         },
         yAxis: {
-          title: { text: `Predicted ${yName}`, style: { color: th.muted, fontSize: '11px' } },
+          title: { text: `Predicted ${prettyPredictor(yName)}`, style: { color: th.muted, fontSize: '11px' } },
           gridLineColor: th.grid,
           labels: { style: { color: th.muted, fontSize: '11px' } }
         },
@@ -2247,7 +2521,20 @@
           borderColor: th.tooltipBorder,
           style: { color: th.tooltipText },
           shared: true,
-          valueDecimals: digits
+          formatter() {
+            const xTxt = Highcharts.numberFormat(this.x, digits);
+            let html = `<span>${prettyPredictor(predXVar)}: <b>${xTxt}</b></span>`;
+            (this.points || []).forEach((p) => {
+              if (p.series.type === 'arearange') return;
+              html += `<br/><span style="color:${p.color}">●</span> ${p.series.name}: <b>${Highcharts.numberFormat(p.y, digits)}</b>`;
+              const lo = p.point && p.point.low;
+              const hi = p.point && p.point.high;
+              if (Number.isFinite(lo) && Number.isFinite(hi)) {
+                html += `<br/>&nbsp;&nbsp;95% CI for the mean: ${Highcharts.numberFormat(lo, digits)} – ${Highcharts.numberFormat(hi, digits)}`;
+              }
+            });
+            return html;
+          }
         },
         plotOptions: { series: { animation: false } },
         series
@@ -2276,7 +2563,7 @@
       body.innerHTML = rows.map((p) => {
         const on = selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a);
         return `<tr data-a="${escapeHtml(p.a)}" data-b="${escapeHtml(p.b)}" class="${on ? 'is-selected' : ''}">
-          <td>${escapeHtml(p.a)} vs ${escapeHtml(p.b)}</td>
+          <td>${escapeHtml(prettyGroupLabel(p.a))} vs ${escapeHtml(prettyGroupLabel(p.b))}</td>
           <td class="dsp-band dsp-band--${p.bandKey}">${escapeHtml(p.band)}</td>
           <td>${dspFmt(p.pattern)}</td>
           <td>${dspFmt(p.strength)}</td>
@@ -2316,9 +2603,9 @@
         body.innerHTML = '<div class="dsp-kpi-note">Select a pairwise table row.</div>';
         return;
       }
-      title.textContent = `${pair.a} vs ${pair.b}`;
+      title.textContent = `${prettyGroupLabel(pair.a)} vs ${prettyGroupLabel(pair.b)}`;
       body.innerHTML = `
-        <div class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(pair.a)} vs ${escapeHtml(pair.b)} · ${escapeHtml(pair.band)}</div>
+        <div class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(prettyGroupLabel(pair.a))} vs ${escapeHtml(prettyGroupLabel(pair.b))} · ${escapeHtml(pair.band)}</div>
         <div class="dsp-bars-head">
           Three components
           <button type="button" class="dsp-info-btn" onclick="openRegSimHelp()" aria-label="About pattern, strength and sign">i</button>
@@ -2328,7 +2615,7 @@
           ${dspBar('Strength', pair.strength)}
           ${dspBar('Sign', pair.sign)}
         </div>
-        <div class="dsp-kpi-note">Comparing β in ${escapeHtml(String(pair.a))} (n=${pair.nA}) with β in ${escapeHtml(String(pair.b))} (n=${pair.nB}). ${pair.pairCount} overlapping coefficients. Intercept omitted.</div>
+        <div class="dsp-kpi-note">Comparing β in ${escapeHtml(prettyGroupLabel(pair.a))} (n=${pair.nA}) with β in ${escapeHtml(prettyGroupLabel(pair.b))} (n=${pair.nB}). ${pair.pairCount} overlapping coefficients. Intercept omitted.</div>
       `;
       animateProfileBars();
     }
@@ -2352,6 +2639,7 @@
       }));
       activeGroupFits = groupFits;
       predHeld = {};
+      predCatReason = {};
 
       tableRows = displayTerms.map((term, termIndex) => {
         const overall = extractCoef(overallFit, termIndex);

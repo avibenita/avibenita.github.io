@@ -549,7 +549,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v24">
+<body data-page-version="20260915-reg-bygroup-v25">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -673,7 +673,7 @@
       <div class="group-dialog-head">
         <div>
           <strong id="groupDialogTitle">Select Grouping Column</strong>
-          <span class="group-dialog-note">Choose a column that is not already in the model. Columns with more than 7 levels are omitted. Recode a many-level variable into fewer categories in <a href="#" onclick="openPrepareDataForRecode(); return false;">Prepare Data</a>, then use that recoded column here.</span>
+          <span class="group-dialog-note">Choose a column that is not already in the model and has 7 or fewer levels. Other columns stay visible but dimmed. Recode a many-level variable into fewer categories in <a href="https://statistico.live/Statistico-Website/analytics/data-manipulation.html" target="_blank" rel="noopener noreferrer" onclick="openPrepareDataOverview(event)">Prepare Data</a>, then use that recoded column here.</span>
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -1250,31 +1250,32 @@
       return groupingLevelCount(idx) <= MAX_GROUP_LEVELS;
     }
 
-    function openPrepareDataForRecode() {
-      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.navigateTo === 'function') {
-        StatisticoHeader.navigateTo('prepare/prepare-dataset-n.html');
-      }
+    function openPrepareDataOverview(event) {
+      if (event) event.preventDefault();
+      window.open('https://statistico.live/Statistico-Website/analytics/data-manipulation.html', '_blank', 'noopener,noreferrer');
     }
 
     function populateGroupChoices() {
       const list = document.getElementById('groupDialogList');
       const rows = sourceHeaders.map((header, idx) => {
         const levels = getLevelCounts(idx);
-        if (levels.length > MAX_GROUP_LEVELS) return '';
         const inModel = isModelVariable(header);
-        const note = inModel
-          ? `In the model · ${levels.length} level${levels.length === 1 ? '' : 's'}`
-          : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
-        const dimCls = inModel ? ' is-dimmed' : '';
-        const disabled = inModel ? ' disabled' : '';
-        const click = inModel ? '' : ` onclick="selectGroupColumn(${idx}, true)"`;
+        const tooMany = levels.length > MAX_GROUP_LEVELS;
+        const dimmed = inModel || tooMany;
+        let note = `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
+        if (inModel && tooMany) note = `In the model · ${levels.length} levels`;
+        else if (inModel) note = `In the model · ${levels.length} level${levels.length === 1 ? '' : 's'}`;
+        else if (tooMany) note = `${levels.length} levels · recode in Prepare Data`;
+        const dimCls = dimmed ? ' is-dimmed' : '';
+        const disabled = dimmed ? ' disabled' : '';
+        const click = dimmed ? '' : ` onclick="selectGroupColumn(${idx}, true)"`;
         return `<button type="button" class="group-option${dimCls}" data-group-index="${idx}"${disabled}${click}>
           <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
         </button>`;
-      }).filter(Boolean);
+      });
       list.innerHTML = rows.length
         ? rows.join('')
-        : `<div class="group-dialog-empty">No columns with 7 or fewer levels. Recode a many-level variable into categories in <a href="#" onclick="openPrepareDataForRecode(); return false;">Prepare Data</a>, then return here.</div>`;
+        : `<div class="group-dialog-empty">No columns available.</div>`;
       refreshGroupDialogSelection();
     }
 
@@ -2520,7 +2521,7 @@
       try { Office.onReady(bootOnce); } catch (_officeErr) { bootOnce(); }
     }
 
-    window.openPrepareDataForRecode = openPrepareDataForRecode;
+    window.openPrepareDataOverview = openPrepareDataOverview;
     window.openGroupDialog = openGroupDialog;
     window.closeGroupDialog = closeGroupDialog;
     window.selectGroupColumn = selectGroupColumn;

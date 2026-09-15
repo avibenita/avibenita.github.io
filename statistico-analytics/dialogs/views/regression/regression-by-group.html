@@ -62,18 +62,24 @@
       min-width:0; min-height:0;
       display:flex; flex-direction:column;
     }
-    .dsp-homo-gauge-wrap { flex:1 1 auto; display:flex; align-items:center; justify-content:center; min-height:220px; margin:0; }
-    .dsp-homo-gauge { width:min(100%, 440px); height:100%; display:block; color:var(--text-secondary); }
-    .dsp-homo-gauge .homo-track { fill:none; stroke:rgba(148,163,184,.14); stroke-width:10; stroke-linecap:butt; }
+    .dsp-homo-gauge-wrap { flex:1 1 auto; display:flex; align-items:center; justify-content:center; min-height:280px; margin:0; }
+    .dsp-homo-gauge { width:100%; height:auto; max-height:100%; display:block; color:var(--text-secondary); }
+    .dsp-homo-gauge .homo-track { fill:none; stroke:rgba(148,163,184,.14); stroke-width:12; stroke-linecap:butt; }
     html[data-theme="light"] .dsp-homo-gauge .homo-track { stroke:rgba(15,23,42,.08); }
-    .dsp-homo-gauge .homo-seg { fill:none; stroke-width:10; stroke-linecap:butt; }
+    .dsp-homo-gauge .homo-seg { fill:none; stroke-width:12; stroke-linecap:butt; }
     .dsp-homo-gauge .homo-arrow { stroke:color-mix(in srgb, var(--text-primary) 35%, var(--surface-1)); stroke-width:1; }
     .dsp-homo-gauge .homo-tick { stroke:var(--text-secondary); stroke-width:1; opacity:.4; }
     .dsp-homo-gauge .homo-tick-lbl { fill:var(--text-secondary); font-size:8px; font-weight:600; font-family:"Segoe UI", Tahoma, sans-serif; }
     .dsp-homo-gauge .homo-zone-lbl { fill:var(--text-secondary); font-size:8px; font-weight:600; letter-spacing:.03em; font-family:"Segoe UI", Tahoma, sans-serif; opacity:.72; }
     .dsp-homo-gauge .homo-end-lbl { fill:var(--text-secondary); font-size:8px; font-weight:600; font-family:"Segoe UI", Tahoma, sans-serif; opacity:.7; }
-    .dsp-homo-gauge .homo-title { fill:var(--text-secondary); font-size:8px; font-weight:700; letter-spacing:.16em; font-family:"Segoe UI", Tahoma, sans-serif; }
-    .dsp-homo-gauge .homo-score { fill:var(--text-primary); font-size:22px; font-weight:700; font-family:"Segoe UI", Tahoma, sans-serif; }
+    .dsp-homo-gauge .homo-title { fill:var(--text-secondary); font-size:9px; font-weight:700; letter-spacing:.16em; font-family:"Segoe UI", Tahoma, sans-serif; }
+    .dsp-homo-gauge .homo-score { fill:var(--text-primary); font-size:26px; font-weight:700; font-family:"Segoe UI", Tahoma, sans-serif; }
+    .dsp-hold-tip {
+      display:none; margin-top:6px; padding:8px 9px; border-radius:8px;
+      background:var(--surface-2); border:1px solid color-mix(in srgb, var(--accent-2) 35%, var(--border));
+      color:var(--text-secondary); font-size:11px; font-weight:500; letter-spacing:0; text-transform:none; line-height:1.4;
+    }
+    .dsp-hold-tip.is-open { display:block; }
     .dsp-homo-meta { text-align:center; color:var(--text-secondary); font-size:10px; line-height:1.3; margin-top:2px; }
     .dsp-side-panel {
       border:1px solid var(--border); border-radius:14px; background:var(--surface-2);
@@ -532,7 +538,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v27">
+<body data-page-version="20260915-reg-bygroup-v28">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -1735,8 +1741,8 @@
 
     function homoGaugeSvg(score, bandKey) {
       const cx = 190;
-      const cy = 126;
-      const r = 86;
+      const cy = 152;
+      const r = 118;
       const startX = cx - r;
       const startY = cy;
       const trackD = `M ${startX} ${startY} A ${r} ${r} 0 0 1 ${cx + r} ${startY}`;
@@ -1759,35 +1765,36 @@
       ];
       const segs = segments.map((s) => `<path class="homo-seg" d="${arcD(s.from, s.to)}" stroke="${s.color}"/>`).join('');
       const zoneLabels = segments.map((s) => {
-        const p = pt(s.at, r + 16);
+        const p = pt(s.at, r + 20);
         return `<text class="homo-zone-lbl" text-anchor="middle" x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}">${s.label}</text>`;
       }).join('');
       const ticks = [0, 50, 75, 90, 100];
       const tickMarks = ticks.map((v) => {
-        const inner = pt(v, r - 8);
-        const outer = pt(v, r + 6);
+        const inner = pt(v, r - 10);
+        const outer = pt(v, r + 8);
         const labelPt = (v === 0 || v === 100)
-          ? { x: pt(v, r).x + (v === 0 ? -12 : 12), y: pt(v, r).y + 3 }
-          : pt(v, r - 18);
+          ? { x: pt(v, r).x + (v === 0 ? -14 : 14), y: pt(v, r).y + 4 }
+          : pt(v, r - 22);
         return `<line class="homo-tick" x1="${inner.x.toFixed(1)}" y1="${inner.y.toFixed(1)}" x2="${outer.x.toFixed(1)}" y2="${outer.y.toFixed(1)}" />`
           + `<text class="homo-tick-lbl" text-anchor="middle" dominant-baseline="middle" x="${labelPt.x.toFixed(1)}" y="${labelPt.y.toFixed(1)}">${v}</text>`;
       }).join('');
       const left = pt(0, r);
       const right = pt(100, r);
       const scoreText = Number.isFinite(score) ? score.toFixed(1) : '—';
-      return `<svg class="dsp-homo-gauge" viewBox="0 8 380 154" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Group homogeneity ${scoreText} out of 100, higher means more similar">
+      const tip = cx + r - 8;
+      return `<svg class="dsp-homo-gauge" viewBox="0 0 380 200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Group homogeneity ${scoreText} out of 100, higher means more similar">
         <path class="homo-track" d="${trackD}"/>
         ${segs}
         ${tickMarks}
         ${zoneLabels}
         <g id="regHomoNeedle" transform="rotate(-180 ${cx} ${cy})">
-          <line class="homo-arrow" x1="${cx + 6}" y1="${cy}" x2="${cx + r - 10}" y2="${cy}" stroke="${fillColor}" stroke-width="1.6" stroke-linecap="round"/>
-          <circle class="homo-arrow" cx="${cx}" cy="${cy}" r="4.5" fill="${fillColor}"/>
+          <polygon class="homo-arrow" fill="${fillColor}" points="${cx + 10},${cy - 4} ${tip - 18},${cy - 4} ${tip - 18},${cy - 11} ${tip},${cy} ${tip - 18},${cy + 11} ${tip - 18},${cy + 4} ${cx + 10},${cy + 4}"/>
+          <circle class="homo-arrow" cx="${cx}" cy="${cy}" r="7" fill="${fillColor}"/>
         </g>
-        <text class="homo-title" text-anchor="middle" x="${cx}" y="${cy - 36}">HOMOGENEITY</text>
-        <text class="homo-score" id="regHomoScore" text-anchor="middle" x="${cx}" y="${cy - 16}">0.0</text>
-        <text class="homo-end-lbl" text-anchor="start" x="${(left.x - 4).toFixed(1)}" y="${(left.y + 16).toFixed(1)}">Less</text>
-        <text class="homo-end-lbl" text-anchor="end" x="${(right.x + 4).toFixed(1)}" y="${(right.y + 16).toFixed(1)}">More</text>
+        <text class="homo-title" text-anchor="middle" x="${cx}" y="${cy - 42}">HOMOGENEITY</text>
+        <text class="homo-score" id="regHomoScore" text-anchor="middle" x="${cx}" y="${cy - 18}">0.0</text>
+        <text class="homo-end-lbl" text-anchor="start" x="${(left.x - 6).toFixed(1)}" y="${(left.y + 18).toFixed(1)}">Less</text>
+        <text class="homo-end-lbl" text-anchor="end" x="${(right.x + 6).toFixed(1)}" y="${(right.y + 18).toFixed(1)}">More</text>
       </svg>`;
     }
 
@@ -1796,7 +1803,7 @@
       const scoreEl = document.getElementById('regHomoScore');
       if (!needle) return;
       const cx = 190;
-      const cy = 126;
+      const cy = 152;
       const dest = Number.isFinite(targetScore) ? Math.max(0, Math.min(100, targetScore)) : 0;
       const toDeg = (v) => -180 + (v / 100) * 180;
       const apply = (v) => {
@@ -2104,8 +2111,9 @@
         </div>
         ${hasHold ? `<div class="dsp-pred-hold">
           <div class="dsp-pred-kicker">Held constant for every group
-            <button type="button" class="dsp-info-btn" data-tooltip="${tipAttr(holdTip)}" aria-label="About held values">i</button>
+            <button type="button" class="dsp-info-btn" id="regSimHoldHelpBtn" title="${tipAttr(holdTip)}" data-st-tip="${tipAttr(holdTip)}" aria-label="About held values" aria-expanded="false">i</button>
           </div>
+          <div class="dsp-hold-tip" id="regSimHoldHelpPop">${escapeHtml(holdTip)}</div>
           ${holdNumerics}${holdCats}
         </div>` : ''}`;
       const xEl = document.getElementById('regSimPredX');
@@ -2125,6 +2133,16 @@
           renderRegSimCharts();
         });
       });
+      const helpBtn = document.getElementById('regSimHoldHelpBtn');
+      const helpPop = document.getElementById('regSimHoldHelpPop');
+      if (helpBtn && helpPop) {
+        helpBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const open = helpPop.classList.toggle('is-open');
+          helpBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+      }
       if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
         window.StatisticoTooltip.refresh(host);
       }

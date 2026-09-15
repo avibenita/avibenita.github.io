@@ -60,7 +60,8 @@
       background:linear-gradient(180deg, color-mix(in srgb, var(--accent-1) 12%, var(--surface-2)) 0%, var(--surface-2) 58%);
       padding:8px 10px 6px;
       box-shadow:0 10px 28px rgba(0,0,0,.18);
-      min-width:0;
+      min-width:0; min-height:0;
+      display:flex; flex-direction:column;
     }
     .dsp-homo-head { text-align:center; margin:0 0 0; }
     .dsp-homo-kicker {
@@ -75,8 +76,8 @@
       display:block; margin-top:2px; color:var(--text-secondary);
       font-size:10px; line-height:1.35;
     }
-    .dsp-homo-gauge-wrap { display:flex; justify-content:center; margin:0; }
-    .dsp-homo-gauge { width:min(248px, 100%); height:auto; display:block; color:var(--text-secondary); }
+    .dsp-homo-gauge-wrap { flex:1 1 auto; display:flex; align-items:center; justify-content:center; min-height:180px; margin:0; }
+    .dsp-homo-gauge { width:100%; height:100%; display:block; color:var(--text-secondary); }
     .dsp-homo-gauge .homo-track { fill:none; stroke:rgba(148,163,184,.16); stroke-width:18; stroke-linecap:butt; }
     html[data-theme="light"] .dsp-homo-gauge .homo-track { stroke:rgba(15,23,42,.08); }
     .dsp-homo-gauge .homo-seg { fill:none; stroke-width:18; stroke-linecap:butt; }
@@ -128,11 +129,11 @@
       border:1px solid color-mix(in srgb, var(--accent-2) 38%, var(--border));
     }
     .dsp-pred-kicker {
+      display:flex; align-items:center; gap:6px;
       font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px;
     }
     .dsp-pred-vary .dsp-pred-kicker { color:var(--accent-1); }
     .dsp-pred-hold .dsp-pred-kicker { color:var(--accent-2); }
-    .dsp-pred-hold-note { margin:6px 0 0; color:var(--text-secondary); font-size:11px; line-height:1.35; }
     .dsp-pred-field { display:flex; flex-direction:column; gap:3px; min-width:0; }
     .dsp-pred-field + .dsp-pred-field { margin-top:6px; }
     .dsp-pred-field label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
@@ -538,7 +539,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v22">
+<body data-page-version="20260915-reg-bygroup-v23">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -1743,7 +1744,7 @@
       const left = pt(0, r);
       const right = pt(100, r);
       const scoreText = Number.isFinite(score) ? score.toFixed(1) : '—';
-      return `<svg class="dsp-homo-gauge" viewBox="0 0 380 220" role="img" aria-label="Group homogeneity ${scoreText} out of 100, higher means more similar">
+      return `<svg class="dsp-homo-gauge" viewBox="0 0 380 220" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Group homogeneity ${scoreText} out of 100, higher means more similar">
         <path class="homo-track" d="${trackD}"/>
         ${segs}
         ${tickMarks}
@@ -1880,10 +1881,46 @@
       if (idx < 0) return null;
       const vals = sourceRows
         .map((row) => parseFloat(rowValue(row, idx, name)))
-        .filter((v) => Number.isFinite(v));
+        .filter((v) => Number.isFinite(v))
+        .sort((a, b) => a - b);
       if (!vals.length) return null;
       const sum = vals.reduce((a, b) => a + b, 0);
-      return { min: Math.min(...vals), max: Math.max(...vals), mean: sum / vals.length };
+      const mid = Math.floor(vals.length / 2);
+      const median = vals.length % 2 ? vals[mid] : (vals[mid - 1] + vals[mid]) / 2;
+      const integerish = vals.filter((v) => Math.abs(v - Math.round(v)) < 1e-6).length / vals.length >= 0.7;
+      return { min: vals[0], max: vals[vals.length - 1], mean: sum / vals.length, median, integerish };
+    }
+
+    function logicalHoldValue(stats) {
+      if (!stats) return 0;
+      const raw = Number.isFinite(stats.median) ? stats.median : stats.mean;
+      if (stats.integerish) {
+        return Math.min(stats.max, Math.max(stats.min, Math.round(raw)));
+      }
+      const span = stats.max - stats.min;
+      let step = 1;
+      if (span > 0) {
+        const mag = Math.pow(10, Math.floor(Math.log10(span / 25)));
+        const n = (span / 25) / mag;
+        step = n < 1.5 ? mag : n < 3.5 ? 2 * mag : n < 7.5 ? 5 * mag : 10 * mag;
+      }
+      if (step < 0.01) step = 0.01;
+      const snapped = Math.round(raw / step) * step;
+      const clamped = Math.min(stats.max, Math.max(stats.min, snapped));
+      const decimals = step >= 1 ? 0 : step >= 0.1 ? 1 : 2;
+      return Number(clamped.toFixed(decimals));
+    }
+
+    function modalCategory(info) {
+      if (!info || !info.categories || !info.categories.length) return '';
+      const counts = {};
+      sourceRows.forEach((row) => {
+        const raw = rowValue(row, info.index, info.name);
+        if (raw === null || raw === undefined || raw === '') return;
+        const key = String(raw);
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      return info.categories.slice().sort((a, b) => (counts[b] || 0) - (counts[a] || 0))[0];
     }
 
     function ensurePredDefaults() {
@@ -1891,12 +1928,11 @@
       if (!predXVar || !xn.includes(predXVar)) predXVar = xn[0] || null;
       xn.forEach((name) => {
         if (predHeld[name] == null) {
-          const stats = numericColStats(name);
-          predHeld[name] = stats ? stats.mean : 0;
+          predHeld[name] = logicalHoldValue(numericColStats(name));
         }
       });
       (fixedCategoricalInfo || []).forEach((info) => {
-        if (predHeld[info.name] == null) predHeld[info.name] = info.categories[0];
+        if (predHeld[info.name] == null) predHeld[info.name] = modalCategory(info);
       });
     }
 
@@ -2021,12 +2057,14 @@
       const holdNames = xn.filter((name) => name !== predXVar);
       const holdNumerics = holdNames.map((name) => {
         const stats = numericColStats(name);
-        const val = Number.isFinite(Number(predHeld[name])) ? Number(predHeld[name]) : (stats ? stats.mean : 0);
+        const val = Number.isFinite(Number(predHeld[name])) ? Number(predHeld[name]) : logicalHoldValue(stats);
+        const step = stats && stats.integerish ? '1' : '0.1';
+        const shown = Number.isInteger(val) ? String(val) : Number(val).toFixed(1);
         return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(name)}">${escapeHtml(name)}</label>
-          <input id="regSimHold-${escapeHtml(name)}" data-hold-num="${escapeHtml(name)}" type="number" step="any" value="${val}"></div>`;
+          <input id="regSimHold-${escapeHtml(name)}" data-hold-num="${escapeHtml(name)}" type="number" step="${step}" value="${shown}"></div>`;
       }).join('');
       const holdCats = (fixedCategoricalInfo || []).map((info) => {
-        const current = predHeld[info.name] ?? info.categories[0];
+        const current = predHeld[info.name] ?? modalCategory(info);
         return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(info.name)}">${escapeHtml(info.name)}</label>
           <select id="regSimHold-${escapeHtml(info.name)}" data-hold-cat="${escapeHtml(info.name)}">
             ${info.categories.map((cat) => `<option value="${escapeHtml(cat)}"${cat === current ? ' selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
@@ -2034,18 +2072,17 @@
       }).join('');
       const hasHold = !!(holdNumerics || holdCats);
       host.classList.toggle('is-axis-only', !hasHold);
-      const holdNote = hasHold
-        ? `<p class="dsp-pred-hold-note">Every group uses this same value, so the lines show only how predicted ${escapeHtml(yName)} changes with ${escapeHtml(predXVar || 'the axis predictor')}. Starts at the sample mean; edit it to compare another level.</p>`
-        : '';
+      const holdTip = `Every group uses this same value, so the lines show only how predicted ${yName} changes with ${predXVar || 'the axis predictor'}. It starts at a typical sample value (rounded median). Edit it to compare another level.`;
       host.innerHTML = `
         <div class="dsp-pred-vary">
           <div class="dsp-pred-kicker">Varies across the chart</div>
           ${axisField}
         </div>
         ${hasHold ? `<div class="dsp-pred-hold">
-          <div class="dsp-pred-kicker">Held constant for every group</div>
+          <div class="dsp-pred-kicker">Held constant for every group
+            <button type="button" class="dsp-info-btn" data-tooltip="${tipAttr(holdTip)}" aria-label="About held values">i</button>
+          </div>
           ${holdNumerics}${holdCats}
-          ${holdNote}
         </div>` : ''}`;
       const xEl = document.getElementById('regSimPredX');
       if (xEl) xEl.addEventListener('change', () => {
@@ -2064,6 +2101,9 @@
           renderRegSimCharts();
         });
       });
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(host);
+      }
     }
 
     function renderRegSimCharts() {
@@ -2113,15 +2153,13 @@
           const yhat = predictFromFit(gf.fit, buildDesignVector(numericValues, catValues, catInfo));
           return Number.isFinite(yhat) ? { x, y: yhat } : null;
         }).filter(Boolean);
-        if (data.length) data[data.length - 1].dataLabels = { enabled: true, format: String(gf.group), crop: false, overflow: 'allow' };
         return {
           type: 'line',
           name: `${gf.group} (n=${gf.n})`,
           color: groupChartColor(i),
           data,
           marker: { enabled: false },
-          lineWidth: 2,
-          dataLabels: { enabled: false, style: { fontSize: '10px', fontWeight: '700', textOutline: 'none', color: groupChartColor(i) } }
+          lineWidth: 2
         };
       }).filter(Boolean);
       if (!series.length) {
@@ -2130,18 +2168,32 @@
       }
       host.innerHTML = '<div id="regSimPredChart" style="height:176px;width:100%;"></div>';
       const th = chartTheme();
-      const digits = decimalDigits(3);
+      const digits = decimalDigits(2);
       const chart = Highcharts.chart('regSimPredChart', {
-        chart: { backgroundColor: 'transparent', height: 176, spacing: [4, 28, 2, 4], style: { fontFamily: 'inherit' } },
+        chart: { backgroundColor: 'transparent', height: 176, spacing: [8, 8, 4, 4], style: { fontFamily: 'inherit' } },
         title: { text: null },
         credits: { enabled: false },
-        legend: { enabled: false },
+        legend: {
+          enabled: true,
+          floating: true,
+          align: 'left',
+          verticalAlign: 'top',
+          layout: 'vertical',
+          x: 6,
+          y: 2,
+          margin: 0,
+          padding: 4,
+          itemDistance: 2,
+          symbolHeight: 8,
+          symbolWidth: 10,
+          itemStyle: { color: th.text, fontSize: '10px', fontWeight: '600' },
+          itemHoverStyle: { color: th.text }
+        },
         xAxis: {
           title: { text: predXVar, style: { color: th.muted, fontSize: '11px' } },
           gridLineColor: th.grid,
           lineColor: th.line,
           tickColor: th.line,
-          max: max + (max - min) * 0.06,
           labels: { style: { color: th.muted, fontSize: '11px' } }
         },
         yAxis: {
@@ -2252,6 +2304,7 @@
         fit: fitRegression(g.rows, dropNonvaryingCategoricals(fixedCategoricalInfo, g.rows))
       }));
       activeGroupFits = groupFits;
+      predHeld = {};
 
       tableRows = displayTerms.map((term, termIndex) => {
         const overall = extractCoef(overallFit, termIndex);

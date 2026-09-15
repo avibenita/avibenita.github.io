@@ -8539,7 +8539,7 @@ const StatisticoHeader = {
       'regression-ancova-viz':
         'This view shows adjusted means with CI, an adjusted mean difference, and group regression lines. Describe the visual story (parallelism, gap between groups) — not coefficient values.',
       'regression-by-group-similarity':
-        'This is Similarity Profile™: a pairwise table grouped by the four gauge ranges, plus a pair profile of 0–100 descriptive scores (pattern / strength / sign) comparing aligned β-vectors across groups. Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different. Do not treat Overall as a group, and do not invent a Chow or interaction test.',
+        'This is Similarity Profile™: a pairwise table of 0–100 descriptive scores (pattern / strength / sign) comparing aligned β-vectors across groups, plus a pair profile. Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different. Do not treat Overall as a group, and do not invent a Chow or interaction test.',
       'logistic-predictive-performance-roc-thresholds':
         'This is an ROC curve with a threshold slider. Describe the curve shape, AUC band, and the trade-off the slider exposes — not coefficient inference.',
       'logistic-predictive-performance-calibration':

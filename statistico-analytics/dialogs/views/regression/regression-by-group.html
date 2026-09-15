@@ -12,7 +12,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260914w75b" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260914regsim2" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260914regsim7"></script>
+  <script src="../shared-header.js?v=20260915regsim8"></script>
   <script src="../../shared/regression-similarity.js?v=20260914regsim6"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -129,7 +129,16 @@
     .dsp-bars { display:flex; flex-direction:column; gap:8px; margin:8px 0 12px; }
     .dsp-bar-row { display:grid; grid-template-columns:84px 1fr 42px; gap:8px; align-items:center; font-size:12px; }
     .dsp-bar-track { height:8px; border-radius:99px; background:rgba(148,163,184,.18); overflow:hidden; }
-    .dsp-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, var(--accent-2), var(--accent-1)); }
+    .dsp-bars-head {
+      display:flex; align-items:center; gap:6px; margin:10px 0 8px;
+      color:var(--text-secondary); font-size:11px; font-weight:800;
+      letter-spacing:.06em; text-transform:uppercase;
+    }
+    .dsp-bar-fill {
+      height:100%; width:0; border-radius:99px;
+      background:linear-gradient(90deg, var(--accent-2), var(--accent-1));
+      transition:width .75s cubic-bezier(.22, 1, .36, 1);
+    }
     .dsp-band { font-size:12px; font-weight:700; }
     .dsp-band--very { color:#34d399; }
     .dsp-band--mostly { color:#38bdf8; }
@@ -187,10 +196,6 @@
     .dsp-pair-table tbody tr { cursor:pointer; }
     .dsp-pair-table tbody tr:hover td { background:rgba(129,140,248,.12); }
     .dsp-pair-table tbody tr.is-selected td { background:rgba(129,140,248,.16); }
-    .dsp-pair-table .dsp-band-row td {
-      text-align:left; font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
-      background:var(--surface-1); color:var(--accent-1); cursor:default; padding-top:10px;
-    }
     .dsp-score { font-weight:800; }
     .reg-sim-svg { display:block; width:100%; height:240px; }
     .reg-sim-svg .scatter-bg { fill:rgba(0,0,0,.16); stroke:var(--border); }
@@ -495,7 +500,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260914-reg-bygroup-v17">
+<body data-page-version="20260915-reg-bygroup-v18">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -570,7 +575,7 @@
                 <div class="dsp-split">
                   <div class="dsp-card">
                     <div class="dsp-subhead">Pairwise scores by range</div>
-                    <div class="dsp-subhead-note">Grouped by the four gauge ranges — pairs in the same range are not ranked against each other</div>
+                    <div class="dsp-subhead-note">Click a row for the three-component profile. Pairs in the same range are not ranked against each other</div>
                     <div class="dsp-pair-wrap">
                       <table class="dsp-pair-table" id="regSimPairTable">
                         <thead>
@@ -591,7 +596,6 @@
                   <div class="dsp-card">
                     <div class="dsp-subhead" id="regSimProfileTitle">Pair profile</div>
                     <div id="regSimProfileBody"></div>
-                    <div id="regSimChart"></div>
                   </div>
                 </div>
               </div>
@@ -659,7 +663,7 @@
           <b>75–89</b> Mostly similar<br>
           <b>50–74</b> Mixed similarity<br>
           <b>Below 50</b> Substantially different<br>
-          Most similar / most distinct / most different are only named when pairs or groups fall in different ranges. Click a table row for the three-component profile. The scatter plots each predictor’s β in one group against the other; the diagonal is a perfect match.</p>
+          Most similar / most distinct / most different are only named when pairs or groups fall in different ranges. Click a table row for the three-component profile.</p>
         </div>
       </div>
       <div class="dsp-help-rule">
@@ -695,7 +699,6 @@
     let selectedRegSimPair = null;
     let homoGaugePlayed = false;
     const levelSelections = {};
-    const REG_SIM_COLORS = ['#78c8ff', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#fb923c'];
 
     function decimalDigits(autoDefault) {
       const fallback = Number.isFinite(autoDefault) ? autoDefault : 3;
@@ -1636,14 +1639,6 @@
       return '#94a3b8';
     }
 
-    const DSP_BAND_SECTIONS = [
-      { key: 'very', label: 'Very similar', range: '90–100' },
-      { key: 'mostly', label: 'Mostly similar', range: '75–89' },
-      { key: 'mixed', label: 'Mixed similarity', range: '50–74' },
-      { key: 'different', label: 'Substantially different', range: 'below 50' },
-      { key: 'na', label: 'Not enough data', range: '' }
-    ];
-
     function formatPairNames(pairs) {
       if (!pairs || !pairs.length) return '';
       if (pairs.length === 1) return `${pairs[0].a} vs ${pairs[0].b}`;
@@ -1876,25 +1871,25 @@
       const body = document.getElementById('regSimPairBody');
       if (!body || !regSimProfile) return;
       const selectedKey = selectedRegSimPair ? simPairKey(selectedRegSimPair.a, selectedRegSimPair.b) : '';
-      const byName = (a, b) => `${a.a} ${a.b}`.localeCompare(`${b.a} ${b.b}`, undefined, { numeric: true });
-      let html = '';
-      DSP_BAND_SECTIONS.forEach((section) => {
-        const rows = (regSimProfile.pairs || []).filter((p) => (p.bandKey || 'na') === section.key).sort(byName);
-        if (!rows.length) return;
-        html += `<tr class="dsp-band-row"><td colspan="6">${escapeHtml(section.label)}${section.range ? ` · ${section.range}` : ''}</td></tr>`;
-        html += rows.map((p) => {
-          const on = selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a);
-          return `<tr data-a="${escapeHtml(p.a)}" data-b="${escapeHtml(p.b)}" class="${on ? 'is-selected' : ''}">
-            <td>${escapeHtml(p.a)} vs ${escapeHtml(p.b)}</td>
-            <td class="dsp-band dsp-band--${p.bandKey}">${escapeHtml(p.band)}</td>
-            <td>${dspFmt(p.pattern)}</td>
-            <td>${dspFmt(p.strength)}</td>
-            <td>${dspFmt(p.sign)}</td>
-            <td>${dspFmt(p.overall)}</td>
-          </tr>`;
-        }).join('');
+      const rankOf = (key) => (typeof StatisticoRegressionSimilarity !== 'undefined'
+        ? StatisticoRegressionSimilarity.bandRank(key)
+        : -1);
+      const rows = (regSimProfile.pairs || []).slice().sort((a, b) => {
+        const rankDiff = rankOf(b.bandKey) - rankOf(a.bandKey);
+        if (rankDiff) return rankDiff;
+        return `${a.a} ${a.b}`.localeCompare(`${b.a} ${b.b}`, undefined, { numeric: true });
       });
-      body.innerHTML = html;
+      body.innerHTML = rows.map((p) => {
+        const on = selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a);
+        return `<tr data-a="${escapeHtml(p.a)}" data-b="${escapeHtml(p.b)}" class="${on ? 'is-selected' : ''}">
+          <td>${escapeHtml(p.a)} vs ${escapeHtml(p.b)}</td>
+          <td class="dsp-band dsp-band--${p.bandKey}">${escapeHtml(p.band)}</td>
+          <td>${dspFmt(p.pattern)}</td>
+          <td>${dspFmt(p.strength)}</td>
+          <td>${dspFmt(p.sign)}</td>
+          <td>${dspFmt(p.overall)}</td>
+        </tr>`;
+      }).join('');
       body.querySelectorAll('tr[data-a]').forEach((tr) => {
         tr.addEventListener('click', () => selectRegSimPair(tr.getAttribute('data-a'), tr.getAttribute('data-b')));
       });
@@ -1902,7 +1897,19 @@
 
     function dspBar(label, score) {
       const width = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
-      return `<div class="dsp-bar-row"><span>${escapeHtml(label)}</span><div class="dsp-bar-track"><div class="dsp-bar-fill" style="width:${width}%;"></div></div><strong>${dspFmt(score)}</strong></div>`;
+      return `<div class="dsp-bar-row"><span>${escapeHtml(label)}</span><div class="dsp-bar-track"><div class="dsp-bar-fill" data-width="${width}"></div></div><strong>${dspFmt(score)}</strong></div>`;
+    }
+
+    function animateProfileBars() {
+      const fills = document.querySelectorAll('#regSimProfileBody .dsp-bar-fill');
+      fills.forEach((el) => { el.style.width = '0%'; });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          fills.forEach((el) => {
+            el.style.width = `${el.getAttribute('data-width') || 0}%`;
+          });
+        });
+      });
     }
 
     function renderRegSimProfile() {
@@ -1913,110 +1920,23 @@
       if (!pair) {
         title.textContent = 'Pair profile';
         body.innerHTML = '<div class="dsp-kpi-note">Select a pairwise table row.</div>';
-        renderRegSimCongruence(null);
         return;
       }
       title.textContent = `${pair.a} vs ${pair.b}`;
       body.innerHTML = `
         <div class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(pair.a)} vs ${escapeHtml(pair.b)} · ${escapeHtml(pair.band)}</div>
+        <div class="dsp-bars-head">
+          Three components
+          <button type="button" class="dsp-info-btn" onclick="openRegSimHelp()" aria-label="About pattern, strength and sign">i</button>
+        </div>
         <div class="dsp-bars">
           ${dspBar('Pattern', pair.pattern)}
           ${dspBar('Strength', pair.strength)}
           ${dspBar('Sign', pair.sign)}
         </div>
-        <div class="dsp-kpi-note">Comparing β in ${escapeHtml(String(pair.a))} (n=${pair.nA}) with β in ${escapeHtml(String(pair.b))} (n=${pair.nB}). ${pair.pairCount} overlapping coefficients; the diagonal is a perfect match. Intercept omitted.</div>
+        <div class="dsp-kpi-note">Comparing β in ${escapeHtml(String(pair.a))} (n=${pair.nA}) with β in ${escapeHtml(String(pair.b))} (n=${pair.nB}). ${pair.pairCount} overlapping coefficients. Intercept omitted.</div>
       `;
-      renderRegSimCongruence(pair);
-    }
-
-    function betaAxisLimits(values) {
-      let min = Infinity;
-      let max = -Infinity;
-      values.forEach((v) => {
-        if (Number.isFinite(v)) {
-          min = Math.min(min, v);
-          max = Math.max(max, v);
-        }
-      });
-      if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: -1, max: 1 };
-      if (min === max) {
-        const pad = Math.max(Math.abs(min) * 0.25, 1);
-        return { min: min - pad, max: max + pad };
-      }
-      const pad = (max - min) * 0.08;
-      return { min: min - pad, max: max + pad };
-    }
-
-    function niceBetaTicks(min, max) {
-      const span = max - min || 1;
-      const raw = span / 4;
-      const mag = Math.pow(10, Math.floor(Math.log10(raw)));
-      const residual = raw / mag;
-      const step = residual >= 5 ? 5 * mag : residual >= 2 ? 2 * mag : mag;
-      const start = Math.floor(min / step) * step;
-      const ticks = [];
-      for (let v = start; v <= max + step * 0.501; v += step) {
-        ticks.push(Number(v.toPrecision(8)));
-        if (ticks.length > 8) break;
-      }
-      return ticks;
-    }
-
-    function fmtTick(v) {
-      const abs = Math.abs(v);
-      if (abs >= 100) return v.toFixed(0);
-      if (abs >= 10) return v.toFixed(1);
-      if (abs >= 1) return v.toFixed(2);
-      return v.toFixed(3);
-    }
-
-    function renderRegSimCongruence(pair) {
-      const el = document.getElementById('regSimChart');
-      if (!el) return;
-      if (!pair || !pair.rA || !pair.rA.length) {
-        el.innerHTML = '';
-        return;
-      }
-      const values = pair.rA.concat(pair.rB);
-      const lim = betaAxisLimits(values);
-      const w = 420;
-      const h = 240;
-      const pad = { l: 64, r: 16, t: 12, b: 42 };
-      const plotW = w - pad.l - pad.r;
-      const plotH = h - pad.t - pad.b;
-      const span = lim.max - lim.min || 1;
-      const sx = (v) => pad.l + ((v - lim.min) / span) * plotW;
-      const sy = (v) => pad.t + plotH - ((v - lim.min) / span) * plotH;
-      const ticks = niceBetaTicks(lim.min, lim.max);
-      let chrome = `<rect class="scatter-bg" x="${pad.l}" y="${pad.t}" width="${plotW}" height="${plotH}" rx="4" />`;
-      ticks.forEach((v) => {
-        const x = sx(v);
-        const y = sy(v);
-        chrome += `<line class="scatter-grid" x1="${x.toFixed(1)}" y1="${pad.t}" x2="${x.toFixed(1)}" y2="${(pad.t + plotH).toFixed(1)}" />`;
-        chrome += `<line class="scatter-grid" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${(pad.l + plotW).toFixed(1)}" y2="${y.toFixed(1)}" />`;
-        chrome += `<text class="scatter-tick" style="text-anchor:middle" x="${x.toFixed(1)}" y="${(pad.t + plotH + 14).toFixed(1)}">${fmtTick(v)}</text>`;
-        chrome += `<text class="scatter-tick scatter-tick-y" x="${(pad.l - 6).toFixed(1)}" y="${(y + 3.5).toFixed(1)}">${fmtTick(v)}</text>`;
-      });
-      chrome += `<line class="r-profile-zero" x1="${sx(lim.min).toFixed(1)}" y1="${sy(lim.min).toFixed(1)}" x2="${sx(lim.max).toFixed(1)}" y2="${sy(lim.max).toFixed(1)}" />`;
-      const gi = Math.max(0, (regSimProfile.groups || []).findIndex((name) => String(name) === String(pair.a)));
-      const colorA = REG_SIM_COLORS[gi % REG_SIM_COLORS.length];
-      const pred = predictorRows();
-      let dots = '';
-      pair.rA.forEach((x, i) => {
-        const y = pair.rB[i];
-        const row = pred[pair.index[i]];
-        const label = row ? row.term : `term ${i + 1}`;
-        const tip = `${escapeHtml(label)}<br>${escapeHtml(pair.a)} β=${fmt(x)} · ${escapeHtml(pair.b)} β=${fmt(y)}`;
-        dots += `<circle class="r-profile-dot" style="fill:${colorA}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.6" data-st-tip-html="${tipAttr(tip)}" />`;
-      });
-      el.innerHTML = `<svg class="reg-sim-svg scatter-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Coefficient congruence scatter">
-        ${chrome}${dots}
-        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 8}">β in ${escapeHtml(String(pair.a))}</text>
-        <text class="scatter-axis-label" x="12" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 12 ${(pad.t + plotH / 2).toFixed(1)})">β in ${escapeHtml(String(pair.b))}</text>
-      </svg>`;
-      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
-        window.StatisticoTooltip.refresh(el);
-      }
+      animateProfileBars();
     }
 
     function renderByGroup() {

@@ -496,12 +496,22 @@
     .group-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; border-bottom:1px solid var(--border); }
     .group-dialog-head strong { display:block; color:var(--accent-1); font-size:15px; margin-bottom:4px; }
     .group-dialog-head span { color:var(--text-secondary); font-size:12px; line-height:1.4; }
+    .group-dialog-note { display:block; color:var(--text-secondary); font-size:12px; line-height:1.45; max-width:640px; }
+    .group-dialog-note a { color:var(--accent-2); font-weight:700; cursor:pointer; text-decoration:underline; }
     .group-dialog-close { width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:8px; }
     .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
     .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
     .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
     .group-option:hover, .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option.is-dimmed, .group-option:disabled {
+      opacity:.42; cursor:not-allowed; pointer-events:none;
+    }
+    .group-option.is-dimmed:hover, .group-option:disabled:hover {
+      border-color:var(--border); box-shadow:none;
+    }
     .group-option small { color:var(--text-secondary); font-weight:500; }
+    .group-dialog-empty { padding:18px 12px; color:var(--text-secondary); font-size:12px; line-height:1.5; }
+    .group-dialog-empty a { color:var(--accent-2); font-weight:700; cursor:pointer; }
     .level-preview { padding:12px; overflow:auto; min-height:360px; }
     .level-preview.is-hidden { display:none; }
     .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
@@ -539,7 +549,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v23">
+<body data-page-version="20260915-reg-bygroup-v24">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -663,7 +673,7 @@
       <div class="group-dialog-head">
         <div>
           <strong id="groupDialogTitle">Select Grouping Column</strong>
-          <span>Choose the categorical column used to split the regression. Adjust included levels on the right.</span>
+          <span class="group-dialog-note">Choose a column that is not already in the model. Columns with more than 7 levels are omitted. Recode a many-level variable into fewer categories in <a href="#" onclick="openPrepareDataForRecode(); return false;">Prepare Data</a>, then use that recoded column here.</span>
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -754,6 +764,7 @@
     let regSimCharts = [];
     let predXVar = null;
     let predHeld = {};
+    const MAX_GROUP_LEVELS = 7;
     const GROUP_CHART_COLORS = ['#5B9BD5', '#ED7D31', '#70AD47', '#FFC000', '#9B59B6', '#4472C4', '#FF6B6B', '#4ECDC4'];
     const levelSelections = {};
 
@@ -1222,15 +1233,48 @@
       document.getElementById('mainContent').style.display = 'none';
     }
 
+    function modelVariableNames() {
+      if (!modelSpec) return new Set();
+      return new Set([modelSpec.y, ...(modelSpec.xn || []), ...(modelSpec.xc || [])].filter(Boolean));
+    }
+
+    function isModelVariable(name) {
+      return modelVariableNames().has(name);
+    }
+
+    function groupingLevelCount(idx) {
+      return getLevelCounts(idx).length;
+    }
+
+    function isEligibleGroupingColumn(idx) {
+      return groupingLevelCount(idx) <= MAX_GROUP_LEVELS;
+    }
+
+    function openPrepareDataForRecode() {
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader.navigateTo === 'function') {
+        StatisticoHeader.navigateTo('prepare/prepare-dataset-n.html');
+      }
+    }
+
     function populateGroupChoices() {
       const list = document.getElementById('groupDialogList');
-      list.innerHTML = sourceHeaders.map((header, idx) => {
+      const rows = sourceHeaders.map((header, idx) => {
         const levels = getLevelCounts(idx);
-        const note = `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
-        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
+        if (levels.length > MAX_GROUP_LEVELS) return '';
+        const inModel = isModelVariable(header);
+        const note = inModel
+          ? `In the model · ${levels.length} level${levels.length === 1 ? '' : 's'}`
+          : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
+        const dimCls = inModel ? ' is-dimmed' : '';
+        const disabled = inModel ? ' disabled' : '';
+        const click = inModel ? '' : ` onclick="selectGroupColumn(${idx}, true)"`;
+        return `<button type="button" class="group-option${dimCls}" data-group-index="${idx}"${disabled}${click}>
           <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
         </button>`;
-      }).join('');
+      }).filter(Boolean);
+      list.innerHTML = rows.length
+        ? rows.join('')
+        : `<div class="group-dialog-empty">No columns with 7 or fewer levels. Recode a many-level variable into categories in <a href="#" onclick="openPrepareDataForRecode(); return false;">Prepare Data</a>, then return here.</div>`;
       refreshGroupDialogSelection();
     }
 
@@ -1389,7 +1433,10 @@
     }
 
     function selectGroupColumn(idx, keepDialogOpen) {
-      groupIndex = Number(idx);
+      idx = Number(idx);
+      const name = sourceHeaders[idx];
+      if (!Number.isFinite(idx) || isModelVariable(name) || !isEligibleGroupingColumn(idx)) return;
+      groupIndex = idx;
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();
       const token = ++previewLoadToken;
@@ -2473,6 +2520,7 @@
       try { Office.onReady(bootOnce); } catch (_officeErr) { bootOnce(); }
     }
 
+    window.openPrepareDataForRecode = openPrepareDataForRecode;
     window.openGroupDialog = openGroupDialog;
     window.closeGroupDialog = closeGroupDialog;
     window.selectGroupColumn = selectGroupColumn;

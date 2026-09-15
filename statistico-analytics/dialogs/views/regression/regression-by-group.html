@@ -266,7 +266,7 @@
     .consistency-head strong i { margin-right:6px; }
     .consistency-head span { color:var(--text-secondary); font-size:12px; }
     .consistency-verdict { font-size:26px; font-weight:800; color:var(--accent-1); line-height:1.1; }
-    .consistency-verdict.consistency-mixed { color:var(--neg-r); }
+    .consistency-verdict.consistency-mixed { color:#d6a84a; }
     .consistency-verdict.consistency-moderate { color:#fbbf24; }
     .consistency-stat label { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-secondary); margin-bottom:3px; }
     .consistency-stat strong { font-size:15px; font-variant-numeric:tabular-nums; }
@@ -423,15 +423,24 @@
       max-width:100px;
     }
     .stability-stable { color:var(--pos-r); border-color:color-mix(in srgb, var(--pos-r) 45%, var(--border)); background:color-mix(in srgb, var(--pos-r) 12%, transparent); }
-    .stability-varies { color:#fbbf24; border-color:color-mix(in srgb, #fbbf24 45%, var(--border)); background:color-mix(in srgb, #fbbf24 12%, transparent); }
-    .stability-reversed { color:var(--neg-r); border-color:color-mix(in srgb, var(--neg-r) 50%, var(--border)); background:color-mix(in srgb, var(--neg-r) 14%, transparent); }
+    .stability-varies { color:#d6a84a; border-color:color-mix(in srgb, #d6a84a 40%, var(--border)); background:color-mix(in srgb, #d6a84a 10%, transparent); }
+    .stability-opposite { color:#c4a35a; border-color:color-mix(in srgb, #c4a35a 38%, var(--border)); background:color-mix(in srgb, #c4a35a 9%, transparent); }
     .stability-na { color:var(--text-secondary); }
-    #regByGroupTable tbody tr.row-reversal td.term-cell { box-shadow:inset 3px 0 0 var(--neg-r); }
-    #regByGroupTable tbody tr.row-reversal td.group-cell.metric-col-r { background:color-mix(in srgb, var(--neg-r) 14%, var(--surface-2)); }
-    .reversal-flag {
-      display:block; margin-top:4px; font-size:10px; font-weight:800; letter-spacing:.04em;
-      text-transform:uppercase; color:var(--neg-r);
+    .stability-badge { cursor:help; }
+    .table-toolbar {
+      display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+      margin:0 0 8px;
     }
+    .table-toolbar-toggles { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .table-toggle { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; cursor:pointer; }
+    .table-expand-btn {
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid var(--border); border-radius:8px; padding:5px 9px;
+      background:var(--surface-1); color:var(--text-primary); font-size:12px; font-weight:700; cursor:pointer;
+    }
+    .table-expand-btn i { font-size:10px; color:var(--text-secondary); transition:transform .15s ease; }
+    .table-expand-btn.is-open i { transform:rotate(90deg); }
+    .table-note { margin:6px 0 0; color:var(--text-secondary); font-size:11px; line-height:1.4; }
     .ci-main { font-size:12px; color:var(--text-secondary); font-weight:600; }
     #regByGroupTable th.group-category { border-right:2px solid var(--grid-block-group); text-align:center; border-bottom:2px solid var(--grid-block-group); }
     #regByGroupTable th.group-category-overall { border-right-color:var(--grid-block-overall); border-bottom-color:var(--grid-block-overall); }
@@ -549,7 +558,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v31">
+<body data-page-version="20260915-reg-bygroup-v32">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -581,11 +590,11 @@
             <div id="consistencyStrip" class="consistency-strip" style="display:none;">
               <div class="consistency-head">
                 <strong><i class="fa-solid fa-scale-balanced"></i> Model consistency</strong>
-                <span id="consistencySubtitle">Coefficient stability and fit spread across groups</span>
+                <span id="consistencySubtitle">Describes fitted group coefficients, not a formal test that groups differ</span>
               </div>
               <div class="consistency-verdict" id="consistencyVerdict">—</div>
-              <div class="consistency-stat"><label>Sign reversals</label><strong id="consistencyReversals">—</strong></div>
-              <div class="consistency-stat"><label>Varying predictors</label><strong id="consistencyVaries">—</strong></div>
+              <div class="consistency-stat"><label>Opposite signs</label><strong id="consistencyReversals">—</strong></div>
+              <div class="consistency-stat"><label>Estimates vary</label><strong id="consistencyVaries">—</strong></div>
               <div class="consistency-stat"><label>R² range</label><strong id="consistencyR2Range">—</strong></div>
             </div>
             <div id="assumptionStrip" class="assumption-strip" style="display:none;">
@@ -603,12 +612,21 @@
               </div>
               <div class="fit-cards" id="fitCards"></div>
             </div>
+            <div class="table-toolbar">
+              <button type="button" class="table-expand-btn" id="regExpandCoefs" aria-expanded="false">
+                <i class="fa-solid fa-chevron-right"></i> Show 95% CI
+              </button>
+              <div class="table-toolbar-toggles">
+                <label class="table-toggle"><input type="checkbox" id="regShowOverallModel"> Show overall model</label>
+              </div>
+            </div>
             <div class="table-wrap">
               <table id="regByGroupTable">
                 <thead id="regByGroupHead"></thead>
                 <tbody id="regByGroupBody"></tbody>
               </table>
             </div>
+            <p class="table-note" id="regByGroupTableNote">Estimate labels describe the fitted coefficients. They are not tests that groups differ.</p>
             </div>
             <div class="reg-bg-panel" id="regByGroupPanel-similarity">
               <div class="section-title">
@@ -756,6 +774,8 @@
     let tableRows = [];
     let overallFit = null;
     let sortConfig = { key: 'term', direction: 'ascending' };
+    let showOverallModel = false;
+    let showCoefDetails = false;
     let regByGroupPanel = 'coefficients';
     window.__regByGroupActiveTab = 'coefficients';
     let regSimProfile = null;
@@ -818,33 +838,49 @@
       return `[${fmt(lower, 3)}, ${fmt(upper, 3)}]`;
     }
 
+    function ciIncludesZero(coef) {
+      return Number.isFinite(coef.ciLower) && Number.isFinite(coef.ciUpper)
+        && coef.ciLower <= 0 && coef.ciUpper >= 0;
+    }
+
     function computeTermStability(groupCoefs, term) {
-      if (term === 'Intercept') return { label: '—', code: 'na', reversed: false };
-      const betas = groupCoefs.filter((g) => Number.isFinite(g.beta)).map((g) => g.beta);
-      if (betas.length < 2) return { label: '—', code: 'na', reversed: false };
+      if (term === 'Intercept') return { label: '—', code: 'na', tip: '' };
+      const usable = (groupCoefs || []).filter((g) => Number.isFinite(g.beta));
+      if (usable.length < 2) return { label: '—', code: 'na', tip: '' };
 
-      const hasPos = betas.some((b) => b > 1e-8);
-      const hasNeg = betas.some((b) => b < -1e-8);
-      if (hasPos && hasNeg) return { label: 'Reversed', code: 'reversed', reversed: true };
+      const hasPos = usable.some((g) => g.beta > 1e-8);
+      const hasNeg = usable.some((g) => g.beta < -1e-8);
+      if (hasPos && hasNeg) {
+        const uncertain = usable.every(ciIncludesZero);
+        return {
+          label: 'Opposite signs',
+          code: 'opposite',
+          tip: uncertain
+            ? 'Estimated coefficients have opposite signs; their confidence intervals include zero. Individual intervals do not test whether the groups differ.'
+            : 'Estimated coefficients have opposite signs. Individual confidence intervals do not test whether the groups differ; that requires an interaction or coefficient-contrast test.'
+        };
+      }
 
-      const absBetas = betas.map((b) => Math.abs(b));
+      const absBetas = usable.map((g) => Math.abs(g.beta));
       const maxA = Math.max(...absBetas);
       const minA = Math.min(...absBetas);
       const meanA = absBetas.reduce((s, v) => s + v, 0) / absBetas.length;
-      if (meanA < 1e-8) return { label: 'Stable', code: 'stable', reversed: false };
+      const estimateTip = 'This describes the fitted coefficients, not a formal test that the groups differ.';
+      if (meanA < 1e-8) return { label: 'Similar estimates', code: 'stable', tip: estimateTip };
 
       const ratio = maxA / (minA || maxA);
       if (ratio <= 2 && (maxA - minA) / meanA <= 0.55) {
-        return { label: 'Stable', code: 'stable', reversed: false };
+        return { label: 'Similar estimates', code: 'stable', tip: estimateTip };
       }
-      return { label: 'Varies by group', code: 'varies', reversed: false };
+      return { label: 'Estimates vary', code: 'varies', tip: `Point estimates differ in magnitude across groups. ${estimateTip}` };
     }
 
-    function computeModelConsistency(tableRows, overall, groupFits) {
+    function computeModelConsistency(tableRows, _overall, groupFits) {
       const predRows = tableRows.filter((r) => r.term !== 'Intercept');
-      const reversals = predRows.filter((r) => r.stability && r.stability.code === 'reversed').length;
+      const reversals = predRows.filter((r) => r.stability && r.stability.code === 'opposite').length;
       const varies = predRows.filter((r) => r.stability && r.stability.code === 'varies').length;
-      const r2s = [overall, ...groupFits.map((g) => g.fit)]
+      const r2s = (groupFits || [])
+        .map((g) => g.fit)
         .filter((f) => f && f.results && Number.isFinite(f.results.R2))
         .map((f) => f.results.R2);
       const r2Min = r2s.length ? Math.min(...r2s) : NaN;
@@ -887,8 +923,8 @@
       const hint = document.getElementById('assumptionMismatchHint');
       if (!strip || !grid) return;
 
-      const entries = [{ label: 'Overall', fit: overall, overall: true }]
-        .concat(groupFits.map((g) => ({ label: String(g.group), fit: g.fit, overall: false })));
+      const entries = (showOverallModel ? [{ label: 'Overall — pooled fit', fit: overall, overall: true }] : [])
+        .concat(groupFits.map((g) => ({ label: prettyGroupLabel(g.group), fit: g.fit, overall: false })));
 
       strip.style.display = 'block';
       grid.innerHTML = entries.map((entry) => {
@@ -912,7 +948,7 @@
       if (hint) {
         if (overallBad && groupsOk && groupFits.length) {
           hint.style.display = 'block';
-          hint.textContent = 'Overall residuals look non-normal while each subgroup looks normal — the pooled model may be mixing distinct populations. Consider fitting or interpreting effects by group.';
+          hint.textContent = 'The pooled-fit residuals look non-normal while each subgroup looks normal — the overall model may be mixing distinct populations. Consider fitting or interpreting effects by group.';
         } else {
           hint.style.display = 'none';
           hint.textContent = '';
@@ -922,9 +958,38 @@
 
     function stabilityBadgeHtml(stability) {
       if (!stability || stability.code === 'na') return '<span class="stability-badge stability-na">—</span>';
-      const cls = stability.code === 'reversed' ? 'stability-reversed'
+      const cls = stability.code === 'opposite' ? 'stability-opposite'
         : (stability.code === 'varies' ? 'stability-varies' : 'stability-stable');
-      return `<span class="stability-badge ${cls}">${escapeHtml(stability.label)}</span>`;
+      const tip = stability.tip || '';
+      const tipAttrs = tip ? ` title="${tipAttr(tip)}" data-st-tip="${tipAttr(tip)}"` : '';
+      return `<span class="stability-badge ${cls}"${tipAttrs}>${escapeHtml(stability.label)}</span>`;
+    }
+
+    function fittedN(fit) {
+      if (fit && fit.results && Number.isFinite(fit.results.n)) return fit.results.n;
+      if (fit && Number.isFinite(fit.n)) return fit.n;
+      return NaN;
+    }
+
+    function nHeadingMeta(fit, availableN) {
+      const n = fittedN(fit);
+      if (!Number.isFinite(n)) return Number.isFinite(availableN) ? `n=${availableN}` : '';
+      if (Number.isFinite(availableN) && availableN !== n) return `n=${n} fitted`;
+      return `n=${n}`;
+    }
+
+    function nHeadingTip(fit, availableN) {
+      const n = fittedN(fit);
+      if (Number.isFinite(n) && Number.isFinite(availableN) && availableN !== n) {
+        return `${n} complete-case rows used in the regression (${availableN} rows available in this group).`;
+      }
+      return Number.isFinite(n) ? `${n} complete-case rows used in the regression.` : '';
+    }
+
+    function fmtBeta(value) {
+      if (!Number.isFinite(Number(value))) return '—';
+      const text = fmt(value, 4);
+      return Number(value) > 1e-12 ? `+${text}` : text;
     }
 
     function normalizeInteractionTerms(interactions) {
@@ -1506,8 +1571,8 @@
       const cards = document.getElementById('fitCards');
       if (!strip || !cards) return;
 
-      const entries = [{ label: 'Overall', fit: overall, type: 'overall' }]
-        .concat(groups.map((g) => ({ label: String(g.group), fit: g.fit, type: 'group' })));
+      const entries = (showOverallModel ? [{ label: 'Overall — pooled fit', fit: overall, type: 'overall' }] : [])
+        .concat(groups.map((g) => ({ label: prettyGroupLabel(g.group), fit: g.fit, type: 'group' })));
 
       strip.style.display = 'block';
       const groupNote = groupingIsModelPredictor()
@@ -1530,7 +1595,7 @@
         const normCls = !Number.isFinite(norm.p) ? 'fit-norm-na' : (norm.p >= 0.05 ? 'fit-norm-ok' : 'fit-norm-bad');
         const histTip = `Residual histogram (n=${fit.n}). Min=${fmt(Math.min(...fit.residuals), 3)}, max=${fmt(Math.max(...fit.residuals), 3)}.`;
         return `<div class="fit-card ${cardType}">
-          <div class="fit-card-label" title="${escapeHtml(entry.label)}">${escapeHtml(entry.label)}</div>
+          <div class="fit-card-label" title="${escapeHtml(entry.label)}">${escapeHtml(entry.label)}${Number.isFinite(fittedN(fit)) ? ` · n=${fittedN(fit)}` : ''}</div>
           <div class="fit-metrics">
             <span>R²<strong>${fmt(fit.results.R2, 3)}</strong></span>
             <span>Adj R²<strong>${fmt(fit.results.R2_adj, 3)}</strong></span>
@@ -1568,34 +1633,70 @@
       return `<th rowspan="2" class="${cls}${active}" data-key="${key}"><span class="th-main">${label}</span> <i class="fa fa-sort"></i></th>`;
     }
 
-    function categoryTh(label, meta, colspan, extraClass) {
-      return `<th colspan="${colspan}" class="group-category ${extraClass || ''}">
+    function categoryTh(label, meta, colspan, extraClass, tip, sortKey) {
+      const tipAttrs = tip ? ` title="${tipAttr(tip)}" data-st-tip="${tipAttr(tip)}"` : '';
+      const sortCls = sortKey ? ' sortable' : '';
+      const sortAttr = sortKey ? ` data-key="${escapeHtml(sortKey)}"` : '';
+      return `<th colspan="${colspan}" class="group-category ${extraClass || ''}${sortCls}"${sortAttr}${tipAttrs}>
         <span class="group-category-name">${escapeHtml(label)}</span>
         ${meta ? `<span class="group-category-meta">${escapeHtml(meta)}</span>` : ''}
       </th>`;
     }
 
+    function groupFitAt(i) {
+      return (activeGroupFits && activeGroupFits[i]) || null;
+    }
+
+    function estimatesHeaderTip() {
+      return 'Describes the fitted coefficients across groups. This is not a formal test that the groups differ.';
+    }
+
     function renderTableHead() {
-      const row1 = ['<tr class="group-category-row">', sortThRowspan('term', 'Term', 'term-col')];
-      row1.push('<th rowspan="2" class="stability-col"><span class="th-main">Stability</span></th>');
-      row1.push(categoryTh('Overall', overallFit ? `n=${overallFit.n}` : '', 3, 'group-category-overall'));
-      activeGroups.forEach((g, i) => {
-        row1.push(categoryTh(String(g.group), `n=${g.n}`, 2, i === 0 ? 'group-category-first' : ''));
-      });
-      row1.push('<th rowspan="2" class="pattern-col"><span class="th-main">β pattern</span></th></tr>');
+      const details = showCoefDetails;
+      const showOverall = showOverallModel;
+      const groupSpan = details ? 2 : 1;
+      const overallSpan = details ? 3 : 1;
+      const termTh = details ? sortThRowspan('term', 'Term', 'term-col') : sortTh('term', 'Term', 'term-col');
+      const estimatesTip = estimatesHeaderTip();
+      const estimatesTh = `<th${details ? ' rowspan="2"' : ''} class="stability-col"><span class="th-main">Estimates</span>
+        <button type="button" class="dsp-info-btn" title="${tipAttr(estimatesTip)}" data-st-tip="${tipAttr(estimatesTip)}" aria-label="About estimate labels">i</button>
+      </th>`;
+      const patternTh = `<th${details ? ' rowspan="2"' : ''} class="pattern-col"><span class="th-main">β pattern</span></th>`;
 
-      const row2 = ['<tr class="group-metric-row">'];
-      row2.push(sortTh('overall_beta', 'β', 'group-metric-overall block-divider-start block-divider-overall metric-col-r'));
-      row2.push(sortTh('overall_ci', '95% CI', 'group-metric-overall metric-col-ci'));
-      row2.push(sortTh('overall_p', 'p', 'group-metric-overall block-divider-end block-divider-overall metric-col-p'));
+      const overallMeta = nHeadingMeta(overallFit, sourceRows.length);
+      const overallTip = nHeadingTip(overallFit, sourceRows.length);
+      const row1 = ['<tr class="group-category-row">', termTh, estimatesTh];
+      if (showOverall) {
+        const overallLabelMeta = details ? overallMeta : (overallMeta ? `β · ${overallMeta}` : 'β');
+        row1.push(categoryTh('Overall — pooled fit', overallLabelMeta, overallSpan, 'group-category-overall', overallTip, details ? '' : 'overall_beta'));
+      }
       activeGroups.forEach((g, i) => {
-        const blockFirst = i === 0 ? ' block-divider-start' : '';
-        row2.push(sortTh(`group:${i}:beta`, 'β', `group-metric-col metric-col-r${blockFirst}`));
-        row2.push(sortTh(`group:${i}:ci`, '95% CI', `group-metric-col block-divider-end metric-col-ci`));
+        const gf = groupFitAt(i);
+        const meta = nHeadingMeta(gf && gf.fit, g.n);
+        const tip = nHeadingTip(gf && gf.fit, g.n);
+        const labelMeta = details ? meta : (meta ? `β · ${meta}` : 'β');
+        row1.push(categoryTh(prettyGroupLabel(g.group), labelMeta, groupSpan, i === 0 ? 'group-category-first' : '', tip, details ? '' : `group:${i}:beta`));
       });
-      row2.push('</tr>');
+      row1.push(`${patternTh}</tr>`);
 
-      document.getElementById('regByGroupHead').innerHTML = row1.join('') + row2.join('');
+      let row2 = '';
+      if (details) {
+        const cells = ['<tr class="group-metric-row">'];
+        if (showOverall) {
+          cells.push(sortTh('overall_beta', 'β', 'group-metric-overall block-divider-start block-divider-overall metric-col-r'));
+          cells.push(sortTh('overall_ci', '95% CI', 'group-metric-overall metric-col-ci'));
+          cells.push(sortTh('overall_p', 'p', 'group-metric-overall block-divider-end block-divider-overall metric-col-p'));
+        }
+        activeGroups.forEach((g, i) => {
+          const blockFirst = i === 0 ? ' block-divider-start' : '';
+          cells.push(sortTh(`group:${i}:beta`, 'β', `group-metric-col metric-col-r${blockFirst}`));
+          cells.push(sortTh(`group:${i}:ci`, '95% CI', `group-metric-col block-divider-end metric-col-ci`));
+        });
+        cells.push('</tr>');
+        row2 = cells.join('');
+      }
+
+      document.getElementById('regByGroupHead').innerHTML = row1.join('') + row2;
       document.querySelectorAll('#regByGroupHead th.sortable').forEach((th) => {
         th.onclick = () => requestSort(th.getAttribute('data-key'));
       });
@@ -1645,20 +1746,23 @@
     function renderOverallCells(overall) {
       const startCls = ' block-divider-start block-divider-overall';
       const endCls = ' block-divider-end block-divider-overall';
+      const beta = `<td class="overall-cell metric-col-r${startCls}${showCoefDetails ? '' : endCls} ${coefClass(overall.beta)}">${fmtBeta(overall.beta)}</td>`;
+      if (!showCoefDetails) return beta;
       return [
-        `<td class="overall-cell metric-col-r${startCls} ${coefClass(overall.beta)}">${fmt(overall.beta, 4)}</td>`,
+        beta,
         `<td class="overall-cell metric-col-ci"><span class="ci-main">${formatCI(overall.ciLower, overall.ciUpper)}</span></td>`,
         `<td class="overall-cell metric-col-p${endCls}">${formatP(overall.p)}</td>`
       ].join('');
     }
 
-    function renderGroupCells(gr, i, stability) {
+    function renderGroupCells(gr, i) {
       const startCls = i === 0 ? ' block-divider-start' : '';
       const endCls = ' block-divider-end';
-      const revCls = stability && stability.reversed ? ' coef-reversal-cell' : '';
+      const beta = `<td class="group-cell metric-col-r${startCls}${showCoefDetails ? '' : endCls} ${coefClass(gr.beta)}">${fmtBeta(gr.beta)}</td>`;
+      if (!showCoefDetails) return beta;
       return [
-        `<td class="group-cell metric-col-r${startCls}${revCls} ${coefClass(gr.beta)}">${fmt(gr.beta, 4)}</td>`,
-        `<td class="group-cell metric-col-ci${endCls}${revCls}"><span class="ci-main">${formatCI(gr.ciLower, gr.ciUpper)}</span></td>`
+        beta,
+        `<td class="group-cell metric-col-ci${endCls}"><span class="ci-main">${formatCI(gr.ciLower, gr.ciUpper)}</span></td>`
       ].join('');
     }
 
@@ -1666,15 +1770,11 @@
       const body = document.getElementById('regByGroupBody');
       const rows = getSortedRows();
       body.innerHTML = rows.map((row) => {
-        const rowCls = row.stability && row.stability.reversed ? ' class="row-reversal"' : '';
-        const reversalFlag = row.stability && row.stability.reversed
-          ? '<span class="reversal-flag"><i class="fa-solid fa-circle-exclamation"></i> Direction reversal</span>'
-          : '';
-        const groupCells = row.groupCoefs.map((gr, i) => renderGroupCells(gr, i, row.stability)).join('');
-        return `<tr${rowCls}>
-          <td class="term-cell">${escapeHtml(row.term)}${reversalFlag}</td>
+        const groupCells = row.groupCoefs.map((gr, i) => renderGroupCells(gr, i)).join('');
+        return `<tr>
+          <td class="term-cell">${escapeHtml(row.term)}</td>
           <td class="stability-cell">${stabilityBadgeHtml(row.stability)}</td>
-          ${renderOverallCells(row.overall)}
+          ${showOverallModel ? renderOverallCells(row.overall) : ''}
           ${groupCells}
           <td class="spark-cell">${buildCoefSparklineSvg(row.groupCoefs)}</td>
         </tr>`;
@@ -1701,12 +1801,41 @@
       table.style.setProperty('--cat-row-h', `${Math.ceil(catRow.getBoundingClientRect().height)}px`);
     }
 
+    function bindTableToggles() {
+      const expandBtn = document.getElementById('regExpandCoefs');
+      if (expandBtn && !expandBtn.dataset.bound) {
+        expandBtn.dataset.bound = '1';
+        expandBtn.addEventListener('click', () => {
+          showCoefDetails = !showCoefDetails;
+          renderTable();
+        });
+      }
+      if (expandBtn) {
+        expandBtn.classList.toggle('is-open', showCoefDetails);
+        expandBtn.setAttribute('aria-expanded', showCoefDetails ? 'true' : 'false');
+        expandBtn.innerHTML = `<i class="fa-solid fa-chevron-right"></i> ${showCoefDetails ? 'Hide 95% CI' : 'Show 95% CI'}`;
+      }
+      const overallEl = document.getElementById('regShowOverallModel');
+      if (overallEl && !overallEl.dataset.bound) {
+        overallEl.dataset.bound = '1';
+        overallEl.addEventListener('change', () => {
+          showOverallModel = !!overallEl.checked;
+          renderAssumptionStrip(overallFit, activeGroupFits);
+          renderFitStrip(overallFit, activeGroupFits);
+          renderTable();
+        });
+      }
+      if (overallEl) overallEl.checked = showOverallModel;
+    }
+
     function renderTable() {
+      bindTableToggles();
       renderTableHead();
       renderTableBody();
       syncCategoryRowHeight();
       if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
         window.StatisticoTooltip.refresh(document.getElementById('regByGroupTable'));
+        window.StatisticoTooltip.refresh(document.querySelector('.table-toolbar'));
       }
     }
 
@@ -2633,11 +2762,15 @@
       if (!overallFit) return setEmpty('Could not fit the model on filtered rows. Check predictors, missing data, or sample size.');
 
       displayTerms = overallFit.displayNames;
-      const groupFits = activeGroups.map((g) => ({
-        group: g.group,
-        n: g.n,
-        fit: fitRegression(g.rows, dropNonvaryingCategoricals(fixedCategoricalInfo, g.rows))
-      }));
+      const groupFits = activeGroups.map((g) => {
+        const fit = fitRegression(g.rows, dropNonvaryingCategoricals(fixedCategoricalInfo, g.rows));
+        return {
+          group: g.group,
+          n: Number.isFinite(fittedN(fit)) ? fittedN(fit) : g.n,
+          availableN: g.n,
+          fit
+        };
+      });
       activeGroupFits = groupFits;
       predHeld = {};
       predCatReason = {};
@@ -2709,7 +2842,7 @@
             ...row.groupCoefs.flatMap((gr) => [gr.beta, gr.ciLower, gr.ciUpper])
           ]),
           usedRange: 'Regression by group',
-          notice: 'Grouped regressions refit the same model on each level. Group columns show β and 95% CI only. Stability flags sign reversals and cross-group coefficient spread.'
+          notice: 'Grouped regressions refit the same model on each level. Estimate labels describe fitted coefficients and are not tests that groups differ. Sample sizes are complete-case n used in each fit.'
         }),
         moduleName: 'Copy grouped regression to clipboard'
       });

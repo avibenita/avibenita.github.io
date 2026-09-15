@@ -427,19 +427,31 @@
     .stability-opposite { color:#c4a35a; border-color:color-mix(in srgb, #c4a35a 38%, var(--border)); background:color-mix(in srgb, #c4a35a 9%, transparent); }
     .stability-na { color:var(--text-secondary); }
     .stability-badge { cursor:help; }
+    .coef-panel {
+      border:1px solid var(--border); border-radius:12px; background:var(--surface-2); margin-top:4px;
+    }
+    .coef-panel-head {
+      width:100%; display:flex; align-items:center; gap:10px; padding:12px 14px;
+      border:0; background:transparent; color:var(--text-primary); cursor:pointer; text-align:left;
+    }
+    .coef-panel-head:hover { background:color-mix(in srgb, var(--accent-1) 8%, transparent); }
+    .coef-panel-head .chev { color:var(--text-secondary); font-size:11px; transition:transform .15s ease; }
+    .coef-panel.is-open .coef-panel-head .chev { transform:rotate(90deg); }
+    .coef-panel-head strong {
+      color:var(--accent-1); font-size:13px; letter-spacing:.04em; text-transform:uppercase;
+    }
+    .coef-panel-head span { color:var(--text-secondary); font-size:12px; }
+    .coef-panel-body { display:none; padding:0 12px 12px; }
+    .coef-panel.is-open .coef-panel-body { display:block; }
     .table-toolbar {
-      display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
-      margin:0 0 8px;
+      display:flex; align-items:center; justify-content:flex-end; gap:14px; flex-wrap:wrap;
+      margin:0 0 8px; position:relative; z-index:2;
     }
-    .table-toolbar-toggles { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-    .table-toggle { display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; cursor:pointer; }
-    .table-expand-btn {
-      display:inline-flex; align-items:center; gap:6px;
-      border:1px solid var(--border); border-radius:8px; padding:5px 9px;
-      background:var(--surface-1); color:var(--text-primary); font-size:12px; font-weight:700; cursor:pointer;
+    .table-toggle {
+      display:flex; align-items:center; gap:6px; color:var(--text-secondary); font-size:12px; cursor:pointer;
+      pointer-events:auto; user-select:none;
     }
-    .table-expand-btn i { font-size:10px; color:var(--text-secondary); transition:transform .15s ease; }
-    .table-expand-btn.is-open i { transform:rotate(90deg); }
+    .table-toggle input { pointer-events:auto; }
     .table-note { margin:6px 0 0; color:var(--text-secondary); font-size:11px; line-height:1.4; }
     .ci-main { font-size:12px; color:var(--text-secondary); font-weight:600; }
     #regByGroupTable th.group-category { border-right:2px solid var(--grid-block-group); text-align:center; border-bottom:2px solid var(--grid-block-group); }
@@ -470,7 +482,7 @@
     #regByGroupTable tr.group-metric-row th .th-main { color:var(--accent-2); }
     .group-category-name { display:block; font-size:13px; font-weight:800; color:var(--accent-2); line-height:1.15; letter-spacing:.02em; }
     th.group-category-overall .group-category-name { color:var(--accent-1); }
-    .group-category-meta { display:block; margin-top:5px; font-size:11px; font-weight:700; color:var(--text-secondary); letter-spacing:.04em; text-transform:uppercase; }
+    .group-category-meta { display:block; margin-top:5px; font-size:11px; font-weight:700; color:var(--text-secondary); letter-spacing:.02em; text-transform:none; }
     td.coef-pos { color:var(--pos-r); font-weight:600; }
     td.coef-neg { color:var(--neg-r); font-weight:600; }
     td.group-cell, td.overall-cell { min-width:52px; }
@@ -558,7 +570,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v32">
+<body data-page-version="20260915-reg-bygroup-v33">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -612,21 +624,26 @@
               </div>
               <div class="fit-cards" id="fitCards"></div>
             </div>
-            <div class="table-toolbar">
-              <button type="button" class="table-expand-btn" id="regExpandCoefs" aria-expanded="false">
-                <i class="fa-solid fa-chevron-right"></i> Show 95% CI
+            <div class="coef-panel" id="regCoefPanel">
+              <button type="button" class="coef-panel-head" id="regCoefPanelToggle" aria-expanded="false" aria-controls="regCoefPanelBody">
+                <i class="fa-solid fa-chevron-right chev"></i>
+                <strong>Coefficients</strong>
+                <span>β by group — collapsed</span>
               </button>
-              <div class="table-toolbar-toggles">
-                <label class="table-toggle"><input type="checkbox" id="regShowOverallModel"> Show overall model</label>
+              <div class="coef-panel-body" id="regCoefPanelBody">
+                <div class="table-toolbar">
+                  <label class="table-toggle"><input type="checkbox" id="regShowCoefDetails"> Show 95% CI</label>
+                  <label class="table-toggle"><input type="checkbox" id="regShowOverallModel"> Show overall model</label>
+                </div>
+                <div class="table-wrap">
+                  <table id="regByGroupTable">
+                    <thead id="regByGroupHead"></thead>
+                    <tbody id="regByGroupBody"></tbody>
+                  </table>
+                </div>
+                <p class="table-note" id="regByGroupTableNote">Estimate labels describe the fitted coefficients. They are not tests that groups differ.</p>
               </div>
             </div>
-            <div class="table-wrap">
-              <table id="regByGroupTable">
-                <thead id="regByGroupHead"></thead>
-                <tbody id="regByGroupBody"></tbody>
-              </table>
-            </div>
-            <p class="table-note" id="regByGroupTableNote">Estimate labels describe the fitted coefficients. They are not tests that groups differ.</p>
             </div>
             <div class="reg-bg-panel" id="regByGroupPanel-similarity">
               <div class="section-title">
@@ -776,6 +793,7 @@
     let sortConfig = { key: 'term', direction: 'ascending' };
     let showOverallModel = false;
     let showCoefDetails = false;
+    let showCoefPanel = false;
     let regByGroupPanel = 'coefficients';
     window.__regByGroupActiveTab = 'coefficients';
     let regSimProfile = null;
@@ -974,7 +992,6 @@
     function nHeadingMeta(fit, availableN) {
       const n = fittedN(fit);
       if (!Number.isFinite(n)) return Number.isFinite(availableN) ? `n=${availableN}` : '';
-      if (Number.isFinite(availableN) && availableN !== n) return `n=${n} fitted`;
       return `n=${n}`;
     }
 
@@ -1801,30 +1818,51 @@
       table.style.setProperty('--cat-row-h', `${Math.ceil(catRow.getBoundingClientRect().height)}px`);
     }
 
+    function syncCoefPanel() {
+      const panel = document.getElementById('regCoefPanel');
+      const toggle = document.getElementById('regCoefPanelToggle');
+      const hint = toggle ? toggle.querySelector('span') : null;
+      if (panel) panel.classList.toggle('is-open', showCoefPanel);
+      if (toggle) toggle.setAttribute('aria-expanded', showCoefPanel ? 'true' : 'false');
+      if (hint) hint.textContent = showCoefPanel ? 'β by group' : 'β by group — collapsed';
+    }
+
+    function bindCheckToggle(id, apply) {
+      const el = document.getElementById(id);
+      if (!el || el.dataset.bound) return el;
+      el.dataset.bound = '1';
+      const run = () => apply(!!el.checked);
+      el.addEventListener('click', (event) => event.stopPropagation());
+      el.addEventListener('change', run);
+      return el;
+    }
+
     function bindTableToggles() {
-      const expandBtn = document.getElementById('regExpandCoefs');
-      if (expandBtn && !expandBtn.dataset.bound) {
-        expandBtn.dataset.bound = '1';
-        expandBtn.addEventListener('click', () => {
-          showCoefDetails = !showCoefDetails;
-          renderTable();
+      const panelToggle = document.getElementById('regCoefPanelToggle');
+      if (panelToggle && !panelToggle.dataset.bound) {
+        panelToggle.dataset.bound = '1';
+        panelToggle.addEventListener('click', (event) => {
+          event.preventDefault();
+          showCoefPanel = !showCoefPanel;
+          syncCoefPanel();
+          if (showCoefPanel) {
+            renderTable();
+            requestAnimationFrame(syncCategoryRowHeight);
+          }
         });
       }
-      if (expandBtn) {
-        expandBtn.classList.toggle('is-open', showCoefDetails);
-        expandBtn.setAttribute('aria-expanded', showCoefDetails ? 'true' : 'false');
-        expandBtn.innerHTML = `<i class="fa-solid fa-chevron-right"></i> ${showCoefDetails ? 'Hide 95% CI' : 'Show 95% CI'}`;
-      }
-      const overallEl = document.getElementById('regShowOverallModel');
-      if (overallEl && !overallEl.dataset.bound) {
-        overallEl.dataset.bound = '1';
-        overallEl.addEventListener('change', () => {
-          showOverallModel = !!overallEl.checked;
-          renderAssumptionStrip(overallFit, activeGroupFits);
-          renderFitStrip(overallFit, activeGroupFits);
-          renderTable();
-        });
-      }
+      syncCoefPanel();
+      const detailsEl = bindCheckToggle('regShowCoefDetails', (on) => {
+        showCoefDetails = on;
+        renderTable();
+      });
+      if (detailsEl) detailsEl.checked = showCoefDetails;
+      const overallEl = bindCheckToggle('regShowOverallModel', (on) => {
+        showOverallModel = on;
+        renderAssumptionStrip(overallFit, activeGroupFits);
+        renderFitStrip(overallFit, activeGroupFits);
+        renderTable();
+      });
       if (overallEl) overallEl.checked = showOverallModel;
     }
 
@@ -2952,6 +2990,7 @@
     window.openRegSimHelp = openRegSimHelp;
     window.closeRegSimHelp = closeRegSimHelp;
     window.openDspHelp = openRegSimHelp;
+    bindTableToggles();
 
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;

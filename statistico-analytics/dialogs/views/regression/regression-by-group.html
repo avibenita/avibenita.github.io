@@ -18,6 +18,8 @@
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260524a"></script>
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts-more.js"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -52,7 +54,7 @@
     .section-title { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 0 10px; }
     .section-title strong { color:var(--accent-1); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
     .section-title span { color:var(--text-secondary); font-size:12px; }
-    .dsp-kpis { display:grid; grid-template-columns:minmax(340px, 1.4fr) minmax(220px, 0.6fr); gap:12px; margin-bottom:12px; align-items:stretch; }
+    .dsp-kpis { display:grid; grid-template-columns:minmax(240px, 0.62fr) minmax(420px, 1.58fr); gap:12px; margin-bottom:12px; align-items:stretch; }
     .dsp-homo-card {
       border:1px solid color-mix(in srgb, var(--accent-1) 42%, var(--border));
       border-radius:14px;
@@ -113,6 +115,34 @@
     .dsp-kpi-label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
     .dsp-kpi-value { color:var(--accent-1); font-size:18px; font-weight:800; margin-top:3px; line-height:1.1; }
     .dsp-kpi-note { color:var(--text-secondary); font-size:11px; margin-top:3px; line-height:1.35; }
+    .dsp-chart-panel {
+      border:1px solid var(--border); border-radius:14px; background:var(--surface-2);
+      padding:10px 12px 12px; min-width:0; display:flex; flex-direction:column; gap:8px;
+    }
+    .dsp-chart-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .dsp-chart-tabs { display:flex; gap:6px; flex-wrap:wrap; }
+    .dsp-chart-tab {
+      border:1px solid var(--border); background:var(--surface-1); color:var(--text-secondary);
+      border-radius:8px; padding:6px 10px; font-size:11px; font-weight:800;
+      letter-spacing:.04em; text-transform:uppercase; cursor:pointer;
+    }
+    .dsp-chart-tab.is-active {
+      color:var(--accent-1);
+      border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border));
+      background:color-mix(in srgb, var(--accent-1) 12%, var(--surface-1));
+    }
+    .dsp-chart-legend { display:flex; flex-wrap:wrap; gap:8px 14px; color:var(--text-secondary); font-size:11px; }
+    .dsp-chart-swatch { display:inline-block; width:10px; height:10px; border-radius:99px; margin-right:6px; vertical-align:-1px; }
+    .dsp-pred-controls { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:end; }
+    .dsp-pred-field { display:flex; flex-direction:column; gap:3px; min-width:132px; }
+    .dsp-pred-field label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
+    .dsp-pred-field input, .dsp-pred-field select {
+      background:var(--surface-1); color:var(--text-primary); border:1px solid var(--border);
+      border-radius:8px; padding:6px 8px; font-size:12px;
+    }
+    .dsp-chart-host { min-height:240px; }
+    .dsp-forest-list { display:flex; flex-direction:column; gap:10px; }
+    .dsp-forest-item { width:100%; height:220px; }
     .dsp-card { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:10px; min-width:0; }
     .dsp-pair-grid {
       display:grid; grid-template-columns:minmax(280px, 1.35fr) minmax(220px, 0.85fr);
@@ -510,7 +540,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v20">
+<body data-page-version="20260915-reg-bygroup-v21">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -581,7 +611,25 @@
                 Similarity Profile needs at least two groups with overlapping estimated coefficients.
               </div>
               <div id="regSimMain" style="display:none;">
-                <div class="dsp-kpis" id="regSimKpis"></div>
+                <div class="dsp-kpis">
+                  <div class="dsp-homo-card" id="regSimGaugeCard"></div>
+                  <div class="dsp-chart-panel">
+                    <div class="dsp-chart-head">
+                      <div>
+                        <div class="dsp-subhead" id="regSimChartTitle">Coefficient comparison</div>
+                        <div class="dsp-subhead-note" id="regSimChartNote">Each dot is a group’s estimated coefficient. Each line is its 95% confidence interval. Colours stay the same across predictors.</div>
+                      </div>
+                      <div class="dsp-chart-tabs" role="tablist">
+                        <button type="button" class="dsp-chart-tab is-active" data-chart-view="coef">Coefficient comparison</button>
+                        <button type="button" class="dsp-chart-tab" data-chart-view="pred">Predicted response</button>
+                      </div>
+                    </div>
+                    <div class="dsp-chart-legend" id="regSimChartLegend"></div>
+                    <div class="dsp-pred-controls" id="regSimPredControls" hidden></div>
+                    <div class="dsp-chart-host" id="regSimChartHost"></div>
+                    <em class="dsp-footnote" id="regSimChartFoot">Visual comparison of group coefficients and 95% CIs. This is not a test of group × predictor interaction.</em>
+                  </div>
+                </div>
                 <div class="dsp-card">
                   <div class="dsp-subhead">Pairwise scores by range</div>
                   <div class="dsp-subhead-note">Click a row for the three-component profile. Pairs in the same range are not ranked against each other</div>
@@ -710,6 +758,12 @@
     let regSimProfile = null;
     let selectedRegSimPair = null;
     let homoGaugePlayed = false;
+    let activeGroupFits = [];
+    let regSimChartView = 'coef';
+    let regSimCharts = [];
+    let predXVar = null;
+    let predHeld = {};
+    const GROUP_CHART_COLORS = ['#5B9BD5', '#ED7D31', '#70AD47', '#FFC000', '#9B59B6', '#4472C4', '#FF6B6B', '#4ECDC4'];
     const levelSelections = {};
 
     function decimalDigits(autoDefault) {
@@ -1769,7 +1823,6 @@
     function selectRegSimPair(a, b) {
       const pair = findRegSimPair(a, b);
       selectedRegSimPair = pair ? { a: pair.a, b: pair.b } : null;
-      renderRegSimKpis();
       renderRegSimPairTable();
       renderRegSimProfile();
     }
@@ -1780,6 +1833,7 @@
       if (!empty || !main) return;
       if (typeof StatisticoRegressionSimilarity === 'undefined') {
         regSimProfile = null;
+        destroyRegSimCharts();
         empty.style.display = 'block';
         main.style.display = 'none';
         return;
@@ -1788,6 +1842,7 @@
       regSimProfile = StatisticoRegressionSimilarity.buildProfile(groups);
       if (!regSimProfile.usablePairCount) {
         selectedRegSimPair = null;
+        destroyRegSimCharts();
         empty.style.display = 'block';
         main.style.display = 'none';
         return;
@@ -1799,84 +1854,426 @@
       if (!selectedRegSimPair && regSimProfile.mostSimilar) {
         selectedRegSimPair = { a: regSimProfile.mostSimilar.a, b: regSimProfile.mostSimilar.b };
       }
-      renderRegSimKpis();
+      renderRegSimGauge();
+      renderRegSimCharts();
       renderRegSimPairTable();
       renderRegSimProfile();
     }
 
-    function renderRegSimKpis() {
-      const host = document.getElementById('regSimKpis');
+    function groupChartColor(index) {
+      return GROUP_CHART_COLORS[index % GROUP_CHART_COLORS.length];
+    }
+
+    function chartTheme() {
+      const light = document.documentElement.getAttribute('data-theme') === 'light';
+      return {
+        text: light ? '#334155' : '#cbd5e1',
+        muted: light ? '#64748b' : 'rgba(203,213,225,.68)',
+        grid: light ? 'rgba(15,23,42,.08)' : 'rgba(148,163,184,.12)',
+        line: light ? 'rgba(15,23,42,.18)' : 'rgba(148,163,184,.28)',
+        zero: light ? 'rgba(15,23,42,.35)' : 'rgba(255,255,255,.42)',
+        tooltipBg: light ? '#fff' : '#0c1624',
+        tooltipText: light ? '#0f172a' : '#e2e8f0',
+        tooltipBorder: light ? '#cbd5e1' : '#2d3748'
+      };
+    }
+
+    function destroyRegSimCharts() {
+      regSimCharts.forEach((chart) => {
+        try { chart.destroy(); } catch (_e) { /* ignore */ }
+      });
+      regSimCharts = [];
+    }
+
+    function numericColStats(name) {
+      const idx = sourceHeaders.indexOf(name);
+      if (idx < 0) return null;
+      const vals = sourceRows
+        .map((row) => parseFloat(rowValue(row, idx, name)))
+        .filter((v) => Number.isFinite(v));
+      if (!vals.length) return null;
+      const sum = vals.reduce((a, b) => a + b, 0);
+      return { min: Math.min(...vals), max: Math.max(...vals), mean: sum / vals.length };
+    }
+
+    function ensurePredDefaults() {
+      const xn = [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])];
+      if (!predXVar || !xn.includes(predXVar)) predXVar = xn[0] || null;
+      xn.forEach((name) => {
+        if (predHeld[name] == null) {
+          const stats = numericColStats(name);
+          predHeld[name] = stats ? stats.mean : 0;
+        }
+      });
+      (fixedCategoricalInfo || []).forEach((info) => {
+        if (predHeld[info.name] == null) predHeld[info.name] = info.categories[0];
+      });
+    }
+
+    function currentNumericValues() {
+      const values = {};
+      [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])].forEach((name) => {
+        values[name] = Number(predHeld[name]);
+      });
+      return values;
+    }
+
+    function currentCatValues() {
+      const values = {};
+      (fixedCategoricalInfo || []).forEach((info) => {
+        values[info.name] = predHeld[info.name];
+      });
+      return values;
+    }
+
+    function buildDesignVector(numericValues, catValues, catInfo) {
+      const names = [];
+      const values = [];
+      const xnSorted = [...(modelSpec.xn || [])].sort((a, b) => sourceHeaders.indexOf(a) - sourceHeaders.indexOf(b));
+      xnSorted.forEach((name) => {
+        names.push(name);
+        values.push(Number(numericValues[name]));
+      });
+      (catInfo || []).forEach((info) => {
+        const dums = createDummyVariables(catValues[info.name] ?? info.categories[0], info.categories);
+        info.dummyNames.forEach((dummyName, i) => {
+          names.push(dummyName);
+          values.push(dums[i]);
+        });
+      });
+      normalizeInteractionTerms(modelSpec.interactions).forEach((ix) => {
+        const v1IsNumeric = xnSorted.indexOf(ix.var1) >= 0;
+        const v2IsNumeric = xnSorted.indexOf(ix.var2) >= 0;
+        const v1Cat = (catInfo || []).find((c) => c.name === ix.var1);
+        const v2Cat = (catInfo || []).find((c) => c.name === ix.var2);
+        if (v1IsNumeric && v2IsNumeric) {
+          names.push(`${ix.var1} × ${ix.var2}`);
+          values.push(Number(numericValues[ix.var1]) * Number(numericValues[ix.var2]));
+        } else if (v1IsNumeric && v2Cat) {
+          const v1Val = Number(numericValues[ix.var1]);
+          createDummyVariables(catValues[ix.var2] ?? v2Cat.categories[0], v2Cat.categories).forEach((d, i) => {
+            names.push(`${ix.var1} × ${v2Cat.dummyNames[i]}`);
+            values.push(v1Val * d);
+          });
+        } else if (v1Cat && v2IsNumeric) {
+          const v2Val = Number(numericValues[ix.var2]);
+          createDummyVariables(catValues[ix.var1] ?? v1Cat.categories[0], v1Cat.categories).forEach((d, i) => {
+            names.push(`${v1Cat.dummyNames[i]} × ${ix.var2}`);
+            values.push(d * v2Val);
+          });
+        } else if (v1Cat && v2Cat) {
+          const dums1 = createDummyVariables(catValues[ix.var1] ?? v1Cat.categories[0], v1Cat.categories);
+          const dums2 = createDummyVariables(catValues[ix.var2] ?? v2Cat.categories[0], v2Cat.categories);
+          dums1.forEach((d1, i) => dums2.forEach((d2, j) => {
+            names.push(`${v1Cat.dummyNames[i]} × ${v2Cat.dummyNames[j]}`);
+            values.push(d1 * d2);
+          }));
+        }
+      });
+      return { names, values };
+    }
+
+    function predictFromFit(fit, design) {
+      if (!fit || !fit.results || !Array.isArray(fit.results.coefficients)) return NaN;
+      const beta = fit.results.coefficients;
+      const labels = fit.displayNames || [];
+      let yhat = 0;
+      labels.forEach((name, i) => {
+        const b = Number(beta[i]);
+        if (!Number.isFinite(b)) return;
+        if (name === 'Intercept') {
+          yhat += b;
+          return;
+        }
+        const j = design.names.indexOf(name);
+        if (j >= 0 && Number.isFinite(design.values[j])) yhat += b * design.values[j];
+      });
+      return yhat;
+    }
+
+    function bindRegSimChartUi() {
+      if (bindRegSimChartUi.done) return;
+      bindRegSimChartUi.done = true;
+      document.querySelectorAll('[data-chart-view]').forEach((btn) => {
+        btn.addEventListener('click', () => setRegSimChartView(btn.getAttribute('data-chart-view')));
+      });
+    }
+
+    function setRegSimChartView(view) {
+      regSimChartView = view === 'pred' ? 'pred' : 'coef';
+      document.querySelectorAll('[data-chart-view]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-chart-view') === regSimChartView);
+      });
+      renderRegSimCharts();
+    }
+
+    function renderRegSimGauge() {
+      const host = document.getElementById('regSimGaugeCard');
       if (!host || !regSimProfile) return;
-      const similarPairs = regSimProfile.mostSimilarPairs || (regSimProfile.mostSimilar ? [regSimProfile.mostSimilar] : []);
-      const distinctPairs = regSimProfile.mostDistinctPairs || [];
-      const similar = similarPairs[0] || null;
-      const distinct = distinctPairs[0] || null;
       const homo = regSimProfile.homogeneity;
       const band = regSimProfile.homogeneityBand || { key: 'na', label: 'Not enough data' };
-      const outliers = regSimProfile.mostDifferentGroups || (regSimProfile.mostDifferentGroup ? [regSimProfile.mostDifferentGroup] : []);
-      const outlier = outliers[0] || null;
       const pairN = Number(regSimProfile.usablePairCount) || 0;
-      const contrast = !!regSimProfile.rangeContrast;
-      const groupContrast = !!regSimProfile.groupRangeContrast;
-      const selectedKey = selectedRegSimPair ? simPairKey(selectedRegSimPair.a, selectedRegSimPair.b) : '';
-      const similarSelected = similarPairs.some((p) => selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a));
-      const distinctSelected = distinctPairs.some((p) => selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a));
-      const similarNote = similar
-        ? (contrast ? formatPairNames(similarPairs) : (pairN === 1 ? `${similar.a} vs ${similar.b}` : `All ${pairN} pairs in this range`))
-        : 'Need two groups';
-      const distinctNote = contrast
-        ? formatPairNames(distinctPairs)
-        : (pairN ? 'No range contrast — all pairs share one reading' : 'Need two groups');
-      const outlierValue = groupContrast && outlier
-        ? (outliers.length === 1 ? String(outlier.group) : `${outliers.length} groups`)
-        : '—';
-      const outlierNote = groupContrast && outlier
-        ? (outliers.length === 1
-          ? `${escapeHtml((outlier.meanBand && outlier.meanBand.label) || outlier.meanBandKey)}`
-          : outliers.map((g) => g.group).join(' · '))
-        : (pairN ? 'No range contrast — all groups share one reading' : 'Need two groups');
       host.innerHTML = `
-        <div class="dsp-homo-card">
-          <div class="dsp-homo-head">
-            <span class="dsp-homo-kicker">Similarity Profile™</span>
-            <span class="dsp-homo-title">Group homogeneity</span>
-            <span class="dsp-homo-sub">Overall index — geometric mean of pairwise scores</span>
-          </div>
-          <div class="dsp-homo-gauge-wrap">${homoGaugeSvg(homo, band.key)}</div>
-          <div class="dsp-homo-meta">
-            <div class="dsp-band dsp-band--${escapeHtml(band.key)}" style="text-align:center;">${escapeHtml(band.label)}</div>
-            <div class="dsp-homo-caption"><strong>Higher index → groups look more similar</strong> in pattern, strength, and sign.</div>
-            <div class="dsp-kpi-note" style="text-align:center;">${pairN} pairwise ${pairN === 1 ? 'score' : 'scores'} · not a significance test</div>
-          </div>
+        <div class="dsp-homo-head">
+          <span class="dsp-homo-kicker">Similarity Profile™</span>
+          <span class="dsp-homo-title">Group homogeneity</span>
+          <span class="dsp-homo-sub">Overall index — geometric mean of pairwise scores</span>
         </div>
-        <div class="dsp-side-panel">
-          <div class="dsp-side-panel-head">
-            <strong>Range comparisons</strong>
-            <span>Named only when pairs or groups fall in different gauge ranges</span>
-          </div>
-          <div class="dsp-kpi-row">
-            <button type="button" class="dsp-kpi dsp-kpi--secondary${similar && similarSelected ? ' is-active' : ''}" data-kpi="similar" ${similar ? '' : 'disabled'}>
-              <div class="dsp-kpi-label">Most similar range</div>
-              <div class="dsp-kpi-value">${similar ? escapeHtml(similar.band) : '—'}</div>
-              <div class="dsp-kpi-note">${escapeHtml(similarNote)}</div>
-            </button>
-            <button type="button" class="dsp-kpi dsp-kpi--secondary${distinct && distinctSelected ? ' is-active' : ''}" data-kpi="distinct" ${distinct ? '' : 'disabled'}>
-              <div class="dsp-kpi-label">Most distinct range</div>
-              <div class="dsp-kpi-value">${distinct ? escapeHtml(distinct.band) : '—'}</div>
-              <div class="dsp-kpi-note">${escapeHtml(distinctNote)}</div>
-            </button>
-            <div class="dsp-kpi dsp-kpi--secondary${groupContrast ? '' : ' is-muted'}" style="cursor:default;">
-              <div class="dsp-kpi-label">Most different group</div>
-              <div class="dsp-kpi-value">${escapeHtml(outlierValue)}</div>
-              <div class="dsp-kpi-note">${outlierNote}</div>
-            </div>
-          </div>
+        <div class="dsp-homo-gauge-wrap">${homoGaugeSvg(homo, band.key)}</div>
+        <div class="dsp-homo-meta">
+          <div class="dsp-band dsp-band--${escapeHtml(band.key)}" style="text-align:center;">${escapeHtml(band.label)}</div>
+          <div class="dsp-homo-caption"><strong>Higher index → groups look more similar</strong> in pattern, strength, and sign.</div>
+          <div class="dsp-kpi-note" style="text-align:center;">${pairN} pairwise ${pairN === 1 ? 'score' : 'scores'} · not a significance test</div>
         </div>`;
-      const similarBtn = host.querySelector('[data-kpi="similar"]');
-      const distinctBtn = host.querySelector('[data-kpi="distinct"]');
-      if (similarBtn && similar) similarBtn.addEventListener('click', () => selectRegSimPair(similar.a, similar.b));
-      if (distinctBtn && distinct) distinctBtn.addEventListener('click', () => selectRegSimPair(distinct.a, distinct.b));
       animateHomoGauge(homo);
+    }
+
+    function renderRegSimLegend() {
+      const host = document.getElementById('regSimChartLegend');
+      if (!host) return;
+      host.innerHTML = (activeGroups || []).map((g, i) => (
+        `<span><i class="dsp-chart-swatch" style="background:${groupChartColor(i)}"></i>${escapeHtml(g.group)} (n=${g.n})</span>`
+      )).join('');
+    }
+
+    function renderRegSimPredControls() {
+      const host = document.getElementById('regSimPredControls');
+      if (!host) return;
+      const xn = [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])];
+      const show = regSimChartView === 'pred' && xn.length > 0;
+      host.hidden = !show;
+      if (!show) {
+        host.innerHTML = '';
+        return;
+      }
+      ensurePredDefaults();
+      const xSelect = xn.length > 1
+        ? `<div class="dsp-pred-field"><label for="regSimPredX">Horizontal axis</label>
+            <select id="regSimPredX">${xn.map((name) => `<option value="${escapeHtml(name)}"${name === predXVar ? ' selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select>
+          </div>`
+        : '';
+      const holdNumerics = xn.filter((name) => name !== predXVar).map((name) => {
+        const stats = numericColStats(name);
+        const val = Number.isFinite(Number(predHeld[name])) ? Number(predHeld[name]) : (stats ? stats.mean : 0);
+        return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(name)}">Hold ${escapeHtml(name)}</label>
+          <input id="regSimHold-${escapeHtml(name)}" data-hold-num="${escapeHtml(name)}" type="number" step="any" value="${val}"></div>`;
+      }).join('');
+      const holdCats = (fixedCategoricalInfo || []).map((info) => {
+        const current = predHeld[info.name] ?? info.categories[0];
+        return `<div class="dsp-pred-field"><label for="regSimHold-${escapeHtml(info.name)}">Hold ${escapeHtml(info.name)}</label>
+          <select id="regSimHold-${escapeHtml(info.name)}" data-hold-cat="${escapeHtml(info.name)}">
+            ${info.categories.map((cat) => `<option value="${escapeHtml(cat)}"${cat === current ? ' selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
+          </select></div>`;
+      }).join('');
+      host.innerHTML = `${xSelect}${holdNumerics}${holdCats}`;
+      const xEl = document.getElementById('regSimPredX');
+      if (xEl) xEl.addEventListener('change', () => {
+        predXVar = xEl.value;
+        renderRegSimCharts();
+      });
+      host.querySelectorAll('[data-hold-num]').forEach((input) => {
+        input.addEventListener('change', () => {
+          predHeld[input.getAttribute('data-hold-num')] = parseFloat(input.value);
+          renderRegSimCharts();
+        });
+      });
+      host.querySelectorAll('[data-hold-cat]').forEach((select) => {
+        select.addEventListener('change', () => {
+          predHeld[select.getAttribute('data-hold-cat')] = select.value;
+          renderRegSimCharts();
+        });
+      });
+    }
+
+    function renderRegSimCharts() {
+      bindRegSimChartUi();
+      renderRegSimLegend();
+      const title = document.getElementById('regSimChartTitle');
+      const note = document.getElementById('regSimChartNote');
+      const foot = document.getElementById('regSimChartFoot');
+      const host = document.getElementById('regSimChartHost');
+      if (!host) return;
+      destroyRegSimCharts();
+      const groupCol = sourceHeaders[groupIndex] || 'Group';
+      const yName = (modelSpec && modelSpec.y) || 'Y';
+      if (regSimChartView === 'pred') {
+        if (title) title.textContent = 'Predicted response by group';
+        if (note) note.textContent = `Horizontal axis is one predictor; ${yName} is predicted from each group’s fitted model. Other predictors are held at the same selected value for every group.`;
+        if (foot) foot.textContent = 'Fitted lines, not a significance test. A group × predictor interaction test would be needed to say whether slopes differ statistically.';
+        renderRegSimPredControls();
+        renderPredictedChart(host, groupCol, yName);
+        return;
+      }
+      if (title) title.textContent = 'Coefficient comparison';
+      if (note) note.textContent = `Each dot is a group’s estimated coefficient. Each line is its 95% confidence interval. One panel per predictor; colours stay the same across panels.`;
+      if (foot) foot.textContent = 'Visual comparison of group coefficients and 95% CIs. This is not a test of group × predictor interaction.';
+      renderRegSimPredControls();
+      renderCoefficientCharts(host, groupCol);
+    }
+
+    function renderCoefficientCharts(host, groupCol) {
+      const rows = predictorRows().filter((row) => (row.groupCoefs || []).some((g) => Number.isFinite(g.beta)));
+      if (!rows.length) {
+        host.innerHTML = '<div class="dsp-kpi-note">No overlapping predictor coefficients to plot.</div>';
+        return;
+      }
+      if (typeof Highcharts === 'undefined') {
+        host.innerHTML = '<div class="dsp-kpi-note">Charts need Highcharts to render.</div>';
+        return;
+      }
+      const height = Math.max(190, 72 + (activeGroups.length * 38));
+      host.innerHTML = `<div class="dsp-forest-list">${rows.map((row, i) => `<div class="dsp-forest-item" id="regSimForest-${i}" style="height:${height}px"></div>`).join('')}</div>`;
+      const th = chartTheme();
+      const digits = decimalDigits(4);
+      rows.forEach((row, i) => {
+        const cats = (row.groupCoefs || []).map((g) => `${g.group} (n=${g.n})`);
+        const errorData = (row.groupCoefs || []).map((g, gi) => (
+          Number.isFinite(g.beta) && Number.isFinite(g.ciLower) && Number.isFinite(g.ciUpper)
+            ? { x: gi, low: g.ciLower, high: g.ciUpper, color: groupChartColor(gi) }
+            : null
+        )).filter(Boolean);
+        const pointData = (row.groupCoefs || []).map((g, gi) => (
+          Number.isFinite(g.beta)
+            ? { x: gi, y: g.beta, color: groupChartColor(gi), ciLower: g.ciLower, ciUpper: g.ciUpper, group: g.group, n: g.n }
+            : { x: gi, y: null }
+        ));
+        const finite = (row.groupCoefs || []).flatMap((g) => [g.ciLower, g.ciUpper, g.beta]).filter(Number.isFinite);
+        const min = finite.length ? Math.min(...finite, 0) : -1;
+        const max = finite.length ? Math.max(...finite, 0) : 1;
+        const pad = Math.max((max - min) * 0.12, 0.05);
+        const chart = Highcharts.chart(`regSimForest-${i}`, {
+          chart: { type: 'scatter', inverted: true, backgroundColor: 'transparent', spacing: [28, 16, 18, 8], style: { fontFamily: 'inherit' } },
+          title: { text: `${row.term}: coefficients by ${groupCol}`, align: 'left', style: { color: th.text, fontSize: '13px', fontWeight: '700' } },
+          subtitle: { text: 'Point: coefficient estimate · Line: 95% confidence interval', align: 'left', style: { color: th.muted, fontSize: '11px' } },
+          credits: { enabled: false },
+          legend: { enabled: false },
+          xAxis: {
+            categories: cats,
+            title: { text: groupCol, style: { color: th.muted, fontSize: '11px' } },
+            lineColor: th.line,
+            tickColor: th.line,
+            labels: { style: { color: th.text, fontSize: '12px' } }
+          },
+          yAxis: {
+            title: { text: 'Reported coefficient', style: { color: th.muted, fontSize: '11px' } },
+            gridLineColor: th.grid,
+            labels: { style: { color: th.muted, fontSize: '11px' } },
+            min: min - pad,
+            max: max + pad,
+            plotLines: [{ value: 0, color: th.zero, width: 1, dashStyle: 'Dash', zIndex: 3 }]
+          },
+          tooltip: {
+            backgroundColor: th.tooltipBg,
+            borderColor: th.tooltipBorder,
+            style: { color: th.tooltipText },
+            formatter() {
+              const p = this.point;
+              if (!p || p.y == null) return false;
+              const lo = Number.isFinite(p.ciLower) ? p.ciLower.toFixed(digits) : '—';
+              const hi = Number.isFinite(p.ciUpper) ? p.ciUpper.toFixed(digits) : '—';
+              return `<b>${p.group}</b> (n=${p.n})<br/>${row.term}: <b>${Number(p.y).toFixed(digits)}</b><br/>95% CI [${lo}, ${hi}]`;
+            }
+          },
+          plotOptions: { series: { animation: false, states: { inactive: { opacity: 1 } } } },
+          series: [
+            { type: 'errorbar', data: errorData, whiskerLength: 10, lineWidth: 2, enableMouseTracking: false },
+            {
+              type: 'scatter',
+              data: pointData,
+              marker: { radius: 6, symbol: 'circle', lineWidth: 1, lineColor: 'rgba(255,255,255,.7)' },
+              dataLabels: {
+                enabled: true,
+                format: `{y:.${digits}f}`,
+                style: { color: th.text, fontSize: '11px', fontWeight: '700', textOutline: 'none' },
+                y: -12
+              }
+            }
+          ]
+        });
+        regSimCharts.push(chart);
+      });
+    }
+
+    function renderPredictedChart(host, groupCol, yName) {
+      ensurePredDefaults();
+      const xn = [...(modelSpec && modelSpec.xn ? modelSpec.xn : [])];
+      if (!xn.length || !predXVar) {
+        host.innerHTML = '<div class="dsp-kpi-note">Predicted response needs at least one numeric predictor on the horizontal axis.</div>';
+        return;
+      }
+      if (typeof Highcharts === 'undefined') {
+        host.innerHTML = '<div class="dsp-kpi-note">Charts need Highcharts to render.</div>';
+        return;
+      }
+      const stats = numericColStats(predXVar);
+      if (!stats) {
+        host.innerHTML = `<div class="dsp-kpi-note">No numeric values for ${escapeHtml(predXVar)}.</div>`;
+        return;
+      }
+      let min = stats.min;
+      let max = stats.max;
+      if (min === max) {
+        const pad = Math.max(Math.abs(min) * 0.1, 1);
+        min -= pad;
+        max += pad;
+      }
+      const steps = 40;
+      const xs = Array.from({ length: steps + 1 }, (_, i) => min + ((max - min) * i) / steps);
+      const catValues = currentCatValues();
+      const series = (activeGroupFits || []).map((gf, i) => {
+        if (!gf.fit || !gf.fit.results) return null;
+        const catInfo = dropNonvaryingCategoricals(fixedCategoricalInfo, (activeGroups[i] && activeGroups[i].rows) || []);
+        const data = xs.map((x) => {
+          const numericValues = currentNumericValues();
+          numericValues[predXVar] = x;
+          const yhat = predictFromFit(gf.fit, buildDesignVector(numericValues, catValues, catInfo));
+          return Number.isFinite(yhat) ? [x, yhat] : null;
+        }).filter(Boolean);
+        return {
+          type: 'line',
+          name: `${gf.group} (n=${gf.n})`,
+          color: groupChartColor(i),
+          data,
+          marker: { enabled: false },
+          lineWidth: 2
+        };
+      }).filter(Boolean);
+      if (!series.length) {
+        host.innerHTML = '<div class="dsp-kpi-note">No group models could be used to predict the response.</div>';
+        return;
+      }
+      host.innerHTML = '<div id="regSimPredChart" style="height:300px;width:100%;"></div>';
+      const th = chartTheme();
+      const digits = decimalDigits(3);
+      const chart = Highcharts.chart('regSimPredChart', {
+        chart: { backgroundColor: 'transparent', spacing: [18, 12, 16, 8], style: { fontFamily: 'inherit' } },
+        title: { text: `Predicted ${yName} by ${groupCol}`, align: 'left', style: { color: th.text, fontSize: '13px', fontWeight: '700' } },
+        subtitle: { text: `${predXVar} on the horizontal axis · other predictors held constant`, align: 'left', style: { color: th.muted, fontSize: '11px' } },
+        credits: { enabled: false },
+        legend: { itemStyle: { color: th.text, fontSize: '11px', fontWeight: '600' }, itemHoverStyle: { color: th.text } },
+        xAxis: {
+          title: { text: predXVar, style: { color: th.muted, fontSize: '11px' } },
+          gridLineColor: th.grid,
+          lineColor: th.line,
+          tickColor: th.line,
+          labels: { style: { color: th.muted, fontSize: '11px' } }
+        },
+        yAxis: {
+          title: { text: `Predicted ${yName}`, style: { color: th.muted, fontSize: '11px' } },
+          gridLineColor: th.grid,
+          labels: { style: { color: th.muted, fontSize: '11px' } }
+        },
+        tooltip: {
+          backgroundColor: th.tooltipBg,
+          borderColor: th.tooltipBorder,
+          style: { color: th.tooltipText },
+          shared: true,
+          valueDecimals: digits
+        },
+        plotOptions: { series: { animation: false } },
+        series
+      });
+      regSimCharts.push(chart);
     }
 
     function renderRegSimPairTable() {
@@ -1968,6 +2365,7 @@
         n: g.n,
         fit: fitRegression(g.rows, dropNonvaryingCategoricals(fixedCategoricalInfo, g.rows))
       }));
+      activeGroupFits = groupFits;
 
       tableRows = displayTerms.map((term, termIndex) => {
         const overall = extractCoef(overallFit, termIndex);

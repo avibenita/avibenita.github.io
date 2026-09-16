@@ -23,7 +23,9 @@ describe('shared contained tabs', () => {
     expect(css).toMatch(/#header-container[\s\S]*background:\s*transparent !important;/);
     expect(headerCss).toMatch(/#header-container[\s\S]*background:\s*transparent !important;/);
     expect(css).toMatch(/display:\s*none !important;/);
-    expect(css).toMatch(/--st-contained-h:\s*48px/);
+    expect(css).toMatch(/--st-header-pre-tabs:\s*80px/);
+    expect(css).toMatch(/\.sb-logo[\s\S]*border-bottom:\s*1px solid var\(--st-contained-divider\)/);
+    expect(headerCss).toMatch(/\.header-module-frame \{[\s\S]*border:\s*0;/);
     expect(css).toMatch(/border-top:\s*3px solid transparent/);
     expect(header).toMatch(/localStorage\.getItem\('statistico-tabs'\)/);
     expect(header).toMatch(/data-tabs-pref="classic"/);

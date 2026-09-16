@@ -18,7 +18,9 @@ describe('shared contained tabs', () => {
     expect(headerCss).toMatch(/--st-header-text:\s*#F5FAFF/);
     expect(headerCss).toMatch(/--st-header-tab-indicator:\s*#35CFFF/);
     expect(css).toMatch(/--st-contained-selected:\s*var\(--st-header-tab-selected/);
-    expect(css).toMatch(/background:\s*transparent !important;/);
+    expect(css).toMatch(/border-top:\s*1px solid var\(--st-contained-divider\)/);
+    expect(css).toMatch(/border-bottom:\s*1px solid var\(--st-contained-divider\)/);
+    expect(css).toMatch(/display:\s*none !important;/);
     expect(css).toMatch(/--st-contained-h:\s*48px/);
     expect(css).toMatch(/border-top:\s*3px solid transparent/);
     expect(header).toMatch(/localStorage\.getItem\('statistico-tabs'\)/);

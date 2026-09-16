@@ -2327,7 +2327,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260916headerband',
+  _TAB_ASSET_VER: '20260916tablines',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -3722,7 +3722,9 @@ const StatisticoHeader = {
       help: t.help
     })).join('');
     const activeTab = viewTabs.find((t) => t.panel === activePanel) || viewTabs[0];
-    const captionHtml = this._buildUniViewCaptionHtml(activeTab);
+    const captionHtml = this.getTabStylePreference() === 'classic'
+      ? this._buildUniViewCaptionHtml(activeTab)
+      : '';
     const ariaLabel = cfg.ariaLabel || 'Explore views';
     const describedBy = captionHtml ? ' aria-describedby="uniViewCaption"' : '';
     stack.innerHTML =
@@ -3818,7 +3820,9 @@ const StatisticoHeader = {
     const activeTab = viewTabs.find((t) => (
       t.inPage ? t.panel === activeInPageTab : t.view === this.currentView
     )) || viewTabs[0];
-    const captionHtml = this._buildUniViewCaptionHtml(activeTab);
+    const captionHtml = this.getTabStylePreference() === 'classic'
+      ? this._buildUniViewCaptionHtml(activeTab)
+      : '';
 
     const ariaLabel = activeSection.id === 'advanced'
       ? 'Normality and inference views'

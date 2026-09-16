@@ -1625,7 +1625,6 @@ const StatisticoHeader = {
       reliability: 'Evaluate internal consistency.',
       'descriptive-stats': 'Summarize variables and distributions.',
       'correlation-by-group': 'Compare pairwise r across group levels.',
-      'correlation-by-group-profile': 'See how other variables associate with an anchor across groups.',
       'correlation-by-group-similarity': 'See how closely groups resemble one another in correlation pattern, strength and sign.',
       'regression-by-group': 'Compare coefficients and residual normality across group levels.',
       'regression-by-group-coefficients': 'Compare coefficients and residual normality across group levels.',
@@ -3458,11 +3457,13 @@ const StatisticoHeader = {
         ariaLabel: 'Correlations by group views',
         inviteTabKey: 'correlation-by-group-similarity',
         seenKey: 'statistico.corr.similarityProfile.seen',
-        getActive: () => globalThis.__corrByGroupActiveTab || 'table',
+        getActive: () => {
+          const tab = globalThis.__corrByGroupActiveTab || 'table';
+          return tab === 'profile' ? 'table' : tab;
+        },
         onSelect: (panel) => this.setCorrByGroupResultsTab(panel),
         tabs: [
           { tabKey: 'correlation-by-group-table', label: 'Grouped r', icon: 'fa-table', panel: 'table', caption: 'Compare pairwise correlations across group levels.' },
-          { tabKey: 'correlation-by-group-profile', label: 'Group Profile', icon: 'fa-chart-line', panel: 'profile', caption: 'See how other variables associate with an anchor across groups.' },
           { tabKey: 'correlation-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in correlation pattern, strength and sign.', badge: 'STATISTICO', help: true }
         ]
       };
@@ -8093,7 +8094,6 @@ const StatisticoHeader = {
     if (this.module === 'correlations' && this.currentView === 'correlation-by-group') {
       const tab = globalThis.__corrByGroupActiveTab || 'table';
       if (tab === 'similarity') return 'correlation-by-group-similarity';
-      if (tab === 'profile') return 'correlation-by-group-profile';
       return 'correlation-by-group';
     }
     if (this.module === 'regression' && this.currentView === 'regression-by-group') {
@@ -9537,7 +9537,6 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       'taylor-diagram': 'Taylor Diagram',
       'descriptive-stats': 'Descriptives',
       'correlation-by-group': 'By Group',
-      'correlation-by-group-profile': 'Group Profile',
       'correlation-by-group-similarity': 'Similarity Profile™',
       correlations: 'Correlations'
     };
@@ -10002,7 +10001,6 @@ READING: [1–2 sentences comparing the named groups using exact per-group numbe
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
       'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group and a sparkline of group-specific correlations.',
-      'correlation-by-group-profile': 'Group Profile plots r between a chosen anchor variable and every other variable, one line per group level (Overall omitted). Use it to see which associations stay stable or reverse across groups.',
       'correlation-by-group-similarity': 'Similarity Profile™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. The layout matches Regression: a homogeneity gauge, a congruence scatter (r in one group vs r in the other), and a pairwise table with a three-component profile. Click a table row for the profile; click a congruence point to open that pair’s scatter. Group labels use col="level" (n=N).'
     };
   },

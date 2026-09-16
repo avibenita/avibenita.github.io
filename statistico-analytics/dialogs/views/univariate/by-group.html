@@ -14,10 +14,10 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260914w75" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260908bygrouptabs" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260908bygrouptabs"></script>
+  <script src="../shared-header.js?v=20260916overlay"></script>
   <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
-  <script src="../../shared/distribution-similarity.js?v=20260902dsp"></script>
+  <script src="../../shared/distribution-similarity.js?v=20260916overlay"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -117,6 +117,8 @@
       background:transparent; color:var(--text-secondary);
     }
     .dist-toggle button.active { background:linear-gradient(135deg, var(--accent-2), #6d5dfc); color:#fff; }
+    #overlayKindToggle.is-hidden { display:none; }
+    .dsp-overlap-toggles { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:8px 0; }
     .grouped-line-wrap {
       border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:8px 8px 4px;
     }
@@ -428,7 +430,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260908-uni-bygroup-v17">
+<body data-page-version="20260916-uni-bygroup-overlay">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -467,7 +469,11 @@
               <div class="section-title">
                 <strong id="distPanelTitle">Grouped distributions</strong>
                 <div class="dist-title-right">
-                  <span id="distPanelHint">One line per group on a shared value scale</span>
+                  <span id="distPanelHint">Overlapping kernel densities on a shared value scale</span>
+                  <div class="dist-toggle" id="overlayKindToggle" role="tablist" aria-label="Overlay geometry">
+                    <button type="button" id="overlayKernelBtn" class="active" role="tab" aria-selected="true" onclick="setOverlayKind('kernel')">Kernel</button>
+                    <button type="button" id="overlayHistBtn" role="tab" aria-selected="false" onclick="setOverlayKind('histogram')">Histogram</button>
+                  </div>
                   <div class="dist-toggle" role="tablist" aria-label="Distribution view">
                     <button type="button" id="distViewGroupedBtn" class="active" role="tab" aria-selected="true" onclick="setDistView('grouped')">Grouped</button>
                     <button type="button" id="distViewHistBtn" role="tab" aria-selected="false" onclick="setDistView('histograms')">Histograms</button>
@@ -515,9 +521,15 @@
                     <div class="dsp-card">
                       <div class="dsp-subhead" id="dspProfileTitle">Pair profile</div>
                       <div id="dspProfileBody"></div>
-                      <div class="dist-toggle" role="tablist" aria-label="Overlap view" style="margin:8px 0;">
-                        <button type="button" id="dspRawBtn" class="active" role="tab" aria-selected="true" onclick="setSimDistMode('raw')">Raw values</button>
-                        <button type="button" id="dspShapeBtn" role="tab" aria-selected="false" onclick="setSimDistMode('shape')">Standardized shape</button>
+                      <div class="dsp-overlap-toggles">
+                        <div class="dist-toggle" role="tablist" aria-label="Overlap view">
+                          <button type="button" id="dspRawBtn" class="active" role="tab" aria-selected="true" onclick="setSimDistMode('raw')">Raw values</button>
+                          <button type="button" id="dspShapeBtn" role="tab" aria-selected="false" onclick="setSimDistMode('shape')">Standardized shape</button>
+                        </div>
+                        <div class="dist-toggle" role="tablist" aria-label="Overlap geometry">
+                          <button type="button" id="dspKernelBtn" class="active" role="tab" aria-selected="true" onclick="setSimGeom('kernel')">Kernel</button>
+                          <button type="button" id="dspHistBtn" role="tab" aria-selected="false" onclick="setSimGeom('histogram')">Histogram</button>
+                        </div>
                       </div>
                       <div id="dspOverlapChart"></div>
                     </div>
@@ -653,6 +665,7 @@
     let boxplotChart = null;
     let groupedLineChart = null;
     let distView = 'grouped';
+    let overlayKind = 'kernel';
     let selectedGroup = null;
     const GROUP_LINE_COLORS = ['#818cf8', '#fb923c', '#34d399', '#f472b6', '#38bdf8', '#fbbf24', '#a78bfa', '#fb7185', '#2dd4bf', '#94a3b8'];
     let activeByGroupTab = 'stats';
@@ -663,6 +676,7 @@
     let dspProfile = null;
     let selectedSimPair = null;
     let simDistMode = 'raw';
+    let simGeom = 'kernel';
     let simOverlapChart = null;
 
     function fmt(value, digits = 2) {
@@ -1385,8 +1399,33 @@
       if (view === 'boxplot') {
         return { title: 'Grouped box plots', hint: 'One chart — compare spread and quartiles across groups' };
       }
-      return { title: 'Grouped distributions', hint: 'One line per group on a shared value scale' };
+      if (overlayKind === 'histogram') {
+        return { title: 'Grouped distributions', hint: 'Overlapping histograms on a shared value scale' };
+      }
+      return { title: 'Grouped distributions', hint: 'Overlapping kernel densities on a shared value scale' };
     }
+
+    function syncOverlayKindToggle() {
+      const wrap = document.getElementById('overlayKindToggle');
+      const kernelBtn = document.getElementById('overlayKernelBtn');
+      const histBtn = document.getElementById('overlayHistBtn');
+      if (wrap) wrap.classList.toggle('is-hidden', distView !== 'grouped');
+      if (kernelBtn) {
+        kernelBtn.classList.toggle('active', overlayKind === 'kernel');
+        kernelBtn.setAttribute('aria-selected', overlayKind === 'kernel' ? 'true' : 'false');
+      }
+      if (histBtn) {
+        histBtn.classList.toggle('active', overlayKind === 'histogram');
+        histBtn.setAttribute('aria-selected', overlayKind === 'histogram' ? 'true' : 'false');
+      }
+    }
+
+    function setOverlayKind(kind) {
+      overlayKind = kind === 'histogram' ? 'histogram' : 'kernel';
+      syncDistToggle();
+      if (distView === 'grouped') renderGroupedLineChart();
+    }
+    window.setOverlayKind = setOverlayKind;
 
     function syncDistToggle() {
       const groupedBtn = document.getElementById('distViewGroupedBtn');
@@ -1404,6 +1443,7 @@
         boxBtn.classList.toggle('active', distView === 'boxplot');
         boxBtn.setAttribute('aria-selected', distView === 'boxplot' ? 'true' : 'false');
       }
+      syncOverlayKindToggle();
       const meta = distViewMeta(distView);
       const title = document.getElementById('distPanelTitle');
       const hint = document.getElementById('distPanelHint');
@@ -1460,16 +1500,91 @@
       emphasizeGroupedLine(selectedGroup);
     }
 
+    function histStepPoints(centers, density, width) {
+      if (!centers.length || !width) return [];
+      const half = width / 2;
+      const pts = [[centers[0] - half, 0]];
+      centers.forEach((x, i) => {
+        const y = density[i] || 0;
+        pts.push([x - half, y], [x + half, y]);
+      });
+      pts.push([centers[centers.length - 1] + half, 0]);
+      return pts;
+    }
+
+    function overlapChartOptions(kind, xTitle, series, interactive) {
+      const isHist = kind === 'histogram';
+      const opts = {
+        chart: { type: isHist ? 'area' : 'areaspline', backgroundColor: 'transparent', spacing: [8, 8, 12, 10] },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: {
+          enabled: true,
+          itemStyle: { color: 'var(--text-secondary)', fontWeight: '600', fontSize: '11px' },
+          itemHoverStyle: { color: 'var(--text-primary)' },
+          itemHiddenStyle: { color: 'var(--text-secondary)' }
+        },
+        xAxis: {
+          title: { text: xTitle, style: { color: 'var(--text-secondary)', fontSize: '11px' } },
+          labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' } },
+          lineColor: 'var(--border)',
+          tickLength: 0,
+          gridLineColor: 'rgba(148,163,184,.12)'
+        },
+        yAxis: {
+          min: 0,
+          title: { text: 'Density', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
+          labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' } },
+          gridLineColor: 'rgba(148,163,184,.18)'
+        },
+        tooltip: { shared: true, valueDecimals: 3 },
+        plotOptions: {
+          areaspline: {
+            fillOpacity: 0.22,
+            lineWidth: 2.2,
+            marker: { enabled: false }
+          },
+          area: {
+            fillOpacity: 0.22,
+            lineWidth: 2.2,
+            marker: { enabled: false }
+          },
+          series: {
+            states: {
+              inactive: { opacity: 0.18 },
+              hover: { lineWidthPlus: 0.6 }
+            }
+          }
+        },
+        series
+      };
+      if (interactive) {
+        opts.plotOptions.series.cursor = 'pointer';
+        opts.plotOptions.series.events = {
+          click: function () {
+            selectedGroup = selectedGroup === this.name ? null : this.name;
+            syncTableChartSelection();
+          },
+          legendItemClick: function () {
+            selectedGroup = selectedGroup === this.name ? null : this.name;
+            syncTableChartSelection();
+            return false;
+          }
+        };
+      }
+      return opts;
+    }
+
     function emphasizeGroupedLine(name) {
       if (!groupedLineChart) return;
       groupedLineChart.series.forEach((s) => {
         const isOn = !name || s.name === name;
         const isSel = s.name === name;
         s.update({
-          lineWidth: isSel ? 3.6 : 2,
           opacity: isOn ? 1 : 0.18,
           zIndex: isSel ? 8 : 1,
-          marker: { enabled: true, radius: isSel ? 5.5 : 3.2, lineWidth: isSel ? 2 : 0 }
+          fillOpacity: isSel ? 0.38 : 0.22,
+          lineWidth: isSel ? 3.2 : 2.2
         }, false);
       });
       groupedLineChart.redraw();
@@ -1482,75 +1597,38 @@
         try { groupedLineChart.destroy(); } catch (_e) {}
         groupedLineChart = null;
       }
-      const allValues = groupStats.flatMap((g) => g.values);
-      if (!allValues.length) return;
-      const globalMin = Math.min(...allValues);
-      const globalMax = Math.max(...allValues);
-      const bins = 5;
-      const sample = histogramSeries(groupStats[0].values, globalMin, globalMax, bins);
-      const categories = sample.map((p) => p.name);
-      const series = groupStats.map((g) => ({
-        name: g.group,
-        color: colorForGroup(g.group),
-        data: histogramSeries(g.values, globalMin, globalMax, bins).map((p) => ({ y: p.pct, count: p.y })),
-        lineWidth: selectedGroup === g.group ? 3.6 : 2,
-        opacity: !selectedGroup || selectedGroup === g.group ? 1 : 0.18,
-        zIndex: selectedGroup === g.group ? 8 : 1,
-        marker: { enabled: true, radius: selectedGroup === g.group ? 5.5 : 3.2 }
-      }));
-      groupedLineChart = Highcharts.chart('groupedLineChart', {
-        chart: { type: 'spline', backgroundColor: 'transparent', spacing: [12, 12, 16, 18] },
-        title: { text: null },
-        credits: { enabled: false },
-        legend: {
-          enabled: true,
-          itemStyle: { color: 'var(--text-secondary)', fontWeight: '600', fontSize: '11px' },
-          itemHoverStyle: { color: 'var(--text-primary)' },
-          itemHiddenStyle: { color: 'var(--text-secondary)' }
-        },
-        xAxis: {
-          categories,
-          title: { text: 'Value range', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
-          labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' }, rotation: -25 },
-          lineColor: 'var(--border)',
-          tickLength: 0
-        },
-        yAxis: {
-          min: 0,
-          title: { text: 'Percent of group', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
-          labels: { format: '{value}%', style: { color: 'var(--text-secondary)', fontSize: '10px' } },
-          gridLineColor: 'rgba(148,163,184,.18)'
-        },
-        tooltip: {
-          shared: false,
-          pointFormat: '<b>{series.name}</b><br/>Percent: <b>{point.y:.1f}%</b><br/>Count: <b>{point.count}</b>'
-        },
-        plotOptions: {
-          spline: {
-            cursor: 'pointer',
-            stickyTracking: false,
-            marker: { symbol: 'circle', lineColor: '#fff' }
-          },
-          series: {
-            states: {
-              inactive: { opacity: 0.18 },
-              hover: { lineWidthPlus: 1.4 }
-            },
-            events: {
-              click: function () {
-                selectedGroup = selectedGroup === this.name ? null : this.name;
-                syncTableChartSelection();
-              },
-              legendItemClick: function () {
-                selectedGroup = selectedGroup === this.name ? null : this.name;
-                syncTableChartSelection();
-                return false;
-              }
-            }
-          }
-        },
-        series
-      });
+      if (typeof StatisticoDistributionSimilarity === 'undefined') return;
+      const isHist = overlayKind === 'histogram';
+      const series = [];
+      if (isHist) {
+        const hist = StatisticoDistributionSimilarity.histogramOverlay(groupStats, 'raw');
+        hist.series.forEach((s) => {
+          series.push({
+            name: s.name,
+            color: colorForGroup(s.name),
+            data: histStepPoints(hist.centers, s.density, hist.width),
+            opacity: !selectedGroup || selectedGroup === s.name ? 1 : 0.18,
+            zIndex: selectedGroup === s.name ? 8 : 1,
+            lineWidth: selectedGroup === s.name ? 3.2 : 2.2,
+            fillOpacity: selectedGroup === s.name ? 0.38 : 0.22
+          });
+        });
+      } else {
+        const ov = StatisticoDistributionSimilarity.overlayMany(groupStats, 'raw');
+        ov.series.forEach((s) => {
+          series.push({
+            name: s.name,
+            color: colorForGroup(s.name),
+            data: ov.grid.map((x, i) => [x, s.density[i]]),
+            lineWidth: selectedGroup === s.name ? 3.2 : 2.2,
+            opacity: !selectedGroup || selectedGroup === s.name ? 1 : 0.18,
+            zIndex: selectedGroup === s.name ? 8 : 1,
+            fillOpacity: selectedGroup === s.name ? 0.38 : 0.22
+          });
+        });
+      }
+      if (!series.length) return;
+      groupedLineChart = Highcharts.chart('groupedLineChart', overlapChartOptions(overlayKind, 'Value', series, true));
     }
 
     function renderHistograms() {
@@ -1745,10 +1823,11 @@
       selectSimPair(a, b, true);
     };
 
-    function setSimDistMode(mode) {
-      simDistMode = mode === 'shape' ? 'shape' : 'raw';
+    function syncSimToggles() {
       const rawBtn = document.getElementById('dspRawBtn');
       const shapeBtn = document.getElementById('dspShapeBtn');
+      const kernelBtn = document.getElementById('dspKernelBtn');
+      const histBtn = document.getElementById('dspHistBtn');
       if (rawBtn) {
         rawBtn.classList.toggle('active', simDistMode === 'raw');
         rawBtn.setAttribute('aria-selected', simDistMode === 'raw' ? 'true' : 'false');
@@ -1757,9 +1836,29 @@
         shapeBtn.classList.toggle('active', simDistMode === 'shape');
         shapeBtn.setAttribute('aria-selected', simDistMode === 'shape' ? 'true' : 'false');
       }
+      if (kernelBtn) {
+        kernelBtn.classList.toggle('active', simGeom === 'kernel');
+        kernelBtn.setAttribute('aria-selected', simGeom === 'kernel' ? 'true' : 'false');
+      }
+      if (histBtn) {
+        histBtn.classList.toggle('active', simGeom === 'histogram');
+        histBtn.setAttribute('aria-selected', simGeom === 'histogram' ? 'true' : 'false');
+      }
+    }
+
+    function setSimDistMode(mode) {
+      simDistMode = mode === 'shape' ? 'shape' : 'raw';
+      syncSimToggles();
       renderDspOverlap();
     }
     window.setSimDistMode = setSimDistMode;
+
+    function setSimGeom(kind) {
+      simGeom = kind === 'histogram' ? 'histogram' : 'kernel';
+      syncSimToggles();
+      renderDspOverlap();
+    }
+    window.setSimGeom = setSimGeom;
 
     function renderGroupSimilarity() {
       const empty = document.getElementById('dspEmpty');
@@ -1781,6 +1880,7 @@
       }
       empty.style.display = 'none';
       main.style.display = 'block';
+      syncSimToggles();
       if (selectedSimPair && !findSimPair(selectedSimPair.a, selectedSimPair.b)) selectedSimPair = null;
       if (!selectedSimPair && dspProfile.mostSimilar) {
         selectedSimPair = { a: dspProfile.mostSimilar.a, b: dspProfile.mostSimilar.b };
@@ -1921,44 +2021,25 @@
       const ga = groupStats.find((g) => g.group === pair.a);
       const gb = groupStats.find((g) => g.group === pair.b);
       if (!ga || !gb) return;
-      const overlay = StatisticoDistributionSimilarity.overlaySeries(ga, gb, simDistMode);
-      const dataA = overlay.grid.map((x, i) => [x, overlay.a[i]]);
-      const dataB = overlay.grid.map((x, i) => [x, overlay.b[i]]);
-      simOverlapChart = Highcharts.chart('dspOverlapChart', {
-        chart: { type: 'areaspline', backgroundColor: 'transparent', spacing: [8, 8, 12, 10] },
-        title: { text: null },
-        credits: { enabled: false },
-        legend: {
-          enabled: true,
-          itemStyle: { color: 'var(--text-secondary)', fontWeight: '600', fontSize: '11px' },
-          itemHoverStyle: { color: 'var(--text-primary)' }
-        },
-        xAxis: {
-          title: { text: simDistMode === 'shape' ? 'Standardized value' : 'Value', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
-          labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' } },
-          lineColor: 'var(--border)',
-          tickLength: 0,
-          gridLineColor: 'rgba(148,163,184,.12)'
-        },
-        yAxis: {
-          min: 0,
-          title: { text: 'Density', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
-          labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' } },
-          gridLineColor: 'rgba(148,163,184,.18)'
-        },
-        tooltip: { shared: true, valueDecimals: 3 },
-        plotOptions: {
-          areaspline: {
-            fillOpacity: 0.22,
-            lineWidth: 2.2,
-            marker: { enabled: false }
-          }
-        },
-        series: [
-          { name: ga.group, color: colorForGroup(ga.group), data: dataA },
-          { name: gb.group, color: colorForGroup(gb.group), data: dataB }
-        ]
-      });
+      const xTitle = simDistMode === 'shape' ? 'Standardized value' : 'Value';
+      const pairGroups = [ga, gb];
+      let series = [];
+      if (simGeom === 'histogram') {
+        const hist = StatisticoDistributionSimilarity.histogramOverlay(pairGroups, simDistMode);
+        series = hist.series.map((s) => ({
+          name: s.name,
+          color: colorForGroup(s.name),
+          data: histStepPoints(hist.centers, s.density, hist.width)
+        }));
+      } else {
+        const overlay = StatisticoDistributionSimilarity.overlayMany(pairGroups, simDistMode);
+        series = overlay.series.map((s) => ({
+          name: s.name,
+          color: colorForGroup(s.name),
+          data: overlay.grid.map((x, i) => [x, s.density[i]])
+        }));
+      }
+      simOverlapChart = Highcharts.chart('dspOverlapChart', overlapChartOptions(simGeom, xTitle, series, false));
     }
 
     function renderDspSelection() {

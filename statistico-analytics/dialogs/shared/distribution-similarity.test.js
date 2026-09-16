@@ -115,4 +115,33 @@ describe('Distribution Similarity Profile', () => {
     expect(row.usable).toBe(false);
     expect(row.overall).toBe(null);
   });
+
+  test('overlayMany shares one grid and a density per group', () => {
+    const a = group('A', BASE);
+    const b = group('B', shift(BASE, 3));
+    const ov = DSP.overlayMany([a, b], 'raw');
+    expect(ov.grid.length).toBe(201);
+    expect(ov.series).toHaveLength(2);
+    expect(ov.series[0].name).toBe('A');
+    expect(ov.series[1].name).toBe('B');
+    expect(ov.series[0].density).toHaveLength(ov.grid.length);
+    const areaA = ov.series[0].density.reduce((s, y, i) => {
+      if (i === ov.series[0].density.length - 1) return s;
+      return s + 0.5 * (y + ov.series[0].density[i + 1]) * ov.step;
+    }, 0);
+    expect(areaA).toBeCloseTo(1, 2);
+  });
+
+  test('histogramOverlay uses shared bins and densities that integrate to ~1', () => {
+    const a = group('A', BASE);
+    const b = group('B', shift(BASE, 2));
+    const hist = DSP.histogramOverlay([a, b], 'raw');
+    expect(hist.centers.length).toBeGreaterThanOrEqual(4);
+    expect(hist.centers.length).toBeLessThanOrEqual(40);
+    expect(hist.series).toHaveLength(2);
+    expect(hist.width).toBeGreaterThan(0);
+    const areaA = hist.series[0].density.reduce((s, y) => s + y * hist.width, 0);
+    expect(areaA).toBeCloseTo(1, 8);
+    expect(hist.series[0].counts.reduce((s, c) => s + c, 0)).toBe(BASE.length);
+  });
 });

@@ -296,19 +296,140 @@
     };
   }
 
-  function overlaySeries(a, b, mode) {
+  function groupValues(g, mode) {
     var useZ = mode === 'shape';
-    var aPts = (a && Array.isArray(a.values)) ? (useZ ? standardize(a.values, a.mean, a.stdDev) : a.values.slice()) : [];
-    var bPts = (b && Array.isArray(b.values)) ? (useZ ? standardize(b.values, b.mean, b.stdDev) : b.values.slice()) : [];
-    if (aPts.length < 2 || bPts.length < 2) {
-      return { grid: [], a: [], b: [], step: null, mode: useZ ? 'shape' : 'raw' };
+    var values = (g && Array.isArray(g.values)) ? g.values : [];
+    if (useZ && values.length && finite(g.mean) && finite(g.stdDev)) {
+      return standardize(values, g.mean, g.stdDev);
     }
-    var dens = pairedDensities(aPts, bPts);
+    return values.slice();
+  }
+
+  function namedValueGroups(groups, mode, minN) {
+    var list = Array.isArray(groups) ? groups : [];
+    var named = [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var pts = groupValues(list[i], mode);
+      if (pts.length >= minN) named.push({ name: groupName(list[i]), values: pts });
+    }
+    return named;
+  }
+
+  function overlayMany(groups, mode) {
+    var useZ = mode === 'shape';
+    var named = namedValueGroups(groups, mode, 2);
+    if (!named.length) {
+      return { grid: [], series: [], step: null, mode: useZ ? 'shape' : 'raw' };
+    }
+    var all = [];
+    var hs = [];
+    var i;
+    for (i = 0; i < named.length; i++) {
+      all = all.concat(named[i].values);
+      hs.push(silvermanBandwidth(named[i].values));
+    }
+    var h = Math.max.apply(null, hs);
+    var rng = rangeOf(all);
+    var spec = makeGrid(rng.min, rng.max, KERNEL_PAD * h, GRID_POINTS);
     return {
-      grid: dens.grid,
-      a: dens.a,
-      b: dens.b,
-      step: dens.step,
+      grid: spec.grid,
+      series: named.map(function (g) {
+        return {
+          name: g.name,
+          density: normalizeDensity(densityOnGrid(g.values, spec.grid, h), spec.step)
+        };
+      }),
+      step: spec.step,
+      mode: useZ ? 'shape' : 'raw'
+    };
+  }
+
+  function overlaySeries(a, b, mode) {
+    var many = overlayMany([a, b], mode);
+    var byName = Object.create(null);
+    many.series.forEach(function (s) { byName[s.name] = s.density; });
+    return {
+      grid: many.grid,
+      a: (a && byName[groupName(a)]) || (many.series[0] && many.series[0].density) || [],
+      b: (b && byName[groupName(b)]) || (many.series[1] && many.series[1].density) || [],
+      series: many.series,
+      step: many.step,
+      mode: many.mode
+    };
+  }
+
+  function iqrOf(values) {
+    var s = values.slice().sort(function (a, b) { return a - b; });
+    var n = s.length;
+    if (n < 2) return 0;
+    function q(p) {
+      var pos = (n - 1) * p;
+      var i = Math.floor(pos);
+      var f = pos - i;
+      return s[i + 1] !== undefined ? s[i] + f * (s[i + 1] - s[i]) : s[i];
+    }
+    return q(0.75) - q(0.25);
+  }
+
+  function fdBinWidth(values) {
+    var n = values.length;
+    if (n < 2) return 1;
+    var width = 2 * iqrOf(values) / Math.pow(n, 1 / 3);
+    if (!finite(width) || width <= 0) {
+      var sd = sampleStd(values);
+      width = 3.5 * sd / Math.pow(n, 1 / 3);
+    }
+    if (!finite(width) || width <= 0) {
+      var r = rangeOf(values);
+      width = Math.max((r.max - r.min) / 10, 1e-6);
+    }
+    return width;
+  }
+
+  function histogramOverlay(groups, mode) {
+    var useZ = mode === 'shape';
+    var named = namedValueGroups(groups, mode, 1);
+    if (!named.length) {
+      return { centers: [], edges: [], width: null, series: [], mode: useZ ? 'shape' : 'raw' };
+    }
+    var all = [];
+    var i;
+    var j;
+    for (i = 0; i < named.length; i++) all = all.concat(named[i].values);
+    var rng = rangeOf(all);
+    var width = fdBinWidth(all);
+    var span = rng.max - rng.min;
+    if (span <= 0) {
+      width = Math.max(width, 1);
+      rng.min -= width / 2;
+      rng.max += width / 2;
+      span = rng.max - rng.min;
+    }
+    var bins = Math.max(4, Math.min(40, Math.ceil(span / width) || 10));
+    width = span / bins;
+    var edges = new Array(bins + 1);
+    for (i = 0; i <= bins; i++) edges[i] = rng.min + i * width;
+    var centers = new Array(bins);
+    for (i = 0; i < bins; i++) centers[i] = (edges[i] + edges[i + 1]) / 2;
+    return {
+      centers: centers,
+      edges: edges,
+      width: width,
+      series: named.map(function (g) {
+        var counts = new Array(bins);
+        for (i = 0; i < bins; i++) counts[i] = 0;
+        for (j = 0; j < g.values.length; j++) {
+          var idx = Math.min(bins - 1, Math.max(0, Math.floor((g.values[j] - rng.min) / width)));
+          counts[idx] += 1;
+        }
+        var n = g.values.length || 1;
+        return {
+          name: g.name,
+          counts: counts,
+          density: counts.map(function (c) { return c / (n * width); })
+        };
+      }),
       mode: useZ ? 'shape' : 'raw'
     };
   }
@@ -322,6 +443,8 @@
     comparePair: comparePair,
     buildProfile: buildProfile,
     overlaySeries: overlaySeries,
+    overlayMany: overlayMany,
+    histogramOverlay: histogramOverlay,
     overlapCoefficient: overlapCoefficient
   };
 });

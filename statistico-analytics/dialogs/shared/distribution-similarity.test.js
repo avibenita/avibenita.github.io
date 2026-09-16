@@ -138,6 +138,8 @@ describe('Distribution Similarity Profile', () => {
     const hist = DSP.histogramOverlay([a, b], 'raw');
     expect(hist.centers.length).toBeGreaterThanOrEqual(8);
     expect(hist.centers.length).toBeLessThanOrEqual(40);
+    expect(hist.labels).toHaveLength(hist.centers.length);
+    expect(hist.labels[0]).toMatch(/–/);
     expect(hist.series).toHaveLength(2);
     expect(hist.width).toBeGreaterThan(0);
     const areaA = hist.series[0].density.reduce((s, y) => s + y * hist.width, 0);

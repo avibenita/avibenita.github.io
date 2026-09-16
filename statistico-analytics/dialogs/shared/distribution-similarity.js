@@ -387,11 +387,22 @@
     return width;
   }
 
+  function formatRangeLabel(lo, hi) {
+    function edge(v) {
+      if (!finite(v)) return '—';
+      var abs = Math.abs(v);
+      if (Math.abs(v - Math.round(v)) < 1e-6) return String(Math.round(v));
+      if (abs >= 10) return v.toFixed(1);
+      return v.toFixed(2);
+    }
+    return edge(lo) + '–' + edge(hi);
+  }
+
   function histogramOverlay(groups, mode) {
     var useZ = mode === 'shape';
     var named = namedValueGroups(groups, mode, 1);
     if (!named.length) {
-      return { centers: [], edges: [], width: null, series: [], mode: useZ ? 'shape' : 'raw' };
+      return { centers: [], edges: [], labels: [], width: null, series: [], mode: useZ ? 'shape' : 'raw' };
     }
     var all = [];
     var i;
@@ -414,10 +425,15 @@
     var edges = new Array(bins + 1);
     for (i = 0; i <= bins; i++) edges[i] = rng.min + i * width;
     var centers = new Array(bins);
-    for (i = 0; i < bins; i++) centers[i] = (edges[i] + edges[i + 1]) / 2;
+    var labels = new Array(bins);
+    for (i = 0; i < bins; i++) {
+      centers[i] = (edges[i] + edges[i + 1]) / 2;
+      labels[i] = formatRangeLabel(edges[i], edges[i + 1]);
+    }
     return {
       centers: centers,
       edges: edges,
+      labels: labels,
       width: width,
       series: named.map(function (g) {
         var counts = new Array(bins);

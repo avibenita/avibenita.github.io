@@ -746,18 +746,18 @@ const StatisticoHeader = {
   render() {
     const viewTitles = {
       // Univariate views
-      'histogram': 'Distribution · Histogram',
+      'histogram': 'Distribution \u00B7 Histogram',
       'boxplot': 'Box Plot & Outliers',
-      'qqplot': 'Normality · PP/QQ',
-      'normality': 'Normality · Tests',
+      'qqplot': 'Normality \u00B7 PP/QQ',
+      'normality': 'Normality \u00B7 Tests',
       'kernel': 'Kernel',
       'descriptive-stats': 'Descriptive Statistics',
       'by-group': 'Grouped Analysis',
-      'cdf': 'Distribution · CDF',
+      'cdf': 'Distribution \u00B7 CDF',
       'confidence': 'Confidence Intervals',
       'hypothesis': 'One-Sample Test',
       'outliers': 'Outliers',
-      'percentile': 'Distribution · Percentiles',
+      'percentile': 'Distribution \u00B7 Percentiles',
       // Correlation views
       'correlation-matrix': 'Correlation Matrix',
       'correlation-network': 'Correlation Network',
@@ -2327,7 +2327,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260916nobot',
+  _TAB_ASSET_VER: '20260916nokick',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -3944,7 +3944,6 @@ const StatisticoHeader = {
         <div class="sb-logo-icon" data-statistico-brand-logo></div>
       </div>
       <div class="sb-body">
-        <div class="sb-analyses-kicker">Analyses</div>
         ${groupsHtml}${this._renderSidebarPinnedNav(cfg)}
       </div>
     `;

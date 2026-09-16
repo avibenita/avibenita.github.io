@@ -14,7 +14,7 @@
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../shared-header.js?v=20260915regsim8"></script>
   <script src="../../shared/regression-similarity.js?v=20260914regsim6"></script>
-  <script src="../../shared/regression-pred-labels.js?v=20260915pred1"></script>
+  <script src="../../shared/regression-pred-labels.js?v=20260916pred2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260524a"></script>
@@ -306,7 +306,7 @@
     .fit-card { border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:var(--surface-1); min-width:0; }
     .fit-card-overall { border-color:color-mix(in srgb, var(--accent-1) 42%, var(--border)); background:linear-gradient(180deg, color-mix(in srgb, var(--accent-1) 10%, var(--surface-1)) 0%, var(--surface-1) 100%); }
     .fit-card-group { border-color:color-mix(in srgb, var(--accent-2) 42%, var(--border)); background:linear-gradient(180deg, color-mix(in srgb, var(--accent-2) 10%, var(--surface-1)) 0%, var(--surface-1) 100%); }
-    .fit-card-label { font-size:14px; font-weight:800; color:var(--accent-2); margin-bottom:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fit-card-label { font-size:14px; font-weight:800; color:var(--accent-2); margin-bottom:8px; line-height:1.3; }
     .fit-card-overall .fit-card-label { color:var(--accent-1); }
     .fit-metrics { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 10px; margin-bottom:10px; font-size:11px; }
     .fit-metrics span { color:var(--text-secondary); }
@@ -570,7 +570,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260915-reg-bygroup-v33">
+<body data-page-version="20260916-reg-bygroup-v34">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -942,7 +942,7 @@
       if (!strip || !grid) return;
 
       const entries = (showOverallModel ? [{ label: 'Overall — pooled fit', fit: overall, overall: true }] : [])
-        .concat(groupFits.map((g) => ({ label: prettyGroupLabel(g.group), fit: g.fit, overall: false })));
+        .concat(groupFits.map((g) => ({ label: groupLevelWithN(g.group, fittedN(g.fit)), fit: g.fit, overall: false })));
 
       strip.style.display = 'block';
       grid.innerHTML = entries.map((entry) => {
@@ -1416,8 +1416,7 @@
         previewLevels.map((item, pos) => `
           <div class="level-row${isLevelIncluded(previewGroupIndex, item.level) ? ' is-included' : ''}" role="checkbox" tabindex="0" aria-checked="${isLevelIncluded(previewGroupIndex, item.level) ? 'true' : 'false'}" data-level-pos="${pos}" title="${escapeHtml(item.level)}">
             <span class="level-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
-            <span class="level-name">${escapeHtml(item.level)}</span>
-            <span class="level-n">n=${item.n}</span>
+            <span class="level-name">${escapeHtml(groupLevelWithN(item.level, item.n, sourceHeaders[previewGroupIndex]))}</span>
           </div>
         `).join('')
       ].join('');
@@ -1589,7 +1588,7 @@
       if (!strip || !cards) return;
 
       const entries = (showOverallModel ? [{ label: 'Overall — pooled fit', fit: overall, type: 'overall' }] : [])
-        .concat(groups.map((g) => ({ label: prettyGroupLabel(g.group), fit: g.fit, type: 'group' })));
+        .concat(groups.map((g) => ({ label: groupLevelWithN(g.group, fittedN(g.fit)), fit: g.fit, type: 'group' })));
 
       strip.style.display = 'block';
       const groupNote = groupingIsModelPredictor()
@@ -1612,7 +1611,7 @@
         const normCls = !Number.isFinite(norm.p) ? 'fit-norm-na' : (norm.p >= 0.05 ? 'fit-norm-ok' : 'fit-norm-bad');
         const histTip = `Residual histogram (n=${fit.n}). Min=${fmt(Math.min(...fit.residuals), 3)}, max=${fmt(Math.max(...fit.residuals), 3)}.`;
         return `<div class="fit-card ${cardType}">
-          <div class="fit-card-label" title="${escapeHtml(entry.label)}">${escapeHtml(entry.label)}${Number.isFinite(fittedN(fit)) ? ` · n=${fittedN(fit)}` : ''}</div>
+          <div class="fit-card-label" title="${escapeHtml(entry.label)}">${escapeHtml(entry.label)}</div>
           <div class="fit-metrics">
             <span>R²<strong>${fmt(fit.results.R2, 3)}</strong></span>
             <span>Adj R²<strong>${fmt(fit.results.R2_adj, 3)}</strong></span>
@@ -1689,10 +1688,9 @@
       }
       activeGroups.forEach((g, i) => {
         const gf = groupFitAt(i);
-        const meta = nHeadingMeta(gf && gf.fit, g.n);
+        const n = fittedN(gf && gf.fit);
         const tip = nHeadingTip(gf && gf.fit, g.n);
-        const labelMeta = details ? meta : (meta ? `β · ${meta}` : 'β');
-        row1.push(categoryTh(prettyGroupLabel(g.group), labelMeta, groupSpan, i === 0 ? 'group-category-first' : '', tip, details ? '' : `group:${i}:beta`));
+        row1.push(categoryTh(groupLevelWithN(g.group, n), details ? '' : 'β', groupSpan, i === 0 ? 'group-category-first' : '', tip, details ? '' : `group:${i}:beta`));
       });
       row1.push(`${patternTh}</tr>`);
 
@@ -2115,10 +2113,18 @@
         : String(name || '');
     }
 
-    function prettyGroupLabel(raw) {
+    function prettyGroupLabel(raw, colName) {
       return typeof predLabels().prettyGroupLabel === 'function'
-        ? predLabels().prettyGroupLabel(raw, groupingColumnName())
+        ? predLabels().prettyGroupLabel(raw, colName || groupingColumnName())
         : String(raw == null ? '' : raw);
+    }
+
+    function groupLevelWithN(raw, n, colName) {
+      if (typeof predLabels().groupLevelWithN === 'function') {
+        return predLabels().groupLevelWithN(raw, colName || groupingColumnName(), n);
+      }
+      const base = prettyGroupLabel(raw, colName);
+      return Number.isFinite(Number(n)) ? `${base} (n=${Number(n)})` : base;
     }
 
     function numericColStats(name, rows) {
@@ -2612,7 +2618,7 @@
         const catValues = catValuesForGroup(groupRows);
         const xs = xGridForGroup(groupRows, stats);
         const color = groupChartColor(i);
-        const label = `${prettyGroupLabel(gf.group)} (n=${gf.n})`;
+        const label = groupLevelWithN(gf.group, gf.n);
         const lineData = [];
         const bandData = [];
         xs.forEach((x) => {
@@ -2783,7 +2789,7 @@
           ${dspBar('Strength', pair.strength)}
           ${dspBar('Sign', pair.sign)}
         </div>
-        <div class="dsp-kpi-note">Comparing β in ${escapeHtml(prettyGroupLabel(pair.a))} (n=${pair.nA}) with β in ${escapeHtml(prettyGroupLabel(pair.b))} (n=${pair.nB}). ${pair.pairCount} overlapping coefficients. Intercept omitted.</div>
+        <div class="dsp-kpi-note">Comparing β in ${escapeHtml(groupLevelWithN(pair.a, pair.nA))} with β in ${escapeHtml(groupLevelWithN(pair.b, pair.nB))}. ${pair.pairCount} overlapping coefficients. Intercept omitted.</div>
       `;
       animateProfileBars();
     }
@@ -2861,7 +2867,7 @@
       const exportHeaders = [
         'Term', 'Stability',
         'Overall β', 'Overall 95% CI lower', 'Overall 95% CI upper', 'Overall p',
-        ...activeGroups.flatMap((g) => [`${g.group} β`, `${g.group} 95% CI lower`, `${g.group} 95% CI upper`])
+        ...activeGroups.flatMap((g) => [`${prettyGroupLabel(g.group)} β`, `${prettyGroupLabel(g.group)} 95% CI lower`, `${prettyGroupLabel(g.group)} 95% CI upper`])
       ];
       const exportRows = getSortedRows();
       StatisticoHeader.registerActions({

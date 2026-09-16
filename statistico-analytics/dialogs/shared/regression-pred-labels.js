@@ -22,8 +22,6 @@
     day: 'days',
     wk: 'weeks'
   };
-  var LEVEL_WORDS = { high: 1, low: 1, medium: 1, mid: 1, med: 1 };
-
   function predictorStem(name) {
     return String(name || '')
       .replace(RECODE_SUFFIX, '')
@@ -65,14 +63,28 @@
     return prettyPredictor(stripped).replace(/\s*\([^)]*\)\s*$/, '').trim();
   }
 
-  function prettyGroupLabel(raw, groupingName) {
+  function displayLevel(raw) {
     var s = String(raw == null ? '' : raw).trim();
     if (!s) return s;
-    var noun = groupingNoun(groupingName);
-    if (noun && LEVEL_WORDS[s.toLowerCase()]) {
-      return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() + ' ' + noun.toLowerCase();
-    }
-    return prettyPredictor(s);
+    if (s !== s.toLowerCase()) return s;
+    return s.replace(/(^|[\s_-])([a-z])/g, function (_m, sep, ch) {
+      return (sep === '_' || sep === '-' ? ' ' : sep) + ch.toUpperCase();
+    });
+  }
+
+  function prettyGroupLabel(raw, groupingName) {
+    var level = displayLevel(raw);
+    if (!level) return '';
+    var g = String(groupingName || '').trim();
+    if (!g) return level;
+    return g + '="' + level + '"';
+  }
+
+  function groupLevelWithN(raw, groupingName, n) {
+    var label = prettyGroupLabel(raw, groupingName);
+    var count = Number(n);
+    if (!label) return Number.isFinite(count) ? '(n=' + count + ')' : '';
+    return Number.isFinite(count) ? label + ' (n=' + count + ')' : label;
   }
 
   return {
@@ -80,6 +92,8 @@
     isLinkedToGrouping: isLinkedToGrouping,
     prettyPredictor: prettyPredictor,
     groupingNoun: groupingNoun,
-    prettyGroupLabel: prettyGroupLabel
+    displayLevel: displayLevel,
+    prettyGroupLabel: prettyGroupLabel,
+    groupLevelWithN: groupLevelWithN
   };
 });

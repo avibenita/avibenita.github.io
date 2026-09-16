@@ -14,8 +14,9 @@ describe('Regression predicted-response labels', () => {
     expect(Labels.isLinkedToGrouping('Experience_yr', 'Training_hr_recode')).toBe(false);
   });
 
-  test('labels high/low groups from a training recode', () => {
-    expect(Labels.prettyGroupLabel('high', 'Training_hr_recode')).toBe('High training');
-    expect(Labels.prettyGroupLabel('low', 'Training_hr_recode')).toBe('Low training');
+  test('labels group levels as column="Level"', () => {
+    expect(Labels.prettyGroupLabel('high', 'tcat')).toBe('tcat="High"');
+    expect(Labels.prettyGroupLabel('low', 'tcat')).toBe('tcat="Low"');
+    expect(Labels.groupLevelWithN('high', 'tcat', 61)).toBe('tcat="High" (n=61)');
   });
 });

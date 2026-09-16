@@ -136,7 +136,7 @@ describe('Distribution Similarity Profile', () => {
     const a = group('A', BASE);
     const b = group('B', shift(BASE, 2));
     const hist = DSP.histogramOverlay([a, b], 'raw');
-    expect(hist.centers.length).toBeGreaterThanOrEqual(4);
+    expect(hist.centers.length).toBeGreaterThanOrEqual(8);
     expect(hist.centers.length).toBeLessThanOrEqual(40);
     expect(hist.series).toHaveLength(2);
     expect(hist.width).toBeGreaterThan(0);

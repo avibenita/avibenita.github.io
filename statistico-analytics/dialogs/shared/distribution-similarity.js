@@ -398,7 +398,10 @@
     var j;
     for (i = 0; i < named.length; i++) all = all.concat(named[i].values);
     var rng = rangeOf(all);
-    var width = fdBinWidth(all);
+    var width = named.reduce(function (minW, g) {
+      var w = fdBinWidth(g.values);
+      return w < minW ? w : minW;
+    }, fdBinWidth(all));
     var span = rng.max - rng.min;
     if (span <= 0) {
       width = Math.max(width, 1);
@@ -406,7 +409,7 @@
       rng.max += width / 2;
       span = rng.max - rng.min;
     }
-    var bins = Math.max(4, Math.min(40, Math.ceil(span / width) || 10));
+    var bins = Math.max(8, Math.min(30, Math.ceil(span / width) || 12));
     width = span / bins;
     var edges = new Array(bins + 1);
     for (i = 0; i <= bins; i++) edges[i] = rng.min + i * width;

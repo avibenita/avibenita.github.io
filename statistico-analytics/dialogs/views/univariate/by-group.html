@@ -17,7 +17,7 @@
   <script src="../shared-header.js?v=20260916overlay"></script>
   <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
-  <script src="../../shared/distribution-similarity.js?v=20260916overlay"></script>
+  <script src="../../shared/distribution-similarity.js?v=20260916histbars"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -430,7 +430,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260916-uni-bygroup-overlay">
+<body data-page-version="20260916-uni-bygroup-histbars">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -1400,7 +1400,7 @@
         return { title: 'Grouped box plots', hint: 'One chart — compare spread and quartiles across groups' };
       }
       if (overlayKind === 'histogram') {
-        return { title: 'Grouped distributions', hint: 'Overlapping histograms on a shared value scale' };
+        return { title: 'Grouped distributions', hint: 'Overlapping histogram bars on a shared value scale' };
       }
       return { title: 'Grouped distributions', hint: 'Overlapping kernel densities on a shared value scale' };
     }
@@ -1500,22 +1500,10 @@
       emphasizeGroupedLine(selectedGroup);
     }
 
-    function histStepPoints(centers, density, width) {
-      if (!centers.length || !width) return [];
-      const half = width / 2;
-      const pts = [[centers[0] - half, 0]];
-      centers.forEach((x, i) => {
-        const y = density[i] || 0;
-        pts.push([x - half, y], [x + half, y]);
-      });
-      pts.push([centers[centers.length - 1] + half, 0]);
-      return pts;
-    }
-
     function overlapChartOptions(kind, xTitle, series, interactive) {
       const isHist = kind === 'histogram';
       const opts = {
-        chart: { type: isHist ? 'area' : 'areaspline', backgroundColor: 'transparent', spacing: [8, 8, 12, 10] },
+        chart: { type: isHist ? 'column' : 'areaspline', backgroundColor: 'transparent', spacing: [8, 8, 12, 10] },
         title: { text: null },
         credits: { enabled: false },
         legend: {
@@ -1533,26 +1521,32 @@
         },
         yAxis: {
           min: 0,
-          title: { text: 'Density', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
+          title: { text: isHist ? 'Frequency' : 'Density', style: { color: 'var(--text-secondary)', fontSize: '11px' } },
           labels: { style: { color: 'var(--text-secondary)', fontSize: '10px' } },
           gridLineColor: 'rgba(148,163,184,.18)'
         },
-        tooltip: { shared: true, valueDecimals: 3 },
+        tooltip: isHist
+          ? { shared: true, headerFormat: '<span style="font-size:11px">{point.key:.2f}</span><br/>', pointFormat: '<span style="color:{point.color}">\u25CF</span> {series.name}: <b>{point.y}</b> ({point.pct:.1f}%)<br/>' }
+          : { shared: true, valueDecimals: 3 },
         plotOptions: {
           areaspline: {
             fillOpacity: 0.22,
             lineWidth: 2.2,
             marker: { enabled: false }
           },
-          area: {
-            fillOpacity: 0.22,
-            lineWidth: 2.2,
-            marker: { enabled: false }
+          column: {
+            grouping: false,
+            pointPadding: 0,
+            groupPadding: 0,
+            borderWidth: 1,
+            borderRadius: 0,
+            fillOpacity: 0.42,
+            shadow: false
           },
           series: {
             states: {
               inactive: { opacity: 0.18 },
-              hover: { lineWidthPlus: 0.6 }
+              hover: { lineWidthPlus: 0.6, brightness: 0.08 }
             }
           }
         },
@@ -1577,17 +1571,35 @@
 
     function emphasizeGroupedLine(name) {
       if (!groupedLineChart) return;
+      const isHist = overlayKind === 'histogram';
       groupedLineChart.series.forEach((s) => {
         const isOn = !name || s.name === name;
         const isSel = s.name === name;
         s.update({
           opacity: isOn ? 1 : 0.18,
           zIndex: isSel ? 8 : 1,
-          fillOpacity: isSel ? 0.38 : 0.22,
-          lineWidth: isSel ? 3.2 : 2.2
+          fillOpacity: isHist ? (isSel ? 0.7 : 0.42) : (isSel ? 0.38 : 0.22),
+          lineWidth: isHist ? 1 : (isSel ? 3.2 : 2.2)
         }, false);
       });
       groupedLineChart.redraw();
+    }
+
+    function overlayHistSeries(groups, mode) {
+      const hist = StatisticoDistributionSimilarity.histogramOverlay(groups, mode);
+      return hist.series.map((s) => {
+        const total = s.counts.reduce((sum, c) => sum + c, 0) || 1;
+        return {
+          name: s.name,
+          color: colorForGroup(s.name),
+          pointRange: hist.width,
+          data: hist.centers.map((x, i) => ({
+            x,
+            y: s.counts[i],
+            pct: s.counts[i] / total * 100
+          }))
+        };
+      });
     }
 
     function renderGroupedLineChart() {
@@ -1598,34 +1610,24 @@
         groupedLineChart = null;
       }
       if (typeof StatisticoDistributionSimilarity === 'undefined') return;
-      const isHist = overlayKind === 'histogram';
-      const series = [];
-      if (isHist) {
-        const hist = StatisticoDistributionSimilarity.histogramOverlay(groupStats, 'raw');
-        hist.series.forEach((s) => {
-          series.push({
-            name: s.name,
-            color: colorForGroup(s.name),
-            data: histStepPoints(hist.centers, s.density, hist.width),
-            opacity: !selectedGroup || selectedGroup === s.name ? 1 : 0.18,
-            zIndex: selectedGroup === s.name ? 8 : 1,
-            lineWidth: selectedGroup === s.name ? 3.2 : 2.2,
-            fillOpacity: selectedGroup === s.name ? 0.38 : 0.22
-          });
-        });
+      let series = [];
+      if (overlayKind === 'histogram') {
+        series = overlayHistSeries(groupStats, 'raw').map((s) => Object.assign(s, {
+          opacity: !selectedGroup || selectedGroup === s.name ? 1 : 0.18,
+          zIndex: selectedGroup === s.name ? 8 : 1,
+          fillOpacity: selectedGroup === s.name ? 0.7 : 0.42
+        }));
       } else {
         const ov = StatisticoDistributionSimilarity.overlayMany(groupStats, 'raw');
-        ov.series.forEach((s) => {
-          series.push({
-            name: s.name,
-            color: colorForGroup(s.name),
-            data: ov.grid.map((x, i) => [x, s.density[i]]),
-            lineWidth: selectedGroup === s.name ? 3.2 : 2.2,
-            opacity: !selectedGroup || selectedGroup === s.name ? 1 : 0.18,
-            zIndex: selectedGroup === s.name ? 8 : 1,
-            fillOpacity: selectedGroup === s.name ? 0.38 : 0.22
-          });
-        });
+        series = ov.series.map((s) => ({
+          name: s.name,
+          color: colorForGroup(s.name),
+          data: ov.grid.map((x, i) => [x, s.density[i]]),
+          lineWidth: selectedGroup === s.name ? 3.2 : 2.2,
+          opacity: !selectedGroup || selectedGroup === s.name ? 1 : 0.18,
+          zIndex: selectedGroup === s.name ? 8 : 1,
+          fillOpacity: selectedGroup === s.name ? 0.38 : 0.22
+        }));
       }
       if (!series.length) return;
       groupedLineChart = Highcharts.chart('groupedLineChart', overlapChartOptions(overlayKind, 'Value', series, true));
@@ -2025,12 +2027,7 @@
       const pairGroups = [ga, gb];
       let series = [];
       if (simGeom === 'histogram') {
-        const hist = StatisticoDistributionSimilarity.histogramOverlay(pairGroups, simDistMode);
-        series = hist.series.map((s) => ({
-          name: s.name,
-          color: colorForGroup(s.name),
-          data: histStepPoints(hist.centers, s.density, hist.width)
-        }));
+        series = overlayHistSeries(pairGroups, simDistMode);
       } else {
         const overlay = StatisticoDistributionSimilarity.overlayMany(pairGroups, simDistMode);
         series = overlay.series.map((s) => ({

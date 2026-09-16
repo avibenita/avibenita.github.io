@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260914w75" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260908bygrouptabs" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260916kernelback"></script>
+  <script src="../shared-header.js?v=20260916zoom"></script>
   <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <script src="../../shared/distribution-similarity.js?v=20260916histrange"></script>
@@ -103,9 +103,21 @@
     }
     .hist-grid { display:grid; grid-template-columns:repeat(4, minmax(180px, 1fr)); gap:10px; }
     .hist-grid.is-hidden { display:none; }
-    .hist-card { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; transition:opacity .15s ease, box-shadow .15s ease; }
+    .hist-card { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden; transition:opacity .15s ease, box-shadow .15s ease; cursor:pointer; }
     .hist-card.is-dimmed { opacity:.38; }
     .hist-card.is-selected { box-shadow:inset 3px 0 0 var(--group-color, var(--accent-2)), 0 0 0 1px color-mix(in srgb, var(--group-color, var(--accent-2)) 45%, transparent); }
+    .chart-zoom-overlay { position:fixed; inset:0; z-index:2147483300; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(3,7,18,.72); backdrop-filter:blur(4px); }
+    .chart-zoom-overlay.is-open { display:flex; }
+    .chart-zoom-box {
+      width:min(920px, 96vw); height:min(640px, 88vh);
+      display:flex; flex-direction:column;
+      background:var(--surface-1); border:1px solid var(--border); border-radius:14px;
+      box-shadow:0 24px 70px rgba(0,0,0,.45); overflow:hidden;
+    }
+    .chart-zoom-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:14px 16px; border-bottom:1px solid var(--border); }
+    .chart-zoom-head strong { display:block; color:var(--accent-1); font-size:16px; }
+    .chart-zoom-head span { color:var(--text-secondary); font-size:12px; }
+    .chart-zoom-chart { flex:1; min-height:0; padding:8px 12px 12px; }
     .hist-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 9px; border-bottom:1px solid var(--border); color:var(--text-secondary); font-size:10px; }
     .hist-head strong { color:var(--accent-1); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .hist-head span { white-space:nowrap; }
@@ -429,7 +441,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260916-uni-bygroup-kernelback">
+<body data-page-version="20260916-uni-bygroup-zoom">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -456,7 +468,7 @@
           <div id="mainContent" style="display:none;">
             <div id="byGroupPanel-stats" class="by-group-panel is-active">
             <section id="tablePanel" class="panel">
-              <div class="section-title"><strong>Grouped Statistics</strong><span>Select a group to emphasize it on the chart</span></div>
+              <div class="section-title"><strong>Grouped Statistics</strong><span>Select a group to zoom its chart</span></div>
               <div class="table-wrap" id="statsTableWrap">
                 <table id="statsTable">
                   <thead id="statsHead"></thead>
@@ -552,6 +564,18 @@
           </div>
         </div>
       </section>
+    </div>
+  </div>
+  <div class="chart-zoom-overlay" id="chartZoomOverlay" role="dialog" aria-modal="true" aria-labelledby="chartZoomTitle">
+    <div class="chart-zoom-box">
+      <div class="chart-zoom-head">
+        <div>
+          <strong id="chartZoomTitle">Group</strong>
+          <span id="chartZoomMeta"></span>
+        </div>
+        <button class="group-dialog-close" type="button" onclick="closeChartZoom()" aria-label="Close zoomed chart"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="chart-zoom-chart" id="chartZoomChart"></div>
     </div>
   </div>
   <div class="group-dialog-overlay" id="groupDialog" role="dialog" aria-modal="true" aria-labelledby="groupDialogTitle">
@@ -659,6 +683,7 @@
     const levelCountCache = Object.create(null);
     let boxplotChart = null;
     let kernelChart = null;
+    let zoomChart = null;
     let distView = 'kernel';
     let selectedGroup = null;
     const GROUP_LINE_COLORS = ['#818cf8', '#fb923c', '#34d399', '#f472b6', '#38bdf8', '#fbbf24', '#a78bfa', '#fb7185', '#2dd4bf', '#94a3b8'];
@@ -1466,6 +1491,112 @@
         card.classList.toggle('is-dimmed', !!selectedGroup && !match);
       });
       emphasizeKernelSeries(selectedGroup);
+      if (selectedGroup) openChartZoom(selectedGroup);
+      else closeChartZoom(true);
+    }
+
+    function destroyZoomChart() {
+      if (!zoomChart) return;
+      try { zoomChart.destroy(); } catch (_e) {}
+      zoomChart = null;
+    }
+
+    function closeChartZoom(keepSelection) {
+      const overlay = document.getElementById('chartZoomOverlay');
+      if (overlay) overlay.classList.remove('is-open');
+      destroyZoomChart();
+      if (!keepSelection && selectedGroup) {
+        selectedGroup = null;
+        syncTableChartSelection();
+      }
+    }
+    window.closeChartZoom = closeChartZoom;
+
+    function bindChartZoom() {
+      const overlay = document.getElementById('chartZoomOverlay');
+      if (!overlay || overlay.dataset.zoomBound === '1') return;
+      overlay.dataset.zoomBound = '1';
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeChartZoom();
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) {
+          e.preventDefault();
+          closeChartZoom();
+        }
+      });
+    }
+
+    function openChartZoom(name) {
+      const overlay = document.getElementById('chartZoomOverlay');
+      const title = document.getElementById('chartZoomTitle');
+      const meta = document.getElementById('chartZoomMeta');
+      const host = document.getElementById('chartZoomChart');
+      const g = groupStats.find((item) => item.group === name);
+      if (!overlay || !host || !g || typeof Highcharts === 'undefined') return;
+      bindChartZoom();
+      if (title) title.textContent = g.group;
+      if (meta) meta.textContent = 'n=' + g.n + ', mean=' + fmt(g.mean);
+      overlay.classList.add('is-open');
+      destroyZoomChart();
+      const color = colorForGroup(g.group);
+      if (distView === 'kernel' && typeof StatisticoDistributionSimilarity !== 'undefined') {
+        const ov = StatisticoDistributionSimilarity.overlayMany([g], 'raw');
+        const series = ov.series.map((s) => ({
+          name: s.name,
+          color: color,
+          data: ov.grid.map((x, i) => [x, s.density[i]])
+        }));
+        zoomChart = Highcharts.chart('chartZoomChart', overlapChartOptions('kernel', 'Value', series));
+      } else {
+        const allValues = groupStats.flatMap((item) => item.values);
+        const globalMin = Math.min(...allValues);
+        const globalMax = Math.max(...allValues);
+        zoomChart = Highcharts.chart('chartZoomChart', groupHistogramChartOptions(g, globalMin, globalMax, 5, true, color));
+      }
+      requestAnimationFrame(function () {
+        if (zoomChart && zoomChart.reflow) zoomChart.reflow();
+      });
+    }
+
+    function groupHistogramChartOptions(g, globalMin, globalMax, bins, large, color) {
+      const labelSize = large ? '11px' : '8px';
+      const titleSize = large ? '12px' : '9px';
+      return {
+        chart: { type:'column', backgroundColor:'transparent', spacing: large ? [12, 12, 20, 12] : [6, 6, 28, 6] },
+        title: { text:null },
+        credits: { enabled:false },
+        legend: { enabled:false },
+        xAxis: {
+          type:'category',
+          title: { text:'Value range', style:{ color:'var(--text-secondary)', fontSize: titleSize } },
+          labels:{ enabled:true, rotation:-45, style:{ color:'var(--text-secondary)', fontSize: labelSize } },
+          tickLength:0,
+          lineColor:'var(--border)'
+        },
+        yAxis: {
+          min:0,
+          title:{ text:'Frequency', style:{ color:'var(--text-secondary)', fontSize: titleSize } },
+          labels:{ style:{ color:'var(--text-secondary)', fontSize: labelSize } },
+          gridLineColor:'rgba(148,163,184,.18)'
+        },
+        tooltip: { pointFormat:'Frequency: <b>{point.y}</b><br/>Percent: <b>{point.pct:.1f}%</b>' },
+        plotOptions: {
+          column:{
+            borderWidth:0,
+            color: color || colorForGroup(g.group),
+            borderRadius: large ? 4 : 3,
+            dataLabels:{
+              enabled:true,
+              crop:false,
+              overflow:'allow',
+              formatter:function(){ return this.point.pct > 0 ? this.point.pct.toFixed(0) + '%' : ''; },
+              style:{ color:'var(--text-primary)', fontSize: large ? '12px' : '9px', fontWeight:'700', textOutline:'none' }
+            }
+          }
+        },
+        series: [{ data: histogramSeries(g.values, globalMin, globalMax, bins) }]
+      };
     }
 
     function emphasizeKernelSeries(name) {
@@ -1614,42 +1745,12 @@
         card.setAttribute('data-group', g.group);
         card.style.setProperty('--group-color', colorForGroup(g.group));
         card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(g.group)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${id}" class="hist-chart"></div>`;
-        grid.appendChild(card);
-        Highcharts.chart(id, {
-          chart: { type:'column', backgroundColor:'transparent', spacing:[6, 6, 28, 6] },
-          title: { text:null },
-          credits: { enabled:false },
-          legend: { enabled:false },
-          xAxis: {
-            type:'category',
-            title: { text:'Value range', style:{ color:'var(--text-secondary)', fontSize:'9px' } },
-            labels:{ enabled:true, rotation:-45, style:{ color:'var(--text-secondary)', fontSize:'8px' } },
-            tickLength:0,
-            lineColor:'var(--border)'
-          },
-          yAxis: {
-            min:0,
-            title:{ text:'Frequency', style:{ color:'var(--text-secondary)', fontSize:'9px' } },
-            labels:{ style:{ color:'var(--text-secondary)', fontSize:'9px' } },
-            gridLineColor:'rgba(148,163,184,.18)'
-          },
-          tooltip: { pointFormat:'Frequency: <b>{point.y}</b><br/>Percent: <b>{point.pct:.1f}%</b>' },
-          plotOptions: {
-            column:{
-              borderWidth:0,
-              color: colorForGroup(g.group),
-              borderRadius:3,
-              dataLabels:{
-                enabled:true,
-                crop:false,
-                overflow:'allow',
-                formatter:function(){ return this.point.pct > 0 ? this.point.pct.toFixed(0) + '%' : ''; },
-                style:{ color:'var(--text-primary)', fontSize:'9px', fontWeight:'700', textOutline:'none' }
-              }
-            }
-          },
-          series: [{ data: histogramSeries(g.values, globalMin, globalMax, bins) }]
+        card.addEventListener('click', () => {
+          selectedGroup = selectedGroup === g.group ? null : g.group;
+          syncTableChartSelection();
         });
+        grid.appendChild(card);
+        Highcharts.chart(id, groupHistogramChartOptions(g, globalMin, globalMax, bins, false, colorForGroup(g.group)));
       });
     }
 
@@ -2287,6 +2388,7 @@
       }
       if (typeof StatisticoWorkspaceTabs !== 'undefined') StatisticoWorkspaceTabs.init();
       bindDspHelp();
+      bindChartZoom();
       initializeFromPayload();
     }
 

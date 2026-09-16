@@ -21,6 +21,14 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
   sanitizeDialogHostInfoParam();
 
+  (function applyPersistedTabStyleEarly() {
+    var style = 'contained';
+    try {
+      if (localStorage.getItem('statistico-tabs') === 'classic') style = 'classic';
+    } catch (e) {}
+    document.documentElement.setAttribute('data-tabs', style);
+  })();
+
   // Hub / marketing embeds (?embed=1): mark the document and keep the 300px
   // sidebar from swallowing narrow modal iframes before page-specific CSS runs.
   // Demos always stay dark so they don't inherit the marketing site's light theme.
@@ -244,6 +252,31 @@ const StatisticoHeader = {
     this.applyTheme(this.resolveTheme(next), { savePreference: false, preference: next });
   },
 
+  getTabStylePreference() {
+    try {
+      return localStorage.getItem('statistico-tabs') === 'classic' ? 'classic' : 'contained';
+    } catch (e) {
+      return 'contained';
+    }
+  },
+
+  setTabStylePreference(pref) {
+    this.applyTabStyle(pref === 'classic' ? 'classic' : 'contained', { savePreference: true });
+  },
+
+  applyTabStyle(style, opts) {
+    const options = opts || {};
+    const next = style === 'classic' ? 'classic' : 'contained';
+    if (options.savePreference !== false) {
+      try { localStorage.setItem('statistico-tabs', next); } catch (e) {}
+    }
+    document.documentElement.setAttribute('data-tabs', next);
+    this._syncTabStyleSwitcherUI();
+    if (globalThis.StatisticoWorkspaceTabs && typeof globalThis.StatisticoWorkspaceTabs.applyTabStyle === 'function') {
+      try { globalThis.StatisticoWorkspaceTabs.applyTabStyle(next); } catch (_e) {}
+    }
+  },
+
   _installSystemThemeListener() {
     if (this._systemThemeListenerBound) return;
     this._systemThemeListenerBound = true;
@@ -269,6 +302,37 @@ const StatisticoHeader = {
       if (!btn) return;
       e.preventDefault();
       this.setThemePreference(btn.getAttribute('data-theme-pref'));
+    });
+  },
+
+  _bindTabStyleSwitcher() {
+    if (this._tabStyleSwitcherBound) return;
+    this._tabStyleSwitcherBound = true;
+    document.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest && e.target.closest('[data-tabs-pref]');
+      if (!btn) return;
+      e.preventDefault();
+      this.setTabStylePreference(btn.getAttribute('data-tabs-pref'));
+    });
+  },
+
+  _renderTabStyleSwitcherHtml(extraClass) {
+    const pref = this.getTabStylePreference();
+    const isSidebar = !!(extraClass && String(extraClass).indexOf('sidebar') !== -1);
+    const cls = extraClass ? `hc-theme-switch st-tab-style-switch ${extraClass}` : 'hc-theme-switch st-tab-style-switch';
+    const id = isSidebar ? 'sbTabStyleSwitch' : 'headerTabStyleSwitch';
+    return `
+      <div class="${cls}" id="${id}" role="radiogroup" aria-label="Tab style" title="Contained tabs sit flush with results. Classic restores the previous pill tabs." data-st-tip-pos="top">
+        <button type="button" class="hc-theme-opt" data-tabs-pref="contained" aria-pressed="${pref === 'contained' ? 'true' : 'false'}" aria-label="Contained tabs">Contained</button>
+        <button type="button" class="hc-theme-opt" data-tabs-pref="classic" aria-pressed="${pref === 'classic' ? 'true' : 'false'}" aria-label="Classic pill tabs">Classic</button>
+      </div>
+    `;
+  },
+
+  _syncTabStyleSwitcherUI() {
+    const pref = this.getTabStylePreference();
+    document.querySelectorAll('.st-tab-style-switch [data-tabs-pref]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', btn.getAttribute('data-tabs-pref') === pref ? 'true' : 'false');
     });
   },
 
@@ -439,7 +503,7 @@ const StatisticoHeader = {
     }
     const headerThemeBtn = document.getElementById('headerThemeBtn');
     if (headerThemeBtn && forcedDark) headerThemeBtn.style.display = 'none';
-    document.querySelectorAll('.hc-theme-switch').forEach((el) => {
+    document.querySelectorAll('.hc-theme-switch:not(.st-tab-style-switch)').forEach((el) => {
       if (forcedDark) el.style.display = 'none';
     });
 
@@ -514,8 +578,10 @@ const StatisticoHeader = {
 
     // Apply persisted theme before rendering (avoids flash of wrong theme)
     this.applyTheme(this.resolveTheme(), { savePreference: false, preference: this.getThemePreference() });
+    this.applyTabStyle(this.getTabStylePreference(), { savePreference: false });
     this._installSystemThemeListener();
     this._bindThemeSwitcher();
+    this._bindTabStyleSwitcher();
     this._ensureMinimalStyles();
     this._ensureWorkspaceTabAssets();
     this._ensureHighchartsThemeStyles();
@@ -2164,6 +2230,35 @@ const StatisticoHeader = {
       + '</p>';
   },
 
+  _explorePanelDomId(tab) {
+    if (!tab) return '';
+    if (tab.panelId) return tab.panelId;
+    if (!tab.panel) return '';
+    if (this.module === 'correlations') return 'corrByGroupPanel-' + tab.panel;
+    if (this.module === 'regression') return 'regByGroupPanel-' + tab.panel;
+    if (this.module === 'contingency') return 'ctByGroupPanel-' + tab.panel;
+    if (this.module === 'univariate' && this.currentView === 'by-group') return 'byGroupPanel-' + tab.panel;
+    if (this.module === 'univariate' && this.currentView === 'boxplot') return 'boxplotPanel-' + tab.panel;
+    return '';
+  },
+
+  _syncExploreTabPanels(cfg) {
+    const tabs = (cfg && cfg.tabs) || [];
+    const activePanel = cfg && typeof cfg.getActive === 'function' ? cfg.getActive() : '';
+    tabs.forEach((tab) => {
+      const panelId = this._explorePanelDomId(tab);
+      if (!panelId) return;
+      const panel = document.getElementById(panelId);
+      if (!panel) return;
+      const tabId = tab.tabKey ? 'st-tab-' + tab.tabKey : '';
+      panel.setAttribute('role', 'tabpanel');
+      if (tabId) panel.setAttribute('aria-labelledby', tabId);
+      const selected = tab.panel === activePanel;
+      panel.setAttribute('aria-hidden', selected ? 'false' : 'true');
+      if (!panel.hasAttribute('tabindex')) panel.setAttribute('tabindex', '0');
+    });
+  },
+
   _buildUniWsTabBtn(opts) {
     const active = opts.active ? ' active' : '';
     let onclick = '';
@@ -2183,9 +2278,21 @@ const StatisticoHeader = {
     const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
     const showBadge = !!opts.badge;
     const showHelp = !!opts.help;
-    return `<button type="button" class="ws-mode-tab${active}${showBadge ? ' ws-tab--sim-profile' : ''}" role="tab"`
-      + ` aria-selected="${opts.active ? 'true' : 'false'}"`
-      + (opts.active ? ' aria-current="true"' : '')
+    const tabId = opts.tabKey ? ` id="st-tab-${opts.tabKey}"` : '';
+    const panelId = opts.panelId || this._explorePanelDomId(opts);
+    const inPage = !!opts.inPage;
+    const roleAttr = inPage ? ' role="tab"' : '';
+    const selectedAttr = inPage
+      ? ` aria-selected="${opts.active ? 'true' : 'false'}"`
+      : (opts.active ? ' aria-current="page"' : '');
+    const controlsAttr = (inPage && panelId) ? ` aria-controls="${panelId}"` : '';
+    const tabIndexAttr = inPage ? ` tabindex="${opts.active ? '0' : '-1'}"` : '';
+    return `<button type="button" class="ws-mode-tab${active}${showBadge ? ' ws-tab--sim-profile' : ''}"${roleAttr}`
+      + selectedAttr
+      + (opts.active && inPage ? ' aria-current="true"' : '')
+      + tabId
+      + controlsAttr
+      + tabIndexAttr
       + ` data-uni-tab="${opts.tabKey}"${titleAttr}${onclick}>`
       + `<span class="view-switcher-glow" aria-hidden="true"></span>`
       + `<i class="fa-solid ${opts.icon}" aria-hidden="true"></i>`
@@ -2220,7 +2327,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260912exploretabs',
+  _TAB_ASSET_VER: '20260916contained',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -3344,6 +3451,21 @@ const StatisticoHeader = {
       '  opacity: 1 !important;',
       '}'
     ].join('\n');
+    this._ensureContainedTabStyles();
+  },
+
+  _ensureContainedTabStyles() {
+    const ver = this._TAB_ASSET_VER;
+    const containedHref = this.resolveDialogUrl('shared-contained-tabs.css?v=' + ver);
+    let contained = document.getElementById('statistico-contained-tabs-css');
+    if (!contained) {
+      contained = document.createElement('link');
+      contained.id = 'statistico-contained-tabs-css';
+      contained.rel = 'stylesheet';
+    }
+    contained.href = containedHref;
+    const host = document.body || document.head;
+    host.appendChild(contained);
   },
 
   _ensureMinimalStyles() {
@@ -3389,6 +3511,8 @@ const StatisticoHeader = {
       document.head.appendChild(link);
     }
 
+    this._ensureContainedTabStyles();
+
     const runInit = () => {
       try {
         if (globalThis.StatisticoWorkspaceTabs) {
@@ -3417,8 +3541,8 @@ const StatisticoHeader = {
     if (!section || !Array.isArray(section.tabs) || !section.tabs.length) return [];
     if (section.id === 'core' && this.currentView === 'boxplot') {
       return [
-        { tabKey: 'boxplot-main', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'main', inPage: true },
-        { tabKey: 'boxplot-outliers', label: 'Outliers', icon: 'fa-map-location-dot', panel: 'outliers', inPage: true }
+        { tabKey: 'boxplot-main', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'main', panelId: 'boxplotPanel-main', inPage: true },
+        { tabKey: 'boxplot-outliers', label: 'Outliers', icon: 'fa-map-location-dot', panel: 'outliers', panelId: 'boxplotPanel-outliers', inPage: true }
       ];
     }
     const limit = typeof section.resultTabLimit === 'number' ? section.resultTabLimit : 3;
@@ -3446,9 +3570,9 @@ const StatisticoHeader = {
         getActive: () => globalThis.__byGroupActiveTab || 'stats',
         onSelect: (panel) => this.setByGroupResultsTab(panel),
         tabs: [
-          { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', caption: 'Compare centres, spread and distributions across groups.' },
-          { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', caption: 'Examine distribution shape and normality strength within each group.' },
-          { tabKey: 'by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in location, spread and shape.', badge: 'STATISTICO', help: true }
+          { tabKey: 'by-group-stats', label: 'Statistics', icon: 'fa-table', panel: 'stats', panelId: 'byGroupPanel-stats', caption: 'Compare centres, spread and distributions across groups.' },
+          { tabKey: 'by-group-normality', label: 'Normality', icon: 'fa-wave-square', panel: 'normality', panelId: 'byGroupPanel-normality', caption: 'Examine distribution shape and normality strength within each group.' },
+          { tabKey: 'by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', panelId: 'byGroupPanel-similarity', caption: 'See how closely groups resemble one another in location, spread and shape.', badge: 'STATISTICO', help: true }
         ]
       };
     }
@@ -3463,8 +3587,8 @@ const StatisticoHeader = {
         },
         onSelect: (panel) => this.setCorrByGroupResultsTab(panel),
         tabs: [
-          { tabKey: 'correlation-by-group-table', label: 'Grouped r', icon: 'fa-table', panel: 'table', caption: 'Compare pairwise correlations across group levels.' },
-          { tabKey: 'correlation-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in correlation pattern, strength and sign.', badge: 'STATISTICO', help: true }
+          { tabKey: 'correlation-by-group-table', label: 'Grouped r', icon: 'fa-table', panel: 'table', panelId: 'corrByGroupPanel-table', caption: 'Compare pairwise correlations across group levels.' },
+          { tabKey: 'correlation-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', panelId: 'corrByGroupPanel-similarity', caption: 'See how closely groups resemble one another in correlation pattern, strength and sign.', badge: 'STATISTICO', help: true }
         ]
       };
     }
@@ -3476,8 +3600,8 @@ const StatisticoHeader = {
         getActive: () => globalThis.__regByGroupActiveTab || 'coefficients',
         onSelect: (panel) => this.setRegByGroupResultsTab(panel),
         tabs: [
-          { tabKey: 'regression-by-group-coefficients', label: 'Coefficients', icon: 'fa-table', panel: 'coefficients', caption: 'Compare coefficients and residual normality across group levels.' },
-          { tabKey: 'regression-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in coefficient pattern, strength and sign.', badge: 'STATISTICO', help: true }
+          { tabKey: 'regression-by-group-coefficients', label: 'Coefficients', icon: 'fa-table', panel: 'coefficients', panelId: 'regByGroupPanel-coefficients', caption: 'Compare coefficients and residual normality across group levels.' },
+          { tabKey: 'regression-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', panelId: 'regByGroupPanel-similarity', caption: 'See how closely groups resemble one another in coefficient pattern, strength and sign.', badge: 'STATISTICO', help: true }
         ]
       };
     }
@@ -3489,10 +3613,10 @@ const StatisticoHeader = {
         getActive: () => globalThis.__contingencyByGroupActiveTab || 'association',
         onSelect: (panel) => this.setContingencyByGroupResultsTab(panel),
         tabs: [
-          { tabKey: 'contingency-by-group-association', label: 'Association table', icon: 'fa-table', panel: 'association', caption: 'Examine the same association separately within each group. χ², p and V are not a test of whether groups differ.' },
-          { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', caption: 'Compare all groups in one table, or inspect a single group. Column % is the comparison default.' },
-          { tabKey: 'contingency-by-group-chart', label: 'Chart', icon: 'fa-chart-column', panel: 'chart', caption: 'Faceted 100% stacked distributions and residual heat maps with shared scales. Descriptive only.' },
-          { tabKey: 'contingency-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', caption: 'See how closely groups resemble one another in association pattern, strength and residual sign.', badge: 'STATISTICO', help: true }
+          { tabKey: 'contingency-by-group-association', label: 'Association table', icon: 'fa-table', panel: 'association', panelId: 'ctByGroupPanel-association', caption: 'Examine the same association separately within each group. χ², p and V are not a test of whether groups differ.' },
+          { tabKey: 'contingency-by-group-table', label: 'Tables', icon: 'fa-border-all', panel: 'table', panelId: 'ctByGroupPanel-table', caption: 'Compare all groups in one table, or inspect a single group. Column % is the comparison default.' },
+          { tabKey: 'contingency-by-group-chart', label: 'Chart', icon: 'fa-chart-column', panel: 'chart', panelId: 'ctByGroupPanel-chart', caption: 'Faceted 100% stacked distributions and residual heat maps with shared scales. Descriptive only.' },
+          { tabKey: 'contingency-by-group-similarity', label: 'Similarity Profile™', icon: 'fa-clone', panel: 'similarity', panelId: 'ctByGroupPanel-similarity', caption: 'See how closely groups resemble one another in association pattern, strength and residual sign.', badge: 'STATISTICO', help: true }
         ]
       };
     }
@@ -3592,6 +3716,7 @@ const StatisticoHeader = {
       inPage: true,
       explore: true,
       panel: t.panel,
+      panelId: t.panelId || this._explorePanelDomId(t),
       title: t.caption || this._getUniViewCaption(t.tabKey),
       badge: t.badge,
       help: t.help
@@ -3615,6 +3740,7 @@ const StatisticoHeader = {
     }
     this._ensurePlainTabUnderlineStyles();
     this._decorateViewSwitcherInviteAndGlow();
+    this._syncExploreTabPanels(cfg);
   },
 
   _renderUnivariateResultsTabs() {
@@ -3685,6 +3811,7 @@ const StatisticoHeader = {
       file: t.file,
       inPage: t.inPage,
       panel: t.panel,
+      panelId: t.panelId || this._explorePanelDomId(t),
       title: this._getUniViewCaption(t.tabKey)
     })).join('');
 
@@ -3718,6 +3845,10 @@ const StatisticoHeader = {
     }
     this._ensurePlainTabUnderlineStyles();
     this._decorateViewSwitcherInviteAndGlow();
+    this._syncExploreTabPanels({
+      tabs: viewTabs,
+      getActive: () => activeInPageTab
+    });
   },
 
   _renderSidebarNavItem(item) {
@@ -4349,6 +4480,7 @@ const StatisticoHeader = {
           ${optionsHtml}
         </select>
         ${this._renderThemeSwitcherHtml()}
+        ${this._renderTabStyleSwitcherHtml()}
       </div>
     `;
   },
@@ -6977,6 +7109,8 @@ const StatisticoHeader = {
       layout.appendChild(rightCol);
     }
     this._renderSharedSidebar();
+    this.applyTabStyle(this.getTabStylePreference(), { savePreference: false });
+    this._bindTabStyleSwitcher();
     this._ensureMinimalStyles();
     this._ensureWorkspaceTabAssets();
     this._ensureHighchartsThemeStyles();
@@ -7258,6 +7392,7 @@ const StatisticoHeader = {
         </button>
         <div class="sb-theme-switch-wrap">
           ${this._renderThemeSwitcherHtml('hc-theme-switch--sidebar')}
+          ${this._renderTabStyleSwitcherHtml('hc-theme-switch--sidebar')}
         </div>
         <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
                 id="sbExportJsonBtn"

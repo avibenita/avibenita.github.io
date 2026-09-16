@@ -106,6 +106,159 @@
     return bar && bar.classList && bar.classList.contains('ws-mode-bar--connected');
   }
 
+  function isContainedTabs() {
+    return document.documentElement.getAttribute('data-tabs') !== 'classic';
+  }
+
+  function visibleTabButtons(list) {
+    if (!list) return [];
+    return Array.prototype.filter.call(list.querySelectorAll('.ws-mode-tab'), function(tab) {
+      return !tab.disabled && tab.getClientRects().length > 0;
+    });
+  }
+
+  function syncRovingTabindex(list) {
+    var tabs = visibleTabButtons(list);
+    if (!tabs.length) return;
+    var active = list.querySelector('.ws-mode-tab.active, .ws-mode-tab[aria-selected="true"], .ws-mode-tab[aria-current="page"]') || tabs[0];
+    tabs.forEach(function(tab) {
+      var selected = tab === active;
+      if (tab.getAttribute('role') === 'tab') {
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        tab.tabIndex = selected ? 0 : -1;
+      }
+    });
+  }
+
+  function unwrapTabOverflow(bar) {
+    if (!bar) return;
+    var wrap = bar.querySelector(':scope > .ws-tab-scroll-wrap');
+    if (!wrap) return;
+    var cluster = wrap.querySelector('.ws-tab-cluster');
+    var scroller = wrap.querySelector('.ws-tab-scroll');
+    var tabs = [];
+    if (cluster) {
+      bar.insertBefore(cluster, wrap);
+    } else if (scroller) {
+      tabs = Array.prototype.filter.call(scroller.children, function(el) {
+        return el.classList && el.classList.contains('ws-mode-tab');
+      });
+      tabs.forEach(function(tab) { bar.insertBefore(tab, wrap); });
+    }
+    wrap.remove();
+  }
+
+  function ensureTabOverflow(bar) {
+    if (!bar || isSlantBar(bar)) return;
+    if (!isContainedTabs()) {
+      unwrapTabOverflow(bar);
+      return;
+    }
+
+    var wrap = bar.querySelector(':scope > .ws-tab-scroll-wrap');
+    var cluster = bar.querySelector(':scope > .ws-tab-cluster') ||
+      (wrap && wrap.querySelector('.ws-tab-cluster'));
+    var looseTabs = Array.prototype.filter.call(bar.children, function(el) {
+      return el.classList && el.classList.contains('ws-mode-tab');
+    });
+
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.className = 'ws-tab-scroll-wrap';
+
+      var prev = document.createElement('button');
+      prev.type = 'button';
+      prev.className = 'ws-tab-scroll-btn ws-tab-scroll-btn--prev';
+      prev.setAttribute('aria-label', 'Show previous tabs');
+      prev.innerHTML = '<i class="fa-solid fa-chevron-left" aria-hidden="true"></i>';
+
+      var scroller = document.createElement('div');
+      scroller.className = 'ws-tab-scroll';
+
+      var next = document.createElement('button');
+      next.type = 'button';
+      next.className = 'ws-tab-scroll-btn ws-tab-scroll-btn--next';
+      next.setAttribute('aria-label', 'Show next tabs');
+      next.innerHTML = '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
+
+      if (cluster) scroller.appendChild(cluster);
+      else looseTabs.forEach(function(tab) { scroller.appendChild(tab); });
+
+      wrap.appendChild(prev);
+      wrap.appendChild(scroller);
+      wrap.appendChild(next);
+      bar.appendChild(wrap);
+
+      prev.addEventListener('click', function() {
+        scroller.scrollBy({ left: Math.max(120, scroller.clientWidth * 0.6) * -1, behavior: 'smooth' });
+      });
+      next.addEventListener('click', function() {
+        scroller.scrollBy({ left: Math.max(120, scroller.clientWidth * 0.6), behavior: 'smooth' });
+      });
+      scroller.addEventListener('scroll', function() { updateTabOverflow(bar); }, { passive: true });
+    }
+
+    updateTabOverflow(bar);
+    scrollActiveTabIntoView(bar);
+  }
+
+  function updateTabOverflow(bar) {
+    if (!bar) return;
+    var wrap = bar.querySelector(':scope > .ws-tab-scroll-wrap');
+    if (!wrap) return;
+    var scroller = wrap.querySelector('.ws-tab-scroll');
+    var prev = wrap.querySelector('.ws-tab-scroll-btn--prev');
+    var next = wrap.querySelector('.ws-tab-scroll-btn--next');
+    if (!scroller) return;
+    var overflowing = scroller.scrollWidth > scroller.clientWidth + 1;
+    wrap.classList.toggle('is-overflowing', overflowing);
+    if (prev) prev.disabled = !overflowing || scroller.scrollLeft <= 1;
+    if (next) {
+      next.disabled = !overflowing || scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1;
+    }
+  }
+
+  function scrollActiveTabIntoView(bar) {
+    var scroller = bar && bar.querySelector('.ws-tab-scroll');
+    var active = bar && bar.querySelector('.ws-mode-tab.active, .ws-mode-tab[aria-selected="true"]');
+    if (!scroller || !active) return;
+    var a = active.getBoundingClientRect();
+    var s = scroller.getBoundingClientRect();
+    if (a.left < s.left + 8) scroller.scrollLeft -= (s.left - a.left + 16);
+    else if (a.right > s.right - 8) scroller.scrollLeft += (a.right - s.right + 16);
+  }
+
+  function refreshAllOverflow() {
+    document.querySelectorAll('.ws-mode-bar--attached, .view-switcher-bar').forEach(function(bar) {
+      ensureTabOverflow(bar);
+      syncRovingTabindex(bar);
+    });
+  }
+
+  function bindTablistKeyboard() {
+    if (bindTablistKeyboard._bound) return;
+    bindTablistKeyboard._bound = true;
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return;
+      var tab = e.target && e.target.closest && e.target.closest('[role="tab"]');
+      if (!tab) return;
+      var list = tab.closest('[role="tablist"]');
+      if (!list) return;
+      var tabs = visibleTabButtons(list);
+      var index = tabs.indexOf(tab);
+      if (index < 0) return;
+      var next = index;
+      if (e.key === 'ArrowRight') next = (index + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = tabs.length - 1;
+      if (next === index) return;
+      e.preventDefault();
+      tabs[next].focus();
+      if (isContainedTabs()) tabs[next].click();
+    });
+  }
+
   function ensureConnectedBar(bar) {
     if (!bar || !bar.classList) return;
     if (bar.classList.contains('ws-mode-bar--legacy-slant')) return;
@@ -144,6 +297,7 @@
   function onTabActiveChanged() {
     requestAnimationFrame(function() {
       refreshAllIndicators();
+      refreshAllOverflow();
       document.querySelectorAll('.view-switcher').forEach(updateViewSwitcherDescription);
     });
   }
@@ -293,6 +447,7 @@
   var hintStarted = {};
 
   function maybeHintViewSwitcher(host) {
+    if (isContainedTabs()) return;
     var key = getViewSwitcherModuleKey();
     if (hintStarted[key]) return;
     try {
@@ -348,11 +503,16 @@
     enhanceWorkspaceTabs();
     document.querySelectorAll('.view-switcher').forEach(updateViewSwitcherDescription);
     refreshAllIndicators();
+    refreshAllOverflow();
     bindViewSwitcherUpdates();
+    bindTablistKeyboard();
 
     if (!initialized) {
       initialized = true;
-      window.addEventListener('resize', refreshAllIndicators);
+      window.addEventListener('resize', function() {
+        refreshAllIndicators();
+        refreshAllOverflow();
+      });
     }
   }
 
@@ -368,6 +528,11 @@
     init: initWorkspaceTabBars,
     enhance: enhanceWorkspaceTabs,
     refresh: refreshAllIndicators,
+    refreshOverflow: refreshAllOverflow,
+    applyTabStyle: function() {
+      refreshAllOverflow();
+      refreshAllIndicators();
+    },
     onActiveChanged: onTabActiveChanged,
     pulseBody: pulseWsBody,
     setSubtitles: function(map) { Object.assign(subtitles, map); },

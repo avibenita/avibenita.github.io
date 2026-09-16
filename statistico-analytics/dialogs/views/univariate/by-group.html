@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260914w75" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260908bygrouptabs" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260916simlayout"></script>
+  <script src="../shared-header.js?v=20260916simdist"></script>
   <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <script src="../../shared/distribution-similarity.js?v=20260916histrange"></script>
@@ -338,8 +338,16 @@
       padding:6px 8px 6px; min-width:0; display:flex; flex-direction:column; gap:4px;
     }
     .dsp-chart-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .dsp-chart-head .dist-title-right {
+      width:100%; justify-content:space-between;
+      color:var(--text-secondary); font-size:12px;
+    }
     .dsp-chart-host { flex:1 1 auto; min-height:260px; display:flex; flex-direction:column; }
-    .dsp-chart-host #dspOverlapChart { flex:1 1 auto; width:100%; min-height:260px; }
+    .dsp-chart-host .kernel-wrap,
+    .dsp-chart-host .boxplot-wrap { flex:1 1 auto; min-height:260px; border:none; background:transparent; padding:0; }
+    .dsp-chart-host #dspKernelChart,
+    .dsp-chart-host #dspBoxplotChart { flex:1 1 auto; width:100%; height:260px; min-height:260px; }
+    .dsp-chart-host .hist-grid { flex:1 1 auto; min-height:260px; overflow:auto; }
     .dsp-card { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:10px; min-width:0; }
     .dsp-pair-grid {
       display:grid; grid-template-columns:minmax(280px, 1.35fr) minmax(220px, 0.85fr);
@@ -451,7 +459,6 @@
     }
     .dsp-help-rule h4 { margin:0 0 4px; font-size:13.5px; }
     .dsp-help-rule p { margin:0; font-size:13px; line-height:1.55; color:var(--text-secondary); }
-    #dspOverlapChart { min-height:260px; }
     .dsp-pair-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); max-height:calc(36px + 12 * 33px); }
     .dsp-pair-table { width:100%; border-collapse:collapse; min-width:640px; }
     .dsp-pair-table th, .dsp-pair-table td { padding:8px 10px; border-bottom:1px solid var(--border); text-align:right; font-size:12px; }
@@ -477,7 +484,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260916-uni-simlayout2">
+<body data-page-version="20260916-uni-simdist">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -558,22 +565,24 @@
                     <div class="dsp-homo-card" id="dspGaugeCard"></div>
                     <div class="dsp-chart-panel">
                       <div class="dsp-chart-head">
-                        <div class="dsp-subhead" id="dspChartTitle">Kernel densities</div>
-                        <div class="dsp-overlap-toggles">
-                          <div class="dist-toggle" role="tablist" aria-label="Overlap view">
-                            <button type="button" id="dspRawBtn" class="active" role="tab" aria-selected="true" onclick="setSimDistMode('raw')">Raw values</button>
-                            <button type="button" id="dspShapeBtn" role="tab" aria-selected="false" onclick="setSimDistMode('shape')">Standardized shape</button>
-                          </div>
-                          <div class="dist-toggle" role="tablist" aria-label="Overlap geometry">
-                            <button type="button" id="dspKernelBtn" class="active" role="tab" aria-selected="true" onclick="setSimGeom('kernel')">Kernel</button>
-                            <button type="button" id="dspHistBtn" role="tab" aria-selected="false" onclick="setSimGeom('histogram')">Histogram</button>
+                        <div class="dist-title-right">
+                          <span id="dspDistHint">Overlapping kernel densities on a shared value scale</span>
+                          <div class="dist-toggle" role="tablist" aria-label="Distribution view">
+                            <button type="button" id="dspViewKernelBtn" class="active" role="tab" aria-selected="true" onclick="setSimDistView('kernel')">Kernel</button>
+                            <button type="button" id="dspViewHistBtn" role="tab" aria-selected="false" onclick="setSimDistView('histograms')">Histograms</button>
+                            <button type="button" id="dspViewBoxplotBtn" role="tab" aria-selected="false" onclick="setSimDistView('boxplot')">Boxplots</button>
                           </div>
                         </div>
                       </div>
                       <div class="dsp-chart-host" id="dspChartHost">
-                        <div id="dspOverlapChart"></div>
+                        <div id="dspKernelWrap" class="kernel-wrap">
+                          <div id="dspKernelChart"></div>
+                        </div>
+                        <div id="dspHistGrid" class="hist-grid is-hidden"></div>
+                        <div id="dspBoxplotWrap" class="boxplot-wrap is-hidden">
+                          <div id="dspBoxplotChart"></div>
+                        </div>
                       </div>
-                      <em class="dsp-footnote" id="dspChartFoot">Overlapping kernel densities, not a significance test.</em>
                     </div>
                   </div>
                   <div class="dsp-card">
@@ -740,9 +749,9 @@
     const NSI_TIP_TEXT = "NSI(TM) is Statistico's 0–100 Normality Strength Index. It combines the six normality test outcomes into a weighted score: higher values indicate stronger support for approximate normality. When scores are tied, Shapiro–Wilk is down-weighted.";
     let dspProfile = null;
     let selectedSimPair = null;
-    let simDistMode = 'raw';
-    let simGeom = 'kernel';
+    let simDistView = 'kernel';
     let simOverlapChart = null;
+    let simBoxplotChart = null;
     let homoGaugePlayed = false;
 
     function predLabels() {
@@ -908,10 +917,7 @@
       document.getElementById('mainContent').style.display = 'none';
       dspProfile = null;
       selectedSimPair = null;
-      if (simOverlapChart) {
-        try { simOverlapChart.destroy(); } catch (_e) {}
-        simOverlapChart = null;
-      }
+      destroySimCharts();
       delete window.__byGroupAiContext;
       if (!isValidGroupIndex(groupIndex)) {
         const title = document.getElementById('resultTitle');
@@ -1370,7 +1376,7 @@
         renderNormMiniHistograms(normGroupResults);
       }
       if (activeByGroupTab === 'similarity') {
-        renderDspOverlap();
+        renderSimDistributionPanel();
       }
     }
     window.switchByGroupTab = switchByGroupTab;
@@ -1701,39 +1707,55 @@
       kernelChart.redraw();
     }
 
-    function renderKernelChart() {
-      const el = document.getElementById('kernelChart');
+    function renderKernelChart(targetId) {
+      const id = targetId || 'kernelChart';
+      const pretty = id === 'dspKernelChart';
+      const el = document.getElementById(id);
       if (!el || typeof Highcharts === 'undefined' || !groupStats.length) return;
-      if (kernelChart) {
-        try { kernelChart.destroy(); } catch (_e) {}
-        kernelChart = null;
+      const prior = pretty ? simOverlapChart : kernelChart;
+      if (prior) {
+        try { prior.destroy(); } catch (_e) {}
+        if (pretty) simOverlapChart = null;
+        else kernelChart = null;
       }
       if (typeof StatisticoDistributionSimilarity === 'undefined') return;
       const ov = StatisticoDistributionSimilarity.overlayMany(groupStats, 'raw');
-      const series = ov.series.map((s) => ({
-        name: s.name,
-        color: colorForGroup(s.name),
-        data: ov.grid.map((x, i) => [x, s.density[i]]),
-        lineWidth: selectedGroup === s.name ? 3.2 : 2.2,
-        opacity: !selectedGroup || selectedGroup === s.name ? 1 : 0.18,
-        zIndex: selectedGroup === s.name ? 8 : 1,
-        fillOpacity: selectedGroup === s.name ? 0.38 : 0.22
-      }));
+      const series = ov.series.map((s) => {
+        const raw = s.name;
+        return {
+          name: pretty ? groupLevelWithN(raw, groupN(raw)) : raw,
+          color: colorForGroup(raw),
+          data: ov.grid.map((x, i) => [x, s.density[i]]),
+          lineWidth: selectedGroup === raw ? 3.2 : 2.2,
+          opacity: !selectedGroup || selectedGroup === raw ? 1 : 0.18,
+          zIndex: selectedGroup === raw ? 8 : 1,
+          fillOpacity: selectedGroup === raw ? 0.38 : 0.22,
+          custom: { group: raw }
+        };
+      });
       if (!series.length) return;
       const opts = overlapChartOptions('kernel', 'Value', series);
-      opts.plotOptions.series.cursor = 'pointer';
-      opts.plotOptions.series.events = {
-        click: function () {
-          selectedGroup = selectedGroup === this.name ? null : this.name;
-          syncTableChartSelection();
-        },
-        legendItemClick: function () {
-          selectedGroup = selectedGroup === this.name ? null : this.name;
-          syncTableChartSelection();
-          return false;
-        }
-      };
-      kernelChart = Highcharts.chart('kernelChart', opts);
+      if (!pretty) {
+        opts.plotOptions.series.cursor = 'pointer';
+        opts.plotOptions.series.events = {
+          click: function () {
+            const raw = (this.options && this.options.custom && this.options.custom.group) || this.name;
+            selectedGroup = selectedGroup === raw ? null : raw;
+            syncTableChartSelection();
+          },
+          legendItemClick: function () {
+            const raw = (this.options && this.options.custom && this.options.custom.group) || this.name;
+            selectedGroup = selectedGroup === raw ? null : raw;
+            syncTableChartSelection();
+            return false;
+          }
+        };
+      }
+      const host = pretty ? document.getElementById('dspChartHost') : null;
+      if (host) opts.chart.height = Math.max(260, Math.round(host.clientHeight || 260));
+      const chart = Highcharts.chart(id, opts);
+      if (pretty) simOverlapChart = chart;
+      else kernelChart = chart;
     }
 
     function overlapChartOptions(kind, xTitle, series, categories) {
@@ -1815,8 +1837,10 @@
       };
     }
 
-    function renderHistograms() {
-      const grid = document.getElementById('histGrid');
+    function renderHistograms(gridId) {
+      const id = gridId || 'histGrid';
+      const pretty = id === 'dspHistGrid';
+      const grid = document.getElementById(id);
       if (!grid) return;
       grid.innerHTML = '';
       const allValues = groupStats.flatMap((g) => g.values);
@@ -1824,29 +1848,42 @@
       const globalMin = Math.min(...allValues);
       const globalMax = Math.max(...allValues);
       const bins = 5;
+      const prefix = pretty ? 'dspGroupHist' : 'groupHist';
       groupStats.forEach((g, idx) => {
-        const id = `groupHist${idx}`;
+        const chartId = `${prefix}${idx}`;
         const card = document.createElement('div');
         const isSel = selectedGroup === g.group;
         card.className = 'hist-card' + (selectedGroup ? (isSel ? ' is-selected' : ' is-dimmed') : '');
         card.setAttribute('data-group', g.group);
         card.style.setProperty('--group-color', colorForGroup(g.group));
-        card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(g.group)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${id}" class="hist-chart"></div>`;
-        card.addEventListener('click', () => {
-          selectedGroup = selectedGroup === g.group ? null : g.group;
-          syncTableChartSelection();
-        });
+        const title = pretty ? groupLevelWithN(g.group, g.n) : g.group;
+        card.innerHTML = `<div class="hist-head"><strong>${escapeHtml(title)}</strong><span>n=${g.n}, mean=${fmt(g.mean)}</span></div><div id="${chartId}" class="hist-chart"></div>`;
+        if (!pretty) {
+          card.addEventListener('click', () => {
+            selectedGroup = selectedGroup === g.group ? null : g.group;
+            syncTableChartSelection();
+          });
+        }
         grid.appendChild(card);
-        Highcharts.chart(id, groupHistogramChartOptions(g, globalMin, globalMax, bins, false, colorForGroup(g.group)));
+        Highcharts.chart(chartId, groupHistogramChartOptions(g, globalMin, globalMax, bins, false, colorForGroup(g.group)));
       });
     }
 
-    function renderGroupBoxplot() {
+    function renderGroupBoxplot(targetId) {
+      const id = targetId || 'groupBoxplotChart';
+      const pretty = id === 'dspBoxplotChart';
       if (typeof Highcharts === 'undefined' || !Highcharts.seriesTypes || !Highcharts.seriesTypes.boxplot) return;
-      const categories = groupStats.map((g) => g.group);
+      const prior = pretty ? simBoxplotChart : boxplotChart;
+      if (prior) {
+        try { prior.destroy(); } catch (_e) {}
+        if (pretty) simBoxplotChart = null;
+        else boxplotChart = null;
+      }
+      const categories = groupStats.map((g) => pretty ? groupLevelWithN(g.group, g.n) : g.group);
       const boxData = groupStats.map((g) => [g.min, g.q1, g.median, g.q3, g.max]);
       const varLabel = getAnalysisVariableName();
-      boxplotChart = Highcharts.chart('groupBoxplotChart', {
+      const host = pretty ? document.getElementById('dspChartHost') : null;
+      const chart = Highcharts.chart(id, {
         chart: { type:'boxplot', backgroundColor:'transparent', spacing:[12, 12, 16, 12] },
         title: { text:null },
         credits: { enabled:false },
@@ -1884,6 +1921,12 @@
         },
         series: [{ name: varLabel, data: boxData, color:'rgba(129,140,248,.92)' }]
       });
+      if (host) {
+        const plotH = Math.max(260, Math.round(host.clientHeight || 260));
+        try { chart.setSize(null, plotH, false); } catch (_e) { /* ignore */ }
+      }
+      if (pretty) simBoxplotChart = chart;
+      else boxplotChart = chart;
     }
 
     function formatNormP(test) {
@@ -1977,42 +2020,43 @@
       selectSimPair(a, b, true);
     };
 
-    function syncSimToggles() {
-      const rawBtn = document.getElementById('dspRawBtn');
-      const shapeBtn = document.getElementById('dspShapeBtn');
-      const kernelBtn = document.getElementById('dspKernelBtn');
-      const histBtn = document.getElementById('dspHistBtn');
-      if (rawBtn) {
-        rawBtn.classList.toggle('active', simDistMode === 'raw');
-        rawBtn.setAttribute('aria-selected', simDistMode === 'raw' ? 'true' : 'false');
+    function destroySimCharts() {
+      if (simOverlapChart) {
+        try { simOverlapChart.destroy(); } catch (_e) {}
+        simOverlapChart = null;
       }
-      if (shapeBtn) {
-        shapeBtn.classList.toggle('active', simDistMode === 'shape');
-        shapeBtn.setAttribute('aria-selected', simDistMode === 'shape' ? 'true' : 'false');
+      if (simBoxplotChart) {
+        try { simBoxplotChart.destroy(); } catch (_e) {}
+        simBoxplotChart = null;
       }
+    }
+
+    function syncSimDistToggle() {
+      const kernelBtn = document.getElementById('dspViewKernelBtn');
+      const histBtn = document.getElementById('dspViewHistBtn');
+      const boxBtn = document.getElementById('dspViewBoxplotBtn');
       if (kernelBtn) {
-        kernelBtn.classList.toggle('active', simGeom === 'kernel');
-        kernelBtn.setAttribute('aria-selected', simGeom === 'kernel' ? 'true' : 'false');
+        kernelBtn.classList.toggle('active', simDistView === 'kernel');
+        kernelBtn.setAttribute('aria-selected', simDistView === 'kernel' ? 'true' : 'false');
       }
       if (histBtn) {
-        histBtn.classList.toggle('active', simGeom === 'histogram');
-        histBtn.setAttribute('aria-selected', simGeom === 'histogram' ? 'true' : 'false');
+        histBtn.classList.toggle('active', simDistView === 'histograms');
+        histBtn.setAttribute('aria-selected', simDistView === 'histograms' ? 'true' : 'false');
       }
+      if (boxBtn) {
+        boxBtn.classList.toggle('active', simDistView === 'boxplot');
+        boxBtn.setAttribute('aria-selected', simDistView === 'boxplot' ? 'true' : 'false');
+      }
+      const hint = document.getElementById('dspDistHint');
+      if (hint) hint.textContent = distViewMeta(simDistView).hint;
     }
 
-    function setSimDistMode(mode) {
-      simDistMode = mode === 'shape' ? 'shape' : 'raw';
-      syncSimToggles();
-      renderDspOverlap();
+    function setSimDistView(view) {
+      simDistView = view === 'boxplot' ? 'boxplot' : (view === 'histograms' ? 'histograms' : 'kernel');
+      syncSimDistToggle();
+      renderSimDistributionPanel();
     }
-    window.setSimDistMode = setSimDistMode;
-
-    function setSimGeom(kind) {
-      simGeom = kind === 'histogram' ? 'histogram' : 'kernel';
-      syncSimToggles();
-      renderDspOverlap();
-    }
-    window.setSimGeom = setSimGeom;
+    window.setSimDistView = setSimDistView;
 
     function renderGroupSimilarity() {
       const empty = document.getElementById('dspEmpty');
@@ -2035,14 +2079,13 @@
       empty.style.display = 'none';
       main.style.display = 'block';
       homoGaugePlayed = false;
-      syncSimToggles();
-      syncSimChartChrome();
+      syncSimDistToggle();
       if (selectedSimPair && !findSimPair(selectedSimPair.a, selectedSimPair.b)) selectedSimPair = null;
       if (!selectedSimPair && dspProfile.mostSimilar) {
         selectedSimPair = { a: dspProfile.mostSimilar.a, b: dspProfile.mostSimilar.b };
       }
       renderDspGauge();
-      renderDspOverlap();
+      renderSimDistributionPanel();
       renderDspPairTable();
       renderDspProfile();
       syncByGroupAiContext();
@@ -2149,19 +2192,18 @@
       animateHomoGauge(homo);
     }
 
-    function syncSimChartChrome() {
-      const title = document.getElementById('dspChartTitle');
-      const foot = document.getElementById('dspChartFoot');
-      if (title) title.textContent = simGeom === 'histogram' ? 'Histograms' : 'Kernel densities';
-      if (foot) {
-        const geom = simGeom === 'histogram'
-          ? 'Clustered frequency bars, not a significance test.'
-          : 'Overlapping kernel densities, not a significance test.';
-        const mode = simDistMode === 'shape'
-          ? 'Standardized shape lines up mean and SD before overlaying.'
-          : 'Raw values keep each group on the original scale.';
-        foot.textContent = `${geom} ${mode}`;
-      }
+    function renderSimDistributionPanel() {
+      const kernelWrap = document.getElementById('dspKernelWrap');
+      const histGrid = document.getElementById('dspHistGrid');
+      const boxWrap = document.getElementById('dspBoxplotWrap');
+      if (!kernelWrap || !histGrid || !boxWrap) return;
+      syncSimDistToggle();
+      kernelWrap.classList.toggle('is-hidden', simDistView !== 'kernel');
+      histGrid.classList.toggle('is-hidden', simDistView !== 'histograms');
+      boxWrap.classList.toggle('is-hidden', simDistView !== 'boxplot');
+      if (simDistView === 'boxplot') renderGroupBoxplot('dspBoxplotChart');
+      else if (simDistView === 'histograms') renderHistograms('dspHistGrid');
+      else renderKernelChart('dspKernelChart');
     }
 
     function renderDspPairTable() {
@@ -2232,53 +2274,6 @@
       animateProfileBars();
     }
 
-    function renderDspOverlap() {
-      const host = document.getElementById('dspChartHost');
-      const el = document.getElementById('dspOverlapChart');
-      if (!el || !groupStats.length || typeof StatisticoDistributionSimilarity === 'undefined') return;
-      if (simOverlapChart) {
-        try { simOverlapChart.destroy(); } catch (_e) {}
-        simOverlapChart = null;
-      }
-      if (typeof Highcharts === 'undefined') {
-        el.innerHTML = '<div class="dsp-kpi-note">Charts need Highcharts to render.</div>';
-        return;
-      }
-      syncSimChartChrome();
-      let series = [];
-      let categories;
-      let xTitle = simDistMode === 'shape' ? 'Standardized value' : 'Value';
-      if (simGeom === 'histogram') {
-        const hist = overlayHistSeries(groupStats, simDistMode);
-        categories = hist.categories;
-        xTitle = simDistMode === 'shape' ? 'Standardized range' : 'Value range';
-        series = hist.series.map((s) => ({
-          ...s,
-          name: groupLevelWithN(s.name, groupN(s.name))
-        }));
-      } else {
-        const overlay = StatisticoDistributionSimilarity.overlayMany(groupStats, simDistMode);
-        series = overlay.series.map((s) => ({
-          name: groupLevelWithN(s.name, groupN(s.name)),
-          color: colorForGroup(s.name),
-          data: overlay.grid.map((x, i) => [x, s.density[i]])
-        }));
-      }
-      if (!series.length) {
-        el.innerHTML = '<div class="dsp-kpi-note">No group densities could be drawn.</div>';
-        return;
-      }
-      const opts = overlapChartOptions(simGeom, xTitle, series, categories);
-      const plotH = Math.max(260, Math.round((host && host.clientHeight) || 260));
-      opts.chart.height = plotH;
-      simOverlapChart = Highcharts.chart('dspOverlapChart', opts);
-      requestAnimationFrame(() => {
-        const next = Math.max(260, Math.round((host && host.clientHeight) || 260));
-        if (simOverlapChart && next > plotH + 4) {
-          try { simOverlapChart.setSize(null, next, false); } catch (_e) { /* ignore */ }
-        }
-      });
-    }
 
     function renderDspSelection() {
       renderDspPairTable();

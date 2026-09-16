@@ -20,6 +20,8 @@ describe('shared contained tabs', () => {
     expect(css).toMatch(/--st-contained-selected:\s*var\(--st-header-tab-selected/);
     expect(css).toMatch(/border-top:\s*1px solid var\(--st-contained-divider\)/);
     expect(css).toMatch(/border-bottom:\s*1px solid var\(--st-contained-divider\)/);
+    expect(css).toMatch(/#header-container[\s\S]*background:\s*transparent !important;/);
+    expect(headerCss).toMatch(/#header-container[\s\S]*background:\s*transparent !important;/);
     expect(css).toMatch(/display:\s*none !important;/);
     expect(css).toMatch(/--st-contained-h:\s*48px/);
     expect(css).toMatch(/border-top:\s*3px solid transparent/);

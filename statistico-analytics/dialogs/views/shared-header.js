@@ -8542,6 +8542,8 @@ const StatisticoHeader = {
         'This is Similarity Profile™: a pairwise table of 0–100 descriptive scores (pattern / strength / sign) comparing aligned β-vectors across groups, plus a pair profile. Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different. Do not treat Overall as a group, and do not invent a Chow or interaction test.',
       'by-group-similarity':
         'This is Similarity Profile™: a homogeneity gauge, the same Kernel / Histograms / Boxplots chart panel as Statistics (labels use col="level" (n=N)), and a pairwise table of 0–100 descriptive scores (location / spread / shape) plus a pair profile. Focus READING on practical similarity, not significance. Cite Location / Spread / Shape when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different.',
+      'correlation-by-group-similarity':
+        'This is Similarity Profile™: a homogeneity gauge, a congruence scatter of pairwise r in one group vs the other, and a pairwise table of 0–100 descriptive scores (pattern / strength / sign) plus a pair profile. Group labels use col="level" (n=N). Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different.',
       'logistic-predictive-performance-roc-thresholds':
         'This is an ROC curve with a threshold slider. Describe the curve shape, AUC band, and the trade-off the slider exposes — not coefficient inference.',
       'logistic-predictive-performance-calibration':
@@ -10001,7 +10003,7 @@ READING: [1–2 sentences comparing the named groups using exact per-group numbe
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
       'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group and a sparkline of group-specific correlations.',
       'correlation-by-group-profile': 'Group Profile plots r between a chosen anchor variable and every other variable, one line per group level (Overall omitted). Use it to see which associations stay stable or reverse across groups.',
-      'correlation-by-group-similarity': 'Similarity Profile™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. Click heatmap cells or table rows for the three-component profile; click a congruence point to open that pair’s scatter.'
+      'correlation-by-group-similarity': 'Similarity Profile™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. The layout matches Regression: a homogeneity gauge, a congruence scatter (r in one group vs r in the other), and a pairwise table with a three-component profile. Click a table row for the profile; click a congruence point to open that pair’s scatter. Group labels use col="level" (n=N).'
     };
   },
 

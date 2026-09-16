@@ -12,10 +12,11 @@
   <link rel="stylesheet" href="../shared-header.css?v=20260914w75" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260908corrn5" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260908corrn5"></script>
+  <script src="../shared-header.js?v=20260916corrsim"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/correlation-similarity.js?v=20260907csi"></script>
+  <script src="../../shared/regression-pred-labels.js?v=20260916corrsim"></script>
   <style>
     :root {
       --surface-0:#0c1624; --surface-1:#1a1f2e; --surface-2:#242938; --border:#2d3748;
@@ -107,21 +108,53 @@
     #corrByGroupPanel-profile .r-profile-card { flex:1; min-height:0; display:flex; flex-direction:column; }
     #corrByGroupPanel-profile .r-profile-chart { flex:1; min-height:0; }
     #corrByGroupPanel-profile .r-profile-svg { height:100%; min-height:280px; }
-    .dsp-kpis { display:grid; grid-template-columns:repeat(4, minmax(140px, 1fr)); gap:10px; margin-bottom:12px; }
-    .dsp-kpi {
-      width:100%; box-sizing:border-box;
-      background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; cursor:pointer;
-      text-align:left; color:inherit;
+    .dsp-kpis { display:grid; grid-template-columns:minmax(0, .9fr) minmax(0, 1.1fr); gap:8px; margin-bottom:8px; align-items:stretch; }
+    .dsp-homo-card {
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--surface-2);
+      padding:8px 10px 6px;
+      min-width:0; min-height:0;
+      display:flex; flex-direction:column;
     }
-    .dsp-kpi:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
-    .dsp-kpi.is-active { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 40%, transparent); }
-    .dsp-kpi:disabled { opacity:.5; cursor:not-allowed; }
-    .dsp-kpi-label { color:var(--text-secondary); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
-    .dsp-kpi-value { color:var(--accent-1); font-size:22px; font-weight:800; margin-top:4px; line-height:1.1; }
+    .dsp-homo-gauge-wrap { flex:1 1 auto; display:flex; align-items:center; justify-content:center; min-height:227px; margin:0; }
+    .dsp-homo-gauge { width:81%; height:auto; max-height:100%; display:block; color:var(--text-secondary); }
+    .dsp-homo-gauge .homo-track { fill:none; stroke:rgba(148,163,184,.14); stroke-width:12; stroke-linecap:butt; }
+    html[data-theme="light"] .dsp-homo-gauge .homo-track { stroke:rgba(15,23,42,.08); }
+    .dsp-homo-gauge .homo-seg { fill:none; stroke-width:12; stroke-linecap:butt; }
+    .dsp-homo-gauge .homo-arrow { stroke:color-mix(in srgb, var(--text-primary) 35%, var(--surface-1)); stroke-width:1; }
+    .dsp-homo-gauge .homo-tick { stroke:var(--text-secondary); stroke-width:1; opacity:.4; }
+    .dsp-homo-gauge .homo-tick-lbl { fill:var(--text-secondary); font-size:8px; font-weight:600; font-family:"Segoe UI", Tahoma, sans-serif; }
+    .dsp-homo-gauge .homo-zone-lbl { fill:var(--text-secondary); font-size:8px; font-weight:600; letter-spacing:.03em; font-family:"Segoe UI", Tahoma, sans-serif; opacity:.72; }
+    .dsp-homo-gauge .homo-end-lbl { fill:var(--text-secondary); font-size:8px; font-weight:600; font-family:"Segoe UI", Tahoma, sans-serif; opacity:.7; }
+    .dsp-homo-gauge .homo-title { fill:var(--text-secondary); font-size:9px; font-weight:700; letter-spacing:.16em; font-family:"Segoe UI", Tahoma, sans-serif; }
+    .dsp-homo-gauge .homo-score { fill:var(--text-primary); font-size:26px; font-weight:700; font-family:"Segoe UI", Tahoma, sans-serif; }
+    .dsp-homo-meta { text-align:center; color:var(--text-secondary); font-size:10px; line-height:1.3; margin-top:2px; }
     .dsp-kpi-note { color:var(--text-secondary); font-size:11px; margin-top:4px; line-height:1.35; }
-    .dsp-split { display:grid; grid-template-columns:minmax(280px, 1.1fr) minmax(280px, 0.9fr); gap:12px; align-items:start; }
+    .dsp-chart-panel {
+      border:1px solid var(--border); border-radius:12px; background:var(--surface-2);
+      padding:6px 8px 6px; min-width:0; display:flex; flex-direction:column; gap:4px;
+    }
+    .dsp-chart-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .dsp-chart-host { flex:1 1 auto; min-height:260px; display:flex; flex-direction:column; }
+    .dsp-chart-host #corrSimChart { flex:1 1 auto; width:100%; min-height:260px; }
     .dsp-card { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:10px; min-width:0; }
-    .dsp-subhead { color:var(--accent-1); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin:0 0 8px; }
+    .dsp-pair-grid {
+      display:grid; grid-template-columns:minmax(280px, 1.35fr) minmax(220px, 0.85fr);
+      gap:16px 20px; align-items:start; margin-top:8px;
+    }
+    .dsp-pair-profile {
+      padding-left:18px;
+      border-left:1px solid var(--border);
+      min-width:0;
+    }
+    .dsp-subhead { color:var(--accent-1); font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin:0 0 4px; }
+    .dsp-subhead-note { color:var(--text-secondary); font-size:11px; line-height:1.4; margin:0 0 8px; }
+    .dsp-bars-head {
+      display:flex; align-items:center; gap:6px; margin:10px 0 8px;
+      color:var(--text-secondary); font-size:11px; font-weight:800;
+      letter-spacing:.06em; text-transform:uppercase;
+    }
     .dsp-heat-wrap { overflow:auto; max-height:min(420px, 52vh); }
     .dsp-heat { border-collapse:collapse; font-size:11px; min-width:100%; }
     .dsp-heat th, .dsp-heat td { padding:6px 7px; text-align:center; border:1px solid var(--border); white-space:nowrap; }
@@ -137,7 +170,11 @@
     .dsp-bars { display:flex; flex-direction:column; gap:8px; margin:8px 0 12px; }
     .dsp-bar-row { display:grid; grid-template-columns:84px 1fr 42px; gap:8px; align-items:center; font-size:12px; }
     .dsp-bar-track { height:8px; border-radius:99px; background:rgba(148,163,184,.18); overflow:hidden; }
-    .dsp-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, var(--accent-2), var(--accent-1)); }
+    .dsp-bar-fill {
+      height:100%; width:0; border-radius:99px;
+      background:linear-gradient(90deg, var(--accent-2), var(--accent-1));
+      transition:width .75s cubic-bezier(.22, 1, .36, 1);
+    }
     .dsp-band { font-size:12px; font-weight:700; }
     .dsp-band--very { color:#34d399; }
     .dsp-band--mostly { color:#38bdf8; }
@@ -196,7 +233,7 @@
     .dsp-pair-table tbody tr:hover td { background:rgba(129,140,248,.12); }
     .dsp-pair-table tbody tr.is-selected td { background:rgba(129,140,248,.16); }
     .dsp-score { font-weight:800; }
-    .corr-sim-svg { display:block; width:100%; max-width:420px; height:auto; }
+    .corr-sim-svg { display:block; width:100%; height:100%; min-height:260px; }
     .corr-sim-svg .r-profile-dot { cursor:pointer; }
     .section-title { display:flex; flex-direction:column; gap:3px; margin:0 0 10px; }
     .section-title strong { color:var(--accent-1); font-size:13px; letter-spacing:.04em; text-transform:uppercase; display:inline-flex; align-items:center; }
@@ -689,14 +726,15 @@
       .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
       .toolbar { flex-direction:column; align-items:flex-start; }
       .controls { justify-content:flex-start; }
-      .dsp-kpis { grid-template-columns:repeat(2, minmax(140px, 1fr)); }
-      .dsp-split { grid-template-columns:1fr; }
+      .dsp-kpis { grid-template-columns:1fr; }
+      .dsp-pair-grid { grid-template-columns:1fr; }
+      .dsp-pair-profile { padding-left:0; border-left:none; padding-top:12px; border-top:1px solid var(--border); }
       .group-dialog-body { grid-template-columns:1fr; }
       .group-dialog-list { border-right:none; border-bottom:1px solid var(--border); max-height:280px; }
     }
   </style>
 </head>
-<body data-page-version="20260908-bygroup-v24">
+<body data-page-version="20260916-corr-simlayout">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -763,36 +801,47 @@
                 Similarity Profile needs at least two groups with enough overlapping pairwise r values.
               </div>
               <div id="corrSimMain" style="display:none;">
-                <div class="dsp-kpis" id="corrSimKpis"></div>
-                <div class="dsp-split">
-                  <div class="dsp-card">
-                    <div class="dsp-subhead">Overall pairwise similarity</div>
-                    <div class="dsp-heat-wrap" id="corrSimHeatWrap"></div>
-                    <div class="dsp-legend"><span>0</span><div class="dsp-legend-bar" aria-hidden="true"></div><span>100</span></div>
-                  </div>
-                  <div class="dsp-card">
-                    <div class="dsp-subhead" id="corrSimProfileTitle">Pair profile</div>
-                    <div id="corrSimProfileBody"></div>
-                    <div id="corrSimChart"></div>
+                <div class="dsp-kpis">
+                  <div class="dsp-homo-card" id="corrSimGaugeCard"></div>
+                  <div class="dsp-chart-panel">
+                    <div class="dsp-chart-head">
+                      <div class="dsp-subhead">Congruence scatter</div>
+                      <div class="dsp-subhead-note">Each point is one variable pair’s r in both groups. The diagonal is a perfect match.</div>
+                    </div>
+                    <div class="dsp-chart-host" id="corrSimChartHost">
+                      <div id="corrSimChart"></div>
+                    </div>
+                    <em class="dsp-footnote">Click a point to open that pair’s scatter. Not a significance test.</em>
                   </div>
                 </div>
-                <div class="section-title" style="margin-top:14px;"><strong>Pairwise scores</strong><span>Click a row or heatmap cell to open the three-component profile</span></div>
-                <div class="dsp-pair-wrap">
-                  <table class="dsp-pair-table" id="corrSimPairTable">
-                    <thead>
-                      <tr>
-                        <th>Groups</th>
-                        <th>Overall</th>
-                        <th>Pattern</th>
-                        <th>Strength</th>
-                        <th>Sign</th>
-                        <th>Reading</th>
-                      </tr>
-                    </thead>
-                    <tbody id="corrSimPairBody"></tbody>
-                  </table>
+                <div class="dsp-card">
+                  <div class="dsp-subhead">Pairwise scores by range</div>
+                  <div class="dsp-subhead-note">Click a row for the three-component profile. Pairs in the same range are not ranked against each other</div>
+                  <div class="dsp-pair-grid">
+                    <div>
+                      <div class="dsp-pair-wrap">
+                        <table class="dsp-pair-table" id="corrSimPairTable">
+                          <thead>
+                            <tr>
+                              <th>Groups</th>
+                              <th>Range</th>
+                              <th>Pattern</th>
+                              <th>Strength</th>
+                              <th>Sign</th>
+                              <th>Combined index</th>
+                            </tr>
+                          </thead>
+                          <tbody id="corrSimPairBody"></tbody>
+                        </table>
+                      </div>
+                      <em class="dsp-footnote">A higher combined index may indicate greater similarity between groups in correlation pattern, strength, and sign. Readings use four ranges (below 50 Different · 50–74 Mixed · 75–89 Mostly · 90–100 Very). Pairs in the same range are treated as the same reading.</em>
+                    </div>
+                    <div class="dsp-pair-profile">
+                      <div class="dsp-subhead" id="corrSimProfileTitle">Pair profile</div>
+                      <div id="corrSimProfileBody"></div>
+                    </div>
+                  </div>
                 </div>
-                <em class="dsp-footnote">90–100 Very similar · 75–89 Mostly similar · 50–74 Mixed similarity · below 50 Substantially different. Combined score uses a geometric mean so one weak component is not hidden by two strong ones.</em>
               </div>
             </div>
           </div>
@@ -878,7 +927,7 @@
           <b>75–89</b> Mostly similar<br>
           <b>50–74</b> Mixed similarity<br>
           <b>Below 50</b> Substantially different<br>
-          Click a heatmap cell or table row to see why a pair scored that way. The scatter plots each variable pair’s r in one group against the other; the diagonal is a perfect match.</p>
+          Click a table row to see why a pair scored that way. The scatter plots each variable pair’s r in one group against the other; the diagonal is a perfect match.</p>
         </div>
       </div>
       <div class="dsp-help-rule">
@@ -915,6 +964,45 @@
     window.__corrByGroupActiveTab = 'table';
     let corrSimProfile = null;
     let selectedCorrSimPair = null;
+    let homoGaugePlayed = false;
+
+    function predLabels() {
+      return (typeof StatisticoRegressionPredLabels !== 'undefined' && StatisticoRegressionPredLabels) || {};
+    }
+    function groupingColumnName() {
+      return (sourceHeaders && groupIndex != null && sourceHeaders[groupIndex]) || '';
+    }
+    function prettyGroupLabel(raw, colName) {
+      return typeof predLabels().prettyGroupLabel === 'function'
+        ? predLabels().prettyGroupLabel(raw, colName || groupingColumnName())
+        : String(raw == null ? '' : raw);
+    }
+    function groupLevelWithN(raw, n, colName) {
+      if (typeof predLabels().groupLevelWithN === 'function') {
+        return predLabels().groupLevelWithN(raw, colName || groupingColumnName(), n);
+      }
+      const base = prettyGroupLabel(raw, colName);
+      const count = Number(n);
+      return Number.isFinite(count) ? `${base} (n=${count})` : base;
+    }
+    function groupN(name) {
+      const g = (activeGroups || []).find((item) => String(item.group) === String(name));
+      return g && Number.isFinite(g.n) ? g.n : NaN;
+    }
+    function dspBandColor(key) {
+      if (key === 'very') return '#6d9a86';
+      if (key === 'mostly') return '#6f8ea6';
+      if (key === 'mixed') return '#b39b6d';
+      if (key === 'different') return '#a67c82';
+      return '#8b93a1';
+    }
+    function dspBandRank(key) {
+      if (key === 'very') return 3;
+      if (key === 'mostly') return 2;
+      if (key === 'mixed') return 1;
+      if (key === 'different') return 0;
+      return -1;
+    }
     const levelSelections = {};
     let scatterPopupState = { panels: [], varA: '', varB: '', combined: false, hiddenKeys: { overall: true } };
     const scatterGroupColors = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635'];
@@ -1136,7 +1224,7 @@
         previewLevels.map((item, pos) => `
           <div class="level-row${isLevelIncluded(previewGroupIndex, item.level) ? ' is-included' : ''}" role="checkbox" tabindex="0" aria-checked="${isLevelIncluded(previewGroupIndex, item.level) ? 'true' : 'false'}" data-level-pos="${pos}" title="${escapeHtml(item.level)}">
             <span class="level-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span>
-            <span class="level-name">${escapeHtml(item.level)}</span>
+            <span class="level-name">${escapeHtml(prettyGroupLabel(item.level, sourceHeaders[previewGroupIndex]))}</span>
             <span class="level-n">n=${item.n}</span>
           </div>
         `).join('')
@@ -1531,7 +1619,7 @@
       const { label, points, stats, variant } = panel;
       const head = `<div class="scatter-panel-head">
         <strong title="${escapeHtml(label)}">${escapeHtml(label)}</strong>
-        <span>r=${fmtR(stats.r)} · p=${formatP(stats.p)} · n=${stats.n}</span>
+        <span>r=${fmtR(stats.r)} · p=${formatP(stats.p)}${variant === 'overall' ? ` · n=${stats.n}` : ''}</span>
       </div>`;
       if (!points.length) {
         return `<div class="scatter-panel scatter-panel-${variant}">${head}<div class="scatter-empty">Not enough valid pairs</div></div>`;
@@ -1599,7 +1687,7 @@
         }
         legend.push(`<button type="button" class="scatter-legend-item${panel.variant === 'overall' ? ' overall' : ''}${hidden ? ' is-off' : ''}" data-series-key="${escapeHtml(key)}" aria-pressed="${hidden ? 'false' : 'true'}" title="${hidden ? 'Show' : 'Hide'} ${escapeHtml(panel.label)}">
           <span class="scatter-legend-swatch" style="border-top-color:${color}"></span>
-          <span>${escapeHtml(panel.label)} · r=${fmtR(panel.stats.r)} · n=${panel.stats.n}</span>
+          <span>${escapeHtml(panel.label)} · r=${fmtR(panel.stats.r)}${panel.variant === 'overall' ? ` · n=${panel.stats.n}` : ''}</span>
         </button>`);
       });
 
@@ -1669,7 +1757,7 @@
       }];
       activeGroups.forEach((g, i) => {
         panels.push({
-          label: String(g.group),
+          label: groupLevelWithN(g.group, g.n),
           points: extractPairPoints(g.rows, varA, varB),
           stats: row.groupResults[i] || { r: NaN, p: null, n: 0 },
           variant: 'group'
@@ -1739,7 +1827,7 @@
     function buildSparklineTipHtml(groupResults) {
       return groupResults.map((gr) => {
         const val = Number.isFinite(gr.r) ? fmtR(gr.r) : '—';
-        return `<div style="display:flex;justify-content:space-between;gap:12px;line-height:1.45;"><span><strong>${escapeHtml(gr.group)}</strong></span><span>r = ${val}, p = ${formatP(gr.p)} <span style="opacity:.75">(n=${gr.n})</span></span></div>`;
+        return `<div style="display:flex;justify-content:space-between;gap:12px;line-height:1.45;"><span><strong>${escapeHtml(groupLevelWithN(gr.group, gr.n))}</strong></span><span>r = ${val}, p = ${formatP(gr.p)}</span></div>`;
       }).join('');
     }
 
@@ -1854,9 +1942,9 @@
       legendEl.innerHTML = groups.map((g, i) => {
         const color = scatterGroupColors[i % scatterGroupColors.length];
         const hidden = !!profileHiddenGroups[String(g.group)];
-        return `<button type="button" class="r-profile-legend-item${hidden ? ' is-off' : ''}" data-profile-group="${escapeHtml(String(g.group))}" aria-pressed="${hidden ? 'false' : 'true'}" title="${hidden ? 'Show' : 'Hide'} ${escapeHtml(String(g.group))}">
+        return `<button type="button" class="r-profile-legend-item${hidden ? ' is-off' : ''}" data-profile-group="${escapeHtml(String(g.group))}" aria-pressed="${hidden ? 'false' : 'true'}" title="${hidden ? 'Show' : 'Hide'} ${escapeHtml(groupLevelWithN(g.group, g.n))}">
           <span class="r-profile-legend-swatch" style="border-top-color:${color}"></span>
-          <span>${escapeHtml(String(g.group))}</span>
+          <span>${escapeHtml(groupLevelWithN(g.group, g.n))}</span>
         </button>`;
       }).join('');
       legendEl.onclick = (event) => {
@@ -1946,7 +2034,7 @@
           if (!pt) return;
           const item = pt[3];
           const gr = item.groupResults[i];
-          const tip = `${escapeHtml(String(g.group))} · ${escapeHtml(anchor)} vs ${escapeHtml(item.xLabel)}<br>r = ${fmtR(gr.r)}, p = ${formatP(gr.p)} (n=${gr.n})`;
+          const tip = `${escapeHtml(groupLevelWithN(g.group, g.n))} · ${escapeHtml(anchor)} vs ${escapeHtml(item.xLabel)}<br>r = ${fmtR(gr.r)}, p = ${formatP(gr.p)}`;
           series += `<circle class="r-profile-dot" style="fill:${color}" cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="3.4" data-var-a="${escapeHtml(item.varA)}" data-var-b="${escapeHtml(item.varB)}" data-st-tip-html="${tipAttr(tip)}" />`;
         });
       });
@@ -2074,11 +2162,11 @@
       row1.push(categoryTh('Overall', 'All filtered rows', 3, 'group-category-overall'));
       activeGroups.forEach((g, i) => {
         row1.push(categoryTh(
-          String(g.group),
-          `${g.n} row${g.n === 1 ? '' : 's'}`,
+          groupLevelWithN(g.group, g.n),
+          '',
           3,
           i === 0 ? 'group-category-first' : '',
-          String(g.group)
+          groupLevelWithN(g.group, g.n)
         ));
       });
       row1.push(`<th rowspan="2" class="chart-col" title="Open scatterplot"><span class="chart-col-inner">${scatterChartIcon('pair-chart-icon')}<span class="chart-col-label">Scatterplot</span></span></th>`);
@@ -2125,7 +2213,7 @@
           { dividerStart: true, dividerEnd: true, overall: true }
         );
         const groupCells = row.groupResults.map((gr, i) => renderMetricCells(
-          [gr.r, gr.p, gr.n, `${gr.group}: valid pairs n=${gr.n}`],
+          [gr.r, gr.p, gr.n, `${groupLevelWithN(gr.group, gr.n)}: valid pairs`],
           `group-cell${i === 0 ? ' group-block-first' : ''}`,
           { dividerStart: i === 0, dividerEnd: true }
         )).join('');
@@ -2232,8 +2320,6 @@
     function selectCorrSimPair(a, b) {
       const pair = findCorrSimPair(a, b);
       selectedCorrSimPair = pair ? { a: pair.a, b: pair.b } : null;
-      renderCorrSimKpis();
-      renderCorrSimHeatmap();
       renderCorrSimPairTable();
       renderCorrSimProfile();
     }
@@ -2258,100 +2344,135 @@
       }
       empty.style.display = 'none';
       main.style.display = 'block';
+      homoGaugePlayed = false;
       if (selectedCorrSimPair && !findCorrSimPair(selectedCorrSimPair.a, selectedCorrSimPair.b)) selectedCorrSimPair = null;
       if (!selectedCorrSimPair && corrSimProfile.mostSimilar) {
         selectedCorrSimPair = { a: corrSimProfile.mostSimilar.a, b: corrSimProfile.mostSimilar.b };
       }
-      renderCorrSimKpis();
-      renderCorrSimHeatmap();
+      renderCorrSimGauge();
       renderCorrSimPairTable();
       renderCorrSimProfile();
     }
 
-    function renderCorrSimKpis() {
-      const host = document.getElementById('corrSimKpis');
-      if (!host || !corrSimProfile) return;
-      const similar = corrSimProfile.mostSimilar;
-      const distinct = corrSimProfile.mostDistinct;
-      const homo = corrSimProfile.homogeneity;
-      const outlier = corrSimProfile.mostDifferentGroup;
-      const selectedKey = selectedCorrSimPair ? simPairKey(selectedCorrSimPair.a, selectedCorrSimPair.b) : '';
-      const similarKey = similar ? simPairKey(similar.a, similar.b) : '';
-      const distinctKey = distinct ? simPairKey(distinct.a, distinct.b) : '';
-      host.innerHTML = [
-        `<button type="button" class="dsp-kpi${similar && selectedKey === similarKey ? ' is-active' : ''}" data-kpi="similar" ${similar ? '' : 'disabled'}>
-          <div class="dsp-kpi-label">Most similar pair</div>
-          <div class="dsp-kpi-value">${similar ? dspFmt(similar.overall) : '—'}</div>
-          <div class="dsp-kpi-note">${similar ? `${escapeHtml(similar.a)} · ${escapeHtml(similar.b)}` : 'Need two groups'}</div>
-        </button>`,
-        `<button type="button" class="dsp-kpi${distinct && selectedKey === distinctKey ? ' is-active' : ''}" data-kpi="distinct" ${distinct ? '' : 'disabled'}>
-          <div class="dsp-kpi-label">Most distinct pair</div>
-          <div class="dsp-kpi-value">${distinct ? dspFmt(distinct.overall) : '—'}</div>
-          <div class="dsp-kpi-note">${distinct ? `${escapeHtml(distinct.a)} · ${escapeHtml(distinct.b)}` : 'Need two groups'}</div>
-        </button>`,
-        `<div class="dsp-kpi" style="cursor:default;">
-          <div class="dsp-kpi-label">Group homogeneity</div>
-          <div class="dsp-kpi-value">${dspFmt(homo)}</div>
-          <div class="dsp-kpi-note">${escapeHtml((corrSimProfile.homogeneityBand && corrSimProfile.homogeneityBand.label) || 'Across all pairs')}</div>
-        </div>`,
-        `<div class="dsp-kpi" style="cursor:default;">
-          <div class="dsp-kpi-label">Most different group</div>
-          <div class="dsp-kpi-value">${outlier ? escapeHtml(String(outlier.group)) : '—'}</div>
-          <div class="dsp-kpi-note">${outlier ? `mean similarity ${dspFmt(outlier.meanSimilarity)}` : 'Need two groups'}</div>
-        </div>`
-      ].join('');
-      const similarBtn = host.querySelector('[data-kpi="similar"]');
-      const distinctBtn = host.querySelector('[data-kpi="distinct"]');
-      if (similarBtn && similar) similarBtn.addEventListener('click', () => selectCorrSimPair(similar.a, similar.b));
-      if (distinctBtn && distinct) distinctBtn.addEventListener('click', () => selectCorrSimPair(distinct.a, distinct.b));
+    function homoGaugeSvg(score, bandKey) {
+      const cx = 190;
+      const cy = 152;
+      const r = 118;
+      const startX = cx - r;
+      const startY = cy;
+      const trackD = `M ${startX} ${startY} A ${r} ${r} 0 0 1 ${cx + r} ${startY}`;
+      const fillColor = dspBandColor(bandKey);
+      const angle = (v) => -Math.PI + (v / 100) * Math.PI;
+      const pt = (v, rr) => {
+        const a = angle(v);
+        return { x: cx + rr * Math.cos(a), y: cy + rr * Math.sin(a) };
+      };
+      const arcD = (from, to) => {
+        const a = pt(from, r);
+        const b = pt(to, r);
+        return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${r} ${r} 0 0 1 ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+      };
+      const segments = [
+        { from: 0, to: 50, color: '#a67c82', label: 'Different', at: 25 },
+        { from: 50, to: 75, color: '#b39b6d', label: 'Mixed', at: 62.5 },
+        { from: 75, to: 90, color: '#6f8ea6', label: 'Mostly', at: 82.5 },
+        { from: 90, to: 100, color: '#6d9a86', label: 'Very', at: 95 }
+      ];
+      const segs = segments.map((s) => `<path class="homo-seg" d="${arcD(s.from, s.to)}" stroke="${s.color}"/>`).join('');
+      const zoneLabels = segments.map((s) => {
+        const p = pt(s.at, r + 20);
+        return `<text class="homo-zone-lbl" text-anchor="middle" x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}">${s.label}</text>`;
+      }).join('');
+      const ticks = [0, 50, 75, 90, 100];
+      const tickMarks = ticks.map((v) => {
+        const inner = pt(v, r - 10);
+        const outer = pt(v, r + 8);
+        const labelPt = (v === 0 || v === 100)
+          ? { x: pt(v, r).x + (v === 0 ? -14 : 14), y: pt(v, r).y + 4 }
+          : pt(v, r - 22);
+        return `<line class="homo-tick" x1="${inner.x.toFixed(1)}" y1="${inner.y.toFixed(1)}" x2="${outer.x.toFixed(1)}" y2="${outer.y.toFixed(1)}" />`
+          + `<text class="homo-tick-lbl" text-anchor="middle" dominant-baseline="middle" x="${labelPt.x.toFixed(1)}" y="${labelPt.y.toFixed(1)}">${v}</text>`;
+      }).join('');
+      const left = pt(0, r);
+      const right = pt(100, r);
+      const scoreText = Number.isFinite(score) ? score.toFixed(1) : '—';
+      const tip = cx + r - 8;
+      return `<svg class="dsp-homo-gauge" viewBox="0 0 380 200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Group homogeneity ${scoreText} out of 100, higher means more similar">
+        <path class="homo-track" d="${trackD}"/>
+        ${segs}
+        ${tickMarks}
+        ${zoneLabels}
+        <g id="corrHomoNeedle" transform="rotate(-180 ${cx} ${cy})">
+          <polygon class="homo-arrow" fill="${fillColor}" points="${cx + 8},${cy - 1.6} ${tip - 14},${cy - 1.6} ${tip - 14},${cy - 5.5} ${tip},${cy} ${tip - 14},${cy + 5.5} ${tip - 14},${cy + 1.6} ${cx + 8},${cy + 1.6}"/>
+          <circle class="homo-arrow" cx="${cx}" cy="${cy}" r="4.5" fill="${fillColor}"/>
+        </g>
+        <text class="homo-title" text-anchor="middle" x="${cx}" y="${cy - 42}">HOMOGENEITY</text>
+        <text class="homo-score" id="corrHomoScore" text-anchor="middle" x="${cx}" y="${cy - 18}">0.0</text>
+        <text class="homo-end-lbl" text-anchor="start" x="${(left.x - 6).toFixed(1)}" y="${(left.y + 18).toFixed(1)}">Less</text>
+        <text class="homo-end-lbl" text-anchor="end" x="${(right.x + 6).toFixed(1)}" y="${(right.y + 18).toFixed(1)}">More</text>
+      </svg>`;
     }
 
-    function renderCorrSimHeatmap() {
-      const wrap = document.getElementById('corrSimHeatWrap');
-      if (!wrap || !corrSimProfile) return;
-      const names = corrSimProfile.groups || [];
-      let html = '<table class="dsp-heat"><thead><tr><th></th>';
-      names.forEach((name) => {
-        const label = String(name);
-        html += `<th title="${escapeHtml(label)}">${escapeHtml(label.length > 12 ? `${label.slice(0, 11)}…` : label)}</th>`;
-      });
-      html += '</tr></thead><tbody>';
-      names.forEach((rowName, r) => {
-        const rowLabel = String(rowName);
-        html += `<tr><th title="${escapeHtml(rowLabel)}">${escapeHtml(rowLabel.length > 14 ? `${rowLabel.slice(0, 13)}…` : rowLabel)}</th>`;
-        names.forEach((colName, c) => {
-          if (r === c) {
-            html += '<td style="opacity:.4;">—</td>';
-            return;
-          }
-          const cell = corrSimProfile.matrix[r][c];
-          const score = cell && cell.overall;
-          const selected = selectedCorrSimPair && ((selectedCorrSimPair.a === rowName && selectedCorrSimPair.b === colName) || (selectedCorrSimPair.a === colName && selectedCorrSimPair.b === rowName));
-          html += `<td data-a="${escapeHtml(rowName)}" data-b="${escapeHtml(colName)}" class="${selected ? 'is-selected' : ''}" style="background:${dspScoreColor(score)};" title="${escapeHtml(rowName)} vs ${escapeHtml(colName)}">${dspFmt(score)}</td>`;
-        });
-        html += '</tr>';
-      });
-      html += '</tbody></table>';
-      wrap.innerHTML = html;
-      wrap.querySelectorAll('td[data-a]').forEach((td) => {
-        td.addEventListener('click', () => selectCorrSimPair(td.getAttribute('data-a'), td.getAttribute('data-b')));
-      });
+    function animateHomoGauge(targetScore) {
+      const needle = document.getElementById('corrHomoNeedle');
+      const scoreEl = document.getElementById('corrHomoScore');
+      if (!needle) return;
+      const cx = 190;
+      const cy = 152;
+      const dest = Number.isFinite(targetScore) ? Math.max(0, Math.min(100, targetScore)) : 0;
+      const toDeg = (v) => -180 + (v / 100) * 180;
+      const apply = (v) => {
+        needle.setAttribute('transform', `rotate(${toDeg(v).toFixed(2)} ${cx} ${cy})`);
+        if (scoreEl) scoreEl.textContent = v.toFixed(1);
+      };
+      if (homoGaugePlayed) {
+        apply(dest);
+        return;
+      }
+      homoGaugePlayed = true;
+      apply(0);
+      const duration = 800;
+      let startTs = null;
+      const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+      const step = (ts) => {
+        if (!startTs) startTs = ts;
+        const p = easeOutCubic(Math.min((ts - startTs) / duration, 1));
+        apply(p * dest);
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    function renderCorrSimGauge() {
+      const host = document.getElementById('corrSimGaugeCard');
+      if (!host || !corrSimProfile) return;
+      const homo = corrSimProfile.homogeneity;
+      const band = corrSimProfile.homogeneityBand || { key: 'na', label: 'Not enough data' };
+      const pairN = Number(corrSimProfile.usablePairCount) || 0;
+      host.innerHTML = `
+        <div class="dsp-homo-gauge-wrap">${homoGaugeSvg(homo, band.key)}</div>
+        <div class="dsp-homo-meta">${escapeHtml(band.label)} · ${pairN} pairwise ${pairN === 1 ? 'score' : 'scores'}</div>`;
+      animateHomoGauge(homo);
     }
 
     function renderCorrSimPairTable() {
       const body = document.getElementById('corrSimPairBody');
       if (!body || !corrSimProfile) return;
-      const rows = corrSimProfile.pairs.slice().sort((a, b) => (b.overallRaw || -1) - (a.overallRaw || -1));
+      const rows = corrSimProfile.pairs.slice().sort((a, b) => {
+        const rankDiff = dspBandRank(b.bandKey) - dspBandRank(a.bandKey);
+        if (rankDiff) return rankDiff;
+        return `${a.a} ${a.b}`.localeCompare(`${b.a} ${b.b}`, undefined, { numeric: true });
+      });
       const selectedKey = selectedCorrSimPair ? simPairKey(selectedCorrSimPair.a, selectedCorrSimPair.b) : '';
       body.innerHTML = rows.map((p) => {
         const on = selectedKey === simPairKey(p.a, p.b) || selectedKey === simPairKey(p.b, p.a);
         return `<tr data-a="${escapeHtml(p.a)}" data-b="${escapeHtml(p.b)}" class="${on ? 'is-selected' : ''}">
-          <td>${escapeHtml(p.a)} – ${escapeHtml(p.b)}</td>
-          <td class="dsp-score">${dspFmt(p.overall)}</td>
+          <td>${escapeHtml(prettyGroupLabel(p.a))} vs ${escapeHtml(prettyGroupLabel(p.b))}</td>
+          <td class="dsp-band dsp-band--${p.bandKey}">${escapeHtml(p.band)}</td>
           <td>${dspFmt(p.pattern)}</td>
           <td>${dspFmt(p.strength)}</td>
           <td>${dspFmt(p.sign)}</td>
-          <td class="dsp-band dsp-band--${p.bandKey}">${escapeHtml(p.band)}</td>
+          <td class="dsp-score">${dspFmt(p.overall)}</td>
         </tr>`;
       }).join('');
       body.querySelectorAll('tr[data-a]').forEach((tr) => {
@@ -2361,7 +2482,19 @@
 
     function dspBar(label, score) {
       const width = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
-      return `<div class="dsp-bar-row"><span>${escapeHtml(label)}</span><div class="dsp-bar-track"><div class="dsp-bar-fill" style="width:${width}%;"></div></div><strong>${dspFmt(score)}</strong></div>`;
+      return `<div class="dsp-bar-row"><span>${escapeHtml(label)}</span><div class="dsp-bar-track"><div class="dsp-bar-fill" data-width="${width}"></div></div><strong>${dspFmt(score)}</strong></div>`;
+    }
+
+    function animateProfileBars() {
+      const fills = document.querySelectorAll('#corrSimProfileBody .dsp-bar-fill');
+      fills.forEach((el) => { el.style.width = '0%'; });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          fills.forEach((el) => {
+            el.style.width = `${el.getAttribute('data-width') || 0}%`;
+          });
+        });
+      });
     }
 
     function renderCorrSimProfile() {
@@ -2371,20 +2504,24 @@
       const pair = selectedCorrSimPair ? findCorrSimPair(selectedCorrSimPair.a, selectedCorrSimPair.b) : null;
       if (!pair) {
         title.textContent = 'Pair profile';
-        body.innerHTML = '<div class="dsp-kpi-note">Select a heatmap cell or table row.</div>';
+        body.innerHTML = '<div class="dsp-kpi-note">Select a pairwise table row.</div>';
         renderCorrSimCongruence(null);
         return;
       }
-      title.textContent = `${pair.a} vs ${pair.b}`;
+      title.innerHTML = `${escapeHtml(prettyGroupLabel(pair.a))} vs ${escapeHtml(prettyGroupLabel(pair.b))} · <span class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(pair.band)}</span>`;
       body.innerHTML = `
-        <div class="dsp-band dsp-band--${pair.bandKey}">Overall ${dspFmt(pair.overall)} · ${escapeHtml(pair.band)}</div>
+        <div class="dsp-bars-head">
+          Three components
+          <button type="button" class="dsp-info-btn" onclick="openCorrSimHelp()" aria-label="About pattern, strength and sign">i</button>
+        </div>
         <div class="dsp-bars">
           ${dspBar('Pattern', pair.pattern)}
           ${dspBar('Strength', pair.strength)}
           ${dspBar('Sign', pair.sign)}
         </div>
-        <div class="dsp-kpi-note">n=${pair.nA} vs n=${pair.nB} · ${pair.pairCount} overlapping pairs. Each point is one variable pair’s r in both groups; the diagonal is a perfect match.</div>
+        <div class="dsp-kpi-note">Comparing ${escapeHtml(groupLevelWithN(pair.a, pair.nA))} with ${escapeHtml(groupLevelWithN(pair.b, pair.nB))}. ${pair.pairCount} overlapping pairs. Each point is one variable pair’s r in both groups.</div>
       `;
+      animateProfileBars();
       renderCorrSimCongruence(pair);
     }
 
@@ -2392,11 +2529,12 @@
       const el = document.getElementById('corrSimChart');
       if (!el) return;
       if (!pair || !pair.rA || !pair.rA.length) {
-        el.innerHTML = '';
+        el.innerHTML = '<div class="dsp-kpi-note">Select a pairwise table row to plot congruence.</div>';
         return;
       }
-      const w = 420;
-      const h = 240;
+      const host = document.getElementById('corrSimChartHost');
+      const w = Math.max(420, Math.round((host && host.clientWidth) || 420));
+      const h = Math.max(260, Math.round((host && host.clientHeight) || 260));
       const pad = { l: 46, r: 14, t: 12, b: 40 };
       const plotW = w - pad.l - pad.r;
       const plotH = h - pad.t - pad.b;
@@ -2419,15 +2557,15 @@
         const y = pair.rB[i];
         const row = tableRows[pair.index[i]];
         const label = row ? row.pair : `pair ${i + 1}`;
-        const tip = `${escapeHtml(label)}<br>${escapeHtml(pair.a)} r=${fmtR(x)} · ${escapeHtml(pair.b)} r=${fmtR(y)}`;
+        const tip = `${escapeHtml(label)}<br>${escapeHtml(prettyGroupLabel(pair.a))} r=${fmtR(x)} · ${escapeHtml(prettyGroupLabel(pair.b))} r=${fmtR(y)}`;
         const varA = row ? row.varA : '';
         const varB = row ? row.varB : '';
         dots += `<circle class="r-profile-dot" style="fill:${colorA}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.6" data-var-a="${escapeHtml(varA)}" data-var-b="${escapeHtml(varB)}" data-st-tip-html="${tipAttr(tip)}" />`;
       });
       el.innerHTML = `<svg class="corr-sim-svg scatter-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Congruence scatter">
         ${chrome}${dots}
-        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 8}">${escapeHtml(pair.a)} r</text>
-        <text class="scatter-axis-label" x="12" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 12 ${(pad.t + plotH / 2).toFixed(1)})">${escapeHtml(pair.b)} r</text>
+        <text class="scatter-axis-label" x="${(pad.l + plotW / 2).toFixed(1)}" y="${h - 8}">${escapeHtml(prettyGroupLabel(pair.a))} r</text>
+        <text class="scatter-axis-label" x="12" y="${(pad.t + plotH / 2).toFixed(1)}" transform="rotate(-90 12 ${(pad.t + plotH / 2).toFixed(1)})">${escapeHtml(prettyGroupLabel(pair.b))} r</text>
       </svg>`;
       el.onclick = (event) => {
         const hit = event.target.closest('[data-var-a]');
@@ -2510,7 +2648,7 @@
       const exportHeaders = [
         'Pair',
         'Overall r', 'Overall p', 'Overall n',
-        ...activeGroups.flatMap((g) => [`${g.group} r`, `${g.group} p`, `${g.group} n`])
+        ...activeGroups.flatMap((g) => [`${groupLevelWithN(g.group, g.n)} r`, `${groupLevelWithN(g.group, g.n)} p`, `${groupLevelWithN(g.group, g.n)} n`])
       ];
       const exportRows = getFilteredRows();
       const allExportRows = getSortedRows();

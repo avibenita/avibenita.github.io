@@ -22,11 +22,7 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
   sanitizeDialogHostInfoParam();
 
   (function applyPersistedTabStyleEarly() {
-    var style = 'contained';
-    try {
-      if (localStorage.getItem('statistico-tabs') === 'classic') style = 'classic';
-    } catch (e) {}
-    document.documentElement.setAttribute('data-tabs', style);
+    document.documentElement.setAttribute('data-tabs', 'contained');
   })();
 
   // Hub / marketing embeds (?embed=1): mark the document and keep the 300px
@@ -253,25 +249,16 @@ const StatisticoHeader = {
   },
 
   getTabStylePreference() {
-    try {
-      return localStorage.getItem('statistico-tabs') === 'classic' ? 'classic' : 'contained';
-    } catch (e) {
-      return 'contained';
-    }
+    return 'contained';
   },
 
-  setTabStylePreference(pref) {
-    this.applyTabStyle(pref === 'classic' ? 'classic' : 'contained', { savePreference: true });
+  setTabStylePreference() {
+    this.applyTabStyle('contained', { savePreference: false });
   },
 
-  applyTabStyle(style, opts) {
-    const options = opts || {};
-    const next = style === 'classic' ? 'classic' : 'contained';
-    if (options.savePreference !== false) {
-      try { localStorage.setItem('statistico-tabs', next); } catch (e) {}
-    }
+  applyTabStyle() {
+    const next = 'contained';
     document.documentElement.setAttribute('data-tabs', next);
-    this._syncTabStyleSwitcherUI();
     if (globalThis.StatisticoWorkspaceTabs && typeof globalThis.StatisticoWorkspaceTabs.applyTabStyle === 'function') {
       try { globalThis.StatisticoWorkspaceTabs.applyTabStyle(next); } catch (_e) {}
     }
@@ -305,36 +292,13 @@ const StatisticoHeader = {
     });
   },
 
-  _bindTabStyleSwitcher() {
-    if (this._tabStyleSwitcherBound) return;
-    this._tabStyleSwitcherBound = true;
-    document.addEventListener('click', (e) => {
-      const btn = e.target && e.target.closest && e.target.closest('[data-tabs-pref]');
-      if (!btn) return;
-      e.preventDefault();
-      this.setTabStylePreference(btn.getAttribute('data-tabs-pref'));
-    });
+  _bindTabStyleSwitcher() {},
+
+  _renderTabStyleSwitcherHtml() {
+    return '';
   },
 
-  _renderTabStyleSwitcherHtml(extraClass) {
-    const pref = this.getTabStylePreference();
-    const isSidebar = !!(extraClass && String(extraClass).indexOf('sidebar') !== -1);
-    const cls = extraClass ? `hc-theme-switch st-tab-style-switch ${extraClass}` : 'hc-theme-switch st-tab-style-switch';
-    const id = isSidebar ? 'sbTabStyleSwitch' : 'headerTabStyleSwitch';
-    return `
-      <div class="${cls}" id="${id}" role="radiogroup" aria-label="Tab style" title="Contained tabs sit flush with results. Classic restores the previous pill tabs." data-st-tip-pos="top">
-        <button type="button" class="hc-theme-opt" data-tabs-pref="contained" aria-pressed="${pref === 'contained' ? 'true' : 'false'}" aria-label="Contained tabs">Contained</button>
-        <button type="button" class="hc-theme-opt" data-tabs-pref="classic" aria-pressed="${pref === 'classic' ? 'true' : 'false'}" aria-label="Classic pill tabs">Classic</button>
-      </div>
-    `;
-  },
-
-  _syncTabStyleSwitcherUI() {
-    const pref = this.getTabStylePreference();
-    document.querySelectorAll('.st-tab-style-switch [data-tabs-pref]').forEach((btn) => {
-      btn.setAttribute('aria-pressed', btn.getAttribute('data-tabs-pref') === pref ? 'true' : 'false');
-    });
-  },
+  _syncTabStyleSwitcherUI() {},
 
   _themeSwitcherTipText() {
     const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
@@ -578,10 +542,9 @@ const StatisticoHeader = {
 
     // Apply persisted theme before rendering (avoids flash of wrong theme)
     this.applyTheme(this.resolveTheme(), { savePreference: false, preference: this.getThemePreference() });
-    this.applyTabStyle(this.getTabStylePreference(), { savePreference: false });
+    this.applyTabStyle('contained', { savePreference: false });
     this._installSystemThemeListener();
     this._bindThemeSwitcher();
-    this._bindTabStyleSwitcher();
     this._ensureMinimalStyles();
     this._ensureWorkspaceTabAssets();
     this._ensureHighchartsThemeStyles();
@@ -2327,7 +2290,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260916blend',
+  _TAB_ASSET_VER: '20260916sbedge',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -4483,7 +4446,6 @@ const StatisticoHeader = {
           ${optionsHtml}
         </select>
         ${this._renderThemeSwitcherHtml()}
-        ${this._renderTabStyleSwitcherHtml()}
       </div>
     `;
   },
@@ -7112,8 +7074,7 @@ const StatisticoHeader = {
       layout.appendChild(rightCol);
     }
     this._renderSharedSidebar();
-    this.applyTabStyle(this.getTabStylePreference(), { savePreference: false });
-    this._bindTabStyleSwitcher();
+    this.applyTabStyle('contained', { savePreference: false });
     this._ensureMinimalStyles();
     this._ensureWorkspaceTabAssets();
     this._ensureHighchartsThemeStyles();
@@ -7395,7 +7356,6 @@ const StatisticoHeader = {
         </button>
         <div class="sb-theme-switch-wrap">
           ${this._renderThemeSwitcherHtml('hc-theme-switch--sidebar')}
-          ${this._renderTabStyleSwitcherHtml('hc-theme-switch--sidebar')}
         </div>
         <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
                 id="sbExportJsonBtn"

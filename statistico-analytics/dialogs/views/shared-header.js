@@ -9822,9 +9822,9 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`,
 
-      'by-group-stats': `Controls available: (1) Compare Groups / Change — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Minimum group size — keep only levels with at least n rows; (4) Source row filter (header) — limits which rows enter every group; (5) Histograms / Boxplots toggle — one compact histogram panel per group, or one box plot across groups; (6) Select checkbox in the statistics table — emphasize that group's histogram (click again to clear). A histogram card does the same. The table shows per-group N, mean, CI, spread, and shape statistics.`,
+      'by-group-stats': `Controls available: (1) Compare Groups / Change — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Minimum group size — keep only levels with at least n rows; (4) Source row filter (header) — limits which rows enter every group; (5) Kernel / Histograms / Boxplots toggle — overlapping kernel densities, one compact histogram panel per group, or one box plot; (6) Select checkbox in the statistics table — emphasize that group's series (click again to clear). A chart series, legend item, or histogram card does the same. The table shows per-group N, mean, CI, spread, and shape statistics.`,
 
-      'by-group-boxplot': `Controls available: Boxplots now live on the Statistics tab. Use the Histograms / Boxplots toggle. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
+      'by-group-boxplot': `Controls available: Boxplots now live on the Statistics tab. Use the Kernel / Histograms / Boxplots toggle. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
 
       'by-group-normality': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`,
 
@@ -9860,7 +9860,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     let tabBlock = '';
     if (tab === 'stats') {
       tabBlock = [
-        'ACTIVE TAB: Grouped Statistics (descriptive table + Histograms / Boxplots chart toggle)',
+        'ACTIVE TAB: Grouped Statistics (descriptive table + Kernel / Histograms / Boxplots chart toggle)',
         `Compare ${ctx.groups.length} groups on ${ctx.variable} split by ${ctx.groupingColumn}.`,
         `Mean spread across groups: ${f(meanSpread)} (${lowest.name}=${f(lowest.mean)} vs ${highest.name}=${f(highest.mean)}).`,
         'Focus READING on whether central tendency, spread, and shape differ meaningfully between named groups — not on a single pooled sample.'

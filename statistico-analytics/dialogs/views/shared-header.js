@@ -8540,6 +8540,8 @@ const StatisticoHeader = {
         'This view shows adjusted means with CI, an adjusted mean difference, and group regression lines. Describe the visual story (parallelism, gap between groups) — not coefficient values.',
       'regression-by-group-similarity':
         'This is Similarity Profile™: a pairwise table of 0–100 descriptive scores (pattern / strength / sign) comparing aligned β-vectors across groups, plus a pair profile. Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different. Do not treat Overall as a group, and do not invent a Chow or interaction test.',
+      'by-group-similarity':
+        'This is Similarity Profile™: a homogeneity gauge, overlapping kernel densities for every group (labels use col="level" (n=N)), and a pairwise table of 0–100 descriptive scores (location / spread / shape) plus a pair profile. Focus READING on practical similarity, not significance. Cite Location / Spread / Shape when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different.',
       'logistic-predictive-performance-roc-thresholds':
         'This is an ROC curve with a threshold slider. Describe the curve shape, AUC band, and the trade-off the slider exposes — not coefficient inference.',
       'logistic-predictive-performance-calibration':
@@ -9828,7 +9830,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
 
       'by-group-normality': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`,
 
-      'by-group-similarity': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Heatmap cells and pairwise table rows — click a pair to open its three-component profile; (3) Most similar / Most distinct KPI cards — jump to those pairs; (4) Raw values / Standardized shape toggle — overlapping densities on the original scale, or after removing mean and SD so only shape remains; (5) Kernel / Histogram toggle — smooth filled densities or clustered frequency bars with labeled ranges. Scores are 0–100 descriptive similarity, not p-values.`
+      'by-group-similarity': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Homogeneity gauge — overall 0–100 similarity across pairs; (3) Kernel panel — overlapping densities for every group, labeled col="level" (n=N); Raw values / Standardized shape and Kernel / Histogram toggles; (4) Pairwise table rows — click a pair for the three-component profile. Scores are 0–100 descriptive similarity, not p-values.`
     };
   },
 

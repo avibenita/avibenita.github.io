@@ -10,6 +10,8 @@ describe('shared contained tabs', () => {
   test('gates the Carbon strip behind data-tabs=contained and keeps classic restore', () => {
     expect(css).toMatch(/html\[data-tabs="contained"\]/);
     expect(css).toMatch(/html\[data-tabs="classic"\]/);
+    expect(css).toMatch(/--st-contained-chrome:/);
+    expect(css).toMatch(/row-gap:\s*16px/);
     expect(css).toMatch(/--st-contained-h:\s*48px/);
     expect(css).toMatch(/border-top:\s*3px solid transparent/);
     expect(header).toMatch(/localStorage\.getItem\('statistico-tabs'\)/);

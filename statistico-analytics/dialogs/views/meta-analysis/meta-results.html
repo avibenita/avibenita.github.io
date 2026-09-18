@@ -15,10 +15,10 @@
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <script src="https://code.highcharts.com/highcharts.js"></script>
-  <link rel="stylesheet" href="../shared-header.css?v=20260828viewcta"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20260916noexp"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260828viewcta"></script>
-  <script src="meta-engine.js?v=20260813-ratio1"></script>
+  <script src="../shared-header.js?v=20260916noexp"></script>
+  <script src="meta-engine.js?v=20260913-dir1"></script>
   <style>
     :root {
       /* Deeper page vs lighter panels for clearer separation */
@@ -180,7 +180,28 @@
       margin-left: auto; flex-shrink: 1; min-width: 0;
       font-size: 12px; font-weight: 600; color: var(--text-muted);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      cursor: help;
+      cursor: pointer;
+    }
+    .cfg-labels-menu {
+      display: none; position: fixed; left: 0; top: 0; z-index: 10060;
+      min-width: 280px; padding: 10px; border-radius: 10px;
+      background: var(--surface-1); border: 1px solid var(--border);
+      box-shadow: 0 12px 28px rgba(0,0,0,.55);
+    }
+    .cfg-labels-menu.open { display: grid; gap: 7px; }
+    .cfg-labels-menu label {
+      display: flex; flex-direction: column; gap: 3px;
+      font-size: 10px; font-weight: 700; color: var(--text-muted);
+    }
+    .cfg-labels-menu input {
+      padding: 6px 8px; border-radius: 7px;
+      border: 1px solid var(--border); background: var(--surface-2);
+      color: var(--text-primary); font-size: 12px; font-weight: 600;
+    }
+    .cfg-labels-menu button {
+      margin-top: 2px; padding: 6px 10px; border-radius: 7px;
+      border: none; background: #4f46e5; color: #fff;
+      font-size: 12px; font-weight: 700; cursor: pointer;
     }
     .cfg-studies {
       font-size: 14.5px; color: var(--text-secondary); white-space: nowrap;
@@ -918,10 +939,30 @@
             <button type="button" class="cfg-measure-opt" role="option" data-value="none">Do not display favour labels</button>
           </div>
         </div>
-        <span class="cfg-contrast-chip" id="cfgContrastChip" title="Contrast is always Treatment − Control">
-          <span id="cfgContrastLabel">Treatment − Control</span>
-          <span class="info-icon" tabindex="0">i<span class="tip" id="cfgContrastTip">Contrast is always Treatment − Control. Beneficial direction changes favour labels only — effect sizes are never sign-flipped.</span></span>
-        </span>
+        <div class="cfg-measure-dd" id="cfgLabelsWrap" style="margin-left:auto;">
+          <span class="cfg-contrast-chip" id="cfgContrastChip" title="Edit comparison labels">
+            <span id="cfgContrastLabel">Treatment − Control</span>
+            <span class="info-icon" tabindex="0">i<span class="tip" id="cfgContrastTip">Comparison labels name the groups and outcome. They do not change calculated effects.</span></span>
+          </span>
+          <div class="cfg-labels-menu" id="cfgLabelsMenu">
+            <label id="cfgNumeratorLab">Numerator / treatment
+              <input type="text" id="cfgNumeratorInput" maxlength="80" />
+            </label>
+            <label id="cfgReferenceLab">Reference / control
+              <input type="text" id="cfgReferenceInput" maxlength="80" />
+            </label>
+            <label id="cfgEventLab">Event / outcome
+              <input type="text" id="cfgEventInput" maxlength="80" />
+            </label>
+            <label id="cfgLeftLab" style="display:none;">Left / negative
+              <input type="text" id="cfgLeftInput" maxlength="80" />
+            </label>
+            <label id="cfgRightLab" style="display:none;">Right / positive
+              <input type="text" id="cfgRightInput" maxlength="80" />
+            </label>
+            <button type="button" id="cfgLabelsApply">Apply labels</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="meta-context-warn" id="metaContextWarn" role="status"></div>
@@ -1225,6 +1266,11 @@
       { value: 'higher', label: 'Event is beneficial', full: 'Event is beneficial' },
       { value: 'none', label: 'Direction not specified', full: 'Direction not specified' }
     ];
+    var BENEFIT_OPTIONS_PRECOMPUTED = [
+      { value: 'higher', label: 'Beneficial', full: 'Event is beneficial' },
+      { value: 'lower', label: 'Adverse', full: 'Event is adverse' },
+      { value: 'none', label: 'Not specified', full: 'Event meaning: not specified' }
+    ];
     var BENEFIT_OPTIONS_CORR = [
       { value: 'lower', label: 'Show neg / pos', full: 'Show negative / positive association' },
       { value: 'none', label: 'No direction labels', full: 'Do not display direction labels' }
@@ -1518,6 +1564,9 @@
       return s.charAt(0) === '-' ? ('\u2212' + s.slice(1)) : s;
     }
     function comparisonLabel(spec) {
+      if (typeof MetaEngine !== 'undefined' && MetaEngine.comparisonLabel) {
+        return MetaEngine.comparisonLabel(spec);
+      }
       if (isFisherCorrelation(spec)) return 'Association';
       if (isLogRatioMeasure(spec) || (isBinaryOutcome(spec) && (spec.effectMeasure || '') === 'rd')) {
         return isLogRatioMeasure(spec) ? 'Treatment / Control' : 'Treatment − Control';
@@ -1542,18 +1591,24 @@
 
     function outcomeBetterOf(bundle) {
       var spec = (bundle && bundle.spec) || {};
+      if (typeof MetaEngine !== 'undefined' && MetaEngine.resolveOutcomeBetter) {
+        return MetaEngine.resolveOutcomeBetter(spec);
+      }
       if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher' || spec.outcomeBetter === 'none') {
         return spec.outcomeBetter;
       }
-      // Legacy mapping: old “positive favors control” ≈ lower-is-better intent
       if (spec.effectDirection === 'control') return 'lower';
       return 'lower';
     }
 
-    function favoredArm(effect, outcomeBetter) {
+    function favoredArm(effect, outcomeBetter, bundle) {
+      var spec = (bundle && bundle.spec) || (metaBundle && metaBundle.spec) || {};
+      var disp = isLogRatioMeasure(spec) ? toDisplayEffect(effect, spec) : effect;
+      if (typeof MetaEngine !== 'undefined' && MetaEngine.favoredGroup) {
+        return MetaEngine.favoredGroup(disp, Object.assign({}, spec, { outcomeBetter: outcomeBetter }));
+      }
       if (effect == null || !isFinite(effect) || outcomeBetter === 'none') return null;
       if (effect === 0) return null;
-      // Contrast is always Treatment − Control. Labels only.
       if (outcomeBetter === 'lower') return effect < 0 ? 'treatment' : 'control';
       return effect > 0 ? 'treatment' : 'control';
     }
@@ -1578,7 +1633,7 @@
       var spec = bundle.spec;
       var et = effectTypeLabel(spec);
       var better = outcomeBetterOf(bundle);
-      var arm = favoredArm(bundle.pooled.effect, better);
+      var arm = favoredArm(bundle.pooled.effect, better, bundle);
       var g = fmtDisplay(toDisplayEffect(bundle.pooled.effect, spec), spec);
       var lo = fmtDisplay(toDisplayEffect(bundle.pooled.ciLower, spec), spec);
       var hi = fmtDisplay(toDisplayEffect(bundle.pooled.ciUpper, spec), spec);
@@ -1659,32 +1714,25 @@
       var i2 = bundle.heterogeneity.I2;
       var tau2 = bundle.heterogeneity.tau2;
       var excludesNull = ciExcludesNull(bundle.pooled.ciLower, bundle.pooled.ciUpper, spec);
-      var arm = favoredArm(e, outcomeBetter);
+      var arm = favoredArm(e, outcomeBetter, bundle);
       var mag = magnitudeBand(bundle, et);
       var ratio = isLogRatioMeasure(spec);
       var eventMeaning = usesEventMeaningLabels(spec);
       var fisher = isFisherCorrelation(spec);
       var nullLabel = ratio ? '1.00' : '0';
+      var ratioInterp = (ratio && eventMeaning && typeof MetaEngine !== 'undefined' && MetaEngine.interpretRatio)
+        ? MetaEngine.interpretRatio(Object.assign({}, spec, { outcomeBetter: outcomeBetter }), disp,
+          toDisplayEffect(bundle.pooled.ciLower, spec), toDisplayEffect(bundle.pooled.ciUpper, spec))
+        : null;
 
       var magLine;
       if (fisher) {
         if (disp > 0.05) magLine = 'Positive association (r = ' + g + ')';
         else if (disp < -0.05) magLine = 'Negative association (r = ' + g + ')';
         else magLine = 'Near-zero association (r = ' + g + ')';
-      } else if (ratio && eventMeaning) {
-        if (outcomeBetter === 'lower' && disp > 0 && disp < 1) {
-          magLine = 'Lower event risk with treatment (~' +
-            Math.round((1 - disp) * 100) + '% relative risk reduction)';
-        } else if (outcomeBetter === 'lower' && disp > 1) {
-          magLine = 'Higher event risk with treatment';
-        } else if (outcomeBetter === 'higher' && disp > 1) {
-          magLine = 'Higher event rate with treatment';
-        } else if (outcomeBetter === 'higher' && disp > 0 && disp < 1) {
-          magLine = 'Lower event rate with treatment';
-        } else {
-          magLine = 'Pooled ' + effectMeasureShort(spec) + ' = ' + g;
-        }
-      } else if (arm === 'treatment' || arm === 'control') {
+      } else if (ratioInterp) {
+        magLine = ratioInterp.mag;
+      } else if (arm) {
         if (mag.key === 'moderate-large') magLine = 'moderate-to-large effect favoring ' + arm;
         else if (mag.key === 'effect') magLine = 'pooled effect favoring ' + arm;
         else magLine = mag.key + ' effect favoring ' + arm;
@@ -1715,22 +1763,14 @@
           ? 'The confidence interval excludes 0 (<strong>p' +
             (bundle.pooled.p < 0.001 ? ' &lt; .001' : (' = ' + fmtPProse(bundle.pooled.p))) + '</strong>). '
           : 'The confidence interval includes 0 (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
-      } else if (ratio && eventMeaning) {
-        var eventPhrase = outcomeBetter === 'lower'
-          ? 'indicating an estimated ' + Math.round(Math.abs(1 - disp) * 100) + '% ' +
-            (disp < 1 ? 'lower' : 'higher') + ' event risk in the treatment group than in the control group'
-          : outcomeBetter === 'higher'
-            ? 'on the risk-ratio scale (event coded as beneficial)'
-            : 'on the risk-ratio scale';
-        narrative = 'Across ' + k + ' studies, the pooled ' + et.toLowerCase() + ' was ' + g +
-          ' (95% CI ' + lo + ' to ' + hi + ')' +
-          (outcomeBetter === 'lower' && disp > 0 ? ', ' + eventPhrase : '') + '. ';
+      } else if (ratioInterp) {
+        narrative = 'Across ' + k + ' studies, ' + ratioInterp.lead + '. ';
         narrative += excludesNull
           ? 'The confidence interval excludes ' + nullLabel + ' (<strong>p' +
             (bundle.pooled.p < 0.001 ? ' &lt; .001' : (' = ' + fmtPProse(bundle.pooled.p))) + '</strong>). '
           : 'The confidence interval includes ' + nullLabel +
             ' (<strong>p = ' + fmt(bundle.pooled.p) + '</strong>). ';
-      } else if (arm === 'treatment' || arm === 'control') {
+      } else if (arm) {
         var betterPhrase = outcomeBetter === 'lower'
           ? 'lower values are better'
           : outcomeBetter === 'higher'
@@ -1804,15 +1844,19 @@
       var fisher = isFisherCorrelation(bundle && bundle.spec);
       var genericDirect = ((bundle && bundle.spec && bundle.spec.effectType) === 'direct') &&
         ((bundle.spec.effectMeasure || '') === 'generic');
+      var precomputedRatio = typeof MetaEngine !== 'undefined' && MetaEngine.isPrecomputedRatio
+        ? MetaEngine.isPrecomputedRatio(bundle && bundle.spec)
+        : false;
       BENEFIT_OPTIONS = fisher ? BENEFIT_OPTIONS_CORR
-        : eventMeaning ? BENEFIT_OPTIONS_BINARY
-          : genericDirect
-            ? [
-              { value: 'lower', label: 'Lower values better', full: 'Lower values are better' },
-              { value: 'higher', label: 'Higher values better', full: 'Higher values are better' },
-              { value: 'none', label: 'No direction labels', full: 'Do not display direction labels' }
-            ]
-            : BENEFIT_OPTIONS_CONTINUOUS;
+        : precomputedRatio ? BENEFIT_OPTIONS_PRECOMPUTED
+          : eventMeaning ? BENEFIT_OPTIONS_BINARY
+            : genericDirect
+              ? [
+                { value: 'lower', label: 'Lower values better', full: 'Lower values are better' },
+                { value: 'higher', label: 'Higher values better', full: 'Higher values are better' },
+                { value: 'none', label: 'No direction labels', full: 'Do not display direction labels' }
+              ]
+              : BENEFIT_OPTIONS_CONTINUOUS;
       var titleEl = document.getElementById('cfgBenefitTitle');
       if (titleEl) titleEl.textContent = fisher ? 'Direction' : eventMeaning ? 'Event' : 'Benefit';
       var label = document.getElementById('cfgBenefitLabel');
@@ -1845,64 +1889,58 @@
             ? 'Direction labels are hidden.'
             : 'Forest axis: Negative association ← 0 → Positive association.');
       } else if (eventMeaning) {
-        tipText = 'Comparison is Treatment / Control for ratios (Treatment − Control for risk difference). ' +
+        tipText = 'Comparison is ' + cmp + '. Labels do not change the numbers. ' +
           (better === 'lower'
-            ? 'Event is adverse → RR or OR below 1 favours treatment.'
+            ? 'Event is adverse → ratio below 1 favours the numerator group.'
             : better === 'higher'
-              ? 'Event is beneficial → RR or OR above 1 favours treatment.'
-              : 'Direction not specified — favour labels are hidden.');
+              ? 'Event is beneficial → ratio above 1 favours the numerator group.'
+              : 'Event meaning not specified — no “favours” conclusions; forest uses Lower ratio / Higher ratio.');
       } else {
         tipText =
-          'Contrast is always Treatment − Control (numbers never flip). ' +
+          'Contrast / comparison labels do not flip the numbers. ' +
           (better === 'lower'
-            ? 'Lower values are better → negative effects favour treatment.'
+            ? 'Lower values are better → negative effects favour the numerator.'
             : better === 'higher'
-              ? 'Higher values are better → positive effects favour treatment.'
+              ? 'Higher values are better → positive effects favour the numerator.'
               : genericDirect
-                ? 'Direction labels are hidden.'
+                ? 'Direction labels stay Neutral (negative / positive) unless you customise them.'
                 : 'Favour labels are hidden.');
       }
       if (tip) tip.textContent = tipText;
       if (chip) chip.title = tipText;
     }
 
-    function applyOutcomeBetterLabels(bundle) {
-      if (!bundle) return;
-      syncBenefitControl(bundle);
+    function syncDirectionHeader(bundle) {
       var better = outcomeBetterOf(bundle);
-      var arm = favoredArm(bundle.pooled && bundle.pooled.effect, better);
+      var arm = favoredArm(bundle.pooled && bundle.pooled.effect, better, bundle);
+      var header = (typeof MetaEngine !== 'undefined' && MetaEngine.resultsHeader)
+        ? MetaEngine.resultsHeader(bundle.spec || {})
+        : null;
       var dirEl = document.getElementById('resultDirection');
       var favorEl = document.getElementById('resultFavor');
-      var eventMeaning = usesEventMeaningLabels(bundle.spec);
+      var contrastEl = document.getElementById('resultContrast');
       var fisher = isFisherCorrelation(bundle.spec);
+      if (contrastEl) {
+        contrastEl.textContent = header ? header.comparisonLine
+          : ((fisher ? 'Scale: ' : isLogRatioMeasure(bundle.spec) ? 'Comparison: ' : 'Contrast: ') +
+            comparisonLabel(bundle.spec));
+      }
       if (dirEl) {
-        if (better === 'none') {
-          dirEl.textContent = fisher ? 'Direction labels: hidden'
-            : eventMeaning ? 'Event meaning: not specified'
-              : ((bundle.spec && bundle.spec.effectType) === 'direct' && (bundle.spec.effectMeasure || '') === 'generic')
-                ? 'Direction labels: hidden'
-                : 'Favour labels: hidden';
-        } else if (fisher) {
-          dirEl.textContent = 'Association: negative ← 0 → positive';
-        } else if (eventMeaning) {
-          dirEl.textContent = better === 'lower' ? 'Event is adverse' : 'Event is beneficial';
-        } else if (better === 'lower') {
-          dirEl.textContent = 'Better outcomes: Lower values';
-        } else {
-          dirEl.textContent = 'Better outcomes: Higher values';
-        }
+        dirEl.textContent = header ? header.outcomeLine
+          : (better === 'none' ? 'Event meaning: not specified'
+            : better === 'lower' ? 'Event is adverse' : 'Event is beneficial');
       }
       if (favorEl) {
         if (better === 'none' || fisher) favorEl.textContent = '';
         else favorEl.textContent = arm ? ('Result favors ' + arm) : 'Result near no difference';
       }
-      var contrastEl = document.getElementById('resultContrast');
-      if (contrastEl) {
-        contrastEl.textContent =
-          (isFisherCorrelation(bundle.spec) ? 'Scale: '
-            : isLogRatioMeasure(bundle.spec) ? 'Comparison: ' : 'Contrast: ') +
-          comparisonLabel(bundle.spec);
-      }
+    }
+
+    function applyOutcomeBetterLabels(bundle) {
+      if (!bundle) return;
+      syncBenefitControl(bundle);
+      syncDirectionHeader(bundle);
+      var better = outcomeBetterOf(bundle);
       var et = effectTypeLabel(bundle.spec);
       var interp = buildInterpretationCard(bundle, et, better);
       var nEl = document.getElementById('interpNarrative');
@@ -1911,9 +1949,12 @@
       if (nEl) nEl.innerHTML = interp.narrative;
       if (mEl) mEl.textContent = interp.mag;
       if (cEl) cEl.textContent = interp.cert;
+      var sEl = document.getElementById('interpCons');
+      if (sEl) sEl.textContent = interp.cons;
       syncForestInterpretation(bundle);
       updateCiBar(bundle);
       if (activeTabName === 'forest') renderForestPlot(bundle);
+      if (activeTabName === 'studies') renderStudiesTable();
     }
 
     function changeOutcomeBetter(next) {
@@ -1929,6 +1970,81 @@
       } catch (_e) {}
       sendParent('syncMetaSpec', { spec: metaBundle.spec });
       applyOutcomeBetterLabels(metaBundle);
+    }
+
+    function fillLabelsMenu(bundle) {
+      var spec = (bundle && bundle.spec) || {};
+      var ctx = (typeof MetaEngine !== 'undefined' && MetaEngine.resolveDirectionContext)
+        ? MetaEngine.resolveDirectionContext(spec) : spec;
+      var generic = typeof MetaEngine !== 'undefined' && MetaEngine.isGenericDirect
+        && MetaEngine.isGenericDirect(spec);
+      var eventful = usesEventMeaningLabels(spec);
+      var n = document.getElementById('cfgNumeratorInput');
+      var r = document.getElementById('cfgReferenceInput');
+      var e = document.getElementById('cfgEventInput');
+      var l = document.getElementById('cfgLeftInput');
+      var p = document.getElementById('cfgRightInput');
+      if (n) n.value = ctx.numeratorLabel || '';
+      if (r) r.value = ctx.referenceLabel || '';
+      if (e) e.value = ctx.eventLabel || '';
+      if (l) l.value = ctx.leftLabel || '';
+      if (p) p.value = ctx.rightLabel || '';
+      var nLab = document.getElementById('cfgNumeratorLab');
+      var rLab = document.getElementById('cfgReferenceLab');
+      var eLab = document.getElementById('cfgEventLab');
+      var lLab = document.getElementById('cfgLeftLab');
+      var pLab = document.getElementById('cfgRightLab');
+      if (nLab) nLab.style.display = generic ? 'none' : '';
+      if (rLab) rLab.style.display = generic ? 'none' : '';
+      if (eLab) eLab.style.display = eventful ? '' : 'none';
+      if (lLab) lLab.style.display = generic ? '' : 'none';
+      if (pLab) pLab.style.display = generic ? '' : 'none';
+    }
+
+    function applyComparisonLabelsFromMenu() {
+      if (!metaBundle) return;
+      var n = document.getElementById('cfgNumeratorInput');
+      var r = document.getElementById('cfgReferenceInput');
+      var e = document.getElementById('cfgEventInput');
+      var l = document.getElementById('cfgLeftInput');
+      var p = document.getElementById('cfgRightInput');
+      metaBundle.spec = Object.assign({}, metaBundle.spec || {}, {
+        numeratorLabel: n && n.value.trim() ? n.value.trim() : metaBundle.spec.numeratorLabel,
+        referenceLabel: r && r.value.trim() ? r.value.trim() : metaBundle.spec.referenceLabel,
+        eventLabel: e && e.value.trim() ? e.value.trim() : metaBundle.spec.eventLabel,
+        leftLabel: l && l.value.trim() ? l.value.trim() : metaBundle.spec.leftLabel,
+        rightLabel: p && p.value.trim() ? p.value.trim() : metaBundle.spec.rightLabel
+      });
+      try {
+        sessionStorage.setItem('metaBundle', JSON.stringify(metaBundle));
+        sessionStorage.setItem('metaModelSpec', JSON.stringify(metaBundle.spec));
+      } catch (_e) {}
+      sendParent('syncMetaSpec', { spec: metaBundle.spec });
+      applyOutcomeBetterLabels(metaBundle);
+      closeLabelsMenu();
+    }
+
+    var labelsMenuOpen = false;
+    function closeLabelsMenu() {
+      labelsMenuOpen = false;
+      var menu = document.getElementById('cfgLabelsMenu');
+      if (menu) {
+        menu.classList.remove('open');
+        menu.style.display = '';
+        menu.style.visibility = '';
+      }
+    }
+    function openLabelsMenu() {
+      closeBenefitMenu();
+      closeMeasureMenu();
+      fillLabelsMenu(metaBundle);
+      var menu = document.getElementById('cfgLabelsMenu');
+      var chip = document.getElementById('cfgContrastChip');
+      if (!menu || !chip) return;
+      labelsMenuOpen = true;
+      menu.classList.add('open');
+      positionFixedMenu(menu, chip);
+      menu.style.display = 'grid';
     }
 
     function countDroppedStudies(source, bundle) {
@@ -2079,7 +2195,21 @@
             vi: roundAiNum(s.vi, 5),
             weightPct: roundAiNum(s.weightPct, 2)
           };
-        })
+        }),
+        direction: (typeof MetaEngine !== 'undefined' && MetaEngine.resolveDirectionContext)
+          ? Object.assign({}, MetaEngine.resolveDirectionContext(b.spec || {}), {
+            comparison: MetaEngine.comparisonLabel(b.spec || {}),
+            header: MetaEngine.resultsHeader(b.spec || {}),
+            forestLabels: MetaEngine.forestFavorLabels(b.spec || {}),
+            favored: MetaEngine.favoredGroup(toDisplayEffect(pooled.effect, b.spec), b.spec || {}),
+            quantityWord: MetaEngine.ratioQuantityWord(b.spec || {}),
+            wordingRule: MetaEngine.isOddsRatio(b.spec || {})
+              ? 'Describe this as odds, never as risk or probability change unless a baseline risk is supplied.'
+              : MetaEngine.isRiskRatio(b.spec || {})
+                ? 'Describe this as risk (relative risk).'
+                : 'Do not assume Treatment/Control unless those labels are present.'
+          })
+          : null
       };
       if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._roundAiPayload === 'function') {
         return StatisticoHeader._roundAiPayload(payload, 4);
@@ -2111,17 +2241,14 @@
         var prompt =
 'You are interpreting a meta-analysis computed by Statistico.\n' +
 'Do NOT recompute any statistic. Use only the values in the JSON below.\n' +
+'Use the direction.comparison labels and direction.header; do not invent Treatment/Control unless those labels are present.\n' +
+'If quantityWord is "odds", never say risk. If eventMeaning is unspecified, do not say the result favours a group.\n' +
 'Use cautious language ("suggests", "indicates") unless evidence is clear.\n' +
 'If a field is null or missing, do not mention it.\n' +
 'NUMBER FORMAT: effects/CIs/Q/τ²/intercepts to 3 decimals; I² to 1 decimal with %; p to 3 decimals (p < .001 if smaller). Never copy long float tails.\n\n' +
 'JSON:\n' + JSON.stringify(payload, null, 2) + '\n\n' +
-'Reply ONLY in this exact format (no extra lines, no markdown):\n' +
-'CONCLUSION: [One decisive sentence — the single most important finding about the pooled effect]\n' +
-'EVIDENCE: [pooled effect with CI and p] | [heterogeneity finding with I²/Q] | [publication-bias finding from Egger/funnel when available] | [study-weight or consistency note]\n' +
-'INTERPRETATION: [3 sentences — unified synthesis in plain language: what the pooled estimate means and how trustworthy it is given heterogeneity/bias]\n' +
-'IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]\n' +
-'ACTION: [next step 1] | [next step 2] | [next step 3]\n' +
-'STRENGTH: [High, Moderate, or Low — short reason based on k, CI width, I², and bias diagnostics]';
+'Prioritize the pooled effect, heterogeneity, influential studies, and publication-bias indicators.\n' +
+(typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeader._overallAiReplyFormat() : '');
         var raw = await StatisticoHeader._callAiForSidebar(prompt);
         var sections = StatisticoHeader._parseAiStructured(raw);
         StatisticoHeader._showAiOverlay(sections, 'meta-analysis', 'full');
@@ -2131,7 +2258,7 @@
       } finally {
         if (btn) {
           btn.disabled = false;
-          btn.innerHTML = origHtml || '<i class="st-ai-icon" aria-hidden="true"></i><span>Interpret with AI</span><sup class="sb-ai-sup">AI</sup>';
+          btn.innerHTML = origHtml || (typeof StatisticoHeader._sidebarAiButtonInnerHtml === 'function' ? StatisticoHeader._sidebarAiButtonInnerHtml(false) : '<i class="st-ai-icon" aria-hidden="true"></i><span>Analyze all results</span><sup class="sb-ai-sup">AI</sup>');
         }
       }
     };
@@ -2186,6 +2313,7 @@
       var btn = document.getElementById('cfgBenefitBtn');
       if (!menu || !btn) return;
       closeMeasureMenu();
+      closeLabelsMenu();
       benefitMenuOpen = true;
       menu.classList.add('open');
       btn.setAttribute('aria-expanded', 'true');
@@ -2197,6 +2325,7 @@
       var btn = document.getElementById('cfgEffectMeasureBtn');
       if (!menu || !btn || btn.disabled) return;
       closeBenefitMenu();
+      closeLabelsMenu();
       measureMenuOpen = true;
       menu.classList.add('open');
       btn.setAttribute('aria-expanded', 'true');
@@ -2372,7 +2501,6 @@
       switchTab(keepTab);
 
       var better = outcomeBetterOf(bundle);
-      var arm = favoredArm(bundle.pooled.effect, better);
       var spec = bundle.spec || {};
       var dispE = toDisplayEffect(bundle.pooled.effect, spec);
       var dispLo = toDisplayEffect(bundle.pooled.ciLower, spec);
@@ -2381,28 +2509,7 @@
       document.getElementById('resultSub').textContent =
         et + ' = ' + fmtDisplay(dispE, spec) +
         ' · 95% CI [' + fmtDisplay(dispLo, spec) + ', ' + fmtDisplay(dispHi, spec) + ']';
-      document.getElementById('resultContrast').textContent =
-        (isFisherCorrelation(spec) ? 'Scale: '
-          : isLogRatioMeasure(spec) ? 'Comparison: ' : 'Contrast: ') + comparisonLabel(spec);
-      var eventMeaning = usesEventMeaningLabels(spec);
-      var fisher = isFisherCorrelation(spec);
-      document.getElementById('resultDirection').textContent =
-        better === 'none'
-          ? (fisher ? 'Direction labels: hidden'
-            : eventMeaning ? 'Event meaning: not specified'
-              : (spec.effectType === 'direct' && (spec.effectMeasure || '') === 'generic')
-                ? 'Direction labels: hidden'
-                : 'Favour labels: hidden')
-          : fisher
-            ? 'Association: negative ← 0 → positive'
-            : eventMeaning
-              ? (better === 'lower' ? 'Event is adverse' : 'Event is beneficial')
-              : (better === 'lower' ? 'Better outcomes: Lower values' : 'Better outcomes: Higher values');
-      var favorEl = document.getElementById('resultFavor');
-      if (favorEl) {
-        if (better === 'none') favorEl.textContent = '';
-        else favorEl.textContent = arm ? ('Result favors ' + arm) : 'Result near no difference';
-      }
+      syncDirectionHeader(bundle);
 
       updateCiBar(bundle);
 
@@ -2774,8 +2881,10 @@
         panel.hidden = false;
         body.innerHTML =
           '<table class="studies-source-table"><thead><tr>' +
-          '<th>Study</th><th>Treatment events</th><th>Treatment n</th>' +
-          '<th>Control events</th><th>Control n</th><th>Total N</th>' +
+          '<th>Study</th><th>' + escapeHtml((metaBundle && metaBundle.spec && metaBundle.spec.numeratorLabel) || 'Treatment') + ' events</th><th>' +
+          escapeHtml((metaBundle && metaBundle.spec && metaBundle.spec.numeratorLabel) || 'Treatment') + ' n</th>' +
+          '<th>' + escapeHtml((metaBundle && metaBundle.spec && metaBundle.spec.referenceLabel) || 'Control') + ' events</th><th>' +
+          escapeHtml((metaBundle && metaBundle.spec && metaBundle.spec.referenceLabel) || 'Control') + ' n</th><th>Total N</th>' +
           '</tr></thead><tbody>' +
           (bundle.studies || []).map(function (s) {
             if (s.events1 == null) return '';
@@ -2795,8 +2904,12 @@
       panel.hidden = false;
       body.innerHTML =
         '<table class="studies-source-table"><thead><tr>' +
-        '<th>Study</th><th>Treatment mean</th><th>Treatment SD</th><th>Treatment n</th>' +
-        '<th>Control mean</th><th>Control SD</th><th>Control n</th><th>Total N</th>' +
+        '<th>Study</th><th>' + escapeHtml((bundle.spec && bundle.spec.numeratorLabel) || 'Treatment') + ' mean</th><th>' +
+        escapeHtml((bundle.spec && bundle.spec.numeratorLabel) || 'Treatment') + ' SD</th><th>' +
+        escapeHtml((bundle.spec && bundle.spec.numeratorLabel) || 'Treatment') + ' n</th>' +
+        '<th>' + escapeHtml((bundle.spec && bundle.spec.referenceLabel) || 'Control') + ' mean</th><th>' +
+        escapeHtml((bundle.spec && bundle.spec.referenceLabel) || 'Control') + ' SD</th><th>' +
+        escapeHtml((bundle.spec && bundle.spec.referenceLabel) || 'Control') + ' n</th><th>Total N</th>' +
         '</tr></thead><tbody>' +
         (bundle.studies || []).map(function (s) {
           if (s.mean1 == null) return '';
@@ -2865,7 +2978,9 @@
     }
 
     function forestFavorLabels(bundle) {
-      // Labels follow outcome / event coding only (analysis scale never flips).
+      if (typeof MetaEngine !== 'undefined' && MetaEngine.forestFavorLabels) {
+        return MetaEngine.forestFavorLabels((bundle && bundle.spec) || {});
+      }
       var better = outcomeBetterOf(bundle);
       if (better === 'none') return null;
       if (isFisherCorrelation(bundle && bundle.spec)) {
@@ -3693,8 +3808,17 @@
       lines.push('Meta-Analysis Results');
       lines.push('Model,' + modelLabel(metaBundle));
       lines.push('Effect type,' + ((metaBundle.spec && metaBundle.spec.effectType) || ''));
+      if (typeof MetaEngine !== 'undefined' && MetaEngine.resultsHeader) {
+        var hdr = MetaEngine.resultsHeader(metaBundle.spec || {});
+        lines.push('Comparison,' + hdr.comparison);
+        lines.push('Outcome,' + hdr.outcomeLine.replace(/^Outcome:\s*/, ''));
+      }
       lines.push('k,' + metaBundle.k);
       lines.push('Pooled effect,' + metaBundle.pooled.effect);
+      if (typeof MetaEngine !== 'undefined' && MetaEngine.isLogRatio &&
+          MetaEngine.isLogRatio(metaBundle.spec || {})) {
+        lines.push('Pooled display,' + Math.exp(metaBundle.pooled.effect));
+      }
       lines.push('SE,' + metaBundle.pooled.se);
       lines.push('CI lower,' + metaBundle.pooled.ciLower);
       lines.push('CI upper,' + metaBundle.pooled.ciUpper);
@@ -3952,6 +4076,26 @@
         measureMenu.addEventListener('click', function (e) { e.stopPropagation(); });
       }
 
+      var contrastChip = document.getElementById('cfgContrastChip');
+      var labelsMenu = document.getElementById('cfgLabelsMenu');
+      var labelsApply = document.getElementById('cfgLabelsApply');
+      if (contrastChip && labelsMenu) {
+        contrastChip.addEventListener('click', function (e) {
+          if (e.target && e.target.closest && e.target.closest('.info-icon')) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (labelsMenuOpen) closeLabelsMenu();
+          else openLabelsMenu();
+        });
+        labelsMenu.addEventListener('click', function (e) { e.stopPropagation(); });
+      }
+      if (labelsApply) {
+        labelsApply.addEventListener('click', function (e) {
+          e.preventDefault();
+          applyComparisonLabelsFromMenu();
+        });
+      }
+
       var benefitBtn = document.getElementById('cfgBenefitBtn');
       var benefitMenu = document.getElementById('cfgBenefitMenu');
       if (benefitBtn && benefitMenu) {
@@ -3974,8 +4118,10 @@
       document.addEventListener('click', function (e) {
         var mWrap = document.getElementById('cfgEffectMeasureWrap');
         var bWrap = document.getElementById('cfgBenefitWrap');
+        var lWrap = document.getElementById('cfgLabelsWrap');
         if (!(mWrap && mWrap.contains(e.target))) closeMeasureMenu();
         if (!(bWrap && bWrap.contains(e.target))) closeBenefitMenu();
+        if (!(lWrap && lWrap.contains(e.target))) closeLabelsMenu();
       });
       window.addEventListener('resize', function () {
         if (measureMenuOpen) positionMeasureMenu();

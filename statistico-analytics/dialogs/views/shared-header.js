@@ -2340,7 +2340,9 @@ const StatisticoHeader = {
         const raw = await this._callAiForSidebar(prompt);
         const parsed = this._parseAiStructured(raw) || {};
         if (wantDesc) description = parsed.ABOUT || fallbackDesc;
-        if (wantInterp) interpretation = parsed.READING || fallbackInterp;
+        if (wantInterp) {
+          interpretation = parsed.BOTTOMLINE || parsed.READING || parsed.CONCLUSION || fallbackInterp;
+        }
       }
     } catch (_) {}
 
@@ -4240,6 +4242,7 @@ const StatisticoHeader = {
    */
   setAiReady(ready) {
     const btn = document.getElementById('sbAiBtn');
+    if (ready) this._aiRunNonce = (this._aiRunNonce || 0) + 1;
     if (!btn) return;
     if (ready) {
       btn.removeAttribute('disabled');
@@ -7113,11 +7116,65 @@ const StatisticoHeader = {
 
   _sidebarAiButtonInnerHtml(busy) {
     if (busy) return '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
-    return this._aiIconHtml() + '<span>Interpret with AI</span><sup class="sb-ai-sup">AI</sup>';
+    return this._aiIconHtml() + '<span>Analyze all results</span><sup class="sb-ai-sup">AI</sup>';
   },
 
   _explainViewButtonInnerHtml() {
-    return this._aiIconHtml() + '<span>Explain View</span><sup class="sb-ai-sup">AI</sup>';
+    return this._aiIconHtml() + '<span>Explain this view</span><sup class="sb-ai-sup">AI</sup>';
+  },
+
+  _sidebarAiButtonTitle() {
+    return 'Synthesize findings, diagnostics and limitations across the complete analysis.';
+  },
+
+  _explainViewButtonTitle() {
+    return 'Interpret the results displayed on this page.';
+  },
+
+  _localAiReplyFormat() {
+    return `Reply ONLY in this exact format — each key on its own line. Do not use markdown.
+BOTTOMLINE: [1-2 sentences describing the most important observation from the current results]
+EVIDENCE: [exact displayed value or finding] | [exact finding] | [exact finding]
+MEANING: [plain-language statistical interpretation of this view only]
+CHECKS: [only warnings relevant to this view] | [next check if needed]
+NEXT: [one concrete next action] | [optional second action]
+ABOUT: [2 sentences — what this view shows]
+CONTROLS: [control: what it does] | [next control]
+PATTERNS: [what to look for → meaning] | [next pattern]`;
+  },
+
+  _overallAiReplyFormat() {
+    return `Reply ONLY in this exact format — each key on its own line. Do not use markdown.
+CONCLUSION: [short answer to the main analytical question]
+STRENGTH: [Strong, Moderate, Tentative, or Inconclusive — short reason from the computed evidence, not subjective confidence]
+FINDINGS: [prioritized finding 1] | [finding 2] | [finding 3]
+SUPPORT: [exact statistic, effect size, CI or n, with source view when known] | [exact statistic] | [exact statistic]
+DIAGNOSTICS: [what passed, what failed, and how much it affects the conclusion]
+INTERPRETATION: [what the findings mean in realistic terms, without inventing domain information]
+LIMITATIONS: [limitation 1] | [limitation 2]
+ACTION: [recommended next step 1] | [next step 2]
+REPORT: [one polished paragraph suitable for a report]`;
+  },
+
+  _overallAssessmentEmphasis() {
+    const map = {
+      univariate: 'Prioritize the distributional shape, unusual values, and whether formal tests support the visual reading.',
+      correlations: 'Prioritize the strongest relationships, the overall pattern, uncertainty, multiplicity, and non-causality. Do not mention Cronbach alpha or other reliability metrics unless this is the Reliability view.',
+      regression: 'Prioritize model fit, important coefficients, effect sizes, diagnostics, and prediction limits.',
+      anova: 'Prioritize the omnibus result, effect size, post-hoc differences, and assumptions.',
+      independent: 'Prioritize the omnibus or two-group result, effect size, post-hoc differences, and assumptions.',
+      dependent: 'Prioritize the omnibus or paired result, effect size, post-hoc differences, and assumptions.',
+      cluster: 'Prioritize solution quality, cluster profiles, separation, balance and stability.',
+      factor: 'Prioritize factorability, retained dimensions, loadings, communalities, and factor meaning.',
+      pca: 'Prioritize retained dimensions, loadings, communalities, and component meaning.',
+      reliability: 'Prioritize overall reliability, weak items, improvement if deleted, and dimensionality.',
+      logistic: 'Prioritize discrimination, calibration, threshold trade-offs, and classification errors.',
+      'meta-analysis': 'Prioritize the pooled effect, heterogeneity, influential studies, and publication-bias indicators.',
+      'mixed-model': 'Prioritize fixed effects, ICC or variance components, model fit, and convergence.',
+      contingency: 'Prioritize association strength, residuals, and whether the pattern is consistent across cells.',
+      power: 'Prioritize achieved power, required sample size, and the smallest detectable effect.'
+    };
+    return map[this.module] || 'Prioritize the main analytical question, evidence strength, diagnostics, and limitations.';
   },
 
   _sidebarAiOnClick() {
@@ -7188,7 +7245,7 @@ const StatisticoHeader = {
     const aiSection = document.createElement('div');
     aiSection.id = 'sbAiSection';
     aiSection.className = 'sb-ai-section-wrap';
-    const aiTitle = 'Generate an AI-assisted interpretation of the complete analysis, assumptions, and key findings.';
+    const aiTitle = this._sidebarAiButtonTitle();
     aiSection.innerHTML = `
       <button class="sb-ai-sidebar-pill ${supportsFullAiPill ? 'sb-ai-sidebar-pill--full' : ''}"
               id="sbAiBtn"
@@ -7894,8 +7951,31 @@ const StatisticoHeader = {
   // ── Global AI Interpretation (univariate sidebar) ────────────────────────
 
   /**
-   * Inject a contextual floating "Explain this view" button into .right-col.
-   * Only shown for univariate views that are not hypothesis.
+   * Place the local "Explain this view" button beside the active view title.
+   * Falls back to a sticky slot in the results column, then a floating host.
+   */
+  _mountLocalAiButton(btn) {
+    if (!btn) return;
+    btn.type = 'button';
+    btn.classList.add('sb-ai-local-btn');
+    const headerRight = document.querySelector('.header-right');
+    if (headerRight) {
+      btn.classList.add('sb-ai-local-btn--header');
+      btn.classList.remove('is-floating-free', 'sb-ai-float-btn--tab');
+      headerRight.insertBefore(btn, headerRight.firstChild);
+      return;
+    }
+    const rightCol = document.querySelector('.right-col') || document.querySelector('.lf-content');
+    if (rightCol) {
+      btn.classList.add('sb-ai-local-btn--sticky');
+      rightCol.insertBefore(btn, rightCol.firstChild);
+      return;
+    }
+    this._mountFloatingAiButton(btn);
+  },
+
+  /**
+   * Legacy floating host used only when no header/results column is available.
    */
   _mountFloatingAiButton(btn) {
     if (!btn) return;
@@ -8013,24 +8093,22 @@ const StatisticoHeader = {
     if (this.module === 'independent') {
       const btn = document.createElement('button');
       btn.id = 'sbAiFloatBtn';
-      btn.className = 'sb-ai-float-btn sb-ai-float-btn--tab';
-      btn.title = 'Start explaining the active Independent Means view';
+      btn.className = 'sb-ai-float-btn sb-ai-local-btn';
+      btn.title = this._explainViewButtonTitle();
       btn.innerHTML = this._explainViewButtonInnerHtml();
       btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentTabInterpret());
-      this._mountFloatingAiButton(btn);
+      this._mountLocalAiButton(btn);
       return;
     }
 
-    const label = this._getInsightGuideLabel();
-
     const btn = document.createElement('button');
     btn.id = 'sbAiFloatBtn';
-    btn.className = 'sb-ai-float-btn';
-    btn.title = `Start explaining the ${label} view`;
+    btn.className = 'sb-ai-float-btn sb-ai-local-btn';
+    btn.title = this._explainViewButtonTitle();
     btn.innerHTML = this._explainViewButtonInnerHtml();
     btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
 
-    this._mountFloatingAiButton(btn);
+    this._mountLocalAiButton(btn);
   },
 
   _supportsInsightGuide() {
@@ -8603,22 +8681,21 @@ COMPUTED PAYLOAD WHEN AVAILABLE:
 ${snapshot.payload || '(No structured payload exposed by this page.)'}
 
 YOUR TASK:
-1. Explain what this specific view reveals.
-2. Describe how to interact with the available controls or table/chart elements.
-3. List the patterns a practitioner should look for in this view.
-4. Give a brief reading of the current visible state without inventing values.
+1. Start with the current result — not a definition of the chart or table.
+2. Cite exact values that are visible on this page.
+3. Interpret what those values mean for this view only.
+4. Flag only cautions that apply to this view.
+5. Suggest one concrete next step, preferably another Statistico view.
+6. Put educational material only in ABOUT / CONTROLS / PATTERNS — those are shown collapsed.
 
 RULES:
 - Keep the explanation specific to this active view, not the full module.
 - Do not infer causality.
 - If values are absent, describe what to inspect rather than inventing numbers.
 - Keep each section concise and practical.
+- Do not calculate new statistics.
 
-Reply ONLY in this exact format:
-ABOUT: [2-3 sentences explaining what this view answers]
-CONTROLS: [Control or interaction: what it does + when to use it] | [next control/interaction] | [next control/interaction]
-PATTERNS: [Pattern description -> what it means analytically] | [next pattern] | [next pattern]
-READING: [1-2 sentences about what the currently visible state suggests, using exact values only if present]`;
+${this._localAiReplyFormat()}`;
   },
 
   async _sbAiDependentKplusInterpret() {
@@ -8655,6 +8732,11 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
       });
       if (floatBtn) floatBtn.disabled = busy;
     };
+    this._lastAiInvoke = { mode: 'full', kind: 'independent' };
+    if (this._openCachedAi('overall', 'full', this.currentView)) {
+      this._aiForceRefresh = false;
+      return;
+    }
     setBusy(true);
     try {
       this._lastAiMeta = null;
@@ -8678,11 +8760,18 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
     } catch (err) {
       this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'full', this._lastAiMeta);
     } finally {
+      this._aiForceRefresh = false;
       setBusy(false);
     }
   },
 
   async _sbAiIndependentTabInterpret() {
+    this._lastAiInvoke = { mode: 'per-view', kind: 'independent' };
+    const activeTabHint = this._getIndependentActiveTab();
+    if (this._openCachedAi('local', 'per-view', `independent-${activeTabHint}`)) {
+      this._aiForceRefresh = false;
+      return;
+    }
     const btn = document.getElementById('sbAiFloatBtn');
     if (btn) {
       btn.disabled = true;
@@ -8701,6 +8790,7 @@ READING: [1-2 sentences about what the currently visible state suggests, using e
       const activeTab = this._getIndependentActiveTab();
       this._showAiOverlay({ error: err.message || 'AI request failed.' }, `independent-${activeTab}`, 'per-view', this._lastAiMeta);
     } finally {
+      this._aiForceRefresh = false;
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = this._explainViewButtonInnerHtml();
@@ -8808,13 +8898,9 @@ Views browsed for this full analysis: ${viewsBrowsed.join(', ')}
 Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
-Reply ONLY in this exact format:
-CONCLUSION: [One decisive sentence - the single most important independent-means finding]
-EVIDENCE: [specific group or test finding with number] | [specific assumption or robustness finding] | [specific effect-size or post-hoc finding] | [specific sample/design finding]
-INTERPRETATION: [3 sentences - unified synthesis in plain language, no causality claims]
-IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
-ACTION: [conditional next step 1] | [conditional next step 2] | [conditional next step 3]
-STRENGTH: [High, Moderate, or Low - short reason based on p-values, effect size, assumptions, and sample balance]`;
+${this._overallAssessmentEmphasis()}
+
+${this._overallAiReplyFormat()}`;
   },
 
   _buildIndependentTabPrompt(payload, tab) {
@@ -8848,11 +8934,7 @@ Do not infer causality. If a value is null or unavailable, say it is not availab
 Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
-Reply ONLY in this exact format:
-ABOUT: [2-3 sentences explaining what this view answers]
-CONTROLS: [Control or interaction: what it does + when to use it] | [next control/interaction] | [next control/interaction]
-PATTERNS: [Pattern description -> what it means analytically] | [next pattern] | [next pattern]
-READING: [1-2 sentences about what the current tab shows, using exact values where available]`;
+${this._localAiReplyFormat()}`;
   },
 
   /**
@@ -8860,16 +8942,20 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
    */
   async _sbAiPerViewInterpret() {
     const btn = document.getElementById('sbAiFloatBtn');
-    const sidebarBtn = document.getElementById('sbAiBtn');
     const markBusy = (busy) => {
-      [btn, sidebarBtn].forEach((el) => {
-        if (!el) return;
-        el.disabled = busy;
-        if (busy) el.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view...</span>';
-      });
+      if (!btn) return;
+      btn.disabled = busy;
+      btn.innerHTML = busy
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view…</span>'
+        : this._explainViewButtonInnerHtml();
     };
-    markBusy(true);
+    this._lastAiInvoke = { mode: 'per-view', kind: 'generic' };
     const viewKey = this._getInsightGuideViewKey();
+    if (this._openCachedAi('local', 'per-view', viewKey)) {
+      this._aiForceRefresh = false;
+      return;
+    }
+    markBusy(true);
     try {
       // Rule-based Insight Guide for meta heterogeneity (deterministic stats — not AI)
       if (viewKey === 'meta-heterogeneity' &&
@@ -8909,9 +8995,8 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     } catch (err) {
       this._showAiOverlay({ error: err.message || 'AI request failed.' }, viewKey, 'per-view', this._lastAiMeta);
     } finally {
+      this._aiForceRefresh = false;
       markBusy(false);
-      if (btn) btn.innerHTML = this._explainViewButtonInnerHtml();
-      if (sidebarBtn) sidebarBtn.innerHTML = this._sidebarAiButtonInnerHtml(false);
     }
   },
 
@@ -8926,6 +9011,11 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
       if (btn) btn.innerHTML = html;
     };
 
+    this._lastAiInvoke = { mode: 'full', kind: this.module };
+    if (this._openCachedAi('overall', 'full', this.currentView)) {
+      this._aiForceRefresh = false;
+      return;
+    }
     if (btn) btn.disabled = true;
     setLabel(`<i class="fa-solid fa-spinner fa-spin"></i><span>${this.module === 'correlations' ? 'Collecting views…' : 'Loading views…'}</span>`);
 
@@ -8955,6 +9045,7 @@ READING: [1-2 sentences about what the current tab shows, using exact values whe
     } catch (err) {
       this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'full');
     } finally {
+      this._aiForceRefresh = false;
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = this._sidebarAiButtonInnerHtml(false);
@@ -9942,12 +10033,9 @@ RULES:
 - Do NOT report a single overall mean/SD as if there is one sample
 - Similarity scores are descriptive 0–100 values, not p-values. Do not label them good/poor.
 
-Reply ONLY in this exact format:
-CONCLUSION: [One sentence — main between-group finding]
-EVIDENCE: [group-specific fact with number] | [group-specific fact] | [group-specific fact]
-INTERPRETATION: [3 sentences comparing groups]
-IMPLICATIONS: [implication 1] | [implication 2] | [implication 3]
-ACTION: [next step 1] | [next step 2] | [next step 3]`;
+${this._overallAssessmentEmphasis()}
+
+${this._overallAiReplyFormat()}`;
     }
 
     return `You are explaining the "${viewName}" tab inside Statistico Grouped Analysis. The user is comparing "${ctx.variable}" across groups defined by "${ctx.groupingColumn}".
@@ -9970,11 +10058,7 @@ RULES:
 - Use exact numbers from PER-GROUP STATISTICS / ACTIVE TAB blocks above
 - Be specific to this tab (${viewName}), not generic univariate advice
 
-Reply ONLY in this exact format — each key on its own line:
-ABOUT: [2–3 sentences — what this tab shows for comparing groups and why it matters]
-CONTROLS: [Control name: what it does + when to use it] | [next control] | [next control if applicable]
-PATTERNS: [Between-group pattern → analytical meaning] | [next pattern] | [next pattern]
-READING: [1–2 sentences comparing the named groups using exact per-group numbers from the data above]`;
+${this._localAiReplyFormat()}`;
   },
 
   _correlationControlsDoc() {
@@ -10006,17 +10090,15 @@ ${dataBlock}
 
 RULES:
 - Treat the data above as authoritative.
-- Synthesize Matrix, Network, Descriptives, Reliability, Partial controls, and PCA/Taylor dimensionality cues when present.
+- Synthesize Matrix, Network, Descriptives, Partial controls, and PCA/Taylor dimensionality cues when present.
 - Cite exact values where useful.
 - Do not overclaim causality; these are associations.
-- Mention disconnected variables or weak reliability if present.
+- Mention disconnected variables if present.
+- Do not mention Cronbach alpha, omega, or other reliability metrics unless the Reliability view is included in the data and the question is specifically about a scale.
 
-Reply ONLY in this exact format:
-CONCLUSION: [One decisive sentence - the single most important correlation finding]
-EVIDENCE: [specific numeric finding] | [specific numeric finding] | [specific numeric finding] | [specific numeric finding]
-INTERPRETATION: [3 sentences - unified synthesis across the views]
-IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
-ACTION: [next step 1] | [next step 2] | [next step 3]`;
+${this._overallAssessmentEmphasis()}
+
+${this._overallAiReplyFormat()}`;
     }
 
     return `You are explaining the "${viewLabel}" correlation view to a data analyst.
@@ -10028,19 +10110,16 @@ ALL AVAILABLE CORRELATION RESULTS:
 ${dataBlock}
 
 RULES:
-- Explain this current view first, but use the broader results as context.
+- Start with the current result — not a tutorial about what this chart is.
 - Be practical and concise.
 - Do not overclaim causality.
-- Mention exact values when they clarify the reading.${view === 'correlation-by-group-similarity' ? `
-- Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed.
+- Mention exact values when they clarify the reading.
+- Do not mention Cronbach alpha unless this is the Reliability view.${view === 'correlation-by-group-similarity' ? `
+- Focus BOTTOMLINE and EVIDENCE on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed.
 - Do not call this a published coefficient — it is Statistico's Similarity Profile™.
 - Use Very similar / Mostly similar / Mixed similarity / Substantially different.` : ''}
 
-Reply ONLY in this exact format:
-ABOUT: [2-3 sentences explaining what this view answers]
-CONTROLS: [Control or interaction: what it does + when to use it] | [next control/interaction] | [next control/interaction]
-PATTERNS: [Pattern description -> what it means analytically] | [next pattern] | [next pattern]
-READING: [1-2 sentences about what the current correlation results suggest, using exact values where available]`;
+${this._localAiReplyFormat()}`;
   },
 
   /**
@@ -10180,14 +10259,11 @@ RULES:
 - Do NOT repeat the same fact across sections
 - Do NOT mention formula names (CV, IQR/SD, etc.) — describe patterns in plain language
 
-TASK: Write a comprehensive diagnostic report. Synthesise signals and results into a unified narrative. Where test results exist, cite exact numbers. Cover: the defining characteristic, what diagnostics collectively confirm, practical consequences, and what to do next.
+TASK: Write a decision-oriented overall assessment. Synthesise signals and results into a unified narrative. Where test results exist, cite exact numbers. Cover: the defining characteristic, what diagnostics collectively confirm, practical consequences, limitations, and what to do next.
 
-Reply ONLY in this exact format:
-CONCLUSION: [One decisive sentence — the single most important finding]
-EVIDENCE: [specific finding with number] | [specific finding] | [specific finding] | [specific finding]
-INTERPRETATION: [3 sentences — unified synthesis, plain language, no formula names]
-IMPLICATIONS: [analytical implication 1] | [analytical implication 2] | [analytical implication 3]
-ACTION: [conditional step 1] | [conditional step 2] | [conditional step 3]`;
+${this._overallAssessmentEmphasis()}
+
+${this._overallAiReplyFormat()}`;
     }
 
     // ── Per-view: Insight Guide (elaborate view explanation + controls guidance) ──
@@ -10210,23 +10286,19 @@ DESCRIPTIVE STATISTICS:
 n = ${n}, Mean = ${f(mean)}, SD = ${f(sd)}, Median = ${f(med)}, Skewness = ${skew !== null ? f(skew) : 'n/a'}
 
 YOUR TASK:
-1. Explain what this view reveals — specifically and concretely, not generically.
-2. Describe each control and give a practical tip on when and how to use it effectively.
-3. List the key patterns a practitioner should look for in this view and what each pattern indicates analytically.
-4. Give a brief 1–2 sentence reading of what this specific data currently shows in this view.
+1. Start with the current result — not a definition of what this view is.
+2. Cite exact values from the current data state.
+3. Interpret what those values mean for this view only.
+4. Flag only cautions that apply to this view (outliers, small n, skew, assumption failure).
+5. Suggest one concrete next step.
+6. Put educational material only in ABOUT / CONTROLS / PATTERNS.
 
 RULES:
 - Be concrete and specific to this view type — not a generic stats lesson
-- For controls: name each one, say what it does, and give a practical usage tip
-- For patterns: describe the visual/statistical pattern, then explain its analytical meaning
-- Do NOT mention other views or suggest navigating elsewhere
 - Do NOT be vague — every sentence should give actionable information
+- Do NOT calculate new statistics
 
-Reply ONLY in this exact format — each key on its own line:
-ABOUT: [2–3 sentences — what specific analytical question this view answers and what kind of information it exposes that other views do not]
-CONTROLS: [Control name: what it does + when to use it] | [next control] | [next control if applicable]
-PATTERNS: [Pattern description → what it means analytically] | [next pattern] | [next pattern] | [next pattern if applicable]
-READING: [1–2 sentences — what the current data state in this view specifically shows, using exact numbers where available]`;
+${this._localAiReplyFormat()}`;
   },
 
   // ── AI number formatting ─────────────────────────────────────────────────
@@ -10298,10 +10370,10 @@ CRITICAL RULES (strictly enforced):
 - "What to Check Next" must use conditional reasoning ("If X, then run Y") — not a plain test list
 - NUMBER FORMAT: report effects, SEs, CIs, Q, τ², and intercepts to 3 decimal places; I² to 1 decimal with %; p-values to 3 decimals (use p < .001 when smaller). Never paste long floating-point tails from JSON.
 
-Always follow the exact output format requested.` },
+Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUSION keys over tutorial text. Never wrap the reply in markdown fences.` },
               { role: 'user',   content: prompt }
             ],
-            max_tokens: 700,
+            max_tokens: 1200,
             temperature: 0.3
           })
         });
@@ -10317,54 +10389,177 @@ Always follow the exact output format requested.` },
 
   // ── Response parser ──────────────────────────────────────────────────────
 
+  _aiListKeys() {
+    return ['EVIDENCE', 'IMPLICATIONS', 'ACTION', 'NEXT', 'CONTROLS', 'PATTERNS',
+      'CHECKS', 'FINDINGS', 'SUPPORT', 'LIMITATIONS', 'DIAGNOSTICS'];
+  },
+
+  _cleanAiText(value) {
+    if (value == null) return '';
+    if (Array.isArray(value)) return value.map((v) => this._cleanAiText(v)).filter(Boolean);
+    return this._formatAiProseNumbers(String(value)
+      .replace(/```(?:json)?/gi, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/^#+\s+/gm, '')
+      .replace(/^\s*[-*]\s+/gm, '')
+      .trim());
+  },
+
+  _escapeAiHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  },
+
+  _asAiList(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map((v) => this._cleanAiText(v)).filter(Boolean);
+    const cleaned = this._cleanAiText(value);
+    if (!cleaned) return [];
+    if (cleaned.includes('|')) return cleaned.split('|').map((s) => s.trim()).filter(Boolean);
+    return [cleaned];
+  },
+
+  _normalizeStrength(raw, jsLevel) {
+    const src = String(jsLevel || raw || '');
+    if (!src.trim()) return null;
+    if (/strong|high/i.test(src)) return { level: 'strong', label: 'Strong' };
+    if (/inconclusive/i.test(src)) return { level: 'inconclusive', label: 'Inconclusive' };
+    if (/tentative|low/i.test(src)) return { level: 'tentative', label: 'Tentative' };
+    if (/moderate/i.test(src)) return { level: 'moderate', label: 'Moderate' };
+    return { level: 'moderate', label: 'Moderate' };
+  },
+
+  _aiFingerprint() {
+    const bits = [this.module, this.currentView, this.variableName, this.sampleSize, this._aiRunNonce || 0];
+    try {
+      const stored = localStorage.getItem('univariateResults')
+        || sessionStorage.getItem('univariateResults')
+        || sessionStorage.getItem('metaBundle')
+        || '';
+      bits.push(String(stored).length + ':' + String(stored).slice(0, 64));
+    } catch (_e) {}
+    return bits.join('|');
+  },
+
+  _storeAiCache(scope, sections, meta, view) {
+    this._aiCache = this._aiCache || {};
+    this._aiCache[scope] = {
+      fingerprint: this._aiFingerprint(),
+      sections,
+      meta,
+      view,
+      ts: Date.now()
+    };
+  },
+
+  _readAiCache(scope) {
+    const hit = this._aiCache && this._aiCache[scope];
+    if (!hit) return null;
+    return Object.assign({}, hit, { stale: hit.fingerprint !== this._aiFingerprint() });
+  },
+
   /**
-   * Parse the structured CONCLUSION / EVIDENCE / INTERPRETATION / IMPLICATIONS / ACTION
-   * format into a plain object. Handles pipe-separated list items.
+   * Parse structured KEY: lines or JSON into a plain object.
+   * Accepts the new local/overall keys plus the legacy CONCLUSION/ABOUT set.
    */
   _parseAiStructured(raw) {
     if (!raw) return null;
     raw = this._formatAiProseNumbers(raw);
-    // Full-view keys + per-view keys (union)
-    const sectionKeys = ['ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION', 'IMPLICATIONS', 'ACTION',
-                         'INSIGHT', 'MEANS', 'NEXT', 'STRENGTH',
-                         'CONTROLS', 'PATTERNS', 'READING'];
+    const trimmed = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const json = JSON.parse(trimmed);
+        if (json && typeof json === 'object') return this._normalizeAiJson(json);
+      } catch (_e) { /* fall through to KEY: parser */ }
+    }
+
+    const sectionKeys = [
+      'BOTTOMLINE', 'MEANING', 'CHECKS', 'FINDINGS', 'SUPPORT', 'DIAGNOSTICS',
+      'LIMITATIONS', 'REPORT', 'ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION',
+      'IMPLICATIONS', 'ACTION', 'INSIGHT', 'MEANS', 'NEXT', 'STRENGTH',
+      'CONTROLS', 'PATTERNS', 'READING'
+    ];
     const result = {};
     const lines = raw.split('\n');
     let current = null;
     const buf = [];
+    const listKeys = this._aiListKeys();
 
     const flush = () => {
       if (!current) return;
-      const joined = this._formatAiProseNumbers(buf.join(' ').trim());
-      if (['EVIDENCE', 'IMPLICATIONS', 'ACTION', 'NEXT', 'CONTROLS', 'PATTERNS'].includes(current)) {
-        result[current] = joined.split('|').map((s) => this._formatAiProseNumbers(s.trim())).filter(Boolean);
+      const joined = this._cleanAiText(buf.join(' ').trim());
+      if (listKeys.includes(current)) {
+        result[current] = this._asAiList(joined);
       } else {
         result[current] = joined;
       }
     };
 
     lines.forEach((line) => {
-      const trimmed = line.trim();
+      const cleanedLine = String(line || '')
+        .replace(/^\s*[-*]\s*/, '')
+        .replace(/^\*+/, '')
+        .replace(/:\*+/, ':')
+        .replace(/\*+$/g, '')
+        .trim();
       let matched = false;
       for (const key of sectionKeys) {
-        if (trimmed.toUpperCase().startsWith(key + ':')) {
-          flush(); current = key; buf.length = 0;
-          buf.push(trimmed.slice(key.length + 1).trim());
-          matched = true; break;
+        if (cleanedLine.toUpperCase().startsWith(key + ':')) {
+          flush();
+          current = key;
+          buf.length = 0;
+          buf.push(cleanedLine.slice(key.length + 1).trim());
+          matched = true;
+          break;
         }
       }
-      if (!matched && current) buf.push(trimmed);
+      if (!matched && current) buf.push(cleanedLine);
     });
     flush();
-    return Object.keys(result).length ? result : { INSIGHT: raw };
+    if (!Object.keys(result).length) {
+      const cleaned = this._cleanAiText(raw);
+      return cleaned ? { INSIGHT: cleaned } : null;
+    }
+    return result;
+  },
+
+  _normalizeAiJson(json) {
+    const pick = (...keys) => {
+      for (const key of keys) {
+        if (json[key] != null && json[key] !== '') return json[key];
+      }
+      return null;
+    };
+    return {
+      BOTTOMLINE: this._cleanAiText(pick('bottomLine', 'BOTTOMLINE', 'READING')),
+      EVIDENCE: this._asAiList(pick('evidence', 'EVIDENCE')),
+      MEANING: this._cleanAiText(pick('meaning', 'MEANING', 'MEANS')),
+      CHECKS: this._asAiList(pick('checks', 'CHECKS')),
+      NEXT: this._asAiList(pick('nextStep', 'NEXT', 'ACTION')),
+      ABOUT: this._cleanAiText(
+        (json.about && typeof json.about === 'object') ? json.about.what : pick('about', 'ABOUT')
+      ),
+      CONTROLS: this._asAiList(pick('interact', 'CONTROLS') || (json.about && json.about.interact)),
+      PATTERNS: this._asAiList(pick('lookFor', 'PATTERNS') || (json.about && json.about.lookFor)),
+      CONCLUSION: this._cleanAiText(pick('conclusion', 'CONCLUSION')),
+      STRENGTH: this._cleanAiText(pick('evidenceStrength', 'STRENGTH')),
+      FINDINGS: this._asAiList(pick('mainFindings', 'FINDINGS', 'EVIDENCE')),
+      SUPPORT: this._asAiList(pick('supportingEvidence', 'SUPPORT')),
+      DIAGNOSTICS: this._asAiList(pick('diagnostics', 'DIAGNOSTICS')),
+      INTERPRETATION: this._cleanAiText(pick('practicalInterpretation', 'INTERPRETATION')),
+      LIMITATIONS: this._asAiList(pick('limitations', 'LIMITATIONS', 'IMPLICATIONS')),
+      ACTION: this._asAiList(pick('nextSteps', 'ACTION')),
+      REPORT: this._cleanAiText(pick('reportSummary', 'REPORT')),
+      INSIGHT: this._cleanAiText(pick('insight', 'INSIGHT'))
+    };
   },
 
   // ── Overlay renderer ─────────────────────────────────────────────────────
 
-  _showAiOverlay(sections, view, mode = 'per-view', meta = null) {
-    const existing = document.getElementById('sbAiOverlay');
-    if (existing) existing.remove();
-
+  _aiViewLabel(view) {
     const viewLabels = {
       histogram:'Histogram', boxplot:'Box Plot & Outliers', cdf:'CDF', percentile:'Percentiles',
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
@@ -10375,170 +10570,244 @@ Always follow the exact output format requested.` },
       ...this._independentViewLabels(),
       ...this._genericModuleViewLabels()
     };
-    const viewLabel = viewLabels[view] || view;
+    return viewLabels[view] || String(view || 'View').replace(/[-_]/g, ' ');
+  },
+
+  _renderAiText(value, allowHtml) {
+    if (value == null || value === '') return '';
+    if (allowHtml) return String(value);
+    return this._escapeAiHtml(this._cleanAiText(value));
+  },
+
+  _renderAiList(items, allowHtml) {
+    const list = this._asAiList(items);
+    if (!list.length) return '';
+    return `<ul class="sb-ai-list">${list.map((i) => `<li>${this._renderAiText(i, allowHtml)}</li>`).join('')}</ul>`;
+  },
+
+  _aiSectionCard(cls, label, bodyHtml, icon) {
+    if (!bodyHtml) return '';
+    return `<div class="sb-ai-section ${cls}">
+      <div class="sb-ai-section-label">${icon ? `<i class="${icon}"></i> ` : ''}${label}</div>
+      <div class="sb-ai-section-body">${bodyHtml}</div>
+    </div>`;
+  },
+
+  _aboutThisViewHtml(sections, viewLabel, meta) {
+    const allowHtml = !!meta?.ruleBased;
+    const questions = (!meta?.ruleBased || meta?.includeQuestions) ? this._getQuestionsAnsweredContent() : [];
+    const what = sections.ABOUT || '';
+    const interact = this._asAiList(sections.CONTROLS);
+    const lookFor = this._asAiList(sections.PATTERNS);
+    if (!what && !questions.length && !interact.length && !lookFor.length) return '';
+    const parts = [];
+    if (what) {
+      parts.push(`<div class="sb-ai-about-block"><div class="sb-ai-about-kicker">What this view shows</div><p>${this._renderAiText(what, allowHtml)}</p></div>`);
+    }
+    if (questions.length) {
+      parts.push(`<div class="sb-ai-about-block"><div class="sb-ai-about-kicker">Questions it answers</div>${this._renderAiList(questions, false)}</div>`);
+    }
+    if (interact.length) {
+      parts.push(`<div class="sb-ai-about-block"><div class="sb-ai-about-kicker">How to interact</div>${this._renderAiList(interact, allowHtml)}</div>`);
+    }
+    if (lookFor.length) {
+      parts.push(`<div class="sb-ai-about-block"><div class="sb-ai-about-kicker">${meta?.guideLabels?.patterns || 'What to look for'}</div>${this._renderAiList(lookFor, allowHtml)}</div>`);
+    }
+    return `<div class="sb-ai-section sb-ai-section--about sb-ai-collapsible">
+      <div class="sb-ai-collapsible-hdr" data-target="sb-about">
+        <span><i class="fa-solid fa-circle-info"></i> About this view — ${this._escapeAiHtml(viewLabel)}</span>
+        <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
+      </div>
+      <div class="sb-ai-collapsible-body" id="sb-about">${parts.join('')}</div>
+    </div>`;
+  },
+
+  _copyAiOverlayText() {
+    const body = document.querySelector('#sbAiOverlay .sb-ai-body');
+    const text = body ? String(body.innerText || '').trim() : '';
+    if (!text) return;
+    const done = () => this._flashAiAction('Copied');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(done);
+    } else {
+      done();
+    }
+  },
+
+  _addAiToReport() {
+    const title = document.querySelector('#sbAiOverlay .sb-ai-title')?.textContent || 'AI assessment';
+    const report = document.querySelector('#sbAiOverlay [data-ai-report]')?.textContent
+      || document.querySelector('#sbAiOverlay .sb-ai-body')?.innerText
+      || '';
+    const block = { title: String(title).trim(), text: String(report).trim(), module: this.module, ts: Date.now() };
+    if (!block.text) return;
+    let blocks = [];
+    try { blocks = JSON.parse(sessionStorage.getItem('statisticoAiReportBlocks') || '[]'); } catch (_e) {}
+    if (!Array.isArray(blocks)) blocks = [];
+    blocks.push(block);
+    try { sessionStorage.setItem('statisticoAiReportBlocks', JSON.stringify(blocks)); } catch (_e) {}
+    this._aiReportBlocks = blocks;
+    this._flashAiAction('Added to report');
+  },
+
+  _openCachedAi(scope, mode, fallbackView) {
+    if (this._aiForceRefresh) return false;
+    const cache = this._readAiCache(scope);
+    if (!cache || !cache.sections) return false;
+    this._showAiOverlay(
+      cache.sections,
+      cache.view || fallbackView,
+      mode,
+      Object.assign({}, cache.meta || {}, { stale: cache.stale, fromCache: true })
+    );
+    return true;
+  },
+
+  _refreshLastAi() {
+    this._aiForceRefresh = true;
+    const overlay = document.getElementById('sbAiOverlay');
+    if (overlay) overlay.remove();
+    if (this._lastAiInvoke?.mode === 'full') return this._sidebarAiOnClick();
+    if (this.module === 'independent') return this._sbAiIndependentTabInterpret();
+    return this._sbAiPerViewInterpret();
+  },
+
+  _flashAiAction(label) {
+    const el = document.getElementById('sbAiActionStatus');
+    if (!el) return;
+    el.textContent = label;
+    el.hidden = false;
+    clearTimeout(this._aiActionTimer);
+    this._aiActionTimer = setTimeout(() => { el.hidden = true; }, 1600);
+  },
+
+  _showAiOverlay(sections, view, mode = 'per-view', meta = null) {
+    const existing = document.getElementById('sbAiOverlay');
+    if (existing) existing.remove();
+
+    const viewLabel = this._aiViewLabel(view);
+    const moduleName = this._getModuleDisplayName();
     const title = mode === 'full'
-      ? (this.module === 'correlations' ? 'Full Correlation Analysis' : (this.module === 'independent' ? 'Independent Means Analysis' : (this.module === 'factor' ? 'Full Factor Analysis' : 'Full Variable Analysis')))
-      : mode === 'per-view' ? `Insight Guide — ${viewLabel}`
-      : `AI Insight — ${viewLabel}`;
+      ? `Overall assessment — ${moduleName}`
+      : `View insight — ${viewLabel}`;
     const titleIconHtml = mode === 'full'
       ? '<i class="fa-solid fa-brain"></i>'
       : this._aiIconHtml();
+    const allowHtml = !!meta?.ruleBased;
+    const scope = mode === 'full' ? 'overall' : 'local';
+    if (sections && !sections.error && !meta?.fromCache) this._storeAiCache(scope, sections, meta, view);
+    const stale = !!meta?.stale;
+
+    const card = (cls, label, html, icon) => this._aiSectionCard(cls, label, html, icon);
+    const textCard = (cls, label, value, icon) => {
+      const cleaned = this._cleanAiText(value);
+      return cleaned ? card(cls, label, `<p class="sb-ai-insight-body">${this._renderAiText(cleaned, allowHtml)}</p>`, icon) : '';
+    };
+    const listCard = (cls, label, value, icon) => {
+      const html = this._renderAiList(value, allowHtml);
+      return html ? card(cls, label, html, icon) : '';
+    };
 
     let bodyHtml;
-
     if (!sections) {
       bodyHtml = '<p class="sb-ai-empty">No analysis data available. Run the analysis first.</p>';
     } else if (sections.error) {
-      bodyHtml = `<p class="sb-ai-empty sb-ai-error"><i class="fa-solid fa-triangle-exclamation"></i> ${sections.error}</p>`;
-    } else {
-      const renderList = (items) =>
-        Array.isArray(items)
-          ? `<ul class="sb-ai-list">${items.map((i) => `<li>${i}</li>`).join('')}</ul>`
-          : `<p>${items}</p>`;
-
+      bodyHtml = `<p class="sb-ai-empty sb-ai-error"><i class="fa-solid fa-triangle-exclamation"></i> ${this._escapeAiHtml(sections.error)}</p>`;
+    } else if (mode === 'full') {
+      const strength = this._normalizeStrength(sections.STRENGTH, meta?.strengthLevel);
+      const strengthNote = meta?.strengthNote || (sections.STRENGTH
+        ? String(sections.STRENGTH).replace(/^(strong|high|moderate|tentative|low|inconclusive)\s*[—–:-]?\s*/i, '')
+        : '');
+      const findings = sections.FINDINGS && sections.FINDINGS.length ? sections.FINDINGS : sections.EVIDENCE;
+      const support = sections.SUPPORT && sections.SUPPORT.length ? sections.SUPPORT : null;
       bodyHtml = `
-        ${(meta?.primarySignal && mode !== 'per-view') ? `
+        ${stale ? `<div class="sb-ai-stale"><i class="fa-solid fa-rotate"></i> Out of date — results changed since this assessment was generated. <button type="button" class="sb-ai-stale-btn" data-ai-action="refresh">Update interpretation</button></div>` : ''}
+        ${(meta?.primarySignal) ? `
         <div class="sb-ai-primary-signal">
           <span class="sb-ai-signal-label">Primary Signal</span>
-          <span class="sb-ai-signal-value">${meta.primarySignal}</span>
+          <span class="sb-ai-signal-value">${this._escapeAiHtml(meta.primarySignal)}</span>
         </div>` : ''}
-        ${(meta?.viewsBrowsed?.length && mode !== 'per-view') ? `
+        ${(meta?.viewsBrowsed?.length) ? `
         <div class="sb-ai-views-browsed">
           <div class="sb-ai-views-label"><i class="fa-solid fa-layer-group"></i> Views Browsed</div>
           <div class="sb-ai-view-chips">
-            ${meta.viewsBrowsed.map((label) => `<span class="sb-ai-view-chip">${label}</span>`).join('')}
+            ${meta.viewsBrowsed.map((label) => `<span class="sb-ai-view-chip">${this._escapeAiHtml(label)}</span>`).join('')}
           </div>
         </div>` : ''}
-        ${sections.ABOUT ? `
-        <div class="sb-ai-section sb-ai-section--about ${meta?.ruleBased ? 'sb-ai-about-soft' : 'sb-ai-about-hero'}">
-          <div class="sb-ai-section-label" style="margin-bottom:6px;"><i class="fa-solid fa-circle-info" style="margin-right:5px;"></i>What this view shows</div>
-          <div class="sb-ai-section-body sb-ai-about-line">${sections.ABOUT}</div>
-        </div>` : ''}
-
-        ${/* ── What Questions This View Answers (static, per-view only; skip for rule-based meta guides) ── */ ''}
-        ${mode === 'per-view' && (!meta?.ruleBased || meta?.includeQuestions) ? (() => {
-          const qs = this._getQuestionsAnsweredContent();
-          if (!qs.length) return '';
-          return `<div class="sb-ai-section sb-ai-section--questions">
-            <div class="sb-ai-section-label"><i class="fa-solid fa-circle-question" style="margin-right:5px;"></i>What Questions This View Answers</div>
-            <div class="sb-ai-section-body"><ul class="sb-ai-list">${qs.map(q => `<li>${q}</li>`).join('')}</ul></div>
-          </div>`;
-        })() : ''}
-        <div class="sb-ai-divider"></div>
-
-        ${/* ── Per-view structure ── */ ''}
-        ${sections.INSIGHT ? `
-        <div class="sb-ai-section sb-ai-section--insight">
-          <div class="sb-ai-section-label"><i class="fa-solid fa-brain"></i> AI Insight</div>
-          <div class="sb-ai-section-body sb-ai-insight-body">${sections.INSIGHT}</div>
-        </div>` : ''}
-        ${sections.MEANS ? `
-        <div class="sb-ai-section sb-ai-section--means">
-          <div class="sb-ai-section-label">What This Means</div>
-          <div class="sb-ai-section-body">${sections.MEANS}</div>
-        </div>` : ''}
-        ${sections.NEXT ? `
-        <div class="sb-ai-section sb-ai-section--next">
-          <div class="sb-ai-section-label">What to Check Next</div>
-          <div class="sb-ai-section-body">${renderList(sections.NEXT)}</div>
-        </div>` : ''}
-
-        ${/* ── Insight Guide sections (per-view explain mode) ── */ ''}
-        ${sections.CONTROLS ? `
-        <div class="sb-ai-section sb-ai-section--controls sb-ai-collapsible">
-          <div class="sb-ai-collapsible-hdr" data-target="sb-ctrl">
-            <span><i class="fa-solid fa-sliders"></i> How to Interact</span>
-            <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
-          </div>
-          <div class="sb-ai-collapsible-body" id="sb-ctrl">${renderList(sections.CONTROLS)}</div>
-        </div>` : ''}
-        ${sections.PATTERNS ? `
-        <div class="sb-ai-section sb-ai-section--patterns sb-ai-collapsible">
-          <div class="sb-ai-collapsible-hdr" data-target="sb-patt">
-            <span><i class="fa-solid fa-chart-line"></i> ${meta?.guideLabels?.patterns || 'What to Look For'}</span>
-            <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
-          </div>
-          <div class="sb-ai-collapsible-body" id="sb-patt">${renderList(sections.PATTERNS)}</div>
-        </div>` : ''}
-        ${sections.READING ? `
-        <div class="sb-ai-section sb-ai-section--reading sb-ai-collapsible">
-          <div class="sb-ai-collapsible-hdr" data-target="sb-read">
-            <span><i class="fa-solid fa-magnifying-glass-chart"></i> ${meta?.guideLabels?.reading || 'Current Reading'}</span>
-            <i class="fa-solid fa-chevron-down sb-ai-chevron${meta?.openReading ? ' sb-ai-chevron--open' : ''}"></i>
-          </div>
-          <div class="sb-ai-collapsible-body${meta?.openReading ? ' sb-ai-collapsible-body--open' : ''}" id="sb-read">
-            ${meta?.resultBadge ? `<div class="sb-ai-result-badge">${meta.resultBadge}</div>` : ''}
-            <p class="sb-ai-insight-body">${sections.READING}</p>
-          </div>
-        </div>` : ''}
-
-        ${/* ── Full-view structure ── */ ''}
-        ${sections.CONCLUSION ? `
-        <div class="sb-ai-section sb-ai-section--conclusion">
-          <div class="sb-ai-section-label">Core Finding</div>
-          <div class="sb-ai-section-body sb-ai-insight-body">${sections.CONCLUSION}</div>
-        </div>` : ''}
-        ${sections.EVIDENCE ? `
-        <div class="sb-ai-section sb-ai-section--evidence">
-          <div class="sb-ai-section-label">Key Evidence</div>
-          <div class="sb-ai-section-body">${renderList(sections.EVIDENCE)}</div>
-        </div>` : ''}
-        ${sections.INTERPRETATION ? `
-        <div class="sb-ai-section sb-ai-section--interpretation">
-          <div class="sb-ai-section-label">Diagnostic Interpretation</div>
-          <div class="sb-ai-section-body">${sections.INTERPRETATION}</div>
-        </div>` : ''}
-        ${sections.IMPLICATIONS ? `
-        <div class="sb-ai-section sb-ai-section--implications">
-          <div class="sb-ai-section-label">Analytical Implications</div>
-          <div class="sb-ai-section-body">${renderList(sections.IMPLICATIONS)}</div>
-        </div>` : ''}
-        ${sections.ACTION ? `
-        <div class="sb-ai-section sb-ai-section--action">
-          <div class="sb-ai-section-label">Next Analytical Steps</div>
-          <div class="sb-ai-section-body">${renderList(sections.ACTION)}</div>
-        </div>` : ''}
-
-        ${/* ── Insight Strength: JS-computed for per-view, AI-parsed for full ── */ ''}
-        ${mode !== 'per-view' ? (() => {
-          const jsLevel = meta?.strengthLevel;
-          const raw     = !jsLevel ? sections.STRENGTH : null;
-          const level   = jsLevel
-            ? jsLevel.toLowerCase()
-            : raw ? (/^high/i.test(raw) ? 'high' : /^low/i.test(raw) ? 'low' : 'moderate') : null;
-          const label   = level ? (level.charAt(0).toUpperCase() + level.slice(1)) : null;
-          const note    = meta?.strengthNote || (raw ? raw.replace(/^(high|moderate|low)\s*[—–-]?\s*/i, '') : null);
-          if (!level) return '';
-          return `<div class="sb-ai-divider"></div>
-        <div class="sb-ai-section sb-ai-section--strength">
-          <div class="sb-ai-section-label">Insight Strength</div>
+        ${textCard('sb-ai-section--conclusion', 'Overall conclusion', sections.CONCLUSION)}
+        ${strength ? `<div class="sb-ai-section sb-ai-section--strength">
+          <div class="sb-ai-section-label">Evidence strength</div>
           <div class="sb-ai-section-body sb-ai-strength-body">
-            <span class="sb-ai-strength-badge sb-ai-strength-${level}">${label}</span>
-            <span class="sb-ai-strength-note">${note}</span>
+            <span class="sb-ai-strength-badge sb-ai-strength-${strength.level}">${strength.label}</span>
+            ${strengthNote ? `<span class="sb-ai-strength-note">${this._escapeAiHtml(this._cleanAiText(strengthNote))}</span>` : ''}
           </div>
-        </div>`;
-        })() : ''}
+        </div>` : ''}
+        ${listCard('sb-ai-section--evidence', 'Main findings', findings)}
+        ${listCard('sb-ai-section--support', 'Supporting evidence', support)}
+        ${listCard('sb-ai-section--diagnostics', 'Diagnostics and assumptions', sections.DIAGNOSTICS)}
+        ${textCard('sb-ai-section--interpretation', 'Practical interpretation', sections.INTERPRETATION)}
+        ${listCard('sb-ai-section--limitations', 'Limitations', sections.LIMITATIONS && sections.LIMITATIONS.length ? sections.LIMITATIONS : sections.IMPLICATIONS)}
+        ${listCard('sb-ai-section--action', 'Recommended next steps', sections.ACTION)}
+        ${sections.REPORT ? `<div class="sb-ai-section sb-ai-section--report sb-ai-collapsible">
+          <div class="sb-ai-collapsible-hdr" data-target="sb-report">
+            <span><i class="fa-solid fa-file-lines"></i> Report-ready summary</span>
+            <i class="fa-solid fa-chevron-down sb-ai-chevron"></i>
+          </div>
+          <div class="sb-ai-collapsible-body" id="sb-report"><p data-ai-report>${this._renderAiText(sections.REPORT, false)}</p></div>
+        </div>` : ''}
+      `;
+    } else {
+      const bottomLine = sections.BOTTOMLINE || sections.READING || sections.CONCLUSION || sections.INSIGHT;
+      const meaning = sections.MEANING || sections.MEANS || sections.INTERPRETATION;
+      const evidence = sections.EVIDENCE;
+      const checks = sections.CHECKS;
+      const next = sections.NEXT || sections.ACTION;
+      bodyHtml = `
+        ${stale ? `<div class="sb-ai-stale"><i class="fa-solid fa-rotate"></i> Out of date — results changed since this interpretation was generated. <button type="button" class="sb-ai-stale-btn" data-ai-action="refresh">Update interpretation</button></div>` : ''}
+        ${meta?.resultBadge ? `<div class="sb-ai-result-badge">${this._escapeAiHtml(meta.resultBadge)}</div>` : ''}
+        ${textCard('sb-ai-section--conclusion', 'Bottom line', bottomLine)}
+        ${listCard('sb-ai-section--evidence', 'Evidence from this view', evidence)}
+        ${textCard('sb-ai-section--means', 'What it means', meaning)}
+        ${listCard('sb-ai-section--checks', 'Checks and cautions', checks)}
+        ${listCard('sb-ai-section--next', 'Suggested next step', next)}
+        ${this._aboutThisViewHtml(sections, viewLabel, meta)}
       `;
     }
 
     const footerNote = meta?.ruleBased
-      ? 'Insight Guide is a rule-based explanation of the current statistics — not an AI narrative. Use Explain View AI only when you want optional domain context.'
-      : 'AI interpretations are decision aids — verify critical findings with domain experts.';
+      ? 'Rule-based explanation of the current statistics — not an AI narrative.'
+      : 'AI-generated interpretation. Verify critical decisions and domain conclusions.';
     const overlay = document.createElement('div');
     overlay.id = 'sbAiOverlay';
     overlay.className = 'sb-ai-overlay';
     overlay.innerHTML = `
-      <div class="sb-ai-panel${meta?.ruleBased ? ' sb-ai-panel--compact' : ''}">
+      <div class="sb-ai-panel">
         <div class="sb-ai-header">
-          <span class="sb-ai-title">${titleIconHtml} ${title}</span>
+          <span class="sb-ai-title">${titleIconHtml} ${this._escapeAiHtml(title)}</span>
           <button class="sb-ai-close" onclick="document.getElementById('sbAiOverlay').remove()" title="Close">&times;</button>
         </div>
         <div class="sb-ai-body">${bodyHtml}</div>
-        <div class="sb-ai-footer">${footerNote}</div>
+        <div class="sb-ai-footer">
+          <div class="sb-ai-actions">
+            <button type="button" class="sb-ai-action-btn" data-ai-action="copy"><i class="fa-solid fa-copy"></i> Copy</button>
+            <button type="button" class="sb-ai-action-btn" data-ai-action="report"><i class="fa-solid fa-file-circle-plus"></i> Add to report</button>
+            <button type="button" class="sb-ai-action-btn" data-ai-action="refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            <span id="sbAiActionStatus" class="sb-ai-action-status" hidden></span>
+          </div>
+          <div class="sb-ai-disclaimer">${footerNote}</div>
+        </div>
       </div>
     `;
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) { overlay.remove(); return; }
+      const actionBtn = e.target.closest('[data-ai-action]');
+      if (actionBtn) {
+        const action = actionBtn.getAttribute('data-ai-action');
+        if (action === 'copy') this._copyAiOverlayText();
+        else if (action === 'report') this._addAiToReport();
+        else if (action === 'refresh') this._refreshLastAi();
+        return;
+      }
       const hdr = e.target.closest('.sb-ai-collapsible-hdr');
       if (!hdr) return;
       const id   = hdr.dataset.target;

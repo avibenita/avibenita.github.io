@@ -10666,22 +10666,6 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     }
   },
 
-  _addAiToReport() {
-    const title = document.querySelector('#sbAiOverlay .sb-ai-title')?.textContent || 'AI assessment';
-    const report = document.querySelector('#sbAiOverlay [data-ai-report]')?.textContent
-      || document.querySelector('#sbAiOverlay .sb-ai-body')?.innerText
-      || '';
-    const block = { title: String(title).trim(), text: String(report).trim(), module: this.module, ts: Date.now() };
-    if (!block.text) return;
-    let blocks = [];
-    try { blocks = JSON.parse(sessionStorage.getItem('statisticoAiReportBlocks') || '[]'); } catch (_e) {}
-    if (!Array.isArray(blocks)) blocks = [];
-    blocks.push(block);
-    try { sessionStorage.setItem('statisticoAiReportBlocks', JSON.stringify(blocks)); } catch (_e) {}
-    this._aiReportBlocks = blocks;
-    this._flashAiAction('Added to report');
-  },
-
   _openCachedAi(scope, mode, fallbackView) {
     if (this._aiForceRefresh) return false;
     const cache = this._readAiCache(scope);
@@ -10822,7 +10806,6 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
         <div class="sb-ai-footer">
           <div class="sb-ai-actions">
             <button type="button" class="sb-ai-action-btn" data-ai-action="copy"><i class="fa-solid fa-copy"></i> Copy</button>
-            <button type="button" class="sb-ai-action-btn" data-ai-action="report"><i class="fa-solid fa-file-circle-plus"></i> Add to report</button>
             <button type="button" class="sb-ai-action-btn" data-ai-action="refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
             <span id="sbAiActionStatus" class="sb-ai-action-status" hidden></span>
           </div>
@@ -10836,7 +10819,6 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       if (actionBtn) {
         const action = actionBtn.getAttribute('data-ai-action');
         if (action === 'copy') this._copyAiOverlayText();
-        else if (action === 'report') this._addAiToReport();
         else if (action === 'refresh') this._refreshLastAi();
         return;
       }

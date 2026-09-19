@@ -62,7 +62,7 @@ describe('Statistico AI structure (Cursor100)', () => {
 
   test('overlay actions and short disclaimer are present', () => {
     expect(header).toMatch(/data-ai-action="copy"/);
-    expect(header).toMatch(/Add to report/);
+    expect(header).not.toMatch(/Add to report/);
     expect(header).toMatch(/data-ai-action="refresh"/);
     expect(header).toMatch(/AI-generated interpretation\. Verify critical decisions and domain conclusions\./);
     expect(header).toMatch(/Out of date/);

@@ -89,6 +89,18 @@ describe('Correlation Similarity Index', () => {
     expect(aligned.index).toEqual([0, 3]);
   });
 
+  test('overall similarity averages pairwise scores so a zero pair does not pin the gauge at 0', () => {
+    const same = group('Same', BASE);
+    const flipped = group('Flipped', BASE.map((v) => -v));
+    const twin = group('Twin', BASE.slice());
+    const profile = CSI.buildProfile([same, flipped, twin]);
+    const scores = profile.pairs.map((p) => p.overall);
+    expect(scores).toContain(100);
+    expect(scores.filter((v) => v === 0).length).toBe(2);
+    expect(profile.homogeneity).toBeCloseTo(33.3, 5);
+    expect(profile.homogeneityBand.label).toBe('Substantially different');
+  });
+
   test('buildProfile reports most similar, most distinct, and homogeneity', () => {
     const g0 = group('0', BASE, 65);
     const g1 = group('1', BASE.map((v) => v * 0.95), 64);

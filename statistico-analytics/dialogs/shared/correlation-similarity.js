@@ -152,16 +152,19 @@
     };
   }
 
-  function geometricMean(values) {
-    var prod = 1;
+  // Pair-level overall stays a geometric mean of pattern / strength / sign.
+  // Profile-level similarity is the arithmetic mean of those pair scores so a
+  // single sign-reversal (combined = 0) cannot pin the gauge at 0.0.
+  function arithmeticMean(values) {
+    var sum = 0;
     var k = 0;
     for (var i = 0; i < values.length; i++) {
       if (!finite(values[i]) || values[i] < 0) continue;
-      prod *= values[i];
+      sum += values[i];
       k += 1;
     }
     if (!k) return null;
-    return Math.pow(prod, 1 / k);
+    return sum / k;
   }
 
   function buildProfile(groups) {
@@ -183,7 +186,7 @@
 
     var usablePairs = pairs.filter(function (p) { return p.usable; });
     var overalls = usablePairs.map(function (p) { return p.overallRaw; });
-    var homogeneity = geometricMean(overalls);
+    var homogeneity = arithmeticMean(overalls);
     var mostSimilar = null;
     var mostDistinct = null;
     for (i = 0; i < usablePairs.length; i++) {

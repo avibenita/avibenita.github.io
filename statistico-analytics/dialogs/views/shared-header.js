@@ -7116,7 +7116,7 @@ const StatisticoHeader = {
 
   _sidebarAiButtonInnerHtml(busy) {
     if (busy) return '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
-    return this._aiIconHtml() + '<span>Analyze all results</span><sup class="sb-ai-sup">AI</sup>';
+    return this._aiIconHtml() + '<span>Analyze all results</span><sup class="sb-ai-sup sb-ai-sup--all">ALL</sup>';
   },
 
   _explainViewButtonInnerHtml() {
@@ -10795,11 +10795,15 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       : 'AI-generated interpretation. Verify critical decisions and domain conclusions.';
     const overlay = document.createElement('div');
     overlay.id = 'sbAiOverlay';
-    overlay.className = 'sb-ai-overlay';
+    overlay.className = 'sb-ai-overlay' + (mode === 'full' ? ' sb-ai-overlay--overall' : ' sb-ai-overlay--local');
+    const scopeLabel = mode === 'full' ? 'All results' : 'This view';
     overlay.innerHTML = `
-      <div class="sb-ai-panel">
+      <div class="sb-ai-panel ${mode === 'full' ? 'sb-ai-panel--overall' : 'sb-ai-panel--local'}">
         <div class="sb-ai-header">
-          <span class="sb-ai-title">${titleIconHtml} ${this._escapeAiHtml(title)}</span>
+          <div class="sb-ai-header-copy">
+            <span class="sb-ai-scope">${scopeLabel}</span>
+            <span class="sb-ai-title">${titleIconHtml} ${this._escapeAiHtml(title)}</span>
+          </div>
           <button class="sb-ai-close" onclick="document.getElementById('sbAiOverlay').remove()" title="Close">&times;</button>
         </div>
         <div class="sb-ai-body">${bodyHtml}</div>

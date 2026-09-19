@@ -8,7 +8,13 @@ const css = fs.readFileSync(path.join(__dirname, 'shared-header.css'), 'utf8');
 describe('Statistico AI structure (Cursor100)', () => {
   test('keeps two distinct AI actions with different jobs', () => {
     expect(header).toMatch(/Analyze all results/);
+    expect(header).toMatch(/sb-ai-sup--all/);
+    expect(header).toMatch(/sb-ai-panel--overall/);
+    expect(header).toMatch(/All results/);
+    expect(header).toMatch(/This view/);
     expect(header).toMatch(/Explain this view/);
+    expect(css).toMatch(/\.sb-ai-panel--overall/);
+    expect(css).toMatch(/#1d4ed8/);
     expect(header).toMatch(/Synthesize findings, diagnostics and limitations across the complete analysis/);
     expect(header).toMatch(/Interpret the results displayed on this page/);
     expect(header).not.toMatch(/<span>Interpret with AI<\/span>/);

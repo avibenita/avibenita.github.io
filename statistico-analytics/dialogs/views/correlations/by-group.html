@@ -5,15 +5,17 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>By Group - Correlations</title>
+  <title>By-Group Analysis - Correlations</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260919sbchrome" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260916nobot" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260919sbchrome"></script>
+  <script src="../../shared/by-group-standard.js?v=20260919bygrp"></script>
+  <script src="../shared-header.js?v=20260919bygrp"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/correlation-similarity.js?v=20260907csi"></script>
@@ -706,8 +708,8 @@
       <section class="view-card">
         <div class="toolbar">
           <div class="title">
-            <strong>Correlations by Group</strong>
-            <span id="subtitle">Compare pairwise r across group levels.</span>
+            <strong>By-Group Analysis</strong>
+            <span id="subtitle">Examine whether the overall finding remains consistent across categories, segments, or conditions.</span>
           </div>
           <div class="controls">
             <label class="control" for="corrTypeSelect">Type
@@ -716,16 +718,20 @@
                 <option value="Spearman">Spearman</option>
               </select>
             </label>
-            <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
-            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
+            <span class="group-choice-label" id="groupChoiceLabel">Group by: not selected</span>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Group by</button>
           </div>
         </div>
         <div class="content">
+          <div id="byGroupIntro"></div>
           <div id="emptyState" class="empty">
-            <i class="fa-solid fa-sitemap"></i>
-            Run a correlation analysis, then choose a grouping column to compare r-values across levels.
+            <i class="fa-solid fa-layer-group"></i>
+            Run a correlation analysis, then choose a grouping column to compare results across groups.
           </div>
           <div id="mainContent" style="display:none;">
+            <div id="byGroupSetup"></div>
+            <div id="byGroupConsistency"></div>
+            <div id="byGroupSafeguard"></div>
             <div class="corr-bg-panel is-active" id="corrByGroupPanel-table">
               <div class="summary-strip">
                 <div class="metric"><label>Variable pairs</label><strong id="metricPairs">—</strong></div>
@@ -793,6 +799,7 @@
                 </div>
               </div>
             </div>
+            <div id="byGroupInterpret"></div>
           </div>
         </div>
       </section>
@@ -803,8 +810,8 @@
     <div class="group-dialog">
       <div class="group-dialog-head">
         <div>
-          <strong id="groupDialogTitle">Select Grouping Column</strong>
-          <span>Choose the categorical column used to split correlations. Adjust included levels on the right.</span>
+          <strong id="groupDialogTitle">Group by</strong>
+          <span>Select a categorical variable that defines the groups to compare. Included levels and sample sizes appear on the right.</span>
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -1087,8 +1094,113 @@
 
     function updateGroupChoiceLabel() {
       document.getElementById('groupChoiceLabel').textContent = !isValidGroupIndex(groupIndex)
-        ? 'No grouping column selected'
+        ? 'Group by: not selected'
         : `Group by: ${sourceHeaders[groupIndex] || 'Group'}`;
+    }
+
+    function countMissingGroupValues() {
+      if (!isValidGroupIndex(groupIndex)) return 0;
+      return sourceRows.reduce((sum, row) => {
+        const raw = rowValue(row, groupIndex, sourceHeaders[groupIndex]);
+        return sum + (raw === null || raw === undefined || raw === '' ? 1 : 0);
+      }, 0);
+    }
+
+    function assessCorrByGroup() {
+      const BG = window.StatisticoByGroup;
+      const minN = currentMinGroupN();
+      let directionChanges = false;
+      let magnitudeVaries = false;
+      let reversalPair = '';
+      let maxRange = 0;
+      let maxRangePair = '';
+      let maxRangeGroup = '';
+      (tableRows || []).forEach((row) => {
+        const usable = (row.groupResults || []).filter((g) => Number.isFinite(g.r) && Number(g.n) >= minN);
+        if (usable.length < 2) return;
+        const signs = usable.map((g) => Math.sign(g.r)).filter((s) => s !== 0);
+        if (signs.includes(1) && signs.includes(-1)) {
+          directionChanges = true;
+          if (!reversalPair) reversalPair = row.pair;
+        }
+        const abs = usable.map((g) => Math.abs(g.r));
+        const range = Math.max.apply(null, abs) - Math.min.apply(null, abs);
+        if (range > maxRange) {
+          maxRange = range;
+          maxRangePair = row.pair;
+          const extreme = usable.slice().sort((a, b) => Math.abs(b.r) - Math.abs(a.r))[0];
+          maxRangeGroup = extreme ? extreme.group : '';
+        }
+        if (range >= 0.2) magnitudeVaries = true;
+      });
+      const reliableGroups = (activeGroups || []).filter((g) => g.n >= minN);
+      const insufficient = reliableGroups.length < 2;
+      const status = BG
+        ? BG.classifyConsistency({ insufficient, directionChanges, magnitudeVaries })
+        : { id: 'insufficient', label: 'Insufficient data', hint: '', descriptive: true };
+      const smallGroups = (activeGroups || []).filter((g) => g.n < minN).map((g) => g.group);
+      return {
+        status,
+        minN,
+        reversalPair,
+        maxRangePair,
+        maxRangeGroup,
+        smallGroups,
+        missingN: countMissingGroupValues()
+      };
+    }
+
+    function syncByGroupStandard() {
+      const BG = window.StatisticoByGroup;
+      if (!BG) return;
+      BG.applyPageTitles();
+      BG.mount('#byGroupIntro', BG.introHtml('correlations'));
+      if (!isValidGroupIndex(groupIndex) || !(activeGroups || []).length) {
+        BG.mount('#byGroupSetup', '');
+        BG.mount('#byGroupConsistency', '');
+        BG.mount('#byGroupSafeguard', '');
+        BG.mount('#byGroupInterpret', '');
+        BG.publishContext(null);
+        return;
+      }
+      const assessed = assessCorrByGroup();
+      const levels = (activeGroups || []).map((g) => ({
+        name: g.group,
+        n: g.n,
+        included: true,
+        small: g.n < assessed.minN
+      }));
+      const differs = assessed.status.id === 'reversal' && assessed.reversalPair
+        ? `${assessed.maxRangeGroup || 'A group'} reverses direction on ${assessed.reversalPair}.`
+        : (assessed.maxRangeGroup
+          ? `${assessed.maxRangeGroup} differs most${assessed.maxRangePair ? ` on ${assessed.maxRangePair}` : ''}.`
+          : 'No single group stands out from the others.');
+      const warning = assessed.smallGroups.length
+        ? `Small groups: ${assessed.smallGroups.join(', ')}.`
+        : (assessed.missingN ? `${assessed.missingN} rows were missing a group value.` : '');
+      BG.mount('#byGroupSetup', BG.groupSetupHtml({
+        groupName: sourceHeaders[groupIndex],
+        missingN: assessed.missingN,
+        levels
+      }));
+      BG.mount('#byGroupConsistency', BG.consistencyHtml(assessed.status));
+      BG.mount('#byGroupSafeguard', BG.safeguardHtml(false));
+      BG.mount('#byGroupInterpret', BG.interpretationHtml({
+        moduleKey: 'correlations',
+        status: assessed.status,
+        differsText: differs,
+        directionText: assessed.status.directionChanges
+          ? `Direction reverses${assessed.reversalPair ? ` for ${assessed.reversalPair}` : ''}.`
+          : 'No direction reversal was detected among reliable groups.',
+        warningText: warning
+      }));
+      BG.publishContext({
+        moduleKey: 'correlations',
+        status: assessed.status,
+        directionChanges: assessed.status.directionChanges,
+        differsText: differs,
+        warningText: warning
+      });
     }
 
     function isValidGroupIndex(idx) {
@@ -2434,12 +2546,12 @@
       document.getElementById('metricGroups').textContent = activeGroups.length;
       document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
       document.getElementById('metricRows').textContent = sourceRows.length;
-      document.getElementById('subtitle').textContent = `${corrType} r for ${analysisHeaders.length} variables across ${activeGroups.length} groups (${sourceRows.length} filtered rows)`;
       renderTable();
       renderCorrSimilarity();
       registerHeaderActions();
       syncHeaderSample();
       showCorrByGroupPanel(corrByGroupPanel);
+      syncByGroupStandard();
       try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
     }
 
@@ -2582,9 +2694,13 @@
       console.log('[by-group] boot', document.body && document.body.getAttribute('data-page-version'));
       bindScatterCombinedToggle();
       if (typeof StatisticoHeader !== 'undefined') {
-        StatisticoHeader.init('correlation-by-group', 'Correlations by Group', 0, 'correlations');
+        StatisticoHeader.init('correlation-by-group', 'By-Group Analysis', 0, 'correlations');
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle('Correlations by Group');
+        StatisticoHeader.updateTitle('By-Group Analysis');
+      }
+      if (window.StatisticoByGroup) {
+        window.StatisticoByGroup.applyPageTitles();
+        window.StatisticoByGroup.mount('#byGroupIntro', window.StatisticoByGroup.introHtml('correlations'));
       }
       if (!tryLoadStored()) {
         setEmpty('Run a correlation analysis first, then open Correlations by Group.');

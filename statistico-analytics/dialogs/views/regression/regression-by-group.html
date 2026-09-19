@@ -5,15 +5,17 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>By Group - Regression</title>
+  <title>By-Group Analysis - Regression</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260919sbchrome" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260916nobot" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260919sbchrome"></script>
+  <script src="../../shared/by-group-standard.js?v=20260919bygrp"></script>
+  <script src="../shared-header.js?v=20260919bygrp"></script>
   <script src="../../shared/regression-similarity.js?v=20260914regsim6"></script>
   <script src="../../shared/regression-pred-labels.js?v=20260916pred2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -579,20 +581,24 @@
       <section class="view-card">
         <div class="toolbar">
           <div class="title">
-            <strong>Regression by Group</strong>
-            <span id="subtitle">Compare coefficients and residual normality across group levels.</span>
+            <strong>By-Group Analysis</strong>
+            <span id="subtitle">Examine whether the overall finding remains consistent across categories, segments, or conditions.</span>
           </div>
           <div class="controls">
-            <span class="group-choice-label" id="groupChoiceLabel">No grouping column selected</span>
-            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Choose Group</button>
+            <span class="group-choice-label" id="groupChoiceLabel">Group by: not selected</span>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Group by</button>
           </div>
         </div>
         <div class="content">
+          <div id="byGroupIntro"></div>
           <div id="emptyState" class="empty">
-            <i class="fa-solid fa-sitemap"></i>
-            Run a regression analysis, then choose a grouping column to compare model parameters across levels.
+            <i class="fa-solid fa-layer-group"></i>
+            Run a regression analysis, then choose a grouping column to compare results across groups.
           </div>
           <div id="mainContent" style="display:none;">
+            <div id="byGroupSetup"></div>
+            <div id="byGroupConsistency"></div>
+            <div id="byGroupSafeguard"></div>
             <div class="reg-bg-panel is-active" id="regByGroupPanel-coefficients">
             <div class="summary-strip">
               <div class="metric"><label>Predictors</label><strong id="metricPredictors">—</strong></div>
@@ -602,8 +608,8 @@
             </div>
             <div id="consistencyStrip" class="consistency-strip" style="display:none;">
               <div class="consistency-head">
-                <strong><i class="fa-solid fa-scale-balanced"></i> Model consistency</strong>
-                <span id="consistencySubtitle">Describes fitted group coefficients, not a formal test that groups differ</span>
+                <strong><i class="fa-solid fa-scale-balanced"></i> Consistency across groups</strong>
+                <span id="consistencySubtitle">similar direction and magnitude · descriptive unless a formal test supports a group effect</span>
               </div>
               <div class="consistency-verdict" id="consistencyVerdict">—</div>
               <div class="consistency-stat"><label>Opposite signs</label><strong id="consistencyReversals">—</strong></div>
@@ -699,6 +705,7 @@
                 </div>
               </div>
             </div>
+            <div id="byGroupInterpret"></div>
           </div>
         </div>
       </section>
@@ -709,8 +716,8 @@
     <div class="group-dialog">
       <div class="group-dialog-head">
         <div>
-          <strong id="groupDialogTitle">Select Grouping Column</strong>
-          <span class="group-dialog-note">Choose a column that is not already in the model and has 7 or fewer levels. Other columns stay visible but dimmed. Recode a many-level variable into fewer categories in <a href="https://statistico.live/Statistico-Website/analytics/data-manipulation.html" target="_blank" rel="noopener noreferrer" onclick="openPrepareDataOverview(event)">Prepare Data</a>, then use that recoded column here.</span>
+          <strong id="groupDialogTitle">Group by</strong>
+          <span class="group-dialog-note">Select a categorical variable that defines the groups to compare. Prefer a column that is not already in the model and has 7 or fewer levels. Recode a many-level variable into fewer categories in <a href="https://statistico.live/Statistico-Website/analytics/data-manipulation.html" target="_blank" rel="noopener noreferrer" onclick="openPrepareDataOverview(event)">Prepare Data</a>, then use that recoded column here.</span>
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -905,20 +912,90 @@
       const r2Min = r2s.length ? Math.min(...r2s) : NaN;
       const r2Max = r2s.length ? Math.max(...r2s) : NaN;
 
-      let consistency = 'Strong';
-      let consistencyClass = 'consistency-strong';
-      if (reversals > 0) {
-        consistency = 'Mixed';
-        consistencyClass = 'consistency-mixed';
-      } else if (varies >= Math.max(1, Math.ceil(predRows.length * 0.5))) {
-        consistency = 'Moderate';
-        consistencyClass = 'consistency-moderate';
-      } else if (varies > 0) {
-        consistency = 'Moderate';
-        consistencyClass = 'consistency-moderate';
-      }
+      const unreliable = (groupFits || []).some((g) => !g.fit || !g.fit.results || Number(g.n) < 10);
+      const BG = window.StatisticoByGroup;
+      const status = BG
+        ? BG.classifyConsistency({
+          insufficient: unreliable && reversals === 0 && varies === 0,
+          directionChanges: reversals > 0,
+          magnitudeVaries: varies > 0
+        })
+        : { id: reversals ? 'reversal' : (varies ? 'varies' : 'consistent'), label: reversals ? 'Direction changes' : (varies ? 'Varies by group' : 'Consistent') };
+      const classMap = {
+        consistent: 'consistency-strong',
+        varies: 'consistency-moderate',
+        reversal: 'consistency-mixed',
+        insufficient: 'consistency-moderate'
+      };
 
-      return { consistency, consistencyClass, reversals, varies, r2Min, r2Max, predictorCount: predRows.length };
+      return {
+        consistency: status.label,
+        consistencyClass: classMap[status.id] || 'consistency-strong',
+        status,
+        reversals,
+        varies,
+        r2Min,
+        r2Max,
+        predictorCount: predRows.length
+      };
+    }
+
+    function countMissingGroupValues() {
+      if (groupIndex == null) return 0;
+      return sourceRows.reduce((sum, row) => {
+        const raw = rowValue(row, groupIndex, sourceHeaders[groupIndex]);
+        return sum + (raw === null || raw === undefined || raw === '' ? 1 : 0);
+      }, 0);
+    }
+
+    function syncByGroupStandard(summary) {
+      const BG = window.StatisticoByGroup;
+      if (!BG) return;
+      BG.applyPageTitles();
+      BG.mount('#byGroupIntro', BG.introHtml('regression'));
+      if (!(activeGroups || []).length || !summary) {
+        BG.mount('#byGroupSetup', '');
+        BG.mount('#byGroupConsistency', '');
+        BG.mount('#byGroupSafeguard', '');
+        BG.mount('#byGroupInterpret', '');
+        BG.publishContext(null);
+        return;
+      }
+      const minN = 10;
+      const status = summary.status || BG.classifyConsistency({
+        directionChanges: summary.reversals > 0,
+        magnitudeVaries: summary.varies > 0
+      });
+      const reversalTerm = (tableRows || []).find((r) => r.stability && r.stability.code === 'opposite');
+      const differs = reversalTerm
+        ? `${reversalTerm.term} changes direction across groups.`
+        : (summary.varies > 0 ? 'Coefficient magnitudes differ across groups.' : 'No single group stands out from the others.');
+      const warning = (activeGroups || []).some((g) => g.n < minN)
+        ? 'One or more groups have a small fitted n; those coefficients are unstable.'
+        : '';
+      BG.mount('#byGroupSetup', BG.groupSetupHtml({
+        groupName: sourceHeaders[groupIndex],
+        missingN: countMissingGroupValues(),
+        levels: activeGroups.map((g) => ({ name: g.group, n: g.n, included: true, small: g.n < minN }))
+      }));
+      BG.mount('#byGroupConsistency', BG.consistencyHtml(status));
+      BG.mount('#byGroupSafeguard', BG.safeguardHtml(false));
+      BG.mount('#byGroupInterpret', BG.interpretationHtml({
+        moduleKey: 'regression',
+        status,
+        differsText: differs,
+        directionText: status.directionChanges
+          ? 'At least one coefficient changes sign across groups.'
+          : 'No coefficient sign reversal was detected among reliable groups.',
+        warningText: warning
+      }));
+      BG.publishContext({
+        moduleKey: 'regression',
+        status,
+        directionChanges: status.directionChanges,
+        differsText: differs,
+        warningText: warning
+      });
     }
 
     function renderConsistencyStrip(summary) {
@@ -1367,7 +1444,7 @@
 
     function updateGroupChoiceLabel() {
       document.getElementById('groupChoiceLabel').textContent = groupIndex == null
-        ? 'No grouping column selected'
+        ? 'Group by: not selected'
         : `Group by: ${sourceHeaders[groupIndex] || 'Group'}`;
     }
 
@@ -2839,12 +2916,8 @@
       document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
       document.getElementById('metricRows').textContent = sourceRows.length;
 
-      const y = modelSpec.y || 'Y';
-      const preds = [...(modelSpec.xn || []), ...(modelSpec.xc || [])].join(' + ');
-      document.getElementById('subtitle').textContent =
-        `${y} ~ ${preds} · ${displayTerms.length} terms · ${activeGroups.length} groups · ${sourceRows.length} filtered rows`;
-
       renderConsistencyStrip(consistencySummary);
+      syncByGroupStandard(consistencySummary);
       renderAssumptionStrip(overallFit, groupFits);
       renderFitStrip(overallFit, groupFits);
       renderTable();
@@ -2960,9 +3033,13 @@
 
     function boot() {
       if (typeof StatisticoHeader !== 'undefined') {
-        StatisticoHeader.init('regression-by-group', 'Regression by Group', 0, 'regression');
+        StatisticoHeader.init('regression-by-group', 'By-Group Analysis', 0, 'regression');
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle('Regression by Group');
+        StatisticoHeader.updateTitle('By-Group Analysis');
+      }
+      if (window.StatisticoByGroup) {
+        window.StatisticoByGroup.applyPageTitles();
+        window.StatisticoByGroup.mount('#byGroupIntro', window.StatisticoByGroup.introHtml('regression'));
       }
       if (!tryLoadStored()) {
         setEmpty('Run a regression analysis first, then open Regression by Group.');

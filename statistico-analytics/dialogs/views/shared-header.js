@@ -715,7 +715,7 @@ const StatisticoHeader = {
       'normality': 'Normality \u00B7 Tests',
       'kernel': 'Kernel',
       'descriptive-stats': 'Descriptive Statistics',
-      'by-group': 'Grouped Analysis',
+      'by-group': 'By-Group Analysis',
       'cdf': 'Distribution \u00B7 CDF',
       'confidence': 'Confidence Intervals',
       'hypothesis': 'One-Sample Test',
@@ -727,14 +727,14 @@ const StatisticoHeader = {
       'partial-correlations': 'Partial Correlations',
       'reliability': 'Overview',
       'taylor-diagram': 'Taylor Diagram',
-      'correlation-by-group': 'Correlations by Group',
+      'correlation-by-group': 'By-Group Analysis',
       'rolling-correlations': 'Rolling Correlations',
       'correlation-tests': 'Correlation Tests',
       // Regression views
       'regression-input': 'Model Setup',
       'regression-results': 'Regression Results',
       'regression-residuals': 'Residual Diagnostics',
-      'regression-by-group': 'Regression by Group',
+      'regression-by-group': 'By-Group Analysis',
       // Logistic regression views
       'logistic-results': 'Logistic Regression',
 
@@ -768,7 +768,7 @@ const StatisticoHeader = {
       // Meta-analysis
       'meta-analysis': 'Meta-Analysis',
       'contingency': 'Contingency Tables',
-      'contingency-by-group': 'Grouped Analysis'
+      'contingency-by-group': 'By-Group Analysis'
     };
 
     const moduleNames = {
@@ -1334,8 +1334,8 @@ const StatisticoHeader = {
       { id: 'boxplot', label: 'Box Plot & Outliers', file: 'univariate/boxplot-standalone.html' },
       { id: 'kernel', label: 'Kernel', file: 'univariate/kernel-standalone.html' },
       { id: 'separator-core-by-group', label: '---', file: null, isSeparator: true },
-      { id: 'group-by-group', label: 'Grouped Analysis', file: null, isGroup: true },
-      { id: 'by-group', label: 'Grouped Analysis', file: 'univariate/by-group.html' },
+      { id: 'group-by-group', label: 'GROUP COMPARISON', file: null, isGroup: true },
+      { id: 'by-group', label: 'By Group', file: 'univariate/by-group.html' },
       { id: 'separator-by-group-advanced', label: '---', file: null, isSeparator: true },
       { id: 'group-advanced', label: 'Advanced Diagnostics', file: null, isGroup: true },
       { id: 'outliers', label: 'Outliers', file: 'univariate/outliers-standalone.html' },
@@ -1351,13 +1351,13 @@ const StatisticoHeader = {
       { id: 'partial-correlations', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
       { id: 'taylor-diagram', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'descriptive-stats', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
-      { id: 'correlation-by-group', label: 'Correlations by Group', file: 'correlations/by-group.html' }
+      { id: 'correlation-by-group', label: 'By Group', file: 'correlations/by-group.html' }
     ];
 
     const regressionViews = [
       { id: 'regression-results',   label: 'Regression Results',   file: 'regression/regression-coefficients.html' },
       { id: 'regression-residuals', label: 'Residual Diagnostics', file: 'regression/regression-residuals.html' },
-      { id: 'regression-by-group',  label: 'Regression by Group',  file: 'regression/regression-by-group.html' }
+      { id: 'regression-by-group',  label: 'By Group',  file: 'regression/regression-by-group.html' }
     ];
 
     const independentViews = [
@@ -1416,7 +1416,7 @@ const StatisticoHeader = {
             </div>
           </div>
           <div class="header-tabs-row">
-            <span class="header-tab-group header-tab-group--by-group">Grouped Analysis</span>
+            <span class="header-tab-group header-tab-group--by-group">GROUP COMPARISON</span>
             <div class="header-tab-row-tabs" role="tablist" aria-label="Grouped analysis views">
               ${byGroupTabs.map(renderTabButton).join('')}
             </div>
@@ -1546,7 +1546,7 @@ const StatisticoHeader = {
       'partial-correlations': 'Control variables and compare residual links.',
       reliability: 'Evaluate internal consistency.',
       'descriptive-stats': 'Summarize variables and distributions.',
-      'correlation-by-group': 'Compare pairwise r across group levels.',
+      'correlation-by-group': 'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.',
       'correlation-by-group-similarity': 'See how closely groups resemble one another in correlation pattern, strength and sign.',
       'regression-by-group': 'Compare coefficients and residual normality across group levels.',
       'regression-by-group-coefficients': 'Compare coefficients and residual normality across group levels.',
@@ -1556,7 +1556,7 @@ const StatisticoHeader = {
       cdf: 'Empirical cumulative distribution.',
       percentile: 'Percentile cut points.',
       kernel: 'Smoothed density estimate.',
-      'by-group': 'Compare distributions and statistics across group levels.',
+      'by-group': 'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.',
       normality: 'Shapiro-Wilk, Anderson-Darling, and friends.',
       qqplot: 'PP and QQ probability plots.',
       hypothesis: 'One-sample mean / median test.',
@@ -1571,6 +1571,35 @@ const StatisticoHeader = {
     };
 
     return descriptions[key] || 'Open this analysis section.';
+  },
+
+  _byGroupNavCopy() {
+    const std = globalThis.StatisticoByGroup;
+    return {
+      section: (std && std.SIDEBAR_SECTION) || 'GROUP COMPARISON',
+      label: (std && std.SIDEBAR_LABEL) || 'By Group',
+      description: (std && std.SIDEBAR_DESCRIPTION)
+        || 'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.',
+      icon: (std && std.SIDEBAR_ICON) || 'fa-layer-group'
+    };
+  },
+
+  _byGroupNavItem(opts) {
+    const copy = this._byGroupNavCopy();
+    return Object.assign({
+      icon: copy.icon,
+      iconTone: 'group',
+      label: copy.label,
+      description: copy.description
+    }, opts || {});
+  },
+
+  _byGroupPinnedNav(item) {
+    const copy = this._byGroupNavCopy();
+    return {
+      title: copy.section,
+      items: [this._byGroupNavItem(item)]
+    };
   },
 
   _getSharedSidebarConfig() {
@@ -1619,11 +1648,11 @@ const StatisticoHeader = {
             ]
           }
         ],
-        pinnedNav: {
-          items: [
-            { type: 'navigate', view: 'by-group', file: 'univariate/by-group.html', icon: 'fa-layer-group', label: 'Compare Groups', description: 'Compare distributions and statistics across group levels.' }
-          ]
-        }
+        pinnedNav: this._byGroupPinnedNav({
+          type: 'navigate',
+          view: 'by-group',
+          file: 'univariate/by-group.html'
+        })
       };
     }
 
@@ -1649,11 +1678,11 @@ const StatisticoHeader = {
             ]
           }
         ],
-        pinnedNav: {
-          items: [
-            { type: 'navigate', view: 'correlation-by-group', file: 'correlations/by-group.html', icon: 'fa-sitemap', label: 'By Group', description: 'Compare pairwise r across group levels with pattern sparklines.' }
-          ]
-        }
+        pinnedNav: this._byGroupPinnedNav({
+          type: 'navigate',
+          view: 'correlation-by-group',
+          file: 'correlations/by-group.html'
+        })
       };
     }
 
@@ -1698,11 +1727,11 @@ const StatisticoHeader = {
             items: resultItems
           }
         ],
-        pinnedNav: {
-          items: [
-            { type: 'navigate', view: 'contingency-by-group', file: 'contingency/by-group.html', icon: 'fa-layer-group', label: 'By Group', description: 'Examine the same association separately within each group.' }
-          ]
-        }
+        pinnedNav: this._byGroupPinnedNav({
+          type: 'navigate',
+          view: 'contingency-by-group',
+          file: 'contingency/by-group.html'
+        })
       };
     }
 
@@ -1782,11 +1811,11 @@ const StatisticoHeader = {
             ]
           }
         ],
-        pinnedNav: {
-          items: [
-            { type: 'navigate', view: 'regression-by-group', file: 'regression/regression-by-group.html', icon: 'fa-sitemap', label: 'By Group', description: 'Coefficients & residuals by level' }
-          ]
-        }
+        pinnedNav: this._byGroupPinnedNav({
+          type: 'navigate',
+          view: 'regression-by-group',
+          file: 'regression/regression-by-group.html'
+        })
       };
     }
 
@@ -1912,14 +1941,11 @@ const StatisticoHeader = {
               { type: 'tab', tab: 'structure', icon: 'fa-chart-line', label: 'Scale Structure', description: 'Assess whether one dominant dimension is plausible.' }
             ]
           },
-          {
-            title: 'Additional analyses',
-            defaultOpen: true,
-            items: [
-              { type: 'tab', tab: 'by-group', icon: 'fa-layer-group', label: 'By Group', description: 'Compare reliability across selected group levels.' }
-            ]
-          }
-        ]
+        ],
+        pinnedNav: this._byGroupPinnedNav({
+          type: 'tab',
+          tab: 'by-group'
+        })
       };
     }
 
@@ -2019,7 +2045,7 @@ const StatisticoHeader = {
       {
         id: 'group',
         tabKey: 'uni-group',
-        label: 'Grouped Analysis',
+        label: 'GROUP COMPARISON',
         icon: 'fa-layer-group',
         views: ['by-group'],
         defaultFile: 'univariate/by-group.html',
@@ -3738,9 +3764,10 @@ const StatisticoHeader = {
               + ` onclick="StatisticoHeader.navigateTo('${f.file}')">${f.label}</button>`;
           }).join('')}</div>`
         : '');
+      const iconTone = item.iconTone === 'group' ? ' sb-item-icon--group' : '';
       return `<div class="sb-faceted${isGroupActive ? ' is-active-group' : ''}">`
         + `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${parentNavAttr}${parentOnclick}>`
-        + `<i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i>`
+        + `<i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon${iconTone}"></i>`
         + `<span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span>`
         + `<span class="sb-item-description">${description}</span></span></button>`
         + facetsHtml
@@ -3759,19 +3786,22 @@ const StatisticoHeader = {
     }
     const onclickAttr = onclick ? ` onclick="${onclick}"` : '';
     const description = this._getSidebarItemDescription(item);
+    const iconTone = item.iconTone === 'group' ? ' sb-item-icon--group' : '';
 
-    return `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${navFileAttr}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
+    return `<button type="button" class="sb-item${active}"${idAttr}${dataTab}${dataView}${navFileAttr}${onclickAttr}><i class="fa-solid ${item.icon || 'fa-circle'} sb-item-icon${iconTone}"></i><span class="sb-item-copy"><span class="sb-item-label">${item.label || ''}</span><span class="sb-item-description">${description}</span></span></button>`;
   },
 
   _renderSidebarPinnedNav(cfg) {
     const pinned = cfg && cfg.pinnedNav;
     if (!pinned || !Array.isArray(pinned.items) || !pinned.items.length) return '';
 
+    const copy = this._byGroupNavCopy();
+    const title = pinned.title || copy.section;
     const itemsHtml = pinned.items.map((item) => this._renderSidebarNavItem(item)).join('');
 
-    return `<div class="sb-pinned-items" role="navigation" aria-label="Grouped analysis">`
-      + `<div class="sb-pinned-separator" role="presentation"></div>`
-      + `<div class="sb-pinned-rail">${itemsHtml}</div></div>`;
+    return `<div class="sb-group sb-group--comparison is-open" data-sb-group="${this._sidebarGroupKey(title)}" role="navigation" aria-label="${title}">`
+      + `<div class="sb-group-title">${title}</div>`
+      + `<div class="sb-items-rail">${itemsHtml}</div></div>`;
   },
 
   _renderSharedSidebar() {
@@ -4521,7 +4551,7 @@ const StatisticoHeader = {
       { id: 'partial', label: 'Partial Correlations', file: 'correlations/correlation-partial.html' },
       { id: 'taylor', label: 'Taylor Diagram', file: 'correlations/correlation-taylor.html' },
       { id: 'descriptives', label: 'Descriptive Statistics', file: 'correlations/descriptive-stats.html' },
-      { id: 'by-group', label: 'Correlations by Group', file: 'correlations/by-group.html' }
+      { id: 'by-group', label: 'By Group', file: 'correlations/by-group.html' }
     ]);
     const extractRichSnapshot = (doc, sourceUrl) => {
       const headClone = (doc.head ? doc.head.cloneNode(true) : document.createElement('head'));
@@ -7093,18 +7123,22 @@ const StatisticoHeader = {
     const anchor = main || body;
     if (!anchor) return;
     if (document.getElementById('regByGroupNav')) return;
+    const copy = this._byGroupNavCopy();
     const pinned = document.createElement('div');
     pinned.id = 'regByGroupNav';
-    pinned.className = 'sb-pinned-items';
+    pinned.className = 'sb-group sb-group--comparison is-open';
+    pinned.setAttribute('data-sb-group', this._sidebarGroupKey(copy.section));
+    pinned.setAttribute('role', 'navigation');
+    pinned.setAttribute('aria-label', copy.section);
     pinned.innerHTML = `
-      <div class="sb-pinned-separator" role="presentation"></div>
-      <div class="sb-pinned-rail">
+      <div class="sb-group-title">${copy.section}</div>
+      <div class="sb-items-rail">
         <button type="button" class="sb-item" id="regByGroupNavBtn"
                 onclick="StatisticoHeader.navigateTo('regression/regression-by-group.html')"
                 data-nav-file="regression/regression-by-group.html"
-                title="Compare coefficients and residual normality across group levels.">
-          <i class="fa-solid fa-sitemap sb-item-icon"></i>
-          <span class="sb-item-copy"><span class="sb-item-label">By Group</span><span class="sb-item-description">Coefficients &amp; residuals by level</span></span>
+                title="${copy.description}">
+          <i class="fa-solid ${copy.icon} sb-item-icon sb-item-icon--group"></i>
+          <span class="sb-item-copy"><span class="sb-item-label">${copy.label}</span><span class="sb-item-description">${copy.description}</span></span>
         </button>
       </div>`;
     anchor.appendChild(pinned);
@@ -7152,11 +7186,22 @@ CONCLUSION: [short answer to the main analytical question]
 STRENGTH: [Strong, Moderate, Tentative, or Inconclusive — short reason from the computed evidence, not subjective confidence]
 FINDINGS: [prioritized finding 1] | [finding 2] | [finding 3]
 SUPPORT: [exact statistic, effect size, CI or n, with source view when known] | [exact statistic] | [exact statistic]
+GROUP CONSISTENCY: [Consistent, Varies by group, Direction changes, or Insufficient data — say whether the overall finding holds, weakens, or reverses across groups. Prominently report any strong difference or direction reversal. If By Group was not run, write "Not assessed — open By Group."]
 DIAGNOSTICS: [what passed, what failed, and how much it affects the conclusion]
 INTERPRETATION: [what the findings mean in realistic terms, without inventing domain information]
 LIMITATIONS: [limitation 1] | [limitation 2]
 ACTION: [recommended next step 1] | [next step 2]
 REPORT: [one polished paragraph suitable for a report]`;
+  },
+
+  _groupConsistencyAiInstruction() {
+    const std = globalThis.StatisticoByGroup;
+    if (std && typeof std.aiPromptBlock === 'function') return std.aiPromptBlock();
+    const ctx = globalThis.__byGroupStandardContext;
+    if (!ctx || !ctx.status) {
+      return 'GROUP CONSISTENCY DATA: Not assessed — open By Group to check whether the overall finding holds across categories, segments, or conditions.';
+    }
+    return `GROUP CONSISTENCY DATA: Status=${ctx.status.label}. Prominently report any strong difference or direction reversal. Visible differences are descriptive unless a formal group-comparison test supports them.`;
   },
 
   _overallAssessmentEmphasis() {
@@ -7177,7 +7222,8 @@ REPORT: [one polished paragraph suitable for a report]`;
       contingency: 'Prioritize association strength, residuals, and whether the pattern is consistent across cells.',
       power: 'Prioritize achieved power, required sample size, and the smallest detectable effect.'
     };
-    return map[this.module] || 'Prioritize the main analytical question, evidence strength, diagnostics, and limitations.';
+    return (map[this.module] || 'Prioritize the main analytical question, evidence strength, diagnostics, and limitations.')
+      + ' Include a dedicated Group consistency reading. If a direction reversal or strong subgroup difference appears, mention it prominently and do not treat the pooled result as the whole story.';
   },
 
   _sidebarAiOnClick() {
@@ -8158,7 +8204,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       cdf: 'CDF',
       percentile: 'Percentiles',
       kernel: 'Kernel',
-      'by-group': 'Grouped Analysis',
+      'by-group': 'By-Group Analysis',
       'by-group-stats': 'Grouped Statistics',
       'by-group-boxplot': 'Grouped Box Plots',
       'by-group-normality': 'Group Normality Analysis',
@@ -8278,12 +8324,12 @@ REPORT: [one polished paragraph suitable for a report]`;
       'contingency-table': 'Contingency Table',
       'contingency-diagnostics': 'Diagnostics & Visualization',
       'contingency-twobytwo': '2×2 Measures',
-      'contingency-by-group': 'Grouped Analysis',
+      'contingency-by-group': 'By-Group Analysis',
       'contingency-by-group-association': 'Association table',
       'contingency-by-group-table': 'Tables by Group',
       'contingency-by-group-chart': 'Charts by Group',
       'contingency-by-group-similarity': 'Similarity Profile™',
-      'regression-by-group': 'Regression by Group',
+      'regression-by-group': 'By-Group Analysis',
       'regression-by-group-coefficients': 'Coefficients',
       'regression-by-group-similarity': 'Similarity Profile™',
       'segmentation-overview': 'Overview',
@@ -8931,6 +8977,8 @@ Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
 ${this._overallAssessmentEmphasis()}
+
+${this._groupConsistencyAiInstruction()}
 
 ${this._overallAiReplyFormat()}`;
   },
@@ -9933,13 +9981,13 @@ ${this._localAiReplyFormat()}`;
 
       hypothesis: `Controls available: hypothesis-test setup fields define the null and alternative hypothesis, alpha sets the decision threshold, and test-specific inputs determine the statistic and p-value. Use this view to connect the formal decision rule to the practical interpretation of the sample evidence.`,
 
-      'by-group-stats': `Controls available: (1) Compare Groups / Change — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Minimum group size — keep only levels with at least n rows; (4) Source row filter (header) — limits which rows enter every group; (5) Kernel / Histograms / Boxplots toggle — overlapping kernel densities, one compact histogram panel per group, or one box plot; (6) Select a group in the statistics table or click a histogram card — opens a zoomed popup of that group's chart (click again, press Esc, or click outside to close). The table shows per-group N, mean, CI, spread, and shape statistics.`,
+      'by-group-stats': `Controls available: (1) Group by / Change — pick the categorical column that splits the numeric variable; (2) Group level checkboxes in the dialog — include or exclude specific levels; (3) Minimum group size — keep only levels with at least n rows; (4) Source row filter (header) — limits which rows enter every group; (5) Kernel / Histograms / Boxplots toggle — overlapping kernel densities, one compact histogram panel per group, or one box plot; (6) Select a group in the statistics table or click a histogram card — opens a zoomed popup of that group's chart (click again, press Esc, or click outside to close). The table shows per-group N, mean, CI, spread, and shape statistics.`,
 
       'by-group-boxplot': `Controls available: Boxplots now live on the Statistics tab. Use the Kernel / Histograms / Boxplots toggle. One combined box plot compares quartiles, medians, and whiskers across groups on a common y-axis.`,
 
-      'by-group-normality': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`,
+      'by-group-normality': `Controls available: (1) Group by / Change and level filters — same as other tabs; (2) Fixed α = 0.05 for all six tests. Each column shows group name, n, a distribution sparkline, a plain-English Verdict row, six formal normality p-values, and NSI. Shapiro–Wilk is flagged (⚠) when tied/discrete scores make it unreliable; the Verdict row ignores it in that case.`,
 
-      'by-group-similarity': `Controls available: (1) Compare Groups / Change and level filters — same as other tabs; (2) Homogeneity gauge — overall 0–100 similarity across pairs; (3) Chart panel — the same Kernel / Histograms / Boxplots toggle as Statistics, with group labels col="level" (n=N); (4) Pairwise table rows — click a pair for the three-component profile. Scores are 0–100 descriptive similarity, not p-values.`
+      'by-group-similarity': `Controls available: (1) Group by / Change and level filters — same as other tabs; (2) Homogeneity gauge — overall 0–100 similarity across pairs; (3) Chart panel — the same Kernel / Histograms / Boxplots toggle as Statistics, with group labels col="level" (n=N); (4) Pairwise table rows — click a pair for the three-component profile. Scores are 0–100 descriptive similarity, not p-values.`
     };
   },
 
@@ -10067,6 +10115,8 @@ RULES:
 
 ${this._overallAssessmentEmphasis()}
 
+${this._groupConsistencyAiInstruction()}
+
 ${this._overallAiReplyFormat()}`;
     }
 
@@ -10129,6 +10179,8 @@ RULES:
 - Do not mention Cronbach alpha, omega, or other reliability metrics unless the Reliability view is included in the data and the question is specifically about a scale.
 
 ${this._overallAssessmentEmphasis()}
+
+${this._groupConsistencyAiInstruction()}
 
 ${this._overallAiReplyFormat()}`;
     }
@@ -10295,6 +10347,8 @@ TASK: Write a decision-oriented overall assessment. Synthesise signals and resul
 
 ${this._overallAssessmentEmphasis()}
 
+${this._groupConsistencyAiInstruction()}
+
 ${this._overallAiReplyFormat()}`;
     }
 
@@ -10423,7 +10477,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
 
   _aiListKeys() {
     return ['EVIDENCE', 'IMPLICATIONS', 'ACTION', 'NEXT', 'CONTROLS', 'PATTERNS',
-      'CHECKS', 'FINDINGS', 'SUPPORT', 'LIMITATIONS', 'DIAGNOSTICS'];
+      'CHECKS', 'FINDINGS', 'SUPPORT', 'LIMITATIONS', 'DIAGNOSTICS', 'GROUP CONSISTENCY'];
   },
 
   _cleanAiText(value) {
@@ -10512,6 +10566,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       'BOTTOMLINE', 'MEANING', 'CHECKS', 'FINDINGS', 'SUPPORT', 'DIAGNOSTICS',
       'LIMITATIONS', 'REPORT', 'ABOUT', 'CONCLUSION', 'EVIDENCE', 'INTERPRETATION',
       'IMPLICATIONS', 'ACTION', 'INSIGHT', 'MEANS', 'NEXT', 'STRENGTH',
+      'GROUP CONSISTENCY', 'GROUP_CONSISTENCY',
       'CONTROLS', 'PATTERNS', 'READING'
     ];
     const result = {};
@@ -10551,6 +10606,9 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       if (!matched && current) buf.push(cleanedLine);
     });
     flush();
+    if (result['GROUP CONSISTENCY'] && !result.GROUP_CONSISTENCY) {
+      result.GROUP_CONSISTENCY = result['GROUP CONSISTENCY'];
+    }
     if (!Object.keys(result).length) {
       const cleaned = this._cleanAiText(raw);
       return cleaned ? { INSIGHT: cleaned } : null;
@@ -10579,6 +10637,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       CONCLUSION: this._cleanAiText(pick('conclusion', 'CONCLUSION')),
       STRENGTH: this._cleanAiText(pick('evidenceStrength', 'STRENGTH')),
       FINDINGS: this._asAiList(pick('mainFindings', 'FINDINGS', 'EVIDENCE')),
+      GROUP_CONSISTENCY: this._cleanAiText(pick('groupConsistency', 'GROUP_CONSISTENCY', 'GROUP CONSISTENCY')),
       SUPPORT: this._asAiList(pick('supportingEvidence', 'SUPPORT')),
       DIAGNOSTICS: this._asAiList(pick('diagnostics', 'DIAGNOSTICS')),
       INTERPRETATION: this._cleanAiText(pick('practicalInterpretation', 'INTERPRETATION')),
@@ -10597,7 +10656,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       kernel:'Kernel', outliers:'Outliers', normality:'Tests',
       qqplot:'PP/QQ', confidence:'Confidence Intervals', hypothesis:'One-Sample Test',
       'by-group-stats':'Grouped Statistics', 'by-group-boxplot':'Grouped Box Plots',
-      'by-group-normality':'Group Normality Analysis', 'by-group-similarity':'Similarity Profile™', 'by-group':'Grouped Analysis',
+      'by-group-normality':'Group Normality Analysis', 'by-group-similarity':'Similarity Profile™', 'by-group':'By-Group Analysis',
       ...this._correlationViewLabels(),
       ...this._independentViewLabels(),
       ...this._genericModuleViewLabels()
@@ -10623,6 +10682,29 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       <div class="sb-ai-section-label">${icon ? `<i class="${icon}"></i> ` : ''}${label}</div>
       <div class="sb-ai-section-body">${bodyHtml}</div>
     </div>`;
+  },
+
+  _aiGroupConsistencyCard(value, textCard) {
+    let text = this._cleanAiText(value);
+    const ctx = globalThis.__byGroupStandardContext;
+    if (!text && ctx && ctx.status) {
+      const bits = [ctx.status.label + ' — ' + ctx.status.hint];
+      if (ctx.directionChanges) bits.push('A direction reversal was detected and should be treated as potentially critical.');
+      if (ctx.differsText) bits.push(ctx.differsText);
+      if (ctx.status.descriptive) bits.push('These group differences are descriptive unless a formal comparison test supports them.');
+      text = bits.join(' ');
+    }
+    if (!text) {
+      text = 'Not assessed — open By Group to see whether the overall finding holds across categories, segments, or conditions.';
+    }
+    const reversal = /direction changes|revers/i.test(text);
+    const varies = /varies by group|strong difference/i.test(text);
+    const cls = reversal
+      ? 'sb-ai-section--group-consistency is-reversal'
+      : varies
+        ? 'sb-ai-section--group-consistency is-varies'
+        : 'sb-ai-section--group-consistency';
+    return textCard(cls, 'Group consistency', text, 'fa-solid fa-layer-group');
   },
 
   _aboutThisViewHtml(sections, viewLabel, meta) {
@@ -10759,6 +10841,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
           </div>
         </div>` : ''}
         ${listCard('sb-ai-section--evidence', 'Main findings', findings)}
+        ${this._aiGroupConsistencyCard(sections.GROUP_CONSISTENCY || sections['GROUP CONSISTENCY'], textCard)}
         ${listCard('sb-ai-section--support', 'Supporting evidence', support)}
         ${listCard('sb-ai-section--diagnostics', 'Diagnostics and assumptions', sections.DIAGNOSTICS)}
         ${textCard('sb-ai-section--interpretation', 'Practical interpretation', sections.INTERPRETATION)}

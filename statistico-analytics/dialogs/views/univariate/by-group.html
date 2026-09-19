@@ -5,17 +5,19 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Grouped Analysis - Univariate</title>
+  <title>By-Group Analysis - Univariate</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20260919sbchrome" />
+  <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260916nobot" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260919sbchrome"></script>
+  <script src="../../shared/by-group-standard.js?v=20260919bygrp"></script>
+  <script src="../shared-header.js?v=20260919bygrp"></script>
   <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <script src="../../shared/distribution-similarity.js?v=20260916histrange"></script>
@@ -493,23 +495,27 @@
       <section class="view-card">
         <div class="toolbar">
           <div class="title">
-            <strong id="resultTitle">Grouped Analysis</strong>
-            <span id="subtitle">Compare the selected numeric variable across a grouping column.</span>
+            <strong id="resultTitle">By-Group Analysis</strong>
+            <span id="subtitle">Examine whether the overall finding remains consistent across categories, segments, or conditions.</span>
           </div>
           <div class="controls">
             <div class="grouping-compact" id="groupingCompact" hidden>
-              <span id="groupingCompactText">Grouping: —</span>
+              <span id="groupingCompactText">Group by: —</span>
               <button type="button" class="grouping-change-btn" id="changeGroupBtn" onclick="openGroupDialog()">Change</button>
             </div>
-            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Compare Groups</button>
+            <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Group by</button>
           </div>
         </div>
         <div class="content">
+          <div id="byGroupIntro"></div>
           <div id="emptyState" class="empty" style="display:none;">
             <i class="fa-solid fa-layer-group"></i>
-            <div id="emptyText">Run a univariate analysis with source rows, then choose Compare Groups.</div>
+            <div id="emptyText">Run a univariate analysis with source rows, then choose a grouping column.</div>
           </div>
           <div id="mainContent" style="display:none;">
+            <div id="byGroupSetup"></div>
+            <div id="byGroupConsistency"></div>
+            <div id="byGroupSafeguard"></div>
             <div id="byGroupPanel-stats" class="by-group-panel is-active">
             <section id="tablePanel" class="panel">
               <div class="section-title"><strong>Grouped Statistics</strong><span>Select a group to zoom its chart</span></div>
@@ -617,6 +623,7 @@
                 </div>
               </section>
             </div>
+            <div id="byGroupInterpret"></div>
           </div>
         </div>
       </section>
@@ -638,8 +645,8 @@
     <div class="group-dialog">
       <div class="group-dialog-head">
         <div>
-          <strong id="groupDialogTitle">Choose How to Group the Results</strong>
-          <span>Recommended grouping variables are listed first. Unique identifiers, emails, and the current analysis variable stay visible but cannot be selected.</span>
+          <strong id="groupDialogTitle">Group by</strong>
+          <span>Select a categorical variable that defines the groups to compare. Recommended grouping variables are listed first. Unique identifiers, emails, and the current analysis variable stay visible but cannot be selected.</span>
         </div>
         <button class="group-dialog-close" type="button" onclick="closeGroupDialog()" aria-label="Close group selection"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -649,7 +656,7 @@
         <div class="level-placeholder" id="groupLevelPlaceholder"><div><i class="fa-solid fa-hand-pointer"></i>Select a grouping column to see its categories and n.</div></div>
       </div>
       <div class="group-dialog-foot">
-        <button type="button" class="group-dialog-done-btn" id="groupDialogConfirmBtn" onclick="closeGroupDialog()" disabled><i class="fa-solid fa-check"></i> Compare Groups</button>
+        <button type="button" class="group-dialog-done-btn" id="groupDialogConfirmBtn" onclick="closeGroupDialog()" disabled><i class="fa-solid fa-check"></i> Compare groups</button>
       </div>
     </div>
   </div>
@@ -922,7 +929,7 @@
       delete window.__byGroupAiContext;
       if (!isValidGroupIndex(groupIndex)) {
         const title = document.getElementById('resultTitle');
-        if (title) title.textContent = 'Grouped Analysis';
+        if (title) title.textContent = 'By-Group Analysis';
         const subtitle = document.getElementById('subtitle');
         if (subtitle) subtitle.textContent = 'Compare the selected numeric variable across a grouping column.';
       }
@@ -946,11 +953,11 @@
 
     function initializeFromPayload(data) {
       payload = data || loadStoredPayload();
-      if (!payload) return setEmpty('Run a univariate analysis first, then choose Compare Groups.');
+      if (!payload) return setEmpty('Run a univariate analysis first, then choose a grouping column.');
       headers = (payload.sourceHeaders || payload.headers || []).slice();
       analysisIndex = payload.columnIndex != null ? Number(payload.columnIndex) : 0;
       rows = normalizeRows(payload);
-      if (!headers.length || !rows.length) return setEmpty('Compare Groups needs source rows from the workbook range.');
+      if (!headers.length || !rows.length) return setEmpty('By-Group Analysis needs source rows from the workbook range.');
       syncHeaderVariable(rows.length);
       invalidateLevelCountCache();
       groupIndex = null;
@@ -1070,7 +1077,7 @@
       if (chooseBtn) chooseBtn.style.display = hasGroup ? 'none' : '';
       if (compact) compact.hidden = !hasGroup;
       if (!hasGroup) {
-        if (compactText) compactText.textContent = 'Grouping: —';
+        if (compactText) compactText.textContent = 'Group by: —';
         return;
       }
       const groupName = headers[groupIndex] || 'Group';
@@ -1078,8 +1085,8 @@
       const nRows = groupStats.reduce((sum, g) => sum + g.n, 0);
       if (compactText) {
         compactText.textContent = nGroups
-          ? `Grouping: ${groupName} · ${nGroups} group${nGroups === 1 ? '' : 's'} · n = ${nRows}`
-          : `Grouping: ${groupName}`;
+          ? `Group by: ${groupName} · ${nGroups} group${nGroups === 1 ? '' : 's'} · n = ${nRows}`
+          : `Group by: ${groupName}`;
       }
     }
 
@@ -1328,24 +1335,88 @@
         .sort((a, b) => String(a.group).localeCompare(String(b.group), undefined, { numeric: true }));
     }
 
+    function countMissingGroupValues() {
+      if (!isValidGroupIndex(groupIndex)) return 0;
+      return rows.reduce((sum, row) => {
+        const raw = rowValue(row, groupIndex, headers[groupIndex]);
+        return sum + (raw === null || raw === undefined || raw === '' ? 1 : 0);
+      }, 0);
+    }
+
+    function syncByGroupStandard() {
+      const BG = window.StatisticoByGroup;
+      if (!BG) return;
+      BG.applyPageTitles();
+      BG.mount('#byGroupIntro', BG.introHtml('univariate'));
+      if (!(groupStats || []).length) {
+        BG.mount('#byGroupSetup', '');
+        BG.mount('#byGroupConsistency', '');
+        BG.mount('#byGroupSafeguard', '');
+        BG.mount('#byGroupInterpret', '');
+        BG.publishContext(null);
+        return;
+      }
+      const minN = currentMinGroupN();
+      const items = groupStats.map((g) => ({ name: g.group, value: g.mean, n: g.n }));
+      const assessed = BG.assessSignedMetrics(items, { minN, absDelta: 0 });
+      const means = groupStats.filter((g) => Number.isFinite(g.mean) && g.n >= minN);
+      const meanRange = means.length > 1
+        ? Math.max.apply(null, means.map((g) => g.mean)) - Math.min.apply(null, means.map((g) => g.mean))
+        : 0;
+      const pooledSd = (() => {
+        const sds = means.filter((g) => Number.isFinite(g.stdDev));
+        if (!sds.length) return 0;
+        return sds.reduce((sum, g) => sum + g.stdDev, 0) / sds.length;
+      })();
+      const magnitudeVaries = meanRange >= Math.max(0.35 * (pooledSd || 1), 1e-6);
+      const status = BG.classifyConsistency({
+        insufficient: assessed.classification.insufficient,
+        directionChanges: false,
+        magnitudeVaries
+      });
+      const highest = means.reduce((a, b) => (b.mean > a.mean ? b : a), means[0]);
+      const lowest = means.reduce((a, b) => (b.mean < a.mean ? b : a), means[0]);
+      const differs = highest && lowest && highest !== lowest
+        ? `${highest.group} is highest and ${lowest.group} is lowest on the mean.`
+        : 'No single group stands out from the others.';
+      const warning = assessed.smallGroups.length
+        ? `Small groups: ${assessed.smallGroups.join(', ')}.`
+        : '';
+      BG.mount('#byGroupSetup', BG.groupSetupHtml({
+        groupName: headers[groupIndex],
+        missingN: countMissingGroupValues(),
+        levels: groupStats.map((g) => ({ name: g.group, n: g.n, included: true, small: g.n < minN }))
+      }));
+      BG.mount('#byGroupConsistency', BG.consistencyHtml(status));
+      BG.mount('#byGroupSafeguard', BG.safeguardHtml(false));
+      BG.mount('#byGroupInterpret', BG.interpretationHtml({
+        moduleKey: 'univariate',
+        status,
+        differsText: differs,
+        directionText: 'Direction reversal does not apply to a single numeric variable; compare location and spread instead.',
+        warningText: warning
+      }));
+      BG.publishContext({
+        moduleKey: 'univariate',
+        status,
+        directionChanges: false,
+        differsText: differs,
+        warningText: warning
+      });
+    }
+
     function renderByGroup() {
       groupStats = buildGroups();
       if (!groupStats.length) return setEmpty('No numeric values remain after grouping. Choose another grouping column or adjust filters.');
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
-      const varName = getAnalysisVariableName();
-      const groupName = headers[groupIndex] || 'Group';
-      const nGroups = groupStats.length;
-      const nRows = groupStats.reduce((sum, g) => sum + g.n, 0);
-      const title = document.getElementById('resultTitle');
-      if (title) title.textContent = `${varName} grouped by ${groupName}`;
-      document.getElementById('subtitle').textContent = `${nGroups} group${nGroups === 1 ? '' : 's'} · ${nRows} row${nRows === 1 ? '' : 's'}`;
       updateGroupChoiceLabel();
       renderTable();
       renderGroupBoxplot();
       renderGroupNormality();
       renderGroupSimilarity();
       syncByGroupAiContext();
+      syncByGroupStandard();
       switchByGroupTab(activeByGroupTab);
       if (activeByGroupTab === 'stats') renderDistributionPanel();
       if (typeof StatisticoHeader !== 'undefined') {
@@ -2547,9 +2618,13 @@
       activeByGroupTab = 'stats';
       window.__byGroupActiveTab = 'stats';
       if (typeof StatisticoHeader !== 'undefined') {
-        StatisticoHeader.init('by-group', 'Grouped Analysis', 0, 'univariate');
+        StatisticoHeader.init('by-group', 'By-Group Analysis', 0, 'univariate');
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle('Grouped Analysis');
+        StatisticoHeader.updateTitle('By-Group Analysis');
+      }
+      if (window.StatisticoByGroup) {
+        window.StatisticoByGroup.applyPageTitles();
+        window.StatisticoByGroup.mount('#byGroupIntro', window.StatisticoByGroup.introHtml('univariate'));
       }
       if (typeof StatisticoWorkspaceTabs !== 'undefined') StatisticoWorkspaceTabs.init();
       bindDspHelp();

@@ -136,7 +136,7 @@ describe('StatisticoByGroup contract', () => {
     expect(finding).toContain('Groups differ mainly in location');
     expect(finding).toContain('Descriptive only');
     expect(BG.scoreCardHtml({ score: 57.4, band: 'Mixed similarity' })).toContain('Overall similarity');
-    expect(BG.methodDetailsHtml({ moduleKey: 'univariate' })).toContain('Method &amp; interpretation');
+    expect(finding).not.toContain('Method &amp; interpretation');
     const comps = BG.similarityComponentsFromPairs([
       { usable: true, location: 26, spread: 92, shape: 93 },
       { usable: true, location: 26, spread: 92, shape: 93 }

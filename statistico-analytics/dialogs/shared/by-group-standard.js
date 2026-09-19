@@ -385,13 +385,11 @@
     var badge = model.descriptive !== false
       ? '<span class="bg-std-badge" title="' + escapeHtml(SAFEGUARD_DESCRIPTIVE) + '">Descriptive only <i class="fa-solid fa-circle-info"></i></span>'
       : '';
-    var info = '<button type="button" class="bg-std-info-btn" onclick="if(window.openByGroupMethod)window.openByGroupMethod()" aria-label="Why this matters">'
-      + '<i class="fa-solid fa-circle-info"></i></button>';
     if (!status && !conclusion) return '';
     return '<section class="bg-std-finding" aria-label="Main finding">'
       + '<div class="bg-std-finding-row">'
       + '<strong class="bg-std-finding-status">' + escapeHtml(status) + '</strong>'
-      + badge + info
+      + badge
       + '</div>'
       + (conclusion ? '<p class="bg-std-finding-copy">' + escapeHtml(conclusion) + '</p>' : '')
       + '</section>';
@@ -431,7 +429,7 @@
 
   function hideLegacyChrome() {
     if (typeof document === 'undefined') return;
-    ['byGroupIntro', 'byGroupSetup', 'byGroupConsistency', 'byGroupSafeguard'].forEach(function (id) {
+    ['byGroupIntro', 'byGroupSetup', 'byGroupConsistency', 'byGroupSafeguard', 'byGroupInterpret'].forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
       el.innerHTML = '';
@@ -446,7 +444,7 @@
     applyHeaderMeta(model.headerEl || '#subtitle', model.header || {});
     var hasResult = !!(model.headline || (model.status && model.status.label) || model.conclusion);
     mount(model.findingEl || '#byGroupFinding', hasResult ? findingHtml(model) : '');
-    mount(model.methodEl || '#byGroupInterpret', hasResult ? methodDetailsHtml(model) : '');
+    mount('#byGroupInterpret', '');
     if (model.publish === false) return;
     if (!hasResult) {
       publishContext(null);

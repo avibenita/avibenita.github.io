@@ -60,7 +60,7 @@
     .corr-bg-panel { display:none; flex:1; min-height:0; }
     .corr-bg-panel.is-active { display:flex; flex-direction:column; gap:10px; overflow:hidden; }
     #corrByGroupPanel-similarity.is-active { display:block; overflow:auto; }
-    .dsp-kpis { display:grid; grid-template-columns:minmax(0, .9fr) minmax(0, 1.1fr); grid-template-rows:300px; gap:8px; margin-bottom:8px; align-items:stretch; }
+    .dsp-kpis { display:grid; grid-template-columns:minmax(220px, .7fr) minmax(0, 1.5fr); grid-template-rows:minmax(300px, auto); gap:8px; margin-bottom:8px; align-items:stretch; }
     .dsp-homo-card {
       border:1px solid var(--border);
       border-radius:12px;
@@ -88,8 +88,38 @@
       padding:6px 8px 6px; min-width:0; display:flex; flex-direction:column; gap:4px;
     }
     .dsp-chart-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
-    .dsp-chart-host { flex:1 1 auto; min-height:0; height:260px; display:flex; flex-direction:column; }
-    .dsp-chart-host #corrSimChart { flex:1 1 auto; width:100%; min-height:0; height:100%; }
+    .dsp-chart-host { flex:1 1 auto; min-height:220px; display:flex; flex-direction:column; }
+    .dsp-chart-host #corrProfileChart,
+    .dsp-chart-host #corrSimChart { flex:1 1 auto; width:100%; min-height:180px; }
+    .corr-profile-headline {
+      margin:4px 0 0; color:var(--text-primary); font-size:13px; font-weight:650; line-height:1.4;
+    }
+    .corr-profile-svg { display:block; width:100%; height:auto; }
+    .corr-profile-zero { stroke:rgba(255,255,255,.38); stroke-width:1.2; stroke-dasharray:3 3; }
+    html[data-theme="light"] .corr-profile-zero { stroke:rgba(15,23,42,.32); }
+    .corr-profile-range { stroke:rgba(148,163,184,.55); stroke-width:3; stroke-linecap:round; }
+    .corr-profile-range.is-reversal { stroke:#fb7185; }
+    .corr-profile-label { fill:var(--text-primary); font-size:11px; font-weight:700; font-family:"Segoe UI", Tahoma, sans-serif; }
+    .corr-profile-label.is-reversal { fill:#fb7185; }
+    .corr-profile-legend {
+      display:flex; flex-wrap:wrap; gap:6px 14px; padding:2px 2px 4px;
+    }
+    .corr-profile-legend-item {
+      display:inline-flex; align-items:center; gap:6px;
+      color:var(--text-secondary); font-size:12px; font-weight:700;
+    }
+    .corr-profile-legend-swatch {
+      width:9px; height:9px; border-radius:99px; flex:0 0 9px;
+      box-shadow:0 0 0 1px rgba(12,22,36,.45);
+    }
+    .corr-sim-drill {
+      margin-top:12px; border-top:1px solid var(--border); padding-top:8px;
+    }
+    .corr-sim-drill summary {
+      cursor:pointer; color:var(--text-secondary); font-size:12px; font-weight:700;
+    }
+    .corr-sim-drill[open] summary { margin-bottom:8px; }
+    .corr-sim-drill .dsp-chart-host { min-height:200px; height:220px; }
     .dsp-card { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:10px; min-width:0; }
     .dsp-pair-grid {
       display:grid; grid-template-columns:minmax(280px, 1.35fr) minmax(220px, 0.85fr);
@@ -693,7 +723,7 @@
       .summary-strip { grid-template-columns:repeat(2, minmax(110px, 1fr)); }
       .toolbar { flex-direction:column; align-items:flex-start; }
       .controls { justify-content:flex-start; }
-      .dsp-kpis { grid-template-columns:1fr; grid-template-rows:300px 300px; }
+      .dsp-kpis { grid-template-columns:1fr; grid-template-rows:auto; }
       .dsp-pair-grid { grid-template-columns:1fr; }
       .dsp-pair-profile { padding-left:0; border-left:none; padding-top:12px; border-top:1px solid var(--border); }
       .group-dialog-body { grid-template-columns:1fr; }
@@ -701,7 +731,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260919-corr-sim-lockh">
+<body data-page-version="20260919-corr-profile">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -757,13 +787,15 @@
                   <div class="dsp-homo-card" id="corrSimGaugeCard"></div>
                   <div class="dsp-chart-panel">
                     <div class="dsp-chart-head">
-                      <div class="dsp-subhead">Congruence scatter</div>
-                      <div class="dsp-subhead-note">Each point is one variable pair’s r in both groups. The diagonal is a perfect match.</div>
+                      <div>
+                        <div class="dsp-subhead">Correlation Profiles Across Groups</div>
+                        <p class="corr-profile-headline" id="corrProfileHeadline"></p>
+                      </div>
                     </div>
-                    <div class="dsp-chart-host" id="corrSimChartHost">
-                      <div id="corrSimChart"></div>
+                    <div class="dsp-chart-host" id="corrProfileHost">
+                      <div id="corrProfileChart"></div>
                     </div>
-                    <em class="dsp-footnote">Click a point to open that pair’s scatter. Not a significance test.</em>
+                    <div class="corr-profile-legend" id="corrProfileLegend"></div>
                   </div>
                 </div>
                 <div class="dsp-card">
@@ -791,6 +823,12 @@
                     <div class="dsp-pair-profile">
                       <div class="dsp-subhead" id="corrSimProfileTitle">Pair profile</div>
                       <div id="corrSimProfileBody"></div>
+                      <details class="corr-sim-drill" id="corrSimCongruenceWrap">
+                        <summary>Congruence scatter for the selected groups</summary>
+                        <div class="dsp-chart-host" id="corrSimChartHost">
+                          <div id="corrSimChart"></div>
+                        </div>
+                      </details>
                     </div>
                   </div>
                 </div>
@@ -1170,13 +1208,8 @@
       if (assessed.status.id === 'consistent') conclusion = 'The overall finding remains similar across groups.';
       if (assessed.status.id === 'insufficient') conclusion = warning || assessed.status.hint;
       if (corrByGroupPanel === 'similarity' && corrSimProfile && corrSimProfile.usablePairCount) {
-        const comps = BG.similarityComponentsFromPairs(corrSimProfile.pairs, [
-          { id: 'pattern', label: 'pattern', key: 'pattern' },
-          { id: 'strength', label: 'strength', key: 'strength' },
-          { id: 'sign', label: 'sign', key: 'sign' }
-        ]);
         headline = BG.similarityHeadline((corrSimProfile.homogeneityBand || {}).label, corrSimProfile.homogeneity);
-        conclusion = BG.similarityConclusion(comps);
+        conclusion = corrProfileHeadlineText(buildCorrProfileRows());
       }
       BG.mountResultFirst({
         moduleKey: 'correlations',
@@ -2233,6 +2266,7 @@
         selectedCorrSimPair = { a: corrSimProfile.mostSimilar.a, b: corrSimProfile.mostSimilar.b };
       }
       renderCorrSimGauge();
+      renderCorrProfileChart();
       renderCorrSimPairTable();
       renderCorrSimProfile();
     }
@@ -2389,7 +2423,8 @@
       if (!pair) {
         title.textContent = 'Pair profile';
         body.innerHTML = '<div class="dsp-kpi-note">Select a pairwise table row.</div>';
-        renderCorrSimCongruence(null);
+        const emptyDrill = document.getElementById('corrSimCongruenceWrap');
+        if (emptyDrill) emptyDrill.hidden = true;
         return;
       }
       title.innerHTML = `${escapeHtml(prettyGroupLabel(pair.a))} vs ${escapeHtml(prettyGroupLabel(pair.b))} · <span class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(pair.band)}</span>`;
@@ -2401,7 +2436,127 @@
         </div>
       `;
       animateProfileBars();
-      renderCorrSimCongruence(pair);
+      const drill = document.getElementById('corrSimCongruenceWrap');
+      if (drill) {
+        drill.hidden = !pair;
+        if (!drill.dataset.bound) {
+          drill.dataset.bound = '1';
+          drill.addEventListener('toggle', () => {
+            if (!drill.open) return;
+            const current = selectedCorrSimPair ? findCorrSimPair(selectedCorrSimPair.a, selectedCorrSimPair.b) : null;
+            renderCorrSimCongruence(current);
+          });
+        }
+        if (drill.open) renderCorrSimCongruence(pair);
+      }
+    }
+
+    const GROUP_PROFILE_COLORS = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635', '#f472b6', '#22d3ee', '#f97316', '#818cf8', '#34d399'];
+
+    function groupProfileColor(index) {
+      return GROUP_PROFILE_COLORS[index % GROUP_PROFILE_COLORS.length];
+    }
+
+    function corrProfilePairLabel(row) {
+      return `${shortVarName(row.varA, 14)}–${shortVarName(row.varB, 14)}`;
+    }
+
+    function buildCorrProfileRows() {
+      const minN = currentMinGroupN();
+      return (tableRows || []).map((row) => {
+        const points = (row.groupResults || []).map((gr, i) => ({
+          group: gr.group,
+          r: Number(gr.r),
+          n: gr.n,
+          index: i,
+          usable: Number.isFinite(Number(gr.r)) && Number(gr.n) >= minN
+        })).filter((p) => p.usable);
+        const rs = points.map((p) => p.r);
+        const minR = rs.length ? Math.min.apply(null, rs) : NaN;
+        const maxR = rs.length ? Math.max.apply(null, rs) : NaN;
+        const spread = rs.length > 1 ? maxR - minR : 0;
+        const signs = rs.map((r) => (r > 0.05 ? 1 : r < -0.05 ? -1 : 0)).filter((s) => s);
+        return {
+          pair: row.pair,
+          varA: row.varA,
+          varB: row.varB,
+          points,
+          minR,
+          maxR,
+          spread,
+          reversal: signs.includes(1) && signs.includes(-1)
+        };
+      }).filter((row) => row.points.length >= 2)
+        .sort((a, b) => (Number(b.reversal) - Number(a.reversal)) || (b.spread - a.spread) || String(a.pair).localeCompare(String(b.pair)));
+    }
+
+    function corrProfileHeadlineText(rows) {
+      const list = Array.isArray(rows) ? rows : [];
+      if (!list.length) return 'Not enough overlapping group correlations to describe the profile.';
+      const tight = (row) => !row.reversal && row.spread < 0.15;
+      const loose = (row) => row.reversal || row.spread >= 0.2;
+      const reversal = list.find((row) => row.reversal);
+      const main = list.find(loose) || list[0];
+      const consistent = list.find((row) => tight(row) && row !== main);
+      if (reversal) {
+        return `Groups reverse sign on ${corrProfilePairLabel(reversal)}.`
+          + (consistent ? ` ${corrProfilePairLabel(consistent)} is broadly consistent.` : '');
+      }
+      if (!loose(main)) return 'Group correlations are broadly consistent across pairs.';
+      if (consistent) {
+        return `Groups differ mainly on ${corrProfilePairLabel(main)}; ${corrProfilePairLabel(consistent)} is broadly consistent.`;
+      }
+      return `Groups differ mainly on ${corrProfilePairLabel(main)}.`;
+    }
+
+    function renderCorrProfileChart() {
+      const el = document.getElementById('corrProfileChart');
+      const headline = document.getElementById('corrProfileHeadline');
+      const legend = document.getElementById('corrProfileLegend');
+      const host = document.getElementById('corrProfileHost');
+      if (!el) return;
+      const rows = buildCorrProfileRows();
+      const story = corrProfileHeadlineText(rows);
+      if (headline) headline.textContent = story;
+      if (legend) {
+        legend.innerHTML = (activeGroups || []).map((g, i) => (
+          `<span class="corr-profile-legend-item"><span class="corr-profile-legend-swatch" style="background:${groupProfileColor(i)}"></span>${escapeHtml(prettyGroupLabel(g.group))}</span>`
+        )).join('');
+      }
+      if (!rows.length) {
+        el.innerHTML = '<div class="dsp-kpi-note">Need at least two groups with overlapping pairwise correlations.</div>';
+        return;
+      }
+      const w = Math.max(460, Math.round((host && host.clientWidth) || 460));
+      const rowH = 38;
+      const pad = { l: 128, r: 16, t: 10, b: 28 };
+      const h = pad.t + pad.b + rows.length * rowH;
+      const plotW = Math.max(160, w - pad.l - pad.r);
+      const sx = (r) => pad.l + ((Math.max(-1, Math.min(1, r)) + 1) / 2) * plotW;
+      const ticks = [-1, -0.5, 0, 0.5, 1];
+      let chrome = '';
+      ticks.forEach((v) => {
+        const x = sx(v);
+        chrome += `<line class="scatter-grid" x1="${x.toFixed(1)}" y1="${pad.t}" x2="${x.toFixed(1)}" y2="${(h - pad.b).toFixed(1)}" />`;
+        chrome += `<text class="scatter-tick" style="text-anchor:middle" x="${x.toFixed(1)}" y="${(h - 8).toFixed(1)}">${v}</text>`;
+      });
+      chrome += `<line class="corr-profile-zero" x1="${sx(0).toFixed(1)}" y1="${pad.t}" x2="${sx(0).toFixed(1)}" y2="${(h - pad.b).toFixed(1)}" />`;
+      let marks = '';
+      rows.forEach((row, i) => {
+        const y = pad.t + i * rowH + rowH / 2;
+        const x1 = sx(row.minR);
+        const x2 = sx(row.maxR);
+        marks += `<line class="corr-profile-range${row.reversal ? ' is-reversal' : ''}" x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" />`;
+        marks += `<text class="corr-profile-label${row.reversal ? ' is-reversal' : ''}" text-anchor="end" x="${(pad.l - 10).toFixed(1)}" y="${(y + 4).toFixed(1)}">${escapeHtml(corrProfilePairLabel(row))}${row.reversal ? ' ±' : ''}</text>`;
+        row.points.forEach((p) => {
+          const tip = `${escapeHtml(prettyGroupLabel(p.group))} · ${escapeHtml(corrProfilePairLabel(row))}<br>r=${fmtR(p.r)} · n=${p.n}`;
+          marks += `<circle class="corr-profile-dot" cx="${sx(p.r).toFixed(1)}" cy="${y.toFixed(1)}" r="5.2" fill="${groupProfileColor(p.index)}" stroke="rgba(12,22,36,.82)" stroke-width="1" data-st-tip-html="${tipAttr(tip)}" />`;
+        });
+      });
+      el.innerHTML = `<svg class="corr-profile-svg scatter-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeHtml(story)}">${chrome}${marks}</svg>`;
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(el);
+      }
     }
 
     const CONGRUENCE_COLORS = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635', '#f472b6', '#22d3ee', '#f97316', '#818cf8', '#34d399'];

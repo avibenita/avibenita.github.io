@@ -7120,7 +7120,10 @@ const StatisticoHeader = {
   },
 
   _explainViewButtonInnerHtml() {
-    return this._aiIconHtml() + '<span>Explain this view</span><sup class="sb-ai-sup">AI</sup>';
+    return this._aiIconHtml()
+      + '<span class="sb-ai-local-label sb-ai-local-label--full">Explain this view</span>'
+      + '<span class="sb-ai-local-label sb-ai-local-label--short">View insight</span>'
+      + '<sup class="sb-ai-sup">AI</sup>';
   },
 
   _sidebarAiButtonTitle() {
@@ -7963,6 +7966,14 @@ REPORT: [one polished paragraph suitable for a report]`;
       btn.classList.add('sb-ai-local-btn--header');
       btn.classList.remove('is-floating-free', 'sb-ai-float-btn--tab');
       headerRight.insertBefore(btn, headerRight.firstChild);
+      let sep = headerRight.querySelector('.sb-ai-local-sep');
+      if (!sep) {
+        sep = document.createElement('span');
+        sep.className = 'sb-ai-local-sep';
+        sep.setAttribute('aria-hidden', 'true');
+      }
+      if (btn.nextSibling !== sep) headerRight.insertBefore(sep, btn.nextSibling);
+      this._wireLocalAiCompactLabel(btn, headerRight);
       return;
     }
     const rightCol = document.querySelector('.right-col') || document.querySelector('.lf-content');
@@ -7972,6 +7983,27 @@ REPORT: [one polished paragraph suitable for a report]`;
       return;
     }
     this._mountFloatingAiButton(btn);
+  },
+
+  _wireLocalAiCompactLabel(btn, headerRight) {
+    if (!btn) return;
+    const apply = () => {
+      if (!btn.isConnected) return;
+      const host = headerRight || document.querySelector('.header-right');
+      const overflow = !!(host && host.scrollWidth > host.clientWidth + 1);
+      const narrow = window.innerWidth <= 1400;
+      const wasCompact = btn.classList.contains('is-compact');
+      const compact = overflow || narrow || (wasCompact && window.innerWidth <= 1480);
+      btn.classList.toggle('is-compact', compact);
+    };
+    requestAnimationFrame(apply);
+    if (btn.dataset.compactWired === '1') return;
+    btn.dataset.compactWired = '1';
+    window.addEventListener('resize', apply);
+    if (typeof ResizeObserver === 'function' && headerRight) {
+      const ro = new ResizeObserver(apply);
+      ro.observe(headerRight);
+    }
   },
 
   /**

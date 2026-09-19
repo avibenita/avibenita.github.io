@@ -19,7 +19,12 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(header).toMatch(/_mountLocalAiButton/);
     expect(header).toMatch(/header-right/);
     expect(header).toMatch(/sb-ai-local-btn--header/);
+    expect(header).toMatch(/sb-ai-local-sep/);
+    expect(header).toMatch(/View insight/);
+    expect(header).toMatch(/_wireLocalAiCompactLabel/);
     expect(css).toMatch(/\.sb-ai-local-btn--header/);
+    expect(css).toMatch(/\.sb-ai-local-sep/);
+    expect(css).toMatch(/@media \(max-width:\s*1400px\)/);
     expect(css).toMatch(/background:\s*rgba\(139,92,246,\.12\)/);
   });
 

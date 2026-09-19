@@ -161,10 +161,17 @@
     return ovl == null ? null : 100 * ovl;
   }
 
+  var COMPONENT_FLOOR = 1;
+
   function overallScore(location, spread, shape) {
     if (!finite(location) || !finite(spread) || !finite(shape)) return null;
     if (location < 0 || spread < 0 || shape < 0) return null;
-    return Math.pow(location * spread * shape, 1 / 3);
+    return Math.pow(
+      Math.max(location, COMPONENT_FLOOR) *
+      Math.max(spread, COMPONENT_FLOOR) *
+      Math.max(shape, COMPONENT_FLOOR),
+      1 / 3
+    );
   }
 
   function bandFor(score) {

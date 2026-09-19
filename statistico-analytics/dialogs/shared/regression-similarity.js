@@ -95,10 +95,17 @@
     return 100 * same / rA.length;
   }
 
+  var COMPONENT_FLOOR = 1;
+
   function overallScore(pattern, strength, sign) {
     if (!finite(pattern) || !finite(strength) || !finite(sign)) return null;
     if (pattern < 0 || strength < 0 || sign < 0) return null;
-    return Math.pow(pattern * strength * sign, 1 / 3);
+    return Math.pow(
+      Math.max(pattern, COMPONENT_FLOOR) *
+      Math.max(strength, COMPONENT_FLOOR) *
+      Math.max(sign, COMPONENT_FLOOR),
+      1 / 3
+    );
   }
 
   function bandFor(score) {

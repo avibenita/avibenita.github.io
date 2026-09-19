@@ -33,7 +33,7 @@ describe('Contingency Similarity Index', () => {
     expect(row.strength).toBe(100);
     expect(row.pattern).toBe(0);
     expect(row.sign).toBe(0);
-    expect(row.overall).toBe(0);
+    expect(row.overall).toBeCloseTo(4.6, 5);
     expect(row.band).toBe('Substantially different');
   });
 

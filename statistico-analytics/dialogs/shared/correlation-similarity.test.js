@@ -35,7 +35,7 @@ describe('Correlation Similarity Index', () => {
     expect(row.strength).toBe(100);
     expect(row.pattern).toBe(0);
     expect(row.sign).toBe(0);
-    expect(row.overall).toBe(0);
+    expect(row.overall).toBeCloseTo(4.6, 5);
     expect(row.band).toBe('Substantially different');
   });
 
@@ -58,6 +58,11 @@ describe('Correlation Similarity Index', () => {
   test('overall is the geometric mean of the three components', () => {
     expect(CSI.overallScore(8, 27, 64)).toBeCloseTo(24, 8);
     expect(CSI.overallScore(90, 80, 70)).toBeCloseTo(Math.pow(90 * 80 * 70, 1 / 3), 8);
+  });
+
+  test('combined index floors a zero component at 1 so the reading is not null', () => {
+    expect(CSI.overallScore(37.4, 44.1, 0)).toBeCloseTo(Math.pow(37.4 * 44.1 * 1, 1 / 3), 8);
+    expect(CSI.overallScore(0, 100, 0)).toBeCloseTo(Math.pow(100, 1 / 3), 8);
   });
 
   test('descriptive bands match the spec cut points', () => {
@@ -96,8 +101,8 @@ describe('Correlation Similarity Index', () => {
     const profile = CSI.buildProfile([same, flipped, twin]);
     const scores = profile.pairs.map((p) => p.overall);
     expect(scores).toContain(100);
-    expect(scores.filter((v) => v === 0).length).toBe(2);
-    expect(profile.homogeneity).toBeCloseTo(33.3, 5);
+    expect(Math.min.apply(null, scores)).toBeCloseTo(4.6, 5);
+    expect(profile.homogeneity).toBeCloseTo(36.4, 5);
     expect(profile.homogeneityBand.label).toBe('Substantially different');
   });
 

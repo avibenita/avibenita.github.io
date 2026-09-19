@@ -96,10 +96,17 @@
     return 100 * same / rA.length;
   }
 
+  var COMPONENT_FLOOR = 1;
+
   function overallScore(pattern, strength, sign) {
     if (!finite(pattern) || !finite(strength) || !finite(sign)) return null;
     if (pattern < 0 || strength < 0 || sign < 0) return null;
-    return Math.pow(pattern * strength * sign, 1 / 3);
+    return Math.pow(
+      Math.max(pattern, COMPONENT_FLOOR) *
+      Math.max(strength, COMPONENT_FLOOR) *
+      Math.max(sign, COMPONENT_FLOOR),
+      1 / 3
+    );
   }
 
   function bandFor(score) {
@@ -152,9 +159,9 @@
     };
   }
 
-  // Pair-level overall stays a geometric mean of pattern / strength / sign.
-  // Profile-level similarity is the arithmetic mean of those pair scores so a
-  // single sign-reversal (combined = 0) cannot pin the gauge at 0.0.
+  // Pair-level overall is a geometric mean of pattern / strength / sign, with
+  // each component floored at 1 so a sign reversal cannot null the reading.
+  // Profile-level similarity is the arithmetic mean of those pair scores.
   function arithmeticMean(values) {
     var sum = 0;
     var k = 0;

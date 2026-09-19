@@ -60,7 +60,7 @@
     .corr-bg-panel { display:none; flex:1; min-height:0; }
     .corr-bg-panel.is-active { display:flex; flex-direction:column; gap:10px; overflow:hidden; }
     #corrByGroupPanel-similarity.is-active { display:block; overflow:auto; }
-    .dsp-kpis { display:grid; grid-template-columns:minmax(220px, .7fr) minmax(0, 1.5fr); grid-template-rows:minmax(300px, auto); gap:8px; margin-bottom:8px; align-items:stretch; }
+    .dsp-kpis { display:grid; grid-template-columns:minmax(220px, .7fr) minmax(0, 1.5fr); grid-template-rows:auto; gap:8px; margin-bottom:8px; align-items:start; }
     .dsp-homo-card {
       border:1px solid var(--border);
       border-radius:12px;
@@ -89,7 +89,8 @@
     }
     .dsp-chart-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
     .dsp-chart-host { flex:1 1 auto; min-height:220px; display:flex; flex-direction:column; }
-    .dsp-chart-host #corrProfileChart,
+    #corrProfileHost { min-height:0; height:auto; flex:0 0 auto; }
+    .dsp-chart-host #corrProfileChart { flex:0 0 auto; width:100%; min-height:0; }
     .dsp-chart-host #corrSimChart { flex:1 1 auto; width:100%; min-height:180px; }
     .corr-profile-headline {
       margin:4px 0 0; color:var(--text-primary); font-size:13px; font-weight:650; line-height:1.4;
@@ -100,7 +101,8 @@
     .corr-profile-range { stroke:rgba(148,163,184,.55); stroke-width:3; stroke-linecap:round; }
     .corr-profile-range.is-reversal { stroke:#fb7185; }
     .corr-profile-label { fill:var(--text-primary); font-size:11px; font-weight:700; font-family:"Segoe UI", Tahoma, sans-serif; }
-    .corr-profile-label.is-reversal { fill:#fb7185; }
+    .corr-profile-badge-bg { fill:color-mix(in srgb, #fb7185 22%, var(--surface-2)); stroke:#fb7185; stroke-width:0.8; }
+    .corr-profile-badge-text { fill:#fb7185; font-size:8px; font-weight:800; letter-spacing:.04em; font-family:"Segoe UI", Tahoma, sans-serif; }
     .corr-profile-legend {
       display:flex; flex-wrap:wrap; gap:6px 14px; padding:2px 2px 4px;
     }
@@ -108,10 +110,7 @@
       display:inline-flex; align-items:center; gap:6px;
       color:var(--text-secondary); font-size:12px; font-weight:700;
     }
-    .corr-profile-legend-swatch {
-      width:9px; height:9px; border-radius:99px; flex:0 0 9px;
-      box-shadow:0 0 0 1px rgba(12,22,36,.45);
-    }
+    .corr-profile-legend-mark { width:14px; height:14px; flex:0 0 14px; }
     .corr-sim-drill {
       margin-top:12px; border-top:1px solid var(--border); padding-top:8px;
     }
@@ -731,7 +730,7 @@
     }
   </style>
 </head>
-<body data-page-version="20260919-corr-profile">
+<body data-page-version="20260919-corr-profile2">
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -2452,13 +2451,57 @@
     }
 
     const GROUP_PROFILE_COLORS = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635', '#f472b6', '#22d3ee', '#f97316', '#818cf8', '#34d399'];
+    const GROUP_PROFILE_SHAPES = ['circle', 'square', 'diamond', 'triangle', 'triangle-down', 'plus'];
 
     function groupProfileColor(index) {
       return GROUP_PROFILE_COLORS[index % GROUP_PROFILE_COLORS.length];
     }
 
+    function groupProfileShape(index) {
+      return GROUP_PROFILE_SHAPES[index % GROUP_PROFILE_SHAPES.length];
+    }
+
+    function prettyVarName(name) {
+      return typeof predLabels().prettyPredictor === 'function'
+        ? predLabels().prettyPredictor(name)
+        : String(name || '').replace(/[_\-.]+/g, ' ').trim();
+    }
+
+    function compactVarToken(name) {
+      const cleaned = prettyVarName(name);
+      const parts = cleaned.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2 && /^feature$/i.test(parts[0])) return parts.slice(1).join(' ');
+      return cleaned;
+    }
+
     function corrProfilePairLabel(row) {
-      return `${shortVarName(row.varA, 14)}–${shortVarName(row.varB, 14)}`;
+      return `${prettyVarName(row.varA)}–${prettyVarName(row.varB)}`;
+    }
+
+    function compactPairLabel(row) {
+      return `${compactVarToken(row.varA)}–${compactVarToken(row.varB)}`;
+    }
+
+    function shortGroupLegendLabel(raw) {
+      const pretty = prettyGroupLabel(raw);
+      const quoted = String(pretty).match(/="([^"]+)"/) || String(pretty).match(/='([^']+)'/);
+      if (quoted) return quoted[1];
+      return String(raw == null || raw === '' ? pretty : raw);
+    }
+
+    function joinPairNames(names) {
+      if (!names.length) return '';
+      if (names.length === 1) return names[0];
+      if (names.length === 2) return names[0] + ' and ' + names[1];
+      return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    }
+
+    function pairStrengthPhrase(row) {
+      const mean = row.points.reduce((sum, p) => sum + p.r, 0) / row.points.length;
+      const mag = Math.abs(mean);
+      if (mag < 0.05) return 'remains near zero';
+      const strength = mag < 0.3 ? 'weakly' : mag < 0.5 ? 'moderately' : 'strongly';
+      return 'remains ' + strength + ' ' + (mean < 0 ? 'negative' : 'positive');
     }
 
     function buildCorrProfileRows() {
@@ -2493,20 +2536,26 @@
     function corrProfileHeadlineText(rows) {
       const list = Array.isArray(rows) ? rows : [];
       if (!list.length) return 'Not enough overlapping group correlations to describe the profile.';
-      const tight = (row) => !row.reversal && row.spread < 0.15;
-      const loose = (row) => row.reversal || row.spread >= 0.2;
-      const reversal = list.find((row) => row.reversal);
-      const main = list.find(loose) || list[0];
-      const consistent = list.find((row) => tight(row) && row !== main);
-      if (reversal) {
-        return `Groups reverse sign on ${corrProfilePairLabel(reversal)}.`
-          + (consistent ? ` ${corrProfilePairLabel(consistent)} is broadly consistent.` : '');
+      const reversals = list.filter((row) => row.reversal);
+      const stable = list.filter((row) => !row.reversal);
+      if (reversals.length && stable.length) {
+        return joinPairNames(reversals.map(compactPairLabel))
+          + ' change direction across groups; '
+          + stable.map((row) => compactPairLabel(row) + ' ' + pairStrengthPhrase(row)).join('; ')
+          + '.';
       }
-      if (!loose(main)) return 'Group correlations are broadly consistent across pairs.';
-      if (consistent) {
-        return `Groups differ mainly on ${corrProfilePairLabel(main)}; ${corrProfilePairLabel(consistent)} is broadly consistent.`;
+      if (reversals.length) {
+        return joinPairNames(reversals.map(compactPairLabel)) + ' change direction across groups.';
       }
-      return `Groups differ mainly on ${corrProfilePairLabel(main)}.`;
+      const loose = stable.filter((row) => row.spread >= 0.2);
+      const tight = stable.filter((row) => row.spread < 0.15);
+      if (loose.length && tight.length) {
+        return 'Groups differ mainly on ' + joinPairNames(loose.map(compactPairLabel))
+          + '; ' + tight.map((row) => compactPairLabel(row) + ' ' + pairStrengthPhrase(row)).join('; ')
+          + '.';
+      }
+      if (tight.length === stable.length) return 'Group correlations are broadly consistent across pairs.';
+      return 'Groups differ mainly on ' + joinPairNames((loose.length ? loose : stable).map(compactPairLabel)) + '.';
     }
 
     function renderCorrProfileChart() {
@@ -2520,7 +2569,7 @@
       if (headline) headline.textContent = story;
       if (legend) {
         legend.innerHTML = (activeGroups || []).map((g, i) => (
-          `<span class="corr-profile-legend-item"><span class="corr-profile-legend-swatch" style="background:${groupProfileColor(i)}"></span>${escapeHtml(prettyGroupLabel(g.group))}</span>`
+          `<span class="corr-profile-legend-item"><svg class="corr-profile-legend-mark" viewBox="0 0 14 14" aria-hidden="true">${congruenceMarker(groupProfileShape(i), 7, 7, groupProfileColor(i), '', 4.4)}</svg>${escapeHtml(shortGroupLegendLabel(g.group))}</span>`
         )).join('');
       }
       if (!rows.length) {
@@ -2528,9 +2577,10 @@
         return;
       }
       const w = Math.max(460, Math.round((host && host.clientWidth) || 460));
-      const rowH = 38;
-      const pad = { l: 128, r: 16, t: 10, b: 28 };
-      const h = pad.t + pad.b + rows.length * rowH;
+      const pad = { l: 158, r: 14, t: 6, b: 22 };
+      const rowHeights = rows.map((row) => (row.reversal ? 44 : 30));
+      const plotH = rowHeights.reduce((sum, h) => sum + h, 0);
+      const h = pad.t + pad.b + plotH;
       const plotW = Math.max(160, w - pad.l - pad.r);
       const sx = (r) => pad.l + ((Math.max(-1, Math.min(1, r)) + 1) / 2) * plotW;
       const ticks = [-1, -0.5, 0, 0.5, 1];
@@ -2538,19 +2588,28 @@
       ticks.forEach((v) => {
         const x = sx(v);
         chrome += `<line class="scatter-grid" x1="${x.toFixed(1)}" y1="${pad.t}" x2="${x.toFixed(1)}" y2="${(h - pad.b).toFixed(1)}" />`;
-        chrome += `<text class="scatter-tick" style="text-anchor:middle" x="${x.toFixed(1)}" y="${(h - 8).toFixed(1)}">${v}</text>`;
+        chrome += `<text class="scatter-tick" style="text-anchor:middle" x="${x.toFixed(1)}" y="${(h - 6).toFixed(1)}">${v}</text>`;
       });
       chrome += `<line class="corr-profile-zero" x1="${sx(0).toFixed(1)}" y1="${pad.t}" x2="${sx(0).toFixed(1)}" y2="${(h - pad.b).toFixed(1)}" />`;
       let marks = '';
+      let yCursor = pad.t;
       rows.forEach((row, i) => {
-        const y = pad.t + i * rowH + rowH / 2;
+        const rowH = rowHeights[i];
+        const y = yCursor + (row.reversal ? rowH * 0.42 : rowH / 2);
+        yCursor += rowH;
         const x1 = sx(row.minR);
         const x2 = sx(row.maxR);
         marks += `<line class="corr-profile-range${row.reversal ? ' is-reversal' : ''}" x1="${x1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y.toFixed(1)}" />`;
-        marks += `<text class="corr-profile-label${row.reversal ? ' is-reversal' : ''}" text-anchor="end" x="${(pad.l - 10).toFixed(1)}" y="${(y + 4).toFixed(1)}">${escapeHtml(corrProfilePairLabel(row))}${row.reversal ? ' ±' : ''}</text>`;
+        marks += `<text class="corr-profile-label" text-anchor="end" x="${(pad.l - 10).toFixed(1)}" y="${(row.reversal ? y - 6 : y + 3.5).toFixed(1)}">${escapeHtml(corrProfilePairLabel(row))}</text>`;
+        if (row.reversal) {
+          marks += `<g transform="translate(${(pad.l - 82).toFixed(1)} ${(y + 8).toFixed(1)})">
+            <rect class="corr-profile-badge-bg" x="0" y="-8" width="72" height="12" rx="3"/>
+            <text class="corr-profile-badge-text" text-anchor="middle" x="36" y="1.5">SIGN REVERSAL</text>
+          </g>`;
+        }
         row.points.forEach((p) => {
-          const tip = `${escapeHtml(prettyGroupLabel(p.group))} · ${escapeHtml(corrProfilePairLabel(row))}<br>r=${fmtR(p.r)} · n=${p.n}`;
-          marks += `<circle class="corr-profile-dot" cx="${sx(p.r).toFixed(1)}" cy="${y.toFixed(1)}" r="5.2" fill="${groupProfileColor(p.index)}" stroke="rgba(12,22,36,.82)" stroke-width="1" data-st-tip-html="${tipAttr(tip)}" />`;
+          const tip = `${escapeHtml(shortGroupLegendLabel(p.group))} · ${escapeHtml(corrProfilePairLabel(row))}<br>r=${fmtR(p.r)} · n=${p.n}`;
+          marks += congruenceMarker(groupProfileShape(p.index), sx(p.r), y, groupProfileColor(p.index), `data-st-tip-html="${tipAttr(tip)}"`);
         });
       });
       el.innerHTML = `<svg class="corr-profile-svg scatter-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeHtml(story)}">${chrome}${marks}</svg>`;

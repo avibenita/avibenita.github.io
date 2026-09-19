@@ -2219,7 +2219,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260919noframe',
+  _TAB_ASSET_VER: '20260919congru',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -8661,7 +8661,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'by-group-similarity':
         'This is Similarity Profile™: a homogeneity gauge, the same Kernel / Histograms / Boxplots chart panel as Statistics (labels use col="level" (n=N)), and a pairwise table of 0–100 descriptive scores (location / spread / shape) plus a pair profile. Focus READING on practical similarity, not significance. Cite Location / Spread / Shape when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different.',
       'correlation-by-group-similarity':
-        'This is Similarity Profile™: a homogeneity gauge, a congruence scatter of pairwise r in one group vs the other, and a pairwise table of 0–100 descriptive scores (pattern / strength / sign) plus a pair profile. Group labels use col="level" (n=N). Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different.',
+        'This is Similarity Profile™: a homogeneity gauge, an all-group correlation profile, and a pairwise table of 0–100 descriptive scores (pattern / strength / sign) plus a pair profile. Open Congruence scatter from the selected pair. Group labels use col="level" (n=N). Focus READING on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed. Do not call this a published coefficient — it is Statistico\'s Similarity Profile™. Use Very similar / Mostly similar / Mixed similarity / Substantially different.',
       'logistic-predictive-performance-roc-thresholds':
         'This is an ROC curve with a threshold slider. Describe the curve shape, AUC band, and the trade-off the slider exposes — not coefficient inference.',
       'logistic-predictive-performance-calibration':
@@ -10129,7 +10129,7 @@ ${this._localAiReplyFormat()}`;
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
       'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group and a sparkline of group-specific correlations.',
-      'correlation-by-group-similarity': 'Similarity Profile™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. The layout matches Regression: a homogeneity gauge, a congruence scatter (r in one group vs r in the other), and a pairwise table with a three-component profile. Click a table row for the profile; click a congruence point to open that pair’s scatter. Group labels use col="level" (n=N).'
+      'correlation-by-group-similarity': 'Similarity Profile™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. The layout is a homogeneity gauge, an all-group correlation profile, and a pairwise table with a three-component profile. Click a table row for the profile; open Congruence scatter from the pair profile, then click a point for that pair’s XY scatter. Group labels use col="level" (n=N).'
     };
   },
 

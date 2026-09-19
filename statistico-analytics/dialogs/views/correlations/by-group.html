@@ -10,12 +10,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
   <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp2" />
-  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp5" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919congru" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260919tabjoin" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../../shared/by-group-standard.js?v=20260919bygrp4"></script>
-  <script src="../shared-header.js?v=20260919tabjoin"></script>
+  <script src="../shared-header.js?v=20260919congru"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/correlation-similarity.js?v=20260907csi"></script>
@@ -111,14 +111,24 @@
       color:var(--text-secondary); font-size:12px; font-weight:700;
     }
     .corr-profile-legend-mark { width:14px; height:14px; flex:0 0 14px; }
-    .corr-sim-drill {
-      margin-top:12px; border-top:1px solid var(--border); padding-top:8px;
+    .corr-sim-open-btn {
+      display:inline-flex; align-items:center; gap:8px; margin-top:4px;
+      padding:8px 12px; border-radius:8px; cursor:pointer;
+      border:1px solid color-mix(in srgb, var(--accent-2) 42%, var(--border));
+      background:var(--surface-1); color:var(--accent-2);
+      font-size:12px; font-weight:700;
     }
-    .corr-sim-drill summary {
-      cursor:pointer; color:var(--text-secondary); font-size:12px; font-weight:700;
+    .corr-sim-open-btn[hidden] { display:none; }
+    .corr-sim-open-btn:hover {
+      border-color:var(--accent-2);
+      background:color-mix(in srgb, var(--accent-2) 14%, var(--surface-1));
     }
-    .corr-sim-drill[open] summary { margin-bottom:8px; }
-    .corr-sim-drill .dsp-chart-host { min-height:200px; height:220px; }
+    #congruenceDialog { z-index:2147483290; }
+    .congruence-dialog { width:min(920px, 96vw); }
+    .congruence-dialog .dsp-chart-host {
+      min-height:420px; height:min(58vh, 520px);
+    }
+    .congruence-dialog #corrSimChart { display:flex; flex-direction:column; min-height:0; height:100%; }
     .dsp-card { border:1px solid var(--border); border-radius:10px; background:var(--surface-2); padding:10px; min-width:0; }
     .dsp-pair-grid {
       display:grid; grid-template-columns:minmax(280px, 1.35fr) minmax(220px, 0.85fr);
@@ -799,7 +809,7 @@
                 </div>
                 <div class="dsp-card">
                   <div class="dsp-subhead">Pairwise scores by range</div>
-                  <div class="dsp-subhead-note">Click a row for the three-component profile. Pairs in the same range are not ranked against each other</div>
+                  <div class="dsp-subhead-note">Click a row for the three-component profile, then open Congruence scatter. Pairs in the same range are not ranked against each other</div>
                   <div class="dsp-pair-grid">
                     <div>
                       <div class="dsp-pair-wrap">
@@ -822,12 +832,10 @@
                     <div class="dsp-pair-profile">
                       <div class="dsp-subhead" id="corrSimProfileTitle">Pair profile</div>
                       <div id="corrSimProfileBody"></div>
-                      <details class="corr-sim-drill" id="corrSimCongruenceWrap">
-                        <summary>Congruence scatter for the selected groups</summary>
-                        <div class="dsp-chart-host" id="corrSimChartHost">
-                          <div id="corrSimChart"></div>
-                        </div>
-                      </details>
+                      <button type="button" class="corr-sim-open-btn" id="corrSimCongruenceBtn" hidden onclick="openCongruencePopup()">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
+                        Congruence scatter
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -855,6 +863,23 @@
       </div>
       <div class="group-dialog-foot">
         <button type="button" class="group-dialog-done-btn" onclick="confirmGroupDialog()"><i class="fa-solid fa-check"></i> Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scatter-dialog-overlay" id="congruenceDialog" role="dialog" aria-modal="true" aria-labelledby="congruenceDialogTitle">
+    <div class="scatter-dialog congruence-dialog">
+      <div class="scatter-dialog-head">
+        <div>
+          <strong id="congruenceDialogTitle">Congruence scatter</strong>
+          <span id="congruenceDialogSubtitle">Pairwise r in one group versus the other. Click a point for the XY scatter.</span>
+        </div>
+        <button class="scatter-dialog-close" type="button" onclick="closeCongruencePopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="scatter-dialog-body">
+        <div class="dsp-chart-host" id="corrSimChartHost">
+          <div id="corrSimChart"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -916,7 +941,7 @@
           <b>75–89</b> Mostly similar<br>
           <b>50–74</b> Mixed similarity<br>
           <b>Below 50</b> Substantially different<br>
-          Click a table row to see why a pair scored that way. The scatter plots each variable pair’s r in one group against the other; the diagonal is a perfect match.</p>
+          Click a table row to see why a pair scored that way. Open Congruence scatter from the pair profile; the plot is each variable pair’s r in one group against the other, and the diagonal is a perfect match.</p>
         </div>
       </div>
       <div class="dsp-help-rule">
@@ -2417,13 +2442,14 @@
     function renderCorrSimProfile() {
       const title = document.getElementById('corrSimProfileTitle');
       const body = document.getElementById('corrSimProfileBody');
+      const btn = document.getElementById('corrSimCongruenceBtn');
       if (!title || !body) return;
       const pair = selectedCorrSimPair ? findCorrSimPair(selectedCorrSimPair.a, selectedCorrSimPair.b) : null;
       if (!pair) {
         title.textContent = 'Pair profile';
         body.innerHTML = '<div class="dsp-kpi-note">Select a pairwise table row.</div>';
-        const emptyDrill = document.getElementById('corrSimCongruenceWrap');
-        if (emptyDrill) emptyDrill.hidden = true;
+        if (btn) btn.hidden = true;
+        closeCongruencePopup();
         return;
       }
       title.innerHTML = `${escapeHtml(prettyGroupLabel(pair.a))} vs ${escapeHtml(prettyGroupLabel(pair.b))} · <span class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(pair.band)}</span>`;
@@ -2435,19 +2461,26 @@
         </div>
       `;
       animateProfileBars();
-      const drill = document.getElementById('corrSimCongruenceWrap');
-      if (drill) {
-        drill.hidden = !pair;
-        if (!drill.dataset.bound) {
-          drill.dataset.bound = '1';
-          drill.addEventListener('toggle', () => {
-            if (!drill.open) return;
-            const current = selectedCorrSimPair ? findCorrSimPair(selectedCorrSimPair.a, selectedCorrSimPair.b) : null;
-            renderCorrSimCongruence(current);
-          });
-        }
-        if (drill.open) renderCorrSimCongruence(pair);
-      }
+      if (btn) btn.hidden = false;
+      const dialog = document.getElementById('congruenceDialog');
+      if (dialog && dialog.classList.contains('is-visible')) renderCorrSimCongruence(pair);
+    }
+
+    function openCongruencePopup() {
+      const pair = selectedCorrSimPair ? findCorrSimPair(selectedCorrSimPair.a, selectedCorrSimPair.b) : null;
+      if (!pair) return;
+      const dialog = document.getElementById('congruenceDialog');
+      const title = document.getElementById('congruenceDialogTitle');
+      const subtitle = document.getElementById('congruenceDialogSubtitle');
+      if (title) title.textContent = `${prettyGroupLabel(pair.a)} vs ${prettyGroupLabel(pair.b)}`;
+      if (subtitle) subtitle.textContent = `${pair.band} · click a point for the XY scatter`;
+      if (dialog) dialog.classList.add('is-visible');
+      requestAnimationFrame(() => renderCorrSimCongruence(pair));
+    }
+
+    function closeCongruencePopup() {
+      const dialog = document.getElementById('congruenceDialog');
+      if (dialog) dialog.classList.remove('is-visible');
     }
 
     const GROUP_PROFILE_COLORS = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635', '#f472b6', '#22d3ee', '#f97316', '#818cf8', '#34d399'];
@@ -2664,8 +2697,8 @@
         return;
       }
       const host = document.getElementById('corrSimChartHost');
-      const w = Math.max(420, Math.round((host && host.clientWidth) || 420));
-      const h = 220;
+      const w = Math.max(520, Math.round((host && host.clientWidth) || 720));
+      const h = Math.max(360, Math.round(((host && host.clientHeight) || 420) - 8));
       const pad = { l: 54, r: 86, t: 20, b: 44 };
       const plotW = w - pad.l - pad.r;
       const plotH = h - pad.t - pad.b;
@@ -2952,15 +2985,26 @@
 
     window.openScatterPopup = openScatterPopup;
     window.closeScatterPopup = closeScatterPopup;
+    window.openCongruencePopup = openCongruencePopup;
+    window.closeCongruencePopup = closeCongruencePopup;
     window.toggleScatterCombinedView = toggleScatterCombinedView;
 
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
-      closeScatterPopup();
+      const scatterEl = document.getElementById('scatterDialog');
+      const scatterOpen = scatterEl && scatterEl.classList.contains('is-visible');
+      if (scatterOpen) {
+        closeScatterPopup();
+        return;
+      }
+      closeCongruencePopup();
       closeCorrSimHelp();
     });
     document.getElementById('scatterDialog').addEventListener('click', (event) => {
       if (event.target.id === 'scatterDialog') closeScatterPopup();
+    });
+    document.getElementById('congruenceDialog').addEventListener('click', (event) => {
+      if (event.target.id === 'congruenceDialog') closeCongruencePopup();
     });
     document.getElementById('corrSimHelpModal').addEventListener('click', (event) => {
       if (event.target.id === 'corrSimHelpModal') closeCorrSimHelp();

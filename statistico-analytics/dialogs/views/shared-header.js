@@ -1499,7 +1499,16 @@ const StatisticoHeader = {
     if (item.view && item.view === this.currentView) return true;
     if (Array.isArray(item.viewIn) && item.viewIn.includes(this.currentView)) return true;
     if (Array.isArray(item.facets) && item.facets.some((f) => f.view === this.currentView)) return true;
+    if (item.file && this._sidebarFileIsCurrent(item.file)) return true;
+    if (item.iconTone === 'group' && /by-group/i.test(String(this.currentView || ''))) return true;
     return false;
+  },
+
+  _sidebarFileIsCurrent(file) {
+    if (!file || typeof location === 'undefined') return false;
+    const target = String(file).replace(/\\/g, '/').split('/').pop().split('?')[0];
+    const current = String(location.pathname || '').replace(/\\/g, '/').split('/').pop();
+    return !!target && target === current;
   },
 
   _getSidebarItemDescription(item) {
@@ -1681,6 +1690,7 @@ const StatisticoHeader = {
         pinnedNav: this._byGroupPinnedNav({
           type: 'navigate',
           view: 'correlation-by-group',
+          viewIn: ['correlation-by-group', 'correlation-by-group-similarity'],
           file: 'correlations/by-group.html'
         })
       };
@@ -2209,7 +2219,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260919sbchrome',
+  _TAB_ASSET_VER: '20260919bygrp2',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

@@ -10,10 +10,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/modules/solid-gauge.js"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp2"/>
-  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp"/>
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp3"/>
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260919bygrp"></script>
-  <script src="../shared-header.js?v=20260919bygrp2"></script>
+  <script src="../../shared/by-group-standard.js?v=20260919bygrp3"></script>
+  <script src="../shared-header.js?v=20260919bygrp3"></script>
   <script src="reliability-engine.js?v=20260820rel2"></script>
   <style>
     :root {
@@ -272,12 +272,8 @@
           <div class="panel">
             <div class="panel-heading">By-Group Analysis</div>
             <div class="panel-body">
-              <p class="help" id="groupSubtitle">Examine whether the overall finding remains consistent across categories, segments, or conditions.</p>
-              <div id="byGroupIntro"></div>
-              <div id="byGroupSetup"></div>
-              <div id="byGroupConsistency"></div>
-              <div id="byGroupSafeguard"></div>
-              <p class="help" id="groupHelp">Select a categorical variable that defines the groups to compare.</p>
+              <div id="byGroupFinding"></div>
+              <p class="help" id="subtitle" hidden></p>
               <div class="matrix-wrap"><table id="groupTable"></table></div>
               <div id="group-chart" style="margin-top:12px;"></div>
               <div id="byGroupInterpret"></div>
@@ -725,19 +721,9 @@
     function renderGroups(obs) {
       var groups = obs.groups || [];
       var BG = window.StatisticoByGroup;
-      if (BG) {
-        BG.mount('#byGroupIntro', BG.introHtml('reliability'));
-      }
       if (!groups.length) {
         document.getElementById('groupTable').innerHTML = '';
-        document.getElementById('groupHelp').textContent = 'No grouping variable was selected.';
-        if (BG) {
-          BG.mount('#byGroupSetup', '');
-          BG.mount('#byGroupConsistency', '');
-          BG.mount('#byGroupSafeguard', '');
-          BG.mount('#byGroupInterpret', '');
-          BG.publishContext(null);
-        }
+        if (BG) BG.mountResultFirst({ header: {} });
         return;
       }
       var cfg = _bundle && _bundle.analysisConfig ? _bundle.analysisConfig : {};
@@ -756,31 +742,26 @@
       var extreme = alphas.slice().sort(function (a, b) { return a.value - b.value; })[0];
       var differs = extreme ? extreme.name + ' has the lowest reliability.' : 'No single group stands out from the others.';
       var warning = assessed && assessed.smallGroups.length ? 'Small groups: ' + assessed.smallGroups.join(', ') + '.' : '';
-      document.getElementById('groupHelp').textContent = 'Select a categorical variable that defines the groups to compare.';
       if (BG) {
-        var setupLevels = groups.map(function (g) {
-          return { name: g.group, n: g.validN, included: true, small: g.validN < minN };
-        });
-        BG.mount('#byGroupSetup', BG.groupSetupHtml({
-          groupName: cfg.groupVariable || 'Group',
-          missingN: 0,
-          levels: setupLevels
-        }));
-        BG.mount('#byGroupConsistency', BG.consistencyHtml(status));
-        BG.mount('#byGroupSafeguard', BG.safeguardHtml(false));
-        BG.mount('#byGroupInterpret', BG.interpretationHtml({
+        var headline = status.label;
+        var conclusion = differs;
+        if (status.id === 'consistent') conclusion = 'The overall finding remains similar across groups.';
+        if (status.id === 'insufficient') conclusion = warning || status.hint;
+        BG.mountResultFirst({
           moduleKey: 'reliability',
+          header: {
+            variable: (cfg.items && cfg.items.length) ? (cfg.items.length + ' items') : 'Reliability',
+            groupName: cfg.groupVariable || 'Group',
+            groupCount: groups.length,
+            n: groups.reduce(function (sum, g) { return sum + (g.validN || 0); }, 0) || undefined
+          },
+          headline: headline,
+          conclusion: conclusion,
           status: status,
           differsText: differs,
           directionText: 'Reliability is bounded 0–1, so direction reversal does not apply; compare coefficient magnitude instead.',
-          warningText: warning
-        }));
-        BG.publishContext({
-          moduleKey: 'reliability',
-          status: status,
-          directionChanges: false,
-          differsText: differs,
-          warningText: warning
+          warningText: warning,
+          directionChanges: false
         });
       }
       var html = '<thead><tr><th>Group</th><th>Valid N</th><th>Items</th><th>Alpha</th><th>Alpha CI</th><th>Omega</th><th>Mean inter-item r</th><th>Status</th></tr></thead><tbody>';

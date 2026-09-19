@@ -13,12 +13,12 @@
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
   <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp2" />
-  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp3" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260916nobot" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260919bygrp"></script>
-  <script src="../shared-header.js?v=20260919bygrp2"></script>
+  <script src="../../shared/by-group-standard.js?v=20260919bygrp3"></script>
+  <script src="../shared-header.js?v=20260919bygrp3"></script>
   <script src="contingency-engine.js?v=20260911freq1"></script>
   <script src="contingency-sample-data.js?v=20260909ctsim"></script>
   <script src="../../shared/contingency-similarity.js?v=20260909ctsim"></script>
@@ -322,7 +322,7 @@
         <div class="toolbar">
           <div class="title">
             <strong>By-Group Analysis</strong>
-            <span id="subtitle">Examine whether the overall finding remains consistent across categories, segments, or conditions.</span>
+            <span id="subtitle" hidden></span>
           </div>
           <div class="controls">
             <span class="group-choice-label" id="groupChoiceLabel">Group by: not selected</span>
@@ -330,15 +330,12 @@
           </div>
         </div>
         <div class="content">
-          <div id="byGroupIntro"></div>
+          <div id="byGroupFinding"></div>
           <div id="emptyState" class="empty">
             <i class="fa-solid fa-layer-group"></i>
             Run Frequencies &amp; Crosstabs, then choose a grouping column to compare results across groups.
           </div>
           <div id="mainContent">
-            <div id="byGroupSetup"></div>
-            <div id="byGroupConsistency"></div>
-            <div id="byGroupSafeguard"></div>
             <div class="summary-strip" id="summaryStrip">
               <div class="metric"><label>Table dimensions</label><strong id="metricShape">—</strong></div>
               <div class="metric"><label id="metricRowsLabel">Total eligible N</label><strong id="metricRows">—</strong></div>
@@ -1696,15 +1693,9 @@
     function syncByGroupStandard() {
       var BG = window.StatisticoByGroup;
       if (!BG) return;
-      BG.applyPageTitles();
-      BG.mount('#byGroupIntro', BG.introHtml('contingency'));
       var levels = (groupResults || []).filter(function (item) { return item.key !== 'overall'; });
       if (!levels.length) {
-        BG.mount('#byGroupSetup', '');
-        BG.mount('#byGroupConsistency', '');
-        BG.mount('#byGroupSafeguard', '');
-        BG.mount('#byGroupInterpret', '');
-        BG.publishContext(null);
+        BG.mountResultFirst({ header: {} });
         return;
       }
       var minN = 10;
@@ -1730,28 +1721,29 @@
       var extreme = signed.slice().sort(function (a, b) { return Math.abs(b.v || 0) - Math.abs(a.v || 0); })[0];
       var differs = extreme ? extreme.name + ' has the largest association strength.' : 'No single group stands out from the others.';
       var warning = unreliable ? 'One or more groups have a small n or sparse cells; those association statistics are unstable.' : '';
-      BG.mount('#byGroupSetup', BG.groupSetupHtml({
-        groupName: sourceHeaders[groupIndex],
-        missingN: countMissingGroupValues(),
-        levels: levels.map(function (item) { return { name: item.label, n: item.n, included: true, small: item.n < minN }; })
-      }));
-      BG.mount('#byGroupConsistency', BG.consistencyHtml(status));
-      BG.mount('#byGroupSafeguard', BG.safeguardHtml(false));
-      BG.mount('#byGroupInterpret', BG.interpretationHtml({
+      var headline = status.label;
+      var conclusion = status.directionChanges
+        ? 'The association changes direction across groups.'
+        : differs;
+      if (status.id === 'consistent') conclusion = 'The overall finding remains similar across groups.';
+      if (status.id === 'insufficient') conclusion = warning || status.hint;
+      BG.mountResultFirst({
         moduleKey: 'contingency',
+        header: {
+          variable: spec.rowVar && spec.colVar ? spec.rowVar + ' × ' + spec.colVar : 'Contingency',
+          groupName: sourceHeaders[groupIndex],
+          groupCount: levels.length,
+          n: levels.reduce(function (sum, item) { return sum + (item.n || 0); }, 0) || undefined
+        },
+        headline: headline,
+        conclusion: conclusion,
         status: status,
         differsText: differs,
         directionText: status.directionChanges
           ? 'The association changes direction across groups.'
           : 'No direction reversal was detected among reliable groups.',
-        warningText: warning
-      }));
-      BG.publishContext({
-        moduleKey: 'contingency',
-        status: status,
-        directionChanges: status.directionChanges,
-        differsText: differs,
-        warningText: warning
+        warningText: warning,
+        directionChanges: status.directionChanges
       });
     }
 
@@ -1858,7 +1850,6 @@
       }
       if (window.StatisticoByGroup) {
         window.StatisticoByGroup.applyPageTitles();
-        window.StatisticoByGroup.mount('#byGroupIntro', window.StatisticoByGroup.introHtml('contingency'));
       }
       var ok = loadNavData() || bootDemoFallback();
       startBridge();

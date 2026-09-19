@@ -12,12 +12,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.4/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
   <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp2" />
-  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp3" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260916nobot" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260919bygrp"></script>
-  <script src="../shared-header.js?v=20260919bygrp2"></script>
+  <script src="../../shared/by-group-standard.js?v=20260919bygrp3"></script>
+  <script src="../shared-header.js?v=20260919bygrp3"></script>
   <script src="../shared/group-column-suitability.js?v=20260902comparegroups"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <script src="../../shared/distribution-similarity.js?v=20260916histrange"></script>
@@ -496,26 +496,23 @@
         <div class="toolbar">
           <div class="title">
             <strong id="resultTitle">By-Group Analysis</strong>
-            <span id="subtitle">Examine whether the overall finding remains consistent across categories, segments, or conditions.</span>
+            <span id="subtitle" hidden></span>
           </div>
           <div class="controls">
             <div class="grouping-compact" id="groupingCompact" hidden>
-              <span id="groupingCompactText">Group by: —</span>
+              <span id="groupingCompactText" hidden></span>
               <button type="button" class="grouping-change-btn" id="changeGroupBtn" onclick="openGroupDialog()">Change</button>
             </div>
             <button id="chooseGroupBtn" type="button" onclick="openGroupDialog()"><i class="fa-solid fa-layer-group"></i> Group by</button>
           </div>
         </div>
         <div class="content">
-          <div id="byGroupIntro"></div>
+          <div id="byGroupFinding"></div>
           <div id="emptyState" class="empty" style="display:none;">
             <i class="fa-solid fa-layer-group"></i>
             <div id="emptyText">Run a univariate analysis with source rows, then choose a grouping column.</div>
           </div>
           <div id="mainContent" style="display:none;">
-            <div id="byGroupSetup"></div>
-            <div id="byGroupConsistency"></div>
-            <div id="byGroupSafeguard"></div>
             <div id="byGroupPanel-stats" class="by-group-panel is-active">
             <section id="tablePanel" class="panel">
               <div class="section-title"><strong>Grouped Statistics</strong><span>Select a group to zoom its chart</span></div>
@@ -560,8 +557,7 @@
             <div id="byGroupPanel-similarity" class="by-group-panel">
               <section class="panel">
                 <div class="section-title">
-                  <strong>Similarity Profile™ <span class="st-original-badge" title="Statistico original">STATISTICO</span><button type="button" class="dsp-info-btn" id="dspInfoBtn" aria-label="About Similarity Profile">i</button></strong>
-                  <span>How similar groups are in location, spread, and shape — an effect-size description, not a significance test</span>
+                  <strong>Similarity Profile<button type="button" class="dsp-info-btn" id="dspInfoBtn" aria-label="About Similarity Profile">i</button></strong>
                 </div>
                 <div id="dspEmpty" class="empty" style="display:none;">
                   <i class="fa-solid fa-clone"></i>
@@ -1071,22 +1067,22 @@
 
     function updateGroupChoiceLabel() {
       const compact = document.getElementById('groupingCompact');
-      const compactText = document.getElementById('groupingCompactText');
       const chooseBtn = document.getElementById('chooseGroupBtn');
       const hasGroup = isValidGroupIndex(groupIndex) && !isGroupColumnDisabled(groupIndex);
       if (chooseBtn) chooseBtn.style.display = hasGroup ? 'none' : '';
       if (compact) compact.hidden = !hasGroup;
       if (!hasGroup) {
-        if (compactText) compactText.textContent = 'Group by: —';
+        if (window.StatisticoByGroup) window.StatisticoByGroup.applyHeaderMeta('#subtitle', {});
         return;
       }
-      const groupName = headers[groupIndex] || 'Group';
-      const nGroups = groupStats.length;
-      const nRows = groupStats.reduce((sum, g) => sum + g.n, 0);
-      if (compactText) {
-        compactText.textContent = nGroups
-          ? `Group by: ${groupName} · ${nGroups} group${nGroups === 1 ? '' : 's'} · n = ${nRows}`
-          : `Group by: ${groupName}`;
+      const BG = window.StatisticoByGroup;
+      if (BG) {
+        BG.applyHeaderMeta('#subtitle', {
+          variable: currentAnalysisVariableName(),
+          groupName: headers[groupIndex] || 'Group',
+          groupCount: groupStats.length,
+          n: groupStats.reduce((sum, g) => sum + g.n, 0) || undefined
+        });
       }
     }
 
@@ -1346,14 +1342,8 @@
     function syncByGroupStandard() {
       const BG = window.StatisticoByGroup;
       if (!BG) return;
-      BG.applyPageTitles();
-      BG.mount('#byGroupIntro', BG.introHtml('univariate'));
       if (!(groupStats || []).length) {
-        BG.mount('#byGroupSetup', '');
-        BG.mount('#byGroupConsistency', '');
-        BG.mount('#byGroupSafeguard', '');
-        BG.mount('#byGroupInterpret', '');
-        BG.publishContext(null);
+        BG.mountResultFirst({ header: {} });
         return;
       }
       const minN = currentMinGroupN();
@@ -1382,26 +1372,30 @@
       const warning = assessed.smallGroups.length
         ? `Small groups: ${assessed.smallGroups.join(', ')}.`
         : '';
-      BG.mount('#byGroupSetup', BG.groupSetupHtml({
-        groupName: headers[groupIndex],
-        missingN: countMissingGroupValues(),
-        levels: groupStats.map((g) => ({ name: g.group, n: g.n, included: true, small: g.n < minN }))
-      }));
-      BG.mount('#byGroupConsistency', BG.consistencyHtml(status));
-      BG.mount('#byGroupSafeguard', BG.safeguardHtml(false));
-      BG.mount('#byGroupInterpret', BG.interpretationHtml({
+      let headline = status.label;
+      let conclusion = differs;
+      if (status.id === 'consistent') conclusion = 'The overall finding remains similar across groups.';
+      if (status.id === 'insufficient') conclusion = warning || status.hint;
+      if (activeByGroupTab === 'similarity' && dspProfile && dspProfile.usablePairCount) {
+        const comps = BG.similarityComponentsFromPairs(dspProfile.pairs);
+        headline = BG.similarityHeadline((dspProfile.homogeneityBand || {}).label, dspProfile.homogeneity);
+        conclusion = BG.similarityConclusion(comps);
+      }
+      BG.mountResultFirst({
         moduleKey: 'univariate',
+        header: {
+          variable: currentAnalysisVariableName(),
+          groupName: headers[groupIndex],
+          groupCount: groupStats.length,
+          n: groupStats.reduce((sum, g) => sum + g.n, 0)
+        },
+        headline,
+        conclusion,
         status,
         differsText: differs,
         directionText: 'Direction reversal does not apply to a single numeric variable; compare location and spread instead.',
-        warningText: warning
-      }));
-      BG.publishContext({
-        moduleKey: 'univariate',
-        status,
-        directionChanges: false,
-        differsText: differs,
-        warningText: warning
+        warningText: warning,
+        directionChanges: false
       });
     }
 
@@ -1450,6 +1444,7 @@
       if (activeByGroupTab === 'similarity') {
         renderSimDistributionPanel();
       }
+      syncByGroupStandard();
     }
     window.switchByGroupTab = switchByGroupTab;
 
@@ -2255,13 +2250,12 @@
     function renderDspGauge() {
       const host = document.getElementById('dspGaugeCard');
       if (!host || !dspProfile) return;
+      const BG = window.StatisticoByGroup;
       const homo = dspProfile.homogeneity;
       const band = dspProfile.homogeneityBand || { key: 'na', label: 'Not enough data' };
-      const pairN = Number(dspProfile.usablePairCount) || 0;
-      host.innerHTML = `
-        <div class="dsp-homo-gauge-wrap">${homoGaugeSvg(homo, band.key)}</div>
-        <div class="dsp-homo-meta">${escapeHtml(band.label)} · ${pairN} pairwise ${pairN === 1 ? 'score' : 'scores'}</div>`;
-      animateHomoGauge(homo);
+      host.innerHTML = BG
+        ? BG.scoreCardHtml({ score: homo, band: band.label })
+        : `<div class="bg-std-score-card"><span class="bg-std-kicker">Overall similarity</span><strong class="bg-std-score-value">${Number.isFinite(homo) ? Math.round(homo) : '—'}</strong><span class="bg-std-score-band">${escapeHtml(band.label)}</span></div>`;
     }
 
     function renderSimDistributionPanel() {
@@ -2332,16 +2326,11 @@
       }
       title.innerHTML = `${escapeHtml(prettyGroupLabel(pair.a))} vs ${escapeHtml(prettyGroupLabel(pair.b))} · <span class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(pair.band)}</span>`;
       body.innerHTML = `
-        <div class="dsp-bars-head">
-          Three components
-          <button type="button" class="dsp-info-btn" onclick="openDspHelp()" aria-label="About location, spread and shape">i</button>
-        </div>
         <div class="dsp-bars">
           ${dspBar('Location', pair.location)}
           ${dspBar('Spread', pair.spread)}
           ${dspBar('Shape', pair.shape)}
         </div>
-        <div class="dsp-kpi-note">Comparing ${escapeHtml(groupLevelWithN(pair.a, pair.nA))} with ${escapeHtml(groupLevelWithN(pair.b, pair.nB))}. Standardized shape removes mean and SD before comparing densities.</div>
       `;
       animateProfileBars();
     }
@@ -2624,7 +2613,6 @@
       }
       if (window.StatisticoByGroup) {
         window.StatisticoByGroup.applyPageTitles();
-        window.StatisticoByGroup.mount('#byGroupIntro', window.StatisticoByGroup.introHtml('univariate'));
       }
       if (typeof StatisticoWorkspaceTabs !== 'undefined') StatisticoWorkspaceTabs.init();
       bindDspHelp();

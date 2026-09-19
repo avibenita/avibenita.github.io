@@ -113,4 +113,34 @@ describe('StatisticoByGroup contract', () => {
     expect(block).toContain('PROMINENT');
     expect(block).toContain(BG.SAFEGUARD_DESCRIPTIVE);
   });
+
+  test('builds a compact header and result-first finding', () => {
+    expect(BG.headerMetaText({
+      variable: 'Feature_Z',
+      groupName: 'Reference_Cluster',
+      groupCount: 3,
+      n: 190
+    })).toBe('Feature_Z · Grouped by Reference_Cluster · 3 groups · n=190');
+    expect(BG.similarityHeadline('Mixed similarity', 57.4)).toBe('Mixed similarity · 57/100');
+    expect(BG.similarityConclusion([
+      { id: 'location', label: 'location', score: 26 },
+      { id: 'spread', label: 'spread', score: 92 },
+      { id: 'shape', label: 'shape', score: 93 }
+    ])).toBe('Groups differ mainly in location. Their spread and shape are very similar.');
+    const finding = BG.findingHtml({
+      headline: 'Mixed similarity · 57/100',
+      conclusion: 'Groups differ mainly in location. Their spread and shape are very similar.',
+      descriptive: true
+    });
+    expect(finding).toContain('Mixed similarity · 57/100');
+    expect(finding).toContain('Groups differ mainly in location');
+    expect(finding).toContain('Descriptive only');
+    expect(BG.scoreCardHtml({ score: 57.4, band: 'Mixed similarity' })).toContain('Overall similarity');
+    expect(BG.methodDetailsHtml({ moduleKey: 'univariate' })).toContain('Method &amp; interpretation');
+    const comps = BG.similarityComponentsFromPairs([
+      { usable: true, location: 26, spread: 92, shape: 93 },
+      { usable: true, location: 26, spread: 92, shape: 93 }
+    ]);
+    expect(BG.similarityConclusion(comps)).toBe('Groups differ mainly in location. Their spread and shape are very similar.');
+  });
 });

@@ -7,6 +7,7 @@
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.StatisticoByGroup = api;
+  root.openByGroupMethod = api.openMethod;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
@@ -285,11 +286,187 @@
     var title = scope.querySelector('.title strong, #resultTitle');
     var sub = scope.querySelector('#subtitle');
     if (title) title.textContent = PAGE_TITLE;
-    if (sub) sub.textContent = PAGE_SUBTITLE;
+    if (sub) {
+      sub.textContent = '';
+      sub.hidden = true;
+    }
     if (typeof document !== 'undefined' && document.title && /by group|grouped analysis/i.test(document.title)) {
       var suffix = document.title.indexOf(' - ') >= 0 ? document.title.slice(document.title.indexOf(' - ')) : '';
       document.title = PAGE_TITLE + suffix;
     }
+  }
+
+  function headerMetaText(info) {
+    info = info || {};
+    var parts = [];
+    if (info.variable) parts.push(info.variable);
+    if (info.groupName) parts.push('Grouped by ' + info.groupName);
+    if (Number(info.groupCount) > 0) {
+      parts.push(info.groupCount + (info.groupCount === 1 ? ' group' : ' groups'));
+    }
+    if (info.n != null && info.n !== '') parts.push('n=' + info.n);
+    return parts.join(' · ');
+  }
+
+  function applyHeaderMeta(el, info) {
+    if (typeof el === 'string') {
+      el = typeof document !== 'undefined' ? document.querySelector(el) : null;
+    }
+    if (!el) return '';
+    var text = headerMetaText(info);
+    el.textContent = text;
+    el.hidden = !text;
+    return text;
+  }
+
+  function joinLabels(items) {
+    if (!items || !items.length) return '';
+    if (items.length === 1) return items[0];
+    if (items.length === 2) return items[0] + ' and ' + items[1];
+    return items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+  }
+
+  function similarityComponentsFromPairs(pairs, keys) {
+    keys = keys || [
+      { id: 'location', label: 'location', key: 'location' },
+      { id: 'spread', label: 'spread', key: 'spread' },
+      { id: 'shape', label: 'shape', key: 'shape' }
+    ];
+    var usable = (Array.isArray(pairs) ? pairs : []).filter(function (p) {
+      return p && p.usable !== false;
+    });
+    return keys.map(function (k) {
+      var vals = usable.map(function (p) { return Number(p[k.key]); }).filter(Number.isFinite);
+      var score = NaN;
+      if (vals.length) {
+        var prod = vals.reduce(function (s, v) { return s * Math.max(v, 1e-9); }, 1);
+        score = Math.pow(prod, 1 / vals.length);
+      }
+      return { id: k.id, label: k.label, score: score };
+    });
+  }
+
+  function similarityHeadline(bandLabel, score) {
+    var rounded = Number.isFinite(Number(score)) ? String(Math.round(Number(score))) + '/100' : '—';
+    var label = String(bandLabel || 'Overall similarity').trim();
+    return label + ' · ' + rounded;
+  }
+
+  function similarityConclusion(components) {
+    var usable = (Array.isArray(components) ? components : []).filter(function (c) {
+      return c && Number.isFinite(Number(c.score));
+    }).map(function (c) {
+      return { id: c.id || c.label, label: c.label || c.id, score: Number(c.score) };
+    });
+    if (!usable.length) return 'Not enough overlapping group data to describe similarity.';
+    var sorted = usable.slice().sort(function (a, b) { return a.score - b.score; });
+    var weakest = sorted[0];
+    var rest = sorted.slice(1);
+    var restSimilar = rest.filter(function (c) { return c.score >= 75; });
+    if (weakest.score >= 90) {
+      return 'Groups are very similar in ' + joinLabels(usable.map(function (c) { return c.label; })) + '.';
+    }
+    if (weakest.score >= 75) {
+      return 'Groups are mostly similar across ' + joinLabels(usable.map(function (c) { return c.label; })) + '.';
+    }
+    if (restSimilar.length && restSimilar.length === rest.length) {
+      return 'Groups differ mainly in ' + weakest.label + '. Their ' + joinLabels(restSimilar.map(function (c) { return c.label; })) + ' are very similar.';
+    }
+    if (restSimilar.length) {
+      return 'Groups differ mainly in ' + weakest.label + '. Their ' + joinLabels(restSimilar.map(function (c) { return c.label; })) + ' remain similar.';
+    }
+    return 'Similarity varies across ' + joinLabels(usable.map(function (c) { return c.label; })) + '.';
+  }
+
+  function findingHtml(model) {
+    model = model || {};
+    var status = model.headline || (model.status && model.status.label) || '';
+    var conclusion = model.conclusion || '';
+    var badge = model.descriptive !== false
+      ? '<span class="bg-std-badge" title="' + escapeHtml(SAFEGUARD_DESCRIPTIVE) + '">Descriptive only <i class="fa-solid fa-circle-info"></i></span>'
+      : '';
+    var info = '<button type="button" class="bg-std-info-btn" onclick="if(window.openByGroupMethod)window.openByGroupMethod()" aria-label="Why this matters">'
+      + '<i class="fa-solid fa-circle-info"></i></button>';
+    if (!status && !conclusion) return '';
+    return '<section class="bg-std-finding" aria-label="Main finding">'
+      + '<div class="bg-std-finding-row">'
+      + '<strong class="bg-std-finding-status">' + escapeHtml(status) + '</strong>'
+      + badge + info
+      + '</div>'
+      + (conclusion ? '<p class="bg-std-finding-copy">' + escapeHtml(conclusion) + '</p>' : '')
+      + '</section>';
+  }
+
+  function scoreCardHtml(model) {
+    model = model || {};
+    var score = Number.isFinite(Number(model.score)) ? String(Math.round(Number(model.score))) : '—';
+    var band = model.band || '';
+    return '<div class="bg-std-score-card">'
+      + '<span class="bg-std-kicker">Overall similarity</span>'
+      + '<strong class="bg-std-score-value">' + escapeHtml(score) + '</strong>'
+      + (band ? '<span class="bg-std-score-band">' + escapeHtml(band) + '</span>' : '')
+      + '</div>';
+  }
+
+  function methodDetailsHtml(model) {
+    model = model || {};
+    var parts = buildInterpretation(model);
+    var extra = moduleSentence(model.moduleKey);
+    return '<details class="bg-std-method" id="byGroupMethodDetails">'
+      + '<summary>Method &amp; interpretation</summary>'
+      + '<p><strong>' + escapeHtml(WHY_TITLE) + '.</strong> ' + escapeHtml(WHY_BODY)
+      + (extra ? ' ' + escapeHtml(extra) : '') + '</p>'
+      + '<p><strong>Group by.</strong> ' + escapeHtml(GROUP_BY_HELP)
+      + (model.groupName ? ' Current grouping: ' + escapeHtml(model.groupName) + '.' : '') + '</p>'
+      + '<ul>'
+      + '<li><strong>What remains consistent.</strong> ' + escapeHtml(parts.consistent) + '</li>'
+      + '<li><strong>Which group differs most.</strong> ' + escapeHtml(parts.differs) + '</li>'
+      + '<li><strong>Whether direction changes.</strong> ' + escapeHtml(parts.direction) + '</li>'
+      + (parts.warning ? '<li><strong>Uncertainty.</strong> ' + escapeHtml(parts.warning) + '</li>' : '')
+      + '<li><strong>Next analysis.</strong> ' + escapeHtml(parts.next) + '</li>'
+      + '</ul>'
+      + (model.descriptive !== false ? '<p class="bg-std-method-note">' + escapeHtml(SAFEGUARD_DESCRIPTIVE) + '</p>' : '')
+      + '</details>';
+  }
+
+  function hideLegacyChrome() {
+    if (typeof document === 'undefined') return;
+    ['byGroupIntro', 'byGroupSetup', 'byGroupConsistency', 'byGroupSafeguard'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = '';
+      el.hidden = true;
+    });
+  }
+
+  function mountResultFirst(model) {
+    model = model || {};
+    applyPageTitles();
+    hideLegacyChrome();
+    applyHeaderMeta(model.headerEl || '#subtitle', model.header || {});
+    var hasResult = !!(model.headline || (model.status && model.status.label) || model.conclusion);
+    mount(model.findingEl || '#byGroupFinding', hasResult ? findingHtml(model) : '');
+    mount(model.methodEl || '#byGroupInterpret', hasResult ? methodDetailsHtml(model) : '');
+    if (model.publish === false) return;
+    if (!hasResult) {
+      publishContext(null);
+      return;
+    }
+    publishContext({
+      moduleKey: model.moduleKey,
+      status: model.status,
+      directionChanges: model.directionChanges,
+      differsText: model.differsText,
+      warningText: model.warningText
+    });
+  }
+
+  function openMethod() {
+    if (typeof document === 'undefined') return;
+    var el = document.getElementById('byGroupMethodDetails');
+    if (!el) return;
+    el.open = true;
+    if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
   }
 
   function publishContext(ctx) {
@@ -343,9 +520,20 @@
     groupSetupHtml: groupSetupHtml,
     consistencyHtml: consistencyHtml,
     interpretationHtml: interpretationHtml,
+    headerMetaText: headerMetaText,
+    applyHeaderMeta: applyHeaderMeta,
+    similarityComponentsFromPairs: similarityComponentsFromPairs,
+    similarityHeadline: similarityHeadline,
+    similarityConclusion: similarityConclusion,
+    findingHtml: findingHtml,
+    scoreCardHtml: scoreCardHtml,
+    methodDetailsHtml: methodDetailsHtml,
+    hideLegacyChrome: hideLegacyChrome,
+    mountResultFirst: mountResultFirst,
     mount: mount,
     applyPageTitles: applyPageTitles,
     publishContext: publishContext,
+    openMethod: openMethod,
     aiPromptBlock: aiPromptBlock
   };
 });

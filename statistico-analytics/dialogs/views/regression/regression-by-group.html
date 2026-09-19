@@ -10,12 +10,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
   <link rel="stylesheet" href="../shared-header.css?v=20260919bygrp2" />
-  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20260919bygrp3" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260916nobot" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260919bygrp"></script>
-  <script src="../shared-header.js?v=20260919bygrp2"></script>
+  <script src="../../shared/by-group-standard.js?v=20260919bygrp3"></script>
+  <script src="../shared-header.js?v=20260919bygrp3"></script>
   <script src="../../shared/regression-similarity.js?v=20260914regsim6"></script>
   <script src="../../shared/regression-pred-labels.js?v=20260916pred2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -582,7 +582,7 @@
         <div class="toolbar">
           <div class="title">
             <strong>By-Group Analysis</strong>
-            <span id="subtitle">Examine whether the overall finding remains consistent across categories, segments, or conditions.</span>
+            <span id="subtitle" hidden></span>
           </div>
           <div class="controls">
             <span class="group-choice-label" id="groupChoiceLabel">Group by: not selected</span>
@@ -590,15 +590,12 @@
           </div>
         </div>
         <div class="content">
-          <div id="byGroupIntro"></div>
+          <div id="byGroupFinding"></div>
           <div id="emptyState" class="empty">
             <i class="fa-solid fa-layer-group"></i>
             Run a regression analysis, then choose a grouping column to compare results across groups.
           </div>
           <div id="mainContent" style="display:none;">
-            <div id="byGroupSetup"></div>
-            <div id="byGroupConsistency"></div>
-            <div id="byGroupSafeguard"></div>
             <div class="reg-bg-panel is-active" id="regByGroupPanel-coefficients">
             <div class="summary-strip">
               <div class="metric"><label>Predictors</label><strong id="metricPredictors">—</strong></div>
@@ -654,8 +651,7 @@
             </div>
             <div class="reg-bg-panel" id="regByGroupPanel-similarity">
               <div class="section-title">
-                <strong>Similarity Profile™ <span class="st-original-badge" title="Statistico original">STATISTICO</span><button type="button" class="dsp-info-btn" onclick="openRegSimHelp()" aria-label="About Similarity Profile">i</button></strong>
-                <span>How similar groups are in coefficient pattern, strength, and sign — a description, not a significance test</span>
+                <strong>Similarity Profile<button type="button" class="dsp-info-btn" onclick="openRegSimHelp()" aria-label="About Similarity Profile">i</button></strong>
               </div>
               <div id="regSimEmpty" class="empty" style="display:none;">
                 <i class="fa-solid fa-clone"></i>
@@ -804,6 +800,7 @@
     let showCoefPanel = false;
     let regByGroupPanel = 'coefficients';
     window.__regByGroupActiveTab = 'coefficients';
+    let lastByGroupSummary = null;
     let regSimProfile = null;
     let selectedRegSimPair = null;
     let homoGaugePlayed = false;
@@ -951,14 +948,10 @@
     function syncByGroupStandard(summary) {
       const BG = window.StatisticoByGroup;
       if (!BG) return;
-      BG.applyPageTitles();
-      BG.mount('#byGroupIntro', BG.introHtml('regression'));
+      if (summary) lastByGroupSummary = summary;
+      else summary = lastByGroupSummary;
       if (!(activeGroups || []).length || !summary) {
-        BG.mount('#byGroupSetup', '');
-        BG.mount('#byGroupConsistency', '');
-        BG.mount('#byGroupSafeguard', '');
-        BG.mount('#byGroupInterpret', '');
-        BG.publishContext(null);
+        BG.mountResultFirst({ header: {} });
         return;
       }
       const minN = 10;
@@ -973,28 +966,39 @@
       const warning = (activeGroups || []).some((g) => g.n < minN)
         ? 'One or more groups have a small fitted n; those coefficients are unstable.'
         : '';
-      BG.mount('#byGroupSetup', BG.groupSetupHtml({
-        groupName: sourceHeaders[groupIndex],
-        missingN: countMissingGroupValues(),
-        levels: activeGroups.map((g) => ({ name: g.group, n: g.n, included: true, small: g.n < minN }))
-      }));
-      BG.mount('#byGroupConsistency', BG.consistencyHtml(status));
-      BG.mount('#byGroupSafeguard', BG.safeguardHtml(false));
-      BG.mount('#byGroupInterpret', BG.interpretationHtml({
+      const n = (activeGroups || []).reduce((sum, g) => sum + (g.n || 0), 0);
+      let headline = status.label;
+      let conclusion = status.directionChanges
+        ? 'At least one coefficient changes sign across groups.'
+        : differs;
+      if (status.id === 'consistent') conclusion = 'The overall finding remains similar across groups.';
+      if (status.id === 'insufficient') conclusion = warning || status.hint;
+      if (regByGroupPanel === 'similarity' && typeof regSimProfile !== 'undefined' && regSimProfile && regSimProfile.usablePairCount) {
+        const comps = BG.similarityComponentsFromPairs(regSimProfile.pairs, [
+          { id: 'pattern', label: 'pattern', key: 'pattern' },
+          { id: 'strength', label: 'strength', key: 'strength' },
+          { id: 'sign', label: 'sign', key: 'sign' }
+        ]);
+        headline = BG.similarityHeadline((regSimProfile.homogeneityBand || {}).label, regSimProfile.homogeneity);
+        conclusion = BG.similarityConclusion(comps);
+      }
+      BG.mountResultFirst({
         moduleKey: 'regression',
+        header: {
+          variable: (modelSpec && modelSpec.y) || 'Regression',
+          groupName: sourceHeaders[groupIndex],
+          groupCount: activeGroups.length,
+          n: n || undefined
+        },
+        headline,
+        conclusion,
         status,
         differsText: differs,
         directionText: status.directionChanges
           ? 'At least one coefficient changes sign across groups.'
           : 'No coefficient sign reversal was detected among reliable groups.',
-        warningText: warning
-      }));
-      BG.publishContext({
-        moduleKey: 'regression',
-        status,
-        directionChanges: status.directionChanges,
-        differsText: differs,
-        warningText: warning
+        warningText: warning,
+        directionChanges: status.directionChanges
       });
     }
 
@@ -1962,6 +1966,7 @@
         el.classList.toggle('is-active', name === regByGroupPanel);
       });
       if (regByGroupPanel === 'similarity') renderRegSimilarity();
+      syncByGroupStandard();
     }
 
     function openRegSimHelp() {
@@ -2541,13 +2546,12 @@
     function renderRegSimGauge() {
       const host = document.getElementById('regSimGaugeCard');
       if (!host || !regSimProfile) return;
+      const BG = window.StatisticoByGroup;
       const homo = regSimProfile.homogeneity;
       const band = regSimProfile.homogeneityBand || { key: 'na', label: 'Not enough data' };
-      const pairN = Number(regSimProfile.usablePairCount) || 0;
-      host.innerHTML = `
-        <div class="dsp-homo-gauge-wrap">${homoGaugeSvg(homo, band.key)}</div>
-        <div class="dsp-homo-meta">${escapeHtml(band.label)} · ${pairN} pairwise ${pairN === 1 ? 'score' : 'scores'}</div>`;
-      animateHomoGauge(homo);
+      host.innerHTML = BG
+        ? BG.scoreCardHtml({ score: homo, band: band.label })
+        : `<div class="bg-std-score-card"><span class="bg-std-kicker">Overall similarity</span><strong class="bg-std-score-value">${Number.isFinite(homo) ? Math.round(homo) : '—'}</strong><span class="bg-std-score-band">${escapeHtml(band.label)}</span></div>`;
     }
 
     function renderRegSimPredControls() {
@@ -2857,16 +2861,11 @@
       }
       title.innerHTML = `${escapeHtml(prettyGroupLabel(pair.a))} vs ${escapeHtml(prettyGroupLabel(pair.b))} · <span class="dsp-band dsp-band--${pair.bandKey}">${escapeHtml(pair.band)}</span>`;
       body.innerHTML = `
-        <div class="dsp-bars-head">
-          Three components
-          <button type="button" class="dsp-info-btn" onclick="openRegSimHelp()" aria-label="About pattern, strength and sign">i</button>
-        </div>
         <div class="dsp-bars">
           ${dspBar('Pattern', pair.pattern)}
           ${dspBar('Strength', pair.strength)}
           ${dspBar('Sign', pair.sign)}
         </div>
-        <div class="dsp-kpi-note">Comparing β in ${escapeHtml(groupLevelWithN(pair.a, pair.nA))} with β in ${escapeHtml(groupLevelWithN(pair.b, pair.nB))}. ${pair.pairCount} overlapping coefficients. Intercept omitted.</div>
       `;
       animateProfileBars();
     }
@@ -3039,7 +3038,6 @@
       }
       if (window.StatisticoByGroup) {
         window.StatisticoByGroup.applyPageTitles();
-        window.StatisticoByGroup.mount('#byGroupIntro', window.StatisticoByGroup.introHtml('regression'));
       }
       if (!tryLoadStored()) {
         setEmpty('Run a regression analysis first, then open Regression by Group.');

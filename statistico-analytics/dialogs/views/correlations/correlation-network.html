@@ -89,6 +89,7 @@
 
     .results-container{
       flex:1;
+      min-height:0;
       padding:20px;
       overflow:hidden;
       display:flex;
@@ -229,7 +230,8 @@
 
     .network-container{
       flex:1;
-      min-height:500px;
+      min-height:0;
+      height:100%;
       background:var(--surface-1);
       border-radius:10px;
       border:2px solid var(--border);
@@ -429,8 +431,8 @@
 
         <div class="control-group">
           <span class="slider-label">Chart size</span>
-          <input type="range" id="networkChartScaleSlider" min="0.7" max="1.8" step="0.05" value="1.55" oninput="updateNetworkChartScale(this.value)">
-          <span class="slider-value" id="networkChartScaleValue">1.55x</span>
+          <input type="range" id="networkChartScaleSlider" min="0.55" max="1" step="0.05" value="1" oninput="updateNetworkChartScale(this.value)">
+          <span class="slider-value" id="networkChartScaleValue">1.00x</span>
         </div>
 
         <div class="control-group">
@@ -467,7 +469,9 @@
     let networkThreshold = 0;
     let showCorr = true;
     let showOnlyConnected = false;
-    let networkChartScale = 1.55;
+    let networkChartScale = 1;
+    let networkGraphGroup = null;
+    let networkFitOnEnd = true;
     const NETWORK_NODE_RADIUS = 13;
     const NETWORK_LABEL_OFFSET = NETWORK_NODE_RADIUS + 11;
     const NETWORK_COLLISION_RADIUS = NETWORK_NODE_RADIUS + 15;
@@ -706,7 +710,7 @@
     function drawNetwork(varNames, matrix) {
       const container = document.getElementById('networkContainer');
       const width = container.clientWidth || window.innerWidth - 40;
-      const height = Math.max(container.clientHeight || 600, 600);
+      const height = container.clientHeight || 600;
 
       console.log('Network dimensions:', { width, height, containerWidth: container.clientWidth, containerHeight: container.clientHeight });
 
@@ -792,15 +796,15 @@
 
       // Add zoom
       const zoom = d3.zoom()
-        .scaleExtent([0.5, 3])
+        .scaleExtent([0.2, 8])
         .on("zoom", (event) => {
           g.attr("transform", event.transform);
         });
       svg.call(zoom);
       networkZoomBehavior = zoom;
       networkSvgSelection = svg;
+      networkGraphGroup = g;
       networkViewport = { width, height };
-      applyNetworkChartScale(false);
 
       // Draw links
       const link = g.append("g")
@@ -868,9 +872,16 @@
       // Store references
       window.networkElements = { link, linkLabels };
       applyNetworkThreshold(networkThreshold);
+      networkFitOnEnd = true;
+      networkSimulation.on("end", () => {
+        if (!networkFitOnEnd) return;
+        networkFitOnEnd = false;
+        fitNetworkToPanel(false);
+      });
     }
 
     function dragstarted(event, d) {
+      networkFitOnEnd = false;
       if (!event.active) networkSimulation.alphaTarget(0.3).restart();
       d.fx = d.x;
       d.fy = d.y;
@@ -935,15 +946,28 @@
     }
 
     function applyNetworkChartScale(animate = true) {
-      if (!networkSvgSelection || !networkZoomBehavior) return;
+      fitNetworkToPanel(animate);
+    }
+
+    function fitNetworkToPanel(animate = true) {
+      if (!networkSvgSelection || !networkZoomBehavior || !networkGraphGroup) return;
       const { width, height } = networkViewport;
-      const transform = d3.zoomIdentity
-        .translate((width * (1 - networkChartScale)) / 2, (height * (1 - networkChartScale)) / 2)
-        .scale(networkChartScale);
-      networkSvgSelection
-        .transition()
-        .duration(animate ? 180 : 0)
-        .call(networkZoomBehavior.transform, transform);
+      if (!width || !height) return;
+      let bbox;
+      try {
+        bbox = networkGraphGroup.node().getBBox();
+      } catch (e) {
+        return;
+      }
+      if (!bbox.width || !bbox.height) return;
+      const pad = 40;
+      const fit = Math.min((width - pad * 2) / bbox.width, (height - pad * 2) / bbox.height);
+      const scale = Math.max(0.2, fit * networkChartScale);
+      const tx = width / 2 - (bbox.x + bbox.width / 2) * scale;
+      const ty = height / 2 - (bbox.y + bbox.height / 2) * scale;
+      const transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
+      const apply = networkSvgSelection.transition().duration(animate ? 180 : 0);
+      apply.call(networkZoomBehavior.transform, transform);
     }
 
     function updateNetworkChartScale(value) {

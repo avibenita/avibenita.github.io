@@ -23,4 +23,25 @@ describe('soft navy/slate dark palette', () => {
     expect(configCss).toMatch(/--cfg-bg:\s*#0E141B/);
     expect(configCss).toMatch(/rgba\(0,\s*0,\s*0,\s*0\.48\)/);
   });
+
+  test('module views no longer define the old near-black canvas token', () => {
+    const viewsRoot = __dirname;
+    const leftovers = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name === 'Ressources' || entry.name === 'node_modules') continue;
+          walk(full);
+        } else if (/\.(html|css)$/i.test(entry.name)) {
+          const text = fs.readFileSync(full, 'utf8');
+          if (/--surface-0\s*:\s*#(?:0c1624|070b14|0b1120|0f172a|1b2439|07090e|0f1115)\b/i.test(text)) {
+            leftovers.push(path.relative(viewsRoot, full).replace(/\\/g, '/'));
+          }
+        }
+      }
+    };
+    walk(viewsRoot);
+    expect(leftovers).toEqual([]);
+  });
 });

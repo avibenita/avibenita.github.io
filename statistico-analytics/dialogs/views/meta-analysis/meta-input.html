@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260810help1"/>
   <script src="../shared-config.js?v=20260810help1"></script>
-  <script src="../../shared/column-type.js?v=20260910num1"></script>
+  <script src="../../shared/column-type.js?v=20260913minus1"></script>
   <script src="../ds-guide.js?v=20260818corr2"></script>
   <style>
     :root {
@@ -301,7 +301,23 @@
       background: var(--cfg-surface); cursor: pointer; font-size: 10px; font-weight: 700;
       text-transform: uppercase; color: var(--cfg-text);
     }
-    .adv-wrap.open .adv-body { max-height: 420px; opacity: 1; padding: 8px 10px; }
+    .label-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+    }
+    .label-field { display: flex; flex-direction: column; gap: 3px; }
+    .label-field.wide { grid-column: 1 / -1; }
+    .label-field span {
+      font-size: 10px; font-weight: 700; color: var(--cfg-text3);
+    }
+    .label-field input {
+      width: 100%; padding: 6px 8px; border-radius: 7px;
+      border: 1px solid var(--cfg-border); background: var(--cfg-surface2, #1c2333);
+      color: var(--cfg-text, #e2e8f0); font-size: 11.5px; font-weight: 600;
+    }
+    [data-theme="light"] .label-field input {
+      background: #ffffff; color: #0f172a;
+    }
+    .adv-wrap.open .adv-body { max-height: 760px; opacity: 1; padding: 8px 10px; }
     .adv-body {
       overflow: hidden; max-height: 0; opacity: 0;
       transition: max-height .28s ease, opacity .2s ease;
@@ -578,6 +594,33 @@
                   <span class="info-icon" tabindex="0">i<span class="tip">Adjusts the SE of the pooled effect using observed between-study dispersion. Useful with few studies; can be conservative.</span></span>
                 </label>
               </div>
+              <div class="opt-row" id="comparisonLabelsRow">
+                <label class="lbl-with-tip" id="comparisonLabelsTitle">Comparison labels
+                  <span class="info-icon" tabindex="0">i<span class="tip" id="comparisonLabelsTip">These labels do <b>not</b> change the calculated effects. They only name the numerator, reference, and outcome in the results header, forest axis, and interpretation.</span></span>
+                </label>
+                <div class="label-grid" id="comparisonLabelsGrid">
+                  <div class="label-field" id="numeratorField">
+                    <span id="numeratorFieldLabel">Treatment</span>
+                    <input type="text" id="numeratorLabel" maxlength="80" aria-label="Numerator or treatment label" />
+                  </div>
+                  <div class="label-field" id="referenceField">
+                    <span id="referenceFieldLabel">Control</span>
+                    <input type="text" id="referenceLabel" maxlength="80" aria-label="Reference or control label" />
+                  </div>
+                  <div class="label-field wide" id="eventField">
+                    <span id="eventFieldLabel">Event / outcome</span>
+                    <input type="text" id="eventLabel" maxlength="80" aria-label="Event or outcome label" />
+                  </div>
+                  <div class="label-field" id="leftLabelField" style="display:none;">
+                    <span>Left / negative label</span>
+                    <input type="text" id="leftLabel" maxlength="80" aria-label="Left axis label" />
+                  </div>
+                  <div class="label-field" id="rightLabelField" style="display:none;">
+                    <span>Right / positive label</span>
+                    <input type="text" id="rightLabel" maxlength="80" aria-label="Right axis label" />
+                  </div>
+                </div>
+              </div>
               <div class="opt-row">
                 <label class="lbl-with-tip" id="outcomeBetterTitle">Beneficial outcome direction
                   <span class="info-icon" tabindex="0">i<span class="tip" id="outcomeBetterTip">Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.</span></span>
@@ -648,6 +691,11 @@
     var tauEstimator = 'reml';
     var hartungKnapp = true;
     var outcomeBetter = 'lower';
+    var numeratorLabel = 'Treatment';
+    var referenceLabel = 'Control';
+    var eventLabel = 'Event';
+    var leftLabel = 'Negative effect';
+    var rightLabel = 'Positive effect';
     var assignments = {};
     var draggedElement = null;
     var corrSuggestDismissed = false;
@@ -893,7 +941,7 @@
           '<li>Log OR / log RR — paste <b>logs</b>, not OR/RR on the natural scale</li>' +
           '<li>CI limits must match the effect scale (not back-transformed OR if effect is log OR)</li>' +
           '</ul>' +
-          '<div class="tipbox"><b>Correlations:</b> use the <b>Correlations</b> tab (Pearson r + N, or Fisher z + SE) — not this Precomputed tab.</div>' +
+          '<div class="tipbox"><b>Log OR / log RR:</b> name the numerator, reference, and event yourself (defaults: Group A / Group B / Event, meaning not specified). Do not assume Treatment / Control. Odds ratios are described as <b>odds</b>, not risk.</div>' +
           '<div class="warn"><b>Warning:</b> Mixing scales (e.g. OR with SE of log OR) produces invalid pooling. SE and variance must be &gt; 0.</div>'
       },
       correlation: {
@@ -1048,8 +1096,54 @@
     function defaultOutcomeBetterForContext() {
       if (isFisherWorkflow()) return 'lower';
       if (effectType === 'direct' && effectMeasure === 'generic') return 'none';
+      if (effectType === 'direct' && (effectMeasure === 'logor' || effectMeasure === 'logrr')) return 'none';
       if (usesEventMeaningLabels()) return 'lower';
       return 'lower';
+    }
+
+    function defaultComparisonLabelsForContext() {
+      if (effectType === 'direct' && (effectMeasure === 'logor' || effectMeasure === 'logrr')) {
+        return { numerator: 'Group A', reference: 'Group B', event: 'Event', left: 'Lower ratio', right: 'Higher ratio' };
+      }
+      if (effectType === 'direct' && effectMeasure === 'generic') {
+        return { numerator: 'Negative effect', reference: 'Positive effect', event: '', left: 'Negative effect', right: 'Positive effect' };
+      }
+      return { numerator: 'Treatment', reference: 'Control', event: 'Event', left: 'Treatment', right: 'Control' };
+    }
+
+    function resetComparisonLabelsForContext() {
+      var d = defaultComparisonLabelsForContext();
+      numeratorLabel = d.numerator;
+      referenceLabel = d.reference;
+      eventLabel = d.event;
+      leftLabel = d.left;
+      rightLabel = d.right;
+    }
+
+    function readComparisonLabelInputs() {
+      var n = qs('numeratorLabel');
+      var r = qs('referenceLabel');
+      var e = qs('eventLabel');
+      var l = qs('leftLabel');
+      var p = qs('rightLabel');
+      if (n) numeratorLabel = n.value.trim() || numeratorLabel;
+      if (r) referenceLabel = r.value.trim() || referenceLabel;
+      if (e) eventLabel = e.value.trim() || eventLabel;
+      if (l) leftLabel = l.value.trim() || leftLabel;
+      if (p) rightLabel = p.value.trim() || rightLabel;
+    }
+
+    function writeComparisonLabelInputs() {
+      var n = qs('numeratorLabel');
+      var r = qs('referenceLabel');
+      var e = qs('eventLabel');
+      var l = qs('leftLabel');
+      var p = qs('rightLabel');
+      if (n) n.value = numeratorLabel;
+      if (r) r.value = referenceLabel;
+      if (e) e.value = eventLabel;
+      if (l) l.value = leftLabel;
+      if (p) p.value = rightLabel;
     }
 
     function refreshMeasureOptions() {
@@ -1100,6 +1194,7 @@
       var eventMeaning = usesEventMeaningLabels();
       var fisher = isFisherWorkflow();
       var genericDirect = effectType === 'direct' && effectMeasure === 'generic';
+      var precomputedRatio = effectType === 'direct' && (effectMeasure === 'logor' || effectMeasure === 'logrr');
       var title = qs('outcomeBetterTitle');
       var tip = qs('outcomeBetterTip');
       var higherWrap = qs('dirHigherLabel');
@@ -1113,20 +1208,24 @@
       }
       if (tip) {
         tip.innerHTML = eventMeaning
-          ? 'Does <b>not</b> change calculated effects. For ratios, comparison is <b>Treatment / Control</b>. Coding only sets favour labels.<br/><b>Event is adverse</b> — death, relapse, infection (RR/OR &lt; 1 favours treatment).<br/><b>Event is beneficial</b> — recovery, response (RR/OR &gt; 1 favours treatment).<br/><b>Direction not specified</b> — hide favour labels.'
+          ? (precomputedRatio
+            ? 'Does <b>not</b> change calculated effects. Ratio &gt; 1 means higher odds/risk of the event in the numerator group.<br/><b>Beneficial</b> — ratio &gt; 1 favours the numerator; ratio &lt; 1 favours the reference.<br/><b>Adverse</b> — ratio &lt; 1 favours the numerator; ratio &gt; 1 favours the reference.<br/><b>Not specified</b> — no “favours” conclusions; forest uses Lower ratio / Higher ratio.'
+            : 'Does <b>not</b> change calculated effects. For ratios, comparison is numerator / reference. Coding only sets favour labels.<br/><b>Event is adverse</b> — death, relapse, infection (RR/OR &lt; 1 favours the numerator).<br/><b>Event is beneficial</b> — recovery, response (RR/OR &gt; 1 favours the numerator).<br/><b>Direction not specified</b> — hide favour conclusions.')
           : fisher
             ? 'Controls the labels on either side of zero in the forest plot. It does not affect the calculations.'
             : genericDirect
-              ? 'Does <b>not</b> change effect sizes or CIs. Use only when “better” has a clear meaning on this scale.<br/><b>Lower / higher values are better</b> — sets favour labels on the forest axis.<br/><b>Do not display direction labels</b> — show the numeric effect only (recommended when direction is ambiguous).'
-              : 'Does <b>not</b> change effect sizes or CIs. Contrast stays <b>Treatment − Control</b>. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.';
+              ? 'Does <b>not</b> change effect sizes or CIs. Use custom left/right labels, or keep the neutral Negative / Positive effect labels.'
+              : 'Does <b>not</b> change effect sizes or CIs. Contrast stays numerator − reference. This only sets favour labels and interpretation (e.g. forest-plot axis).<br/><b>Lower values are better</b> — pain, symptoms, recovery time, blood pressure.<br/><b>Higher values are better</b> — function, survival probability, test scores.<br/><b>Do not display favour labels</b> — show the numeric contrast only.';
       }
-      var map = eventMeaning
-        ? { lower: 'Event is adverse', higher: 'Event is beneficial', none: 'Direction not specified' }
-        : fisher
-          ? { lower: 'Show negative / positive association', higher: 'Show negative / positive association', none: 'Do not display direction labels' }
-          : genericDirect
-            ? { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display direction labels' }
-            : { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display favour labels' };
+      var map = precomputedRatio
+        ? { lower: 'Adverse', higher: 'Beneficial', none: 'Not specified' }
+        : eventMeaning
+          ? { lower: 'Event is adverse', higher: 'Event is beneficial', none: 'Direction not specified' }
+          : fisher
+            ? { lower: 'Show negative / positive association', higher: 'Show negative / positive association', none: 'Do not display direction labels' }
+            : genericDirect
+              ? { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display direction labels' }
+              : { lower: 'Lower values are better', higher: 'Higher values are better', none: 'Do not display favour labels' };
       ['lower', 'higher', 'none'].forEach(function (v) {
         var lab = document.querySelector('label.opt-radio input[name="outcomeBetter"][value="' + v + '"]');
         if (!lab) return;
@@ -1138,6 +1237,37 @@
         var lowerRadio = document.querySelector('input[name="outcomeBetter"][value="lower"]');
         if (lowerRadio) lowerRadio.checked = true;
       }
+      syncComparisonLabelFields();
+    }
+
+    function syncComparisonLabelFields() {
+      var fisher = isFisherWorkflow();
+      var genericDirect = effectType === 'direct' && effectMeasure === 'generic';
+      var precomputedRatio = effectType === 'direct' && (effectMeasure === 'logor' || effectMeasure === 'logrr');
+      var binary = effectType === 'binary';
+      var showNamed = binary || precomputedRatio || (!fisher && !genericDirect && effectType === 'continuous');
+      var row = qs('comparisonLabelsRow');
+      if (row) row.style.display = fisher ? 'none' : '';
+      var numF = qs('numeratorField');
+      var refF = qs('referenceField');
+      var evF = qs('eventField');
+      var leftF = qs('leftLabelField');
+      var rightF = qs('rightLabelField');
+      if (numF) numF.style.display = genericDirect ? 'none' : '';
+      if (refF) refF.style.display = genericDirect ? 'none' : '';
+      if (evF) evF.style.display = (binary || precomputedRatio) ? '' : 'none';
+      if (leftF) leftF.style.display = genericDirect ? '' : 'none';
+      if (rightF) rightF.style.display = genericDirect ? '' : 'none';
+      var numL = qs('numeratorFieldLabel');
+      var refL = qs('referenceFieldLabel');
+      if (precomputedRatio) {
+        if (numL) numL.textContent = 'Numerator group / exposure';
+        if (refL) refL.textContent = 'Reference group';
+      } else {
+        if (numL) numL.textContent = 'Treatment';
+        if (refL) refL.textContent = 'Control';
+      }
+      writeComparisonLabelInputs();
     }
 
     function syncModelOptionVisibility() {
@@ -1399,6 +1529,7 @@
     }
 
     function buildModelSpec() {
+      readComparisonLabelInputs();
       var spec = {
         effectType: effectType,
         effectMeasure: effectType === 'correlation' ? 'fisherz' : effectMeasure,
@@ -1411,6 +1542,11 @@
         tauEstimator: modelType === 'random' ? tauEstimator : undefined,
         hartungKnapp: modelType === 'random' ? !!hartungKnapp : false,
         outcomeBetter: outcomeBetter,
+        numeratorLabel: numeratorLabel,
+        referenceLabel: referenceLabel,
+        eventLabel: eventLabel,
+        leftLabel: leftLabel,
+        rightLabel: rightLabel,
         colNames: {}
       };
       activeZoneKeys().forEach(function (k) {
@@ -1442,15 +1578,19 @@
       if (spec.model) modelType = spec.model === 'fixed' ? 'fixed' : 'random';
       if (spec.tauEstimator) tauEstimator = spec.tauEstimator === 'dl' ? 'dl' : 'reml';
       hartungKnapp = spec.hartungKnapp !== false && modelType === 'random';
+      resetComparisonLabelsForContext();
+      if (spec.numeratorLabel) numeratorLabel = String(spec.numeratorLabel);
+      if (spec.referenceLabel) referenceLabel = String(spec.referenceLabel);
+      if (spec.eventLabel) eventLabel = String(spec.eventLabel);
+      if (spec.leftLabel) leftLabel = String(spec.leftLabel);
+      if (spec.rightLabel) rightLabel = String(spec.rightLabel);
       if (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher' || spec.outcomeBetter === 'none') {
         outcomeBetter = spec.outcomeBetter;
       } else if (spec.effectDirection === 'control') {
         // Legacy: old “positive favors control” ≈ lower-is-better coding intent
         outcomeBetter = 'lower';
-      } else if (effectType === 'correlation') {
-        outcomeBetter = 'lower';
       } else {
-        outcomeBetter = 'lower';
+        outcomeBetter = defaultOutcomeBetterForContext();
       }
       // Legacy: a/b/c/d without format → non-events layout
       if (effectType === 'binary' && !spec.binaryFormat && (spec.bCol != null || (spec.colNames && spec.colNames.bCol))) {
@@ -1500,6 +1640,7 @@
       if (hk) hk.checked = !!hartungKnapp;
       var hkLab = qs('hkLabel');
       if (hkLab) hkLab.classList.toggle('active', !!hartungKnapp);
+      writeComparisonLabelInputs();
       var bf = qs('binaryFormat');
       if (bf) bf.value = binaryFormat;
       var cf = qs('correlationFormat');
@@ -1540,7 +1681,7 @@
       var pearsonR = find(['pearson_r', 'pearsonr', 'corr', 'correlation', 'rho', 'r_pearson']);
       var corrN = findExact(['n', 'n_total', 'ntotal', 'samplesize', 'sample_size']) ||
         find(['samplesize', 'sample_size', 'n_total', 'ntotal']);
-      var effect = find(['effect', 'smd', 'hedges', 'yi', 'logor', 'lor', 'estimate']);
+      var effect = find(['effect', 'smd', 'hedges', 'yi', 'logor', 'lnor', 'lor', 'logrr', 'lnrr', 'estimate']);
       var se = find(['se', 'stderr', 'std.err', 'stderror', 'standarderror']);
       var variance = find(['vi', 'variance', 'var']);
       if (mean1) {
@@ -1578,7 +1719,12 @@
         assignments.nCol = corrN;
       } else if (effect && (se || variance)) {
         effectType = 'direct';
-        effectMeasure = 'generic';
+        var effectKey = String(effect || '').toLowerCase().replace(/\s+/g, '');
+        if (/logor|lnor|\blor\b/.test(effectKey)) effectMeasure = 'logor';
+        else if (/logrr|lnrr|\blrr\b/.test(effectKey)) effectMeasure = 'logrr';
+        else effectMeasure = 'generic';
+        outcomeBetter = defaultOutcomeBetterForContext();
+        resetComparisonLabelsForContext();
         uncertaintyType = variance && !se ? 'variance' : 'se';
         assignments.effectCol = effect;
         if (uncertaintyType === 'variance') assignments.varCol = variance;
@@ -1658,8 +1804,9 @@
       if (type === 'direct' && !MEASURES.direct.some(function (m) { return m.value === effectMeasure; })) {
         effectMeasure = 'generic';
       }
-      if (type === 'direct' && prev !== 'direct') {
+      if (type !== prev) {
         outcomeBetter = defaultOutcomeBetterForContext();
+        resetComparisonLabelsForContext();
       }
       syncOptionControls();
       refreshMeasureOptions();
@@ -1746,6 +1893,7 @@
       tauEstimator = 'reml';
       hartungKnapp = true;
       outcomeBetter = 'lower';
+      resetComparisonLabelsForContext();
       if (_saved) applySpec(_saved);
       else {
         syncOptionControls();
@@ -1900,6 +2048,14 @@
           updateSummary();
         });
       });
+      ['numeratorLabel', 'referenceLabel', 'eventLabel', 'leftLabel', 'rightLabel'].forEach(function (id) {
+        var el = qs(id);
+        if (!el) return;
+        el.addEventListener('input', function () {
+          readComparisonLabelInputs();
+          updateSummary();
+        });
+      });
       var hk = qs('hartungKnapp');
       if (hk) {
         hk.addEventListener('change', function () {
@@ -1915,6 +2071,7 @@
           corrSuggestDismissed = false;
           resetAssignmentsForType();
           outcomeBetter = defaultOutcomeBetterForContext();
+          resetComparisonLabelsForContext();
           syncOptionControls();
         }
         var hint = qs('effectMeasureHint');

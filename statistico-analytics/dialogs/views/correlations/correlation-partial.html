@@ -101,7 +101,7 @@
       padding:20px;
       display:flex;
       flex-direction:column;
-      overflow:hidden;
+      overflow:auto;
     }
 
     /* Control Variables Panel */
@@ -112,6 +112,7 @@
       border:2px solid var(--border);
       box-shadow:0 4px 20px rgba(0,0,0,0.3);
       margin-bottom:14px;
+      flex:0 0 auto;
     }
 
     .control-panel h3{
@@ -187,8 +188,23 @@
     .role-items{
       display:flex;
       flex-wrap:wrap;
+      align-content:flex-start;
       gap:8px;
+      width:100%;
       min-height:38px;
+    }
+
+    .variable-capsules{
+      min-height:48px;
+      padding:10px 12px;
+      border-radius:16px;
+      border:1px solid rgba(120,200,255,.18);
+      background:rgba(255,255,255,.03);
+    }
+
+    .variable-capsules.drag-over{
+      border-color:var(--accent-2);
+      box-shadow:inset 0 0 0 1px rgba(120,200,255,.28);
     }
 
     .variable-capsule{
@@ -219,24 +235,6 @@
       cursor:grabbing;
     }
 
-    .capsule-action{
-      width:20px;
-      height:20px;
-      border:0;
-      border-radius:50%;
-      color:#fff;
-      cursor:pointer;
-      font-size:10px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      background:rgba(255,255,255,.14);
-    }
-
-    .capsule-action:hover{
-      background:var(--accent-1);
-    }
-
     .partial-spatial-row{
       display:grid;
       grid-template-columns:1fr 1fr;
@@ -246,6 +244,7 @@
     .role-drop-zone{
       position:relative;
       min-height:178px;
+      height:auto;
       padding:18px;
       border-radius:18px;
       border:2px dashed rgba(120,200,255,.34);
@@ -314,7 +313,7 @@
     }
 
     .role-drop-zone .variable-capsule{
-      cursor:default;
+      cursor:grab;
     }
 
     .control-zone .variable-capsule{
@@ -851,8 +850,8 @@
           <div>
             <div class="variable-palette">
               <div class="workspace-title"><i class="fa-solid fa-grip"></i><span>Variable Capsules</span></div>
-              <div class="workspace-subtitle">Drag variables into a bucket, or use the small buttons to assign them.</div>
-              <div id="variableCapsules" class="variable-capsules" aria-label="Available variables"></div>
+              <div class="workspace-subtitle">Drag any variable into Control or Excluded. Drag it back here to restore it.</div>
+              <div id="variableCapsules" class="variable-capsules" data-role="available" aria-label="Available variables"></div>
             </div>
 
             <div class="partial-spatial-row">
@@ -893,7 +892,7 @@
       </div>
 
       <div class="tip-line">
-        Tip: Drag variables into Control to adjust for them, or Excluded to remove them from the matrix. Click correlations to compare.
+        Tip: Drag variables into Control to adjust for them, or Excluded to remove them from the matrix. Drag a capsule back to restore it. Click correlations to compare.
       </div>
 
       <!-- Matrix Panel -->
@@ -1260,7 +1259,7 @@
     }
 
     function setupDropZones() {
-      document.querySelectorAll('.role-drop-zone').forEach(zone => {
+      document.querySelectorAll('#variableCapsules, .role-drop-zone').forEach(zone => {
         if (zone.dataset.dropReady === '1') return;
         zone.dataset.dropReady = '1';
         zone.addEventListener('dragover', (event) => {
@@ -1277,32 +1276,17 @@
       });
     }
 
-    function createVariableCapsule(index, role) {
+    function createVariableCapsule(index) {
       const capsule = document.createElement('span');
       capsule.className = 'variable-capsule';
       capsule.draggable = true;
       capsule.tabIndex = 0;
       capsule.dataset.index = String(index);
-      capsule.innerHTML = `
-        <span>${variableNames[index]}</span>
-        ${role === 'available' ? `
-          <button type="button" class="capsule-action" title="Use as control" aria-label="Use ${variableNames[index]} as control">C</button>
-          <button type="button" class="capsule-action" title="Exclude variable" aria-label="Exclude ${variableNames[index]}">X</button>
-        ` : `
-          <button type="button" class="capsule-action" title="Return to variables" aria-label="Return ${variableNames[index]} to variables">X</button>
-        `}
-      `;
+      capsule.textContent = variableNames[index];
       capsule.addEventListener('dragstart', (event) => {
         event.dataTransfer.setData('text/plain', String(index));
         event.dataTransfer.effectAllowed = 'move';
       });
-      const buttons = capsule.querySelectorAll('.capsule-action');
-      if (role === 'available') {
-        buttons[0]?.addEventListener('click', (event) => { event.stopPropagation(); setVariableRole(index, 'control'); });
-        buttons[1]?.addEventListener('click', (event) => { event.stopPropagation(); setVariableRole(index, 'excluded'); });
-      } else {
-        buttons[0]?.addEventListener('click', (event) => { event.stopPropagation(); setVariableRole(index, 'available'); });
-      }
       return capsule;
     }
 
@@ -1318,7 +1302,7 @@
 
       variableNames.forEach((_, index) => {
         const role = variableRoles[index] || 'available';
-        const capsule = createVariableCapsule(index, role);
+        const capsule = createVariableCapsule(index);
         if (role === 'control') controlBucket.appendChild(capsule);
         else if (role === 'excluded') excludedBucket.appendChild(capsule);
         else available.appendChild(capsule);

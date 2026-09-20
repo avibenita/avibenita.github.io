@@ -432,14 +432,14 @@ const StatisticoHeader = {
     } else {
       /* Soft navy/slate dark mode — lift large surfaces off near-black. */
       root.style.setProperty('--surface-0',      '#0E141B');
-      root.style.setProperty('--surface-1',      '#151C24');
+      root.style.setProperty('--surface-1',      '#242C37');
       root.style.setProperty('--surface-2',      '#242C37');
       root.style.setProperty('--surface-modal',  '#1A212B');
-      root.style.setProperty('--surface-plot',   '#121820');
+      root.style.setProperty('--surface-plot',   '#242C37');
       root.style.setProperty('--border',         'rgba(255,255,255,.14)');
       root.style.setProperty('--modal-overlay',  'rgba(0,0,0,.48)');
       root.style.setProperty('--bg-0',           '#0E141B');
-      root.style.setProperty('--bg-1',           '#151C24');
+      root.style.setProperty('--bg-1',           '#242C37');
       root.style.setProperty('--bg-2',           '#242C37');
       root.style.setProperty('--accent-1',       'rgb(255,165,120)');
       root.style.setProperty('--accent-2',       '#818cf8');
@@ -451,7 +451,7 @@ const StatisticoHeader = {
       root.style.setProperty('--warning',        '#fbbf24');
       root.style.setProperty('--danger',         '#fb7185');
       root.style.setProperty('--header-color',   'rgb(255,165,120)');
-      root.style.setProperty('--highcharts-background-color', '#121820');
+      root.style.setProperty('--highcharts-background-color', '#242C37');
     }
 
     if (!forcedDark && options.savePreference !== false && (theme === 'light' || theme === 'dark') && !options.preference) {
@@ -2230,7 +2230,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260919noframe',
+  _TAB_ASSET_VER: '20260920navy4',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -7373,7 +7373,7 @@ REPORT: [one polished paragraph suitable for a report]`;
   PREVIEW_TEMPLATES: {
     night: {
       id: 'night', name: 'Night ink', desc: 'Default dark canvas',
-      light: false, wrapBg: '#121820', pngBg: '#121820', chartBg: 'transparent',
+      light: false, wrapBg: '#242C37', pngBg: '#242C37', chartBg: '#242C37',
       textureKind: 'none', cssTexture: 'none', texSize: '24px 24px', texOpacity: '0',
       axis: '#94a3b8', grid: 'rgba(148,163,184,.15)', grid3d: 'rgba(186,198,214,.38)',
       minorGrid: 'rgba(148,163,184,.18)', line: '#334155',
@@ -7384,7 +7384,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       qFill: 'rgba(15,23,42,.7)', qFillEmpty: 'rgba(15,23,42,.42)', qStroke: 'rgba(226,232,240,.22)',
       qText: '#f8fafc', qTextEmpty: '#e2e8f0', qOutline: '2px rgba(12,22,36,.9)',
       frameBottom: 'rgba(148,163,184,.35)', frameWall: 'rgba(148,163,184,.22)',
-      markerLine: 'rgba(255,255,255,.28)',       swatch: '#121820'
+      markerLine: 'rgba(255,255,255,.28)',       swatch: '#242C37'
     },
     hcLight: {
       id: 'hcLight', name: 'Highcharts light', desc: 'Official Highcharts light canvas',
@@ -7540,7 +7540,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       try {
         Highcharts.setOptions({
           chart: {
-            backgroundColor: resolved === 'light' ? '#ffffff' : '#121820',
+            backgroundColor: resolved === 'light' ? '#ffffff' : '#242C37',
             style: { fontFamily: this.HC_FONT_FAMILY, fontSize: '1rem' }
           },
           xAxis: {
@@ -7662,7 +7662,7 @@ REPORT: [one polished paragraph suitable for a report]`;
         const light = self.getTheme() === 'light';
         Highcharts.setOptions({
           chart: {
-            backgroundColor: light ? '#ffffff' : '#121820',
+            backgroundColor: light ? '#ffffff' : '#242C37',
             style: {
               fontFamily: self.HC_FONT_FAMILY,
               fontSize: '1rem'
@@ -7701,7 +7701,9 @@ REPORT: [one polished paragraph suitable for a report]`;
   _applyPreviewToHighchart(chart, tpl) {
     if (!chart || typeof chart.update !== 'function') return;
     const isLight = !!(tpl && tpl.light);
-    const chartBg = (tpl && tpl.chartBg) || (isLight ? '#ffffff' : 'transparent');
+    const chartBg = (tpl && tpl.id === 'night')
+      ? '#242C37'
+      : ((tpl && tpl.chartBg) || (isLight ? '#ffffff' : '#242C37'));
     const axisColor = tpl.axis;
     const axisPatch = {
       title: { style: { color: axisColor, fontSize: '0.8em' } },
@@ -7747,8 +7749,8 @@ REPORT: [one polished paragraph suitable for a report]`;
     document.querySelectorAll('.js-plotly-plot, .plotly-graph-div').forEach((gd) => {
       try {
         Plotly.relayout(gd, {
-          paper_bgcolor: tpl.light ? (tpl.chartBg || '#ffffff') : 'rgba(0,0,0,0)',
-          plot_bgcolor: tpl.light ? (tpl.chartBg || '#ffffff') : 'rgba(0,0,0,0)',
+          paper_bgcolor: tpl.id === 'night' ? '#242C37' : (tpl.light ? (tpl.chartBg || '#ffffff') : (tpl.chartBg === 'transparent' ? 'rgba(0,0,0,0)' : (tpl.chartBg || '#242C37'))),
+          plot_bgcolor: tpl.id === 'night' ? '#242C37' : (tpl.light ? (tpl.chartBg || '#ffffff') : (tpl.chartBg === 'transparent' ? 'rgba(0,0,0,0)' : (tpl.chartBg || '#242C37'))),
           'font.color': tpl.axis,
           'xaxis.tickfont.color': tpl.axis,
           'yaxis.tickfont.color': tpl.axis,

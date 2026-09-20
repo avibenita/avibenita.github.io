@@ -642,6 +642,41 @@
       text-underline-offset: 3px;
       cursor: pointer;
     }
+    .corr-value-row {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .corr-scatter-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 16px;
+      border-radius: 4px;
+      flex: 0 0 18px;
+      color: var(--accent-1);
+      background: color-mix(in srgb, var(--accent-1) 16%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent-1) 38%, transparent);
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    .corr-scatter-badge::after {
+      content: '';
+      width: 12px;
+      height: 10px;
+      background-color: currentColor;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 16'%3E%3Cpath fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' d='M2.2 1.2v12.4H18'/%3E%3Ccircle cx='6' cy='11.1' r='1.35' fill='black'/%3E%3Ccircle cx='8.6' cy='8.3' r='1.35' fill='black'/%3E%3Ccircle cx='11.4' cy='9.5' r='1.35' fill='black'/%3E%3Ccircle cx='13.8' cy='5.8' r='1.35' fill='black'/%3E%3Ccircle cx='16.6' cy='4.2' r='1.35' fill='black'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 16'%3E%3Cpath fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' d='M2.2 1.2v12.4H18'/%3E%3Ccircle cx='6' cy='11.1' r='1.35' fill='black'/%3E%3Ccircle cx='8.6' cy='8.3' r='1.35' fill='black'/%3E%3Ccircle cx='11.4' cy='9.5' r='1.35' fill='black'/%3E%3Ccircle cx='13.8' cy='5.8' r='1.35' fill='black'/%3E%3Ccircle cx='16.6' cy='4.2' r='1.35' fill='black'/%3E%3C/svg%3E");
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+    }
+    .corr-scatter-badge:hover {
+      background: color-mix(in srgb, var(--accent-1) 28%, transparent);
+    }
 
     .p-value {
       font-size: 12px;
@@ -733,6 +768,14 @@
 
     .heatmap-table thead th:first-child {
       position: sticky; left: 0; z-index: 11; text-align: left; min-width: 150px;
+    }
+
+    .heatmap-cell {
+      position: relative;
+    }
+    .heatmap-cell .corr-scatter-badge {
+      margin-left: 5px;
+      vertical-align: middle;
     }
 
     .heatmap-table tbody td {
@@ -2004,6 +2047,18 @@
     applyThresholdFilter();
   }
 
+  function createScatterBadge(onClick) {
+    const badge = document.createElement('span');
+    badge.className = 'corr-scatter-badge';
+    badge.title = 'View scatter plot';
+    badge.setAttribute('aria-label', 'View scatter plot');
+    badge.addEventListener('click', (event) => {
+      event.stopPropagation();
+      onClick();
+    });
+    return badge;
+  }
+
   function buildMatrixTable(headers, matrix) {
     const thead = document.getElementById('tableHead');
     const tbody = document.getElementById('tableBody');
@@ -2031,8 +2086,17 @@
         corrValue.className = 'corr-value';
         corrValue.textContent = corrData.r.toFixed(3);
         corrValue.setAttribute('data-corr', corrData.r);
-        if (!isDiag) corrValue.addEventListener('click', () => openScatterModal(rowCol, colCol, corrData.r));
-        td.appendChild(corrValue);
+        if (!isDiag) {
+          const openScatter = () => openScatterModal(rowCol, colCol, corrData.r);
+          corrValue.addEventListener('click', openScatter);
+          const valueRow = document.createElement('div');
+          valueRow.className = 'corr-value-row';
+          valueRow.appendChild(corrValue);
+          valueRow.appendChild(createScatterBadge(openScatter));
+          td.appendChild(valueRow);
+        } else {
+          td.appendChild(corrValue);
+        }
 
         if (!isDiag && corrData.p !== null) {
           const pv = document.createElement('div'); pv.className = 'p-value';
@@ -2139,8 +2203,13 @@
       rVal.setAttribute('data-corr', row.r);
       rVal.textContent = row.r.toFixed(3);
       rVal.title = 'View scatter plot';
-      rVal.addEventListener('click', () => openScatterModal(row.varA, row.varB, row.r));
-      rTd.appendChild(rVal);
+      const openScatter = () => openScatterModal(row.varA, row.varB, row.r);
+      rVal.addEventListener('click', openScatter);
+      const valueRow = document.createElement('div');
+      valueRow.className = 'corr-value-row';
+      valueRow.appendChild(rVal);
+      valueRow.appendChild(createScatterBadge(openScatter));
+      rTd.appendChild(valueRow);
       tr.appendChild(rTd);
 
       const pTd = document.createElement('td');
@@ -2227,6 +2296,11 @@
         td.textContent = val.toFixed(2);
         td.style.background = getHeatmapColor(val);
         td.style.color       = getHeatmapTextColor(val);
+        if (i !== j) {
+          const openScatter = () => openScatterModal(rowCol, colCol, val);
+          td.addEventListener('click', openScatter);
+          td.appendChild(createScatterBadge(openScatter));
+        }
         row.appendChild(td);
       });
       body.appendChild(row);

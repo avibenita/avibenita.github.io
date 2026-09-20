@@ -28,6 +28,8 @@ describe('soft navy/slate dark palette', () => {
     expect(headerCss).toMatch(/--highcharts-background-color:\s*#242C37/);
     expect(headerCss).toMatch(/\.highcharts-plot-background/);
     expect(headerCss).toMatch(/\.table-wrap/);
+    expect(headerCss).toMatch(/\.view-card[\s\S]*--surface-0,\s*#0E141B/);
+    expect(headerCss).toMatch(/--sb-active-bg:\s*var\(--surface-0/);
     expect(headerJs).toMatch(/setProperty\('--surface-plot',\s*'#242C37'\)/);
     expect(configCss).toMatch(/--cfg-bg:\s*#0E141B/);
     expect(configCss).toMatch(/rgba\(0,\s*0,\s*0,\s*0\.48\)/);

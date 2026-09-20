@@ -34,6 +34,8 @@ describe('soft navy/slate dark palette', () => {
     expect(headerJs).toMatch(/setProperty\('--surface-plot',\s*'#242C37'\)/);
     expect(configCss).toMatch(/--cfg-bg:\s*#0E141B/);
     expect(configCss).toMatch(/rgba\(0,\s*0,\s*0,\s*0\.48\)/);
+    expect(headerCss).toMatch(/input\[type="checkbox"\][\s\S]*appearance:\s*none/);
+    expect(headerCss).toMatch(/input\[type="checkbox"\][\s\S]*:checked[\s\S]*var\(--accent-1\)/);
   });
 
   test('module views no longer define the old near-black canvas token', () => {

@@ -7540,7 +7540,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       try {
         Highcharts.setOptions({
           chart: {
-            backgroundColor: resolved === 'light' ? '#ffffff' : 'transparent',
+            backgroundColor: resolved === 'light' ? '#ffffff' : '#121820',
             style: { fontFamily: this.HC_FONT_FAMILY, fontSize: '1rem' }
           },
           xAxis: {
@@ -7662,7 +7662,7 @@ REPORT: [one polished paragraph suitable for a report]`;
         const light = self.getTheme() === 'light';
         Highcharts.setOptions({
           chart: {
-            backgroundColor: light ? '#ffffff' : 'transparent',
+            backgroundColor: light ? '#ffffff' : '#121820',
             style: {
               fontFamily: self.HC_FONT_FAMILY,
               fontSize: '1rem'

@@ -16,6 +16,11 @@ describe('soft navy/slate dark palette', () => {
     expect(headerCss).toMatch(/--modal-overlay:\s*rgba\(0,\s*0,\s*0,\s*0\.48\)/);
     expect(headerCss).toMatch(/--border:\s*rgba\(255,\s*255,\s*255,\s*0\.14\)/);
     expect(headerCss).toMatch(/--st-header-band:\s*#18384B/);
+    const uniWs = fs.readFileSync(path.join(__dirname, 'univariate/univariate-workspace.css'), 'utf8');
+    expect(uniWs).toMatch(/--uni-ws-page:\s*#0E141B/);
+    expect(uniWs).toMatch(/--uni-ws-plot:\s*#121820/);
+    expect(uniWs).not.toMatch(/--uni-ws-page:\s*#09111d/);
+    expect(uniWs).toMatch(/--st-header-band,\s*#18384B/);
     expect(headerCss).not.toMatch(/--surface-0:\s*#0f1115/);
     expect(headerJs).toMatch(/setProperty\('--surface-0',\s*'#0E141B'\)/);
     expect(headerJs).toMatch(/setProperty\('--modal-overlay',\s*'rgba\(0,0,0,\.48\)'\)/);

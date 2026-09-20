@@ -16,6 +16,7 @@ describe('soft navy/slate dark palette', () => {
     expect(headerCss).toMatch(/--modal-overlay:\s*rgba\(0,\s*0,\s*0,\s*0\.48\)/);
     expect(headerCss).toMatch(/--border:\s*rgba\(255,\s*255,\s*255,\s*0\.14\)/);
     expect(headerCss).toMatch(/--st-header-band:\s*#18384B/);
+    expect(headerCss).toMatch(/html\[data-theme="dark"\] \.sb-nav[\s\S]*background:\s*#18384B !important/);
     const uniWs = fs.readFileSync(path.join(__dirname, 'univariate/univariate-workspace.css'), 'utf8');
     expect(uniWs).toMatch(/--uni-ws-page:\s*#0E141B/);
     expect(uniWs).toMatch(/--uni-ws-plot:\s*#242C37/);

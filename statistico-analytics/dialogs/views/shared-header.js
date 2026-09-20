@@ -529,9 +529,56 @@ const StatisticoHeader = {
       'html[data-theme="light"] label:has(> input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check):checked)::before{',
       'background-color:var(--accent-1);border-color:var(--accent-1);',
       'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
+      '.checkbox-label.is-checked::before,label.is-checked::before{',
+      'background-color:rgb(255,165,120);border-color:rgb(255,165,120);',
+      'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%230E141B\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
       '#stReportExportOverlay label::before{content:none!important;}',
       '#stReportExportOverlay input[type="checkbox"]{position:static!important;opacity:1!important;pointer-events:auto!important;appearance:auto!important;-webkit-appearance:checkbox!important;}'
     ].join('');
+    this._bindCheckboxToggles();
+  },
+
+  /**
+   * Painted checkboxes hide the native input, so own the toggle here instead of
+   * relying on label activation. One click = one flip, then a real change event.
+   */
+  _bindCheckboxToggles() {
+    if (this._checkboxTogglesBound) return;
+    this._checkboxTogglesBound = true;
+    const SEL = 'input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check)';
+    const sync = (input) => {
+      const label = input.closest ? input.closest('label') : null;
+      if (label) label.classList.toggle('is-checked', !!input.checked);
+    };
+    const syncAll = () => document.querySelectorAll(SEL).forEach(sync);
+
+    document.addEventListener('click', (e) => {
+      const label = e.target && e.target.closest ? e.target.closest('label') : null;
+      if (!label || label.closest('#stReportExportOverlay')) return;
+      if (e.target.closest('a, button, select, textarea, input:not([type="checkbox"])')) return;
+      const input = (label.control && label.control.type === 'checkbox') ? label.control : label.querySelector(SEL);
+      if (!input || input.type !== 'checkbox' || input.disabled) return;
+      if (input.classList.contains('highcharts-legend-checkbox') || input.classList.contains('st-export-check')) return;
+      if (e.target === input) return;
+      e.preventDefault();
+      input.checked = !input.checked;
+      sync(input);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }, true);
+
+    document.addEventListener('change', (e) => {
+      if (e.target && e.target.matches && e.target.matches(SEL)) sync(e.target);
+    }, true);
+
+    syncAll();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', syncAll, { once: true });
+    }
+    window.setTimeout(syncAll, 300);
+    try {
+      new MutationObserver(() => syncAll()).observe(document.documentElement, { childList: true, subtree: true });
+    } catch (_e) {}
   },
 
   /**
@@ -2264,7 +2311,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260920navy10',
+  _TAB_ASSET_VER: '20260920navy11',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

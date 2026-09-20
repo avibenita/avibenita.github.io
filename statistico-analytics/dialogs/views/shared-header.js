@@ -498,6 +498,40 @@ const StatisticoHeader = {
     } catch (_e) {}
 
     if (this._previewReady) this._syncChartSkinToTheme(theme);
+    this._ensureCheckboxStyles();
+  },
+
+  _ensureCheckboxStyles() {
+    const id = 'statistico-checkbox-onoff';
+    let style = document.getElementById(id);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = id;
+      document.head.appendChild(style);
+    }
+    style.textContent = [
+      '.checkbox-label,label:has(> input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check)){',
+      'display:inline-flex;align-items:center;gap:7px;cursor:pointer;pointer-events:auto!important;position:relative;z-index:2;}',
+      '.checkbox-label>input[type="checkbox"],',
+      'label:has(> input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check))>input[type="checkbox"]{',
+      'position:absolute!important;opacity:0!important;width:16px!important;height:16px!important;margin:0!important;',
+      'pointer-events:none!important;-webkit-appearance:none!important;appearance:none!important;}',
+      '.checkbox-label::before,',
+      'label:has(> input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check))::before{',
+      'content:"";width:16px;height:16px;flex:0 0 16px;box-sizing:border-box;border-radius:4px;',
+      'border:1.5px solid rgba(255,165,120,.7);background-color:rgba(255,165,120,.12);',
+      'background-repeat:no-repeat;background-position:center;background-size:10px 10px;}',
+      '.checkbox-label:has(input:checked)::before,',
+      'label:has(> input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check):checked)::before{',
+      'background-color:rgb(255,165,120);border-color:rgb(255,165,120);',
+      'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%230E141B\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
+      'html[data-theme="light"] .checkbox-label:has(input:checked)::before,',
+      'html[data-theme="light"] label:has(> input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check):checked)::before{',
+      'background-color:var(--accent-1);border-color:var(--accent-1);',
+      'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
+      '#stReportExportOverlay label::before{content:none!important;}',
+      '#stReportExportOverlay input[type="checkbox"]{position:static!important;opacity:1!important;pointer-events:auto!important;appearance:auto!important;-webkit-appearance:checkbox!important;}'
+    ].join('');
   },
 
   /**
@@ -2230,7 +2264,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260920navy9',
+  _TAB_ASSET_VER: '20260920navy10',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

@@ -652,8 +652,7 @@
       networkContainer.style.display = 'flex';
       container.style.display = 'flex';
 
-      // Draw network
-      drawNetwork(headers, matrix);
+      requestAnimationFrame(() => drawNetwork(headers, matrix));
     }
 
     function buildNetworkLayoutLinks(varNames, matrix, visibleLinks) {
@@ -792,7 +791,7 @@
         .force("y", d3.forceY(height / 2).strength(0.12))
         .force("collision", d3.forceCollide().radius(NETWORK_COLLISION_RADIUS));
 
-      const g = svg.append("g");
+      const g = svg.append("g").style("opacity", 0);
 
       // Add zoom
       const zoom = d3.zoom()
@@ -846,8 +845,7 @@
         .text(d => d.id)
         .attr("dy", NETWORK_LABEL_OFFSET);
 
-      // Update positions
-      networkSimulation.on("tick", () => {
+      function applyNetworkTick() {
         link
           .attr("x1", d => d.source.x)
           .attr("y1", d => d.source.y)
@@ -867,17 +865,19 @@
           .attr("y", d => d.y);
 
         nodes.forEach(d => networkNodePositions.set(d.id, { x: d.x, y: d.y }));
-      });
+      }
 
       // Store references
       window.networkElements = { link, linkLabels };
       applyNetworkThreshold(networkThreshold);
-      networkFitOnEnd = true;
-      networkSimulation.on("end", () => {
-        if (!networkFitOnEnd) return;
-        networkFitOnEnd = false;
-        fitNetworkToPanel(false);
-      });
+      networkSimulation.stop();
+      networkSimulation.tick(280);
+      applyNetworkTick();
+      fitNetworkToPanel(false);
+      g.style("opacity", 1);
+      networkFitOnEnd = false;
+      networkSimulation.on("tick", applyNetworkTick);
+      networkSimulation.alpha(0.04).restart();
     }
 
     function dragstarted(event, d) {

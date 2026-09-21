@@ -178,13 +178,15 @@ const NAV_STYLE = `
 }
 
 .nav-container {
-  max-width: 1400px;
-  margin: 0 auto;
+  max-width: none;
+  width: 100%;
+  margin: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 24px;
+  justify-content: flex-start;
+  padding: 8px 20px 8px 14px;
   min-height: 92px;
+  box-sizing: border-box;
 }
 
 .nav-logo {
@@ -193,7 +195,7 @@ const NAV_STYLE = `
   align-items: center;
   justify-content: flex-start;
   gap: 13px;
-  margin-right: 16px;
+  margin-right: 36px;
   width: auto;
   height: 66px;
   transition: opacity 0.2s ease;
@@ -286,7 +288,7 @@ const NAV_STYLE = `
   border-left: none;
   display: flex;
   align-items: center;
-  margin-right: 2px;
+  margin-right: 8px;
 }
 
 .nav-products {
@@ -384,8 +386,8 @@ const NAV_STYLE = `
 
 /* Separator before secondary nav cluster */
 .nav-item--sep-left {
-  margin-left: 12px;
-  padding-left: 12px;
+  margin-left: 32px;
+  padding-left: 18px;
   border-left: 1px solid rgba(255,255,255,0.14);
   position: relative;
 }
@@ -428,11 +430,11 @@ const NAV_STYLE = `
   gap: 6px;
   font-size: 0.76rem;
   font-weight: 500;
-  color: rgba(200, 210, 226, 0.55);
+  color: rgba(214, 224, 238, 0.78);
 }
 
 .nav-link--secondary svg {
-  opacity: 0.72;
+  opacity: 0.82;
 }
 
 .nav-link i,
@@ -457,7 +459,7 @@ const NAV_STYLE = `
 }
 
 .nav-link--secondary:hover {
-  color: rgba(236, 242, 250, 0.88);
+  color: rgba(244, 248, 255, 0.96);
   background: rgba(120, 200, 255, 0.06);
 }
 
@@ -470,11 +472,12 @@ const NAV_STYLE = `
 }
 
 .nav-link--secondary.active {
-  color: rgba(255, 255, 255, 0.9);
-  font-weight: 600;
+  color: rgba(236, 244, 255, 0.94);
+  font-weight: 500;
+  background: transparent;
 }
 
-.nav-link.active:not(.nav-link--product):not(.nav-link--product-lite)::after {
+.nav-link.active:not(.nav-link--product):not(.nav-link--product-lite):not(.nav-link--secondary)::after {
   content: '';
   position: absolute;
   left: 10px;
@@ -485,19 +488,30 @@ const NAV_STYLE = `
   background: linear-gradient(90deg, rgb(255,165,120), rgba(120,200,255,0.95));
 }
 
+.nav-link--secondary.active::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 4px;
+  height: 1px;
+  border-radius: 1px;
+  background: rgba(120, 200, 255, 0.42);
+}
+
 .nav-products-row .nav-link--product:hover,
 .nav-products-row .nav-link--product-lite:hover {
   color: #ffffff;
-  background: rgba(120, 200, 255, 0.14) !important;
+  background: rgba(120, 200, 255, 0.1) !important;
 }
 
 .nav-products-row .nav-link--product.active,
 .nav-products-row .nav-link--product-lite.active {
   color: #ffffff;
-  font-weight: 700;
-  background: rgba(120, 200, 255, 0.26) !important;
+  font-weight: 600;
+  background: rgba(120, 200, 255, 0.14) !important;
   border: none !important;
-  box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.32) !important;
+  box-shadow: none !important;
 }
 
 :root[data-theme="light"] .nav-logo { background: none; }
@@ -512,16 +526,21 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-link--secondary {
-  color: rgba(15, 23, 42, 0.48);
+  color: rgba(15, 23, 42, 0.64);
 }
 
 :root[data-theme="light"] .nav-link--secondary:hover {
-  color: rgba(15, 23, 42, 0.78);
+  color: rgba(15, 23, 42, 0.86);
   background: rgba(15, 23, 42, 0.04);
 }
 
 :root[data-theme="light"] .nav-link--secondary.active {
-  color: rgba(15, 23, 42, 0.88);
+  color: rgba(15, 23, 42, 0.82);
+  font-weight: 500;
+}
+
+:root[data-theme="light"] .nav-link--secondary.active::after {
+  background: rgba(37, 99, 235, 0.38);
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product,
@@ -538,8 +557,9 @@ const NAV_STYLE = `
 :root[data-theme="light"] .nav-products-row .nav-link--product.active,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite.active {
   color: #0f172a;
-  background: rgba(37, 99, 235, 0.18) !important;
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.28) !important;
+  font-weight: 600;
+  background: rgba(37, 99, 235, 0.1) !important;
+  box-shadow: none !important;
 }
 
 :root[data-theme="light"] .nav-link.active {
@@ -832,6 +852,7 @@ const NAV_STYLE = `
   align-items: center;
   gap: 9px;
   min-height: 42px;
+  margin-left: auto;
   padding: 7px 12px;
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.2);
@@ -1796,12 +1817,12 @@ footer#contact .footer-bottom {
 
 @media (max-width: 1280px) {
   .nav-container {
-    padding-left: 16px;
+    padding-left: 12px;
     padding-right: 16px;
   }
 
   .nav-logo {
-    margin-right: 10px;
+    margin-right: 24px;
   }
 
   .nav-products-row .nav-link--product,
@@ -1816,8 +1837,8 @@ footer#contact .footer-bottom {
   }
 
   .nav-item--sep-left {
-    margin-left: 8px;
-    padding-left: 8px;
+    margin-left: 22px;
+    padding-left: 14px;
   }
 }
 

@@ -1487,7 +1487,7 @@ def render_page(m: dict) -> str:
 
   <div id="footer-placeholder"></div>
 
-  <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-09-21-products"></script>
+  <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-09-21-nav-refine"></script>
   <script>
     (function () {{
       const tabs = Array.from(document.querySelectorAll('.lr-flow-step[role="tab"]'));

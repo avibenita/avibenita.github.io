@@ -24,7 +24,7 @@ export default defineConfig({
     command: 'node tests/e2e/lib/static-server.mjs',
     url: 'http://127.0.0.1:4173/taskpane/hub.html',
     timeout: 30000,
-    reuseExistingServer: !process.env.CI
+    reuseExistingServer: true
   },
   projects: [
     {

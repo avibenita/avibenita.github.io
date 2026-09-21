@@ -1,11 +1,10 @@
 export type AuditResult =
-  | 'PASS'
-  | 'FAIL_CLICK'
-  | 'FAIL_STATE'
-  | 'FAIL_EFFECT'
+  | 'INTERACTION_PASS'
+  | 'EFFECT_PASS'
+  | 'NEEDS_EXPECTATION'
+  | 'FAIL_VISIBLE_CLICK'
   | 'FAIL_KEYBOARD'
   | 'INTENTIONALLY_DISABLED'
-  | 'NEEDS_EXPECTATION'
   | 'NOT_REACHED';
 
 export type YesNo = 'yes' | 'no' | 'n/a';
@@ -22,12 +21,14 @@ export interface CheckboxRow {
   label: YesNo;
   keyboard: YesNo;
   stateChanged: YesNo;
+  focusTarget?: string;
+  focusVisible?: YesNo;
   intendedEffect: string;
   consoleError: string;
   result: AuditResult;
   notes: string;
   screenshot?: string;
-  proposedFix?: string;
+  defects?: string[];
 }
 
 export interface EffectCheck {

@@ -648,7 +648,7 @@ def render_page(c: dict) -> str:
 
   <div id="footer-placeholder"></div>
 
-  <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-09-21-nav-refine"></script>
+  <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-09-21-nav-active"></script>
 </body>
 </html>
 """

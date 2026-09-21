@@ -472,31 +472,23 @@ const NAV_STYLE = `
 }
 
 .nav-link--secondary.active {
-  color: rgba(236, 244, 255, 0.94);
-  font-weight: 500;
+  color: #ffffff;
+  font-weight: 600;
   background: transparent;
 }
 
-.nav-link.active:not(.nav-link--product):not(.nav-link--product-lite):not(.nav-link--secondary)::after {
+.nav-link.active::after,
+.nav-link--secondary.active::after,
+.nav-products-row .nav-link--product.active::after,
+.nav-products-row .nav-link--product-lite.active::after {
   content: '';
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 5px;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
   height: 2px;
   border-radius: 2px;
-  background: linear-gradient(90deg, rgb(255,165,120), rgba(120,200,255,0.95));
-}
-
-.nav-link--secondary.active::after {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 4px;
-  height: 1px;
-  border-radius: 1px;
-  background: rgba(120, 200, 255, 0.42);
+  background: linear-gradient(90deg, rgb(255,165,120), rgba(120,200,255,0.98));
 }
 
 .nav-products-row .nav-link--product:hover,
@@ -509,7 +501,7 @@ const NAV_STYLE = `
 .nav-products-row .nav-link--product-lite.active {
   color: #ffffff;
   font-weight: 600;
-  background: rgba(120, 200, 255, 0.14) !important;
+  background: rgba(120, 200, 255, 0.18) !important;
   border: none !important;
   box-shadow: none !important;
 }
@@ -535,12 +527,15 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-link--secondary.active {
-  color: rgba(15, 23, 42, 0.82);
-  font-weight: 500;
+  color: #0f172a;
+  font-weight: 600;
 }
 
-:root[data-theme="light"] .nav-link--secondary.active::after {
-  background: rgba(37, 99, 235, 0.38);
+:root[data-theme="light"] .nav-link.active::after,
+:root[data-theme="light"] .nav-link--secondary.active::after,
+:root[data-theme="light"] .nav-products-row .nav-link--product.active::after,
+:root[data-theme="light"] .nav-products-row .nav-link--product-lite.active::after {
+  background: linear-gradient(90deg, rgba(180, 83, 9, 0.92), rgba(37, 99, 235, 0.95));
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product,
@@ -558,7 +553,7 @@ const NAV_STYLE = `
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite.active {
   color: #0f172a;
   font-weight: 600;
-  background: rgba(37, 99, 235, 0.1) !important;
+  background: rgba(37, 99, 235, 0.14) !important;
   box-shadow: none !important;
 }
 

@@ -299,6 +299,42 @@
       cursor:pointer; transition:background .12s ease, border-color .12s ease, transform .12s ease;
     }
     .pair-chart-icon { width:16px; height:16px; display:block; flex:0 0 16px; }
+    .corr-value-row {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:4px;
+    }
+    td.corr-clickable { cursor:pointer; }
+    #corrByGroupTable tbody td.corr-clickable:hover {
+      background:color-mix(in srgb, var(--accent-1) 16%, var(--surface-1));
+    }
+    .corr-scatter-badge {
+      --scatter-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'%3E%3Cpath fill='none' stroke='black' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round' d='M3 2.2v14.4H21.2'/%3E%3Ccircle cx='7.1' cy='13.8' r='1.7' fill='black'/%3E%3Ccircle cx='10.4' cy='10.3' r='1.7' fill='black'/%3E%3Ccircle cx='13.3' cy='12.2' r='1.7' fill='black'/%3E%3Ccircle cx='16.6' cy='7.4' r='1.7' fill='black'/%3E%3Ccircle cx='19.8' cy='5.5' r='1.7' fill='black'/%3E%3C/svg%3E");
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:16px;
+      height:14px;
+      flex:0 0 16px;
+      color:var(--accent-1);
+      opacity:0.4;
+      transition:opacity .16s ease;
+      pointer-events:none;
+    }
+    .corr-scatter-badge::after {
+      content:'';
+      width:14px;
+      height:12px;
+      background-color:currentColor;
+      -webkit-mask-image:var(--scatter-icon);
+      mask-image:var(--scatter-icon);
+      -webkit-mask-size:contain;
+      mask-size:contain;
+      -webkit-mask-repeat:no-repeat;
+      mask-repeat:no-repeat;
+    }
+    td.corr-clickable:hover .corr-scatter-badge { opacity:1; }
     .pair-chart-btn:hover {
       border-color:var(--accent-2);
       background:color-mix(in srgb, var(--accent-2) 14%, var(--surface-1));
@@ -550,7 +586,11 @@
     #corrByGroupTable td.block-divider-start { border-left:2px solid var(--grid-block-group); }
     #corrByGroupTable th.block-divider-overall.block-divider-start,
     #corrByGroupTable td.block-divider-overall.block-divider-start { border-left-color:var(--grid-block-overall); }
-    #corrByGroupTable .metric-col-r { border-right:1px solid var(--grid-inner); }
+    #corrByGroupTable .metric-col-r {
+      border-right:1px solid var(--grid-inner);
+      white-space:nowrap;
+      min-width:72px;
+    }
     #corrByGroupTable .metric-col-p { border-right:1px solid var(--grid-inner); }
     #corrByGroupTable th.group-category { border-right:2px solid var(--grid-block-group); }
     #corrByGroupTable th.group-category-overall { border-right-color:var(--grid-block-overall); }
@@ -1975,9 +2015,16 @@
       body.onclick = (event) => {
         if (event.target.closest('.spark-wrap')) return;
         const btn = event.target.closest('.pair-chart-btn');
-        if (!btn) return;
+        if (btn) {
+          event.stopPropagation();
+          openScatterPopup(btn.getAttribute('data-var-a'), btn.getAttribute('data-var-b'));
+          return;
+        }
+        const rCell = event.target.closest('td.corr-clickable');
+        const row = event.target.closest('tr.pair-row');
+        if (!rCell || !row) return;
         event.stopPropagation();
-        openScatterPopup(btn.getAttribute('data-var-a'), btn.getAttribute('data-var-b'));
+        openScatterPopup(row.getAttribute('data-var-a'), row.getAttribute('data-var-b'));
       };
     }
 
@@ -1997,10 +2044,13 @@
 
     function scatterChartIcon(className) {
       const cls = className || 'pair-chart-icon';
-      return `<svg class="${cls}" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <path d="M2.2 13.2 V3.4" stroke="currentColor" stroke-width="1.1" fill="none" opacity=".45" stroke-linecap="round"></path>
-        <path d="M2.2 13.2 H13.8" stroke="currentColor" stroke-width="1.1" fill="none" opacity=".45" stroke-linecap="round"></path>
-        <polyline points="2.8,10.4 5.8,7.8 8.4,9.1 11.2,5.2 13.6,6.8" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      return `<svg class="${cls}" viewBox="0 0 24 20" aria-hidden="true" focusable="false">
+        <path d="M3 2.2v14.4H21.2" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"></path>
+        <circle cx="7.1" cy="13.8" r="1.7" fill="currentColor"></circle>
+        <circle cx="10.4" cy="10.3" r="1.7" fill="currentColor"></circle>
+        <circle cx="13.3" cy="12.2" r="1.7" fill="currentColor"></circle>
+        <circle cx="16.6" cy="7.4" r="1.7" fill="currentColor"></circle>
+        <circle cx="19.8" cy="5.5" r="1.7" fill="currentColor"></circle>
       </svg>`;
     }
 
@@ -2214,7 +2264,7 @@
       const endCls = ` block-divider-end${opts.overall ? ' block-divider-overall' : ''}`;
       const [rVal, pVal, nVal, rTitle] = values;
       const rCell = Number.isFinite(rVal)
-        ? `<td class="${blockClass} metric-col-r${startCls} ${formatRClass(rVal)}">${fmtR(rVal)}</td>`
+        ? `<td class="${blockClass} metric-col-r${startCls} ${formatRClass(rVal)} corr-clickable" title="View scatter plot"><span class="corr-value-row"><span>${fmtR(rVal)}</span><span class="corr-scatter-badge" aria-hidden="true"></span></span></td>`
         : `<td class="${blockClass} metric-col-r${startCls} r-weak">—</td>`;
       const pCell = `<td class="${blockClass} metric-col-p group-metric-p">${formatP(pVal)}</td>`;
       const nCell = `<td class="${blockClass} metric-col-n group-metric-n${endCls}" title="${tipAttr(rTitle || '')}">${Number.isFinite(nVal) ? nVal : '—'}</td>`;

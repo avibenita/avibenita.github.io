@@ -533,8 +533,18 @@ const StatisticoHeader = {
       '.checkbox-label.is-checked::before,label.is-checked::before{',
       'background-color:rgb(255,165,120);border-color:rgb(255,165,120);',
       'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%230E141B\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
-      '#stReportExportOverlay label::before,#stReportExportOverlay .st-export-check-row::before{content:none!important;display:none!important;}',
-      '#stReportExportOverlay input[type="checkbox"]{position:static!important;opacity:1!important;pointer-events:auto!important;appearance:auto!important;-webkit-appearance:checkbox!important;width:16px!important;height:16px!important;filter:none!important;}'
+      '#stReportExportOverlay{color-scheme:light;}',
+      '#stReportExportOverlay .st-export-check-row{position:relative;}',
+      '#stReportExportOverlay .st-export-check-row::before{',
+      'content:""!important;display:block!important;width:16px;height:16px;flex:0 0 16px;box-sizing:border-box;',
+      'border-radius:4px;border:1.5px solid #f97316;background-color:#fff;background-repeat:no-repeat;',
+      'background-position:center;background-size:10px 10px;}',
+      '#stReportExportOverlay .st-export-check-row:has(input:checked)::before{',
+      'background-color:#f97316;border-color:#f97316;',
+      'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
+      '#stReportExportOverlay .st-export-check-row input[type="checkbox"]{',
+      'position:absolute!important;opacity:0!important;pointer-events:none!important;width:16px!important;height:16px!important;',
+      'margin:0!important;appearance:none!important;-webkit-appearance:none!important;}'
     ].join('');
     this._bindCheckboxToggles();
   },
@@ -583,8 +593,17 @@ const StatisticoHeader = {
 
     document.addEventListener('click', (e) => {
       const label = e.target && e.target.closest ? e.target.closest('label') : null;
-      if (!label || label.closest('#stReportExportOverlay')) return;
+      if (!label) return;
       if (e.target.closest('a, button, select, textarea, input:not([type="checkbox"])')) return;
+      if (label.closest('#stReportExportOverlay')) {
+        const exportInput = label.querySelector('input[type="checkbox"]');
+        if (!exportInput || exportInput.disabled) return;
+        e.preventDefault();
+        exportInput.checked = !exportInput.checked;
+        exportInput.dispatchEvent(new Event('input', { bubbles: true }));
+        exportInput.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
       const input = (label.control && label.control.type === 'checkbox') ? label.control : label.querySelector(SEL);
       if (!input || input.type !== 'checkbox' || input.disabled) return;
       if (isExportOverlayInput(input) || input.classList.contains('highcharts-legend-checkbox') || input.classList.contains('st-export-check')) return;
@@ -2673,30 +2692,31 @@ const StatisticoHeader = {
     overlay.innerHTML = `
       <div style="width:min(640px,95vw);max-height:90vh;background:#fff;border-radius:14px;border:1px solid #cbd5e1;box-shadow:0 16px 40px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden;">
         <style>
+          #stReportExportOverlay { color-scheme: light; }
           #stReportExportOverlay .st-export-check-row {
             display:flex;align-items:center;gap:8px;padding:5px 4px;
             border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;
-            cursor:pointer;pointer-events:auto;opacity:1;
+            cursor:pointer;pointer-events:auto;opacity:1;position:relative;user-select:none;
+          }
+          #stReportExportOverlay .st-export-check-row::before {
+            content:"" !important;display:block !important;width:16px;height:16px;flex:0 0 16px;
+            box-sizing:border-box;border-radius:4px;border:1.5px solid #f97316;background:#fff;
+            background-repeat:no-repeat;background-position:center;background-size:10px 10px;
+          }
+          #stReportExportOverlay .st-export-check-row:has(input:checked)::before {
+            background-color:#f97316;border-color:#f97316;
+            background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M2.2 6.2 4.8 8.8 9.8 3.2'/%3E%3C/svg%3E");
+          }
+          #stReportExportOverlay .st-export-check-row input[type="checkbox"] {
+            position:absolute !important;opacity:0 !important;pointer-events:none !important;
+            width:16px !important;height:16px !important;margin:0 !important;
+            appearance:none !important;-webkit-appearance:none !important;
           }
           #stReportExportOverlay .st-export-all-btn {
             padding:3px 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;
             color:#475569;font-size:11px;font-weight:600;cursor:pointer;
           }
           #stReportExportOverlay .st-export-all-btn:hover { border-color:#f97316;color:#c2410c; }
-          #stReportExportOverlay input[type="checkbox"] {
-            -webkit-appearance:checkbox !important;
-            appearance:auto !important;
-            pointer-events:auto !important;
-            opacity:1 !important;
-            filter:none !important;
-            width:16px !important;
-            height:16px !important;
-            margin:0 !important;
-            cursor:pointer !important;
-            position:static !important;
-            accent-color:#f97316 !important;
-            background:#fff !important;
-          }
         </style>
         <div style="flex-shrink:0;padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;">
           <i class="fa-solid fa-file-export" style="color:#f97316;font-size:16px;"></i>

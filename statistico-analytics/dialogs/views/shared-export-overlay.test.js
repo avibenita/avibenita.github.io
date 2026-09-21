@@ -10,16 +10,17 @@ function read(rel) {
 }
 
 describe('shared export overlay', () => {
-  test('keeps native overlay checkboxes clickable and out of the painted skin', () => {
+  test('paints overlay checkboxes so the dark native box is not the hit target', () => {
     expect(header).toMatch(/class="st-export-check" id="stCoverEnabled"/);
     expect(header).toMatch(/class="st-export-check" id="stCoverIncludeLogo"/);
-    expect(header).toMatch(/cb\.classList\.add\('st-export-check'\)/);
-    expect(header).toMatch(/isExportOverlayInput/);
+    expect(header).toMatch(/#stReportExportOverlay\{color-scheme:light;\}/);
+    expect(header).toMatch(/#stReportExportOverlay \.st-export-check-row::before\{/);
     expect(header).toMatch(/label\.closest\('#stReportExportOverlay'\)/);
-    expect(header).toMatch(/#stReportExportOverlay label::before/);
-    expect(css).toMatch(/#stReportExportOverlay input\[type="checkbox"\]/);
-    expect(css).toMatch(/pointer-events:\s*auto !important/);
-    expect(css).toMatch(/#stReportExportOverlay label::before/);
+    expect(header).toMatch(/exportInput\.checked = !exportInput\.checked/);
+    expect(css).toMatch(/#stReportExportOverlay \{\s*color-scheme:\s*light;/);
+    expect(css).toMatch(/#stReportExportOverlay \.st-export-check-row::before/);
+    expect(css).toMatch(/#stReportExportOverlay \.st-export-check-row input\[type="checkbox"\]/);
+    expect(css).toMatch(/pointer-events:\s*none !important/);
   });
 
   test('offers include/exclude all for report sections', () => {

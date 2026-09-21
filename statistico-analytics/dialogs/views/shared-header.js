@@ -285,7 +285,9 @@ const StatisticoHeader = {
     if (this._themeSwitcherBound) return;
     this._themeSwitcherBound = true;
     document.addEventListener('click', (e) => {
-      const btn = e.target && e.target.closest && e.target.closest('[data-theme-pref]');
+      // Only the switcher buttons. `<html>` also carries data-theme-pref (see
+      // applyTheme), so a bare [data-theme-pref] match would cancel every click.
+      const btn = e.target && e.target.closest && e.target.closest('button[data-theme-pref]');
       if (!btn) return;
       e.preventDefault();
       this.setThemePreference(btn.getAttribute('data-theme-pref'));

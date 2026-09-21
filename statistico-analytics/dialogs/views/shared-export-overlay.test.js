@@ -23,6 +23,14 @@ describe('shared export overlay', () => {
     expect(css).toMatch(/pointer-events:\s*none !important/);
   });
 
+  test('theme switcher only cancels clicks on its own buttons', () => {
+    // <html> carries data-theme-pref too; a bare [data-theme-pref] match would
+    // preventDefault() every click on the page (radios, file inputs, links).
+    expect(header).toMatch(/closest\('button\[data-theme-pref\]'\)/);
+    expect(header).not.toMatch(/closest\('\[data-theme-pref\]'\)/);
+    expect(header).toMatch(/root\.setAttribute\('data-theme-pref', preference\)/);
+  });
+
   test('offers include/exclude all for report sections', () => {
     expect(header).toMatch(/id="stExportIncludeAll"/);
     expect(header).toMatch(/id="stExportExcludeAll"/);

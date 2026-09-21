@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Shared checkbox fixture</title>
+  <style>
+    body { font-family: Segoe UI, sans-serif; padding: 24px; background: #0e141b; color: #e8eef5; }
+    .row { margin: 16px 0; }
+    #log { margin-top: 24px; font-size: 13px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <h1>Shared checkbox contract</h1>
+
+  <div class="row">
+    <label class="checkbox-label" id="uncontrolledLabel">
+      <input type="checkbox" id="uncontrolledBox" />
+      <span>Uncontrolled option</span>
+    </label>
+  </div>
+
+  <div class="row">
+    <label class="checkbox-label" id="controlledLabel">
+      <input type="checkbox" id="controlledBox" />
+      <span>Controlled option</span>
+    </label>
+  </div>
+
+  <div class="row">
+    <input type="checkbox" id="forBox" />
+    <label for="forBox" id="forLabel">Associated label</label>
+  </div>
+
+  <div class="row">
+    <label class="checkbox-label" id="disabledLabel">
+      <input type="checkbox" id="disabledBox" disabled />
+      <span>Disabled option</span>
+    </label>
+  </div>
+
+  <div class="row">
+    <div id="customBox" role="checkbox" tabindex="0" aria-checked="false" aria-label="Custom checkbox">Custom checkbox</div>
+  </div>
+
+  <pre id="log"></pre>
+
+  <script>
+    window.__changes = [];
+
+    const uncontrolled = document.getElementById('uncontrolledBox');
+    uncontrolled.addEventListener('change', function () {
+      window.__changes.push({ id: 'uncontrolledBox', checked: uncontrolled.checked });
+    });
+
+    const controlled = document.getElementById('controlledBox');
+    let controlledState = false;
+    controlled.checked = controlledState;
+    controlled.addEventListener('change', function () {
+      controlledState = controlled.checked;
+      window.__changes.push({ id: 'controlledBox', checked: controlledState });
+    });
+
+    const forBox = document.getElementById('forBox');
+    forBox.addEventListener('change', function () {
+      window.__changes.push({ id: 'forBox', checked: forBox.checked });
+    });
+
+    const disabled = document.getElementById('disabledBox');
+    disabled.addEventListener('change', function () {
+      window.__changes.push({ id: 'disabledBox', checked: disabled.checked });
+    });
+
+    const custom = document.getElementById('customBox');
+    function setCustom(next) {
+      custom.setAttribute('aria-checked', next ? 'true' : 'false');
+      window.__changes.push({ id: 'customBox', checked: next });
+    }
+    custom.addEventListener('click', function () {
+      setCustom(custom.getAttribute('aria-checked') !== 'true');
+    });
+    custom.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        setCustom(custom.getAttribute('aria-checked') !== 'true');
+      }
+    });
+
+    /* Mirrors StatisticoHeader._ensureCheckboxStyles + _bindCheckboxToggles */
+    (function bindSharedCheckboxToggles() {
+      const style = document.createElement('style');
+      style.textContent = [
+        '.checkbox-label,label:has(> input[type="checkbox"]){',
+        'display:inline-flex;align-items:center;gap:7px;cursor:pointer;pointer-events:auto!important;position:relative;z-index:2;}',
+        '.checkbox-label>input[type="checkbox"],',
+        'label:has(> input[type="checkbox"])>input[type="checkbox"]{',
+        'position:absolute!important;opacity:0!important;width:16px!important;height:16px!important;margin:0!important;',
+        'pointer-events:none!important;-webkit-appearance:none!important;appearance:none!important;}',
+        '.checkbox-label::before,',
+        'label:has(> input[type="checkbox"])::before{',
+        'content:"";width:16px;height:16px;flex:0 0 16px;box-sizing:border-box;border-radius:4px;',
+        'border:1.5px solid rgba(255,165,120,.7);background-color:rgba(255,165,120,.12);}',
+        '.checkbox-label:has(input:checked)::before,',
+        'label:has(> input[type="checkbox"]:checked)::before{background-color:rgb(255,165,120);border-color:rgb(255,165,120);}'
+      ].join('');
+      document.head.appendChild(style);
+
+      const SEL = 'input[type="checkbox"]';
+      const sync = (input) => {
+        const label = input.closest ? input.closest('label') : null;
+        if (label) label.classList.toggle('is-checked', !!input.checked);
+      };
+      document.addEventListener('click', (e) => {
+        const label = e.target && e.target.closest ? e.target.closest('label') : null;
+        if (!label) return;
+        if (e.target.closest('a, button, select, textarea, input:not([type="checkbox"])')) return;
+        const input = (label.control && label.control.type === 'checkbox') ? label.control : label.querySelector(SEL);
+        if (!input || input.type !== 'checkbox' || input.disabled) return;
+        if (e.target === input) return;
+        e.preventDefault();
+        input.checked = !input.checked;
+        sync(input);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }, true);
+      document.addEventListener('change', (e) => {
+        if (e.target && e.target.matches && e.target.matches(SEL)) sync(e.target);
+      }, true);
+    })();
+  </script>
+</body>
+</html>

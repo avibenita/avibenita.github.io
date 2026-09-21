@@ -30,7 +30,9 @@
     bubble: 'multivariable visualisation',
     recode: 'data manipulation',
     'chi square': 'contingency',
-    crosstab: 'contingency'
+    crosstab: 'contingency',
+    ezpaste: 'ezpaste paste powerpoint',
+    'split index': 'split index drivers'
   };
 
   var STOP = {
@@ -44,6 +46,7 @@
     family: '',
     product: '',
     kind: '',
+    origin: '',
     outcome: '',
     groups: '',
     design: '',
@@ -127,6 +130,8 @@
     if (state.family && el.getAttribute('data-family') !== state.family) return 0;
     if (state.product && el.getAttribute('data-product') !== state.product) return 0;
     if (state.kind && el.getAttribute('data-kind') !== state.kind) return 0;
+    if (state.origin === 'original' && el.getAttribute('data-original') !== '1') return 0;
+    if (state.origin === 'established' && el.getAttribute('data-original') === '1') return 0;
     if (state.outcome) {
       var outcomes = (el.getAttribute('data-outcome') || '').split(/\s+/);
       if (outcomes.indexOf(state.outcome) < 0) return 0;
@@ -204,10 +209,7 @@
       block.hidden = !any;
     });
 
-    var noun = state.mode === 'method'
-      ? (shown === 1 ? 'method' : 'methods')
-      : (shown === 1 ? 'capability' : 'capabilities');
-    var countText = shown + ' ' + noun;
+    var countText = shown + (shown === 1 ? ' result' : ' results');
     document.querySelectorAll('.results-count').forEach(function (el) {
       el.textContent = countText;
     });
@@ -227,6 +229,7 @@
     if (state.family) params.set('family', state.family);
     if (state.product) params.set('product', state.product);
     if (state.kind) params.set('kind', state.kind);
+    if (state.origin) params.set('origin', state.origin);
     if (state.outcome) params.set('outcome', state.outcome);
     if (state.groups) params.set('groups', state.groups);
     if (state.design) params.set('design', state.design);
@@ -309,6 +312,7 @@
     if (els.filterFamily && els.filterFamily.value !== state.family) els.filterFamily.value = state.family;
     if (els.filterProduct && els.filterProduct.value !== state.product) els.filterProduct.value = state.product;
     if (els.filterKind && els.filterKind.value !== state.kind) els.filterKind.value = state.kind;
+    if (els.filterOrigin && els.filterOrigin.value !== state.origin) els.filterOrigin.value = state.origin;
   }
 
   function setGoal(goal) {
@@ -343,6 +347,7 @@
     state.family = params.get('family') || '';
     state.product = params.get('product') || '';
     state.kind = params.get('kind') || '';
+    state.origin = params.get('origin') || '';
     state.outcome = params.get('outcome') || '';
     state.groups = params.get('groups') || '';
     state.design = params.get('design') || '';
@@ -362,6 +367,7 @@
     els.filterFamily = document.getElementById('filter-family');
     els.filterProduct = document.getElementById('filter-product');
     els.filterKind = document.getElementById('filter-kind');
+    els.filterOrigin = document.getElementById('filter-origin');
 
     document.querySelectorAll('.mode-tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
@@ -439,6 +445,25 @@
         writeUrl();
       });
     }
+    if (els.filterOrigin) {
+      els.filterOrigin.addEventListener('change', function () {
+        state.origin = els.filterOrigin.value;
+        applyFilters();
+        writeUrl();
+      });
+    }
+
+    document.querySelectorAll('.topic-tag').forEach(function (tag) {
+      tag.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.query = tag.getAttribute('data-q') || tag.textContent.trim();
+        if (els.input) els.input.value = state.query;
+        syncFilterChips();
+        applyFilters();
+        writeUrl();
+      });
+    });
 
     document.querySelectorAll('.sort-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -448,7 +473,7 @@
 
     document.querySelectorAll('.method-row').forEach(function (row) {
       row.addEventListener('click', function (event) {
-        if (event.target.closest('a')) return;
+        if (event.target.closest('a, button, .topic-tag')) return;
         var href = row.getAttribute('data-href');
         if (href) window.location.href = href;
       });
@@ -490,6 +515,7 @@
         state.family = '';
         state.product = '';
         state.kind = '';
+        state.origin = '';
         state.outcome = '';
         state.groups = '';
         state.design = '';

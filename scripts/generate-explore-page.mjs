@@ -26,30 +26,35 @@ const PRODUCT_LABEL = {
   'specialized-tools': 'Specialized Tools',
 };
 
-const KIND_CTA = {
-  module: 'Explore module',
-  feature: 'Open in module',
-  calculator: 'Open calculator',
-  tool: 'Explore tool',
-};
+function actionLabel(cap) {
+  const dest = cap.kind === 'feature' ? cap.parentName : String(cap.name || '').replace(/™/g, '');
+  return cap.kind === 'feature' ? `Open in ${dest}` : `Open ${dest}`;
+}
 
-const KIND_LABEL = {
-  module: 'Module',
-  feature: 'Feature',
-  calculator: 'Calculator',
-  tool: 'Tool',
-};
+function topicTagsHtml(tags) {
+  const list = tags || [];
+  const shown = list.slice(0, 3);
+  const extra = list.length - shown.length;
+  const items = shown.map((t) => `<li><button type="button" class="topic-tag" data-q="${esc(t)}">${esc(t)}</button></li>`);
+  if (extra > 0) {
+    items.push(`<li class="topic-more" title="${esc(list.slice(3).join(', '))}">+${extra}</li>`);
+  }
+  return `<ul class="cap-tags">${items.join('')}</ul>`;
+}
 
 function cardHtml(cap) {
-  const tags = (cap.tags || []).map((t) => `          <li>${esc(t)}</li>`).join('\n');
   const inLine = cap.kind === 'feature'
     ? `        <p class="cap-in">In ${esc(cap.parentName)}</p>\n`
+    : '';
+  const original = cap.original
+    ? ` <span class="original-badge" title="Developed by Statistico rather than an established statistical method.">Statistico Original</span>`
     : '';
   return `<article
         class="cap-card${cap.kind === 'feature' ? ' cap-card--feature' : ''}"
         id="cap-${esc(cap.id)}"
         data-id="${esc(cap.id)}"
         data-kind="${esc(cap.kind)}"
+        data-original="${cap.original ? '1' : ''}"
         data-parent="${esc(cap.parent || '')}"
         data-product="${esc(cap.product)}"
         data-family="${esc(cap.family)}"
@@ -59,16 +64,14 @@ function cardHtml(cap) {
         data-design="${esc((cap.design || []).join(' '))}"
         data-tags="${esc((cap.tags || []).join(' '))}"
         data-keywords="${esc((cap.keywords || []).join(' '))}">
-${inLine}        <h3><a href="${esc(cap.overviewUrl)}">${esc(cap.name)}</a></h3>
+${inLine}        <h3><a href="${esc(cap.overviewUrl)}">${esc(cap.name)}</a>${original}</h3>
         <p class="cap-blurb">${esc(cap.blurb)}</p>
-        <ul class="cap-tags">
-${tags}
-        </ul>
+        ${topicTagsHtml(cap.tags || [])}
         <div class="cap-meta">
           <span>${esc(PRODUCT_LABEL[cap.product] || cap.product)}</span>
           <span>${esc((data.families.find((f) => f.id === cap.family) || {}).label || '')}</span>
         </div>
-        <a class="cap-cta" href="${esc(cap.overviewUrl)}">${KIND_CTA[cap.kind] || 'Explore'} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+        <a class="cap-cta" href="${esc(cap.overviewUrl)}">${esc(actionLabel(cap))} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
       </article>`;
 }
 
@@ -83,14 +86,18 @@ const productTabs = [`          <button type="button" class="product-tab is-acti
 
 function tableRowHtml(cap, familyOrder) {
   const familyLabel = (data.families.find((f) => f.id === cap.family) || {}).label || '';
-  const tags = (cap.tags || []).slice(0, 4).map((t) => `<li>${esc(t)}</li>`).join('');
+  const topics = topicTagsHtml(cap.tags || []);
   const inLine = cap.kind === 'feature'
     ? `<span class="row-in">In ${esc(cap.parentName)}</span>`
+    : '';
+  const original = cap.original
+    ? `<span class="original-badge" title="Developed by Statistico rather than an established statistical method.">Statistico Original</span>`
     : '';
   return `<tr
           class="method-row${cap.kind === 'feature' ? ' method-row--feature' : ''}"
           data-id="${esc(cap.id)}"
           data-kind="${esc(cap.kind)}"
+          data-original="${cap.original ? '1' : ''}"
           data-parent="${esc(cap.parent || '')}"
           data-product="${esc(cap.product)}"
           data-family="${esc(cap.family)}"
@@ -105,14 +112,17 @@ function tableRowHtml(cap, familyOrder) {
           data-href="${esc(cap.overviewUrl)}">
           <td class="col-method">
             ${inLine}
-            <a class="row-name" href="${esc(cap.overviewUrl)}">${esc(cap.name)}</a>
+            <div class="row-title">
+              <a class="row-name" href="${esc(cap.overviewUrl)}">${esc(cap.name)}</a>
+              ${original}
+            </div>
             <p class="row-blurb">${esc(cap.blurb)}</p>
+            <div class="row-topics">${topics}</div>
           </td>
           <td class="col-family" data-value="${esc(familyLabel)}">${esc(familyLabel)}</td>
           <td class="col-product"><span class="badge badge-product badge-${esc(cap.product)}">${esc(PRODUCT_LABEL[cap.product] || cap.product)}</span></td>
-          <td class="col-kind"><span class="badge badge-kind badge-${esc(cap.kind)}">${esc(KIND_LABEL[cap.kind] || cap.kind)}</span></td>
-          <td class="col-tags"><ul class="cap-tags">${tags}</ul></td>
-          <td class="col-open"><a class="row-open" href="${esc(cap.overviewUrl)}">${KIND_CTA[cap.kind] || 'Open'} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></td>
+          <td class="col-tags">${topics}</td>
+          <td class="col-open"><a class="row-open" href="${esc(cap.overviewUrl)}">${esc(actionLabel(cap))} <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></td>
         </tr>`;
 }
 
@@ -168,7 +178,7 @@ const html = `<!DOCTYPE html>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
-  <link rel="stylesheet" href="/Statistico-Website/assets/css/explore.css?v=2026-09-21-gap" />
+  <link rel="stylesheet" href="/Statistico-Website/assets/css/explore.css?v=2026-09-21-tax" />
 
   <script type="application/ld+json">
   {
@@ -221,13 +231,13 @@ ${itemList}
     <div class="container explore-bar-inner">
       <h1 class="visually-hidden">Explore Statistico</h1>
       <div class="mode-tabs" role="tablist" aria-label="Browse Explore Statistico">
-        <button type="button" class="mode-tab is-active" role="tab" aria-selected="true" data-mode="method">By method</button>
+        <button type="button" class="mode-tab is-active" role="tab" aria-selected="true" data-mode="method">Methods &amp; tools</button>
         <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="goal">By goal</button>
         <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="product">By product</button>
       </div>
       <form class="explore-search" role="search" action="/Statistico-Website/explore.html" method="get" onsubmit="return false;">
         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input id="explore-q" name="q" type="search" placeholder="Search methods" autocomplete="off" />
+        <input id="explore-q" name="q" type="search" placeholder="Search methods and tools" autocomplete="off" />
         <button type="button" class="explore-search-clear" id="explore-clear" aria-label="Clear search"><i class="fa-solid fa-xmark"></i></button>
       </form>
     </div>
@@ -275,7 +285,7 @@ ${goalButtons}
 ${productTabs}
           </div>
         </div>
-        <p class="results-count results-count--cards" id="explore-count-cards" hidden>${data.capabilities.length} capabilities</p>
+        <p class="results-count results-count--cards" id="explore-count-cards" hidden>${data.capabilities.length} results</p>
       </div>
     </section>
 
@@ -284,9 +294,9 @@ ${productTabs}
         <div class="method-table-toolbar">
           <div class="method-filters">
             <label class="method-filter">
-              <span>Family</span>
-              <select id="filter-family" aria-label="Filter by family">
-              <option value="">All families</option>
+              <span>Category</span>
+              <select id="filter-family" aria-label="Filter by category">
+              <option value="">All categories</option>
 ${familyOptions}
               </select>
             </label>
@@ -298,28 +308,35 @@ ${productOptions}
               </select>
             </label>
             <label class="method-filter">
-              <span>Type</span>
-              <select id="filter-kind" aria-label="Filter by type">
-              <option value="">All types</option>
+              <span>Item type</span>
+              <select id="filter-kind" aria-label="Filter by item type">
+              <option value="">All item types</option>
               <option value="module">Module</option>
-              <option value="feature">Feature</option>
+              <option value="feature">In-module feature</option>
               <option value="calculator">Calculator</option>
               <option value="tool">Tool</option>
               </select>
             </label>
+            <label class="method-filter">
+              <span>Origin</span>
+              <select id="filter-origin" aria-label="Filter by origin">
+              <option value="">All</option>
+              <option value="original">Statistico Originals</option>
+              <option value="established">Established Methods</option>
+              </select>
+            </label>
           </div>
-          <p class="results-count" id="explore-count">${data.capabilities.length} methods</p>
+          <p class="results-count" id="explore-count">${data.capabilities.length} results</p>
         </div>
         <div class="method-table-scroll">
           <table class="method-table" id="method-table">
             <thead>
               <tr>
-                <th scope="col"><button type="button" class="sort-btn" data-sort="name">Method <i class="fa-solid fa-sort" aria-hidden="true"></i></button></th>
-                <th scope="col"><button type="button" class="sort-btn is-active" data-sort="family" data-dir="asc">Family <i class="fa-solid fa-sort-up" aria-hidden="true"></i></button></th>
+                <th scope="col"><button type="button" class="sort-btn" data-sort="name">Method or tool <i class="fa-solid fa-sort" aria-hidden="true"></i></button></th>
+                <th scope="col"><button type="button" class="sort-btn is-active" data-sort="family" data-dir="asc">Category <i class="fa-solid fa-sort-up" aria-hidden="true"></i></button></th>
                 <th scope="col"><button type="button" class="sort-btn" data-sort="product">Product <i class="fa-solid fa-sort" aria-hidden="true"></i></button></th>
-                <th scope="col"><button type="button" class="sort-btn" data-sort="kind">Type <i class="fa-solid fa-sort" aria-hidden="true"></i></button></th>
-                <th scope="col">Capabilities</th>
-                <th scope="col"><span class="visually-hidden">Open</span></th>
+                <th class="col-topics-head" scope="col">Key topics</th>
+                <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -345,7 +362,7 @@ ${familyBlocks}
 
   <div id="footer-placeholder"></div>
   <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-09-21-explore"></script>
-  <script src="/Statistico-Website/assets/js/explore.js?v=2026-09-21-bar"></script>
+  <script src="/Statistico-Website/assets/js/explore.js?v=2026-09-21-tax"></script>
 </body>
 </html>
 `;

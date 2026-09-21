@@ -85,17 +85,33 @@
     .dsp-kpi-note { color:var(--text-secondary); font-size:11px; margin-top:4px; line-height:1.35; }
     .dsp-chart-panel {
       border:1px solid var(--border); border-radius:12px; background:var(--surface-2);
-      padding:6px 8px 6px; min-width:0; height:100%; display:flex; flex-direction:column; gap:4px;
+      padding:6px 8px 6px; min-width:0; height:100%; min-height:0; display:flex; flex-direction:column; gap:4px;
+      overflow:hidden;
     }
-    .dsp-chart-head { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .dsp-chart-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+    .dsp-chart-head > div:first-child { flex:1 1 240px; min-width:0; }
     .dsp-chart-host { flex:1 1 auto; min-height:220px; display:flex; flex-direction:column; }
-    #corrProfileHost { flex:1 1 auto; min-height:0; height:auto; }
-    .dsp-chart-host #corrProfileChart { flex:1 1 auto; width:100%; min-height:0; height:100%; }
+    /* Profile chart scrolls inside its panel instead of spilling onto the table below. */
+    #corrProfileHost {
+      flex:1 1 auto; min-height:0; height:auto; display:block;
+      overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+      border-radius:8px;
+    }
+    .dsp-chart-host #corrProfileChart { width:100%; min-height:0; }
+    .corr-profile-expand {
+      margin-top:0; padding:5px 9px; font-size:11px; gap:6px; flex:0 0 auto; white-space:nowrap;
+    }
+    .corr-profile-expand i { font-size:10px; }
+    #corrProfileDialog { z-index:2147483290; }
+    .corr-profile-dialog { width:min(1100px, 96vw); }
+    .corr-profile-dialog .scatter-dialog-body { display:flex; flex-direction:column; gap:8px; }
+    #corrProfileHostFull { min-height:0; display:block; }
+    #corrProfileChartFull { width:100%; }
     .dsp-chart-host #corrSimChart { flex:1 1 auto; width:100%; min-height:180px; }
     .corr-profile-headline {
       margin:4px 0 0; color:var(--text-primary); font-size:13px; font-weight:650; line-height:1.4;
     }
-    .corr-profile-svg { display:block; width:100%; height:100%; }
+    .corr-profile-svg { display:block; width:100%; height:auto; }
     .corr-profile-zero { stroke:rgba(255,255,255,.38); stroke-width:1.2; stroke-dasharray:3 3; }
     html[data-theme="light"] .corr-profile-zero { stroke:rgba(15,23,42,.32); }
     .corr-profile-range { stroke:rgba(148,163,184,.55); stroke-width:3; stroke-linecap:round; }
@@ -800,6 +816,10 @@
                         <div class="dsp-subhead">Correlation Profiles Across Groups</div>
                         <p class="corr-profile-headline" id="corrProfileHeadline"></p>
                       </div>
+                      <button type="button" class="corr-sim-open-btn corr-profile-expand" onclick="openCorrProfilePopup()" title="Open full view" aria-label="Open full view of correlation profiles">
+                        <i class="fa-solid fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
+                        Full view
+                      </button>
                     </div>
                     <div class="dsp-chart-host" id="corrProfileHost">
                       <div id="corrProfileChart"></div>
@@ -880,6 +900,24 @@
         <div class="dsp-chart-host" id="corrSimChartHost">
           <div id="corrSimChart"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scatter-dialog-overlay" id="corrProfileDialog" role="dialog" aria-modal="true" aria-labelledby="corrProfileDialogTitle">
+    <div class="scatter-dialog corr-profile-dialog">
+      <div class="scatter-dialog-head">
+        <div>
+          <strong id="corrProfileDialogTitle">Correlation Profiles Across Groups</strong>
+          <span id="corrProfileDialogSubtitle"></span>
+        </div>
+        <button class="scatter-dialog-close" type="button" onclick="closeCorrProfilePopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="scatter-dialog-body">
+        <div class="dsp-chart-host" id="corrProfileHostFull">
+          <div id="corrProfileChartFull"></div>
+        </div>
+        <div class="corr-profile-legend" id="corrProfileLegendFull"></div>
       </div>
     </div>
   </div>
@@ -2291,6 +2329,8 @@
       }
       renderCorrSimGauge();
       renderCorrProfileChart();
+      const profileDialog = document.getElementById('corrProfileDialog');
+      if (profileDialog && profileDialog.classList.contains('is-visible')) renderCorrProfileChart('full');
       renderCorrSimPairTable();
       renderCorrSimProfile();
     }
@@ -2591,29 +2631,49 @@
       return 'Groups differ mainly on ' + joinPairNames((loose.length ? loose : stable).map(compactPairLabel)) + '.';
     }
 
-    function renderCorrProfileChart() {
-      const el = document.getElementById('corrProfileChart');
-      const headline = document.getElementById('corrProfileHeadline');
-      const legend = document.getElementById('corrProfileLegend');
-      const host = document.getElementById('corrProfileHost');
+    function corrProfileLegendHtml() {
+      return (activeGroups || []).map((g, i) => (
+        `<span class="corr-profile-legend-item"><svg class="corr-profile-legend-mark" viewBox="0 0 14 14" aria-hidden="true">${congruenceMarker(groupProfileShape(i), 7, 7, groupProfileColor(i), '', 4.4)}</svg>${escapeHtml(shortGroupLegendLabel(g.group))}</span>`
+      )).join('');
+    }
+
+    function openCorrProfilePopup() {
+      const dialog = document.getElementById('corrProfileDialog');
+      if (!dialog) return;
+      const subtitle = document.getElementById('corrProfileDialogSubtitle');
+      const rows = buildCorrProfileRows();
+      if (subtitle) subtitle.textContent = corrProfileHeadlineText(rows);
+      dialog.classList.add('is-visible');
+      requestAnimationFrame(() => renderCorrProfileChart('full'));
+    }
+
+    function closeCorrProfilePopup() {
+      const dialog = document.getElementById('corrProfileDialog');
+      if (dialog) dialog.classList.remove('is-visible');
+    }
+
+    function renderCorrProfileChart(target) {
+      const full = target === 'full';
+      const el = document.getElementById(full ? 'corrProfileChartFull' : 'corrProfileChart');
+      const headline = full ? null : document.getElementById('corrProfileHeadline');
+      const legend = document.getElementById(full ? 'corrProfileLegendFull' : 'corrProfileLegend');
+      const host = document.getElementById(full ? 'corrProfileHostFull' : 'corrProfileHost');
       if (!el) return;
       const rows = buildCorrProfileRows();
       const story = corrProfileHeadlineText(rows);
       if (headline) headline.textContent = story;
-      if (legend) {
-        legend.innerHTML = (activeGroups || []).map((g, i) => (
-          `<span class="corr-profile-legend-item"><svg class="corr-profile-legend-mark" viewBox="0 0 14 14" aria-hidden="true">${congruenceMarker(groupProfileShape(i), 7, 7, groupProfileColor(i), '', 4.4)}</svg>${escapeHtml(shortGroupLegendLabel(g.group))}</span>`
-        )).join('');
-      }
+      if (legend) legend.innerHTML = corrProfileLegendHtml();
       if (!rows.length) {
         el.innerHTML = '<div class="dsp-kpi-note">Need at least two groups with overlapping pairwise correlations.</div>';
         return;
       }
       const w = Math.max(460, Math.round((host && host.clientWidth) || 460));
       const pad = { l: 158, r: 14, t: 10, b: 26 };
+      // Rows keep a readable fixed height; the host scrolls (compact) or the dialog body scrolls (full).
       const hostH = Math.max(140, Math.round((host && host.clientHeight) || 180));
-      const usable = Math.max(180, hostH - pad.t - pad.b);
-      const even = Math.max(48, Math.floor(usable / rows.length));
+      const usable = Math.max(120, hostH - pad.t - pad.b);
+      const minRow = full ? 46 : 40;
+      const even = full ? minRow : Math.max(minRow, Math.floor(usable / rows.length));
       const rowHeights = rows.map(() => even);
       const plotH = rowHeights.reduce((sum, h) => sum + h, 0);
       const h = pad.t + pad.b + plotH;
@@ -2648,7 +2708,7 @@
           marks += congruenceMarker(groupProfileShape(p.index), sx(p.r), y, groupProfileColor(p.index), `data-st-tip-html="${tipAttr(tip)}"`);
         });
       });
-      el.innerHTML = `<svg class="corr-profile-svg scatter-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${escapeHtml(story)}">${chrome}${marks}</svg>`;
+      el.innerHTML = `<svg class="corr-profile-svg scatter-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMinYMin meet" role="img" aria-label="${escapeHtml(story)}">${chrome}${marks}</svg>`;
       if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
         window.StatisticoTooltip.refresh(el);
       }
@@ -2987,6 +3047,8 @@
     window.closeScatterPopup = closeScatterPopup;
     window.openCongruencePopup = openCongruencePopup;
     window.closeCongruencePopup = closeCongruencePopup;
+    window.openCorrProfilePopup = openCorrProfilePopup;
+    window.closeCorrProfilePopup = closeCorrProfilePopup;
     window.toggleScatterCombinedView = toggleScatterCombinedView;
 
     document.addEventListener('keydown', (event) => {
@@ -2998,10 +3060,18 @@
         return;
       }
       closeCongruencePopup();
+      closeCorrProfilePopup();
       closeCorrSimHelp();
     });
     document.getElementById('scatterDialog').addEventListener('click', (event) => {
       if (event.target.id === 'scatterDialog') closeScatterPopup();
+    });
+    document.getElementById('corrProfileDialog').addEventListener('click', (event) => {
+      if (event.target.id === 'corrProfileDialog') closeCorrProfilePopup();
+    });
+    window.addEventListener('resize', () => {
+      const dialog = document.getElementById('corrProfileDialog');
+      if (dialog && dialog.classList.contains('is-visible')) renderCorrProfileChart('full');
     });
     document.getElementById('congruenceDialog').addEventListener('click', (event) => {
       if (event.target.id === 'congruenceDialog') closeCongruencePopup();

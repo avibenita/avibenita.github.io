@@ -629,6 +629,7 @@ def render_page(c: dict) -> str:
         <div class="related-grid">
 {related_html}
         </div>
+        <p style="margin:18px 0 0;"><a href="/Statistico-Website/explore.html">Explore all methods &amp; tools <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>
       </div>
     </section>
 
@@ -647,7 +648,7 @@ def render_page(c: dict) -> str:
 
   <div id="footer-placeholder"></div>
 
-  <script src="/Statistico-Website/assets/js/nav-template.js?v=20260820calc"></script>
+  <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-09-21-explore"></script>
 </body>
 </html>
 """

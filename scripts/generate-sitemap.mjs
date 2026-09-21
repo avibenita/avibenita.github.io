@@ -31,6 +31,7 @@ const SKIP_DIRS = new Set(['assets', 'demos', 'legacy-help', 'node_modules', '.g
    ignores both hints, but Bing still reads changefreq and they cost nothing. */
 const RANKS = [
   [/^https:\/\/statistico\.live\/$/, '1.0', 'weekly'],
+  [/explore\.html$/, '0.9', 'weekly'],
   [/index-Analytics\.html$/, '0.9', 'weekly'],
   [/index-(Calculators|Addins|EzPaste)\.html$/, '0.8', 'weekly'],
   [/\/analytics\/[^/]+\.html$/, '0.7', 'monthly'],

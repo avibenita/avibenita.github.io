@@ -17,6 +17,7 @@ function getNavLinks() {
     addins: '/Statistico-Website/index-Addins.html',
     ezpaste: '/Statistico-Website/index-EzPaste.html',
     faq: '/Statistico-Website/faq.html',
+    explore: '/Statistico-Website/explore.html',
   };
 }
 
@@ -41,6 +42,16 @@ const NAV_TEMPLATE = `
       <li class="nav-item">
         <a href="/Statistico-Website/why-another-package.html" class="nav-link" data-page="why" id="link-why">
           The Paradigm
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a href="/Statistico-Website/explore.html" class="nav-link" data-page="explore" id="link-explore">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="5.2"/>
+            <polygon points="8,4.4 8.7,7.3 11.6,8 8.7,8.7 8,11.6 7.3,8.7 4.4,8 7.3,7.3"/>
+          </svg>
+          Explore
         </a>
       </li>
 
@@ -1939,6 +1950,7 @@ const FOOTER_TEMPLATE = `
       </div>
       <div class="footer-section">
         <h4>Resources</h4>
+        <a href="/Statistico-Website/explore.html" id="footer-link-explore">Explore Statistico</a>
         <a href="/Statistico-Website/why-another-package.html" id="footer-link-why">The Paradigm</a>
         <a href="/Statistico-Website/how-it-works.html" id="footer-link-how">How It Works</a>
         <a href="/Statistico-Website/reusable-workflows.html" id="footer-link-workflows">Reusable Workflows</a>
@@ -2084,6 +2096,7 @@ const FOOTER_TEMPLATE = `
     const links = getNavLinks();
     const footerAnalyticsLink = document.getElementById('footer-link-analytics');
     const footerCalculatorsLink = document.getElementById('footer-link-calculators');
+    const footerExploreLink = document.getElementById('footer-link-explore');
     const footerWhyLink = document.getElementById('footer-link-why');
     const footerHowLink = document.getElementById('footer-link-how');
     const footerWorkflowsLink = document.getElementById('footer-link-workflows');
@@ -2095,6 +2108,7 @@ const FOOTER_TEMPLATE = `
 
     if (footerAnalyticsLink) footerAnalyticsLink.href = links.analytics;
     if (footerCalculatorsLink) footerCalculatorsLink.href = links.calculators;
+    if (footerExploreLink) footerExploreLink.href = links.explore;
     if (footerWhyLink) footerWhyLink.href = links.why;
     if (footerHowLink) footerHowLink.href = links.how;
     if (footerWorkflowsLink) footerWorkflowsLink.href = links.workflows;
@@ -2121,6 +2135,8 @@ const FOOTER_TEMPLATE = `
     document.getElementById('nav-logo-link').href = links.home;
     document.getElementById('link-home').href = links.home;
     document.getElementById('link-why').href = links.why;
+    const linkExplore = document.getElementById('link-explore');
+    if (linkExplore) linkExplore.href = links.explore;
     document.getElementById('link-how').href = links.how;
     document.getElementById('link-faq').href = links.faq;
     const footerFaqLink = document.getElementById('footer-link-faq');
@@ -2195,6 +2211,8 @@ const FOOTER_TEMPLATE = `
       activePage = 'home';
     } else if (currentFile === 'why-another-package.html') {
       activePage = 'why';
+    } else if (currentFile === 'explore.html') {
+      activePage = 'explore';
     } else if (currentFile === 'how-it-works.html') {
       activePage = 'how';
     } else if (currentFile === 'reusable-workflows.html') {
@@ -2237,6 +2255,7 @@ function trailIconForLabel(label) {
   if (t === 'calculators') return 'fa-calculator';
   if (t === 'ezpaste' || t.indexOf('ezpaste') === 0) return 'fa-bullseye';
   if (t === 'the paradigm') return 'fa-lightbulb';
+  if (t === 'explore' || t === 'explore statistico') return 'fa-compass';
   if (t === 'how it works') return 'fa-route';
   if (t === 'reusable workflows' || t.indexOf('workflow') >= 0) return 'fa-rotate';
   if (t === 'faq') return 'fa-circle-question';
@@ -2413,6 +2432,13 @@ function resolveTrailCrumbs() {
       { label: 'Statistico', href: links.home },
       { label: 'Specialized Tools', href: links.addins },
       { label: 'EzPaste' }
+    ];
+  }
+
+  if (file === 'explore.html') {
+    return [
+      { label: 'Statistico', href: links.home },
+      { label: 'Explore Statistico' }
     ];
   }
 

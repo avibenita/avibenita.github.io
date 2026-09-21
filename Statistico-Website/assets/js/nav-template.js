@@ -24,81 +24,72 @@ function getNavLinks() {
 const NAV_TEMPLATE = `
 <nav class="sticky-nav" id="stickyNav">
   <div class="nav-container">
-    <a href="/" class="nav-logo" id="nav-logo-link" aria-label="Statistico">
+    <a href="/" class="nav-logo" id="nav-logo-link" aria-label="Statistico home">
       <img class="nav-logo-full-img" src="/Statistico-Website/assets/statistico-logo-nav.png?v=2026-08-08-blue" alt="Statistico" />
     </a>
 
     <ul class="nav-menu" id="navMenu">
-      <li class="nav-item">
-        <a href="/" class="nav-link" data-page="home" id="link-home">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 7.5L8 2.5L14 7.5"/>
-            <path d="M3.5 7V14H12.5V7"/>
-          </svg>
-          Home
-        </a>
-      </li>
-
-      <li class="nav-item">
-        <a href="/Statistico-Website/why-another-package.html" class="nav-link" data-page="why" id="link-why">
-          The Paradigm
-        </a>
-      </li>
-
-      <li class="nav-item">
-        <a href="/Statistico-Website/explore.html" class="nav-link" data-page="explore" id="link-explore">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="8" cy="8" r="5.2"/>
-            <polygon points="8,4.4 8.7,7.3 11.6,8 8.7,8.7 8,11.6 7.3,8.7 4.4,8 7.3,7.3"/>
-          </svg>
-          Explore
-        </a>
-      </li>
-
-      <!-- Products group — subtle squared frame -->
+      <!-- Products lead — logo is the Home return -->
       <li class="nav-item nav-item--products-group">
-        <div class="nav-products-row" id="nav-products-row">
-          <a href="/Statistico-Website/index-Analytics.html" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics">
-            <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <line x1="2.5" y1="13" x2="13.5" y2="13"/>
-              <rect x="3" y="8" width="2.5" height="5" rx="0.4"/>
-              <rect x="7" y="5" width="2.5" height="8" rx="0.4"/>
-              <rect x="11" y="2" width="2.5" height="11" rx="0.4"/>
-            </svg>
-            Analytics
-          </a>
-          <a href="/Statistico-Website/index-Calculators.html" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators">
-            <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="2" y="2" width="12" height="12" rx="2"/>
-              <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
-              <line x1="5" y1="11" x2="8" y2="11"/>
-            </svg>
-            Calculators
-          </a>
-          <a href="/Statistico-Website/index-Addins.html" class="nav-link nav-link--product-lite" data-page="addins" id="link-addins" title="Statistico Specialized Tools">
-            <svg class="nav-product-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="1" width="10" height="14" rx="1.5"/>
-              <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
-              <line x1="6" y1="11" x2="8.5" y2="11"/>
-            </svg>
-            Specialized Tools
-          </a>
+        <div class="nav-products" id="nav-products">
+          <span class="nav-products-label">Products</span>
+          <div class="nav-products-row" id="nav-products-row">
+            <a href="/Statistico-Website/index-Analytics.html" class="nav-link nav-link--product" data-page="analytics" id="link-analytics" title="Statistico Analytics">
+              <svg class="nav-product-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="2.5" y1="13" x2="13.5" y2="13"/>
+                <rect x="3" y="8" width="2.5" height="5" rx="0.4"/>
+                <rect x="7" y="5" width="2.5" height="8" rx="0.4"/>
+                <rect x="11" y="2" width="2.5" height="11" rx="0.4"/>
+              </svg>
+              Analytics
+            </a>
+            <a href="/Statistico-Website/index-Calculators.html" class="nav-link nav-link--product" data-page="calculators" id="link-calculators" title="Statistico Calculators">
+              <svg class="nav-product-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2" y="2" width="12" height="12" rx="2"/>
+                <line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/>
+                <line x1="5" y1="11" x2="8" y2="11"/>
+              </svg>
+              Calculators
+            </a>
+            <a href="/Statistico-Website/index-Addins.html" class="nav-link nav-link--product" data-page="addins" id="link-addins" title="Statistico Specialized Tools">
+              <svg class="nav-product-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="1" width="10" height="14" rx="1.5"/>
+                <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
+                <line x1="6" y1="11" x2="8.5" y2="11"/>
+              </svg>
+              Specialized Tools
+            </a>
+          </div>
         </div>
       </li>
 
       <li class="nav-item nav-item--sep-left">
-        <a href="/Statistico-Website/how-it-works.html" class="nav-link" data-page="how" id="link-how">
+        <a href="/Statistico-Website/explore.html" class="nav-link nav-link--secondary" data-page="explore" id="link-explore">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="8" cy="8" r="5.2"/>
+            <polygon points="8,4.4 8.7,7.3 11.6,8 8.7,8.7 8,11.6 7.3,8.7 4.4,8 7.3,7.3"/>
+          </svg>
+          Explore All
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="/Statistico-Website/how-it-works.html" class="nav-link nav-link--secondary" data-page="how" id="link-how">
           How It Works
         </a>
       </li>
       <li class="nav-item">
-        <a href="/Statistico-Website/faq.html" class="nav-link" data-page="faq" id="link-faq">
+        <a href="/Statistico-Website/why-another-package.html" class="nav-link nav-link--secondary" data-page="why" id="link-why">
+          The Paradigm
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="/Statistico-Website/faq.html" class="nav-link nav-link--secondary" data-page="faq" id="link-faq">
           FAQ
         </a>
       </li>
       <li class="nav-item">
-        <a href="/Statistico-Website/contact.html" class="nav-link" data-page="contact" id="link-contact">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <a href="/Statistico-Website/contact.html" class="nav-link nav-link--secondary" data-page="contact" id="link-contact">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="1" y="3" width="14" height="10" rx="1.5"/>
             <polyline points="1,4 8,9 15,4"/>
           </svg>
@@ -192,8 +183,8 @@ const NAV_STYLE = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 24px;
-  min-height: 84px;
+  padding: 8px 24px;
+  min-height: 92px;
 }
 
 .nav-logo {
@@ -202,7 +193,7 @@ const NAV_STYLE = `
   align-items: center;
   justify-content: flex-start;
   gap: 13px;
-  margin-right: 26px;
+  margin-right: 16px;
   width: auto;
   height: 66px;
   transition: opacity 0.2s ease;
@@ -268,8 +259,9 @@ const NAV_STYLE = `
   list-style: none;
   margin: 0;
   padding: 0;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
+  flex: 1;
 }
 
 .nav-item {
@@ -287,34 +279,52 @@ const NAV_STYLE = `
   display: none;
 }
 
-/* ── Products group — flat cluster separated from main links ── */
+/* ── Products group — primary destinations immediately after the logo ── */
 .nav-item--products-group {
-  margin-left: 14px;
-  padding-left: 14px;
-  border-left: 1px solid rgba(255,255,255,0.14);
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
   display: flex;
   align-items: center;
+  margin-right: 2px;
 }
 
-:root[data-theme="light"] .nav-item--products-group {
-  border-left-color: rgba(15,23,42,0.14);
+.nav-products {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+
+.nav-products-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(140, 210, 255, 0.72);
+  line-height: 1;
+  padding-left: 3px;
+}
+
+:root[data-theme="light"] .nav-products-label {
+  color: rgba(29, 78, 216, 0.62);
 }
 
 .nav-products-row {
   display: flex;
   gap: 0;
   align-items: center;
-  background: rgba(120,200,255,0.06);
-  border: 1px solid rgba(120,200,255,0.38);
-  border-radius: 4px;
-  padding: 3px 5px;
-  box-shadow: inset 0 0 0 1px rgba(120,200,255,0.08);
+  background: #163456;
+  border: 1.5px solid rgba(120, 200, 255, 0.62);
+  border-radius: 5px;
+  padding: 3px 4px;
+  box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.14);
 }
 
 :root[data-theme="light"] .nav-products-row {
-  background: rgba(37,99,235,0.05);
-  border-color: rgba(37,99,235,0.28);
-  box-shadow: inset 0 0 0 1px rgba(37,99,235,0.06);
+  background: #e4eefb;
+  border-color: rgba(37, 99, 235, 0.46);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.1);
 }
 
 .nav-products-row .nav-link--product,
@@ -322,31 +332,20 @@ const NAV_STYLE = `
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
-  border-radius: 0;
+  border-radius: 3px;
   position: relative;
-  min-height: 40px;
-  padding: 7px 11px;
-  font-size: 0.86rem;
-  font-weight: 500;
-  color: #C8D2E2;
-}
-
-.nav-products-row .nav-link--product[data-page="analytics"] {
-  font-size: 0.86rem;
-  font-weight: 500;
-}
-
-.nav-products-row .nav-link--product-lite[data-page="addins"] {
-  font-size: 0.8rem;
-  padding-left: 9px;
-  padding-right: 9px;
+  min-height: 42px;
+  padding: 8px 13px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #E4ECF6;
 }
 
 .nav-products-row .nav-link--product:not(:first-child),
 .nav-products-row .nav-link--product-lite:not(:first-child) {
   margin-left: 0;
   padding-left: 11px;
-  border-left: 1px solid rgba(120,200,255,0.22);
+  border-left: 1px solid rgba(120,200,255,0.28) !important;
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product:not(:first-child),
@@ -355,11 +354,11 @@ const NAV_STYLE = `
 }
 
 .nav-products-row .nav-product-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
   display: block;
-  color: rgba(140,210,255,0.88);
+  color: rgba(140,210,255,0.92);
   opacity: 1;
 }
 
@@ -385,8 +384,8 @@ const NAV_STYLE = `
 
 /* Separator before secondary nav cluster */
 .nav-item--sep-left {
-  margin-left: 14px;
-  padding-left: 14px;
+  margin-left: 12px;
+  padding-left: 12px;
   border-left: 1px solid rgba(255,255,255,0.14);
   position: relative;
 }
@@ -423,6 +422,19 @@ const NAV_STYLE = `
   line-height: 1.15;
 }
 
+.nav-link--secondary {
+  min-height: 36px;
+  padding: 6px 9px;
+  gap: 6px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: rgba(200, 210, 226, 0.55);
+}
+
+.nav-link--secondary svg {
+  opacity: 0.72;
+}
+
 .nav-link i,
 .nav-link svg {
   flex-shrink: 0;
@@ -444,6 +456,11 @@ const NAV_STYLE = `
   box-shadow: none;
 }
 
+.nav-link--secondary:hover {
+  color: rgba(236, 242, 250, 0.88);
+  background: rgba(120, 200, 255, 0.06);
+}
+
 .nav-link.active {
   color: #ffffff;
   font-weight: 600;
@@ -452,8 +469,12 @@ const NAV_STYLE = `
   box-shadow: none;
 }
 
-.nav-link.active::after,
-.nav-products-row .nav-link.active::after {
+.nav-link--secondary.active {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+}
+
+.nav-link.active:not(.nav-link--product):not(.nav-link--product-lite)::after {
   content: '';
   position: absolute;
   left: 10px;
@@ -466,17 +487,17 @@ const NAV_STYLE = `
 
 .nav-products-row .nav-link--product:hover,
 .nav-products-row .nav-link--product-lite:hover {
-  color: rgba(255,255,255,0.9);
-  background: rgba(120,200,255,0.08);
+  color: #ffffff;
+  background: rgba(120, 200, 255, 0.14) !important;
 }
 
 .nav-products-row .nav-link--product.active,
 .nav-products-row .nav-link--product-lite.active {
   color: #ffffff;
-  font-weight: 600;
-  background: transparent !important;
+  font-weight: 700;
+  background: rgba(120, 200, 255, 0.26) !important;
   border: none !important;
-  box-shadow: none !important;
+  box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.32) !important;
 }
 
 :root[data-theme="light"] .nav-logo { background: none; }
@@ -490,19 +511,35 @@ const NAV_STYLE = `
   background: rgba(15, 23, 42, 0.05);
 }
 
+:root[data-theme="light"] .nav-link--secondary {
+  color: rgba(15, 23, 42, 0.48);
+}
+
+:root[data-theme="light"] .nav-link--secondary:hover {
+  color: rgba(15, 23, 42, 0.78);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+:root[data-theme="light"] .nav-link--secondary.active {
+  color: rgba(15, 23, 42, 0.88);
+}
+
 :root[data-theme="light"] .nav-products-row .nav-link--product,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite {
-  color: rgba(15, 23, 42, 0.72);
+  color: rgba(15, 23, 42, 0.82);
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product:hover,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite:hover {
-  color: rgba(15, 23, 42, 0.92);
+  color: #0f172a;
+  background: rgba(37, 99, 235, 0.1) !important;
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product.active,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite.active {
   color: #0f172a;
+  background: rgba(37, 99, 235, 0.18) !important;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.28) !important;
 }
 
 :root[data-theme="light"] .nav-link.active {
@@ -875,7 +912,7 @@ const NAV_STYLE = `
 }
 
 .sticky-nav.scrolled .nav-container {
-  min-height: 68px;
+  min-height: 76px;
   padding-top: 6px;
   padding-bottom: 6px;
 }
@@ -912,7 +949,7 @@ const NAV_STYLE = `
 }
 
 body {
-  padding-top: 88px;
+  padding-top: 96px;
 }
 
 /* Hero section breathing room — home/marketing hero only (Analytics-style grid heroes use compact padding below) */
@@ -1757,6 +1794,33 @@ footer#contact .footer-bottom {
   border-top: 1px solid var(--border, rgba(255,255,255,.11));
 }
 
+@media (max-width: 1280px) {
+  .nav-container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .nav-logo {
+    margin-right: 10px;
+  }
+
+  .nav-products-row .nav-link--product,
+  .nav-products-row .nav-link--product-lite {
+    padding: 7px 10px;
+    font-size: 0.88rem;
+  }
+
+  .nav-link--secondary {
+    padding: 6px 7px;
+    font-size: 0.72rem;
+  }
+
+  .nav-item--sep-left {
+    margin-left: 8px;
+    padding-left: 8px;
+  }
+}
+
 @media (max-width: 768px) {
   .theme-toggle {
     display: inline-flex;
@@ -1828,12 +1892,21 @@ footer#contact .footer-bottom {
 
   .nav-item--products-group {
     margin-left: 0;
+    margin-right: 0;
     padding-left: 0;
     border-left: none;
-    border-top: 1px solid rgba(255,255,255,0.1);
-    padding-top: 10px;
-    margin-top: 6px;
     width: 100%;
+  }
+
+  .nav-products {
+    width: 100%;
+    align-items: center;
+  }
+
+  .nav-products-label {
+    text-align: center;
+    padding-left: 0;
+    margin-bottom: 2px;
   }
 
   .nav-products-row {
@@ -1856,7 +1929,7 @@ footer#contact .footer-bottom {
     width: 100%;
     min-height: 44px;
     padding: 12px 16px;
-    font-size: 0.95rem;
+    font-size: 1rem;
     justify-content: center;
   }
 
@@ -2133,7 +2206,6 @@ const FOOTER_TEMPLATE = `
     // Wire up navigation links with correct paths
     const links = getNavLinks();
     document.getElementById('nav-logo-link').href = links.home;
-    document.getElementById('link-home').href = links.home;
     document.getElementById('link-why').href = links.why;
     const linkExplore = document.getElementById('link-explore');
     if (linkExplore) linkExplore.href = links.explore;
@@ -2255,7 +2327,7 @@ function trailIconForLabel(label) {
   if (t === 'calculators') return 'fa-calculator';
   if (t === 'ezpaste' || t.indexOf('ezpaste') === 0) return 'fa-bullseye';
   if (t === 'the paradigm') return 'fa-lightbulb';
-  if (t === 'explore' || t === 'explore statistico') return 'fa-compass';
+  if (t === 'explore' || t === 'explore statistico' || t === 'explore all') return 'fa-compass';
   if (t === 'how it works') return 'fa-route';
   if (t === 'reusable workflows' || t.indexOf('workflow') >= 0) return 'fa-rotate';
   if (t === 'faq') return 'fa-circle-question';

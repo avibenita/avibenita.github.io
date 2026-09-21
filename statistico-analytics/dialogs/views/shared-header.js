@@ -533,8 +533,8 @@ const StatisticoHeader = {
       '.checkbox-label.is-checked::before,label.is-checked::before{',
       'background-color:rgb(255,165,120);border-color:rgb(255,165,120);',
       'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%230E141B\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
-      '#stReportExportOverlay label::before{content:none!important;}',
-      '#stReportExportOverlay input[type="checkbox"]{position:static!important;opacity:1!important;pointer-events:auto!important;appearance:auto!important;-webkit-appearance:checkbox!important;}'
+      '#stReportExportOverlay label::before,#stReportExportOverlay .st-export-check-row::before{content:none!important;display:none!important;}',
+      '#stReportExportOverlay input[type="checkbox"]{position:static!important;opacity:1!important;pointer-events:auto!important;appearance:auto!important;-webkit-appearance:checkbox!important;width:16px!important;height:16px!important;filter:none!important;}'
     ].join('');
     this._bindCheckboxToggles();
   },
@@ -572,8 +572,10 @@ const StatisticoHeader = {
   _bindCheckboxToggles() {
     if (this._checkboxTogglesBound) return;
     this._checkboxTogglesBound = true;
+    const isExportOverlayInput = (el) => !!(el && el.closest && el.closest('#stReportExportOverlay'));
     const SEL = 'input[type="checkbox"]:not(.highcharts-legend-checkbox):not(.st-export-check)';
     const sync = (input) => {
+      if (isExportOverlayInput(input)) return;
       const label = input.closest ? input.closest('label') : null;
       if (label) label.classList.toggle('is-checked', !!input.checked);
     };
@@ -585,7 +587,7 @@ const StatisticoHeader = {
       if (e.target.closest('a, button, select, textarea, input:not([type="checkbox"])')) return;
       const input = (label.control && label.control.type === 'checkbox') ? label.control : label.querySelector(SEL);
       if (!input || input.type !== 'checkbox' || input.disabled) return;
-      if (input.classList.contains('highcharts-legend-checkbox') || input.classList.contains('st-export-check')) return;
+      if (isExportOverlayInput(input) || input.classList.contains('highcharts-legend-checkbox') || input.classList.contains('st-export-check')) return;
       if (e.target === input) return;
       e.preventDefault();
       input.checked = !input.checked;
@@ -2676,6 +2678,11 @@ const StatisticoHeader = {
             border-bottom:1px solid #e5e7eb;color:#0f172a;font-size:13px;
             cursor:pointer;pointer-events:auto;opacity:1;
           }
+          #stReportExportOverlay .st-export-all-btn {
+            padding:3px 8px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;
+            color:#475569;font-size:11px;font-weight:600;cursor:pointer;
+          }
+          #stReportExportOverlay .st-export-all-btn:hover { border-color:#f97316;color:#c2410c; }
           #stReportExportOverlay input[type="checkbox"] {
             -webkit-appearance:checkbox !important;
             appearance:auto !important;
@@ -2696,8 +2703,12 @@ const StatisticoHeader = {
           <span style="font-size:15px;font-weight:700;color:#0f172a;">Export Report</span>
         </div>
         <div style="flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;">
-          <div style="padding:10px 18px 4px;">
-            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin-bottom:6px;">Sections to include</div>
+          <div style="padding:10px 18px 4px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#64748b;">Sections to include</div>
+            <div style="display:flex;gap:6px;">
+              <button type="button" id="stExportIncludeAll" class="st-export-all-btn">Include all</button>
+              <button type="button" id="stExportExcludeAll" class="st-export-all-btn">Exclude all</button>
+            </div>
           </div>
           <div style="padding:0 18px 12px;border-bottom:1px solid #e2e8f0;">${sectionListHtml}</div>
           <div id="stExportOptionsWrap" style="padding:0 18px 12px;background:#f8fafc;${hideCover ? 'display:none;' : ''}">
@@ -2711,8 +2722,8 @@ const StatisticoHeader = {
                 <select id="stCoverBackground" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;background:#fff;">${bgOptions}</select>
               </label>
             </div>
-            <label style="display:flex;align-items:center;gap:8px;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;">
-              <input type="checkbox" id="stCoverEnabled" ${coverEnabled} style="cursor:pointer;accent-color:#f97316;" />
+            <label class="st-export-check-row" style="display:flex;align-items:center;gap:8px;color:#0f172a;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;border-bottom:none;padding:0;">
+              <input type="checkbox" class="st-export-check" id="stCoverEnabled" ${coverEnabled} style="cursor:pointer;accent-color:#f97316;" />
               <span>Include cover page</span>
             </label>
             <div id="stCoverPanel" style="display:${coverPanelDisplay};gap:10px;">
@@ -2747,8 +2758,8 @@ const StatisticoHeader = {
                 <textarea id="stCoverDescription" rows="3" style="padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;color:#0f172a;resize:vertical;">${esc(initialCover.description)}</textarea>
               </label>
               <div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;display:grid;gap:8px;background:#f8fafc;">
-                <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#0f172a;cursor:pointer;">
-                  <input type="checkbox" id="stCoverIncludeLogo" ${logoEnabled} style="accent-color:#f97316;" />
+                <label class="st-export-check-row" style="display:flex;align-items:center;gap:8px;font-size:12px;color:#0f172a;cursor:pointer;border-bottom:none;padding:0;">
+                  <input type="checkbox" class="st-export-check" id="stCoverIncludeLogo" ${logoEnabled} style="accent-color:#f97316;" />
                   <span>Include logo on cover</span>
                 </label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;cursor:pointer;">
@@ -2781,7 +2792,27 @@ const StatisticoHeader = {
     overlay.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
       cb.disabled = false;
       cb.removeAttribute('disabled');
+      cb.classList.add('st-export-check');
     });
+    const sectionBoxes = () => overlay.querySelectorAll('input.st-export-check[data-section-id]');
+    const syncExportBtn = () => {
+      const btn = overlay.querySelector('#stReportExportBtn');
+      const n = overlay.querySelectorAll('input.st-export-check[data-section-id]:checked').length;
+      if (!btn) return;
+      btn.disabled = n === 0;
+      btn.style.opacity = n === 0 ? '0.5' : '1';
+      btn.style.cursor = n === 0 ? 'not-allowed' : 'pointer';
+    };
+    const setAllSections = (on) => {
+      sectionBoxes().forEach((cb) => { cb.checked = !!on; });
+      syncExportBtn();
+    };
+    const includeAllBtn = overlay.querySelector('#stExportIncludeAll');
+    const excludeAllBtn = overlay.querySelector('#stExportExcludeAll');
+    if (includeAllBtn) includeAllBtn.addEventListener('click', () => setAllSections(true));
+    if (excludeAllBtn) excludeAllBtn.addEventListener('click', () => setAllSections(false));
+    sectionBoxes().forEach((cb) => cb.addEventListener('change', syncExportBtn));
+    syncExportBtn();
     let customLogoDataUrl = initialCover.useBrandLogo === false ? (initialCover.customLogoDataUrl || '') : '';
     const coverPanel = overlay.querySelector('#stCoverPanel');
     const coverEnabledEl = overlay.querySelector('#stCoverEnabled');
@@ -4418,16 +4449,16 @@ const StatisticoHeader = {
    * directly without going through a fallback builder.
    *
    * @param {Array<{id:string, label:string}>} sections
-   * @param {function(string[]): void} onConfirm  receives array of selected ids
+   * @param {function(string[], object=): void} onConfirm  selected ids, then cover options
+   * @param {object} [options]  passed through to `_pickReportSections`
    */
-  pickReportSections(sections, onConfirm) {
+  pickReportSections(sections, onConfirm, options = {}) {
     const rows = Array.isArray(sections) ? sections : [];
-    this._pickReportSections(rows, (ids) => {
-      if (typeof onConfirm === 'function') onConfirm(ids);
-    }, {
-      defaultIds: rows.map((s) => String(s.id)),
-      hideCover: true
-    });
+    this._pickReportSections(rows, (ids, cover) => {
+      if (typeof onConfirm === 'function') onConfirm(ids, cover);
+    }, Object.assign({
+      defaultIds: rows.map((s) => String(s.id))
+    }, options || {}));
   },
 
   _renderHeaderGlobalControls() {

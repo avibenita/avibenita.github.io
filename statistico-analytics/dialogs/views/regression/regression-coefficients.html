@@ -6923,95 +6923,6 @@
       ));
     }
 
-    function _showRegressionExportOptionsDialog(onConfirm) {
-      const yVar = (receivedModelSpec && receivedModelSpec.y) ? receivedModelSpec.y : 'Outcome';
-      const defaultTitle = `Regression Analysis — ${yVar}`;
-      const ov = document.createElement('div');
-      ov.style.cssText = 'position:fixed;inset:0;background:var(--modal-overlay,rgba(0,0,0,.48));z-index:2147483500;display:flex;align-items:center;justify-content:center;';
-      ov.innerHTML = `
-        <div style="width:460px;background:var(--surface-modal,#1A212B);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:26px 28px;color:#e5e7eb;font-family:'Segoe UI',sans-serif;box-shadow:0 24px 48px rgba(0,0,0,.35);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:22px;">
-            <i class="fa-solid fa-file-export" style="color:#a78bfa;font-size:17px;"></i>
-            <span style="font-size:15px;font-weight:700;letter-spacing:-.01em;">Export Report</span>
-          </div>
-
-          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:6px;">Report Title</label>
-          <input id="regExpTitle" type="text" value="${_regEsc(defaultTitle)}"
-            style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:9px 12px;color:#e5e7eb;font-size:13px;outline:none;margin-bottom:18px;" />
-
-          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:8px;">Style</label>
-          <div style="display:flex;gap:8px;margin-bottom:18px;">
-            <label id="regExpLightLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1.5px solid rgba(99,102,241,.55);background:rgba(99,102,241,.09);cursor:pointer;">
-              <input type="radio" name="regExpStyle" value="light" checked style="margin-top:1px;accent-color:#818cf8;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">Light</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Best for printing &amp; PDF</span>
-              </span>
-            </label>
-            <label id="regExpDarkLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.10);cursor:pointer;">
-              <input type="radio" name="regExpStyle" value="dark" style="margin-top:1px;accent-color:#818cf8;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">Dark</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Screen / digital sharing</span>
-              </span>
-            </label>
-          </div>
-
-          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-              <input type="checkbox" id="regExpOnePage" checked style="width:15px;height:15px;margin-top:2px;accent-color:#818cf8;flex-shrink:0;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">One section per page</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Adds CSS page-breaks for clean Print → PDF</span>
-              </span>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-              <input type="checkbox" id="regExpCover" checked style="width:15px;height:15px;margin-top:2px;accent-color:#818cf8;flex-shrink:0;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">Cover page</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Title, timestamp and table of contents</span>
-              </span>
-            </label>
-          </div>
-
-          <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button id="regExpCancel" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:transparent;color:#94a3b8;font-size:13px;cursor:pointer;">Cancel</button>
-            <button id="regExpGo" style="padding:9px 22px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;">
-              <i class="fa-solid fa-chevron-right"></i> Select Views
-            </button>
-          </div>
-        </div>`;
-      document.body.appendChild(ov);
-
-      const syncStyleLabels = () => {
-        const style = ov.querySelector('input[name="regExpStyle"]:checked')?.value || 'light';
-        const lightOn = style === 'light';
-        const lightLbl = ov.querySelector('#regExpLightLbl');
-        const darkLbl = ov.querySelector('#regExpDarkLbl');
-        if (lightLbl) {
-          lightLbl.style.borderColor = lightOn ? 'rgba(99,102,241,.55)' : 'rgba(255,255,255,.10)';
-          lightLbl.style.background = lightOn ? 'rgba(99,102,241,.09)' : 'transparent';
-        }
-        if (darkLbl) {
-          darkLbl.style.borderColor = !lightOn ? 'rgba(99,102,241,.55)' : 'rgba(255,255,255,.10)';
-          darkLbl.style.background = !lightOn ? 'rgba(99,102,241,.09)' : 'transparent';
-        }
-      };
-      ov.querySelectorAll('input[name="regExpStyle"]').forEach(r => r.addEventListener('change', syncStyleLabels));
-      syncStyleLabels();
-
-      ov.querySelector('#regExpCancel').onclick = () => ov.remove();
-      ov.querySelector('#regExpGo').onclick = () => {
-        const title = ov.querySelector('#regExpTitle').value.trim() || defaultTitle;
-        const style = ov.querySelector('input[name="regExpStyle"]:checked').value;
-        const onePerPage = !!ov.querySelector('#regExpOnePage').checked;
-        const cover = !!ov.querySelector('#regExpCover').checked;
-        ov.remove();
-        onConfirm({ title, style, onePerPage, cover });
-      };
-      setTimeout(() => ov.querySelector('#regExpTitle')?.focus(), 60);
-    }
-
     async function _runRegressionExport(opts, allSections, selectedIds) {
       const selected = allSections.filter(s => selectedIds.includes(s.id));
       if (!selected.length) return;
@@ -7284,12 +7195,27 @@ ${sectionsHtml}
         );
       }
 
-      _showRegressionExportOptionsDialog((opts) => {
-        StatisticoHeader.pickReportSections(
-          allSections.map(({ id, label }) => ({ id, label })),
-          async (selectedIds) => { await _runRegressionExport(opts, allSections, selectedIds); }
-        );
-      });
+      const yVar = (receivedModelSpec && receivedModelSpec.y) ? receivedModelSpec.y : 'Outcome';
+      const defaultTitle = `Regression Analysis — ${yVar}`;
+      StatisticoHeader.pickReportSections(
+        allSections.map(({ id, label }) => ({ id, label })),
+        async (selectedIds, cover) => {
+          const opts = {
+            title: (cover && cover.title) || defaultTitle,
+            style: 'light',
+            onePerPage: true,
+            cover: !!(cover && cover.enabled)
+          };
+          await _runRegressionExport(opts, allSections, selectedIds);
+        },
+        {
+          coverDefaults: {
+            title: defaultTitle,
+            subtitle: 'Statistico Interactive',
+            subject: String(yVar)
+          }
+        }
+      );
     }
     
     /**

@@ -59,7 +59,7 @@ There is no React/Vue `Checkbox` component. Checkboxes are native `input[type=ch
 | Dependent k+ | Correlation p / N | `#showCorrPValue`, `#showCorrN`, `#trajShowCorrPValue`, `#trajShowCorrN` | native | checked | no | Extra correlation columns | Results loaded |
 | Dependent k+ | Show missing | `#showMissingToggle` | native | unchecked | no | Show missing-data rows | Results loaded |
 | ANOVA Input | Descriptives / assumptions / nonparam | `#chkDescriptives`, `#chkAssumptions`, `#chkNonParam` | native | checked | hidden | Internal output flags, not a UI control | None — `display:none` |
-| Shared export overlay | Section include / cover / logo | `.st-export-check`, `#stCoverEnabled`, `#stCoverIncludeLogo` | native | varies | no | Include section in report export | Open export overlay |
+| Shared export overlay | Section include / cover / logo | `.st-export-check`, `#stCoverEnabled`, `#stCoverIncludeLogo` | native | varies | no | Include section, cover, or logo in the export; Include all / Exclude all toggles every section | Open export overlay |
 | Shared header | Painted checkbox skin | `label > input[type=checkbox]` | native + CSS | n/a | n/a | One label click = one toggle + change event | Any header-using page |
 
 ## Shared component

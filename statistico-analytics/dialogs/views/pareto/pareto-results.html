@@ -3167,10 +3167,8 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
   window.runParetoAI    = runParetoAI;
   window.prtCloseAi     = prtCloseAi;
   /* ─────────────────────────────────────────────────────────
-     Utilities: Export Report — exact Mixed Model approach
-     Step 1: Options dialog (title, style, one-per-page, cover)
-     Step 2: Section picker (StatisticoHeader.pickReportSections)
-     Step 3: Tab-capture with live HC SVG + build document
+     Utilities: Export Report — shared StatisticoHeader.pickReportSections
+     then tab-capture with live HC SVG + build document
   ───────────────────────────────────────────────────────── */
   function prtExportReport() {
     if (!_data.length) { alert('Run an analysis first.'); return; }
@@ -3188,77 +3186,25 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
       { id: 'about', label: 'About 80/20'   },
     ].filter(function(v){ return !!document.getElementById('tab-' + v.id); });
 
-    _prtShowExportOptions(catName, function(opts) {
-      StatisticoHeader.pickReportSections(ALL_VIEWS, function(selectedIds) {
-        _prtRunExport(catName, valName, opts, ALL_VIEWS, selectedIds);
-      });
-    });
-  }
-
-  /* ── Step 1: Options dialog (mirrors mixed exactly) ─────── */
-  function _prtShowExportOptions(catName, onConfirm) {
     var defaultTitle = 'Pareto 80/20 \u2014 ' + catName;
-    var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:var(--modal-overlay,rgba(0,0,0,.48));z-index:2147483500;display:flex;align-items:center;justify-content:center;';
-    ov.innerHTML = '<div style="width:460px;background:var(--surface-modal,#1A212B);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:26px 28px;color:#e5e7eb;font-family:\'Segoe UI\',sans-serif;box-shadow:0 24px 48px rgba(0,0,0,.35);">'
-      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:22px;">'
-      + '<i class="fa-solid fa-file-export" style="color:#fb923c;font-size:17px;"></i>'
-      + '<span style="font-size:15px;font-weight:700;letter-spacing:-.01em;">Export Report</span></div>'
-
-      + '<label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:6px;">Report Title</label>'
-      + '<input id="prtExpTitle" type="text" value="' + escHtml(defaultTitle) + '" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:9px 12px;color:#e5e7eb;font-size:13px;outline:none;margin-bottom:18px;"/>'
-
-      + '<label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:8px;">Style</label>'
-      + '<div style="display:flex;gap:8px;margin-bottom:18px;">'
-      + '<label id="_prtExpLightLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1.5px solid rgba(249,115,22,.55);background:rgba(249,115,22,.09);cursor:pointer;">'
-      + '<input type="radio" name="prtExpStyle" value="light" checked style="margin-top:1px;accent-color:#fb923c;">'
-      + '<span><span style="font-size:13px;font-weight:500;display:block;">Light</span><span style="font-size:10.5px;color:rgba(229,231,235,.45);">Best for printing &amp; PDF</span></span></label>'
-      + '<label id="_prtExpDarkLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.10);cursor:pointer;">'
-      + '<input type="radio" name="prtExpStyle" value="dark" style="margin-top:1px;accent-color:#fb923c;">'
-      + '<span><span style="font-size:13px;font-weight:500;display:block;">Dark</span><span style="font-size:10.5px;color:rgba(229,231,235,.45);">Screen / digital sharing</span></span></label>'
-      + '</div>'
-
-      + '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px;">'
-      + '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">'
-      + '<input type="checkbox" id="prtExpOnePage" checked style="width:15px;height:15px;margin-top:2px;accent-color:#fb923c;flex-shrink:0;">'
-      + '<span><span style="font-size:13px;font-weight:500;display:block;">One section per page</span>'
-      + '<span style="font-size:10.5px;color:rgba(229,231,235,.45);">Adds CSS page-breaks \u2014 required for a clean Print \u2192 PDF</span></span></label>'
-      + '<label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">'
-      + '<input type="checkbox" id="prtExpCover" checked style="width:15px;height:15px;margin-top:2px;accent-color:#fb923c;flex-shrink:0;">'
-      + '<span><span style="font-size:13px;font-weight:500;display:block;">Cover page</span>'
-      + '<span style="font-size:10.5px;color:rgba(229,231,235,.45);">Full-page cover with title, date and table of contents</span></span></label>'
-      + '</div>'
-
-      + '<div style="display:flex;gap:8px;justify-content:flex-end;">'
-      + '<button id="prtExpCancel" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:transparent;color:#94a3b8;font-size:13px;cursor:pointer;">Cancel</button>'
-      + '<button id="prtExpGo" style="padding:9px 22px;border-radius:8px;border:none;background:#f97316;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;">'
-      + '<i class="fa-solid fa-chevron-right"></i> Select Sections</button>'
-      + '</div></div>';
-    document.body.appendChild(ov);
-
-    /* Style radio highlight sync */
-    ov.querySelectorAll('input[name="prtExpStyle"]').forEach(function(r) {
-      r.addEventListener('change', function() {
-        var ll = document.getElementById('_prtExpLightLbl');
-        var dl = document.getElementById('_prtExpDarkLbl');
-        if (ll) ll.style.cssText = 'flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;cursor:pointer;' + (r.value === 'light' && r.checked ? 'border:1.5px solid rgba(249,115,22,.55);background:rgba(249,115,22,.09);' : 'border:1px solid rgba(255,255,255,.10);background:none;');
-        if (dl) dl.style.cssText = 'flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;cursor:pointer;' + (r.value === 'dark'  && r.checked ? 'border:1.5px solid rgba(249,115,22,.55);background:rgba(249,115,22,.09);' : 'border:1px solid rgba(255,255,255,.10);background:none;');
-      });
+    StatisticoHeader.pickReportSections(ALL_VIEWS, function(selectedIds, cover) {
+      var opts = {
+        title: (cover && cover.title) || defaultTitle,
+        style: 'light',
+        onePerPage: true,
+        cover: !!(cover && cover.enabled)
+      };
+      _prtRunExport(catName, valName, opts, ALL_VIEWS, selectedIds);
+    }, {
+      coverDefaults: {
+        title: defaultTitle,
+        subtitle: 'Statistico Interactive',
+        subject: catName
+      }
     });
-
-    ov.querySelector('#prtExpCancel').onclick = function(){ ov.remove(); };
-    ov.querySelector('#prtExpGo').onclick = function() {
-      var title      = ov.querySelector('#prtExpTitle').value.trim() || defaultTitle;
-      var style      = ov.querySelector('input[name="prtExpStyle"]:checked').value;
-      var onePerPage = ov.querySelector('#prtExpOnePage').checked;
-      var cover      = ov.querySelector('#prtExpCover').checked;
-      ov.remove();
-      onConfirm({ title: title, style: style, onePerPage: onePerPage, cover: cover });
-    };
-    setTimeout(function(){ var t = ov.querySelector('#prtExpTitle'); if(t) t.focus(); }, 60);
   }
 
-  /* ── Step 3: Capture + render (mirrors mixed _runExport) ── */
+  /* ── Capture + render (mirrors mixed _runExport) ── */
   function _prtRunExport(catName, valName, opts, ALL_VIEWS, selectedIds) {
     var selected    = ALL_VIEWS.filter(function(v){ return selectedIds.indexOf(v.id) >= 0; });
     var originalTab = (document.querySelector('.sb-item.active[data-tab]') || {dataset:{tab:'chart'}}).dataset.tab;

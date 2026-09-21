@@ -1992,94 +1992,25 @@
         { id: 'model-structure', label: 'Model Structure' },
       ].filter(s => !!document.getElementById('tab-' + s.id));
 
-      _showExportOptionsDialog(outcome, (opts) => {
-        StatisticoHeader.pickReportSections(ALL_SECTIONS, async (selectedIds) => {
-          await _runExport(outcome, opts, ALL_SECTIONS, selectedIds);
-        });
+      const defaultTitle = `Linear Mixed Model \u2014 ${outcome}`;
+      StatisticoHeader.pickReportSections(ALL_SECTIONS, async (selectedIds, cover) => {
+        const opts = {
+          title: (cover && cover.title) || defaultTitle,
+          style: 'light',
+          onePerPage: true,
+          cover: !!(cover && cover.enabled)
+        };
+        await _runExport(outcome, opts, ALL_SECTIONS, selectedIds);
+      }, {
+        coverDefaults: {
+          title: defaultTitle,
+          subtitle: 'Statistico Interactive',
+          subject: String(outcome)
+        }
       });
     }
 
-    /* ── Export: step 2 — options dialog ────────────────────────── */
-    function _showExportOptionsDialog(outcome, onConfirm) {
-      const defaultTitle = `Linear Mixed Model \u2014 ${outcome}`;
-      const ov = document.createElement('div');
-      ov.style.cssText = 'position:fixed;inset:0;background:var(--modal-overlay,rgba(0,0,0,.48));z-index:2147483500;display:flex;align-items:center;justify-content:center;';
-      ov.innerHTML = `
-        <div style="width:460px;background:var(--surface-modal,#1A212B);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:26px 28px;color:#e5e7eb;font-family:'Segoe UI',sans-serif;box-shadow:0 24px 48px rgba(0,0,0,.35);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:22px;">
-            <i class="fa-solid fa-file-export" style="color:#a78bfa;font-size:17px;"></i>
-            <span style="font-size:15px;font-weight:700;letter-spacing:-.01em;">Export Report</span>
-          </div>
-
-          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:6px;">Report Title</label>
-          <input id="expTitle" type="text" value="${_esc(defaultTitle)}"
-            style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:9px 12px;color:#e5e7eb;font-size:13px;outline:none;margin-bottom:18px;" />
-
-          <label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:rgba(229,231,235,.45);margin-bottom:8px;">Style</label>
-          <div style="display:flex;gap:8px;margin-bottom:18px;">
-            <label id="_expLightLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1.5px solid rgba(99,102,241,.55);background:rgba(99,102,241,.09);cursor:pointer;">
-              <input type="radio" name="expStyle" value="light" checked style="margin-top:1px;accent-color:#818cf8;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">Light</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Best for printing &amp; PDF</span>
-              </span>
-            </label>
-            <label id="_expDarkLbl" style="flex:1;display:flex;align-items:flex-start;gap:9px;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.10);cursor:pointer;">
-              <input type="radio" name="expStyle" value="dark" style="margin-top:1px;accent-color:#818cf8;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">Dark</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Screen / digital sharing</span>
-              </span>
-            </label>
-          </div>
-
-          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px;">
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-              <input type="checkbox" id="expOnePage" checked style="width:15px;height:15px;margin-top:2px;accent-color:#818cf8;flex-shrink:0;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">One section per page</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Adds CSS page-breaks — required for a clean Print \u2192 PDF</span>
-              </span>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-              <input type="checkbox" id="expCover" checked style="width:15px;height:15px;margin-top:2px;accent-color:#818cf8;flex-shrink:0;">
-              <span>
-                <span style="font-size:13px;font-weight:500;display:block;">Cover page</span>
-                <span style="font-size:10.5px;color:rgba(229,231,235,.45);">Full-page cover with title, date and table of contents</span>
-              </span>
-            </label>
-          </div>
-
-          <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button id="expCancel" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.14);background:transparent;color:#94a3b8;font-size:13px;cursor:pointer;">Cancel</button>
-            <button id="expGo" style="padding:9px 22px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;">
-              <i class="fa-solid fa-chevron-right"></i> Select Sections
-            </button>
-          </div>
-        </div>`;
-      document.body.appendChild(ov);
-
-      // Style radio interaction
-      ov.querySelectorAll('input[name="expStyle"]').forEach(r => r.addEventListener('change', () => {
-        ov.querySelector('#_expLightLbl').style.borderColor = r.value === 'light' ? 'rgba(99,102,241,.55)' : 'rgba(255,255,255,.10)';
-        ov.querySelector('#_expLightLbl').style.background  = r.value === 'light' ? 'rgba(99,102,241,.09)' : 'transparent';
-        ov.querySelector('#_expDarkLbl').style.borderColor  = r.value === 'dark'  ? 'rgba(99,102,241,.55)' : 'rgba(255,255,255,.10)';
-        ov.querySelector('#_expDarkLbl').style.background   = r.value === 'dark'  ? 'rgba(99,102,241,.09)' : 'transparent';
-      }));
-
-      ov.querySelector('#expCancel').onclick = () => ov.remove();
-      ov.querySelector('#expGo').onclick = () => {
-        const title      = ov.querySelector('#expTitle').value.trim() || defaultTitle;
-        const style      = ov.querySelector('input[name="expStyle"]:checked').value;
-        const onePerPage = ov.querySelector('#expOnePage').checked;
-        const cover      = ov.querySelector('#expCover').checked;
-        ov.remove();
-        onConfirm({ title, style, onePerPage, cover });
-      };
-      setTimeout(() => ov.querySelector('#expTitle')?.focus(), 60);
-    }
-
-    /* ── Export: step 3 — capture + render ──────────────────────── */
+    /* ── Export: capture + render ──────────────────────── */
     async function _runExport(outcome, opts, ALL_SECTIONS, selectedIds) {
       const selected    = ALL_SECTIONS.filter(s => selectedIds.includes(s.id));
       const originalTab = document.querySelector('.sb-item.active[data-tab]')?.dataset?.tab || 'overview';

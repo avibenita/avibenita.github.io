@@ -546,7 +546,8 @@ const StatisticoHeader = {
       'background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2.2\' stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M2.2 6.2 4.8 8.8 9.8 3.2\'/%3E%3C/svg%3E");}',
       '#stReportExportOverlay .st-export-check-row input[type="checkbox"]{',
       'position:absolute!important;opacity:0!important;pointer-events:none!important;width:16px!important;height:16px!important;',
-      'margin:0!important;appearance:none!important;-webkit-appearance:none!important;}'
+      'margin:0!important;appearance:none!important;-webkit-appearance:none!important;}',
+      '.overlay-toggle .overlay-check{display:none!important;}'
     ].join('');
     this._bindCheckboxToggles();
   },
@@ -2361,7 +2362,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260921menu05',
+  _TAB_ASSET_VER: '20260921menu07',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

@@ -21,6 +21,9 @@ describe('shared export overlay', () => {
     expect(css).toMatch(/#stReportExportOverlay \.st-export-check-row::before/);
     expect(css).toMatch(/#stReportExportOverlay \.st-export-check-row input\[type="checkbox"\]/);
     expect(css).toMatch(/pointer-events:\s*none !important/);
+    expect(css).toMatch(/\.overlay-toggle \.overlay-check \{\s*display:\s*none !important;/);
+    expect(header).toMatch(/\.overlay-toggle \.overlay-check\{display:none!important;\}/);
+    expect(css).toMatch(/#histogram-panel \.range-control \{[\s\S]*max-width:\s*none !important;/);
   });
 
   test('theme switcher only cancels clicks on its own buttons', () => {

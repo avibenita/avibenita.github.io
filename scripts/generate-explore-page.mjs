@@ -126,16 +126,18 @@ function tableRowHtml(cap, familyOrder) {
         </tr>`;
 }
 
+const listed = data.capabilities.filter((cap) => cap.kind !== 'feature');
+
 const familyOptions = data.families.map((f) => `              <option value="${esc(f.id)}">${esc(f.label)}</option>`).join('\n');
 const productOptions = data.products.map((p) => `              <option value="${esc(p.id)}">${esc(p.label)}</option>`).join('\n');
 
-const tableRows = data.capabilities.map((cap) => {
+const tableRows = listed.map((cap) => {
   const familyOrder = data.families.findIndex((f) => f.id === cap.family);
   return tableRowHtml(cap, familyOrder < 0 ? 99 : familyOrder);
 }).join('\n        ');
 
 const familyBlocks = data.families.map((family) => {
-  const caps = data.capabilities.filter((c) => c.family === family.id);
+  const caps = listed.filter((c) => c.family === family.id);
   if (!caps.length) return '';
   return `      <section class="family-block" data-family-block="${esc(family.id)}" aria-labelledby="family-${esc(family.id)}">
         <h2 id="family-${esc(family.id)}">${esc(family.label)}</h2>
@@ -145,7 +147,7 @@ const familyBlocks = data.families.map((family) => {
       </section>`;
 }).filter(Boolean).join('\n\n');
 
-const itemList = data.capabilities.map((cap, i) => `          {
+const itemList = listed.map((cap, i) => `          {
             "@type": "ListItem",
             "position": ${i + 1},
             "name": ${JSON.stringify(cap.name)},
@@ -215,7 +217,7 @@ const html = `<!DOCTYPE html>
       {
         "@type": "ItemList",
         "name": "Statistico capabilities",
-        "numberOfItems": ${data.capabilities.length},
+        "numberOfItems": ${listed.length},
         "itemListElement": [
 ${itemList}
         ]
@@ -285,7 +287,7 @@ ${goalButtons}
 ${productTabs}
           </div>
         </div>
-        <p class="results-count results-count--cards" id="explore-count-cards" hidden>${data.capabilities.length} results</p>
+        <p class="results-count results-count--cards" id="explore-count-cards" hidden>${listed.length} results</p>
       </div>
     </section>
 
@@ -312,7 +314,6 @@ ${productOptions}
               <select id="filter-kind" aria-label="Filter by item type">
               <option value="">All item types</option>
               <option value="module">Module</option>
-              <option value="feature">In-module feature</option>
               <option value="calculator">Calculator</option>
               <option value="tool">Tool</option>
               </select>
@@ -326,7 +327,7 @@ ${productOptions}
               </select>
             </label>
           </div>
-          <p class="results-count" id="explore-count">${data.capabilities.length} results</p>
+          <p class="results-count" id="explore-count">${listed.length} results</p>
         </div>
         <div class="method-table-scroll">
           <table class="method-table" id="method-table">
@@ -368,4 +369,4 @@ ${familyBlocks}
 `;
 
 fs.writeFileSync(outFile, html);
-console.log(`Wrote ${path.relative(repoRoot, outFile)} with ${data.capabilities.length} capabilities.`);
+console.log(`Wrote ${path.relative(repoRoot, outFile)} with ${listed.length} listed capabilities.`);

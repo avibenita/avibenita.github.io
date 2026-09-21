@@ -108,9 +108,6 @@
     #corrProfileHostFull { min-height:0; display:block; }
     #corrProfileChartFull { width:100%; }
     .dsp-chart-host #corrSimChart { flex:1 1 auto; width:100%; min-height:180px; }
-    .corr-profile-headline {
-      margin:4px 0 0; color:var(--text-primary); font-size:13px; font-weight:650; line-height:1.4;
-    }
     .corr-profile-svg { display:block; width:100%; height:auto; }
     .corr-profile-zero { stroke:rgba(255,255,255,.38); stroke-width:1.2; stroke-dasharray:3 3; }
     html[data-theme="light"] .corr-profile-zero { stroke:rgba(15,23,42,.32); }
@@ -813,8 +810,7 @@
                   <div class="dsp-chart-panel">
                     <div class="dsp-chart-head">
                       <div>
-                        <div class="dsp-subhead">Correlation Profiles Across Groups</div>
-                        <p class="corr-profile-headline" id="corrProfileHeadline"></p>
+                        <div class="dsp-subhead">Correlation Profiles Across Groups<button type="button" class="dsp-info-btn" onclick="openCorrProfileHelp()" aria-label="How to read this chart">i</button></div>
                       </div>
                       <button type="button" class="corr-sim-open-btn corr-profile-expand" onclick="openCorrProfilePopup()" title="Open full view" aria-label="Open full view of correlation profiles">
                         <i class="fa-solid fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
@@ -908,8 +904,8 @@
     <div class="scatter-dialog corr-profile-dialog">
       <div class="scatter-dialog-head">
         <div>
-          <strong id="corrProfileDialogTitle">Correlation Profiles Across Groups</strong>
-          <span id="corrProfileDialogSubtitle"></span>
+          <strong id="corrProfileDialogTitle">Correlation Profiles Across Groups<button type="button" class="dsp-info-btn" onclick="openCorrProfileHelp()" aria-label="How to read this chart">i</button></strong>
+          <span id="corrProfileDialogSubtitle">Each row is a variable pair; each marker is one group's r. Red bars mark a sign reversal.</span>
         </div>
         <button class="scatter-dialog-close" type="button" onclick="closeCorrProfilePopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
@@ -940,6 +936,49 @@
       </div>
       <div class="scatter-dialog-body">
         <div class="scatter-panel-grid" id="scatterPanels"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dsp-help-modal" id="corrProfileHelpModal" role="dialog" aria-modal="true" aria-labelledby="corrProfileHelpTitle">
+    <div class="dsp-help-box">
+      <button type="button" class="dsp-help-close" onclick="closeCorrProfileHelp()" aria-label="Close help">✕</button>
+      <h3 id="corrProfileHelpTitle"><i class="fa-solid fa-grip-lines"></i> Correlation Profiles Across Groups</h3>
+      <p class="dsp-help-sub">How to read the chart.</p>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-list"></i></div>
+        <div>
+          <h4>Rows</h4>
+          <p>Each row is one variable pair. The horizontal axis is the correlation r from −1 to +1; the dashed line is r = 0.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-shapes"></i></div>
+        <div>
+          <h4>Markers</h4>
+          <p>Each marker is one group's r for that pair. Colour and shape identify the group (see the legend under the chart). Hover a marker for the exact r and n.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-arrows-left-right"></i></div>
+        <div>
+          <h4>Bars</h4>
+          <p>The bar joins the lowest and highest group r. A short bar means the groups agree; a long bar means the relationship differs by group.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div>
+          <h4>Sign reversal</h4>
+          <p>A red bar with a <b>SIGN REVERSAL</b> badge means the correlation is positive in at least one group and negative in another. These pairs deserve the closest look.</p>
+        </div>
+      </div>
+      <div class="dsp-help-rule">
+        <div class="dsp-help-icon"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></div>
+        <div>
+          <h4>Full view</h4>
+          <p>The panel scrolls when there are many pairs. Use <b>Full view</b> to open the whole chart in a larger window.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -2255,6 +2294,16 @@
       if (modal) modal.classList.remove('is-open');
     }
 
+    function openCorrProfileHelp() {
+      const modal = document.getElementById('corrProfileHelpModal');
+      if (modal) modal.classList.add('is-open');
+    }
+
+    function closeCorrProfileHelp() {
+      const modal = document.getElementById('corrProfileHelpModal');
+      if (modal) modal.classList.remove('is-open');
+    }
+
     function simPairKey(a, b) {
       return `${a}\u0000${b}`;
     }
@@ -2640,9 +2689,6 @@
     function openCorrProfilePopup() {
       const dialog = document.getElementById('corrProfileDialog');
       if (!dialog) return;
-      const subtitle = document.getElementById('corrProfileDialogSubtitle');
-      const rows = buildCorrProfileRows();
-      if (subtitle) subtitle.textContent = corrProfileHeadlineText(rows);
       dialog.classList.add('is-visible');
       requestAnimationFrame(() => renderCorrProfileChart('full'));
     }
@@ -2655,13 +2701,11 @@
     function renderCorrProfileChart(target) {
       const full = target === 'full';
       const el = document.getElementById(full ? 'corrProfileChartFull' : 'corrProfileChart');
-      const headline = full ? null : document.getElementById('corrProfileHeadline');
       const legend = document.getElementById(full ? 'corrProfileLegendFull' : 'corrProfileLegend');
       const host = document.getElementById(full ? 'corrProfileHostFull' : 'corrProfileHost');
       if (!el) return;
       const rows = buildCorrProfileRows();
       const story = corrProfileHeadlineText(rows);
-      if (headline) headline.textContent = story;
       if (legend) legend.innerHTML = corrProfileLegendHtml();
       if (!rows.length) {
         el.innerHTML = '<div class="dsp-kpi-note">Need at least two groups with overlapping pairwise correlations.</div>';
@@ -3049,6 +3093,8 @@
     window.closeCongruencePopup = closeCongruencePopup;
     window.openCorrProfilePopup = openCorrProfilePopup;
     window.closeCorrProfilePopup = closeCorrProfilePopup;
+    window.openCorrProfileHelp = openCorrProfileHelp;
+    window.closeCorrProfileHelp = closeCorrProfileHelp;
     window.toggleScatterCombinedView = toggleScatterCombinedView;
 
     document.addEventListener('keydown', (event) => {
@@ -3062,6 +3108,10 @@
       closeCongruencePopup();
       closeCorrProfilePopup();
       closeCorrSimHelp();
+      closeCorrProfileHelp();
+    });
+    document.getElementById('corrProfileHelpModal').addEventListener('click', (event) => {
+      if (event.target.id === 'corrProfileHelpModal') closeCorrProfileHelp();
     });
     document.getElementById('scatterDialog').addEventListener('click', (event) => {
       if (event.target.id === 'scatterDialog') closeScatterPopup();

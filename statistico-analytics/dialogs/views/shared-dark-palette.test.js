@@ -37,6 +37,8 @@ describe('soft navy/slate dark palette', () => {
     expect(headerCss).toMatch(/\.checkbox-label::before/);
     expect(headerCss).toMatch(/:has\(input:checked\)::before/);
     expect(headerJs).toMatch(/_ensureCheckboxStyles/);
+    expect(headerCss).toMatch(/scrollbar-color:\s*rgba\(255,\s*165,\s*120,\s*\.78\)/);
+    expect(headerJs).toMatch(/_ensureScrollbarStyles/);
   });
 
   test('module views no longer define the old near-black canvas token', () => {

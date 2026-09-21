@@ -499,6 +499,7 @@ const StatisticoHeader = {
 
     if (this._previewReady) this._syncChartSkinToTheme(theme);
     this._ensureCheckboxStyles();
+    this._ensureScrollbarStyles();
   },
 
   _ensureCheckboxStyles() {
@@ -536,6 +537,32 @@ const StatisticoHeader = {
       '#stReportExportOverlay input[type="checkbox"]{position:static!important;opacity:1!important;pointer-events:auto!important;appearance:auto!important;-webkit-appearance:checkbox!important;}'
     ].join('');
     this._bindCheckboxToggles();
+  },
+
+  _ensureScrollbarStyles() {
+    const id = 'statistico-scrollbar-visible';
+    let style = document.getElementById(id);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = id;
+      document.head.appendChild(style);
+    }
+    style.textContent = [
+      'html{--st-scroll-thumb:rgba(255,165,120,.78);--st-scroll-track:rgba(255,255,255,.1);}',
+      'html[data-theme="light"]{--st-scroll-thumb:#2563eb;--st-scroll-track:#e2e8f0;}',
+      'html *:not(.ws-tab-scroll):not(.tab-navigation):not(.tabs-nav){',
+      'scrollbar-color:var(--st-scroll-thumb) var(--st-scroll-track)!important;}',
+      'html *:not(.ws-tab-scroll):not(.tab-navigation):not(.tabs-nav)::-webkit-scrollbar{',
+      'width:14px!important;height:14px!important;background:var(--st-scroll-track)!important;}',
+      'html *::-webkit-scrollbar-track,html *::-webkit-scrollbar-corner{',
+      'background:var(--st-scroll-track)!important;border:none;}',
+      'html *::-webkit-scrollbar-thumb{',
+      'background-color:var(--st-scroll-thumb)!important;border:2px solid rgba(14,20,27,.55);',
+      'border-radius:999px;background-clip:padding-box;min-height:36px;}',
+      'html[data-theme="light"] *::-webkit-scrollbar-thumb{border-color:#fff;}',
+      'html *::-webkit-scrollbar-thumb:hover{filter:brightness(1.08);}',
+      'html *::-webkit-scrollbar-button{display:none;width:0;height:0;}'
+    ].join('');
   },
 
   /**
@@ -2311,7 +2338,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260920navy11',
+  _TAB_ASSET_VER: '20260920navy12',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

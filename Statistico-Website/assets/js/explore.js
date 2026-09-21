@@ -204,11 +204,13 @@
       block.hidden = !any;
     });
 
-    if (els.count) {
-      var noun = shown === 1 ? 'method' : 'methods';
-      if (state.mode !== 'method') noun = shown === 1 ? 'capability' : 'capabilities';
-      els.count.textContent = shown + ' ' + noun;
-    }
+    var noun = state.mode === 'method'
+      ? (shown === 1 ? 'method' : 'methods')
+      : (shown === 1 ? 'capability' : 'capabilities');
+    var countText = shown + ' ' + noun;
+    document.querySelectorAll('.results-count').forEach(function (el) {
+      el.textContent = countText;
+    });
     if (els.empty) {
       els.empty.classList.toggle('is-visible', shown === 0);
     }
@@ -249,9 +251,7 @@
       els.catalogue.classList.toggle('is-table', mode === 'method');
       els.catalogue.classList.toggle('is-cards', mode !== 'method');
     }
-    if (els.resultsTitle) {
-      els.resultsTitle.textContent = mode === 'method' ? 'Methods' : 'Capabilities';
-    }
+    if (els.countCards) els.countCards.hidden = mode === 'method';
     if (mode !== 'goal') {
       state.goal = '';
       state.outcome = '';
@@ -355,7 +355,7 @@
     els.input = document.getElementById('explore-q');
     els.clearBtn = document.getElementById('explore-clear');
     els.count = document.getElementById('explore-count');
-    els.resultsTitle = document.getElementById('explore-results-title');
+    els.countCards = document.getElementById('explore-count-cards');
     els.empty = document.getElementById('explore-empty');
     els.navigator = document.getElementById('compare-navigator');
     els.catalogue = document.getElementById('explore-catalogue');

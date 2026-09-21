@@ -77,18 +77,9 @@ const goalButtons = data.goals.map((g) => `          <button type="button" class
             <span>${esc(g.prompt)}</span>
           </button>`).join('\n');
 
-const familyTabs = [`          <button type="button" class="family-tab is-active" data-family="">All methods</button>`]
-  .concat(data.families.map((f) => `          <button type="button" class="family-tab" data-family="${esc(f.id)}">${esc(f.label)}</button>`))
-  .join('\n');
-
 const productTabs = [`          <button type="button" class="product-tab is-active" data-product="">All products</button>`]
   .concat(data.products.map((p) => `          <button type="button" class="product-tab" data-product="${esc(p.id)}">${esc(p.label)}</button>`))
   .join('\n');
-
-const productLead = data.products.map((p) => `          <article>
-            <h3>${esc(p.label)}</h3>
-            <p>${esc(p.blurb)}</p>
-          </article>`).join('\n');
 
 function tableRowHtml(cap, familyOrder) {
   const familyLabel = (data.families.find((f) => f.id === cap.family) || {}).label || '';
@@ -177,7 +168,7 @@ const html = `<!DOCTYPE html>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
-  <link rel="stylesheet" href="/Statistico-Website/assets/css/explore.css?v=2026-09-21-table" />
+  <link rel="stylesheet" href="/Statistico-Website/assets/css/explore.css?v=2026-09-21-bar" />
 
   <script type="application/ld+json">
   {
@@ -226,37 +217,25 @@ ${itemList}
 <body>
   <div id="nav-placeholder"></div>
 
-  <header class="explore-hero">
-    <div class="container">
-      <div class="hero-kicker"><i class="fa-solid fa-compass" aria-hidden="true"></i> Explore Statistico</div>
-      <h1>What can you do with Statistico?</h1>
-      <h2>Find the right analysis, calculator, or specialized tool for what you want to accomplish.</h2>
-
+  <header class="explore-bar">
+    <div class="container explore-bar-inner">
+      <h1 class="visually-hidden">Explore Statistico</h1>
+      <div class="mode-tabs" role="tablist" aria-label="Browse Explore Statistico">
+        <button type="button" class="mode-tab is-active" role="tab" aria-selected="true" data-mode="method">By method</button>
+        <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="goal">By goal</button>
+        <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="product">By product</button>
+      </div>
       <form class="explore-search" role="search" action="/Statistico-Website/explore.html" method="get" onsubmit="return false;">
         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <input id="explore-q" name="q" type="search" placeholder="What do you want to analyze?" autocomplete="off" />
+        <input id="explore-q" name="q" type="search" placeholder="Search methods" autocomplete="off" />
         <button type="button" class="explore-search-clear" id="explore-clear" aria-label="Clear search"><i class="fa-solid fa-xmark"></i></button>
       </form>
-      <div class="explore-try">
-        <span>Try</span>
-        <button type="button" data-q="compare groups">compare groups</button>
-        <button type="button" data-q="predict an outcome">predict an outcome</button>
-        <button type="button" data-q="sample size">sample size</button>
-        <button type="button" data-q="factor analysis">factor analysis</button>
-        <button type="button" data-q="reliability">reliability</button>
-        <button type="button" data-q="ROC">ROC</button>
-      </div>
     </div>
   </header>
 
   <main>
     <section class="explore-modes">
       <div class="container">
-        <div class="mode-tabs" role="tablist" aria-label="Browse Explore Statistico">
-          <button type="button" class="mode-tab is-active" role="tab" aria-selected="true" data-mode="method">By method</button>
-          <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="goal">By goal</button>
-          <button type="button" class="mode-tab" role="tab" aria-selected="false" data-mode="product">By product</button>
-        </div>
 
         <div class="browse-panel" data-panel="goal">
           <div class="goal-grid" role="list">
@@ -289,25 +268,14 @@ ${goalButtons}
           </div>
         </div>
 
-        <div class="browse-panel is-active" data-panel="method">
-          <div class="family-tabs" role="tablist" aria-label="Method families">
-${familyTabs}
-          </div>
-        </div>
+        <div class="browse-panel" data-panel="method" hidden></div>
 
         <div class="browse-panel" data-panel="product">
           <div class="product-tabs">
 ${productTabs}
           </div>
-          <div class="product-lead">
-${productLead}
-          </div>
         </div>
-
-        <div class="results-bar">
-          <h2 id="explore-results-title">Methods</h2>
-          <p class="results-count" id="explore-count">${data.capabilities.length} methods</p>
-        </div>
+        <p class="results-count results-count--cards" id="explore-count-cards" hidden>${data.capabilities.length} capabilities</p>
       </div>
     </section>
 
@@ -340,6 +308,7 @@ ${productOptions}
               </select>
             </label>
           </div>
+          <p class="results-count" id="explore-count">${data.capabilities.length} methods</p>
         </div>
         <div class="method-table-scroll">
           <table class="method-table" id="method-table">
@@ -376,7 +345,7 @@ ${familyBlocks}
 
   <div id="footer-placeholder"></div>
   <script src="/Statistico-Website/assets/js/nav-template.js?v=2026-09-21-explore"></script>
-  <script src="/Statistico-Website/assets/js/explore.js?v=2026-09-21-table"></script>
+  <script src="/Statistico-Website/assets/js/explore.js?v=2026-09-21-bar"></script>
 </body>
 </html>
 `;

@@ -686,7 +686,7 @@ var TOOLS_SECTION_META = {
   delivery: {
     id: "delivery",
     label: "Export & Reporting",
-    subtitle: "Send charts and tables to PowerPoint, Word, and more.",
+    subtitle: "Automate Excel export to PPT and Word.",
     icon: "fa-file-export",
     color: "#34d399",
     colorDark: "#059669"

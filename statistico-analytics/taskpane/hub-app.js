@@ -317,13 +317,14 @@ const HUB_CATEGORY_TILES = [
   }
 ];
 const TOOLS_CATEGORY_TILES = [
-  /* ── Cluster 1: Applications ──────────────────────────────────────────
-     Specialized modules that work on the Excel range/selection itself. */
+  /* ── Specialized Tools — purpose-built workflows on the Excel range ──
+     Each tile carries its own family (sectionId) so the category view never
+     repeats the "Specialized Tools" name as an accordion heading. */
   {
     id: "report-tables",
-    section: "Applications",
-    sectionId: "applications",
-    sectionSubtitle: "Build journal-ready tables and run Pareto (80/20) analysis on your Excel data",
+    section: "Reporting",
+    sectionId: "reporting",
+    sectionSubtitle: "Build journal-ready tables from your Excel data",
     title: "Publication Tables",
     icon: "fa-graduation-cap",
     accent: "#eab308",
@@ -345,6 +346,8 @@ const TOOLS_CATEGORY_TILES = [
   },
   {
     id: "quality-ops",
+    section: "Prioritization",
+    sectionId: "prioritization",
     title: "Identify the Vital Few",
     icon: "fa-chart-column",
     iconSvg: '<svg viewBox="0 0 22 19" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" style="display:block"><rect x="0.5" y="5" width="4" height="13" fill="currentColor" opacity="0.9" rx="0.4"/><rect x="5.5" y="8.5" width="4" height="9.5" fill="currentColor" opacity="0.75" rx="0.4"/><rect x="10.5" y="12" width="4" height="6" fill="currentColor" opacity="0.6" rx="0.4"/><rect x="15.5" y="15" width="4" height="3" fill="currentColor" opacity="0.45" rx="0.4"/><path d="M 2.5 18 C 5 7, 12 2, 21 1.5" stroke="rgba(251,146,60,0.95)" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
@@ -371,6 +374,8 @@ const TOOLS_CATEGORY_TILES = [
   {
     id: "survey-tools",
     hidden: true, // temporarily hidden from the hub
+    section: "Survey Tools",
+    sectionId: "survey",
     title: "Survey Segmentation Matrix",
     icon: "fa-border-all",
     accent: "#eab308",
@@ -393,125 +398,13 @@ const TOOLS_CATEGORY_TILES = [
       }
     ]
   },
-  /* ── Cluster 2: Calculators & Planning ────────────────────────────────
-     Standalone tools driven by entered parameters, not a worksheet range. */
-  {
-    id: "distribution-tools",
-    section: "Calculators & Planning",
-    sectionId: "calculators",
-    sectionSubtitle: "Standalone calculations, study design, and simulation tools",
-    title: "Distribution calculators",
-    icon: "fa-chart-area",
-    accent: "#38bdf8",
-    accentDark: "#0284c7",
-    color: "#2563eb",
-    colorDark: "#1d4ed8",
-    subtitle: "Probability, quantiles, and tails for common distributions",
-    desc: "Look up probabilities, critical values, and tail areas for common statistical distributions — no worksheet range required.",
-    info: [
-      "Normal, t, chi-square, F, and related families",
-      "PDF / CDF and quantile calculations",
-      "Left-, right-, and two-tailed probabilities",
-      "Standalone calculator — enter parameters directly"
-    ],
-    modules: [
-      {
-        id: "calc-distribution-hub",
-        label: "Distribution Calculators",
-        tip: "Open the distribution family hub in a dialog.",
-        dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/index-distribution.html"
-      }
-    ]
-  },
-  {
-    id: "sample-planning",
-    title: "Sample planning",
-    icon: "fa-ruler-combined",
-    accent: "#38bdf8",
-    accentDark: "#0284c7",
-    color: "#0ea5e9",
-    colorDark: "#0369a1",
-    subtitle: "Precision and power oriented sample size tools",
-    desc: "Plan how large a sample you need — either for a target precision (margin of error) or for a desired statistical power.",
-    info: [
-      "Precision-based sample size estimation",
-      "Power-based sample size calculation",
-      "Common test families and effect-size inputs",
-      "Standalone planning tools — no Active Range needed"
-    ],
-    modules: [
-      {
-        id: "calc-precision",
-        label: "Sample Size — Precision",
-        tip: "Estimate sample size by target precision.",
-        dialogUrl: "https://statistico.live/statistico-calculators/Precision-Based%20-Sample/PrecisionSampleCalculator.html"
-      },
-      {
-        id: "calc-power",
-        label: "Sample Size — Power",
-        tip: "Power-based sample size calculator.",
-        dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html"
-      }
-    ]
-  },
-  {
-    id: "effect-size-family",
-    hidden: true, // temporarily hidden from the hub
-    title: "Effect size converter",
-    icon: "fa-right-left",
-    accent: "#38bdf8",
-    accentDark: "#0284c7",
-    color: "#a855f7",
-    colorDark: "#7e22ce",
-    subtitle: "Translate effect metrics across test families",
-    desc: "Convert between common effect-size metrics so you can compare or reuse results across different statistical tests.",
-    info: [
-      "Convert between common effect-size families",
-      "Useful when planning studies or pooling literature",
-      "Supports metrics used across t-tests, ANOVA, and correlations",
-      "Standalone converter — enter values directly"
-    ],
-    modules: [
-      {
-        id: "calc-effect-size",
-        label: "Effect Size Converter",
-        tip: "Open the effect-size conversion family.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=effect"
-      }
-    ]
-  },
-  {
-    id: "erlang-family",
-    title: "Call center staffing",
-    icon: "fa-headset",
-    accent: "#38bdf8",
-    accentDark: "#0284c7",
-    color: "#f59e0b",
-    colorDark: "#b45309",
-    subtitle: "Erlang C and operational staffing design",
-    desc: "Estimate how many agents you need to meet service-level targets using Erlang C and related staffing simulations.",
-    info: [
-      "Erlang C staffing calculations",
-      "Service level, wait time, and occupancy trade-offs",
-      "Simulation support for operational scenarios",
-      "Standalone planning tool for call-center design"
-    ],
-    modules: [
-      {
-        id: "calc-erlang",
-        label: "Erlang C & Simulation",
-        tip: "Open call-center staffing and simulation tools.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
-      }
-    ]
-  },
-  /* ── Specialized visualisation ───────────────────────────────────────
+  /* ── Visualization ───────────────────────────────────────────────────
      Applied visual workflow using Excel data. */
   {
     id: "specialized-bubble",
-    section: "Specialized Tools",
-    sectionId: "applications",
-    sectionSubtitle: "Purpose-built tools for analysis and reporting",
+    section: "Visualization",
+    sectionId: "visualization",
+    sectionSubtitle: "Interactive multivariable charts from your Excel data",
     title: "Multivariable Visualisation",
     icon: "fa-chart-scatter",
     accent: "#34d399",
@@ -557,10 +450,130 @@ const TOOLS_CATEGORY_TILES = [
     ]
   }
 ];
+/* ── Calculators — standalone tools driven by entered parameters, not a
+   worksheet range. Own top-level cluster; mirrors the website's Calculators Hub. */
+const CALCULATOR_CATEGORY_TILES = [
+  {
+    id: "distribution-tools",
+    section: "Distributions",
+    sectionId: "distributions",
+    sectionSubtitle: "Probabilities, quantiles, and critical values",
+    title: "Distribution calculators",
+    icon: "fa-chart-area",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
+    color: "#2563eb",
+    colorDark: "#1d4ed8",
+    subtitle: "Probability, quantiles, and tails for common distributions",
+    desc: "Look up probabilities, critical values, and tail areas for common statistical distributions — no worksheet range required.",
+    info: [
+      "Normal, t, chi-square, F, and related families",
+      "PDF / CDF and quantile calculations",
+      "Left-, right-, and two-tailed probabilities",
+      "Standalone calculator — enter parameters directly"
+    ],
+    modules: [
+      {
+        id: "calc-distribution-hub",
+        label: "Distribution Calculators",
+        tip: "Open the distribution family hub in a dialog.",
+        dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/index-distribution.html"
+      }
+    ]
+  },
+  {
+    id: "sample-planning",
+    section: "Power & Sample Size",
+    sectionId: "sample-size",
+    title: "Sample planning",
+    icon: "fa-ruler-combined",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
+    color: "#0ea5e9",
+    colorDark: "#0369a1",
+    subtitle: "Precision and power oriented sample size tools",
+    desc: "Plan how large a sample you need — either for a target precision (margin of error) or for a desired statistical power.",
+    info: [
+      "Precision-based sample size estimation",
+      "Power-based sample size calculation",
+      "Common test families and effect-size inputs",
+      "Standalone planning tools — no Active Range needed"
+    ],
+    modules: [
+      {
+        id: "calc-precision",
+        label: "Sample Size — Precision",
+        tip: "Estimate sample size by target precision.",
+        dialogUrl: "https://statistico.live/statistico-calculators/Precision-Based%20-Sample/PrecisionSampleCalculator.html"
+      },
+      {
+        id: "calc-power",
+        label: "Sample Size — Power",
+        tip: "Power-based sample size calculator.",
+        dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html"
+      }
+    ]
+  },
+  {
+    id: "effect-size-family",
+    hidden: true, // temporarily hidden from the hub
+    section: "Effect Sizes",
+    sectionId: "effect-sizes",
+    title: "Effect size converter",
+    icon: "fa-right-left",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
+    color: "#a855f7",
+    colorDark: "#7e22ce",
+    subtitle: "Translate effect metrics across test families",
+    desc: "Convert between common effect-size metrics so you can compare or reuse results across different statistical tests.",
+    info: [
+      "Convert between common effect-size families",
+      "Useful when planning studies or pooling literature",
+      "Supports metrics used across t-tests, ANOVA, and correlations",
+      "Standalone converter — enter values directly"
+    ],
+    modules: [
+      {
+        id: "calc-effect-size",
+        label: "Effect Size Converter",
+        tip: "Open the effect-size conversion family.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=effect"
+      }
+    ]
+  },
+  {
+    id: "erlang-family",
+    section: "Staffing & Simulation",
+    sectionId: "staffing",
+    title: "Call center staffing",
+    icon: "fa-headset",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
+    color: "#f59e0b",
+    colorDark: "#b45309",
+    subtitle: "Erlang C and operational staffing design",
+    desc: "Estimate how many agents you need to meet service-level targets using Erlang C and related staffing simulations.",
+    info: [
+      "Erlang C staffing calculations",
+      "Service level, wait time, and occupancy trade-offs",
+      "Simulation support for operational scenarios",
+      "Standalone planning tool for call-center design"
+    ],
+    modules: [
+      {
+        id: "calc-erlang",
+        label: "Erlang C & Simulation",
+        tip: "Open call-center staffing and simulation tools.",
+        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
+      }
+    ]
+  }
+];
 const PREPARE_CATEGORY_TILES = [
   {
     id: "prepare-data",
-    section: "Prepare Data",
+    section: "Data Preparation",
     sectionId: "prepare",
     sectionSubtitle: "Check the Active Range, then recode, compute, filter, and reshape for analysis",
     title: "Check & Prepare Data",
@@ -582,25 +595,38 @@ const PREPARE_CATEGORY_TILES = [
     ]
   }
 ];
+/* Three top-level clusters, mirroring the website: Analytics Suite /
+   Calculators Hub / Specialized Tools. */
 let HUB_CLUSTER_TILES = {
   analytics: HUB_CATEGORY_TILES,
+  calculators: CALCULATOR_CATEGORY_TILES,
   tools: PREPARE_CATEGORY_TILES.concat(TOOLS_CATEGORY_TILES)
 };
 let HUB_CLUSTER_META = {
   analytics: {
     eyebrow: "Statistico flagship",
-    name: "Statistical Analysis",
-    tagline: "Models, tests and diagnostics",
+    name: "Statistical Methods",
+    tagline: "Tests, models, diagnostics, and multivariate analyses using worksheet data",
     color: "#c4b5fd",
     colorDark: "#6d28d9",
     icon: "fa-chart-line",
     brandFrom: "#c4b5fd",
     brandTo: "#a78bfa"
   },
+  calculators: {
+    eyebrow: "Statistico calculators",
+    name: "Calculators",
+    tagline: "Probabilities, distributions, power, sample size, and planning calculations",
+    color: "#7dd3fc",
+    colorDark: "#0369a1",
+    icon: "fa-calculator",
+    brandFrom: "#7dd3fc",
+    brandTo: "#38bdf8"
+  },
   tools: {
-    eyebrow: "Statistico flagship",
+    eyebrow: "Statistico tools",
     name: "Specialized Tools",
-    tagline: "Data preparation, calculators and reporting",
+    tagline: "Purpose-built workflows for preparation, visualization, prioritization, and reporting",
     color: "#f4b183",
     colorDark: "#8a4f1c",
     icon: "fa-toolbox",
@@ -608,9 +634,10 @@ let HUB_CLUSTER_META = {
     brandTo: "#c97a32"
   }
 };
-let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
-/* Active Range is shown on Specialized Tools for Prepare Data and purpose-built tools.
-   Calculators and standalone EzPaste pick their own inputs. */
+let HUB_VISIBLE_CLUSTERS = ["analytics", "calculators", "tools"];
+/* The worksheet-data card is shown for Statistical Methods and the
+   data-dependent Specialized Tools. Calculators take entered parameters
+   and never read the worksheet, so the card is hidden there. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
 let HUB_ADVISOR_VISIBLE_CLUSTERS = ["analytics"];
 let ACTIVE_CLUSTER = "analytics";
@@ -624,25 +651,76 @@ var TOOLS_SECTION_META = {
     color: "#14b8a6",
     colorDark: "#0f766e"
   },
-  applications: {
-    id: "applications",
-    label: "Specialized Tools",
-    subtitle: "Purpose-built tools for analysis and reporting.",
+  reporting: {
+    id: "reporting",
+    label: "Reporting",
+    subtitle: "Journal-ready tables from your worksheet data.",
     icon: "fa-table",
     color: "#eab308",
     colorDark: "#a16207"
   },
-  calculators: {
-    id: "calculators",
-    label: "Calculators & Planning",
-    subtitle: "Plan samples and calculate probabilities.",
-    icon: "fa-calculator",
-    color: "#38bdf8",
-    colorDark: "#0284c7"
+  visualization: {
+    id: "visualization",
+    label: "Visualization",
+    subtitle: "Interactive multivariable charts.",
+    icon: "fa-braille",
+    color: "#34d399",
+    colorDark: "#059669"
+  },
+  prioritization: {
+    id: "prioritization",
+    label: "Prioritization",
+    subtitle: "Pareto (80/20) analysis of the vital few.",
+    icon: "fa-ranking-star",
+    color: "#f97316",
+    colorDark: "#c2410c"
+  },
+  survey: {
+    id: "survey",
+    label: "Survey Tools",
+    subtitle: "Segment respondents from two survey dimensions.",
+    icon: "fa-border-all",
+    color: "#0d9488",
+    colorDark: "#0f766e"
   }
 };
-var TOOLS_SECTION_ORDER = ["prepare", "applications", "calculators"];
-var TOOLS_RANGE_SECTIONS = ["prepare", "applications"];
+var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "survey"];
+var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "survey"];
+var CALC_SECTION_META = {
+  distributions: {
+    id: "distributions",
+    label: "Distributions",
+    subtitle: "Probabilities, quantiles, and critical values.",
+    icon: "fa-chart-area",
+    color: "#38bdf8",
+    colorDark: "#0284c7"
+  },
+  "sample-size": {
+    id: "sample-size",
+    label: "Power & Sample Size",
+    subtitle: "Plan samples by precision or by statistical power.",
+    icon: "fa-ruler-combined",
+    color: "#0ea5e9",
+    colorDark: "#0369a1"
+  },
+  "effect-sizes": {
+    id: "effect-sizes",
+    label: "Effect Sizes",
+    subtitle: "Convert between effect-size metrics.",
+    icon: "fa-right-left",
+    color: "#a855f7",
+    colorDark: "#7e22ce"
+  },
+  staffing: {
+    id: "staffing",
+    label: "Staffing & Simulation",
+    subtitle: "Erlang C staffing and service-level trade-offs.",
+    icon: "fa-headset",
+    color: "#f59e0b",
+    colorDark: "#b45309"
+  }
+};
+var CALC_SECTION_ORDER = ["distributions", "sample-size", "effect-sizes", "staffing"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {
@@ -688,7 +766,28 @@ var ANALYTICS_SECTION_META = {
 };
 var ANALYTICS_FAMILY_ORDER = ["explore", "compare", "model", "structure", "synthesize"];
 var ACTIVE_ANALYTICS_SECTION = "all";
-var HUB_OPEN_SECTIONS = { analytics: {}, tools: {} };
+var HUB_OPEN_SECTIONS = { analytics: {}, calculators: {}, tools: {} };
+
+/** Family (accordion) metadata table for the given cluster. */
+function getClusterSectionMeta(clusterId) {
+  if (clusterId === "tools") return TOOLS_SECTION_META;
+  if (clusterId === "calculators") return CALC_SECTION_META;
+  return ANALYTICS_SECTION_META;
+}
+
+/** Display order of families for the given cluster. */
+function getClusterSectionOrder(clusterId) {
+  if (clusterId === "tools") return TOOLS_SECTION_ORDER;
+  if (clusterId === "calculators") return CALC_SECTION_ORDER;
+  return ANALYTICS_FAMILY_ORDER;
+}
+
+/** Resolve which family a tile belongs to inside the given cluster. */
+function getClusterTileSectionId(clusterId, tile, tiles) {
+  if (clusterId === "tools") return getToolsTileSectionId(tile, tiles);
+  if (clusterId === "calculators") return getCalcTileSectionId(tile, tiles);
+  return getAnalyticsTileSectionId(tile, tiles);
+}
 let HUB_ACTIONS = {};
 
 /** Ensures the clustering cards appear even if a cached or older modules.config.json omits them (inserted after PCA). */
@@ -786,7 +885,7 @@ function placeHubRangeSection() {
   var range = document.getElementById("hubRangeSection");
   var holder = document.getElementById("categoryTiles");
   if (!range || !holder) return;
-  if (ACTIVE_CLUSTER === "tools") {
+  if (ACTIVE_CLUSTER !== "analytics") {
     if (!parkRangeInStickyChrome(range) && holder.parentElement) {
       holder.parentElement.insertBefore(range, holder);
     }
@@ -828,27 +927,25 @@ function renderCategoryTiles(query) {
     if (c.title.toLowerCase().indexOf(q) >= 0) return true;
     if ((c.subtitle || "").toLowerCase().indexOf(q) >= 0) return true;
     if ((c.section || "").toLowerCase().indexOf(q) >= 0) return true;
-    var familyMeta = ANALYTICS_SECTION_META[getAnalyticsTileSectionId(c, allSource)];
+    var familyMeta = getClusterSectionMeta(ACTIVE_CLUSTER)[getClusterTileSectionId(ACTIVE_CLUSTER, c, allSource)];
     if (familyMeta && familyMeta.label.toLowerCase().indexOf(q) >= 0) return true;
-    var toolsMeta = TOOLS_SECTION_META[getToolsTileSectionId(c, allSource)];
-    if (toolsMeta && toolsMeta.label.toLowerCase().indexOf(q) >= 0) return true;
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
   var html = "";
-  var sectionOrder = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_ORDER : ANALYTICS_FAMILY_ORDER;
+  var sectionOrder = getClusterSectionOrder(ACTIVE_CLUSTER);
   var searching = !!q;
   var openSet = getHubOpenSectionSet();
   sectionOrder.forEach(function (sectionId) {
     var familyTiles = list.filter(function (c) {
-      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, allSource) === sectionId;
-      return getAnalyticsTileSectionId(c, allSource) === sectionId;
+      return getClusterTileSectionId(ACTIVE_CLUSTER, c, allSource) === sectionId;
     });
     if (!familyTiles.length) return;
     var tilesHtml = '<div class="category-modules">' + familyTiles.map(function (c) {
       var tabStyle = c.tabStyle === "soft" ? "soft" : "pill";
       var scopePrefix = ACTIVE_CLUSTER + ":" + c.id;
-      return getCategoryModules(c).map(function (m) {
-        return renderCategoryModuleBtn(m, tabStyle, scopePrefix);
+      var mods = getCategoryModules(c);
+      return mods.map(function (m) {
+        return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1);
       }).join("");
     }).join("") + "</div>";
     html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
@@ -859,8 +956,9 @@ function renderCategoryTiles(query) {
       var standaloneHtml = standaloneTiles.map(function (c) {
         var tabStyle = c.tabStyle === "soft" ? "soft" : "pill";
         var scopePrefix = ACTIVE_CLUSTER + ":" + c.id;
-        return getCategoryModules(c).map(function (m) {
-          return renderCategoryModuleBtn(m, tabStyle, scopePrefix);
+        var mods = getCategoryModules(c);
+        return mods.map(function (m) {
+          return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1);
         }).join("");
       }).join("");
       html += '<div class="hub-standalone-command"><div class="category-modules">' + standaloneHtml + "</div></div>";
@@ -883,7 +981,17 @@ function getToolsTileSectionId(tile, tiles) {
   for (var i = idx; i >= 0; i--) {
     if (list[i] && list[i].sectionId) return list[i].sectionId;
   }
-  return "applications";
+  return "reporting";
+}
+
+function getCalcTileSectionId(tile, tiles) {
+  var list = tiles || CALCULATOR_CATEGORY_TILES;
+  if (tile && tile.sectionId) return tile.sectionId;
+  var idx = list.indexOf(tile);
+  for (var i = idx; i >= 0; i--) {
+    if (list[i] && list[i].sectionId) return list[i].sectionId;
+  }
+  return "distributions";
 }
 
 function getAnalyticsTileSectionId(tile, tiles) {
@@ -1009,11 +1117,10 @@ function getHubVisibleSectionIds() {
   var allSource = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
     return !c.hidden;
   });
-  var sectionOrder = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_ORDER : ANALYTICS_FAMILY_ORDER;
+  var sectionOrder = getClusterSectionOrder(ACTIVE_CLUSTER);
   return sectionOrder.filter(function (sectionId) {
     return allSource.some(function (c) {
-      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, allSource) === sectionId;
-      return getAnalyticsTileSectionId(c, allSource) === sectionId;
+      return getClusterTileSectionId(ACTIVE_CLUSTER, c, allSource) === sectionId;
     });
   });
 }
@@ -1052,7 +1159,7 @@ function toggleHubExpandAll() {
 }
 
 function renderHubAccordionPanel(sectionId, tilesHtml, open) {
-  var meta = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_META[sectionId] : ANALYTICS_SECTION_META[sectionId];
+  var meta = getClusterSectionMeta(ACTIVE_CLUSTER)[sectionId];
   if (!meta) return tilesHtml || "";
   return (
     '<div class="hub-accordion-panel' + (open ? " is-open" : "") + '" data-section="' + escapeHtml(sectionId) + '"' +
@@ -1080,7 +1187,9 @@ function syncAnalyticsAllBar(query) {
     bar.hidden = false;
   }
   if (input) {
-    input.placeholder = ACTIVE_CLUSTER === "tools" ? "Search tools…" : "Search analyses…";
+    input.placeholder = ACTIVE_CLUSTER === "tools" ? "Search tools…"
+      : ACTIVE_CLUSTER === "calculators" ? "Search calculators…"
+      : "Search methods…";
     if (typeof query === "string") input.value = query;
   }
   syncHubExpandAllButton();
@@ -1131,7 +1240,7 @@ function renderCategoryTileHtml(c, clusterColor, clusterColorDark) {
 }
 
 function findHubCategoryTile(tileId) {
-  var clusters = [PREPARE_CATEGORY_TILES, HUB_CATEGORY_TILES, TOOLS_CATEGORY_TILES];
+  var clusters = [PREPARE_CATEGORY_TILES, HUB_CATEGORY_TILES, CALCULATOR_CATEGORY_TILES, TOOLS_CATEGORY_TILES];
   for (var i = 0; i < clusters.length; i++) {
     var found = (clusters[i] || []).find(function (c) { return c.id === tileId; });
     if (found) return found;
@@ -1173,22 +1282,25 @@ function renderCategoryGroups(category, scopePrefix) {
   var tabStyle = category.tabStyle === "soft" ? "soft" : "pill";
   if (Array.isArray(category.subgroups) && category.subgroups.length) {
     return category.subgroups.map(function (g, idx) {
+      var mods = g.modules || [];
       return (
         '<div class="category-subgroup' + (idx > 0 ? " with-divider" : "") + '">' +
         '<div class="category-subgroup-label">' + escapeHtml(g.label || "") + "</div>" +
         '<div class="category-modules">' +
-        ((g.modules || []).map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix); }).join("")) +
+        (mods.map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1); }).join("")) +
         "</div></div>"
       );
     }).join("");
   }
-  return '<div class="category-modules">' + getCategoryModules(category).map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix); }).join("") + "</div>";
+  var mods = getCategoryModules(category);
+  return '<div class="category-modules">' + mods.map(function (m) { return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1); }).join("") + "</div>";
 }
 
-function renderCategoryModuleBtn(m, tabStyle, scopePrefix) {
+function renderCategoryModuleBtn(m, tabStyle, scopePrefix, fullWidth) {
   var tip = m.tip || m.label;
   var styleClass = tabStyle === "soft" ? " category-module-btn--soft" : "";
   if (m.comingSoon) styleClass += " category-module-btn--soon";
+  if (fullWidth) styleClass += " category-module-btn--full";
   var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
   HUB_ACTIONS[actionKey] = m;
   var soonMark = m.comingSoon ? ' <span class="soon-badge">Soon</span>' : "";
@@ -1388,7 +1500,9 @@ function loadHubScopeConfigIfAny() {
 
 function syncClusterHeader() {
   var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
-  var tabAccent = ACTIVE_CLUSTER === "tools" ? "#f4c84a" : "#c4b5fd";
+  var tabAccent = ACTIVE_CLUSTER === "tools" ? "#f4c84a"
+    : ACTIVE_CLUSTER === "calculators" ? "#7dd3fc"
+    : "#c4b5fd";
   document.documentElement.setAttribute("data-hub-cluster", ACTIVE_CLUSTER);
   document.documentElement.style.setProperty("--hub-tab-accent", tabAccent);
   document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
@@ -1404,7 +1518,7 @@ function syncClusterHeader() {
   var range = document.getElementById("hubRangeSection");
   var advisor = document.getElementById("advisorStrip");
   var showRange = HUB_RANGE_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
-  if (ACTIVE_CLUSTER === "tools") {
+  if (ACTIVE_CLUSTER === "tools" && showRange) {
     showRange = ACTIVE_TOOLS_SECTION === "all" || TOOLS_RANGE_SECTIONS.indexOf(ACTIVE_TOOLS_SECTION) >= 0;
   }
   var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;

@@ -2652,7 +2652,17 @@ const StatisticoHeader = {
       const raw = localStorage.getItem('statistico-export-cover');
       if (raw) savedCover = JSON.parse(raw);
     } catch (_) {}
-    const initialCover = Object.assign({}, coverDefaults, savedCover || {});
+    // Only user preferences are restored from storage. Analysis-specific fields
+    // (title, subject, description, reportDate) always come from the caller's
+    // coverDefaults so a Univariate export never inherits a Contingency title.
+    const savedPrefs = {};
+    if (savedCover && typeof savedCover === 'object') {
+      ['enabled', 'subtitle', 'author', 'organization', 'preparedFor', 'includeLogo',
+        'useBrandLogo', 'customLogoDataUrl', 'coverBackground', 'optionsExpanded'].forEach((k) => {
+        if (savedCover[k] !== undefined) savedPrefs[k] = savedCover[k];
+      });
+    }
+    const initialCover = Object.assign({}, coverDefaults, savedPrefs);
     const esc = (value) => String(value == null ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -2906,7 +2916,10 @@ const StatisticoHeader = {
         aiInterpretationPerSection: false,
         optionsExpanded: optionsBody ? optionsBody.style.display !== 'none' : false
       };
-      try { localStorage.setItem('statistico-export-cover', JSON.stringify(cover)); } catch (_) {}
+      try {
+        const { title, subject, description, reportDate, ...prefs } = cover;
+        localStorage.setItem('statistico-export-cover', JSON.stringify(prefs));
+      } catch (_) {}
       close();
       onConfirm(checked, cover);
     });

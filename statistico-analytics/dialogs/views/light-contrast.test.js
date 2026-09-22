@@ -26,7 +26,14 @@ describe('light-mode contrast', () => {
   });
 
   test('cache-busts theme CSS after contrast changes', () => {
-    expect(headerJs).toMatch(/_TAB_ASSET_VER:\s*'20260922sidewhite'/);
+    expect(headerJs).toMatch(/_TAB_ASSET_VER:\s*'20260922closeread'/);
+  });
+
+  test('light close buttons and range sliders stay readable', () => {
+    expect(theme).toMatch(/html\[data-theme="light"\] \.modal-close-btn[\s\S]*color: #ffffff !important/);
+    expect(theme).toMatch(/html\[data-theme="light"\] \.modal-close-btn[\s\S]*background: #E11D48 !important/);
+    expect(theme).toMatch(/html\[data-theme="light"\][\s\S]*\.chart-slider-row \.slider[\s\S]*accent-color: #007DAA/);
+    expect(theme).toMatch(/::-webkit-slider-runnable-track[\s\S]*background: #64748B !important/);
   });
 
   test('light sidebar matches the header band and selected items are white', () => {

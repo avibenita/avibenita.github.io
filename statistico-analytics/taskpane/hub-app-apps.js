@@ -424,8 +424,8 @@ const TOOLS_CATEGORY_TILES = [
   },
   {
     id: "ezpaste",
-    sectionId: "standalone",
-    standalone: true,
+    section: "Office Delivery",
+    sectionId: "delivery",
     title: "EzPaste",
     icon: "fa-bullseye",
     accent: "#34d399",
@@ -682,9 +682,17 @@ var TOOLS_SECTION_META = {
     icon: "fa-border-all",
     color: "#0d9488",
     colorDark: "#0f766e"
+  },
+  delivery: {
+    id: "delivery",
+    label: "Office Delivery",
+    subtitle: "Export charts and tables to PowerPoint, Word, and more.",
+    icon: "fa-file-export",
+    color: "#34d399",
+    colorDark: "#059669"
   }
 };
-var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "survey"];
+var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "delivery", "survey"];
 var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "survey"];
 var CALC_SECTION_META = {
   distributions: {

@@ -26,6 +26,13 @@ describe('light-mode contrast', () => {
   });
 
   test('cache-busts theme CSS after contrast changes', () => {
-    expect(headerJs).toMatch(/_TAB_ASSET_VER:\s*'20260922contrast'/);
+    expect(headerJs).toMatch(/_TAB_ASSET_VER:\s*'20260922sidewhite'/);
+  });
+
+  test('light sidebar matches the header band and selected items are white', () => {
+    expect(theme).toMatch(/html\[data-theme="light"\] \.sb-nav[\s\S]*--sb-bg:\s*var\(--st-header-band/);
+    expect(theme).toMatch(/html\[data-theme="light"\] \.sb-nav[\s\S]*--sb-active-bg:\s*#ffffff/);
+    expect(theme).toMatch(/html\[data-theme="light"\] \.sb-item\.active[\s\S]*background:\s*#ffffff !important/);
+    expect(headerCss).toMatch(/html\[data-theme="light"\] \.sb-nav[\s\S]*--sb-active-bg:\s*#ffffff/);
   });
 });

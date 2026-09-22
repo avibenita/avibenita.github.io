@@ -3007,30 +3007,42 @@
         return 0.5 * (1 + erf(x / Math.sqrt(2)));
     }
 
+    /**
+     * Acklam's rational approximation to Φ⁻¹.
+     * The previous Horner form reversed the coefficients and, because of
+     * operator precedence, divided only the constant term. That made
+     * Φ⁻¹(0.975) negative, so achieved power exceeded 1 and was clipped to 99%.
+     */
     function normalInverse(p) {
-        const a = [0, -3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
-        const b = [0, -5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
-        const c = [0, -7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
-        const d = [0, 7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
-
         if (p < 0 || p > 1) return NaN;
         if (p === 0) return -Infinity;
         if (p === 1) return Infinity;
 
-        let q = p - 0.5;
-        if (Math.abs(q) <= 0.42) {
-            let r = q * q;
-            return q * (((((a[6] * r + a[5]) * r + a[4]) * r + a[3]) * r + a[2]) * r + a[1]) * r + a[0] /
-                (((((b[5] * r + b[4]) * r + b[3]) * r + b[2]) * r + b[1]) * r + 1);
+        const a1 = -3.969683028665376e+01, a2 = 2.209460984245205e+02, a3 = -2.759285104469687e+02;
+        const a4 = 1.383577518672690e+02, a5 = -3.066479806614716e+01, a6 = 2.506628277459239e+00;
+        const b1 = -5.447609879822406e+01, b2 = 1.615858368580409e+02, b3 = -1.556989798598866e+02;
+        const b4 = 6.680131188771972e+01, b5 = -1.328068155288572e+01;
+        const c1 = -7.784894002430293e-03, c2 = -3.223964580411365e-01, c3 = -2.400758277161838e+00;
+        const c4 = -2.549732539343734e+00, c5 = 4.374664141464968e+00, c6 = 2.938163982698783e+00;
+        const d1 = 7.784695709041462e-03, d2 = 3.224671290700398e-01;
+        const d3 = 2.445134137142996e+00, d4 = 3.754408661907416e+00;
+        const plow = 0.02425;
+        const phigh = 1 - plow;
+
+        if (p < plow) {
+            const q = Math.sqrt(-2 * Math.log(p));
+            return (((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+                ((((d1 * q + d2) * q + d3) * q + d4) * q + 1);
         }
-
-        let r = p < 0.5 ? p : 1 - p;
-        r = Math.sqrt(-Math.log(r));
-
-        let val = (((c[4] * r + c[3]) * r + c[2]) * r + c[1]) * r + c[0];
-        val /= ((d[3] * r + d[2]) * r + d[1]) * r + 1;
-
-        return p < 0.5 ? -val : val;
+        if (p > phigh) {
+            const q = Math.sqrt(-2 * Math.log(1 - p));
+            return -(((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+                ((((d1 * q + d2) * q + d3) * q + d4) * q + 1);
+        }
+        const q = p - 0.5;
+        const r = q * q;
+        return (((((a1 * r + a2) * r + a3) * r + a4) * r + a5) * r + a6) * q /
+            (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1);
     }
 
     function erf(x) {
@@ -3114,6 +3126,126 @@
     function tPDF(x, df) {
         const logGammaRatio = logGamma((df + 1) / 2) - logGamma(df / 2);
         return Math.exp(logGammaRatio - 0.5 * Math.log(df * Math.PI) - (df + 1) / 2 * Math.log(1 + (x * x) / df));
+    }
+
+    /**
+     * CDF of the noncentral t (Lenth, Algorithm AS 243; same series as R's pt).
+     * df may be fractional. ncp = 0 reduces to the central t CDF.
+     */
+    function noncentralTCDF(t, df, ncp) {
+        if (!(df > 0) || !isFinite(df)) return NaN;
+        if (!ncp) return tCDF(t, df);
+        if (t === Infinity) return 1;
+        if (t === -Infinity) return 0;
+
+        const itrmax = 1000;
+        const errmax = 1e-12;
+        const SQRT_2_OVER_PI = Math.sqrt(2 / Math.PI);
+        const LN_SQRT_PI = 0.5 * Math.log(Math.PI);
+
+        let tt, del, negdel;
+        if (t >= 0) {
+            negdel = false;
+            tt = t;
+            del = ncp;
+        } else {
+            if (ncp > 40) return 0;
+            negdel = true;
+            tt = -t;
+            del = -ncp;
+        }
+
+        function normalApprox() {
+            const s = 1 / (4 * df);
+            const sd = Math.sqrt(1 + tt * tt * 2 * s);
+            const cdf = normalCDF((tt * (1 - s) - del) / sd);
+            return negdel ? 1 - cdf : cdf;
+        }
+
+        if (df > 4e5 || del * del > 2 * Math.LN2 * 1022) {
+            return Math.min(1, Math.max(0, normalApprox()));
+        }
+
+        let tnc = 0;
+        const x2 = tt * tt;
+        let rxb = df / (x2 + df);
+        const x = x2 / (x2 + df);
+        if (x > 0) {
+            const lambda = del * del;
+            let p = 0.5 * Math.exp(-0.5 * lambda);
+            if (p === 0) return Math.min(1, Math.max(0, normalApprox()));
+            let q = SQRT_2_OVER_PI * p * del;
+            let s = 0.5 - p;
+            if (s < 1e-7) s = -0.5 * Math.expm1(-0.5 * lambda);
+            let a = 0.5;
+            const b = 0.5 * df;
+            rxb = Math.pow(rxb, b);
+            const albeta = LN_SQRT_PI + logGamma(b) - logGamma(0.5 + b);
+            let xodd = incompleteBeta(a, b, x);
+            let godd = 2 * rxb * Math.exp(a * Math.log(x) - albeta);
+            const tmp = b * x;
+            let xeven = tmp < 1e-16 ? tmp : 1 - rxb;
+            let geven = tmp * rxb;
+            tnc = p * xodd + q * xeven;
+            for (let it = 1; it <= itrmax; it++) {
+                a += 1;
+                xodd -= godd;
+                xeven -= geven;
+                godd *= x * (a + b - 1) / a;
+                geven *= x * (a + b - 0.5) / (a + 0.5);
+                p *= lambda / (2 * it);
+                q *= lambda / (2 * it + 1);
+                tnc += p * xodd + q * xeven;
+                s -= p;
+                if (s < -1e-10) break;
+                if (s <= 0 && it > 1) break;
+                if (Math.abs(2 * s * (xodd - godd)) < errmax) break;
+            }
+        }
+
+        tnc += normalCDF(-del);
+        if (negdel) tnc = 1 - tnc;
+        if (tnc < 0) return 0;
+        if (tnc > 1) return 1;
+        return tnc;
+    }
+
+    /**
+     * Power of a one- or two-sample t-test from the noncentral t.
+     * One-sample: df = n−1, λ = d√n.
+     * Two-sample: n is n₁, n₂ = ceil(n₁ × allocation), df = n₁+n₂−2,
+     * λ = d √(n₁ n₂ / (n₁+n₂)).
+     */
+    function tMeanAchievedPower(testType, n, effectSize, alpha, alternative) {
+        const d = Math.abs(Number(effectSize));
+        const a = Number(alpha);
+        if (!(n >= 2) || !(d > 0) || !(a > 0) || !(a < 1)) return 0;
+        let df, ncp;
+        if (testType === 'two-sample-mean') {
+            let ratio = 1;
+            const ratioEl = document.getElementById('allocationRatio');
+            if (ratioEl) {
+                const r = parseFloat(ratioEl.value);
+                if (isFinite(r) && r > 0) ratio = r;
+            }
+            const n2 = Math.max(1, Math.ceil(n * ratio));
+            df = n + n2 - 2;
+            ncp = d * Math.sqrt((n * n2) / (n + n2));
+        } else {
+            df = n - 1;
+            ncp = d * Math.sqrt(n);
+        }
+        if (!(df > 0)) return 0;
+        let power;
+        if (alternative === 'two-sided') {
+            const crit = tInverse(1 - a / 2, df);
+            power = noncentralTCDF(-crit, df, ncp) + (1 - noncentralTCDF(crit, df, ncp));
+        } else {
+            const crit = tInverse(1 - a, df);
+            power = 1 - noncentralTCDF(crit, df, ncp);
+        }
+        if (!isFinite(power)) return 0;
+        return Math.max(0, Math.min(1, power));
     }
 
     function fCDF(x, df1, df2) {
@@ -3284,16 +3416,14 @@
             if (!n || n < 1) throw new Error('Invalid sample size from API');
             await new Promise(r => setTimeout(r, 300));
             return { sampleSize: n, totalSampleSize: n, effectSize, testType: 'One-Sample t-test',
-                     actualPower: calculateSimplePowerForCurve(n, effectSize, alpha, alternative, 'one-sample-mean') };
+                     actualPower: tMeanAchievedPower('one-sample-mean', n, effectSize, alpha, alternative) };
         } catch (error) {
-            updateLoadingMessage('Cloud function unavailable, using normal approximation...');
-            const zAlpha = alternative === 'two-sided' ? normalInverse(1 - alpha/2) : normalInverse(1 - alpha);
-            const zBeta = normalInverse(power);
-            const n = Math.ceil(Math.pow((zAlpha + zBeta) / effectSize, 2));
+            updateLoadingMessage('Cloud function unavailable, using noncentral t...');
+            const n = calculateSampleSizeForPower('one-sample-mean', power, alpha, alternative);
             await new Promise(r => setTimeout(r, 500));
             showFallbackNotice();
             return { sampleSize: n, totalSampleSize: n, effectSize, testType: 'One-Sample t-test (Fallback)',
-                     actualPower: calculateSimplePowerForCurve(n, effectSize, alpha, alternative, 'one-sample-mean') };
+                     actualPower: tMeanAchievedPower('one-sample-mean', n, effectSize, alpha, alternative) };
         }
     }
 
@@ -3308,24 +3438,12 @@
     function calculateTwoSampleMean(alpha, power, alternative) {
         const effectSize = parseFloat(document.getElementById('effectSize2').value);
         const ratio = parseFloat(document.getElementById('allocationRatio').value);
-        let low = 2, high = 5000;
-        while (high - low > 1) {
-            const n1 = Math.floor((low + high) / 2);
-            const n2 = Math.floor(n1 * ratio);
-            const df = n1 + n2 - 2;
-            const criticalValue = alternative === 'two-sided' ? tInverse(1 - alpha/2, df) : tInverse(1 - alpha, df);
-            const pooledSE = Math.sqrt(1/n1 + 1/n2);
-            const delta = effectSize / pooledSE;
-            const ncp = delta * Math.sqrt(df);
-            const actualPower = alternative === 'two-sided' ?
-                normalCDF(ncp - criticalValue) + (1 - normalCDF(ncp + criticalValue)) :
-                1 - normalCDF(criticalValue - ncp);
-            if (actualPower < power) low = n1; else high = n1;
-        }
-        const n1 = high, n2 = Math.ceil(n1 * ratio);
+        const safeRatio = isFinite(ratio) && ratio > 0 ? ratio : 1;
+        const n1 = calculateSampleSizeForPower('two-sample-mean', power, alpha, alternative);
+        const n2 = Math.max(1, Math.ceil(n1 * safeRatio));
         return { sampleSize: n1, sampleSize2: n2, totalSampleSize: n1 + n2, effectSize,
                  testType: 'Two-Sample t-test',
-                 actualPower: calculateSimplePowerForCurve(n1, effectSize, alpha, alternative, 'two-sample-mean') };
+                 actualPower: tMeanAchievedPower('two-sample-mean', n1, effectSize, alpha, alternative) };
     }
 
     function calculateOneSampleProportion(alpha, power, alternative) {
@@ -3461,11 +3579,8 @@
 
     function calculateActualPower(testType, n, effectSize, alpha, alternative, param2) {
         switch(testType) {
-            case 'one-sample-mean': {
-                const cz = alternative === 'two-sided' ? normalInverse(1-alpha/2) : normalInverse(1-alpha);
-                const ncp = effectSize * Math.sqrt(n);
-                return alternative === 'two-sided' ? normalCDF(ncp-cz) + (1-normalCDF(ncp+cz)) : 1-normalCDF(cz-ncp);
-            }
+            case 'one-sample-mean':
+                return tMeanAchievedPower('one-sample-mean', n, effectSize, alpha, alternative);
             case 'anova': {
                 const ng = param2 || 3;
                 const ncp = effectSize * Math.sqrt(n * ng);
@@ -3484,9 +3599,7 @@
             if (!effectSize || effectSize <= 0 || !n || n <= 0) return 0.1;
             let power;
             if (testType === 'one-sample-mean' || testType === 'two-sample-mean') {
-                const cz = alternative === 'two-sided' ? normalInverse(1-alpha/2) : normalInverse(1-alpha);
-                const ncp = effectSize * Math.sqrt(n);
-                power = alternative === 'two-sided' ? normalCDF(ncp-cz) + (1-normalCDF(ncp+cz)) : 1-normalCDF(cz-ncp);
+                power = tMeanAchievedPower(testType, n, effectSize, alpha, alternative);
             } else if (testType === 'anova') {
                 /* n = per-group sample size; Cohen's f — must include k groups (was wrongly using sqrt(n) only → flat/wrong curve) */
                 const k = Math.max(2, parseInt(document.getElementById('numGroups').value, 10) || 2);
@@ -3510,7 +3623,7 @@
                 const ncp = effectSize * Math.sqrt(n);
                 power = alternative === 'two-sided' ? normalCDF(ncp-cz) + (1-normalCDF(ncp+cz)) : 1-normalCDF(cz-ncp);
             }
-            const out = Math.max(0.05, Math.min(0.99, power));
+            const out = Math.max(0, Math.min(1, power));
             return isFinite(out) ? out : 0.1;
         } catch(e) { return 0.1; }
     }

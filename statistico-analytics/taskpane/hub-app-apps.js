@@ -424,7 +424,7 @@ const TOOLS_CATEGORY_TILES = [
   },
   {
     id: "ezpaste",
-    section: "Office Delivery",
+    section: "Export & Reporting",
     sectionId: "delivery",
     title: "EzPaste",
     icon: "fa-bullseye",
@@ -443,7 +443,7 @@ const TOOLS_CATEGORY_TILES = [
     modules: [
       {
         id: "ezpaste-open",
-        label: "EzPaste — XL to PPT automation",
+        label: "EzPaste — Excel to PowerPoint",
         tip: "Open the EzPaste overview in your browser — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.",
         browserUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
       }
@@ -685,8 +685,8 @@ var TOOLS_SECTION_META = {
   },
   delivery: {
     id: "delivery",
-    label: "Office Delivery",
-    subtitle: "Export charts and tables to PowerPoint, Word, and more.",
+    label: "Export & Reporting",
+    subtitle: "Send charts and tables to PowerPoint, Word, and more.",
     icon: "fa-file-export",
     color: "#34d399",
     colorDark: "#059669"

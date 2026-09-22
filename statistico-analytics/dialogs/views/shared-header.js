@@ -5081,6 +5081,21 @@ const StatisticoHeader = {
       document.body.appendChild(iframe);
     });
 
+    // Snapshot the page that is currently open (no iframe reload), so the
+    // exported section matches exactly what the user sees.
+    const captureLiveSnapshot = (viewId) => {
+      try {
+        const snapshotHtml = extractRichSnapshot(document, window.location.href);
+        if (!snapshotHtml) return { snapshotHtml: '', ok: false, viewData: null };
+        const doc = new DOMParser().parseFromString(snapshotHtml, 'text/html');
+        doc.querySelectorAll('#stExportProgressOverlay, #stReportExportOverlay, .st-toast, .toast, .custom-dialog-overlay').forEach((n) => n.remove());
+        const viewData = viewId ? this._extractViewDataFromIframe(document, window, viewId) : null;
+        return { snapshotHtml: doc.documentElement.outerHTML, ok: true, viewData: viewData || null };
+      } catch (_) {
+        return { snapshotHtml: '', ok: false, viewData: null };
+      }
+    };
+
     const computeStats = (values) => {
       const numeric = (values || []).filter((v) => Number.isFinite(v));
       if (!numeric.length) return null;
@@ -5322,6 +5337,12 @@ const StatisticoHeader = {
               setProgress(i, total, `Capturing: ${esc(s.label)}…`);
               if (!s.file) {
                 snapshotResults.push({ ok: false, snapshotHtml: '', noFile: true });
+              } else if (String(s.id) === String(this.currentView || '')) {
+                // The section being exported is the page on screen: snapshot it
+                // directly so the report reflects the user's live configuration
+                // (H0 / alternative / alpha, bins, CI level…) and the results
+                // they are looking at, instead of a freshly loaded default view.
+                snapshotResults.push(captureLiveSnapshot(String(s.id)));
               } else {
                 const url = appendQueryParam(this.resolveDialogUrl(s.file), 'embed', '1');
                 snapshotResults.push(await captureSectionSnapshot(url, liveData, String(s.id)));

@@ -1,9 +1,313 @@
 ﻿/* Shared meta-analysis engine — used by Results for interactive measure switching */
 (function (global) {
 'use strict';
+function _normalizeMetaNumericString(v) {
+  if (typeof v === 'number') return isFinite(v) ? String(v) : '';
+  if (v == null || typeof v === 'boolean') return '';
+  var s = String(v)
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, ' ')
+    .replace(/\u2212/g, '-')
+    .replace(/^\s+|\s+$/g, '');
+  s = s.replace(/^[\u2010\u2011\u2012\u2013\u2014\u2015]+/, '-');
+  return s.replace(/^\s+|\s+$/g, '');
+}
+
+function parseMetaNumber(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : NaN;
+  var s = _normalizeMetaNumericString(v);
+  if (!s) return NaN;
+  var n = Number(s);
+  if (isFinite(n)) return n;
+  if (s.indexOf(',') >= 0 && s.indexOf('.') < 0) {
+    n = Number(s.replace(',', '.'));
+    return isFinite(n) ? n : NaN;
+  }
+  return NaN;
+}
+
 function _metaNum(v) {
-  const n = parseFloat(v);
-  return isFinite(n) ? n : NaN;
+  return parseMetaNumber(v);
+}
+
+function _specType(spec) {
+  return (spec && spec.effectType) || 'continuous';
+}
+
+function _specMeasure(spec) {
+  var t = _specType(spec);
+  var m = (spec && spec.effectMeasure) || '';
+  if (m) return m;
+  if (t === 'binary') return 'rr';
+  if (t === 'direct') return 'generic';
+  if (t === 'correlation') return 'fisherz';
+  return 'smd';
+}
+
+function isFisherCorrelationSpec(spec) {
+  var t = _specType(spec);
+  var m = _specMeasure(spec);
+  return t === 'correlation' || (t === 'direct' && m === 'fisherz');
+}
+
+function isLogRatioSpec(spec) {
+  var t = _specType(spec);
+  var m = _specMeasure(spec);
+  if (t === 'binary') return m === 'rr' || m === 'or' || m === '';
+  if (t === 'continuous') return m === 'rom';
+  if (t === 'direct') return m === 'logrr' || m === 'logor';
+  return false;
+}
+
+function isOddsRatioSpec(spec) {
+  var m = _specMeasure(spec);
+  return m === 'or' || m === 'logor';
+}
+
+function isRiskRatioSpec(spec) {
+  var m = _specMeasure(spec);
+  return m === 'rr' || m === 'logrr';
+}
+
+function isPrecomputedRatioSpec(spec) {
+  var t = _specType(spec);
+  var m = _specMeasure(spec);
+  return t === 'direct' && (m === 'logor' || m === 'logrr');
+}
+
+function isGenericDirectSpec(spec) {
+  return _specType(spec) === 'direct' && _specMeasure(spec) === 'generic';
+}
+
+function usesEventMeaningSpec(spec) {
+  return _specType(spec) === 'binary' || isPrecomputedRatioSpec(spec);
+}
+
+function _cleanLabel(v, fallback) {
+  var s = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  return s || fallback;
+}
+
+function defaultDirectionLabels(spec) {
+  if (isPrecomputedRatioSpec(spec)) {
+    return {
+      numeratorLabel: 'Group A',
+      referenceLabel: 'Group B',
+      eventLabel: 'Event',
+      leftLabel: 'Lower ratio',
+      rightLabel: 'Higher ratio',
+      outcomeBetter: 'none'
+    };
+  }
+  if (isGenericDirectSpec(spec)) {
+    return {
+      numeratorLabel: 'Negative effect',
+      referenceLabel: 'Positive effect',
+      eventLabel: '',
+      leftLabel: 'Negative effect',
+      rightLabel: 'Positive effect',
+      outcomeBetter: 'none'
+    };
+  }
+  if (_specType(spec) === 'binary') {
+    return {
+      numeratorLabel: 'Treatment',
+      referenceLabel: 'Control',
+      eventLabel: 'Event',
+      leftLabel: 'Treatment',
+      rightLabel: 'Control',
+      outcomeBetter: 'lower'
+    };
+  }
+  return {
+    numeratorLabel: 'Treatment',
+    referenceLabel: 'Control',
+    eventLabel: '',
+    leftLabel: 'Treatment',
+    rightLabel: 'Control',
+    outcomeBetter: 'lower'
+  };
+}
+
+function resolveOutcomeBetter(spec) {
+  var defaults = defaultDirectionLabels(spec);
+  if (spec && (spec.outcomeBetter === 'lower' || spec.outcomeBetter === 'higher' || spec.outcomeBetter === 'none')) {
+    return spec.outcomeBetter;
+  }
+  if (spec && spec.effectDirection === 'control') return 'lower';
+  return defaults.outcomeBetter;
+}
+
+function resolveDirectionContext(spec) {
+  var defaults = defaultDirectionLabels(spec);
+  var better = resolveOutcomeBetter(spec);
+  var meaning = better === 'higher' ? 'beneficial' : better === 'lower' ? 'adverse' : 'unspecified';
+  return {
+    numeratorLabel: _cleanLabel(spec && spec.numeratorLabel, defaults.numeratorLabel),
+    referenceLabel: _cleanLabel(spec && spec.referenceLabel, defaults.referenceLabel),
+    eventLabel: _cleanLabel(spec && spec.eventLabel, defaults.eventLabel || 'Event'),
+    leftLabel: _cleanLabel(spec && spec.leftLabel, defaults.leftLabel),
+    rightLabel: _cleanLabel(spec && spec.rightLabel, defaults.rightLabel),
+    outcomeBetter: better,
+    eventMeaning: meaning,
+    meaningLabel: better === 'higher' ? 'Beneficial' : better === 'lower' ? 'Adverse' : 'Not specified'
+  };
+}
+
+function comparisonLabel(spec) {
+  if (isFisherCorrelationSpec(spec)) return 'Association';
+  var ctx = resolveDirectionContext(spec);
+  if (isGenericDirectSpec(spec)) return ctx.leftLabel + ' / ' + ctx.rightLabel;
+  if (isLogRatioSpec(spec)) return ctx.numeratorLabel + ' / ' + ctx.referenceLabel;
+  return ctx.numeratorLabel + ' \u2212 ' + ctx.referenceLabel;
+}
+
+function resultsHeader(spec) {
+  var ctx = resolveDirectionContext(spec);
+  var comparison = comparisonLabel(spec);
+  if (usesEventMeaningSpec(spec)) {
+    return {
+      comparison: comparison,
+      comparisonLine: 'Comparison: ' + comparison,
+      outcomeLine: 'Outcome: ' + ctx.eventLabel + ' \u00B7 ' + ctx.meaningLabel,
+      eventLabel: ctx.eventLabel,
+      meaningLabel: ctx.meaningLabel
+    };
+  }
+  if (isFisherCorrelationSpec(spec)) {
+    return {
+      comparison: comparison,
+      comparisonLine: 'Scale: ' + comparison,
+      outcomeLine: betterLine(ctx, spec),
+      eventLabel: ctx.eventLabel,
+      meaningLabel: ctx.meaningLabel
+    };
+  }
+  return {
+    comparison: comparison,
+    comparisonLine: (isLogRatioSpec(spec) ? 'Comparison: ' : 'Contrast: ') + comparison,
+    outcomeLine: betterLine(ctx, spec),
+    eventLabel: ctx.eventLabel,
+    meaningLabel: ctx.meaningLabel
+  };
+}
+
+function betterLine(ctx, spec) {
+  if (ctx.outcomeBetter === 'none') {
+    if (isFisherCorrelationSpec(spec) || isGenericDirectSpec(spec)) return 'Direction labels: hidden';
+    return 'Favour labels: hidden';
+  }
+  if (isFisherCorrelationSpec(spec)) return 'Association: negative \u2190 0 \u2192 positive';
+  if (ctx.outcomeBetter === 'lower') return 'Better outcomes: Lower values';
+  return 'Better outcomes: Higher values';
+}
+
+function favoredGroup(displayEffect, spec) {
+  var ctx = resolveDirectionContext(spec);
+  if (ctx.outcomeBetter === 'none') return null;
+  if (displayEffect == null || !isFinite(displayEffect)) return null;
+  if (isLogRatioSpec(spec)) {
+    if (!(displayEffect > 0) || displayEffect === 1) return null;
+    var higherInNumerator = displayEffect > 1;
+    if (ctx.outcomeBetter === 'higher') {
+      return higherInNumerator ? ctx.numeratorLabel : ctx.referenceLabel;
+    }
+    return higherInNumerator ? ctx.referenceLabel : ctx.numeratorLabel;
+  }
+  if (displayEffect === 0) return null;
+  if (ctx.outcomeBetter === 'lower') {
+    return displayEffect < 0 ? ctx.numeratorLabel : ctx.referenceLabel;
+  }
+  return displayEffect > 0 ? ctx.numeratorLabel : ctx.referenceLabel;
+}
+
+function forestFavorLabels(spec) {
+  var ctx = resolveDirectionContext(spec);
+  if (isFisherCorrelationSpec(spec)) {
+    if (ctx.outcomeBetter === 'none') return null;
+    return { left: 'Negative association', right: 'Positive association' };
+  }
+  if (isGenericDirectSpec(spec)) {
+    return { left: ctx.leftLabel, right: ctx.rightLabel };
+  }
+  if (ctx.outcomeBetter === 'none') {
+    if (isLogRatioSpec(spec)) return { left: 'Lower ratio', right: 'Higher ratio' };
+    return null;
+  }
+  if (ctx.outcomeBetter === 'lower') {
+    return { left: 'Favours ' + ctx.numeratorLabel, right: 'Favours ' + ctx.referenceLabel };
+  }
+  return { left: 'Favours ' + ctx.referenceLabel, right: 'Favours ' + ctx.numeratorLabel };
+}
+
+function ratioQuantityWord(spec) {
+  if (isOddsRatioSpec(spec)) return 'odds';
+  if (isRiskRatioSpec(spec)) return 'risk';
+  return 'ratio';
+}
+
+function describeRatioChange(spec, displayRatio) {
+  if (!(displayRatio > 0) || !isFinite(displayRatio)) return '';
+  var word = ratioQuantityWord(spec);
+  var pct = Math.round(Math.abs(1 - displayRatio) * 100);
+  var dir = displayRatio > 1 ? 'higher' : displayRatio < 1 ? 'lower' : 'unchanged';
+  if (dir === 'unchanged') return 'no difference in ' + word;
+  return pct + '% ' + dir + ' ' + word;
+}
+
+function _assocVerb(label) {
+  var s = String(label || '').trim();
+  if (/\b(and|&|with)\b/i.test(s) || /s$/i.test(s) && !/(ss|us|is|Treatment|Control)$/i.test(s)) {
+    return 'were';
+  }
+  return 'was';
+}
+
+function _fmtFixed(n, d) {
+  if (n == null || !isFinite(n)) return '\u2014';
+  return Number(n).toFixed(d == null ? 3 : d);
+}
+
+function interpretRatio(spec, displayRatio, lo, hi) {
+  var ctx = resolveDirectionContext(spec);
+  var qty = ratioQuantityWord(spec);
+  var short = isOddsRatioSpec(spec) ? 'OR' : isRiskRatioSpec(spec) ? 'RR' : 'effect';
+  var change = describeRatioChange(spec, displayRatio);
+  var g = _fmtFixed(displayRatio, 3);
+  var loTxt = _fmtFixed(lo, 3);
+  var hiTxt = _fmtFixed(hi, 3);
+  var favored = favoredGroup(displayRatio, spec);
+  var higherInNumerator = displayRatio > 1;
+  var mag;
+  if (ctx.outcomeBetter === 'none') {
+    mag = (higherInNumerator ? 'Higher' : displayRatio < 1 ? 'Lower' : 'Unchanged') +
+      ' ' + qty + ' of ' + ctx.eventLabel + ' in ' + ctx.numeratorLabel;
+  } else {
+    mag = (higherInNumerator ? 'Higher' : 'Lower') + ' ' + qty + ' of ' +
+      ctx.eventLabel + ' with ' + ctx.numeratorLabel;
+  }
+  var lead;
+  if (ctx.outcomeBetter !== 'none') {
+    var adj = higherInNumerator ? 'greater' : 'lower';
+    lead = ctx.numeratorLabel + ' ' + _assocVerb(ctx.numeratorLabel) +
+      ' associated with ' + adj + ' ' + qty + ' of ' + ctx.eventLabel +
+      ', ' + short + ' = ' + g + ', 95% CI [' + loTxt + ', ' + hiTxt + ']';
+  } else {
+    lead = 'the pooled ' + (isOddsRatioSpec(spec) ? 'odds ratio' : isRiskRatioSpec(spec) ? 'risk ratio' : 'effect') +
+      ' was ' + g + ' (95% CI ' + loTxt + ' to ' + hiTxt + ')';
+    if (change) {
+      lead += ', indicating ' + change + ' of ' + ctx.eventLabel +
+        ' in ' + ctx.numeratorLabel + ' than in ' + ctx.referenceLabel;
+    }
+  }
+  return {
+    lead: lead,
+    mag: mag,
+    favored: favored,
+    quantity: qty,
+    change: change,
+    header: resultsHeader(spec),
+    forest: forestFavorLabels(spec)
+  };
 }
 
 function _metaExtractStudyEffect(row, spec) {
@@ -506,9 +810,26 @@ function approximateChiSquare(chiSq, df) {
   return Math.min(1, Math.max(0, p));
 }
 global.MetaEngine = {
+  parseNumber: parseMetaNumber,
   buildMetaBundle: buildMetaBundle,
   extractStudyEffect: _metaExtractStudyEffect,
   studentTTwoSidedP: studentTTwoSidedP,
+  isLogRatio: isLogRatioSpec,
+  isOddsRatio: isOddsRatioSpec,
+  isRiskRatio: isRiskRatioSpec,
+  isPrecomputedRatio: isPrecomputedRatioSpec,
+  isGenericDirect: isGenericDirectSpec,
+  usesEventMeaning: usesEventMeaningSpec,
+  defaultDirectionLabels: defaultDirectionLabels,
+  resolveOutcomeBetter: resolveOutcomeBetter,
+  resolveDirectionContext: resolveDirectionContext,
+  comparisonLabel: comparisonLabel,
+  resultsHeader: resultsHeader,
+  favoredGroup: favoredGroup,
+  forestFavorLabels: forestFavorLabels,
+  ratioQuantityWord: ratioQuantityWord,
+  describeRatioChange: describeRatioChange,
+  interpretRatio: interpretRatio,
   defaultMeasure: function (effectType) {
     if (effectType === 'binary') return 'rr';
     if (effectType === 'direct') return null;
@@ -539,4 +860,7 @@ global.MetaEngine = {
     return [];
   }
 };
-})(typeof window !== 'undefined' ? window : this);
+if (typeof module === 'object' && module.exports) {
+  module.exports = global.MetaEngine;
+}
+})(typeof globalThis !== 'undefined' ? globalThis : this);

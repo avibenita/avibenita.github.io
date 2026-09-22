@@ -16,7 +16,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20260921export2">  <script src="../shared-brand-logo.js?v=20260716cover"></script>
 
-  <script src="../shared-header.js?v=20260922closeread"></script>
+  <script src="../shared-header.js?v=20260922liveexport"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -2461,6 +2461,7 @@
       }
 
       testHasRun = true;
+      persistHypothesisConfig();
       
       // Show results section and actual results immediately
       document.getElementById('results-section').style.display = 'flex';
@@ -2485,6 +2486,65 @@
         displayResults(result);
       }
     };
+
+    // ── Last-run configuration (so report exports / embeds reproduce the
+    //    test the user actually configured instead of the H0 = 0 default) ──
+    const HYP_CONFIG_KEY = 'univariateHypothesisConfig';
+    const IS_EMBED = new URLSearchParams(location.search).get('embed') === '1';
+
+    function persistHypothesisConfig() {
+      if (IS_EMBED) return;
+      try {
+        const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+        localStorage.setItem(HYP_CONFIG_KEY, JSON.stringify({
+          method: currentMethod,
+          parameter: currentParameter,
+          h0: val('h0-value'),
+          h1Type: currentH1Type,
+          alpha: currentAlpha,
+          percentile: val('percentile-value-input'),
+          popSize: val('pop-size'),
+          bootstrapIterations: val('bootstrap-iterations-input'),
+          variable: resultsData && resultsData.column,
+          savedAt: Date.now()
+        }));
+      } catch (_) {}
+    }
+
+    function restoreHypothesisConfigAndRun() {
+      let cfg = null;
+      try { cfg = JSON.parse(localStorage.getItem(HYP_CONFIG_KEY) || 'null'); } catch (_) {}
+      if (!cfg || !resultsData) return false;
+      if (cfg.variable && resultsData.column && cfg.variable !== resultsData.column) return false;
+      try {
+        const check = (name, value) => {
+          const el = document.querySelector(`input[name="${name}"][value="${value}"]`);
+          if (el) { el.disabled = false; el.checked = true; }
+          return !!el;
+        };
+        if (cfg.method && check('method', cfg.method)) selectMethod(cfg.method);
+        if (cfg.percentile) document.getElementById('percentile-value-input').value = cfg.percentile;
+        if (cfg.parameter && check('parameter', cfg.parameter)) selectParameter(cfg.parameter);
+        if (cfg.h0 !== undefined && cfg.h0 !== '') {
+          document.getElementById('h0-value').value = cfg.h0;
+          updateH1Values();
+        }
+        if (cfg.h1Type) check('h1-type', cfg.h1Type);
+        if (cfg.alpha) {
+          const slider = document.getElementById('alpha-slider');
+          if (slider) { slider.value = cfg.alpha; currentAlpha = parseFloat(cfg.alpha) || 0.05; }
+          const av = document.getElementById('alpha-value');
+          if (av) av.textContent = currentAlpha.toFixed(2);
+        }
+        if (cfg.popSize !== undefined) document.getElementById('pop-size').value = cfg.popSize || '';
+        if (cfg.bootstrapIterations) document.getElementById('bootstrap-iterations-input').value = cfg.bootstrapIterations;
+        runTest();
+        return true;
+      } catch (e) {
+        console.warn('[hypothesis] Could not restore saved configuration:', e);
+        return false;
+      }
+    }
 
     // Perform hypothesis test
     function performHypothesisTest() {
@@ -2809,6 +2869,9 @@
       console.log('[hypothesis] Header updated with data:', variableName, 'n=', resultsData.n);
       refreshMainMomentsIfReady();
       setAwaitingState();
+      // Embedded for a report export: reproduce the test the user last ran
+      // so the exported section is not stuck on the "awaiting" default state.
+      if (IS_EMBED) restoreHypothesisConfigAndRun();
     }
 
     function loadSampleData() {

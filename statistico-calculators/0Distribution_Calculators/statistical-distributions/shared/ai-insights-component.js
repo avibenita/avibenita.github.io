@@ -7,11 +7,11 @@
   'use strict';
 
   // ── Config ─────────────────────────────────────────────────────────────────
-  // URL of your deployed Cloudflare Worker (update after deployment)
-  const WORKER_URL  = 'https://statistico-ai.avibenita.workers.dev';
+  // Same AI proxy the analytics modules use. The Groq key stays on the worker.
+  const WORKER_URL  = 'https://statistico-ai.statistico.workers.dev/';
   const LICENSE_KEY_STORE = 'statistico-license-key';
   const BUY_URL     = 'https://statistico.live/premium';
-  const DEV_MODE    = true; // ← set false to re-enable paywall // your sales page
+  const DEV_MODE    = true; // skip the calculator license paywall; still use the shared proxy
 
   // ── Per-panel state ────────────────────────────────────────────────────────
   const panelRegistry = new Map(); // targetId → { state, activeTab, modalId, cache }
@@ -60,51 +60,41 @@
   }
 
   // ── Worker API call ────────────────────────────────────────────────────────
-  async function callWorker(prompt, licenseKey) {
-    // DEV_MODE: call Groq directly so no Worker deployment is needed for testing
-    if (DEV_MODE) {
-      const models = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
-      const key = atob('Z3NrX0xmVHdFRUFTYjVoY3l4Z2JteTF4V0dkeWIzRlk5WmRyYlNvZmJLTXNja2d4NUNTUzFnTlY=');
-      let lastErr = null;
-      for (const model of models) {
-        try {
-          const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-            body: JSON.stringify({ model, messages: [
+  async function callWorker(prompt) {
+    const models = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
+    let lastErr = null;
+    for (const model of models) {
+      try {
+        const r = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages: [
               { role: 'system', content: 'You are a concise statistics expert. Respond with plain text only.' },
               { role: 'user', content: prompt }
-            ], max_tokens: 300, temperature: 0.6 })
-          });
-          if (!r.ok) { const e = await r.json().catch(()=>({})); lastErr = new Error(e?.error?.message || `HTTP ${r.status}`); if (r.status === 404) continue; throw lastErr; }
-          const d = await r.json();
-          const text = d?.choices?.[0]?.message?.content?.trim();
-          if (!text) { lastErr = new Error('Empty response'); continue; }
-          _activeModel = model;
-          return text;
-        } catch (err) { lastErr = err; if (err.message?.includes('not found')) continue; throw err; }
-      }
-      throw lastErr || new Error('No model available');
-    }
-
-    // PRODUCTION: route through Worker
-    const resp = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, licenseKey }),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      const code = data?.code;
-      if (code === 'NO_KEY' || code === 'INVALID_KEY') {
-        const err = new Error(data.error || 'Invalid license key');
-        err.code = code;
+            ],
+            max_tokens: 300,
+            temperature: 0.6
+          })
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          lastErr = new Error(data?.error?.message || data?.error || `HTTP ${r.status}`);
+          if (r.status === 404) continue;
+          throw lastErr;
+        }
+        const text = (data?.choices?.[0]?.message?.content || data?.text || '').trim();
+        if (!text) { lastErr = new Error('Empty response'); continue; }
+        _activeModel = data.model || model;
+        return text;
+      } catch (err) {
+        lastErr = err;
+        if (String(err.message || '').includes('not found')) continue;
         throw err;
       }
-      throw new Error(data?.error || `Server error ${resp.status}`);
     }
-    if (data.model) _activeModel = data.model;
-    return data.text;
+    throw lastErr || new Error('No AI model available');
   }
 
   // ── Self-contained CSS ─────────────────────────────────────────────────────
@@ -132,43 +122,43 @@
       .st-ai-modal {
         display: none; position: fixed; inset: 0; z-index: 2147483500;
         align-items: center; justify-content: center; padding: 16px;
-        background: rgba(4,12,26,.62); backdrop-filter: blur(3px);
+        background: rgba(0,0,0,.48); backdrop-filter: blur(3px);
       }
       .st-ai-modal.open { display: flex; }
 
       /* ── Dialog box ── */
       .st-ai-dialog {
         width: min(560px, 95vw); max-height: 80vh; overflow: hidden;
-        background: linear-gradient(155deg,#0c1e38,#091525);
-        border: 1px solid rgba(120,200,255,.28); border-radius: 14px;
-        box-shadow: 0 24px 56px rgba(2,8,20,.65); display: flex; flex-direction: column;
+        background: #1A212B;
+        border: 1px solid rgba(255,255,255,.14); border-radius: 12px;
+        box-shadow: 0 24px 56px rgba(0,0,0,.45); display: flex; flex-direction: column;
       }
 
       /* Header */
       .st-ai-head {
         display: flex; align-items: center; gap: 10px;
-        padding: 12px 14px; border-bottom: 1px solid rgba(120,200,255,.18);
-        background: linear-gradient(90deg,rgba(16,32,60,.9),rgba(10,24,48,.9));
+        padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.14);
+        background: #18384B;
         flex-shrink: 0;
       }
-      .st-ai-head-title { font-size: 0.93rem; font-weight: 700; color: #d8edff; display: flex; align-items: center; gap: 7px; }
-      .st-ai-head-title i { color: #f2a277; }
-      .st-ai-model-chip { font-size: 0.68rem; background: rgba(120,200,255,.12); border: 1px solid rgba(120,200,255,.25); border-radius: 999px; padding: 2px 7px; color: #9ab1cc; }
-      .st-ai-close { margin-left: auto; background: none; border: none; color: #9ab1cc; cursor: pointer; font-size: 1rem; padding: 2px 4px; border-radius: 5px; transition: color .2s; }
-      .st-ai-close:hover { color: #f2a277; }
+      .st-ai-head-title { font-size: 0.93rem; font-weight: 700; color: #F5FAFF; display: flex; align-items: center; gap: 7px; }
+      .st-ai-head-title i { color: rgb(255,165,120); }
+      .st-ai-model-chip { font-size: 0.68rem; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 2px 7px; color: #C3D6E2; }
+      .st-ai-close { margin-left: auto; background: none; border: none; color: #C3D6E2; cursor: pointer; font-size: 1rem; padding: 2px 4px; border-radius: 5px; transition: color .2s; }
+      .st-ai-close:hover { color: rgb(255,165,120); }
 
       /* Tabs */
-      .st-ai-tabs { display: flex; gap: 4px; padding: 10px 14px 0; flex-shrink: 0; border-bottom: 1px solid rgba(120,200,255,.12); }
+      .st-ai-tabs { display: flex; gap: 4px; padding: 10px 14px 0; flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,.14); background: #242C37; }
       .st-ai-tab {
         padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
         background: none; border: none; border-bottom: 2px solid transparent;
-        color: #7a9ab8; margin-bottom: -1px; transition: color .18s, border-color .18s;
+        color: #b8c8de; margin-bottom: -1px; transition: color .18s, border-color .18s;
       }
-      .st-ai-tab:hover { color: #b8d8f0; }
-      .st-ai-tab.active { color: #f2a277; border-bottom-color: #f2a277; }
+      .st-ai-tab:hover { color: #fff; }
+      .st-ai-tab.active { color: rgb(255,165,120); border-bottom-color: rgb(255,165,120); }
 
       /* Content area */
-      .st-ai-body { padding: 14px; overflow-y: auto; flex: 1; }
+      .st-ai-body { padding: 14px; overflow-y: auto; flex: 1; background: #242C37; }
 
       /* State chip row */
       .st-ai-state-row {
@@ -537,7 +527,7 @@
 
     try {
       const prompt = buildPrompt(p.state, p.activeTab);
-      const text = await callWorker(prompt, licenseKey);
+      const text = await callWorker(prompt);
       if (!p.cache) p.cache = {};
       p.cache[cacheKey] = text;
       respEl.className = 'st-ai-response';
@@ -588,7 +578,7 @@
       textEl.className = 'st-ai-section-text loading st-ai-dots';
       textEl.textContent = 'Generating';
       try {
-        const text = await callWorker(buildPrompt(p.state, tab), licenseKey);
+        const text = await callWorker(buildPrompt(p.state, tab));
         if (!p.cache) p.cache = {};
         p.cache[cacheKey] = text;
         textEl.className = 'st-ai-section-text';

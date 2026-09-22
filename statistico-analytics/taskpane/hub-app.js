@@ -1508,7 +1508,7 @@ function loadHubScopeConfigIfAny() {
 
 function syncClusterHeader() {
   var meta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
-  var tabAccent = ACTIVE_CLUSTER === "tools" ? "#f4c84a"
+  var tabAccent = ACTIVE_CLUSTER === "tools" ? "#e6c56a"
     : ACTIVE_CLUSTER === "calculators" ? "#7dd3fc"
     : "#c4b5fd";
   document.documentElement.setAttribute("data-hub-cluster", ACTIVE_CLUSTER);

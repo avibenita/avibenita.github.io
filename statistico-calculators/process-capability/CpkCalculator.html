@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Process Capability (Cp, Cpk)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared/analytics-lnf.css?v=20260923cpk1"/>
+  <script src="../shared/shared-brand-logo.js?v=20260923logo1"></script>
+  <script src="../shared/theme-toggle-component.js?v=20260922calc1"></script>
+  <script src="./cpk-math.js?v=20260923cpk1"></script>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--surface-0); color: var(--text-primary); }
+    .st-calc-workspace.cpk-workspace {
+      overflow: auto;
+      padding: 12px;
+    }
+    .cpk-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      min-height: 100%;
+    }
+    .cpk-panel {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px 16px;
+    }
+    .cpk-panel-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 14px;
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--accent-1);
+    }
+    .cpk-block {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(14, 20, 27, 0.42);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    html[data-theme="light"] .cpk-block { background: #f8fafc; }
+    .cpk-block h3 {
+      margin: 0 0 10px;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .field { margin-bottom: 10px; }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 5px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .field label small { font-weight: 500; color: var(--text-muted); }
+    .field input {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-primary);
+      font: 600 0.95rem/1.2 "Montserrat", "Segoe UI", sans-serif;
+      padding: 9px 10px;
+    }
+    html[data-theme="light"] .field input { background: #fff; }
+    .field input:focus {
+      outline: none;
+      border-color: var(--accent-2);
+      box-shadow: 0 0 0 3px rgba(120, 200, 255, 0.18);
+    }
+    .cpk-actions { display: flex; gap: 8px; margin-bottom: 12px; }
+    .cpk-btn {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 12px;
+      font: 700 0.86rem "Montserrat", "Segoe UI", sans-serif;
+      cursor: pointer;
+    }
+    .cpk-btn-primary { background: linear-gradient(135deg, #0f766e, #14b8a6); color: #fff; }
+    .cpk-btn-primary:hover { filter: brightness(1.06); }
+    .cpk-btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    .guide {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      line-height: 1.55;
+    }
+    .guide strong { color: var(--text-secondary); }
+    .error-line {
+      display: none;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(231, 76, 60, 0.14);
+      color: #fecaca;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    html[data-theme="light"] .error-line { color: #991b1b; background: #fee2e2; }
+    .error-line.show { display: block; }
+    .results-top {
+      display: grid;
+      grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    #cpkGauge { min-height: 150px; }
+    #cpkGauge svg, #distributionChart svg { display: block; width: 100%; height: auto; }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .metric {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: rgba(14, 20, 27, 0.35);
+    }
+    html[data-theme="light"] .metric { background: #f8fafc; }
+    .metric-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 700; }
+    .metric-value { margin-top: 3px; font-size: 1.05rem; font-weight: 800; color: var(--text-primary); }
+    .capability-rating {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      vertical-align: 2px;
+    }
+    .rating-excellent { background: #16a34a; color: #fff; }
+    .rating-good { background: #0284c7; color: #fff; }
+    .rating-adequate { background: #eab308; color: #1f2937; }
+    .rating-poor { background: #ea580c; color: #fff; }
+    .rating-inadequate { background: #dc2626; color: #fff; }
+    #distributionChart { min-height: 240px; }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 6px; font-size: 0.72rem; color: var(--text-muted); }
+    .chart-legend i { display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; }
+    .assessment {
+      margin-top: 12px;
+      border: 1px solid rgba(120, 200, 255, 0.28);
+      background: rgba(120, 200, 255, 0.08);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text-secondary);
+      font-size: 0.84rem;
+      line-height: 1.5;
+    }
+    .assessment h4 {
+      margin: 0 0 6px;
+      color: var(--accent-2);
+      font-size: 0.82rem;
+    }
+    html[data-theme="light"] .st-calc-item.active { color: #0D2137; }
+    @media (max-width: 980px) {
+      .cpk-layout, .results-top, .metric-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="st-calc-shell">
+  <div class="st-calc-backdrop" id="sidebarBackdrop"></div>
+  <aside class="st-calc-sidebar" id="calcSidebar">
+    <div class="st-calc-logo">
+      <div class="sb-logo-icon" data-statistico-brand-logo data-logo-cluster="calculators"></div>
+    </div>
+    <nav class="st-calc-nav" aria-label="Process capability">
+      <details class="st-calc-group" open>
+        <summary>
+          <span class="summary-left"><i class="fa-solid fa-industry"></i> Quality</span>
+          <i class="fa-solid fa-caret-right summary-caret"></i>
+        </summary>
+        <button type="button" class="st-calc-item active">Process Capability (Cp, Cpk)</button>
+      </details>
+    </nav>
+  </aside>
+
+  <div class="st-calc-main">
+    <header class="st-calc-header">
+      <div>
+        <button class="st-calc-menu-toggle" id="menuToggle" type="button" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
+        <span class="st-calc-header-kicker">Calculators</span>
+      </div>
+      <div class="st-calc-header-title"><i class="fa-solid fa-gauge-high"></i> Process Capability</div>
+      <div class="st-calc-header-right"></div>
+    </header>
+
+    <section class="st-calc-workspace cpk-workspace">
+      <div class="cpk-layout">
+        <div class="cpk-panel">
+          <h2 class="cpk-panel-title"><i class="fa-solid fa-sliders"></i> Process parameters</h2>
+          <div class="cpk-block">
+            <h3>Specification limits</h3>
+            <div class="field">
+              <label for="lsl">Lower specification (LSL)</label>
+              <input id="lsl" type="number" step="any" value="10"/>
+            </div>
+            <div class="field">
+              <label for="usl">Upper specification (USL)</label>
+              <input id="usl" type="number" step="any" value="20"/>
+            </div>
+            <div class="field">
+              <label for="target">Target <small>optional</small></label>
+              <input id="target" type="number" step="any" value="15"/>
+            </div>
+          </div>
+          <div class="cpk-block">
+            <h3>Process data</h3>
+            <div class="field">
+              <label for="mean">Process mean (μ)</label>
+              <input id="mean" type="number" step="any" value="15.2"/>
+            </div>
+            <div class="field">
+              <label for="sd">Standard deviation (σ)</label>
+              <input id="sd" type="number" step="any" min="0" value="1.5"/>
+            </div>
+          </div>
+          <div id="errorLine" class="error-line" role="alert"></div>
+          <div class="cpk-actions">
+            <button class="cpk-btn cpk-btn-primary" id="calcBtn" type="button"><i class="fa-solid fa-calculator"></i> Calculate</button>
+            <button class="cpk-btn cpk-btn-ghost" id="resetBtn" type="button"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+          </div>
+          <ul class="guide">
+            <li><strong>Cpk ≥ 2.00</strong> Excellent</li>
+            <li><strong>Cpk ≥ 1.67</strong> Good</li>
+            <li><strong>Cpk ≥ 1.33</strong> Adequate</li>
+            <li><strong>Cpk ≥ 1.00</strong> Poor</li>
+            <li><strong>Cpk &lt; 1.00</strong> Inadequate</li>
+          </ul>
+        </div>
+
+        <div class="cpk-panel">
+          <h2 class="cpk-panel-title"><i class="fa-solid fa-chart-area"></i> Capability results</h2>
+          <div class="results-top">
+            <div id="cpkGauge"></div>
+            <div class="metric-grid">
+              <div class="metric"><div class="metric-label">Cp</div><div class="metric-value" id="cpResult">—</div></div>
+              <div class="metric"><div class="metric-label">Cpk</div><div class="metric-value" id="cpkResult">—</div></div>
+              <div class="metric"><div class="metric-label">Cpu</div><div class="metric-value" id="cpuResult">—</div></div>
+              <div class="metric"><div class="metric-label">Cpl</div><div class="metric-value" id="cplResult">—</div></div>
+              <div class="metric"><div class="metric-label">Cpm</div><div class="metric-value" id="cpmResult">—</div></div>
+              <div class="metric"><div class="metric-label">Expected PPM</div><div class="metric-value" id="ppmResult">—</div></div>
+              <div class="metric"><div class="metric-label">Yield</div><div class="metric-value" id="yieldResult">—</div></div>
+            </div>
+          </div>
+          <div id="distributionChart"></div>
+          <div class="assessment">
+            <h4><i class="fa-solid fa-lightbulb"></i> Process assessment</h4>
+            <p id="assessmentText">Enter the specification limits and process mean and standard deviation.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="statistico-footer">
+      2026 Statistico-Interactive (TM) - All rights reserved
+      <a class="statistico-footer-site-link" href="https://statistico.live/Statistico-Website/index.html" target="_blank" rel="noopener noreferrer">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i> statistico.live
+      </a>
+    </footer>
+  </div>
+</div>
+<script>
+(function () {
+  var math = window.CpkMath;
+  var defaults = { lsl: "10", usl: "20", target: "15", mean: "15.2", sd: "1.5" };
+
+  if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
+  if (window.StatisticoThemeToggle) {
+    StatisticoThemeToggle.mount({ container: document.querySelector(".st-calc-header-right") });
+  }
+
+  var sidebar = document.getElementById("calcSidebar");
+  var backdrop = document.getElementById("sidebarBackdrop");
+  document.getElementById("menuToggle").addEventListener("click", function () {
+    var open = sidebar.classList.toggle("drawer-open");
+    backdrop.classList.toggle("open", open);
+  });
+  backdrop.addEventListener("click", function () {
+    sidebar.classList.remove("drawer-open");
+    backdrop.classList.remove("open");
+  });
+
+  function isLight() {
+    return document.documentElement.getAttribute("data-theme") === "light";
+  }
+  function ink() { return isLight() ? "#1f2937" : "#e8eef8"; }
+  function muted() { return isLight() ? "#4b5563" : "rgba(232,238,248,0.78)"; }
+  function grid() { return isLight() ? "#e2e8f0" : "rgba(255,255,255,0.08)"; }
+
+  function readInput() {
+    return {
+      lsl: document.getElementById("lsl").value,
+      usl: document.getElementById("usl").value,
+      mean: document.getElementById("mean").value,
+      sd: document.getElementById("sd").value,
+      target: document.getElementById("target").value.trim()
+    };
+  }
+
+  function fmt(n) { return isFinite(n) ? n.toFixed(3) : "—"; }
+
+  function showError(message) {
+    var line = document.getElementById("errorLine");
+    line.textContent = message || "";
+    line.classList.toggle("show", !!message);
+  }
+
+  function setMetric(id, text) {
+    document.getElementById(id).textContent = text;
+  }
+
+  function renderCpk(result) {
+    var host = document.getElementById("cpkResult");
+    host.textContent = "";
+    host.appendChild(document.createTextNode(fmt(result.cpk) + " "));
+    var badge = document.createElement("span");
+    badge.className = "capability-rating " + result.rating.className;
+    badge.textContent = result.rating.text;
+    host.appendChild(badge);
+  }
+
+  function assessment(result) {
+    var level = result.rating.text.toLowerCase();
+    var text = "Cpk is " + fmt(result.cpk) + ", which is " + level + " capability. ";
+    if (result.cpk >= 2) text += "Defects outside the specifications are expected to be rare.";
+    else if (result.cpk >= 1.67) text += "The process is well controlled, with a low expected defect rate.";
+    else if (result.cpk >= 1.33) text += "This is adequate for many applications, with room to tighten variation or centering.";
+    else if (result.cpk >= 1) text += "The process is only marginally capable. Reduce variation or correct the mean.";
+    else text += "The process is not capable. A large share of output is expected outside the specifications.";
+
+    text += " Centering is " + result.centeringRatio.toFixed(1) + "% of the way from the ";
+    text += result.hasTarget ? "target" : "specification midpoint";
+    text += " to the nearer limit. ";
+    if (result.centeringRatio < 5) text += "The process is well centered.";
+    else if (result.centeringRatio < 15) text += "A small centering adjustment would improve Cpk.";
+    else text += "Recentering the process would improve Cpk.";
+
+    if (result.cp > 0 && result.cp / Math.max(result.cpk, 1e-9) > 1.2) {
+      text += " Cp is noticeably higher than Cpk, so off-center location is using up capability.";
+    }
+    if (!result.hasTarget) {
+      text += " Cpm uses the specification midpoint because no target was entered.";
+    }
+    return text;
+  }
+
+  function svgEl(name, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", name);
+    Object.keys(attrs || {}).forEach(function (key) { el.setAttribute(key, attrs[key]); });
+    return el;
+  }
+
+  function gaugeColor(cpk) {
+    if (cpk >= 1.67) return "#14b8a6";
+    if (cpk >= 1.33) return "#eab308";
+    if (cpk >= 1) return "#ea580c";
+    return "#dc2626";
+  }
+
+  function arcPoint(cx, cy, r, deg) {
+    var rad = deg * Math.PI / 180;
+    return [cx + r * Math.cos(rad), cy - r * Math.sin(rad)];
+  }
+
+  function arcPath(cx, cy, r, startDeg, endDeg) {
+    var s = arcPoint(cx, cy, r, startDeg);
+    var e = arcPoint(cx, cy, r, endDeg);
+    var large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+    return "M " + s[0] + " " + s[1] + " A " + r + " " + r + " 0 " + large + " 0 " + e[0] + " " + e[1];
+  }
+
+  function drawGauge(result) {
+    var cpk = result.cpk;
+    var maxCpk = Math.max(2.4, cpk + 0.3);
+    var minCpk = Math.min(0, cpk);
+    var span = maxCpk - minCpk;
+    var frac = Math.max(0, Math.min(1, (cpk - minCpk) / span));
+    var start = 180;
+    var end = 180 - frac * 180;
+    var host = document.getElementById("cpkGauge");
+    host.textContent = "";
+    var svg = svgEl("svg", { viewBox: "0 0 240 150", role: "img", "aria-label": "Cpk " + fmt(cpk) });
+    svg.appendChild(svgEl("path", { d: arcPath(120, 118, 78, 180, 0), fill: "none", stroke: isLight() ? "#e2e8f0" : "rgba(255,255,255,0.12)", "stroke-width": "16", "stroke-linecap": "round" }));
+    if (frac > 0.01) {
+      svg.appendChild(svgEl("path", { d: arcPath(120, 118, 78, start, end), fill: "none", stroke: gaugeColor(cpk), "stroke-width": "16", "stroke-linecap": "round" }));
+    }
+    var value = svgEl("text", { x: "120", y: "108", "text-anchor": "middle", fill: ink(), "font-size": "28", "font-weight": "800" });
+    value.textContent = cpk.toFixed(2);
+    svg.appendChild(value);
+    var caption = svgEl("text", { x: "120", y: "128", "text-anchor": "middle", fill: muted(), "font-size": "12", "font-weight": "700" });
+    caption.textContent = "Cpk · " + result.rating.text;
+    svg.appendChild(caption);
+    host.appendChild(svg);
+  }
+
+  function drawDistribution(result) {
+    var xMin = Math.min(result.lsl, result.mean - 4 * result.sd);
+    var xMax = Math.max(result.usl, result.mean + 4 * result.sd);
+    if (xMax <= xMin) xMax = xMin + 1;
+    var step = (xMax - xMin) / 160;
+    var points = [];
+    var maxY = 0;
+    var x;
+    for (x = xMin; x <= xMax + step * 0.5; x += step) {
+      var y = math.normalPDF(x, result.mean, result.sd);
+      if (y > maxY) maxY = y;
+      points.push([x, y]);
+    }
+    maxY = maxY * 1.12 || 1;
+    var W = 640, H = 280, L = 46, R = 16, T = 28, B = 36;
+    function px(v) { return L + ((v - xMin) / (xMax - xMin)) * (W - L - R); }
+    function py(v) { return T + (1 - v / maxY) * (H - T - B); }
+    var host = document.getElementById("distributionChart");
+    host.textContent = "";
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Process distribution and specification limits" });
+    var title = svgEl("text", { x: String(W / 2), y: "16", "text-anchor": "middle", fill: ink(), "font-size": "13", "font-weight": "700" });
+    title.textContent = "Process distribution and specification limits";
+    svg.appendChild(title);
+    svg.appendChild(svgEl("line", { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: grid(), "stroke-width": "1" }));
+    var d = "M " + px(points[0][0]) + " " + py(0);
+    points.forEach(function (p) { d += " L " + px(p[0]) + " " + py(p[1]); });
+    d += " L " + px(points[points.length - 1][0]) + " " + py(0) + " Z";
+    svg.appendChild(svgEl("path", { d: d, fill: "rgba(120,200,255,0.28)", stroke: "rgb(120,200,255)", "stroke-width": "2" }));
+    function vline(value, color, dash) {
+      var xx = px(value);
+      svg.appendChild(svgEl("line", { x1: xx, y1: py(0), x2: xx, y2: T, stroke: color, "stroke-width": "2", "stroke-dasharray": dash || "" }));
+    }
+    vline(result.lsl, "#e74c3c", "5 4");
+    vline(result.usl, "#e74c3c", "5 4");
+    vline(result.mean, "#2ecc71", "");
+    if (result.hasTarget) vline(result.target, "rgb(255,165,120)", "2 3");
+    [xMin, (xMin + xMax) / 2, xMax].forEach(function (tick) {
+      var label = svgEl("text", { x: px(tick), y: H - 14, "text-anchor": "middle", fill: muted(), "font-size": "11" });
+      label.textContent = tick.toFixed(1);
+      svg.appendChild(label);
+    });
+    host.appendChild(svg);
+    var legend = document.createElement("div");
+    legend.className = "chart-legend";
+    [
+      ["rgb(120,200,255)", "Distribution"],
+      ["#e74c3c", "LSL / USL"],
+      ["#2ecc71", "Mean"]
+    ].concat(result.hasTarget ? [["rgb(255,165,120)", "Target"]] : []).forEach(function (item) {
+      var span = document.createElement("span");
+      var swatch = document.createElement("i");
+      swatch.style.background = item[0];
+      span.appendChild(swatch);
+      span.appendChild(document.createTextNode(item[1]));
+      legend.appendChild(span);
+    });
+    host.appendChild(legend);
+  }
+
+  function calculate() {
+    var result = math.analyze(readInput());
+    if (!result.ok) {
+      showError(result.error);
+      document.getElementById("assessmentText").textContent = result.error;
+      return;
+    }
+    showError("");
+    setMetric("cpResult", fmt(result.cp));
+    renderCpk(result);
+    setMetric("cpuResult", fmt(result.cpu));
+    setMetric("cplResult", fmt(result.cpl));
+    setMetric("cpmResult", fmt(result.cpm));
+    setMetric("ppmResult", Math.round(result.ppm).toLocaleString());
+    setMetric("yieldResult", result.yieldPct.toFixed(2) + "%");
+    document.getElementById("assessmentText").textContent = assessment(result);
+    drawGauge(result);
+    drawDistribution(result);
+  }
+
+  function reset() {
+    Object.keys(defaults).forEach(function (id) {
+      document.getElementById(id).value = defaults[id];
+    });
+    calculate();
+  }
+
+  ["lsl", "usl", "target", "mean", "sd"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", calculate);
+  });
+  document.getElementById("calcBtn").addEventListener("click", calculate);
+  document.getElementById("resetBtn").addEventListener("click", reset);
+
+  new MutationObserver(function () { calculate(); }).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"]
+  });
+
+  calculate();
+})();
+</script>
+</body>
+</html>

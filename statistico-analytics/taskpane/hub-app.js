@@ -568,6 +568,33 @@ const CALCULATOR_CATEGORY_TILES = [
         dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
       }
     ]
+  },
+  {
+    id: "process-capability",
+    section: "Process Capability",
+    sectionId: "capability",
+    title: "Process capability",
+    icon: "fa-gauge-high",
+    accent: "#34d399",
+    accentDark: "#059669",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Cp, Cpk, and defect rate inside specification limits",
+    desc: "Judge whether a normal process fits its specification limits. Enter the limits, mean, and standard deviation — no worksheet range required.",
+    info: [
+      "Cp, Cpk, Cpu, Cpl, and Cpm",
+      "Expected parts per million outside the limits",
+      "Distribution drawn against LSL, USL, mean, and target",
+      "Standalone calculator — enter parameters directly"
+    ],
+    modules: [
+      {
+        id: "calc-cpk",
+        label: "Process Capability (Cp, Cpk)",
+        tip: "Open the process capability calculator.",
+        dialogUrl: "https://statistico.live/statistico-calculators/process-capability/CpkCalculator.html"
+      }
+    ]
   }
 ];
 const PREPARE_CATEGORY_TILES = [
@@ -726,9 +753,17 @@ var CALC_SECTION_META = {
     icon: "fa-headset",
     color: "#f59e0b",
     colorDark: "#b45309"
+  },
+  capability: {
+    id: "capability",
+    label: "Process Capability",
+    subtitle: "Cp and Cpk against specification limits.",
+    icon: "fa-gauge-high",
+    color: "#14b8a6",
+    colorDark: "#0f766e"
   }
 };
-var CALC_SECTION_ORDER = ["distributions", "sample-size", "effect-sizes", "staffing"];
+var CALC_SECTION_ORDER = ["distributions", "sample-size", "effect-sizes", "staffing", "capability"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {

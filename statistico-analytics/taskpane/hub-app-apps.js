@@ -2875,6 +2875,21 @@ function openPrepareDataFromHub(kind) {
   return false;
 }
 
+/* Second entry point for the same Data Preparation module. The card under
+   Specialized Tools stays the permanent home; this shortcut lives on the
+   Statistical Methods worksheet-data card. */
+function hubOpenPrepareData(event) {
+  if (event) {
+    if (event.preventDefault) event.preventDefault();
+    if (event.stopPropagation) event.stopPropagation();
+  }
+  var pop = document.getElementById("hubRangePopover");
+  if (pop) pop.classList.remove("open");
+  var info = document.getElementById("hubRangeInfo");
+  if (info) info.classList.remove("open");
+  openPrepareDataFromHub("prepare-data");
+}
+
 function openPrepareQualityFromHub() {
   return openPrepareDataFromHub("prepare-quality");
 }
@@ -2999,6 +3014,7 @@ function showError(msg) {
   }
 }
 
+window.hubOpenPrepareData = hubOpenPrepareData;
 window.navigateToModule = navigateToModule;
 window.filterModules = filterModules;
 window.showAdvisor = showAdvisor;

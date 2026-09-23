@@ -386,9 +386,81 @@
     return parts.a1 || address || "";
   }
 
+  function unitLabel(n, singular, plural) {
+    return n + " " + (n === 1 ? singular : plural);
+  }
+
   function formatRangeSize(dim) {
     if (!dim || !dim.rows || !dim.cols) return "";
-    return dim.rows + " rows × " + dim.cols + " columns";
+    return unitLabel(dim.rows, "row", "rows") + " × " + unitLabel(dim.cols, "variable", "variables");
+  }
+
+  function isBlankCell(v) {
+    return v == null || (typeof v === "string" && v.trim() === "");
+  }
+
+  /* Problems that should pull the user into Data Preparation before analysis.
+     Blanks on a completely empty row are empty rows, not missing values.
+     Analysis-only transforms stay inside each analysis dialog. */
+  function countDataProblems(values) {
+    var missing = 0;
+    var emptyRows = 0;
+    var blankHeaders = 0;
+    if (!values || values.length < 2) {
+      return { missing: 0, emptyRows: 0, blankHeaders: 0, label: "" };
+    }
+    var header = values[0] || [];
+    var width = 0;
+    for (var r = 0; r < values.length; r++) {
+      var len = values[r] ? values[r].length : 0;
+      if (len > width) width = len;
+    }
+    for (var c = 0; c < width; c++) {
+      if (isBlankCell(header[c])) blankHeaders++;
+    }
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i] || [];
+      var blanks = 0;
+      var filled = 0;
+      for (var j = 0; j < width; j++) {
+        if (isBlankCell(row[j])) blanks++;
+        else filled++;
+      }
+      if (!filled) emptyRows++;
+      else missing += blanks;
+    }
+    var label = "";
+    if (missing > 0) label = unitLabel(missing, "missing value", "missing values") + " detected";
+    else if (emptyRows > 0) label = unitLabel(emptyRows, "empty row", "empty rows") + " detected";
+    else if (blankHeaders > 0) {
+      label = unitLabel(blankHeaders, "column has no header", "columns have no header");
+    }
+    return { missing: missing, emptyRows: emptyRows, blankHeaders: blankHeaders, label: label };
+  }
+
+  function describeWorksheetData(values, address) {
+    var addr = (address || "").trim();
+    var parts = splitExcelAddress(addr);
+    var dim = dimensionsFromValues(values) || dimensionsFromA1(parts.a1);
+    var problems = countDataProblems(values);
+    return {
+      headline: formatRangeHeadline(addr),
+      size: formatRangeSize(dim),
+      issueLabel: problems.label,
+      problems: problems
+    };
+  }
+
+  function syncDataPrepShortcut(issueLabel) {
+    var bar = document.getElementById("hubWdataBar");
+    var issueText = document.getElementById("hubDataIssueText");
+    var reviewBtn = document.getElementById("hubDataReviewBtn");
+    var label = issueLabel || "";
+    if (bar) bar.classList.toggle("has-data-issues", !!label);
+    if (issueText) issueText.textContent = label;
+    if (reviewBtn) {
+      reviewBtn.setAttribute("aria-label", label ? label + " · Review data" : "Review data");
+    }
   }
 
   function setRangeSize(text) {
@@ -401,11 +473,10 @@
       setRangeSize("");
       return showRangeState("Need a header row and at least 1 data row", true);
     }
-    var addr = (address || "").trim();
-    var parts = splitExcelAddress(addr);
-    var dim = dimensionsFromValues(values) || dimensionsFromA1(parts.a1);
-    showRangeState(formatRangeHeadline(addr) || "Range loaded", false);
-    setRangeSize(formatRangeSize(dim));
+    var summary = describeWorksheetData(values, address);
+    showRangeState(summary.headline || "Range loaded", false);
+    setRangeSize(summary.size);
+    syncDataPrepShortcut(summary.issueLabel);
     updateSourceLabel();
     if (window.StatisticoGlobalRange) {
       StatisticoGlobalRange.save(values, address || "", rangeMode);
@@ -493,8 +564,10 @@
     if (okIcon) {
       okIcon.style.display = isError || pending ? "none" : "";
     }
-    if (isError || pending) setRangeSize("");
-    else updateSourceLabel();
+    if (isError || pending) {
+      setRangeSize("");
+      syncDataPrepShortcut("");
+    } else updateSourceLabel();
     if (bar) {
       bar.classList.toggle("is-error", !!isError);
       bar.classList.toggle("is-ready", !isError && !pending);
@@ -535,7 +608,7 @@
     if (box) box.classList.remove("open");
   }
 
-  Office.onReady(async function (info) {
+  if (typeof Office !== "undefined" && Office.onReady) Office.onReady(async function (info) {
     if (info.host !== Office.HostType.Excel) return;
     await loadNamedRanges();
     await watchSelection();
@@ -564,6 +637,15 @@
   window.hubToggleRangePicker = toggleRangePicker;
   window.hubToggleRangeInfo = toggleRangeInfo;
   window.hubCaptureRange = captureRangeForDialog;
+  window.StatisticoHubRange = {
+    describeWorksheetData: describeWorksheetData,
+    countDataProblems: countDataProblems,
+    formatRangeSize: formatRangeSize,
+    applyRangeData: applyRangeData
+  };
+  if (typeof module === "object" && module.exports) {
+    module.exports = window.StatisticoHubRange;
+  }
 
   document.addEventListener("click", function (ev) {
     var pop = document.getElementById("hubRangePopover");

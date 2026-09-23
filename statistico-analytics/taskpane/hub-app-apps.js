@@ -565,7 +565,7 @@ const CALCULATOR_CATEGORY_TILES = [
         id: "calc-erlang",
         label: "Erlang C & Simulation",
         tip: "Open call-center staffing and simulation tools.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=erlang"
+        dialogUrl: "https://statistico.live/statistico-calculators/erlang/ErlangCalculator.html"
       }
     ]
   },

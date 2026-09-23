@@ -217,6 +217,12 @@
       background: rgba(14, 20, 27, 0.35);
     }
     html[data-theme="light"] .metric { background: #f8fafc; }
+    .metric-primary {
+      border-left: 3px solid #ea580c;
+      background: rgba(234, 88, 12, 0.16);
+    }
+    html[data-theme="light"] .metric-primary { background: rgba(234, 88, 12, 0.12); }
+    .metric-primary .metric-value { font-size: 1.15rem; }
     .metric-label {
       display: flex;
       align-items: center;
@@ -288,25 +294,23 @@
       display: flex;
       flex-direction: column;
     }
-    .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 2px; font-size: 0.7rem; color: var(--text-muted); flex: 0 0 auto; }
-    .chart-legend i { display: inline-block; width: 14px; height: 3px; margin-right: 5px; vertical-align: middle; }
     .assessment {
-      margin-top: 6px;
-      border: 1px solid rgba(120, 200, 255, 0.28);
-      background: rgba(120, 200, 255, 0.08);
-      border-radius: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 6px 0 8px;
+      border: 1px solid rgba(255, 165, 120, 0.38);
+      background: rgba(255, 165, 120, 0.1);
+      border-radius: 8px;
       padding: 7px 10px;
       color: var(--text-secondary);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       line-height: 1.35;
       flex: 0 0 auto;
     }
-    .assessment h4 {
-      margin: 0 0 2px;
-      color: var(--accent-2);
-      font-size: 0.75rem;
-    }
+    .assessment i { color: var(--accent-1); margin-top: 2px; flex: 0 0 auto; }
     .assessment p { margin: 0; }
+    html[data-theme="light"] .assessment { background: rgba(234, 88, 12, 0.08); border-color: rgba(234, 88, 12, 0.28); }
     html[data-theme="light"] .st-calc-item.active { color: #0D2137; }
     @media (max-width: 860px) {
       .cpk-layout, .results-top { grid-template-columns: 1fr; }
@@ -377,7 +381,7 @@
             </div>
             <div class="metric-grid">
               <div class="metric"><div class="metric-label">Cp <span class="info-dot" tabindex="0" data-tip="Cp = (USL − LSL) / (6σ). Spread only, as if the mean were centered.">i</span></div><div class="metric-value" id="cpResult">—</div></div>
-              <div class="metric"><div class="metric-label">Cpk <span class="info-dot" tabindex="0" data-tip="Cpk = min(Cpu, Cpl). The worse one-sided capability.">i</span></div><div class="metric-value" id="cpkResult">—</div></div>
+              <div class="metric metric-primary"><div class="metric-label">Cpk <span class="info-dot" tabindex="0" data-tip="Cpk = min(Cpu, Cpl). The worse one-sided capability.">i</span></div><div class="metric-value" id="cpkResult">—</div></div>
               <div class="metric"><div class="metric-label">Cpu <span class="info-dot" tabindex="0" data-tip="Cpu = (USL − μ) / (3σ). Room from the mean to the upper limit.">i</span></div><div class="metric-value" id="cpuResult">—</div></div>
               <div class="metric"><div class="metric-label">Cpl <span class="info-dot" tabindex="0" data-tip="Cpl = (μ − LSL) / (3σ). Room from the mean to the lower limit.">i</span></div><div class="metric-value" id="cplResult">—</div></div>
               <div class="metric"><div class="metric-label">Cpm <span class="info-dot" tabindex="0" data-tip="Cpm = (USL − LSL) / (6 √(σ² + (μ − T)²)). Penalizes distance from the target.">i</span></div><div class="metric-value" id="cpmResult">—</div></div>
@@ -385,11 +389,11 @@
               <div class="metric"><div class="metric-label">Yield <span class="info-dot" tabindex="0" data-tip="Yield = 100% × P(LSL ≤ X ≤ USL).">i</span></div><div class="metric-value" id="yieldResult">—</div></div>
             </div>
           </div>
-          <div id="distributionChart"></div>
           <div class="assessment">
-            <h4><i class="fa-solid fa-lightbulb"></i> Process assessment</h4>
+            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
             <p id="assessmentText">Enter the specification limits and process mean and standard deviation.</p>
           </div>
+          <div id="distributionChart"></div>
         </div>
       </div>
     </section>
@@ -451,29 +455,45 @@
     host.appendChild(badge);
   }
 
+  function capabilityLead(cpk) {
+    if (cpk >= 2) return "Excellent";
+    if (cpk >= 1.67) return "Capable";
+    if (cpk >= 1.33) return "Adequate";
+    if (cpk >= 1) return "Marginally capable";
+    return "Not capable";
+  }
+
+  function nextCapability(cpk) {
+    var levels = [1, 1.33, 1.67, 2];
+    var i;
+    for (i = 0; i < levels.length; i++) {
+      if (cpk < levels[i] - 1e-9) return levels[i];
+    }
+    return null;
+  }
+
+  function formatGoal(n) {
+    if (Math.abs(n - 1.33) < 0.001) return "1.33";
+    if (Math.abs(n - 1.67) < 0.001) return "1.67";
+    return n.toFixed(2);
+  }
+
   function assessment(result) {
-    var level = result.rating.text.toLowerCase();
-    var text = "Cpk is " + fmt(result.cpk) + ", which is " + level + " capability. ";
-    if (result.cpk >= 2) text += "Defects outside the specifications are expected to be rare.";
-    else if (result.cpk >= 1.67) text += "The process is well controlled, with a low expected defect rate.";
-    else if (result.cpk >= 1.33) text += "This is adequate for many applications, with room to tighten variation or centering.";
-    else if (result.cpk >= 1) text += "The process is only marginally capable. Reduce variation or correct the mean.";
-    else text += "The process is not capable. A large share of output is expected outside the specifications.";
-
-    text += " Centering is " + result.centeringRatio.toFixed(1) + "% of the way from the ";
-    text += result.hasTarget ? "target" : "specification midpoint";
-    text += " to the nearer limit. ";
-    if (result.centeringRatio < 5) text += "The process is well centered.";
-    else if (result.centeringRatio < 15) text += "A small centering adjustment would improve Cpk.";
-    else text += "Recentering the process would improve Cpk.";
-
-    if (result.cp > 0 && result.cp / Math.max(result.cpk, 1e-9) > 1.2) {
-      text += " Cp is noticeably higher than Cpk, so off-center location is using up capability.";
+    var lead = capabilityLead(result.cpk);
+    var goal = nextCapability(result.cpk);
+    var wellCentred = result.centeringRatio < 15;
+    var goalText = goal ? " to at least " + formatGoal(goal) : "";
+    if (result.cpk >= 2) {
+      if (wellCentred) return "Excellent: The process is well centred and variation is low. Cpk is " + fmt(result.cpk) + ".";
+      return "Excellent: Cpk is " + fmt(result.cpk) + ". The mean is off centre, but capability is still high.";
     }
-    if (!result.hasTarget) {
-      text += " Cpm uses the specification midpoint because no target was entered.";
+    if (wellCentred) {
+      return lead + ": The process is well centred, but variation is too high. Reduce variation to improve Cpk from " + fmt(result.cpk) + goalText + ".";
     }
-    return text;
+    if (goal && result.cp + 1e-9 >= goal) {
+      return lead + ": The process is off centre. Recentering would improve Cpk from " + fmt(result.cpk) + goalText + ".";
+    }
+    return lead + ": The process is off centre and variation is too high. Recentering and reducing variation would improve Cpk from " + fmt(result.cpk) + goalText + ".";
   }
 
   function svgEl(name, attrs) {
@@ -568,11 +588,17 @@
     host.appendChild(svg);
   }
 
+  function fmtMark(n) {
+    var v = Math.round(n * 1000) / 1000;
+    if (Math.abs(v - Math.round(v)) < 1e-6) return String(Math.round(v));
+    return String(parseFloat(v.toFixed(3)));
+  }
+
   function drawDistribution(result) {
     var xMin = Math.min(result.lsl, result.mean - 4 * result.sd);
     var xMax = Math.max(result.usl, result.mean + 4 * result.sd);
     if (xMax <= xMin) xMax = xMin + 1;
-    var step = (xMax - xMin) / 160;
+    var step = (xMax - xMin) / 180;
     var points = [];
     var maxY = 0;
     var x;
@@ -582,49 +608,88 @@
       points.push([x, y]);
     }
     maxY = maxY * 1.12 || 1;
-    var W = 640, H = 280, L = 46, R = 16, T = 28, B = 36;
+    var W = 640;
+    var H = 250;
+    var L = 16;
+    var R = 16;
+    var B = 14;
     function px(v) { return L + ((v - xMin) / (xMax - xMin)) * (W - L - R); }
+    var marks = [
+      { name: "LSL", value: result.lsl, color: "#e74c3c" },
+      { name: "USL", value: result.usl, color: "#e74c3c" },
+      { name: "Mean", value: result.mean, color: "#2ecc71" }
+    ];
+    if (result.hasTarget) marks.push({ name: "Target", value: result.target, color: "rgb(255,165,120)" });
+    marks.sort(function (a, b) { return a.value - b.value; });
+    var rowTaken = [];
+    marks.forEach(function (mark) {
+      var at = px(mark.value);
+      var row = 0;
+      while (rowTaken[row] != null && Math.abs(rowTaken[row] - at) < 86) row += 1;
+      rowTaken[row] = at;
+      mark.row = row;
+    });
+    var maxRow = marks.reduce(function (m, mark) { return Math.max(m, mark.row); }, 0);
+    var T = 46 + maxRow * 14;
     function py(v) { return T + (1 - v / maxY) * (H - T - B); }
     var host = document.getElementById("distributionChart");
     host.textContent = "";
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Process distribution and specification limits" });
-    var title = svgEl("text", { x: String(W / 2), y: "16", "text-anchor": "middle", fill: ink(), "font-size": "13", "font-weight": "700" });
+    var title = svgEl("text", { x: String(W / 2), y: "15", "text-anchor": "middle", fill: ink(), "font-size": "13", "font-weight": "700" });
     title.textContent = "Process distribution and specification limits";
     svg.appendChild(title);
+
+    function areaBetween(a, b) {
+      var yA = math.normalPDF(a, result.mean, result.sd);
+      var yB = math.normalPDF(b, result.mean, result.sd);
+      var mid = points.filter(function (p) { return p[0] > a && p[0] < b; });
+      var seq = [[a, yA]].concat(mid, [[b, yB]]);
+      var d = "M " + px(seq[0][0]) + " " + py(0);
+      seq.forEach(function (p) { d += " L " + px(p[0]) + " " + py(p[1]); });
+      d += " L " + px(seq[seq.length - 1][0]) + " " + py(0) + " Z";
+      return d;
+    }
+    function strokeBetween(a, b, color) {
+      var yA = math.normalPDF(a, result.mean, result.sd);
+      var yB = math.normalPDF(b, result.mean, result.sd);
+      var mid = points.filter(function (p) { return p[0] > a && p[0] < b; });
+      var seq = [[a, yA]].concat(mid, [[b, yB]]);
+      var d = "M " + px(seq[0][0]) + " " + py(seq[0][1]);
+      seq.forEach(function (p) { d += " L " + px(p[0]) + " " + py(p[1]); });
+      svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: color, "stroke-width": "2.5" }));
+    }
+    svg.appendChild(svgEl("path", { d: areaBetween(xMin, result.lsl), fill: "rgba(248,113,113,0.85)", stroke: "none" }));
+    svg.appendChild(svgEl("path", { d: areaBetween(result.lsl, result.usl), fill: "rgba(120,200,255,0.28)", stroke: "none" }));
+    svg.appendChild(svgEl("path", { d: areaBetween(result.usl, xMax), fill: "rgba(248,113,113,0.85)", stroke: "none" }));
+    strokeBetween(xMin, result.lsl, "#f87171");
+    strokeBetween(result.lsl, result.usl, "rgb(120,200,255)");
+    strokeBetween(result.usl, xMax, "#f87171");
     svg.appendChild(svgEl("line", { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: grid(), "stroke-width": "1" }));
-    var d = "M " + px(points[0][0]) + " " + py(0);
-    points.forEach(function (p) { d += " L " + px(p[0]) + " " + py(p[1]); });
-    d += " L " + px(points[points.length - 1][0]) + " " + py(0) + " Z";
-    svg.appendChild(svgEl("path", { d: d, fill: "rgba(120,200,255,0.28)", stroke: "rgb(120,200,255)", "stroke-width": "2" }));
+
     function vline(value, color, dash) {
       var xx = px(value);
-      svg.appendChild(svgEl("line", { x1: xx, y1: py(0), x2: xx, y2: T, stroke: color, "stroke-width": "2", "stroke-dasharray": dash || "" }));
+      svg.appendChild(svgEl("line", {
+        x1: xx, y1: py(0), x2: xx, y2: T,
+        stroke: color, "stroke-width": "2", "stroke-dasharray": dash || ""
+      }));
     }
     vline(result.lsl, "#e74c3c", "5 4");
     vline(result.usl, "#e74c3c", "5 4");
     vline(result.mean, "#2ecc71", "");
     if (result.hasTarget) vline(result.target, "rgb(255,165,120)", "2 3");
-    [xMin, (xMin + xMax) / 2, xMax].forEach(function (tick) {
-      var label = svgEl("text", { x: px(tick), y: H - 14, "text-anchor": "middle", fill: muted(), "font-size": "11" });
-      label.textContent = tick.toFixed(1);
+    marks.forEach(function (mark) {
+      var label = svgEl("text", {
+        x: Math.max(40, Math.min(W - 40, px(mark.value))),
+        y: 30 + mark.row * 14,
+        "text-anchor": "middle",
+        fill: mark.color,
+        "font-size": "12",
+        "font-weight": "700"
+      });
+      label.textContent = mark.name + " " + fmtMark(mark.value);
       svg.appendChild(label);
     });
     host.appendChild(svg);
-    var legend = document.createElement("div");
-    legend.className = "chart-legend";
-    [
-      ["rgb(120,200,255)", "Distribution"],
-      ["#e74c3c", "LSL / USL"],
-      ["#2ecc71", "Mean"]
-    ].concat(result.hasTarget ? [["rgb(255,165,120)", "Target"]] : []).forEach(function (item) {
-      var span = document.createElement("span");
-      var swatch = document.createElement("i");
-      swatch.style.background = item[0];
-      span.appendChild(swatch);
-      span.appendChild(document.createTextNode(item[1]));
-      legend.appendChild(span);
-    });
-    host.appendChild(legend);
   }
 
   function calculate() {

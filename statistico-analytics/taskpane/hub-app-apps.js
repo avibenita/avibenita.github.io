@@ -427,7 +427,7 @@ const TOOLS_CATEGORY_TILES = [
     section: "Export & Reporting",
     sectionId: "delivery",
     title: "EzPaste",
-    icon: "fa-bullseye",
+    icon: "fa-file-excel",
     accent: "#34d399",
     accentDark: "#059669",
     color: "#14b8a6",
@@ -443,7 +443,7 @@ const TOOLS_CATEGORY_TILES = [
     modules: [
       {
         id: "ezpaste-open",
-        label: "EzPaste — Excel to PowerPoint",
+        label: "EzPaste\u2122 — Excel to PowerPoint",
         tip: "Open the EzPaste overview in your browser — automate Excel charts and tables into PowerPoint, Word, PDF, and HTML.",
         browserUrl: "https://statistico.live/Statistico-Website/index-EzPaste.html"
       }
@@ -687,7 +687,8 @@ var TOOLS_SECTION_META = {
     id: "delivery",
     label: "Export & Reporting",
     subtitle: "Automate Excel export to PPT and Word.",
-    icon: "fa-file-export",
+    icon: "fa-file-excel",
+    iconPair: ["fa-file-excel", "fa-file-powerpoint"],
     color: "#34d399",
     colorDark: "#059669"
   }
@@ -1166,6 +1167,16 @@ function toggleHubExpandAll() {
   }
 }
 
+function hubAccordionIconHtml(meta) {
+  if (meta.iconPair && meta.iconPair.length > 1) {
+    return '<span class="hub-accordion-icon hub-accordion-icon--pair" aria-hidden="true">' +
+      '<i class="fa-solid ' + escapeHtml(meta.iconPair[0]) + ' hub-office-excel"></i>' +
+      '<i class="fa-solid ' + escapeHtml(meta.iconPair[1]) + ' hub-office-ppt"></i>' +
+      '</span>';
+  }
+  return '<span class="hub-accordion-icon"><i class="fa-solid ' + escapeHtml(meta.icon) + '" aria-hidden="true"></i></span>';
+}
+
 function renderHubAccordionPanel(sectionId, tilesHtml, open) {
   var meta = getClusterSectionMeta(ACTIVE_CLUSTER)[sectionId];
   if (!meta) return tilesHtml || "";
@@ -1175,7 +1186,7 @@ function renderHubAccordionPanel(sectionId, tilesHtml, open) {
     '<button type="button" class="hub-accordion-head" aria-expanded="' + (open ? "true" : "false") + '"' +
     ' aria-label="' + escapeHtml(meta.label) + '"' +
     ' onclick="toggleHubAccordion(\'' + sectionId + '\')">' +
-    '<span class="hub-accordion-icon"><i class="fa-solid ' + escapeHtml(meta.icon) + '" aria-hidden="true"></i></span>' +
+    hubAccordionIconHtml(meta) +
     '<span class="hub-accordion-copy">' +
     '<span class="hub-accordion-title">' + escapeHtml(meta.label) + "</span>" +
     (meta.subtitle ? '<span class="hub-accordion-desc">' + escapeHtml(meta.subtitle).replace(/\n/g, "<br>") + "</span>" : "") +
@@ -1312,7 +1323,8 @@ function renderCategoryModuleBtn(m, tabStyle, scopePrefix, fullWidth) {
   var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
   HUB_ACTIONS[actionKey] = m;
   var soonMark = m.comingSoon ? ' <span class="soon-badge">Soon</span>' : "";
-  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')"><span class="category-module-label">' + escapeHtml(m.label) + soonMark + '</span><i class="fa-solid fa-chevron-right category-module-chevron" aria-hidden="true"></i></button>';
+  var labelHtml = escapeHtml(m.label).replace(/EzPaste\u2122/g, 'EzPaste<sup class="hub-tm">™</sup>');
+  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')"><span class="category-module-label">' + labelHtml + soonMark + '</span><i class="fa-solid fa-chevron-right category-module-chevron" aria-hidden="true"></i></button>';
 }
 
 var GROUP_COLORS = {

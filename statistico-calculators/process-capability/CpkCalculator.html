@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Process Capability (Cp, Cpk)</title>
+  <title>Process Capability Calculator</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
   <link rel="stylesheet" href="../shared/analytics-lnf.css?v=20260923cpk1"/>
   <script src="../shared/shared-brand-logo.js?v=20260923logo1"></script>
@@ -134,15 +134,76 @@
     }
     html[data-theme="light"] .error-line { color: #991b1b; background: #fee2e2; }
     .error-line.show { display: block; }
+    .st-calc-header.cpk-header {
+      height: 96px;
+      flex: 0 0 96px;
+      grid-template-columns: 230px 1fr 200px;
+    }
+    .cpk-header-logo {
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+    .cpk-header-logo .sb-logo-icon {
+      height: 62px;
+      display: grid;
+      place-items: center;
+    }
+    .cpk-header-logo img {
+      max-height: 58px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+      mix-blend-mode: screen;
+      filter: brightness(1.1) contrast(1.04);
+    }
+    html[data-theme="light"] .cpk-header-logo img { mix-blend-mode: normal; filter: none; }
+    .st-calc-header.cpk-header .st-calc-header-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
     .results-top {
       display: grid;
-      grid-template-columns: 168px minmax(0, 1fr);
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
       gap: 10px;
       margin-bottom: 4px;
-      align-items: center;
+      align-items: stretch;
       flex: 0 0 auto;
     }
-    #cpkGauge { height: 112px; }
+    .gauge-panel {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(14, 20, 27, 0.35);
+      padding: 6px 10px 8px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    html[data-theme="light"] .gauge-panel { background: #f8fafc; }
+    #cpkGauge { height: 176px; flex: 0 0 176px; }
+    .gauge-legend {
+      list-style: none;
+      margin: 2px 0 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px 12px;
+    }
+    .gauge-legend li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .gauge-legend i {
+      width: 11px;
+      height: 11px;
+      border-radius: 3px;
+      flex: 0 0 auto;
+    }
     #cpkGauge svg, #distributionChart svg { display: block; width: 100%; height: 100%; }
     .metric-grid {
       display: grid;
@@ -255,29 +316,12 @@
 </head>
 <body>
 <div class="st-calc-shell">
-  <div class="st-calc-backdrop" id="sidebarBackdrop"></div>
-  <aside class="st-calc-sidebar" id="calcSidebar">
-    <div class="st-calc-logo">
-      <div class="sb-logo-icon" data-statistico-brand-logo data-logo-cluster="calculators"></div>
-    </div>
-    <nav class="st-calc-nav" aria-label="Process capability">
-      <details class="st-calc-group" open>
-        <summary>
-          <span class="summary-left"><i class="fa-solid fa-industry"></i> Quality</span>
-          <i class="fa-solid fa-caret-right summary-caret"></i>
-        </summary>
-        <button type="button" class="st-calc-item active">Process Capability (Cp, Cpk)</button>
-      </details>
-    </nav>
-  </aside>
-
   <div class="st-calc-main">
-    <header class="st-calc-header">
-      <div>
-        <button class="st-calc-menu-toggle" id="menuToggle" type="button" aria-label="Toggle navigation"><i class="fa-solid fa-bars"></i></button>
-        <span class="st-calc-header-kicker">Calculators</span>
+    <header class="st-calc-header cpk-header">
+      <div class="cpk-header-logo">
+        <div class="sb-logo-icon" data-statistico-brand-logo data-logo-cluster="calculators"></div>
       </div>
-      <div class="st-calc-header-title"><i class="fa-solid fa-gauge-high"></i> Process Capability</div>
+      <div class="st-calc-header-title"><i class="fa-solid fa-gauge-high"></i> Process Capability Calculator</div>
       <div class="st-calc-header-right"></div>
     </header>
 
@@ -316,19 +360,21 @@
             <button class="cpk-btn cpk-btn-primary" id="calcBtn" type="button"><i class="fa-solid fa-calculator"></i> Calculate</button>
             <button class="cpk-btn cpk-btn-ghost" id="resetBtn" type="button"><i class="fa-solid fa-rotate-left"></i> Reset</button>
           </div>
-          <ul class="guide">
-            <li><strong>Cpk ≥ 2.00</strong> Excellent</li>
-            <li><strong>Cpk ≥ 1.67</strong> Good</li>
-            <li><strong>Cpk ≥ 1.33</strong> Adequate</li>
-            <li><strong>Cpk ≥ 1.00</strong> Poor</li>
-            <li><strong>Cpk &lt; 1.00</strong> Inadequate</li>
-          </ul>
         </div>
 
         <div class="cpk-panel">
           <h2 class="cpk-panel-title"><i class="fa-solid fa-chart-area"></i> Capability results</h2>
           <div class="results-top">
-            <div id="cpkGauge"></div>
+            <div class="gauge-panel">
+              <div id="cpkGauge"></div>
+              <ul class="gauge-legend" aria-label="Cpk scale">
+                <li><i style="background:#dc2626"></i> &lt; 1.00 Inadequate</li>
+                <li><i style="background:#ea580c"></i> 1.00–1.33 Poor</li>
+                <li><i style="background:#eab308"></i> 1.33–1.67 Adequate</li>
+                <li><i style="background:#0284c7"></i> 1.67–2.00 Good</li>
+                <li><i style="background:#16a34a"></i> ≥ 2.00 Excellent</li>
+              </ul>
+            </div>
             <div class="metric-grid">
               <div class="metric"><div class="metric-label">Cp <span class="info-dot" tabindex="0" data-tip="Cp = (USL − LSL) / (6σ). Spread only, as if the mean were centered.">i</span></div><div class="metric-value" id="cpResult">—</div></div>
               <div class="metric"><div class="metric-label">Cpk <span class="info-dot" tabindex="0" data-tip="Cpk = min(Cpu, Cpl). The worse one-sided capability.">i</span></div><div class="metric-value" id="cpkResult">—</div></div>
@@ -365,17 +411,6 @@
   if (window.StatisticoThemeToggle) {
     StatisticoThemeToggle.mount({ container: document.querySelector(".st-calc-header-right") });
   }
-
-  var sidebar = document.getElementById("calcSidebar");
-  var backdrop = document.getElementById("sidebarBackdrop");
-  document.getElementById("menuToggle").addEventListener("click", function () {
-    var open = sidebar.classList.toggle("drawer-open");
-    backdrop.classList.toggle("open", open);
-  });
-  backdrop.addEventListener("click", function () {
-    sidebar.classList.remove("drawer-open");
-    backdrop.classList.remove("open");
-  });
 
   function isLight() {
     return document.documentElement.getAttribute("data-theme") === "light";

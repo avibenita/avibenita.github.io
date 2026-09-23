@@ -62,13 +62,24 @@ describe("worksheet data card summary", () => {
   test("promotes the shortcut when missing values are present", () => {
     const summary = hub.describeWorksheetData(grid(150, 60), "'Prepared_Data'!$A$1:$J$151");
     expect(summary.headline).toBe("Prepared_Data · A1:J151");
-    expect(summary.issueLabel).toBe("60 missing values detected");
-    expect(summary.problems.missing).toBe(60);
+    expect(summary.issueLabel).toBe("60 records with missing values");
+    expect(summary.problems.recordsWithMissing).toBe(60);
   });
 
-  test("uses the singular when one cell is missing", () => {
+  test("counts a record once when several of its cells are missing", () => {
+    const problems = hub.countDataProblems([
+      ["A", "B", "C"],
+      ["", "", 1],
+      [2, 3, 4],
+      ["", 5, ""]
+    ]);
+    expect(problems.recordsWithMissing).toBe(2);
+    expect(problems.label).toBe("2 records with missing values");
+  });
+
+  test("uses the singular when one record has a missing value", () => {
     expect(hub.describeWorksheetData(grid(2, 1), "Sheet1!A1:J3").issueLabel).toBe(
-      "1 missing value detected"
+      "1 record with missing values"
     );
   });
 
@@ -79,7 +90,7 @@ describe("worksheet data card summary", () => {
       [1, 2]
     ];
     const problems = hub.countDataProblems(values);
-    expect(problems.missing).toBe(0);
+    expect(problems.recordsWithMissing).toBe(0);
     expect(problems.emptyRows).toBe(1);
     expect(problems.label).toBe("1 empty row detected");
   });
@@ -111,9 +122,9 @@ describe("prepare shortcut on the data card", () => {
     expect(bar.classList.contains("has-data-issues")).toBe(true);
     expect(document.getElementById("hubRangeBadgeText").textContent).toBe("Prepared_Data · A1:J151");
     expect(document.getElementById("hubRangeSizeLabel").textContent).toBe("151 rows × 10 variables");
-    expect(document.getElementById("hubDataIssueText").textContent).toBe("60 missing values detected");
+    expect(document.getElementById("hubDataIssueText").textContent).toBe("60 records with missing values");
     expect(document.getElementById("hubDataReviewBtn").getAttribute("aria-label")).toBe(
-      "60 missing values detected · Review data"
+      "60 records with missing values · Review data"
     );
   });
 

@@ -400,14 +400,14 @@
   }
 
   /* Problems that should pull the user into Data Preparation before analysis.
-     Blanks on a completely empty row are empty rows, not missing values.
-     Analysis-only transforms stay inside each analysis dialog. */
+     The shortcut counts records that contain a missing value, not blank cells.
+     A completely empty row is an empty row, not a record with missing values. */
   function countDataProblems(values) {
-    var missing = 0;
+    var recordsWithMissing = 0;
     var emptyRows = 0;
     var blankHeaders = 0;
     if (!values || values.length < 2) {
-      return { missing: 0, emptyRows: 0, blankHeaders: 0, label: "" };
+      return { missing: 0, recordsWithMissing: 0, emptyRows: 0, blankHeaders: 0, label: "" };
     }
     var header = values[0] || [];
     var width = 0;
@@ -427,15 +427,23 @@
         else filled++;
       }
       if (!filled) emptyRows++;
-      else missing += blanks;
+      else if (blanks > 0) recordsWithMissing++;
     }
     var label = "";
-    if (missing > 0) label = unitLabel(missing, "missing value", "missing values") + " detected";
+    if (recordsWithMissing > 0) {
+      label = unitLabel(recordsWithMissing, "record with missing values", "records with missing values");
+    }
     else if (emptyRows > 0) label = unitLabel(emptyRows, "empty row", "empty rows") + " detected";
     else if (blankHeaders > 0) {
       label = unitLabel(blankHeaders, "column has no header", "columns have no header");
     }
-    return { missing: missing, emptyRows: emptyRows, blankHeaders: blankHeaders, label: label };
+    return {
+      missing: recordsWithMissing,
+      recordsWithMissing: recordsWithMissing,
+      emptyRows: emptyRows,
+      blankHeaders: blankHeaders,
+      label: label
+    };
   }
 
   function describeWorksheetData(values, address) {

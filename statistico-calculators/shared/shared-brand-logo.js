@@ -6,13 +6,13 @@
 (function (global) {
   'use strict';
 
-  var LOGO_VER = '20260824tools1';
+  var LOGO_VER = '20260923logo1';
   var LOGO_FILES = {
     default: 'statistico-logo-hub.png',
     analytics: 'statistico-logo-hub.png',
-    tools: 'statistico-logo-hub-calculators.png',
-    calculators: 'statistico-logo-hub-calculators.png',
-    applications: 'statistico-logo-hub-applications.png'
+    tools: 'statistico-logo-hub.png',
+    calculators: 'statistico-logo-hub.png',
+    applications: 'statistico-logo-hub.png'
   };
 
   /** Compact normal curve kept for legacy callers (e.g. Gauss.html demos). */

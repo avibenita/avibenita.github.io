@@ -249,10 +249,10 @@
             <div class="queue-controls">
               <button type="button" id="queuePlay">Play</button>
               <button type="button" id="queueRestart">Restart</button>
-              <div class="speed" role="group" aria-label="Playback speed">
-                <button type="button" data-speed="1">1×</button>
-                <button type="button" data-speed="10" class="active">10×</button>
-                <button type="button" data-speed="30">30×</button>
+              <div class="speed" role="group" aria-label="Playback speed" title="Playback speed does not affect simulation calculations.">
+                <button type="button" data-speed="1" title="Playback speed does not affect simulation calculations.">Normal</button>
+                <button type="button" data-speed="10" class="active" title="Playback speed does not affect simulation calculations.">Fast</button>
+                <button type="button" data-speed="30" title="Playback speed does not affect simulation calculations.">Very fast</button>
               </div>
               <span id="queueClock">00:00</span>
             </div>
@@ -606,7 +606,7 @@
     if (text != null) node.textContent = text;
     return node;
   }
-  var queue = { events: [], index: 0, time: 0, speed: 10, playing: false, timer: 0, agents: 1, answered: 0, abandoned: 0, calls: {}, reduced: false };
+  var queue = { events: [], index: 0, time: 0, speed: 10, playing: false, timer: 0, agents: 0, answered: 0, abandoned: 0, calls: {}, reduced: false };
   var reducedQuery = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
   if (reducedQuery) queue.reduced = reducedQuery.matches;
 
@@ -626,6 +626,10 @@
       queue.events = [];
       queue.index = 0;
       queue.time = 0;
+      queue.agents = 0;
+      queue.calls = {};
+      queue.answered = 0;
+      queue.abandoned = 0;
       document.getElementById("queueStatus").textContent = "Run the simulation to view call flow.";
       paintQueue();
     }
@@ -740,19 +744,22 @@
     document.getElementById("queueMore").textContent = waiting.length > 8 ? "+" + (waiting.length - 8) + " more waiting" : "";
     var board = document.getElementById("zoneAgents");
     board.textContent = "";
-    var limit = Math.min(queue.agents || 0, 24);
+    var headcount = queue.events.length ? queue.agents : 0;
+    var limit = Math.min(headcount, 24);
     var free = 0;
     var onCall = 0;
     var i;
-    for (i = 1; i <= (queue.agents || 0); i++) if (busy[i]) onCall += 1; else free += 1;
+    for (i = 1; i <= headcount; i++) if (busy[i]) onCall += 1; else free += 1;
     for (i = 1; i <= limit; i++) {
       var card = el("div", { class: "agent " + (busy[i] ? "busy" : "available") });
       card.appendChild(el("div", {}, (busy[i] ? "On call " : "Available ") + i));
       if (busy[i]) card.appendChild(bubble(busy[i], busy[i].id.replace("c", "#")));
       board.appendChild(card);
     }
-    var extra = (queue.agents || 0) - limit;
-    document.getElementById("agentTotals").textContent = "Available: " + free + " · On call: " + onCall + (extra > 0 ? " · +" + extra + " more agents" : "");
+    var extra = headcount - limit;
+    document.getElementById("agentTotals").textContent = headcount
+      ? "Available: " + free + " · On call: " + onCall + (extra > 0 ? " · +" + extra + " more agents" : "")
+      : "";
     var longest = 0;
     waiting.forEach(function (c) { longest = Math.max(longest, c.wait); });
     document.getElementById("countWait").textContent = "Waiting now: " + waiting.length;

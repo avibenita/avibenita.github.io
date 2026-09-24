@@ -102,7 +102,11 @@
     body.mode-simulation #runBtn { padding: 12px 14px; font-size: 0.95rem; background: rgba(120, 200, 255, 0.28); border-color: #8ec8ef; color: #f4fbff; box-shadow: 0 0 0 2px rgba(120, 200, 255, 0.35); }
     .result-badge { display: inline-block; margin-top: 6px; border: 1px solid rgba(120, 200, 255, 0.55); border-radius: 999px; padding: 2px 8px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #8ec8ef; }
     .stale-banner { margin: 0 0 8px; border: 1px solid rgba(245, 158, 11, 0.7); background: rgba(245, 158, 11, 0.14); color: #fdba74; border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; font-weight: 800; }
-    .hero-card.provisional .v { font-size: 1.35rem; line-height: 1.15; }
+    .results-dim .hero-card,
+    .results-dim .metric-grid,
+    .results-dim .insight,
+    .results-dim .replay-open,
+    .results-dim .chart-panel { opacity: 0.72; }
     .erlang-btn-ghost { background: transparent; color: #d7e3f2; border: 1px solid #5d738c; }
     html[data-theme="light"] .erlang-btn-ghost { color: #1f2937; }
     .hero-card { border: 1px solid rgba(45, 212, 191, 0.45); border-left: 3px solid #14b8a6; border-radius: 10px; background: rgba(20, 184, 166, 0.1); padding: 10px 12px; margin-bottom: 8px; }
@@ -275,7 +279,7 @@
             <button class="erlang-btn erlang-btn-ghost" id="resetBtn" type="button"><i class="fa-solid fa-rotate-left"></i> Reset</button>
           </div>
         </div>
-        <div class="erlang-panel">
+        <div class="erlang-panel" id="resultsPanel">
           <h2 class="erlang-panel-title" id="resultsTitle"><i class="fa-solid fa-chart-column"></i> Staffing results</h2>
           <p class="stale-banner" id="staleBanner" hidden>Results out of date — rerun simulation</p>
           <div class="hero-card" id="heroCard">
@@ -429,6 +433,7 @@
     }
     model.scheduledAgents = staff.scheduledAgents;
     var provisional = mode === "simulation" && model.source !== "simulation";
+    document.getElementById("resultsPanel").classList.toggle("results-dim", provisional || resultsStale);
     document.getElementById("heroCard").classList.toggle("provisional", provisional);
     document.getElementById("staleBanner").hidden = !resultsStale;
     document.getElementById("resultsTitle").lastChild.textContent = provisional ? " Preliminary staffing estimate" : (model.source === "simulation" ? " Simulation result" : " Staffing results");
@@ -510,6 +515,7 @@
   }
 
   function showUnsolved(model) {
+    document.getElementById("resultsPanel").classList.toggle("results-dim", mode === "simulation");
     var input = read();
     var calls = Number(input.callsPerHour);
     var aht = Number(input.ahtSeconds);
@@ -604,7 +610,7 @@
     function py(level) { return T + (1 - Math.max(0, Math.min(1, level))) * (H - T - B); }
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Service level by available agents" });
     var title = svgEl("text", { x: (L + W - R) / 2, y: 14, "text-anchor": "middle", fill: ink(), "font-size": "13", "font-weight": "700" });
-    title.textContent = "Service level by available agents";
+    title.textContent = mode === "simulation" && model.source !== "simulation" ? "Preliminary Erlang C service-level curve" : (model.source === "simulation" ? "Simulation result" : "Service level by available agents");
     svg.appendChild(title);
     [0, 0.5, 1].forEach(function (level) {
       svg.appendChild(svgEl("line", { x1: L, y1: py(level), x2: W - R, y2: py(level), stroke: isLight() ? "rgba(30,41,59,0.12)" : "rgba(232,238,248,0.12)", "stroke-width": "1" }));
@@ -647,15 +653,6 @@
     var chosen = svgEl("text", { x: anchor === "end" ? labelX - 8 : labelX + 8, y: Math.min(H - B - 4, Math.max(T + 12, markY - 8)), "text-anchor": anchor, fill: accent, "font-size": "11", "font-weight": "700" });
     chosen.textContent = model.availableAgents + " agents · " + pct1(model.serviceLevel);
     svg.appendChild(chosen);
-    if (model.source === "simulation") {
-      var ref = svgEl("text", { x: L + 4, y: 16, fill: muted(), "font-size": "11", "font-weight": "700" });
-      ref.textContent = "Simulation result";
-      svg.appendChild(ref);
-    } else if (mode === "simulation") {
-      var prelim = svgEl("text", { x: L + 4, y: 16, fill: muted(), "font-size": "11", "font-weight": "700" });
-      prelim.textContent = "Preliminary Erlang C service-level curve";
-      svg.appendChild(prelim);
-    }
     var xLabel = svgEl("text", { x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle", fill: muted(), "font-size": "11", "font-weight": "700" });
     xLabel.textContent = "Available agents";
     svg.appendChild(xLabel);
@@ -799,6 +796,7 @@
   function noteInputChange() {
     if (mode === "simulation" && displayed && displayed.source === "simulation") {
       resultsStale = true;
+      document.getElementById("resultsPanel").classList.add("results-dim");
       document.getElementById("staleBanner").hidden = false;
       document.getElementById("openReplay").disabled = true;
       closeReplay();

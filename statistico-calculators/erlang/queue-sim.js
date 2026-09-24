@@ -293,7 +293,17 @@
       averageWaitBeforeAbandonmentSeconds: acc.abandonedCalls > 0 ? acc.waitAbandonedSum / acc.abandonedCalls : 0,
       maximumQueueLength: acc.maxQueueLength,
       averageQueueLength: acc.horizon > 0 ? acc.queueArea / acc.horizon : 0,
-      occupancy: acc.agentHorizons > 0 ? acc.busyArea / acc.agentHorizons : 0
+      occupancy: acc.agentHorizons > 0 ? acc.busyArea / acc.agentHorizons : 0,
+      samples: parts.map(function (part) {
+        var n = part.offeredCalls;
+        return {
+          serviceLevel: n > 0 ? part.answeredWithinTarget / n : 0,
+          abandonmentRate: n > 0 ? part.abandonedCalls / n : 0,
+          averageWait: part.answeredCalls > 0 ? part.waitAnsweredSum / part.answeredCalls : 0,
+          maximumQueueLength: part.maxQueueLength,
+          occupancy: part.horizon * part.agents > 0 ? part.busyArea / (part.horizon * part.agents) : 0
+        };
+      })
     };
   }
 
@@ -318,6 +328,34 @@
     summary.events = replayEvents;
     summary.replications = reps;
     return summary;
+  }
+
+  function agentsRequiredSamples(spec) {
+    var reps = Math.max(1, Math.floor(spec.replications || 1));
+    var seed = spec.seed == null ? 1 : spec.seed;
+    var traffic = spec.callsPerHour * spec.ahtSeconds / 3600;
+    var start = Math.max(1, Math.floor(traffic));
+    var limit = Math.min(200, start + 30);
+    var counts = [];
+    var r;
+    var n;
+    for (r = 0; r < reps; r++) {
+      var found = limit;
+      for (n = start; n <= limit; n++) {
+        var trial = {};
+        Object.keys(spec).forEach(function (key) { trial[key] = spec[key]; });
+        trial.agents = n;
+        trial.replications = 1;
+        var part = simulateReplication(trial, mulberry32((seed + r * 9973) >>> 0), false);
+        var sl = part.offeredCalls > 0 ? part.answeredWithinTarget / part.offeredCalls : 0;
+        var ab = part.offeredCalls > 0 ? part.abandonedCalls / part.offeredCalls : 0;
+        var slOk = sl + 1e-12 >= spec.targetServiceLevel;
+        var abOk = !spec.abandonmentEnabled || ab <= spec.maximumAbandonmentRate + 1e-12;
+        if (slOk && abOk) { found = n; break; }
+      }
+      counts.push(found);
+    }
+    return counts;
   }
 
   function meetsTargets(summary, spec) {
@@ -354,6 +392,7 @@
     simulateReplication: simulateReplication,
     run: run,
     findActiveAgents: findActiveAgents,
+    agentsRequiredSamples: agentsRequiredSamples,
     meetsTargets: meetsTargets,
     mulberry32: mulberry32
   };

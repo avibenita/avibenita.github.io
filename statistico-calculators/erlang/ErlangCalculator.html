@@ -106,7 +106,26 @@
     .results-dim .metric-grid,
     .results-dim .insight,
     .results-dim .replay-open,
-    .results-dim .chart-panel { opacity: 0.72; }
+    .results-dim .chart-panel,
+    .results-dim #deeperView { opacity: 0.72; }
+    .deeper-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .deeper-nav button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 6px 10px; font: 700 0.72rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
+    .deeper-nav button.active { border-color: #2dd4bf; background: rgba(20, 184, 166, 0.22); color: #f4fffd; }
+    body.mode-simulation .deeper-nav button.active { border-color: rgba(120, 200, 255, 0.7); background: rgba(120, 200, 255, 0.16); color: #d7ecfa; }
+    .deeper-nav .erlang-view { display: none; }
+    .deeper-nav .sim-view { display: none; }
+    body.mode-erlang .deeper-nav .erlang-view { display: inline-flex; }
+    body.mode-simulation .deeper-nav .sim-view { display: inline-flex; }
+    .deeper-nav button:disabled { opacity: 0.45; cursor: not-allowed; }
+    #deeperView { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    .dist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .dist-card { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: rgba(14, 20, 27, 0.35); }
+    html[data-theme="light"] .dist-card { background: #f8fafc; }
+    .dist-card h3 { margin: 0 0 4px; font-size: 0.78rem; color: #d7e3f2; }
+    .dist-card p { margin: 4px 0 0; font-size: 0.72rem; line-height: 1.35; color: #c5d4e8; }
+    .dist-card svg { width: 100%; height: 120px; display: block; }
+    .dist-warn { margin: 0 0 8px; font-size: 0.78rem; color: #fdba74; }
+    .show-more { margin-top: 8px; }
     .erlang-btn-ghost { background: transparent; color: #d7e3f2; border: 1px solid #5d738c; }
     html[data-theme="light"] .erlang-btn-ghost { color: #1f2937; }
     .hero-card { border: 1px solid rgba(45, 212, 191, 0.45); border-left: 3px solid #14b8a6; border-radius: 10px; background: rgba(20, 184, 166, 0.1); padding: 10px 12px; margin-bottom: 8px; }
@@ -270,7 +289,7 @@
                 </div>
                 <div class="field"><label for="simTime">Simulation duration (minutes) <span class="info-dot" tabindex="0" data-tip="Length of each simulated period. A longer run gives a steadier estimate of the same scenario.">i</span></label><input id="simTime" type="number" min="100" step="100" value="1000"/></div>
                 <div class="field"><label for="reps">Replications <span class="info-dot" tabindex="0" data-tip="Independent repeats of the same scenario. Ten is the default. Fewer is only a quick check, and the estimate can move between runs.">i</span></label><input id="reps" type="number" min="1" max="30" step="1" value="10"/></div>
-                <p class="hint">The service reports one estimate, not a confidence interval. Ten replications is the default. Fewer replications is only a quick check, and the estimate can move between runs.</p>
+                <p class="hint">Ten replications is a quick preview. Use 100 for an ordinary assessment and 500–1,000 for a stable planning estimate. Fewer than 100 makes percentiles unstable.</p>
               </div>
             </details>
           </div>
@@ -296,7 +315,7 @@
               </div>
             </div>
           </div>
-          <div class="metric-grid">
+          <div class="metric-grid" id="metricGrid">
             <div class="metric"><div class="metric-label">Average wait</div><div class="metric-value" id="waitValue">—</div></div>
             <div class="metric"><div class="metric-label">Average queue length <span class="info-dot" tabindex="0" data-tip="Mean number of callers waiting for an agent. Callers already on a call are not included. It equals calls per second times average wait.">i</span></div><div class="metric-value" id="queueLengthValue">—</div></div>
             <div class="metric"><div class="metric-label">Occupancy <span class="info-dot" tabindex="0" data-tip="Offered load divided by available agents. Offered load (Erlangs) = calls per hour × handle time / 3600.">i</span></div><div class="metric-value" id="occValue">—</div></div>
@@ -304,8 +323,19 @@
             <div class="metric"><div class="metric-label">Offered load <span class="info-dot" tabindex="0" data-tip="Calls per hour × handle time / 3600, in Erlangs. One Erlang is one agent occupied for a full hour.">i</span></div><div class="metric-value" id="trafficValue">—</div></div>
           </div>
           <div class="insight"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="insightText">Erlang C updates as you type. Simulation runs when you ask it to.</p></div>
+          <div class="deeper-nav" id="deeperNav">
+            <button type="button" data-view="summary" class="active">Staffing summary</button>
+            <button type="button" data-view="wait" class="erlang-view">Waiting-time probabilities</button>
+            <button type="button" data-view="staff" class="erlang-view">Staffing sensitivity</button>
+            <button type="button" data-view="traffic" class="erlang-view">Traffic sensitivity</button>
+            <button type="button" data-view="variability" class="sim-view" id="variabilityBtn" disabled>Variability</button>
+            <button type="button" data-view="replay" class="sim-view" id="replayNav" disabled>Simulation replay</button>
+          </div>
+          <div id="summaryView">
           <button type="button" class="erlang-btn erlang-btn-primary replay-open" id="openReplay" disabled>Open simulation replay</button>
           <div class="chart-panel" id="chartPanel"><div id="staffingChart"></div></div>
+          </div>
+          <div id="deeperView" hidden></div>
           <div class="replay-modal" id="replayModal">
             <div class="replay-dialog" role="dialog" aria-modal="true" aria-labelledby="replayTitle">
               <div class="replay-dialog-head">
@@ -364,6 +394,7 @@
   var displayed = null;
   var replayReady = null;
   var resultsStale = false;
+  var resultView = "summary";
 
   if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
   if (window.StatisticoThemeToggle) StatisticoThemeToggle.mount({ container: document.querySelector(".st-calc-header-right") });
@@ -501,6 +532,10 @@
     setText("insightText", insight);
     drawCurve(model);
     var replayBtn = document.getElementById("openReplay");
+    var canVary = model.source === "simulation" && !resultsStale && model.samples && model.samples.length;
+    document.getElementById("variabilityBtn").disabled = !canVary;
+    document.getElementById("replayNav").disabled = !canVary;
+    if (!canVary && resultView === "variability") showResultView("summary");
     if (model.source === "simulation" && !resultsStale) {
       replayReady = model;
       replayBtn.disabled = false;
@@ -688,6 +723,7 @@
       serviceLevelLow: summary.serviceLevelLow,
       serviceLevelHigh: summary.serviceLevelHigh,
       replications: summary.replications,
+      samples: summary.samples || [],
       occupancy: summary.occupancy,
       avgWaitSeconds: summary.averageWaitAnsweredSeconds,
       averageQueueLength: summary.averageQueueLength,
@@ -792,11 +828,14 @@
     resultsStale = false;
     displayed = null;
     refreshLocal();
+    showResultView("summary");
   }
   function noteInputChange() {
     if (mode === "simulation" && displayed && displayed.source === "simulation") {
       resultsStale = true;
       document.getElementById("resultsPanel").classList.add("results-dim");
+      document.getElementById("variabilityBtn").disabled = true;
+      document.getElementById("replayNav").disabled = true;
       document.getElementById("staleBanner").hidden = false;
       document.getElementById("openReplay").disabled = true;
       closeReplay();
@@ -1175,6 +1214,251 @@
       queue.speed = Number(button.getAttribute("data-speed"));
       document.querySelectorAll(".speed button").forEach(function (peer) { peer.classList.toggle("active", peer === button); });
     });
+  });
+  function quantile(sorted, p) {
+    if (!sorted.length) return 0;
+    var i = (sorted.length - 1) * p;
+    var lo = Math.floor(i);
+    var hi = Math.min(sorted.length - 1, lo + 1);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  }
+  function distStats(values) {
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var sum = 0;
+    sorted.forEach(function (v) { sum += v; });
+    return { mean: sorted.length ? sum / sorted.length : 0, median: quantile(sorted, 0.5), p5: quantile(sorted, 0.05), p95: quantile(sorted, 0.95), values: sorted };
+  }
+  function miniSvg(title, stats, opts) {
+    opts = opts || {};
+    var vals = stats.values;
+    var lo = Math.min(stats.p5, opts.min != null ? opts.min : vals[0]);
+    var hi = Math.max(stats.p95, opts.max != null ? opts.max : vals[vals.length - 1], opts.target != null ? opts.target : lo);
+    if (hi <= lo) hi = lo + 1;
+    var bins = 8;
+    var width = (hi - lo) / bins;
+    var counts = [];
+    var b;
+    for (b = 0; b < bins; b++) counts.push(0);
+    vals.forEach(function (v) {
+      var idx = Math.min(bins - 1, Math.max(0, Math.floor((v - lo) / width)));
+      counts[idx] += 1;
+    });
+    var peak = Math.max.apply(null, counts.concat([1]));
+    var W = 280, H = 110, L = 8, R = 8, T = 8, B = 16;
+    function px(v) { return L + ((v - lo) / (hi - lo)) * (W - L - R); }
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H });
+    counts.forEach(function (count, i) {
+      var x0 = lo + i * width;
+      var h = (count / peak) * (H - T - B);
+      svg.appendChild(svgEl("rect", { x: px(x0) + 1, y: H - B - h, width: Math.max(2, px(x0 + width) - px(x0) - 2), height: h, fill: "rgba(142,200,239,0.75)" }));
+    });
+    svg.appendChild(svgEl("line", { x1: px(stats.p5), y1: T, x2: px(stats.p5), y2: H - B, stroke: "#94a3b8", "stroke-dasharray": "2 2" }));
+    svg.appendChild(svgEl("line", { x1: px(stats.p95), y1: T, x2: px(stats.p95), y2: H - B, stroke: "#94a3b8", "stroke-dasharray": "2 2" }));
+    svg.appendChild(svgEl("line", { x1: px(stats.mean), y1: T, x2: px(stats.mean), y2: H - B, stroke: "#8ec8ef", "stroke-width": "2" }));
+    if (opts.target != null && opts.target >= lo && opts.target <= hi) {
+      svg.appendChild(svgEl("line", { x1: px(opts.target), y1: T, x2: px(opts.target), y2: H - B, stroke: "rgb(255,165,120)", "stroke-dasharray": "4 3" }));
+    }
+    return svg;
+  }
+  function freqSvg(counts) {
+    var keys = Object.keys(counts).map(Number).sort(function (a, b) { return a - b; });
+    var peak = 1;
+    keys.forEach(function (k) { peak = Math.max(peak, counts[k]); });
+    var W = 280, H = 110, B = 18, T = 8;
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H });
+    var gap = W / Math.max(1, keys.length);
+    keys.forEach(function (k, i) {
+      var h = (counts[k] / peak) * (H - T - B);
+      svg.appendChild(svgEl("rect", { x: i * gap + 8, y: H - B - h, width: Math.max(8, gap - 16), height: h, fill: "rgba(142,200,239,0.75)" }));
+      var label = svgEl("text", { x: i * gap + gap / 2, y: H - 4, "text-anchor": "middle", fill: muted(), "font-size": "10" });
+      label.textContent = String(k);
+      svg.appendChild(label);
+    });
+    return svg;
+  }
+  function card(host, heading, svg, note) {
+    var box = el("div", { class: "dist-card" });
+    box.appendChild(el("h3", {}, heading));
+    box.appendChild(svg);
+    box.appendChild(el("p", {}, note));
+    host.appendChild(box);
+  }
+  function formatPct(fraction) { return (fraction * 100).toFixed(1) + "%"; }
+  function paintVariability(extra) {
+    var host = document.getElementById("deeperView");
+    host.textContent = "";
+    var samples = (displayed && displayed.samples) || [];
+    if (displayed && displayed.replications < 100) {
+      host.appendChild(el("p", { class: "dist-warn" }, "Distribution estimates are unstable with only " + displayed.replications + " replications. Increase replications for reliable percentiles and target probabilities. Use 100 for an ordinary assessment and 500–1,000 for a stable planning estimate."));
+    }
+    var grid = el("div", { class: "dist-grid" });
+    host.appendChild(grid);
+    var input = read();
+    var target = Number(input.targetServiceLevel) / 100;
+    var maxAbandon = Number(document.getElementById("maxAbandon").value) / 100;
+    var waitTarget = Number(input.maxWaitSeconds);
+    function series(key) { return samples.map(function (row) { return row[key]; }); }
+    var sl = distStats(series("serviceLevel"));
+    var ab = distStats(series("abandonmentRate"));
+    var wait = distStats(series("averageWait"));
+    var queueMax = distStats(series("maximumQueueLength"));
+    var slHit = samples.filter(function (row) { return row.serviceLevel + 1e-12 >= target; }).length;
+    var abHit = samples.filter(function (row) { return row.abandonmentRate <= maxAbandon + 1e-12; }).length;
+    var waitHit = samples.filter(function (row) { return row.averageWait <= waitTarget; }).length;
+    card(grid, "Service level", miniSvg("sl", sl, { min: 0, max: 1, target: target }), "Mean " + formatPct(sl.mean) + " · median " + formatPct(sl.median) + " · 5th–95th " + formatPct(sl.p5) + "–" + formatPct(sl.p95) + ". Target achieved in " + Math.round(100 * slHit / Math.max(1, samples.length)) + "% of replications.");
+    card(grid, "Abandonment rate", miniSvg("ab", ab, { min: 0, max: Math.max(0.2, ab.p95, maxAbandon), target: maxAbandon }), "Mean " + formatPct(ab.mean) + " · median " + formatPct(ab.median) + ". At or below the " + formatPct(maxAbandon) + " limit in " + Math.round(100 * abHit / Math.max(1, samples.length)) + "% of replications.");
+    card(grid, "Average wait", miniSvg("wait", wait, { min: 0, target: waitTarget }), "Mean " + wait.mean.toFixed(1) + "s · median " + wait.median.toFixed(1) + "s · 5th–95th " + wait.p5.toFixed(1) + "–" + wait.p95.toFixed(1) + "s. Average wait within " + waitTarget + "s in " + Math.round(100 * waitHit / Math.max(1, samples.length)) + "% of replications.");
+    card(grid, "Maximum queue length", miniSvg("q", queueMax, { min: 0 }), "Mean " + queueMax.mean.toFixed(1) + " · median " + queueMax.median.toFixed(1) + " · 5th–95th " + queueMax.p5.toFixed(1) + "–" + queueMax.p95.toFixed(1) + ".");
+    if (extra) {
+      var occ = distStats(series("occupancy"));
+      card(grid, "Occupancy", miniSvg("occ", occ, { min: 0, max: 1 }), "Mean " + formatPct(occ.mean) + " · median " + formatPct(occ.median) + " · 5th–95th " + formatPct(occ.p5) + "–" + formatPct(occ.p95) + ".");
+      var freq = {};
+      (displayed.agentSamples || []).forEach(function (n) { freq[n] = (freq[n] || 0) + 1; });
+      card(grid, "Agents required", freqSvg(freq), "Each bar is how often that active-agent count was the smallest staffing to meet both targets in one replication.");
+    }
+    var more = el("button", { type: "button", class: "erlang-btn erlang-btn-ghost show-more" }, extra ? "Show fewer charts" : "Show more");
+    more.addEventListener("click", function () {
+      if (!extra && displayed && !displayed.agentSamples) {
+        more.disabled = true;
+        more.textContent = "Calculating agent frequencies…";
+        setTimeout(function () {
+          displayed.agentSamples = window.QueueSim.agentsRequiredSamples(simulationSpec(displayed.availableAgents, false));
+          paintVariability(true);
+        }, 30);
+        return;
+      }
+      paintVariability(!extra);
+    });
+    host.appendChild(more);
+  }
+  function barChart(rows) {
+    var peak = 1;
+    rows.forEach(function (row) { peak = Math.max(peak, row.value); });
+    var W = 560, H = 140, L = 120, B = 8;
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H });
+    rows.forEach(function (row, i) {
+      var y = 12 + i * 24;
+      var w = (row.value / peak) * (W - L - 70);
+      svg.appendChild(svgEl("text", { x: 4, y: y + 12, fill: muted(), "font-size": "11" })).textContent = row.label;
+      svg.appendChild(svgEl("rect", { x: L, y: y, width: Math.max(2, w), height: 14, fill: "rgba(20,184,166,0.8)" }));
+      svg.appendChild(svgEl("text", { x: L + w + 6, y: y + 12, fill: ink(), "font-size": "11" })).textContent = row.text;
+    });
+    return svg;
+  }
+  function paintErlangDeeper(kind) {
+    var host = document.getElementById("deeperView");
+    host.textContent = "";
+    if (!displayed || !displayed.ok) {
+      host.appendChild(el("p", {}, "Enter a staffing level Erlang C can solve."));
+      return;
+    }
+    var input = read();
+    var agents = displayed.availableAgents;
+    var traffic = displayed.traffic;
+    var aht = Number(input.ahtSeconds);
+    var lambda = Number(input.callsPerHour) / 3600;
+    var mu = 1 / aht;
+    var delay = math.erlangC(traffic, agents);
+    var rho = agents > 0 ? traffic / agents : 1;
+    var leave = agents * mu - lambda;
+    if (kind === "wait") {
+      host.appendChild(el("p", { class: "dist-warn" }, "These are Erlang C probabilities for this exact staffing, not a simulated histogram."));
+      var grid = el("div", { class: "dist-grid" });
+      host.appendChild(grid);
+      var waits = [0, 20, 30, 60].map(function (t) {
+        var p = leave > 0 ? delay * Math.exp(-leave * t) : 1;
+        return { label: t === 0 ? "Must wait" : "Wait > " + t + "s", value: p, text: (p * 100).toFixed(1) + "%" };
+      });
+      waits.unshift({ label: "Answered immediately", value: 1 - delay, text: ((1 - delay) * 100).toFixed(1) + "%" });
+      var waitCard = el("div", { class: "dist-card" });
+      waitCard.appendChild(el("h3", {}, "Waiting-time probabilities"));
+      waitCard.appendChild(barChart(waits));
+      var median = leave > 0 ? Math.log(2) / leave : Infinity;
+      waitCard.appendChild(el("p", {}, "Among callers who wait, the median wait is " + (isFinite(median) ? median.toFixed(1) + "s" : "not finite") + ". P(wait) = " + (delay * 100).toFixed(1) + "%."));
+      grid.appendChild(waitCard);
+      var q0 = 1 - delay;
+      var q1 = delay * Math.max(0, 1 - rho);
+      var q2 = q1 * Math.max(0, rho);
+      var q3 = Math.max(0, delay - q1 - q2);
+      var queueCard = el("div", { class: "dist-card" });
+      queueCard.appendChild(el("h3", {}, "Queue-size probabilities"));
+      queueCard.appendChild(barChart([
+        { label: "No caller waiting", value: q0, text: (q0 * 100).toFixed(1) + "%" },
+        { label: "1 waiting", value: q1, text: (q1 * 100).toFixed(1) + "%" },
+        { label: "2 waiting", value: q2, text: (q2 * 100).toFixed(1) + "%" },
+        { label: "3 or more waiting", value: q3, text: (q3 * 100).toFixed(1) + "%" }
+      ]));
+      grid.appendChild(queueCard);
+      return;
+    }
+    var rows = [];
+    if (kind === "staff") {
+      var from = Math.max(Math.floor(traffic) + 1, agents - 4);
+      var to = agents + 4;
+      var n;
+      for (n = from; n <= to; n++) {
+        var point = math.analyze({ callsPerHour: input.callsPerHour, ahtSeconds: input.ahtSeconds, maxWaitSeconds: input.maxWaitSeconds, direction: "fixedAgents", agents: n, targetServiceLevel: input.targetServiceLevel, shrinkageEnabled: false });
+        if (point.ok) rows.push(point);
+      }
+      host.appendChild(el("p", { class: "dist-warn" }, "Each point is the Erlang C result at that headcount. The selected staffing is " + agents + " active agents."));
+    } else {
+      [0.8, 0.9, 1, 1.1, 1.2].forEach(function (scale) {
+        var calls = Number(input.callsPerHour) * scale;
+        var point = math.analyze({ callsPerHour: calls, ahtSeconds: input.ahtSeconds, maxWaitSeconds: input.maxWaitSeconds, direction: "fixedAgents", agents: agents, targetServiceLevel: input.targetServiceLevel, shrinkageEnabled: false });
+        if (point.ok) rows.push(Object.assign({ label: (scale === 1 ? "Baseline" : (scale > 1 ? "+" : "") + Math.round((scale - 1) * 100) + "%") }, point));
+      });
+      host.appendChild(el("p", { class: "dist-warn" }, "Call volume moves around the entered rate while active agents stay at " + agents + "."));
+    }
+    var grid2 = el("div", { class: "dist-grid" });
+    host.appendChild(grid2);
+    function lineCard(title, pick, digits) {
+      var box = el("div", { class: "dist-card" });
+      box.appendChild(el("h3", {}, title));
+      var W = 280, H = 110, L = 28, B = 18, T = 10;
+      var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H });
+      var ys = rows.map(pick);
+      var y0 = Math.min.apply(null, ys.concat([0]));
+      var y1 = Math.max.apply(null, ys.concat([y0 + 0.01]));
+      function px(i) { return L + (rows.length < 2 ? 0 : i / (rows.length - 1)) * (W - L - 8); }
+      function py(v) { return T + (1 - (v - y0) / (y1 - y0)) * (H - T - B); }
+      var d = "";
+      rows.forEach(function (row, i) { d += (i ? " L " : "M ") + px(i) + " " + py(pick(row)); });
+      svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: "#2dd4bf", "stroke-width": "2" }));
+      rows.forEach(function (row, i) {
+        var mark = i === rows.length - 1 && kind === "traffic" ? false : (kind === "staff" && row.baseAgents === agents);
+        svg.appendChild(svgEl("circle", { cx: px(i), cy: py(pick(row)), r: mark || (kind === "traffic" && row.label === "Baseline") ? 4 : 2.5, fill: mark || (kind === "traffic" && row.label === "Baseline") ? "#f0b27a" : "#2dd4bf" }));
+      });
+      box.appendChild(svg);
+      box.appendChild(el("p", {}, rows.map(function (row) { return (kind === "traffic" ? row.label : row.baseAgents + " agents") + " " + pick(row).toFixed(digits); }).join(" · ")));
+      grid2.appendChild(box);
+    }
+    lineCard("Service level", function (row) { return row.serviceLevel * 100; }, 1);
+    lineCard("Average wait (seconds)", function (row) { return row.avgWaitSeconds; }, 1);
+    lineCard("Occupancy (%)", function (row) { return row.occupancy * 100; }, 1);
+    lineCard("Probability of waiting (%)", function (row) { return row.probabilityOfWait * 100; }, 1);
+  }
+  function showResultView(name) {
+    if (name === "replay") {
+      if (!document.getElementById("replayNav").disabled) document.getElementById("openReplay").click();
+      return;
+    }
+    resultView = name;
+    var summary = name === "summary";
+    document.getElementById("summaryView").hidden = !summary;
+    document.getElementById("heroCard").hidden = !summary;
+    document.getElementById("metricGrid").hidden = !summary;
+    document.querySelector(".insight").hidden = !summary;
+    document.getElementById("deeperView").hidden = summary;
+    document.querySelectorAll("#deeperNav button").forEach(function (button) {
+      button.classList.toggle("active", button.getAttribute("data-view") === name);
+    });
+    if (name === "variability") paintVariability(false);
+    else if (name === "wait" || name === "staff" || name === "traffic") paintErlangDeeper(name);
+  }
+  document.getElementById("deeperNav").addEventListener("click", function (event) {
+    var button = event.target.closest("button");
+    if (!button || button.disabled) return;
+    showResultView(button.getAttribute("data-view"));
   });
   new MutationObserver(function () { if (displayed) drawCurve(displayed); else refreshLocal(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   refreshLocal();

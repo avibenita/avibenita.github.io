@@ -284,7 +284,7 @@
             </div>
             <p class="queue-status" id="queueStatus">Run the simulation to view call flow.</p>
             <div class="queue-zones">
-              <section class="queue-zone"><h3>Incoming calls</h3><div class="bubbles" id="zoneIncoming"></div></section>
+              <section class="queue-zone"><h3>Incoming calls</h3><p class="more-waiting" id="incomingTotal"></p><div class="bubbles" id="zoneIncoming"></div><p class="more-waiting" id="incomingMore"></p></section>
               <section class="queue-zone"><h3>Waiting queue</h3><div class="bubbles" id="zoneQueue"></div><p class="more-waiting" id="queueMore"></p></section>
               <section class="queue-zone agents-zone"><h3>Agent board</h3><div class="agent-grid" id="zoneAgents"></div><p class="agent-totals" id="agentTotals"></p></section>
             </div>
@@ -685,7 +685,7 @@
     if (text != null) node.textContent = text;
     return node;
   }
-  var queue = { events: [], index: 0, time: 0, speed: 10, playing: false, timer: 0, agents: 0, answered: 0, abandoned: 0, calls: {}, reduced: false };
+  var queue = { events: [], index: 0, time: 0, speed: 10, playing: false, timer: 0, agents: 0, answered: 0, abandoned: 0, arrived: 0, calls: {}, arrivalOrder: [], arrivalHolds: {}, deferred: [], timelineComplete: false, reduced: false };
   var reducedQuery = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
   if (reducedQuery) queue.reduced = reducedQuery.matches;
 
@@ -709,6 +709,12 @@
       queue.calls = {};
       queue.answered = 0;
       queue.abandoned = 0;
+      queue.arrived = 0;
+      queue.arrivalOrder = [];
+      queue.arrivalHolds = {};
+      queue.deferred = [];
+      queue.timelineComplete = false;
+      queue.done = false;
       document.getElementById("queueStatus").textContent = "";
       setReplayChrome(false);
       paintQueue();
@@ -764,12 +770,25 @@
     setReplayChrome(true);
     restartQueue(!queue.reduced);
   }
+  function arrivalHoldMs() {
+    if (queue.speed >= 30) return 150;
+    if (queue.speed >= 10) return 300;
+    return 700;
+  }
+  function holdActive(callId, now) {
+    return !!(queue.arrivalHolds[callId] && now < queue.arrivalHolds[callId]);
+  }
   function restartQueue(autoplay) {
     queue.index = 0;
     queue.time = 0;
     queue.answered = 0;
     queue.abandoned = 0;
+    queue.arrived = 0;
     queue.calls = {};
+    queue.arrivalOrder = [];
+    queue.arrivalHolds = {};
+    queue.deferred = [];
+    queue.timelineComplete = false;
     queue.done = false;
     paintQueue();
     if (autoplay) playQueue();
@@ -778,55 +797,111 @@
   function playQueue() {
     if (!queue.events.length || queue.done) return;
     queue.playing = true;
+    queue.timelineComplete = false;
     document.getElementById("queuePlay").textContent = "Pause";
     if (queue.timer) clearInterval(queue.timer);
     var last = Date.now();
     queue.timer = setInterval(function () {
       if (!queue.playing || document.hidden || !document.body.classList.contains("view-queue")) return;
       var now = Date.now();
-      var step = ((now - last) / 1000) * queue.speed;
+      if (!queue.timelineComplete) {
+        var step = ((now - last) / 1000) * queue.speed;
+        queue.time += queue.reduced ? Math.max(step, 1) : step;
+        applyDueEvents(now);
+      }
       last = now;
-      queue.time += queue.reduced ? Math.max(step, 1) : step;
-      applyDueEvents();
+      releaseDeferred(now);
       paintQueue();
+      if (queue.timelineComplete && !queue.deferred.length && !activeHolds(now)) finishReplay();
     }, 50);
   }
-  function applyDueEvents() {
+  function activeHolds(now) {
+    var ids = Object.keys(queue.arrivalHolds);
+    var i;
+    for (i = 0; i < ids.length; i++) if (queue.arrivalHolds[ids[i]] > now) return true;
+    return false;
+  }
+  function finishReplay() {
+    queue.playing = false;
+    queue.done = true;
+    queue.timelineComplete = true;
+    if (queue.timer) clearInterval(queue.timer);
+    queue.timer = 0;
+    document.getElementById("queuePlay").textContent = "Replay";
+    document.getElementById("queueStatus").textContent = "30-minute replay complete.";
+    paintQueue();
+  }
+  function applyEvent(ev) {
+    var call = queue.calls[ev.callId] || { id: ev.callId, state: "incoming", arrival: ev.time, wait: 0, agentId: null };
+    queue.calls[ev.callId] = call;
+    if (ev.type === "arrival") {
+      call.state = "incoming";
+      call.arrival = ev.time;
+      queue.arrived += 1;
+      queue.arrivalOrder.push(ev.callId);
+      queue.arrivalHolds[ev.callId] = Date.now() + arrivalHoldMs();
+    } else if (ev.type === "queue_enter") call.state = "queue";
+    else if (ev.type === "service_start") { call.state = "service"; call.agentId = ev.agentId; call.wait = ev.waitSeconds || 0; }
+    else if (ev.type === "service_end") {
+      call.state = "answered";
+      queue.answered += 1;
+      dropVisual(ev.callId);
+    } else if (ev.type === "abandon") {
+      call.state = "abandoned";
+      call.wait = ev.waitSeconds || 0;
+      queue.abandoned += 1;
+      dropVisual(ev.callId);
+    } else if (ev.type === "blocked" && queue.showBlocked) call.state = "blocked";
+    else if (ev.type === "retry" && queue.showRetry) call.state = "retry";
+  }
+  function dropVisual(callId) {
+    delete queue.arrivalHolds[callId];
+    queue.deferred = queue.deferred.filter(function (ev) { return ev.callId !== callId; });
+  }
+  function applyDueEvents(now) {
     var events = queue.events;
+    var batch = [];
     while (queue.index < events.length && events[queue.index].time <= queue.time) {
-      var ev = events[queue.index];
+      batch.push(events[queue.index]);
       queue.index += 1;
-      var call = queue.calls[ev.callId] || { id: ev.callId, state: "incoming", arrival: ev.time, wait: 0, agentId: null };
-      queue.calls[ev.callId] = call;
-      if (ev.type === "arrival") { call.state = "incoming"; call.arrival = ev.time; }
-      else if (ev.type === "queue_enter") call.state = "queue";
-      else if (ev.type === "service_start") { call.state = "service"; call.agentId = ev.agentId; call.wait = ev.waitSeconds || 0; }
-      else if (ev.type === "service_end") { call.state = "answered"; queue.answered += 1; }
-      else if (ev.type === "abandon") { call.state = "abandoned"; call.wait = ev.waitSeconds || 0; queue.abandoned += 1; }
-      else if (ev.type === "blocked" && queue.showBlocked) call.state = "blocked";
-      else if (ev.type === "retry" && queue.showRetry) call.state = "retry";
     }
-    if (queue.index >= events.length && events.length) {
-      queue.playing = false;
-      queue.done = true;
-      if (queue.timer) clearInterval(queue.timer);
-      document.getElementById("queuePlay").textContent = "Play";
-      document.getElementById("queueStatus").textContent = "30-minute replay complete.";
-    }
+    batch.forEach(function (ev) { if (ev.type === "arrival") applyEvent(ev); });
+    batch.forEach(function (ev) {
+      if (ev.type === "arrival") return;
+      if ((ev.type === "queue_enter" || ev.type === "service_start") && holdActive(ev.callId, now)) queue.deferred.push(ev);
+      else applyEvent(ev);
+    });
+    if (queue.index >= events.length && events.length) queue.timelineComplete = true;
+  }
+  function releaseDeferred(now) {
+    var still = [];
+    queue.deferred.forEach(function (ev) {
+      if (holdActive(ev.callId, now)) still.push(ev);
+      else applyEvent(ev);
+    });
+    queue.deferred = still;
   }
   function paintQueue() {
     var calls = Object.keys(queue.calls).map(function (id) { return queue.calls[id]; });
     calls.forEach(function (call) {
       if (call.state === "queue" || call.state === "incoming") call.wait = Math.max(0, queue.time - call.arrival);
     });
-    var incoming = calls.filter(function (c) { return c.state === "incoming"; }).slice(-6);
+    var liveIncoming = calls.filter(function (c) { return c.state === "incoming"; });
+    var incoming = liveIncoming.slice(0, 5);
+    var incomingMore = "";
+    if (queue.done && !liveIncoming.length) {
+      incoming = queue.arrivalOrder.slice(-3).map(function (id) { return queue.calls[id]; }).filter(Boolean);
+    } else if (liveIncoming.length > 5) {
+      incomingMore = "+" + (liveIncoming.length - 5) + " arriving";
+    }
     var waiting = calls.filter(function (c) { return c.state === "queue"; });
     var busy = {};
     calls.forEach(function (c) { if (c.state === "service" && c.agentId) busy[c.agentId] = c; });
     var inHost = document.getElementById("zoneIncoming");
     var qHost = document.getElementById("zoneQueue");
-    var inService = calls.filter(function (c) { return c.state === "service"; });
     syncBubbles(inHost, incoming, function () { return ""; });
+    document.getElementById("incomingTotal").textContent = queue.events.length ? "Calls arrived: " + queue.arrived : "";
+    document.getElementById("incomingMore").textContent = incomingMore;
     var shown = waiting.slice(0, 8);
     syncBubbles(qHost, shown, function (c) { return Math.round(c.wait) + "s"; });
     if (queue.events.length && !shown.length && !qHost.querySelector(".zone-empty")) qHost.appendChild(el("p", { class: "zone-empty" }, "No callers currently waiting."));
@@ -867,8 +942,11 @@
     var status = document.getElementById("queueStatus");
     if (!queue.events.length) status.textContent = "";
     else if (queue.done) status.textContent = "30-minute replay complete.";
-    else if (queue.playing && inService.length && !incoming.length) status.textContent = "Calls with a free agent go straight to the board.";
     else if (queue.playing) status.textContent = "Playing the recorded call flow.";
+    var playBtn = document.getElementById("queuePlay");
+    if (playBtn && queue.events.length) {
+      playBtn.textContent = (queue.done || queue.timelineComplete) ? "Replay" : (queue.playing ? "Pause" : "Play");
+    }
   }
   function syncBubbles(host, items, labelFor) {
     var keep = {};
@@ -908,16 +986,18 @@
     document.getElementById("tabChart").classList.add("active");
     document.getElementById("tabQueue").classList.remove("active");
     queue.playing = false;
-    document.getElementById("queuePlay").textContent = "Play";
+    document.getElementById("queuePlay").textContent = (queue.done || queue.timelineComplete) ? "Replay" : "Play";
   });
   document.getElementById("queuePlay").addEventListener("click", function () {
     if (this.disabled || !queue.events.length) return;
+    if (queue.done || queue.timelineComplete) {
+      restartQueue(true);
+      return;
+    }
     if (queue.playing) {
       queue.playing = false;
       this.textContent = "Play";
       document.getElementById("queueStatus").textContent = "Paused.";
-    } else if (queue.done) {
-      restartQueue(true);
     } else playQueue();
   });
   document.getElementById("queueRestart").addEventListener("click", function () { restartQueue(true); });

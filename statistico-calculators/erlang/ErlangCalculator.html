@@ -99,7 +99,10 @@
     .erlang-btn { border: 0; border-radius: 9px; padding: 8px 12px; font: 700 0.82rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
     .erlang-btn-primary { background: rgba(120, 200, 255, 0.1); color: #8ec8ef; border: 1px solid rgba(120, 200, 255, 0.4); }
     html[data-theme="light"] .erlang-btn-primary { color: #1d4e89; background: rgba(120, 200, 255, 0.16); }
-    .erlang-btn-primary:disabled { opacity: 0.6; cursor: wait; }
+    body.mode-simulation #runBtn { padding: 12px 14px; font-size: 0.95rem; background: rgba(120, 200, 255, 0.28); border-color: #8ec8ef; color: #f4fbff; box-shadow: 0 0 0 2px rgba(120, 200, 255, 0.35); }
+    .result-badge { display: inline-block; margin-top: 6px; border: 1px solid rgba(120, 200, 255, 0.55); border-radius: 999px; padding: 2px 8px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #8ec8ef; }
+    .stale-banner { margin: 0 0 8px; border: 1px solid rgba(245, 158, 11, 0.7); background: rgba(245, 158, 11, 0.14); color: #fdba74; border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; font-weight: 800; }
+    .hero-card.provisional .v { font-size: 1.35rem; line-height: 1.15; }
     .erlang-btn-ghost { background: transparent; color: #d7e3f2; border: 1px solid #5d738c; }
     html[data-theme="light"] .erlang-btn-ghost { color: #1f2937; }
     .hero-card { border: 1px solid rgba(45, 212, 191, 0.45); border-left: 3px solid #14b8a6; border-radius: 10px; background: rgba(20, 184, 166, 0.1); padding: 10px 12px; margin-bottom: 8px; }
@@ -273,12 +276,14 @@
           </div>
         </div>
         <div class="erlang-panel">
-          <h2 class="erlang-panel-title"><i class="fa-solid fa-chart-column"></i> Staffing results</h2>
-          <div class="hero-card">
+          <h2 class="erlang-panel-title" id="resultsTitle"><i class="fa-solid fa-chart-column"></i> Staffing results</h2>
+          <p class="stale-banner" id="staleBanner" hidden>Results out of date — rerun simulation</p>
+          <div class="hero-card" id="heroCard">
             <div class="hero-main">
               <div>
                 <div class="k" id="heroLabel">Available agents</div>
                 <div class="v" id="heroValue">—</div>
+                <span class="result-badge" id="heroBadge" hidden></span>
               </div>
               <div class="hero-facts">
                 <p id="scheduleLine"></p>
@@ -354,6 +359,7 @@
   var running = false;
   var displayed = null;
   var replayReady = null;
+  var resultsStale = false;
 
   if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
   if (window.StatisticoThemeToggle) StatisticoThemeToggle.mount({ container: document.querySelector(".st-calc-header-right") });
@@ -422,22 +428,48 @@
       return;
     }
     model.scheduledAgents = staff.scheduledAgents;
-    if (finding && input.shrinkageEnabled) {
+    var provisional = mode === "simulation" && model.source !== "simulation";
+    document.getElementById("heroCard").classList.toggle("provisional", provisional);
+    document.getElementById("staleBanner").hidden = !resultsStale;
+    document.getElementById("resultsTitle").lastChild.textContent = provisional ? " Preliminary staffing estimate" : (model.source === "simulation" ? " Simulation result" : " Staffing results");
+    var badge = document.getElementById("heroBadge");
+    if (provisional) {
+      setText("heroLabel", "Starting estimate");
+      setText("heroValue", model.availableAgents + " active agents");
+      badge.hidden = false;
+      badge.textContent = "Erlang C baseline";
+      setText("scheduleLine", input.shrinkageEnabled ? "Shrinkage would schedule " + staff.scheduledAgents + " agents." : "Shrinkage is off.");
+    } else if (model.source === "simulation") {
+      setText("heroLabel", finding ? "Simulation staffing" : "Active agents");
+      setText("heroValue", String(model.availableAgents));
+      badge.hidden = false;
+      badge.textContent = "Mean across " + (model.replications || 1) + " replications";
+      setText("scheduleLine", finding && input.shrinkageEnabled
+        ? "Agents to schedule: " + staff.scheduledAgents + " at " + shrink + "% shrinkage."
+        : (finding ? "Shrinkage is off." : (input.shrinkageEnabled ? "Agents to schedule: " + staff.scheduledAgents + "." : "Current staffing: " + model.availableAgents + " active agents.")));
+    } else if (finding && input.shrinkageEnabled) {
+      badge.hidden = true;
       setText("heroLabel", "Active agents required");
       setText("scheduleLine", "Agents to schedule: " + staff.scheduledAgents + ". Shrinkage assumption: " + shrink + "%. Additional scheduled agents: " + staff.additionalAgents + ".");
     } else if (finding) {
+      badge.hidden = true;
       setText("heroLabel", "Agents required");
       setText("scheduleLine", "Shrinkage is off.");
     } else if (input.shrinkageEnabled) {
+      badge.hidden = true;
       setText("heroLabel", "Active agents");
       setText("scheduleLine", "Agents to schedule: " + staff.scheduledAgents + ". Shrinkage assumption: " + shrink + "%.");
     } else {
       setText("heroLabel", "Agents required");
       setText("scheduleLine", "Current staffing: " + model.availableAgents + " active agents. Shrinkage is off.");
+      badge.hidden = true;
     }
-    setText("heroValue", String(model.availableAgents));
-    var methodName = model.source === "simulation" ? "Service level" : "Service level";
-    setText("slLine", methodName + ": " + pct1(model.serviceLevel) + " within " + wait + " seconds");
+    if (!provisional && model.source !== "simulation") setText("heroValue", String(model.availableAgents));
+    var spread = "";
+    if (model.source === "simulation" && model.serviceLevelLow != null && model.serviceLevelHigh != null && model.replications > 1) {
+      spread = " Replication range " + pct1(model.serviceLevelLow) + "–" + pct1(model.serviceLevelHigh) + ".";
+    }
+    setText("slLine", (model.source === "simulation" ? "Mean service level: " : "Service level: ") + pct1(model.serviceLevel) + " within " + wait + " seconds." + spread);
     document.getElementById("slLine").title = "Service level = calls answered within the target time ÷ calls offered.";
     setText("gapLine", Math.abs(gap) < 0.05
       ? "Target: " + target + "% · at target"
@@ -446,10 +478,9 @@
     setText("queueLengthValue", formatQueueLength(model.averageQueueLength));
     setText("occValue", model.occupancy == null ? "—" : pct1(model.occupancy));
     var abandonLabel = "Not modeled";
-    if (model.source === "simulation") {
-      abandonLabel = model.abandonment && model.abandonment.enabled ? pct1(model.abandonmentRate) : "Abandonment disabled";
-    } else if (mode === "simulation") abandonLabel = "Awaiting simulation";
-    setText("abandonValue", model.abandonmentRate == null && !(model.abandonment && model.abandonment.enabled === false && model.source === "simulation") ? abandonLabel : (model.source === "simulation" && model.abandonment && !model.abandonment.enabled ? "Abandonment disabled" : (model.abandonmentRate == null ? abandonLabel : pct1(model.abandonmentRate))));
+    if (provisional) abandonLabel = "Not simulated";
+    else if (model.source === "simulation") abandonLabel = model.abandonment && model.abandonment.enabled ? pct1(model.abandonmentRate) : "Abandonment disabled";
+    setText("abandonValue", abandonLabel);
     setText("trafficValue", model.traffic.toFixed(2) + " Erl");
     var insight;
     if (model.source === "simulation") {
@@ -457,7 +488,7 @@
       insight += " Offered " + model.abandonment.offeredCalls + ", answered " + model.abandonment.answeredCalls + ", abandoned " + model.abandonment.abandonedCalls + ".";
       if (input.shrinkageEnabled) insight += " " + model.availableAgents + " active positions require " + model.scheduledAgents + " scheduled agents at " + shrink + "% shrinkage.";
     } else if (mode === "simulation") {
-      insight = "Preliminary Erlang C estimate. Run the simulation to include abandonment and service-time variability.";
+      insight = "Run the simulation to include abandonment and service-time variability.";
     } else {
       insight = model.availableAgents + " agents available to take calls.";
       if (shrink > 0) insight += " With " + shrink + "% shrinkage, schedule " + model.scheduledAgents + " agents.";
@@ -465,14 +496,16 @@
     setText("insightText", insight);
     drawCurve(model);
     var replayBtn = document.getElementById("openReplay");
-    if (model.source === "simulation") {
+    if (model.source === "simulation" && !resultsStale) {
       replayReady = model;
       replayBtn.disabled = false;
     } else {
-      replayReady = null;
+      if (model.source !== "simulation") replayReady = null;
       replayBtn.disabled = true;
-      closeReplay();
-      stopQueuePlayback(true);
+      if (!resultsStale) {
+        closeReplay();
+        stopQueuePlayback(true);
+      }
     }
   }
 
@@ -488,7 +521,7 @@
     setText("waitValue", "—");
     setText("queueLengthValue", "—");
     setText("occValue", "—");
-    setText("abandonValue", mode === "simulation" ? "Awaiting simulation" : "—");
+    setText("abandonValue", mode === "simulation" ? "Not simulated" : "—");
     setText("trafficValue", isFinite(traffic) && traffic > 0 ? traffic.toFixed(2) + " Erl" : "—");
     stopQueuePlayback(true);
     if (unstable && direction === "fixedAgents" && agents >= 1 && isFinite(traffic)) {
@@ -590,8 +623,12 @@
       svg.appendChild(targetLabel);
     }
     var d = "";
-    rows.forEach(function (row, i) { d += (i ? " L " : "M ") + px(row.agents) + " " + py(row.serviceLevel); });
-    svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: "rgb(120,200,255)", "stroke-width": "2.2" }));
+    if (model.source !== "simulation") {
+      rows.forEach(function (row, i) { d += (i ? " L " : "M ") + px(row.agents) + " " + py(row.serviceLevel); });
+      svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: "rgb(120,200,255)", "stroke-width": "2.2" }));
+    } else if (model.serviceLevelLow != null && model.serviceLevelHigh != null) {
+      svg.appendChild(svgEl("line", { x1: px(model.availableAgents), y1: py(model.serviceLevelLow), x2: px(model.availableAgents), y2: py(model.serviceLevelHigh), stroke: "#8ec8ef", "stroke-width": "6", "stroke-linecap": "round" }));
+    }
     if (model.source === "simulation" && model.bandLow != null && model.bandHigh != null) {
       var yHi = py(model.bandHigh);
       var yLo = py(model.bandLow);
@@ -611,9 +648,13 @@
     chosen.textContent = model.availableAgents + " agents · " + pct1(model.serviceLevel);
     svg.appendChild(chosen);
     if (model.source === "simulation") {
-      var ref = svgEl("text", { x: L + 4, y: H - 22, fill: muted(), "font-size": "10" });
-      ref.textContent = "Curve: Erlang C";
+      var ref = svgEl("text", { x: L + 4, y: 16, fill: muted(), "font-size": "11", "font-weight": "700" });
+      ref.textContent = "Simulation result";
       svg.appendChild(ref);
+    } else if (mode === "simulation") {
+      var prelim = svgEl("text", { x: L + 4, y: 16, fill: muted(), "font-size": "11", "font-weight": "700" });
+      prelim.textContent = "Preliminary Erlang C service-level curve";
+      svg.appendChild(prelim);
     }
     var xLabel = svgEl("text", { x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle", fill: muted(), "font-size": "11", "font-weight": "700" });
     xLabel.textContent = "Available agents";
@@ -647,6 +688,9 @@
       availableAgents: agents,
       scheduledAgents: staff.ok ? staff.scheduledAgents : agents,
       serviceLevel: summary.serviceLevel,
+      serviceLevelLow: summary.serviceLevelLow,
+      serviceLevelHigh: summary.serviceLevelHigh,
+      replications: summary.replications,
       occupancy: summary.occupancy,
       avgWaitSeconds: summary.averageWaitAnsweredSeconds,
       averageQueueLength: summary.averageQueueLength,
@@ -727,6 +771,7 @@
           var replay = window.QueueSim.run(simulationSpec(agents, true));
           summary.events = replay.events;
         }
+        resultsStale = false;
         render(fromQueueSim(summary, agents));
         if (summary.targetsMet === false) {
           setText("insightText", document.getElementById("insightText").textContent + " No staffing level within range met both the service level and the abandonment target.");
@@ -747,6 +792,19 @@
     else document.body.classList.remove("view-queue", "view-chart");
     document.getElementById("modeErlang").checked = next === "erlang";
     document.getElementById("modeSim").checked = next === "simulation";
+    resultsStale = false;
+    displayed = null;
+    refreshLocal();
+  }
+  function noteInputChange() {
+    if (mode === "simulation" && displayed && displayed.source === "simulation") {
+      resultsStale = true;
+      document.getElementById("staleBanner").hidden = false;
+      document.getElementById("openReplay").disabled = true;
+      closeReplay();
+      return;
+    }
+    resultsStale = false;
     displayed = null;
     refreshLocal();
   }
@@ -755,8 +813,7 @@
     document.body.classList.toggle("dir-fixed", next === "fixedAgents");
     document.getElementById("dirFind").classList.toggle("active", next === "findAgents");
     document.getElementById("dirFixed").classList.toggle("active", next === "fixedAgents");
-    displayed = null;
-    refreshLocal();
+    noteInputChange();
   }
 
   document.getElementById("modeErlang").addEventListener("change", function () { if (this.checked) setMode("erlang"); });
@@ -765,18 +822,16 @@
   document.getElementById("dirFixed").addEventListener("click", function () { setDirection("fixedAgents"); });
   document.getElementById("shrinkOn").addEventListener("change", function () {
     document.body.classList.toggle("shrink-on", document.getElementById("shrinkOn").checked);
-    displayed = null;
-    refreshLocal();
+    noteInputChange();
   });
   document.getElementById("abandonOn").addEventListener("change", function () {
     document.body.classList.toggle("abandon-off", !document.getElementById("abandonOn").checked);
+    noteInputChange();
   });
-  ["calls", "aht", "wait", "target", "agents", "shrink"].forEach(function (id) {
-    document.getElementById(id).addEventListener("input", function () {
-      displayed = null;
-      refreshLocal();
-    });
+  ["calls", "aht", "wait", "target", "agents", "shrink", "patience", "simTime", "reps", "maxAbandon"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", noteInputChange);
   });
+  document.getElementById("distribution").addEventListener("change", noteInputChange);
   document.getElementById("runBtn").addEventListener("click", runSimulation);
   document.getElementById("resetBtn").addEventListener("click", function () {
     Object.keys(defaults).forEach(function (id) {
@@ -786,6 +841,7 @@
     document.getElementById("shrinkOn").checked = false;
     document.getElementById("abandonOn").checked = true;
     document.body.classList.remove("shrink-on", "abandon-off");
+    resultsStale = false;
     displayed = null;
     setDirection("findAgents");
     setMode("erlang");

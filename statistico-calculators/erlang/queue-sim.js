@@ -273,7 +273,12 @@
       acc.horizon += part.horizon;
       acc.agentHorizons += part.horizon * part.agents;
     });
+    var levels = parts.map(function (part) {
+      return part.offeredCalls > 0 ? part.answeredWithinTarget / part.offeredCalls : 0;
+    });
     var offered = acc.offeredCalls;
+    var levelLow = levels.length ? Math.min.apply(null, levels) : 0;
+    var levelHigh = levels.length ? Math.max.apply(null, levels) : 0;
     return {
       offeredCalls: offered,
       answeredCalls: acc.answeredCalls,
@@ -282,6 +287,8 @@
       stillWaiting: acc.stillWaiting,
       abandonmentRate: offered > 0 ? acc.abandonedCalls / offered : 0,
       serviceLevel: offered > 0 ? acc.answeredWithinTarget / offered : 0,
+      serviceLevelLow: levelLow,
+      serviceLevelHigh: levelHigh,
       averageWaitAnsweredSeconds: acc.answeredCalls > 0 ? acc.waitAnsweredSum / acc.answeredCalls : 0,
       averageWaitBeforeAbandonmentSeconds: acc.abandonedCalls > 0 ? acc.waitAbandonedSum / acc.abandonedCalls : 0,
       maximumQueueLength: acc.maxQueueLength,

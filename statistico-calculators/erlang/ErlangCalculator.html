@@ -116,6 +116,16 @@
     body.mode-simulation.view-queue .live-queue { display: flex; }
     body.mode-simulation.view-queue #chartPanel { display: none; }
     .queue-controls, .queue-counters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .live-queue:not(.has-replay) .queue-controls,
+    .live-queue:not(.has-replay) .queue-counters,
+    .live-queue:not(.has-replay) .queue-zones,
+    .live-queue:not(.has-replay) .replay-note,
+    .live-queue:not(.has-replay) .queue-status { display: none; }
+    .live-queue.has-replay .queue-empty { display: none; }
+    .queue-empty { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 6px; min-height: 180px; margin: 0; padding: 28px 18px; border: 1px dashed rgba(120, 200, 255, 0.35); border-radius: 10px; color: #d7e3f2; }
+    .queue-empty strong { font-size: 0.95rem; color: #e8eef8; }
+    .queue-empty p { margin: 0; max-width: 420px; font-size: 0.82rem; line-height: 1.4; }
+    .replay-note { margin: 0; font-size: 0.75rem; color: #8ec8ef; }
     .queue-controls button, .speed button { border: 1px solid rgba(120, 200, 255, 0.4); background: rgba(120, 200, 255, 0.1); color: #8ec8ef; border-radius: 8px; padding: 5px 8px; font: 700 0.72rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
     .speed button.active { box-shadow: inset 0 0 0 1px #8ec8ef; }
     .queue-counters span { border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; color: #d7e3f2; }
@@ -245,17 +255,22 @@
           </div>
           <div class="insight"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="insightText">Erlang C updates as you type. Simulation runs when you ask it to.</p></div>
           <div class="result-tabs" id="resultTabs">
-            <button type="button" id="tabQueue">Live queue</button>
+            <button type="button" id="tabQueue">Simulation replay</button>
             <button type="button" id="tabChart">Performance charts</button>
           </div>
           <div class="live-queue" id="liveQueue">
+            <div class="queue-empty" id="queueEmpty">
+              <strong>No simulation replay yet</strong>
+              <p>Run the simulation to generate arrivals, queues, agent assignments and abandonments.</p>
+            </div>
+            <p class="replay-note">Representative 30-minute replay. Summary cards use every replication.</p>
             <div class="queue-controls">
-              <button type="button" id="queuePlay">Play</button>
-              <button type="button" id="queueRestart">Restart</button>
+              <button type="button" id="queuePlay" disabled>Play</button>
+              <button type="button" id="queueRestart" disabled>Restart</button>
               <div class="speed" role="group" aria-label="Playback speed" title="Playback speed does not affect simulation calculations.">
-                <button type="button" data-speed="1" title="Playback speed does not affect simulation calculations.">Normal</button>
-                <button type="button" data-speed="10" class="active" title="Playback speed does not affect simulation calculations.">Fast</button>
-                <button type="button" data-speed="30" title="Playback speed does not affect simulation calculations.">Very fast</button>
+                <button type="button" data-speed="1" disabled title="Playback speed does not affect simulation calculations.">Normal</button>
+                <button type="button" data-speed="10" class="active" disabled title="Playback speed does not affect simulation calculations.">Fast</button>
+                <button type="button" data-speed="30" disabled title="Playback speed does not affect simulation calculations.">Very fast</button>
               </div>
               <span id="queueClock">00:00</span>
             </div>
@@ -318,6 +333,16 @@
     if (!(shrink > 0) || shrink >= 100) return available;
     return Math.ceil(available / (1 - shrink / 100));
   }
+  function staffingSentence(agents, shrink, scheduled, finding) {
+    if (finding) {
+      return shrink > 0
+        ? scheduled + " agents scheduled after " + shrink + "% shrinkage"
+        : "Schedule " + agents + " agents. Shrinkage is off.";
+    }
+    return shrink > 0
+      ? "Current staffing: " + agents + " available agents. Schedule " + scheduled + " after " + shrink + "% shrinkage."
+      : "Current staffing: " + agents + " available agents. Shrinkage is off.";
+  }
 
   function render(model) {
     displayed = model;
@@ -333,9 +358,7 @@
     var finding = direction !== "fixedAgents";
     setText("heroLabel", finding ? "Required available agents" : "Available agents");
     setText("heroValue", String(model.availableAgents));
-    setText("scheduleLine", shrink > 0
-      ? model.scheduledAgents + " agents scheduled after " + shrink + "% shrinkage"
-      : "Schedule " + model.availableAgents + " agents. Shrinkage is off.");
+    setText("scheduleLine", staffingSentence(model.availableAgents, shrink, model.scheduledAgents, finding));
     var methodName = model.source === "simulation" ? "Estimated service level" : "Service level";
     setText("slLine", methodName + ": " + pct1(model.serviceLevel) + " within " + wait + " seconds");
     setText("gapLine", Math.abs(gap) < 0.05
@@ -343,12 +366,18 @@
       : "Target: " + target + "% · " + Math.abs(gap).toFixed(1) + " percentage points " + (gap > 0 ? "above" : "below") + " target");
     setText("waitValue", model.avgWaitSeconds == null ? "—" : model.avgWaitSeconds.toFixed(1) + "s");
     setText("occValue", model.occupancy == null ? "—" : pct1(model.occupancy));
-    setText("abandonValue", model.abandonmentRate == null ? "Not modeled" : pct1(model.abandonmentRate));
+    setText("abandonValue", model.abandonmentRate == null ? (mode === "simulation" ? "Awaiting simulation" : "Not modeled") : pct1(model.abandonmentRate));
     setText("trafficValue", model.traffic.toFixed(2) + " Erl");
-    var insight = model.availableAgents + " agents available to take calls.";
-    if (shrink > 0) insight += " With " + shrink + "% shrinkage, schedule " + model.scheduledAgents + " agents.";
-    if (model.source === "simulation") insight += " This service level is the simulation estimate.";
-    else if (mode === "simulation") insight += " This is the Erlang C figure. Run simulation to replace it.";
+    var insight;
+    if (model.source === "simulation") {
+      insight = "This service level is the simulation estimate.";
+      if (shrink > 0) insight += " With " + shrink + "% shrinkage, schedule " + model.scheduledAgents + " agents.";
+    } else if (mode === "simulation") {
+      insight = "Preliminary Erlang C estimate. Run the simulation to include abandonment and service-time variability.";
+    } else {
+      insight = model.availableAgents + " agents available to take calls.";
+      if (shrink > 0) insight += " With " + shrink + "% shrinkage, schedule " + model.scheduledAgents + " agents.";
+    }
     setText("insightText", insight);
     drawCurve(model);
     if (model.source === "simulation") startQueuePlayback(model);
@@ -366,16 +395,14 @@
     if (chart) chart.textContent = "";
     setText("waitValue", "—");
     setText("occValue", "—");
-    setText("abandonValue", "—");
+    setText("abandonValue", mode === "simulation" ? "Awaiting simulation" : "—");
     setText("trafficValue", isFinite(traffic) && traffic > 0 ? traffic.toFixed(2) + " Erl" : "—");
     stopQueuePlayback(true);
     if (unstable && direction === "fixedAgents" && agents >= 1 && isFinite(traffic)) {
       var shrink = input.shrinkageEnabled ? Number(input.shrinkagePercent) : 0;
       setText("heroLabel", "Available agents");
       setText("heroValue", String(agents));
-      setText("scheduleLine", shrink > 0
-        ? scheduledCount(agents, input) + " agents scheduled after " + shrink + "% shrinkage"
-        : "Schedule " + agents + " agents. Shrinkage is off.");
+      setText("scheduleLine", staffingSentence(agents, shrink, scheduledCount(agents, input), false));
       setText("slLine", "No steady-state service level");
       setText("gapLine", "Offered load is " + traffic.toFixed(1) + " Erlangs");
       setText("insightText", mode === "simulation"
@@ -664,32 +691,48 @@
       queue.calls = {};
       queue.answered = 0;
       queue.abandoned = 0;
-      document.getElementById("queueStatus").textContent = "Run the simulation to view call flow.";
+      document.getElementById("queueStatus").textContent = "";
+      setReplayChrome(false);
       paintQueue();
     }
   }
+  function setReplayChrome(on) {
+    document.getElementById("liveQueue").classList.toggle("has-replay", !!on);
+    document.getElementById("queuePlay").disabled = !on;
+    document.getElementById("queueRestart").disabled = !on;
+    document.querySelectorAll(".speed button").forEach(function (button) { button.disabled = !on; });
+  }
   function startQueuePlayback(model) {
+    var fullSeconds = Math.max(1, model.simSeconds || 1800);
+    var replaySeconds = Math.min(1800, fullSeconds);
+    var scale = replaySeconds / fullSeconds;
     var arrivals = model.simRaw && (model.simRaw.total_arrivals || model.simRaw.total_customers);
-    if (!arrivals) {
-      arrivals = Math.max(0, Math.round((model.traffic || 0) * (model.simSeconds / 3600)));
-    }
+    if (!arrivals) arrivals = Math.max(0, Math.round((model.traffic || 0) * (fullSeconds / 3600)));
+    arrivals = Number(arrivals);
     var abandonedCount = model.simRaw && model.simRaw.abandoned_customers != null
       ? Number(model.simRaw.abandoned_customers)
       : Math.round(arrivals * (model.abandonmentRate || 0));
     var completedCount = model.simRaw && model.simRaw.completed_customers != null
       ? Number(model.simRaw.completed_customers)
       : Math.max(0, arrivals - abandonedCount);
+    var replayArrivals = Math.max(0, Math.round(arrivals * scale));
+    var replayAbandoned = Math.min(replayArrivals, Math.max(0, Math.round(abandonedCount * scale)));
+    var replayCompleted = Math.max(0, Math.round(completedCount * scale));
+    var serverEvents = model.simRaw && (model.simRaw.events || model.simRaw.event_log);
+    if (Array.isArray(serverEvents)) {
+      serverEvents = serverEvents.filter(function (ev) { return Number(ev.time) <= replaySeconds; });
+    }
     var built = window.QueuePlayback.buildEventLog({
       agents: model.availableAgents,
       ahtSeconds: model.ahtSeconds,
       patienceSeconds: model.patienceSeconds,
-      simSeconds: model.simSeconds,
-      arrivals: arrivals,
-      completed: completedCount,
-      abandoned: abandonedCount,
-      blocked: model.simRaw && model.simRaw.blocked_customers ? Number(model.simRaw.blocked_customers) : 0,
-      retrials: model.simRaw && model.simRaw.retrial_customers ? Number(model.simRaw.retrial_customers) : 0,
-      events: model.simRaw && (model.simRaw.events || model.simRaw.event_log)
+      simSeconds: replaySeconds,
+      arrivals: replayArrivals,
+      completed: replayCompleted,
+      abandoned: replayAbandoned,
+      blocked: Math.round((model.simRaw && model.simRaw.blocked_customers ? Number(model.simRaw.blocked_customers) : 0) * scale),
+      retrials: Math.round((model.simRaw && model.simRaw.retrial_customers ? Number(model.simRaw.retrial_customers) : 0) * scale),
+      events: serverEvents
     });
     queue.events = built.events;
     queue.finalAnswered = built.totals.answered;
@@ -700,7 +743,8 @@
     document.body.classList.add("view-queue");
     document.getElementById("tabQueue").classList.add("active");
     document.getElementById("tabChart").classList.remove("active");
-    restartQueue(true);
+    setReplayChrome(true);
+    restartQueue(!queue.reduced);
   }
   function restartQueue(autoplay) {
     queue.index = 0;
@@ -711,7 +755,7 @@
     queue.done = false;
     paintQueue();
     if (autoplay) playQueue();
-    else document.getElementById("queueStatus").textContent = queue.events.length ? "Paused at the start." : "Run the simulation to view call flow.";
+    else document.getElementById("queueStatus").textContent = queue.events.length ? "Paused at the start." : "";
   }
   function playQueue() {
     if (!queue.events.length || queue.done) return;
@@ -749,7 +793,7 @@
       queue.done = true;
       if (queue.timer) clearInterval(queue.timer);
       document.getElementById("queuePlay").textContent = "Play";
-      document.getElementById("queueStatus").textContent = "Simulation complete.";
+      document.getElementById("queueStatus").textContent = "30-minute replay complete.";
     }
   }
   function paintQueue() {
@@ -767,7 +811,7 @@
     syncBubbles(inHost, incoming, function () { return ""; });
     var shown = waiting.slice(0, 8);
     syncBubbles(qHost, shown, function (c) { return Math.round(c.wait) + "s"; });
-    if (!shown.length && !qHost.querySelector(".zone-empty")) qHost.appendChild(el("p", { class: "zone-empty" }, "No callers currently waiting."));
+    if (queue.events.length && !shown.length && !qHost.querySelector(".zone-empty")) qHost.appendChild(el("p", { class: "zone-empty" }, "No callers currently waiting."));
     if (shown.length) {
       var emptyWait = qHost.querySelector(".zone-empty");
       if (emptyWait) emptyWait.remove();
@@ -803,8 +847,8 @@
     document.getElementById("countLongest").textContent = "Longest current wait: " + Math.round(longest) + "s";
     document.getElementById("queueClock").textContent = clockText(queue.time);
     var status = document.getElementById("queueStatus");
-    if (!queue.events.length) status.textContent = "Run the simulation to view call flow.";
-    else if (queue.done) status.textContent = "Simulation complete.";
+    if (!queue.events.length) status.textContent = "";
+    else if (queue.done) status.textContent = "30-minute replay complete.";
     else if (queue.playing && inService.length && !incoming.length) status.textContent = "Calls with a free agent go straight to the board.";
     else if (queue.playing) status.textContent = "Playing the recorded call flow.";
   }
@@ -849,6 +893,7 @@
     document.getElementById("queuePlay").textContent = "Play";
   });
   document.getElementById("queuePlay").addEventListener("click", function () {
+    if (this.disabled || !queue.events.length) return;
     if (queue.playing) {
       queue.playing = false;
       this.textContent = "Play";

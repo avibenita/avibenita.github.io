@@ -125,7 +125,10 @@
     html[data-theme="light"] .queue-zone { background: #f8fafc; }
     .queue-zone h3 { margin: 0 0 6px; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8ec8ef; }
     .bubbles, .agent-grid { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
-    .caller { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 0.62rem; font-weight: 800; color: #042f2e; background: #5eead4; }
+    .caller { width: 42px; min-height: 42px; border-radius: 21px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font-size: 0.58rem; font-weight: 800; color: #042f2e; background: #5eead4; }
+    .caller.slide-in { animation: call-slide 0.45s ease; }
+    @keyframes call-slide { from { transform: translateX(-36px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .agent-name { display: flex; align-items: center; gap: 4px; }
     .caller small { display: block; font-size: 0.55rem; }
     .caller.abandon { background: #fdba74; color: #431407; }
     .caller.done { background: #86efac; color: #052e16; }
@@ -138,7 +141,7 @@
     html[data-theme="light"] .agent.available { color: #115e59; }
     html[data-theme="light"] .agent.busy { color: #9a3412; }
     @media (max-width: 1100px) { .queue-zones { grid-template-columns: 1fr 1fr; } .queue-zones .agents-zone { grid-column: 1 / -1; } }
-    @media (prefers-reduced-motion: reduce) { .caller, .agent { transition: none; } }
+    @media (prefers-reduced-motion: reduce) { .caller, .agent, .caller.slide-in { transition: none; animation: none; } }
     #staffingChart { flex: 1 1 auto; min-height: 240px; }
     #staffingChart svg { width: 100%; height: 100%; display: block; }
     #agentsField { display: none; }
@@ -319,11 +322,7 @@
   function render(model) {
     displayed = model;
     if (!model || !model.ok) {
-      setText("heroValue", "—");
-      setText("scheduleLine", "");
-      setText("slLine", "");
-      setText("gapLine", "");
-      setText("insightText", model && model.error ? model.error : "Enter demand and a service target.");
+      showUnsolved(model);
       return;
     }
     var input = read();
@@ -354,6 +353,41 @@
     drawCurve(model);
     if (model.source === "simulation") startQueuePlayback(model);
     else stopQueuePlayback(true);
+  }
+
+  function showUnsolved(model) {
+    var input = read();
+    var calls = Number(input.callsPerHour);
+    var aht = Number(input.ahtSeconds);
+    var traffic = (calls * aht) / 3600;
+    var agents = Math.floor(Number(input.agents));
+    var unstable = !!(model && model.error && model.error.indexOf("does not settle") !== -1);
+    var chart = document.getElementById("staffingChart");
+    if (chart) chart.textContent = "";
+    setText("waitValue", "—");
+    setText("occValue", "—");
+    setText("abandonValue", "—");
+    setText("trafficValue", isFinite(traffic) && traffic > 0 ? traffic.toFixed(2) + " Erl" : "—");
+    stopQueuePlayback(true);
+    if (unstable && direction === "fixedAgents" && agents >= 1 && isFinite(traffic)) {
+      var shrink = input.shrinkageEnabled ? Number(input.shrinkagePercent) : 0;
+      setText("heroLabel", "Available agents");
+      setText("heroValue", String(agents));
+      setText("scheduleLine", shrink > 0
+        ? scheduledCount(agents, input) + " agents scheduled after " + shrink + "% shrinkage"
+        : "Schedule " + agents + " agents. Shrinkage is off.");
+      setText("slLine", "No steady-state service level");
+      setText("gapLine", "Offered load is " + traffic.toFixed(1) + " Erlangs");
+      setText("insightText", mode === "simulation"
+        ? agents + " agents are below the offered load of " + traffic.toFixed(1) + " Erlangs, so Erlang C has no finite wait. Run the simulation. Abandonment keeps the queue finite."
+        : model.error);
+      return;
+    }
+    setText("heroValue", "—");
+    setText("scheduleLine", "");
+    setText("slLine", "");
+    setText("gapLine", "");
+    setText("insightText", model && model.error ? model.error : "Enter demand and a service target.");
   }
 
   function fromLocal(result) {
@@ -729,18 +763,15 @@
     calls.forEach(function (c) { if (c.state === "service" && c.agentId) busy[c.agentId] = c; });
     var inHost = document.getElementById("zoneIncoming");
     var qHost = document.getElementById("zoneQueue");
-    inHost.textContent = "";
-    qHost.textContent = "";
     var inService = calls.filter(function (c) { return c.state === "service"; });
-    if (!queue.events.length) {
-      inHost.appendChild(el("p", { class: "zone-empty" }, "Run the simulation to view call flow."));
-    } else if (!incoming.length) {
-      inHost.appendChild(el("p", { class: "zone-empty" }, inService.length ? "New calls that find a free agent go straight to that agent." : "No calls arriving."));
-    }
-    incoming.forEach(function (c) { inHost.appendChild(bubble(c, "In")); });
+    syncBubbles(inHost, incoming, function () { return ""; });
     var shown = waiting.slice(0, 8);
-    if (!shown.length) qHost.appendChild(el("p", { class: "zone-empty" }, "No callers currently waiting."));
-    shown.forEach(function (c) { qHost.appendChild(bubble(c, Math.round(c.wait) + "s")); });
+    syncBubbles(qHost, shown, function (c) { return Math.round(c.wait) + "s"; });
+    if (!shown.length && !qHost.querySelector(".zone-empty")) qHost.appendChild(el("p", { class: "zone-empty" }, "No callers currently waiting."));
+    if (shown.length) {
+      var emptyWait = qHost.querySelector(".zone-empty");
+      if (emptyWait) emptyWait.remove();
+    }
     document.getElementById("queueMore").textContent = waiting.length > 8 ? "+" + (waiting.length - 8) + " more waiting" : "";
     var board = document.getElementById("zoneAgents");
     board.textContent = "";
@@ -752,8 +783,11 @@
     for (i = 1; i <= headcount; i++) if (busy[i]) onCall += 1; else free += 1;
     for (i = 1; i <= limit; i++) {
       var card = el("div", { class: "agent " + (busy[i] ? "busy" : "available") });
-      card.appendChild(el("div", {}, (busy[i] ? "On call " : "Available ") + i));
-      if (busy[i]) card.appendChild(bubble(busy[i], busy[i].id.replace("c", "#")));
+      var name = el("div", { class: "agent-name" });
+      name.appendChild(el("i", { class: "fa-solid fa-headset", "aria-hidden": "true" }));
+      name.appendChild(document.createTextNode((busy[i] ? "On call " : "Available ") + i));
+      card.appendChild(name);
+      if (busy[i]) card.appendChild(bubble(busy[i], ""));
       board.appendChild(card);
     }
     var extra = headcount - limit;
@@ -768,11 +802,36 @@
     document.getElementById("countAbandoned").textContent = "Calls abandoned: " + queue.abandoned;
     document.getElementById("countLongest").textContent = "Longest current wait: " + Math.round(longest) + "s";
     document.getElementById("queueClock").textContent = clockText(queue.time);
-    if (queue.playing) document.getElementById("queueStatus").textContent = "Playing the recorded call flow.";
+    var status = document.getElementById("queueStatus");
+    if (!queue.events.length) status.textContent = "Run the simulation to view call flow.";
+    else if (queue.done) status.textContent = "Simulation complete.";
+    else if (queue.playing && inService.length && !incoming.length) status.textContent = "Calls with a free agent go straight to the board.";
+    else if (queue.playing) status.textContent = "Playing the recorded call flow.";
+  }
+  function syncBubbles(host, items, labelFor) {
+    var keep = {};
+    items.forEach(function (c) { keep[c.id] = true; });
+    Array.prototype.forEach.call(host.querySelectorAll(".caller"), function (node) {
+      if (!keep[node.getAttribute("data-id")]) node.remove();
+    });
+    items.forEach(function (c) {
+      var node = host.querySelector('.caller[data-id="' + c.id + '"]');
+      var label = labelFor(c);
+      if (!node) {
+        node = bubble(c, label);
+        node.setAttribute("data-id", c.id);
+        if (!queue.reduced) node.classList.add("slide-in");
+        host.appendChild(node);
+      } else {
+        var text = node.querySelector("span");
+        if (text) text.textContent = label;
+      }
+    });
   }
   function bubble(call, label) {
     var node = el("div", { class: "caller" + (call.state === "abandoned" ? " abandon" : "") });
-    node.textContent = label;
+    node.appendChild(el("i", { class: "fa-solid fa-user", "aria-hidden": "true" }));
+    node.appendChild(el("span", {}, label));
     return node;
   }
   document.getElementById("tabQueue").addEventListener("click", function () {

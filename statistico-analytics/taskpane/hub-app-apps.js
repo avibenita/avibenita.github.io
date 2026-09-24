@@ -516,7 +516,6 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "effect-size-family",
-    hidden: true, // temporarily hidden from the hub
     section: "Effect Sizes",
     sectionId: "effect-sizes",
     title: "Effect size converter",
@@ -525,20 +524,20 @@ const CALCULATOR_CATEGORY_TILES = [
     accentDark: "#0284c7",
     color: "#a855f7",
     colorDark: "#7e22ce",
-    subtitle: "Translate effect metrics across test families",
-    desc: "Convert between common effect-size metrics so you can compare or reuse results across different statistical tests.",
+    subtitle: "Convert common effect-size measures—with assumptions shown",
+    desc: "Convert an effect size you already have, and see which conversions are exact, which are approximations, and which inputs are still missing.",
     info: [
-      "Convert between common effect-size families",
-      "Useful when planning studies or pooling literature",
-      "Supports metrics used across t-tests, ANOVA, and correlations",
-      "Standalone converter — enter values directly"
+      "Mean differences, ANOVA, correlation, and binary outcomes",
+      "Each result is marked exact or approximate",
+      "Missing sample size, degrees of freedom, or baseline risk stay blank",
+      "Send a result to the Power Calculator or copy a meta-analysis row"
     ],
     modules: [
       {
         id: "calc-effect-size",
-        label: "Effect Size Converter",
-        tip: "Open the effect-size conversion family.",
-        dialogUrl: "https://statistico.live/statistico-calculators/hub.html?family=effect"
+        label: "Open converter",
+        tip: "Convert common effect-size measures, with assumptions shown.",
+        dialogUrl: "https://statistico.live/statistico-calculators/effect-size/EffectSizeConverter.html"
       }
     ]
   },
@@ -742,7 +741,7 @@ var CALC_SECTION_META = {
   "effect-sizes": {
     id: "effect-sizes",
     label: "Effect Sizes",
-    subtitle: "Convert between effect-size metrics.",
+    subtitle: "Convert common effect-size measures, with assumptions shown.",
     icon: "fa-right-left",
     color: "#a855f7",
     colorDark: "#7e22ce"

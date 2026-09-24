@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Effect Size Converter</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+  <link rel="stylesheet" href="../shared/analytics-lnf.css?v=20260924effect1"/>
+  <script src="../shared/shared-brand-logo.js?v=20260923logo1"></script>
+  <script src="../shared/theme-toggle-component.js?v=20260922calc1"></script>
+  <script src="./effect-size-math.js?v=20260924effect1"></script>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--surface-0); color: var(--text-primary); }
+    .st-calc-main { min-height: 0; overflow: hidden; }
+    .st-calc-header.effect-header { height: 96px; flex: 0 0 96px; grid-template-columns: 230px 1fr 200px; }
+    .effect-header-logo { height: 100%; display: flex; align-items: center; }
+    .effect-header-logo .sb-logo-icon { height: 62px; display: grid; place-items: center; }
+    .effect-header-logo img { max-height: 58px; width: auto; object-fit: contain; display: block; mix-blend-mode: screen; filter: brightness(1.1) contrast(1.04); }
+    html[data-theme="light"] .effect-header-logo img { mix-blend-mode: normal; filter: none; }
+    .st-calc-header.effect-header .st-calc-header-title { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; }
+    .st-calc-header-right .st-theme-icon, .st-calc-header-right .st-theme-label { display: none; }
+    .st-calc-workspace.effect-workspace { overflow: hidden; padding: 8px 10px; display: flex; flex-direction: column; min-height: 0; }
+    .effect-layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 10px; }
+    .effect-panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-height: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+    .effect-panel-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 0.92rem; font-weight: 800; color: var(--accent-1); flex: 0 0 auto; }
+    .inputs-scroll, .results-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding-right: 2px; }
+    .control-label, .effect-block h3 { margin: 0 0 6px; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: #d5e2f2; font-weight: 800; }
+    html[data-theme="light"] .control-label, html[data-theme="light"] .effect-block h3 { color: #1e3a5f; }
+    .seg { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+    .seg button { flex: 1 1 46%; border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 8px 6px; font: 700 0.72rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; line-height: 1.25; }
+    .seg button.active { border-color: #2dd4bf; background: rgba(20, 184, 166, 0.28); color: #f4fffd; box-shadow: inset 0 0 0 1px #2dd4bf; }
+    html[data-theme="light"] .seg button { color: #1f2937; border-color: #94a3b8; }
+    html[data-theme="light"] .seg button.active { color: #064e3b; background: rgba(20, 184, 166, 0.22); }
+    .effect-block { border: 1px solid var(--border); border-radius: 10px; background: rgba(14, 20, 27, 0.42); padding: 8px 10px; margin-bottom: 8px; }
+    html[data-theme="light"] .effect-block { background: #f8fafc; }
+    .field { margin-bottom: 6px; }
+    .field label { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 0.78rem; font-weight: 700; color: #e7eef8; }
+    html[data-theme="light"] .field label { color: #1e293b; }
+    .field input, .field select { width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.06); color: var(--text-primary); font: 600 0.88rem/1.2 "Montserrat", "Segoe UI", sans-serif; padding: 6px 8px; }
+    html[data-theme="light"] .field input, html[data-theme="light"] .field select { background: #fff; }
+    .hint { margin: 0 0 8px; font-size: 0.75rem; line-height: 1.4; color: #c5d4e8; }
+    html[data-theme="light"] .hint { color: #334155; }
+    .result-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: rgba(14, 20, 27, 0.35); }
+    html[data-theme="light"] .result-card { background: #f8fafc; }
+    .result-card.blocked { opacity: 0.92; border-style: dashed; }
+    .result-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .result-label { font-size: 0.78rem; font-weight: 800; color: #d5e2f2; }
+    html[data-theme="light"] .result-label { color: #1e3a5f; }
+    .result-value { font-size: 1.35rem; font-weight: 800; }
+    .badge { display: inline-block; margin-top: 4px; border-radius: 999px; padding: 2px 8px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+    .badge.exact { color: #042f2e; background: #5eead4; }
+    .badge.approximation { color: #431407; background: #fdba74; }
+    .badge.missing { color: #e8eef8; background: #475569; }
+    .result-card p { margin: 6px 0 0; font-size: 0.78rem; line-height: 1.4; color: #e8eef8; }
+    html[data-theme="light"] .result-card p { color: #1e293b; }
+    .formula { font-family: "Cambria Math", Georgia, serif; color: #f0b27a; }
+    .effect-actions { flex: 0 0 auto; display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+    .effect-btn { border: 0; border-radius: 9px; padding: 8px 10px; font: 700 0.78rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
+    .effect-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .effect-btn-primary { background: linear-gradient(135deg, #0f766e, #14b8a6); color: #fff; }
+    .effect-btn-ghost { background: transparent; color: #d7e3f2; border: 1px solid #5d738c; }
+    html[data-theme="light"] .effect-btn-ghost { color: #1f2937; }
+    .status { margin: 6px 0 0; font-size: 0.75rem; color: #c5d4e8; }
+    @media (max-width: 860px) {
+      .effect-layout { grid-template-columns: 1fr; }
+      .st-calc-workspace.effect-workspace { overflow: auto; }
+    }
+  </style>
+</head>
+<body>
+<div class="st-calc-shell">
+  <div class="st-calc-main">
+    <header class="st-calc-header effect-header">
+      <div class="effect-header-logo"><div class="sb-logo-icon" data-statistico-brand-logo data-logo-cluster="calculators"></div></div>
+      <div class="st-calc-header-title"><i class="fa-solid fa-right-left"></i> Effect Size Converter</div>
+      <div class="st-calc-header-right"></div>
+    </header>
+    <section class="st-calc-workspace effect-workspace">
+      <div class="effect-layout">
+        <div class="effect-panel">
+          <h2 class="effect-panel-title"><i class="fa-solid fa-sliders"></i> What you have</h2>
+          <div class="inputs-scroll">
+            <div class="control-label">Section</div>
+            <div class="seg" id="sectionSeg" role="tablist"></div>
+            <p class="hint" id="sectionHint"></p>
+            <div class="effect-block">
+              <h3>Source measure</h3>
+              <div class="field"><label for="source">Convert from</label><select id="source"></select></div>
+              <div class="field"><label for="value" id="valueLabel">Value</label><input id="value" type="number" step="any" value="0.5"/></div>
+            </div>
+            <div class="effect-block" id="extraBlock"></div>
+          </div>
+        </div>
+        <div class="effect-panel">
+          <h2 class="effect-panel-title"><i class="fa-solid fa-list-check"></i> Converted measures</h2>
+          <div class="results-scroll" id="results"></div>
+          <div class="effect-actions">
+            <button class="effect-btn effect-btn-primary" id="powerBtn" type="button">Use in Power Calculator</button>
+            <button class="effect-btn effect-btn-ghost" id="metaBtn" type="button">Send to Meta-analysis</button>
+          </div>
+          <p class="status" id="actionStatus"></p>
+        </div>
+      </div>
+    </section>
+    <footer class="statistico-footer">
+      2026 Statistico-Interactive (TM) - All rights reserved
+      <a class="statistico-footer-site-link" href="https://statistico.live/Statistico-Website/index.html" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> statistico.live</a>
+    </footer>
+  </div>
+</div>
+<script>
+(function () {
+  var math = window.EffectSizeMath;
+  var POWER = "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html";
+  var sections = {
+    mean: {
+      hint: "Cohen's d, Hedges' g, and r stay in the mean-difference family. An odds ratio is shown only as a logistic approximation, and only with a baseline risk.",
+      sources: [["d", "Cohen's d"], ["g", "Hedges' g"], ["r", "Correlation r"]],
+      extras: [
+        ["n1", "Group 1 sample size", ""],
+        ["n2", "Group 2 sample size", ""],
+        ["baseline", "Baseline risk (0–1), only for an odds-ratio approximation", ""]
+      ]
+    },
+    anova: {
+      hint: "In a one-way design, η² and partial η² are the same. In a factorial design they are not, and ordinary η² is not converted to Cohen's f.",
+      sources: [["partial", "Partial η²"], ["eta2", "η²"], ["f", "Cohen's f"], ["f2", "Cohen's f²"]],
+      extras: [["design", "Design", "oneway", [["oneway", "One-way"], ["factorial", "Factorial"]]]]
+    },
+    correlation: {
+      hint: "R² becomes a correlation only for one predictor. A multiple-regression R² stays a model effect and is not turned into r or Fisher's z.",
+      sources: [["r", "Correlation r"], ["r2", "R²"], ["z", "Fisher's z"], ["f2", "Cohen's f²"]],
+      extras: [
+        ["model", "Model", "simple", [["simple", "One predictor"], ["multiple", "Multiple regression"]]],
+        ["n", "Sample size, for a meta-analysis variance", ""],
+        ["predictors", "Number of predictors, for the power calculator", ""]
+      ]
+    },
+    binary: {
+      hint: "Risk ratio, risk difference, and NNT need the reference group's baseline risk. Odds ratio to Cohen's d is an approximation and is labeled as one.",
+      sources: [["or", "Odds ratio"], ["rr", "Risk ratio"], ["rd", "Risk difference"], ["nnt", "NNT"]],
+      extras: [
+        ["baseline", "Baseline risk (0–1)", ""],
+        ["direction", "If the source is NNT", "decrease", [["decrease", "Treatment lowers risk"], ["increase", "Treatment raises risk"]]]
+      ]
+    }
+  };
+  var section = "mean";
+  var last = null;
+
+  if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
+  if (window.StatisticoThemeToggle) StatisticoThemeToggle.mount({ container: document.querySelector(".st-calc-header-right") });
+
+  function el(tag, attrs, text) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+    if (text != null) node.textContent = text;
+    return node;
+  }
+
+  function renderSections() {
+    var host = document.getElementById("sectionSeg");
+    host.textContent = "";
+    [["mean", "Mean differences"], ["anova", "ANOVA"], ["correlation", "Correlation"], ["binary", "Binary outcomes"]].forEach(function (item) {
+      var button = el("button", { type: "button" }, item[1]);
+      if (item[0] === section) button.className = "active";
+      button.addEventListener("click", function () { section = item[0]; renderInputs(); convert(); });
+      host.appendChild(button);
+    });
+  }
+
+  function renderInputs() {
+    var spec = sections[section];
+    document.getElementById("sectionHint").textContent = spec.hint;
+    var source = document.getElementById("source");
+    source.textContent = "";
+    spec.sources.forEach(function (item) {
+      source.appendChild(el("option", { value: item[0] }, item[1]));
+    });
+    var extra = document.getElementById("extraBlock");
+    extra.textContent = "";
+    extra.appendChild(el("h3", {}, "Required only when the conversion needs them"));
+    spec.extras.forEach(function (item) {
+      var field = el("div", { class: "field" });
+      field.appendChild(el("label", { for: item[0] }, item[1]));
+      if (item[3]) {
+        var select = el("select", { id: item[0] });
+        item[3].forEach(function (opt) { select.appendChild(el("option", { value: opt[0] }, opt[1])); });
+        select.value = item[2];
+        select.addEventListener("change", convert);
+        field.appendChild(select);
+      } else {
+        var input = el("input", { id: item[0], type: "number", step: "any", value: item[2] });
+        input.addEventListener("input", convert);
+        field.appendChild(input);
+      }
+      extra.appendChild(field);
+    });
+    renderSections();
+  }
+
+  function extras() {
+    var out = {};
+    sections[section].extras.forEach(function (item) {
+      var node = document.getElementById(item[0]);
+      out[item[0]] = node ? node.value : "";
+    });
+    return out;
+  }
+
+  function fmt(n) {
+    if (n == null || !isFinite(n)) return "—";
+    var abs = Math.abs(n);
+    if (abs !== 0 && (abs < 0.001 || abs >= 1000)) return n.toExponential(3);
+    return n.toFixed(3);
+  }
+
+  function convert() {
+    var source = document.getElementById("source").value;
+    var out = math.convert(section, source, document.getElementById("value").value, extras());
+    last = out;
+    var host = document.getElementById("results");
+    host.textContent = "";
+    if (out.error) {
+      host.appendChild(el("p", { class: "hint" }, out.error));
+    }
+    (out.results || []).forEach(function (row) {
+      var card = el("article", { class: "result-card" + (row.missing && row.missing.length ? " blocked" : "") });
+      var top = el("div", { class: "result-top" });
+      top.appendChild(el("div", { class: "result-label" }, row.label));
+      top.appendChild(el("div", { class: "result-value" }, row.missing && row.missing.length ? "Needs input" : fmt(row.value)));
+      card.appendChild(top);
+      if (row.missing && row.missing.length) card.appendChild(el("span", { class: "badge missing" }, "Missing input"));
+      else if (row.kind === "exact") card.appendChild(el("span", { class: "badge exact" }, "Exact conversion"));
+      else card.appendChild(el("span", { class: "badge approximation" }, "Approximation"));
+      if (row.missing && row.missing.length) card.appendChild(el("p", {}, row.missing.join(" ")));
+      if (row.assumptions && row.assumptions.length) card.appendChild(el("p", {}, row.assumptions.join(" ")));
+      if (row.formula) card.appendChild(el("p", { class: "formula" }, row.formula));
+      if (row.interpretation) card.appendChild(el("p", {}, row.interpretation));
+      host.appendChild(card);
+    });
+    var power = out.power;
+    var powerBtn = document.getElementById("powerBtn");
+    powerBtn.disabled = !power || !!power.missing;
+    powerBtn.title = power && power.missing ? power.missing.join(" ") : "";
+    var meta = (out.results || []).filter(function (row) { return row.id === "meta"; })[0];
+    document.getElementById("metaBtn").disabled = !meta || !!(meta.missing && meta.missing.length);
+    document.getElementById("actionStatus").textContent = power && power.missing ? power.missing[0] : "";
+  }
+
+  function powerUrl() {
+    var power = last && last.power;
+    if (!power || power.missing) return "";
+    var q = ["test=" + encodeURIComponent(power.test), "autoCalculate=1"];
+    if (power.test === "two-sample-mean") q.push("effectSize=" + encodeURIComponent(power.effectSize));
+    if (power.test === "anova") q.push("f=" + encodeURIComponent(power.effectSizeF));
+    if (power.test === "correlation") q.push("r=" + encodeURIComponent(power.rho));
+    if (power.test === "regression") {
+      q.push("r2=" + encodeURIComponent(power.rsquared));
+      if (power.numPredictors) q.push("p=" + encodeURIComponent(power.numPredictors));
+    }
+    if (power.test === "two-sample-proportion") {
+      q.push("p1=" + encodeURIComponent(power.p1));
+      q.push("p2=" + encodeURIComponent(power.p2));
+    }
+    return POWER + "?" + q.join("&");
+  }
+
+  document.getElementById("source").addEventListener("change", convert);
+  document.getElementById("value").addEventListener("input", convert);
+  document.getElementById("powerBtn").addEventListener("click", function () {
+    var url = powerUrl();
+    if (url) window.open(url, "_blank", "noopener");
+  });
+  document.getElementById("metaBtn").addEventListener("click", function () {
+    var meta = (last.results || []).filter(function (row) { return row.id === "meta"; })[0];
+    if (!meta || (meta.missing && meta.missing.length)) return;
+    var text = "Study\t" + meta.measure + "\tSE\nConverter\t" + meta.value + "\t" + meta.se;
+    var done = function () { document.getElementById("actionStatus").textContent = "Copied one study row (" + meta.measure + " and SE). In Excel, open Meta-analysis and paste it as a direct effect."; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done);
+    else done();
+  });
+  renderInputs();
+  convert();
+})();
+</script>
+</body>
+</html>

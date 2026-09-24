@@ -9,6 +9,7 @@
   <script src="../shared/shared-brand-logo.js?v=20260923logo1"></script>
   <script src="../shared/theme-toggle-component.js?v=20260922calc1"></script>
   <script src="./erlang-math.js?v=20260923erlang1"></script>
+  <script src="./queue-playback.js?v=20260924queue1"></script>
   <style>
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--surface-0); color: var(--text-primary); }
     .st-calc-main { min-height: 0; overflow: hidden; }
@@ -107,6 +108,36 @@
     .insight p { margin: 0; }
     .chart-panel { flex: 1 1 auto; min-height: 260px; margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; background: rgba(14, 20, 27, 0.42); padding: 4px 8px 6px; display: flex; flex-direction: column; }
     html[data-theme="light"] .chart-panel { background: #f8fafc; }
+    .result-tabs { display: none; gap: 6px; margin: 8px 0; }
+    body.mode-simulation .result-tabs { display: flex; }
+    .result-tabs button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 6px 10px; font: 700 0.75rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
+    .result-tabs button.active { border-color: rgba(120, 200, 255, 0.55); background: rgba(120, 200, 255, 0.16); color: #d7ecfa; }
+    .live-queue { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 8px; }
+    body.mode-simulation.view-queue .live-queue { display: flex; }
+    body.mode-simulation.view-queue #chartPanel { display: none; }
+    .queue-controls, .queue-counters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .queue-controls button, .speed button { border: 1px solid rgba(120, 200, 255, 0.4); background: rgba(120, 200, 255, 0.1); color: #8ec8ef; border-radius: 8px; padding: 5px 8px; font: 700 0.72rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
+    .speed button.active { box-shadow: inset 0 0 0 1px #8ec8ef; }
+    .queue-counters span { border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; color: #d7e3f2; }
+    .queue-status { margin: 0; font-size: 0.78rem; color: #8ec8ef; }
+    .queue-zones { flex: 1 1 auto; min-height: 180px; display: grid; grid-template-columns: minmax(90px, 0.7fr) minmax(120px, 1fr) minmax(180px, 1.4fr); gap: 8px; }
+    .queue-zone { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: rgba(14, 20, 27, 0.35); min-width: 0; overflow: hidden; }
+    html[data-theme="light"] .queue-zone { background: #f8fafc; }
+    .queue-zone h3 { margin: 0 0 6px; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8ec8ef; }
+    .bubbles, .agent-grid { display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; }
+    .caller { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 0.62rem; font-weight: 800; color: #042f2e; background: #5eead4; }
+    .caller small { display: block; font-size: 0.55rem; }
+    .caller.abandon { background: #fdba74; color: #431407; }
+    .caller.done { background: #86efac; color: #052e16; }
+    .agent { width: 72px; border-radius: 8px; padding: 4px 6px; font-size: 0.62rem; font-weight: 800; border: 1px solid transparent; }
+    .agent.available { background: rgba(20, 184, 166, 0.2); color: #99f6e4; border-color: #14b8a6; }
+    .agent.busy { background: rgba(245, 158, 11, 0.2); color: #fdba74; border-color: #f59e0b; }
+    .agent-totals { margin-top: 6px; font-size: 0.72rem; color: #d7e3f2; }
+    .more-waiting, .zone-empty { font-size: 0.75rem; color: #c5d4e8; }
+    html[data-theme="light"] .agent.available { color: #115e59; }
+    html[data-theme="light"] .agent.busy { color: #9a3412; }
+    @media (max-width: 1100px) { .queue-zones { grid-template-columns: 1fr 1fr; } .queue-zones .agents-zone { grid-column: 1 / -1; } }
+    @media (prefers-reduced-motion: reduce) { .caller, .agent { transition: none; } }
     #staffingChart { flex: 1 1 auto; min-height: 240px; }
     #staffingChart svg { width: 100%; height: 100%; display: block; }
     #agentsField { display: none; }
@@ -209,7 +240,36 @@
             <div class="metric"><div class="metric-label">Offered load <span class="info-dot" tabindex="0" data-tip="Calls per hour × handle time / 3600, in Erlangs. One Erlang is one agent occupied for a full hour.">i</span></div><div class="metric-value" id="trafficValue">—</div></div>
           </div>
           <div class="insight"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="insightText">Erlang C updates as you type. Simulation runs when you ask it to.</p></div>
-          <div class="chart-panel"><div id="staffingChart"></div></div>
+          <div class="result-tabs" id="resultTabs">
+            <button type="button" id="tabQueue">Live queue</button>
+            <button type="button" id="tabChart">Performance charts</button>
+          </div>
+          <div class="live-queue" id="liveQueue">
+            <div class="queue-controls">
+              <button type="button" id="queuePlay">Play</button>
+              <button type="button" id="queueRestart">Restart</button>
+              <div class="speed" role="group" aria-label="Playback speed">
+                <button type="button" data-speed="1">1×</button>
+                <button type="button" data-speed="10" class="active">10×</button>
+                <button type="button" data-speed="30">30×</button>
+              </div>
+              <span id="queueClock">00:00</span>
+            </div>
+            <div class="queue-counters">
+              <span id="countWait">Waiting now: 0</span>
+              <span id="countFree">Available agents: 0</span>
+              <span id="countAnswered">Calls answered: 0</span>
+              <span id="countAbandoned">Calls abandoned: 0</span>
+              <span id="countLongest">Longest current wait: 0s</span>
+            </div>
+            <p class="queue-status" id="queueStatus">Run the simulation to view call flow.</p>
+            <div class="queue-zones">
+              <section class="queue-zone"><h3>Incoming calls</h3><div class="bubbles" id="zoneIncoming"></div></section>
+              <section class="queue-zone"><h3>Waiting queue</h3><div class="bubbles" id="zoneQueue"></div><p class="more-waiting" id="queueMore"></p></section>
+              <section class="queue-zone agents-zone"><h3>Agent board</h3><div class="agent-grid" id="zoneAgents"></div><p class="agent-totals" id="agentTotals"></p></section>
+            </div>
+          </div>
+          <div class="chart-panel" id="chartPanel"><div id="staffingChart"></div></div>
         </div>
       </div>
     </section>
@@ -291,6 +351,8 @@
     else if (mode === "simulation") insight += " This is the Erlang C figure. Run simulation to replace it.";
     setText("insightText", insight);
     drawCurve(model);
+    if (model.source === "simulation") startQueuePlayback(model);
+    else stopQueuePlayback(true);
   }
 
   function fromLocal(result) {
@@ -326,7 +388,11 @@
       abandonmentRate: abandon == null || !isFinite(abandon) ? null : abandon / 100,
       traffic: (Number(input.callsPerHour) * Number(input.ahtSeconds)) / 3600,
       bandLow: sim.service_level_ci_low != null ? Number(sim.service_level_ci_low) / 100 : null,
-      bandHigh: sim.service_level_ci_high != null ? Number(sim.service_level_ci_high) / 100 : null
+      bandHigh: sim.service_level_ci_high != null ? Number(sim.service_level_ci_high) / 100 : null,
+      simRaw: sim,
+      ahtSeconds: Number(input.ahtSeconds),
+      patienceSeconds: Number(document.getElementById("patience").value),
+      simSeconds: Number(document.getElementById("simTime").value) * 60
     };
   }
 
@@ -490,6 +556,8 @@
     mode = next;
     document.body.classList.toggle("mode-simulation", next === "simulation");
     document.body.classList.toggle("mode-erlang", next === "erlang");
+    if (next === "simulation") document.body.classList.add("view-queue");
+    else document.body.classList.remove("view-queue", "view-chart");
     document.getElementById("modeErlang").checked = next === "erlang";
     document.getElementById("modeSim").checked = next === "simulation";
     displayed = null;
@@ -530,6 +598,196 @@
     displayed = null;
     setDirection("findAgents");
     setMode("erlang");
+  });
+  var queue = { events: [], index: 0, time: 0, speed: 10, playing: false, timer: 0, agents: 1, answered: 0, abandoned: 0, calls: {}, reduced: false };
+  var reducedQuery = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
+  if (reducedQuery) queue.reduced = reducedQuery.matches;
+
+  function clockText(seconds) {
+    var s = Math.max(0, Math.floor(seconds));
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
+  }
+  function stopQueuePlayback(clear) {
+    queue.playing = false;
+    if (queue.timer) clearInterval(queue.timer);
+    queue.timer = 0;
+    var playBtn = document.getElementById("queuePlay");
+    if (playBtn) playBtn.textContent = "Play";
+    if (clear) {
+      queue.events = [];
+      queue.index = 0;
+      queue.time = 0;
+      document.getElementById("queueStatus").textContent = "Run the simulation to view call flow.";
+      paintQueue();
+    }
+  }
+  function startQueuePlayback(model) {
+    var arrivals = model.simRaw && (model.simRaw.total_arrivals || model.simRaw.total_customers);
+    if (!arrivals) {
+      arrivals = Math.max(0, Math.round((model.traffic || 0) * (model.simSeconds / 3600)));
+    }
+    var abandonedCount = model.simRaw && model.simRaw.abandoned_customers != null
+      ? Number(model.simRaw.abandoned_customers)
+      : Math.round(arrivals * (model.abandonmentRate || 0));
+    var completedCount = model.simRaw && model.simRaw.completed_customers != null
+      ? Number(model.simRaw.completed_customers)
+      : Math.max(0, arrivals - abandonedCount);
+    var built = window.QueuePlayback.buildEventLog({
+      agents: model.availableAgents,
+      ahtSeconds: model.ahtSeconds,
+      patienceSeconds: model.patienceSeconds,
+      simSeconds: model.simSeconds,
+      arrivals: arrivals,
+      completed: completedCount,
+      abandoned: abandonedCount,
+      blocked: model.simRaw && model.simRaw.blocked_customers ? Number(model.simRaw.blocked_customers) : 0,
+      retrials: model.simRaw && model.simRaw.retrial_customers ? Number(model.simRaw.retrial_customers) : 0,
+      events: model.simRaw && (model.simRaw.events || model.simRaw.event_log)
+    });
+    queue.events = built.events;
+    queue.finalAnswered = built.totals.answered;
+    queue.finalAbandoned = built.totals.abandoned;
+    queue.agents = model.availableAgents;
+    queue.showBlocked = built.totals.blocked > 0;
+    queue.showRetry = built.totals.retried > 0;
+    document.body.classList.add("view-queue");
+    document.getElementById("tabQueue").classList.add("active");
+    document.getElementById("tabChart").classList.remove("active");
+    restartQueue(true);
+  }
+  function restartQueue(autoplay) {
+    queue.index = 0;
+    queue.time = 0;
+    queue.answered = 0;
+    queue.abandoned = 0;
+    queue.calls = {};
+    queue.done = false;
+    paintQueue();
+    if (autoplay) playQueue();
+    else document.getElementById("queueStatus").textContent = queue.events.length ? "Paused at the start." : "Run the simulation to view call flow.";
+  }
+  function playQueue() {
+    if (!queue.events.length || queue.done) return;
+    queue.playing = true;
+    document.getElementById("queuePlay").textContent = "Pause";
+    if (queue.timer) clearInterval(queue.timer);
+    var last = Date.now();
+    queue.timer = setInterval(function () {
+      if (!queue.playing || document.hidden || !document.body.classList.contains("view-queue")) return;
+      var now = Date.now();
+      var step = ((now - last) / 1000) * queue.speed;
+      last = now;
+      queue.time += queue.reduced ? Math.max(step, 1) : step;
+      applyDueEvents();
+      paintQueue();
+    }, 50);
+  }
+  function applyDueEvents() {
+    var events = queue.events;
+    while (queue.index < events.length && events[queue.index].time <= queue.time) {
+      var ev = events[queue.index];
+      queue.index += 1;
+      var call = queue.calls[ev.callId] || { id: ev.callId, state: "incoming", arrival: ev.time, wait: 0, agentId: null };
+      queue.calls[ev.callId] = call;
+      if (ev.type === "arrival") { call.state = "incoming"; call.arrival = ev.time; }
+      else if (ev.type === "queue_enter") call.state = "queue";
+      else if (ev.type === "service_start") { call.state = "service"; call.agentId = ev.agentId; call.wait = ev.waitSeconds || 0; }
+      else if (ev.type === "service_end") { call.state = "answered"; queue.answered += 1; }
+      else if (ev.type === "abandon") { call.state = "abandoned"; call.wait = ev.waitSeconds || 0; queue.abandoned += 1; }
+      else if (ev.type === "blocked" && queue.showBlocked) call.state = "blocked";
+      else if (ev.type === "retry" && queue.showRetry) call.state = "retry";
+    }
+    if (queue.index >= events.length && events.length) {
+      queue.playing = false;
+      queue.done = true;
+      if (queue.timer) clearInterval(queue.timer);
+      document.getElementById("queuePlay").textContent = "Play";
+      document.getElementById("queueStatus").textContent = "Simulation complete.";
+    }
+  }
+  function paintQueue() {
+    var calls = Object.keys(queue.calls).map(function (id) { return queue.calls[id]; });
+    calls.forEach(function (call) {
+      if (call.state === "queue" || call.state === "incoming") call.wait = Math.max(0, queue.time - call.arrival);
+    });
+    var incoming = calls.filter(function (c) { return c.state === "incoming"; }).slice(-6);
+    var waiting = calls.filter(function (c) { return c.state === "queue"; });
+    var busy = {};
+    calls.forEach(function (c) { if (c.state === "service" && c.agentId) busy[c.agentId] = c; });
+    var inHost = document.getElementById("zoneIncoming");
+    var qHost = document.getElementById("zoneQueue");
+    inHost.textContent = "";
+    qHost.textContent = "";
+    if (!queue.events.length) {
+      inHost.appendChild(el("p", { class: "zone-empty" }, "Run the simulation to view call flow."));
+    } else if (!incoming.length) {
+      inHost.appendChild(el("p", { class: "zone-empty" }, "No calls arriving."));
+    }
+    incoming.forEach(function (c) { inHost.appendChild(bubble(c, "In")); });
+    var shown = waiting.slice(0, 8);
+    if (!shown.length) qHost.appendChild(el("p", { class: "zone-empty" }, "No callers currently waiting."));
+    shown.forEach(function (c) { qHost.appendChild(bubble(c, Math.round(c.wait) + "s")); });
+    document.getElementById("queueMore").textContent = waiting.length > 8 ? "+" + (waiting.length - 8) + " more waiting" : "";
+    var board = document.getElementById("zoneAgents");
+    board.textContent = "";
+    var limit = Math.min(queue.agents || 0, 24);
+    var free = 0;
+    var onCall = 0;
+    var i;
+    for (i = 1; i <= (queue.agents || 0); i++) if (busy[i]) onCall += 1; else free += 1;
+    for (i = 1; i <= limit; i++) {
+      var card = el("div", { class: "agent " + (busy[i] ? "busy" : "available") });
+      card.textContent = (busy[i] ? "On call " : "Available ") + i;
+      board.appendChild(card);
+    }
+    var extra = (queue.agents || 0) - limit;
+    document.getElementById("agentTotals").textContent = "Available: " + free + " · On call: " + onCall + (extra > 0 ? " · +" + extra + " more agents" : "");
+    var longest = 0;
+    waiting.forEach(function (c) { longest = Math.max(longest, c.wait); });
+    document.getElementById("countWait").textContent = "Waiting now: " + waiting.length;
+    document.getElementById("countFree").textContent = "Available agents: " + free;
+    document.getElementById("countAnswered").textContent = "Calls answered: " + queue.answered;
+    document.getElementById("countAbandoned").textContent = "Calls abandoned: " + queue.abandoned;
+    document.getElementById("countLongest").textContent = "Longest current wait: " + Math.round(longest) + "s";
+    document.getElementById("queueClock").textContent = clockText(queue.time);
+    if (queue.playing) document.getElementById("queueStatus").textContent = "Playing the recorded call flow.";
+  }
+  function bubble(call, label) {
+    var node = el("div", { class: "caller" + (call.state === "abandoned" ? " abandon" : "") });
+    node.textContent = label;
+    return node;
+  }
+  document.getElementById("tabQueue").addEventListener("click", function () {
+    document.body.classList.add("view-queue");
+    document.body.classList.remove("view-chart");
+    document.getElementById("tabQueue").classList.add("active");
+    document.getElementById("tabChart").classList.remove("active");
+  });
+  document.getElementById("tabChart").addEventListener("click", function () {
+    document.body.classList.remove("view-queue");
+    document.body.classList.add("view-chart");
+    document.getElementById("tabChart").classList.add("active");
+    document.getElementById("tabQueue").classList.remove("active");
+    queue.playing = false;
+    document.getElementById("queuePlay").textContent = "Play";
+  });
+  document.getElementById("queuePlay").addEventListener("click", function () {
+    if (queue.playing) {
+      queue.playing = false;
+      this.textContent = "Play";
+      document.getElementById("queueStatus").textContent = "Paused.";
+    } else if (queue.done) {
+      restartQueue(true);
+    } else playQueue();
+  });
+  document.getElementById("queueRestart").addEventListener("click", function () { restartQueue(true); });
+  document.querySelectorAll(".speed button").forEach(function (button) {
+    button.addEventListener("click", function () {
+      queue.speed = Number(button.getAttribute("data-speed"));
+      document.querySelectorAll(".speed button").forEach(function (peer) { peer.classList.toggle("active", peer === button); });
+    });
   });
   new MutationObserver(function () { if (displayed) drawCurve(displayed); else refreshLocal(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   refreshLocal();

@@ -10,6 +10,7 @@
   <script src="../shared/theme-toggle-component.js?v=20260922calc1"></script>
   <script src="./erlang-math.js?v=20260923erlang1"></script>
   <script src="./queue-playback.js?v=20260924queue1"></script>
+  <script src="./queue-sim.js?v=20260924sim1"></script>
   <style>
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--surface-0); color: var(--text-primary); }
     .st-calc-main { min-height: 0; overflow: hidden; }
@@ -113,8 +114,15 @@
     .result-tabs button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 6px 10px; font: 700 0.75rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
     .result-tabs button.active { border-color: rgba(120, 200, 255, 0.55); background: rgba(120, 200, 255, 0.16); color: #d7ecfa; }
     .live-queue { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 8px; }
-    body.mode-simulation.view-queue .live-queue { display: flex; }
-    body.mode-simulation.view-queue #chartPanel { display: none; }
+    .replay-open { display: none; margin: 8px 0; }
+    body.mode-simulation .replay-open { display: inline-flex; }
+    .replay-modal { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(2, 8, 20, 0.72); align-items: center; justify-content: center; padding: 24px; }
+    .replay-modal.open { display: flex; }
+    .replay-dialog { width: min(980px, 100%); max-height: min(760px, 100%); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #121a24; padding: 12px; }
+    html[data-theme="light"] .replay-dialog { background: #fff; }
+    .replay-dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .replay-modal .live-queue { display: flex; min-height: 420px; }
+    .shrink-note { margin: 8px 0 0; font-size: 0.78rem; color: #8ec8ef; }
     .queue-controls, .queue-counters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
     .live-queue:not(.has-replay) .queue-controls,
     .live-queue:not(.has-replay) .queue-counters,
@@ -157,6 +165,8 @@
     #agentsField { display: none; }
     body.dir-fixed #agentsField { display: block; }
     #shrinkageField { display: none; }
+    #patienceFields { display: block; }
+    body.abandon-off #patienceFields { display: none; }
     body.shrink-on #shrinkageField { display: block; }
     @media (max-width: 980px) {
       .metric-grid { grid-template-columns: 1fr 1fr; }
@@ -204,8 +214,12 @@
             <div class="erlang-block">
               <h3>Staffing</h3>
               <div class="field" id="agentsField"><label for="agents">Agents available to take calls</label><input id="agents" type="number" min="1" step="1" value="12"/></div>
-              <label class="check-row"><input id="shrinkOn" type="checkbox"/> Include shrinkage</label>
-              <div class="field" id="shrinkageField"><label for="shrink">Shrinkage (%)</label><input id="shrink" type="number" min="0" max="80" step="1" value="30"/></div>
+            </div>
+            <div class="erlang-block">
+              <h3>Staffing adjustment</h3>
+              <label class="check-row"><input id="shrinkOn" type="checkbox"/> Apply shrinkage</label>
+              <p class="hint">Convert the active agents required by the queue model into the number of agents that must be scheduled.</p>
+              <div class="field" id="shrinkageField"><label for="shrink">Shrinkage (%)</label><input id="shrink" type="number" min="0" max="60" step="1" value="25"/></div>
             </div>
             <details class="advanced sim-only" id="advanced">
               <summary><i class="fa-solid fa-cloud" aria-hidden="true"></i> Advanced simulation settings</summary>
@@ -220,7 +234,13 @@
                     <option value="gamma">Gamma</option>
                   </select>
                 </div>
-                <div class="field"><label for="patience">Average patience before abandoning (seconds) <span class="info-dot" tabindex="0" data-tip="How long a caller waits before hanging up. A call that waits longer than this leaves the queue.">i</span></label><input id="patience" type="number" min="10" step="5" value="60"/></div>
+                <label class="check-row"><input id="abandonOn" type="checkbox" checked/> Customer abandonment</label>
+                <p class="hint">Allow waiting customers to leave the queue when their patience time expires.</p>
+                <div id="patienceFields">
+                  <p class="hint">Patience times are exponentially distributed around the selected average.</p>
+                  <div class="field"><label for="patience">Average patience before abandoning (seconds) <span class="info-dot" tabindex="0" data-tip="Each caller draws a separate patience time. This is not a fixed timeout for every caller.">i</span></label><input id="patience" type="number" min="1" step="5" value="60"/></div>
+                  <div class="field"><label for="maxAbandon">Maximum abandonment rate (%) <span class="info-dot" tabindex="0" data-tip="The staffing search must also keep abandonment at or below this rate. A short patience time cannot by itself count as meeting the service target.">i</span></label><input id="maxAbandon" type="number" min="0" max="100" step="1" value="5"/></div>
+                </div>
                 <div class="field"><label for="simTime">Simulation duration (minutes) <span class="info-dot" tabindex="0" data-tip="Length of each simulated period. A longer run gives a steadier estimate of the same scenario.">i</span></label><input id="simTime" type="number" min="100" step="100" value="1000"/></div>
                 <div class="field"><label for="reps">Replications <span class="info-dot" tabindex="0" data-tip="Independent repeats of the same scenario. Ten is the default. Fewer is only a quick check, and the estimate can move between runs.">i</span></label><input id="reps" type="number" min="1" max="30" step="1" value="10"/></div>
                 <p class="hint">The service reports one estimate, not a confidence interval. Ten replications is the default. Fewer replications is only a quick check, and the estimate can move between runs.</p>
@@ -251,15 +271,19 @@
             <div class="metric"><div class="metric-label">Average wait</div><div class="metric-value" id="waitValue">—</div></div>
             <div class="metric"><div class="metric-label">Average queue length <span class="info-dot" tabindex="0" data-tip="Mean number of callers waiting for an agent. Callers already on a call are not included. It equals calls per second times average wait.">i</span></div><div class="metric-value" id="queueLengthValue">—</div></div>
             <div class="metric"><div class="metric-label">Occupancy <span class="info-dot" tabindex="0" data-tip="Offered load divided by available agents. Offered load (Erlangs) = calls per hour × handle time / 3600.">i</span></div><div class="metric-value" id="occValue">—</div></div>
-            <div class="metric"><div class="metric-label">Abandonment rate <span class="info-dot" tabindex="0" data-tip="Share of callers who leave before an agent answers. Erlang C does not model abandonment.">i</span></div><div class="metric-value" id="abandonValue">—</div></div>
+            <div class="metric"><div class="metric-label">Abandonment rate <span class="info-dot" tabindex="0" data-tip="Percentage of all offered calls that abandoned before service began. Service level is calls answered within the target time divided by calls offered.">i</span></div><div class="metric-value" id="abandonValue">—</div></div>
             <div class="metric"><div class="metric-label">Offered load <span class="info-dot" tabindex="0" data-tip="Calls per hour × handle time / 3600, in Erlangs. One Erlang is one agent occupied for a full hour.">i</span></div><div class="metric-value" id="trafficValue">—</div></div>
           </div>
           <div class="insight"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="insightText">Erlang C updates as you type. Simulation runs when you ask it to.</p></div>
-          <div class="result-tabs" id="resultTabs">
-            <button type="button" id="tabQueue">Simulation replay</button>
-            <button type="button" id="tabChart">Performance charts</button>
-          </div>
-          <div class="live-queue" id="liveQueue">
+          <button type="button" class="erlang-btn erlang-btn-primary replay-open" id="openReplay" disabled>Open simulation replay</button>
+          <div class="chart-panel" id="chartPanel"><div id="staffingChart"></div></div>
+          <div class="replay-modal" id="replayModal">
+            <div class="replay-dialog" role="dialog" aria-modal="true" aria-labelledby="replayTitle">
+              <div class="replay-dialog-head">
+                <h2 class="erlang-panel-title" id="replayTitle"><i class="fa-solid fa-headset"></i> Simulation replay</h2>
+                <button type="button" class="erlang-btn erlang-btn-ghost" id="closeReplay">Close</button>
+              </div>
+              <div class="live-queue" id="liveQueue">
             <div class="queue-empty" id="queueEmpty">
               <strong>No simulation replay yet</strong>
               <p>Run the simulation to generate arrivals, queues, agent assignments and abandonments.</p>
@@ -288,8 +312,10 @@
               <section class="queue-zone"><h3>Waiting queue</h3><div class="bubbles" id="zoneQueue"></div><p class="more-waiting" id="queueMore"></p></section>
               <section class="queue-zone agents-zone"><h3>Agent board</h3><div class="agent-grid" id="zoneAgents"></div><p class="agent-totals" id="agentTotals"></p></section>
             </div>
+            <p class="shrink-note" id="shrinkNote"></p>
           </div>
-          <div class="chart-panel" id="chartPanel"><div id="staffingChart"></div></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -302,12 +328,12 @@
 <script>
 (function () {
   var math = window.ErlangMath;
-  var API = "https://us-central1-tukey-multple-comparisons.cloudfunctions.net/erlang-c-server";
-  var defaults = { calls: "100", aht: "300", wait: "20", target: "80", agents: "12", shrink: "30", simTime: "1000", reps: "10", patience: "60", distribution: "exponential" };
+  var defaults = { calls: "100", aht: "300", wait: "20", target: "80", agents: "12", shrink: "25", simTime: "1000", reps: "10", patience: "60", maxAbandon: "5", distribution: "exponential" };
   var mode = "erlang";
   var direction = "findAgents";
   var running = false;
   var displayed = null;
+  var replayReady = null;
 
   if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
   if (window.StatisticoThemeToggle) StatisticoThemeToggle.mount({ container: document.querySelector(".st-calc-header-right") });
@@ -370,23 +396,46 @@
     var wait = Number(input.maxWaitSeconds);
     var gap = model.serviceLevel * 100 - target;
     var finding = direction !== "fixedAgents";
-    setText("heroLabel", finding ? "Required available agents" : "Available agents");
+    var staff = input.shrinkageEnabled ? window.QueueSim.scheduledAgents(model.availableAgents, shrink) : { ok: true, scheduledAgents: model.availableAgents, additionalAgents: 0 };
+    if (input.shrinkageEnabled && !staff.ok) {
+      setText("insightText", staff.error);
+      return;
+    }
+    model.scheduledAgents = staff.scheduledAgents;
+    if (finding && input.shrinkageEnabled) {
+      setText("heroLabel", "Active agents required");
+      setText("scheduleLine", "Agents to schedule: " + staff.scheduledAgents + ". Shrinkage assumption: " + shrink + "%. Additional scheduled agents: " + staff.additionalAgents + ".");
+    } else if (finding) {
+      setText("heroLabel", "Agents required");
+      setText("scheduleLine", "Shrinkage is off.");
+    } else if (input.shrinkageEnabled) {
+      setText("heroLabel", "Active agents");
+      setText("scheduleLine", "Agents to schedule: " + staff.scheduledAgents + ". Shrinkage assumption: " + shrink + "%.");
+    } else {
+      setText("heroLabel", "Agents required");
+      setText("scheduleLine", "Current staffing: " + model.availableAgents + " active agents. Shrinkage is off.");
+    }
     setText("heroValue", String(model.availableAgents));
-    setText("scheduleLine", staffingSentence(model.availableAgents, shrink, model.scheduledAgents, finding));
-    var methodName = model.source === "simulation" ? "Estimated service level" : "Service level";
+    var methodName = model.source === "simulation" ? "Service level" : "Service level";
     setText("slLine", methodName + ": " + pct1(model.serviceLevel) + " within " + wait + " seconds");
+    document.getElementById("slLine").title = "Service level = calls answered within the target time ÷ calls offered.";
     setText("gapLine", Math.abs(gap) < 0.05
       ? "Target: " + target + "% · at target"
       : "Target: " + target + "% · " + Math.abs(gap).toFixed(1) + " percentage points " + (gap > 0 ? "above" : "below") + " target");
     setText("waitValue", model.avgWaitSeconds == null ? "—" : model.avgWaitSeconds.toFixed(1) + "s");
     setText("queueLengthValue", formatQueueLength(model.averageQueueLength));
     setText("occValue", model.occupancy == null ? "—" : pct1(model.occupancy));
-    setText("abandonValue", model.abandonmentRate == null ? (mode === "simulation" ? "Awaiting simulation" : "Not modeled") : pct1(model.abandonmentRate));
+    var abandonLabel = "Not modeled";
+    if (model.source === "simulation") {
+      abandonLabel = model.abandonment && model.abandonment.enabled ? pct1(model.abandonmentRate) : "Abandonment disabled";
+    } else if (mode === "simulation") abandonLabel = "Awaiting simulation";
+    setText("abandonValue", model.abandonmentRate == null && !(model.abandonment && model.abandonment.enabled === false && model.source === "simulation") ? abandonLabel : (model.source === "simulation" && model.abandonment && !model.abandonment.enabled ? "Abandonment disabled" : (model.abandonmentRate == null ? abandonLabel : pct1(model.abandonmentRate))));
     setText("trafficValue", model.traffic.toFixed(2) + " Erl");
     var insight;
     if (model.source === "simulation") {
-      insight = "This service level is the simulation estimate.";
-      if (shrink > 0) insight += " With " + shrink + "% shrinkage, schedule " + model.scheduledAgents + " agents.";
+      insight = model.abandonment && model.abandonment.enabled ? "Simulation with abandonment." : "Simulation with abandonment disabled.";
+      insight += " Offered " + model.abandonment.offeredCalls + ", answered " + model.abandonment.answeredCalls + ", abandoned " + model.abandonment.abandonedCalls + ".";
+      if (input.shrinkageEnabled) insight += " " + model.availableAgents + " active positions require " + model.scheduledAgents + " scheduled agents at " + shrink + "% shrinkage.";
     } else if (mode === "simulation") {
       insight = "Preliminary Erlang C estimate. Run the simulation to include abandonment and service-time variability.";
     } else {
@@ -395,8 +444,16 @@
     }
     setText("insightText", insight);
     drawCurve(model);
-    if (model.source === "simulation") startQueuePlayback(model);
-    else stopQueuePlayback(true);
+    var replayBtn = document.getElementById("openReplay");
+    if (model.source === "simulation") {
+      replayReady = model;
+      replayBtn.disabled = false;
+    } else {
+      replayReady = null;
+      replayBtn.disabled = true;
+      closeReplay();
+      stopQueuePlayback(true);
+    }
   }
 
   function showUnsolved(model) {
@@ -557,39 +614,74 @@
     render(fromLocal(math.analyze(read())));
   }
 
-  function payload(extra) {
+  function fromQueueSim(summary, agents) {
     var input = read();
-    var distribution = document.getElementById("distribution").value;
-    var body = {
-      arrival_rate: Number(input.callsPerHour) / 60,
-      mean_service_time: Number(input.ahtSeconds) / 60,
-      service_distribution: distribution,
-      sla_target_pct: Number(input.targetServiceLevel),
-      sla_threshold_seconds: Number(input.maxWaitSeconds),
-      abandonment_threshold_minutes: Number(document.getElementById("patience").value) / 60,
-      sim_time: Number(document.getElementById("simTime").value),
-      num_replications: Number(document.getElementById("reps").value),
-      max_agents: 200,
-      seed: null
+    var abandonOn = document.getElementById("abandonOn").checked;
+    var shrink = input.shrinkageEnabled ? Number(input.shrinkagePercent) : 0;
+    var staff = window.QueueSim.scheduledAgents(agents, input.shrinkageEnabled ? shrink : 0);
+    return {
+      ok: true,
+      source: "simulation",
+      availableAgents: agents,
+      scheduledAgents: staff.ok ? staff.scheduledAgents : agents,
+      serviceLevel: summary.serviceLevel,
+      occupancy: summary.occupancy,
+      avgWaitSeconds: summary.averageWaitAnsweredSeconds,
+      averageQueueLength: summary.averageQueueLength,
+      abandonmentRate: abandonOn ? summary.abandonmentRate : 0,
+      traffic: (Number(input.callsPerHour) * Number(input.ahtSeconds)) / 3600,
+      simRaw: { events: summary.events || [] },
+      ahtSeconds: Number(input.ahtSeconds),
+      patienceSeconds: abandonOn ? Number(document.getElementById("patience").value) : null,
+      simSeconds: Number(document.getElementById("simTime").value) * 60,
+      abandonment: {
+        enabled: abandonOn,
+        patienceDistribution: abandonOn ? "exponential" : null,
+        meanPatienceSeconds: abandonOn ? Number(document.getElementById("patience").value) : null,
+        maximumAbandonmentRateTarget: Number(document.getElementById("maxAbandon").value) / 100,
+        offeredCalls: summary.offeredCalls,
+        answeredCalls: summary.answeredCalls,
+        answeredWithinTarget: summary.answeredWithinTarget,
+        abandonedCalls: summary.abandonedCalls,
+        abandonmentRate: summary.abandonmentRate,
+        averageWaitBeforeAbandonmentSeconds: summary.averageWaitBeforeAbandonmentSeconds
+      },
+      staffing: {
+        activeAgentsRequired: agents,
+        shrinkageEnabled: !!input.shrinkageEnabled,
+        shrinkageRate: input.shrinkageEnabled ? shrink / 100 : 0,
+        scheduledAgentsRequired: staff.ok ? staff.scheduledAgents : agents
+      },
+      targetsMet: summary.targetsMet !== false
     };
-    if (distribution === "normal") body.service_std_dev = Number(input.ahtSeconds) / 60 / 5;
-    if (distribution === "lognormal" || distribution === "gamma") body.service_cv = 0.5;
-    if (distribution === "uniform") body.service_range_factor = 0.5;
-    Object.keys(extra || {}).forEach(function (k) { body[k] = extra[k]; });
-    return body;
   }
 
-  function postJson(path, body) {
-    return fetch(API + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }).then(function (response) {
-      return response.json().catch(function () { return {}; }).then(function (data) {
-        if (!response.ok || data.error) throw new Error(data.error || ("Staffing service returned " + response.status));
-        return data;
-      });
-    });
+  function simulationSpec(agents, recordReplay) {
+    var input = read();
+    var abandonOn = document.getElementById("abandonOn").checked;
+    var patience = Number(document.getElementById("patience").value);
+    if (abandonOn && !(patience > 0)) throw new Error("Average patience must be greater than 0 seconds.");
+    var shrink = input.shrinkageEnabled ? Number(input.shrinkagePercent) : 0;
+    if (input.shrinkageEnabled) {
+      var check = window.QueueSim.scheduledAgents(Math.max(1, agents || 1), shrink);
+      if (!check.ok) throw new Error(check.error);
+    }
+    return {
+      callsPerHour: Number(input.callsPerHour),
+      ahtSeconds: Number(input.ahtSeconds),
+      agents: agents,
+      simSeconds: Number(document.getElementById("simTime").value) * 60,
+      replications: Number(document.getElementById("reps").value),
+      seed: 20260924,
+      abandonmentEnabled: abandonOn,
+      meanPatienceSeconds: patience,
+      targetSeconds: Number(input.maxWaitSeconds),
+      targetServiceLevel: Number(input.targetServiceLevel) / 100,
+      maximumAbandonmentRate: Number(document.getElementById("maxAbandon").value) / 100,
+      serviceDistribution: document.getElementById("distribution").value,
+      recordReplay: !!recordReplay,
+      replaySeconds: 1800
+    };
   }
 
   function runSimulation() {
@@ -599,44 +691,37 @@
     button.disabled = true;
     setText("insightText", "Running the staffing simulation…");
     var input = read();
-    var chain;
-    if (direction === "fixedAgents") {
-      chain = postJson("/simulate", payload({ num_servers: Math.floor(Number(input.agents)) })).then(function (sim) {
-        return { agents: Math.floor(Number(input.agents)), sim: sim };
-      });
-    } else {
-      chain = postJson("/optimize", payload()).then(function (optimized) {
-        var agents = optimized.minimum_agents;
-        return postJson("/simulate", payload({ num_servers: agents })).then(function (sim) {
-          var target = Number(input.targetServiceLevel);
-          function retry(step) {
-            if (sim.service_level_achieved >= target || step > 3) return { agents: agents, sim: sim };
-            return postJson("/simulate", payload({ num_servers: optimized.minimum_agents + step })).then(function (next) {
-              if (!next.error && next.service_level_achieved >= target) return { agents: optimized.minimum_agents + step, sim: next };
-              sim = next;
-              agents = optimized.minimum_agents + step;
-              return retry(step + 1);
-            });
-          }
-          return retry(1);
-        });
-      });
-    }
-    chain.then(function (out) {
-      render(fromSimulation(out.sim, out.agents));
-    }).catch(function (err) {
-      setText("insightText", err.message || "The staffing simulation did not complete.");
-    }).then(function () {
+    setTimeout(function () {
+      try {
+        var summary;
+        var agents;
+        if (direction === "fixedAgents") {
+          agents = Math.floor(Number(input.agents));
+          summary = window.QueueSim.run(simulationSpec(agents, true));
+          summary.targetsMet = window.QueueSim.meetsTargets(summary, simulationSpec(agents, false));
+        } else {
+          summary = window.QueueSim.findActiveAgents(simulationSpec(1, false));
+          agents = summary.activeAgents;
+          var replay = window.QueueSim.run(simulationSpec(agents, true));
+          summary.events = replay.events;
+        }
+        render(fromQueueSim(summary, agents));
+        if (summary.targetsMet === false) {
+          setText("insightText", document.getElementById("insightText").textContent + " No staffing level within range met both the service level and the abandonment target.");
+        }
+      } catch (err) {
+        setText("insightText", err.message || "The staffing simulation did not complete.");
+      }
       running = false;
       button.disabled = false;
-    });
+    }, 30);
   }
 
   function setMode(next) {
     mode = next;
     document.body.classList.toggle("mode-simulation", next === "simulation");
     document.body.classList.toggle("mode-erlang", next === "erlang");
-    if (next === "simulation") document.body.classList.add("view-queue");
+    if (next === "simulation") document.body.classList.remove("view-queue", "view-chart");
     else document.body.classList.remove("view-queue", "view-chart");
     document.getElementById("modeErlang").checked = next === "erlang";
     document.getElementById("modeSim").checked = next === "simulation";
@@ -661,6 +746,9 @@
     displayed = null;
     refreshLocal();
   });
+  document.getElementById("abandonOn").addEventListener("change", function () {
+    document.body.classList.toggle("abandon-off", !document.getElementById("abandonOn").checked);
+  });
   ["calls", "aht", "wait", "target", "agents", "shrink"].forEach(function (id) {
     document.getElementById(id).addEventListener("input", function () {
       displayed = null;
@@ -674,7 +762,8 @@
       if (el) el.value = defaults[id];
     });
     document.getElementById("shrinkOn").checked = false;
-    document.body.classList.remove("shrink-on");
+    document.getElementById("abandonOn").checked = true;
+    document.body.classList.remove("shrink-on", "abandon-off");
     displayed = null;
     setDirection("findAgents");
     setMode("erlang");
@@ -764,10 +853,12 @@
     queue.agents = model.availableAgents;
     queue.showBlocked = built.totals.blocked > 0;
     queue.showRetry = built.totals.retried > 0;
-    document.body.classList.add("view-queue");
-    document.getElementById("tabQueue").classList.add("active");
-    document.getElementById("tabChart").classList.remove("active");
     setReplayChrome(true);
+    var note = "";
+    if (model.staffing && model.staffing.shrinkageEnabled) {
+      note = model.staffing.activeAgentsRequired + " active positions require " + model.staffing.scheduledAgentsRequired + " scheduled agents at " + Math.round(model.staffing.shrinkageRate * 100) + "% shrinkage.";
+    }
+    document.getElementById("shrinkNote").textContent = note;
     restartQueue(!queue.reduced);
   }
   function arrivalHoldMs() {
@@ -802,7 +893,7 @@
     if (queue.timer) clearInterval(queue.timer);
     var last = Date.now();
     queue.timer = setInterval(function () {
-      if (!queue.playing || document.hidden || !document.body.classList.contains("view-queue")) return;
+      if (!queue.playing || document.hidden || !document.getElementById("replayModal").classList.contains("open")) return;
       var now = Date.now();
       if (!queue.timelineComplete) {
         var step = ((now - last) / 1000) * queue.speed;
@@ -851,6 +942,9 @@
       call.wait = ev.waitSeconds || 0;
       queue.abandoned += 1;
       dropVisual(ev.callId);
+      var callerNo = String(ev.callId || "").replace(/\D/g, "") || ev.callId;
+      queue.notice = "Customer " + callerNo + " abandoned after " + Math.round(ev.waitSeconds || 0) + " seconds";
+      queue.noticeUntil = Date.now() + 1600;
     } else if (ev.type === "blocked" && queue.showBlocked) call.state = "blocked";
     else if (ev.type === "retry" && queue.showRetry) call.state = "retry";
   }
@@ -942,6 +1036,7 @@
     var status = document.getElementById("queueStatus");
     if (!queue.events.length) status.textContent = "";
     else if (queue.done) status.textContent = "30-minute replay complete.";
+    else if (queue.notice && Date.now() < queue.noticeUntil) status.textContent = queue.notice;
     else if (queue.playing) status.textContent = "Playing the recorded call flow.";
     var playBtn = document.getElementById("queuePlay");
     if (playBtn && queue.events.length) {
@@ -974,20 +1069,18 @@
     node.appendChild(el("span", {}, label));
     return node;
   }
-  document.getElementById("tabQueue").addEventListener("click", function () {
-    document.body.classList.add("view-queue");
-    document.body.classList.remove("view-chart");
-    document.getElementById("tabQueue").classList.add("active");
-    document.getElementById("tabChart").classList.remove("active");
-  });
-  document.getElementById("tabChart").addEventListener("click", function () {
-    document.body.classList.remove("view-queue");
-    document.body.classList.add("view-chart");
-    document.getElementById("tabChart").classList.add("active");
-    document.getElementById("tabQueue").classList.remove("active");
+  function closeReplay() {
+    document.getElementById("replayModal").classList.remove("open");
     queue.playing = false;
-    document.getElementById("queuePlay").textContent = (queue.done || queue.timelineComplete) ? "Replay" : "Play";
+    var playBtn = document.getElementById("queuePlay");
+    if (playBtn && !playBtn.disabled) playBtn.textContent = (queue.done || queue.timelineComplete) ? "Replay" : "Play";
+  }
+  document.getElementById("openReplay").addEventListener("click", function () {
+    if (this.disabled || !replayReady) return;
+    document.getElementById("replayModal").classList.add("open");
+    startQueuePlayback(replayReady);
   });
+  document.getElementById("closeReplay").addEventListener("click", closeReplay);
   document.getElementById("queuePlay").addEventListener("click", function () {
     if (this.disabled || !queue.events.length) return;
     if (queue.done || queue.timelineComplete) {

@@ -57,6 +57,7 @@
       serviceLevel: serviceLevel(traffic, n, ahtSeconds, waitSeconds),
       occupancy: n > 0 ? traffic / n : Infinity,
       avgWaitSeconds: averageWaitSeconds(traffic, n, ahtSeconds),
+      averageQueueLength: n > traffic ? (traffic * erlangC(traffic, n)) / (n - traffic) : Infinity,
       probabilityOfWait: erlangC(traffic, n)
     };
   }
@@ -111,6 +112,7 @@
       serviceLevel: point.serviceLevel,
       occupancy: point.occupancy,
       avgWaitSeconds: point.avgWaitSeconds,
+      averageQueueLength: point.averageQueueLength,
       probabilityOfWait: point.probabilityOfWait,
       targetMet: find ? point.serviceLevel + 1e-12 >= targetPct / 100 : true
     };

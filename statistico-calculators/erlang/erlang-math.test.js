@@ -54,6 +54,18 @@ var unstable = math.analyze({
 });
 assert.strictEqual(unstable.ok, false);
 
+var nine = math.analyze({
+  callsPerHour: 100,
+  ahtSeconds: 300,
+  maxWaitSeconds: 20,
+  direction: "fixedAgents",
+  agents: 9,
+  targetServiceLevel: 80
+});
+assert.strictEqual(nine.ok, true);
+assert.ok(Math.abs(nine.averageQueueLength - (100 / 3600) * nine.avgWaitSeconds) < 1e-9);
+assert.ok(nine.averageQueueLength > 1);
+
 console.log("erlang-math ok", {
   traffic: Number(traffic.toFixed(3)),
   agents: sample.baseAgents,

@@ -16,6 +16,10 @@ var r = byId(mean, "r");
 if (r.kind !== "approximation") throw new Error("equal-n r should be an approximation until n is supplied");
 close(r.value, 0.5 / Math.sqrt(0.25 + 4), 1e-8);
 if (!byId(mean, "g").missing.length) throw new Error("g requires sample sizes");
+var or = byId(mean, "or-from-d");
+if (or.kind !== "approximation" || !isFinite(or.value)) throw new Error("OR from d does not need a baseline");
+close(or.value, Math.exp(0.5 * Math.PI / Math.sqrt(3)), 1e-8);
+if (!byId(mean, "absolute").missing.length) throw new Error("absolute effects need baseline risk");
 
 var meanN = math.convert("mean", "d", 0.5, { n1: 40, n2: 40 });
 if (byId(meanN, "g").kind !== "exact") throw new Error("g with n is exact");

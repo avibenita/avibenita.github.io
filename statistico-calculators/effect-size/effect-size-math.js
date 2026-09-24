@@ -47,28 +47,33 @@
       assumptions: spec.assumptions || [],
       formula: spec.formula || "",
       interpretation: spec.interpretation || "",
-      missing: spec.missing || []
+      missing: spec.missing || [],
+      focus: spec.focus || [],
+      action: spec.action || ""
     };
   }
 
-  function blocked(id, label, missing, formula) {
-    return row({ id: id, label: label, value: null, kind: null, missing: missing, formula: formula || "" });
+  function blocked(id, label, missing, formula, focus, action) {
+    return row({
+      id: id,
+      label: label,
+      value: null,
+      kind: null,
+      missing: missing,
+      formula: formula || "",
+      focus: focus || [],
+      action: action || ""
+    });
   }
 
-  function interpretD(d) {
-    var band = magnitude(Math.abs(d), [0.2, 0.5, 0.8], ["negligible", "small", "medium", "large"]);
-    return "About a " + band + " standardized mean difference on Cohen's guidelines. Those cutoffs are not a finding.";
+  function benchmark(abs, cuts) {
+    var band = magnitude(abs, cuts, ["negligible", "small", "medium", "large"]);
+    return "Magnitude: " + band + " by Cohen’s conventional benchmark. Interpret in the context of the field.";
   }
 
-  function interpretR(r) {
-    var band = magnitude(Math.abs(r), [0.1, 0.3, 0.5], ["negligible", "small", "medium", "large"]);
-    return "About a " + band + " correlation on Cohen's guidelines. Those cutoffs are not a finding.";
-  }
-
-  function interpretF(f) {
-    var band = magnitude(Math.abs(f), [0.1, 0.25, 0.4], ["negligible", "small", "medium", "large"]);
-    return "About a " + band + " ANOVA effect on Cohen's guidelines for f. Those cutoffs are not a finding.";
-  }
+  function interpretD(d) { return benchmark(Math.abs(d), [0.2, 0.5, 0.8]); }
+  function interpretR(r) { return benchmark(Math.abs(r), [0.1, 0.3, 0.5]); }
+  function interpretF(f) { return benchmark(Math.abs(f), [0.1, 0.25, 0.4]); }
 
   function groupFactor(n1, n2) {
     if (n1 != null && n2 != null && n1 > 1 && n2 > 1) {
@@ -93,7 +98,7 @@
     if (source === "r") r = value;
 
     if (source === "g") {
-      if (J == null) results.push(blocked("d", "Cohen's d", ["Both sample sizes, so the small-sample correction can be removed."], "d = g / J, J = Γ(df/2) / (√(df/2) Γ((df−1)/2)), df = n1 + n2 − 2"));
+      if (J == null) results.push(blocked("d", "Cohen's d", ["Both sample sizes, so the small-sample correction can be removed."], "d = g / J", ["n1", "n2"], "Enter Group 1 and Group 2 sample sizes"));
       else d = g / J;
     }
     if (source === "r") {
@@ -120,7 +125,7 @@
         }));
       }
       if (J == null) {
-        results.push(blocked("g", "Hedges' g", ["Both sample sizes. Hedges' g is d corrected for small-sample bias."], "g = J d"));
+        results.push(blocked("g", "Hedges' g", ["Hedges' g corrects d for small-sample bias."], "g = J d", ["n1", "n2"], "Enter Group 1 and Group 2 sample sizes"));
       } else if (source !== "g") {
         results.push(row({
           id: "g",
@@ -147,38 +152,60 @@
         }));
       }
     }
-    results.push(binaryFromD(d, num(extra.baseline)));
-    results.push(metaMean(source === "g" && J != null ? g : d, source === "g" ? "g" : "d", n1, n2, J));
+    binaryFromD(d, num(extra.baseline)).forEach(function (item) { results.push(item); });
+    var metaKind = J != null ? "g" : "d";
+    var metaEffect = metaKind === "g" ? (source === "g" ? g : J * d) : d;
+    results.push(metaMean(metaEffect, metaKind, n1, n2, J));
     return { results: results, power: powerMean(source === "g" && J != null ? g / J : d) };
   }
 
   function binaryFromD(d, baseline) {
-    if (d == null) return blocked("or-from-d", "Odds ratio", ["A standardized mean difference."]);
-    var lor = d * Math.PI / Math.sqrt(3);
-    var or = Math.exp(lor);
-    if (baseline == null || !(baseline > 0 && baseline < 1)) {
-      return blocked("or-from-d", "Odds ratio", ["Baseline risk in the reference group. The logistic link is only an approximation, and risk difference still needs a baseline."], "ln(OR) ≈ d π / √3");
-    }
-    var odds0 = baseline / (1 - baseline);
-    var p1 = (or * odds0) / (1 + or * odds0);
-    return row({
+    if (d == null) return [blocked("or-from-d", "Odds ratio", ["A standardized mean difference."])];
+    var or = Math.exp(d * Math.PI / Math.sqrt(3));
+    var direction = d < 0
+      ? "Group 1 is lower than Group 2, so the odds ratio is below 1."
+      : d > 0
+        ? "Group 1 is higher than Group 2, so the odds ratio is above 1."
+        : "The groups are equal, so the odds ratio is 1.";
+    var rows = [row({
       id: "or-from-d",
       label: "Odds ratio",
       value: or,
       kind: "approximation",
       assumptions: [
         "Latent response is logistic. This is not an exact map from a mean difference.",
-        "Baseline risk " + baseline + " turns the odds ratio into a risk only under that model."
+        "d = (Group 1 − Group 2) / pooled SD. " + direction
       ],
       formula: "ln(OR) ≈ d π / √3",
-      interpretation: "Approximate odds ratio " + or.toFixed(2) + ". Implied comparison risk " + (p1 * 100).toFixed(1) + "% if the baseline is " + (baseline * 100).toFixed(1) + "%."
-    });
+      interpretation: direction + " Baseline risk is not required for this odds ratio."
+    })];
+    if (!(baseline > 0 && baseline < 1)) {
+      rows.push(blocked("absolute", "Absolute effects", ["Reference-group event risk turns this odds ratio into a risk ratio, risk difference, and NNT."], "p1 from OR and p0; RR = p1/p0; RD = p1 − p0; NNT = 1/RD", ["baseline"], "Add reference-group risk"));
+      return rows;
+    }
+    var odds0 = baseline / (1 - baseline);
+    var p1 = (or * odds0) / (1 + or * odds0);
+    var rd = p1 - baseline;
+    var rr = p1 / baseline;
+    rows.push(row({
+      id: "absolute",
+      label: "Absolute effects",
+      value: rd,
+      kind: "approximation",
+      assumptions: [
+        "Uses the approximate odds ratio and a reference-group event risk of " + (baseline * 100).toFixed(1) + "%.",
+        direction
+      ],
+      formula: "p1 from OR and p0; RR = p1/p0; RD = p1 − p0; NNT = 1/RD",
+      interpretation: "Risk difference " + rd.toFixed(3) + ", risk ratio " + rr.toFixed(3) + (rd === 0 ? "." : ", NNT " + (1 / rd).toFixed(1) + ".") + " Group 1 event risk is about " + (p1 * 100).toFixed(1) + "%."
+    }));
+    return rows;
   }
 
   function metaMean(effect, kind, n1, n2, J) {
     if (effect == null) return blocked("meta", "Meta-analysis study", ["An effect value."]);
     if (!(n1 > 1 && n2 > 1)) {
-      return blocked("meta", "Meta-analysis study", ["Both sample sizes. A point estimate without a variance cannot enter a meta-analysis."], "Var(d) = (n1+n2)/(n1 n2) + d² / (2(n1+n2))");
+      return blocked("meta", "Meta-analysis study", ["Both sample sizes, so the standard error can be calculated."], "Var(d) = (n1+n2)/(n1 n2) + d² / (2(n1+n2))", ["n1", "n2"], "Enter Group 1 and Group 2 sample sizes");
     }
     var d = kind === "g" ? effect / J : effect;
     var vd = (n1 + n2) / (n1 * n2) + (d * d) / (2 * (n1 + n2));
@@ -199,7 +226,7 @@
 
   function powerMean(d) {
     if (d == null || !isFinite(d)) return null;
-    return { test: "two-sample-mean", effectSize: Math.abs(d), label: "Cohen's d" };
+    return { test: "two-sample-mean", effectSize: d, label: "d", symbol: "d" };
   }
 
   function anovaSection(source, value, extra) {
@@ -463,7 +490,7 @@
     } else {
       results.push(blocked("meta", "Meta-analysis study", model === "multiple"
         ? ["A model R² is not a pooled correlation. Enter r and the sample size, or use a partial correlation."]
-        : ["Sample size n > 3. Fisher's z needs Var(z) = 1/(n − 3)."]));
+        : ["Sample size n > 3. Fisher's z needs Var(z) = 1/(n − 3)."], "", model === "simple" ? ["n"] : [], model === "simple" ? "Enter the sample size" : ""));
     }
 
     var power = null;

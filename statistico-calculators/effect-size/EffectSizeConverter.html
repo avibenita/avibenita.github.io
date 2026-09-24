@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../shared/analytics-lnf.css?v=20260924effect1"/>
   <script src="../shared/shared-brand-logo.js?v=20260923logo1"></script>
   <script src="../shared/theme-toggle-component.js?v=20260922calc1"></script>
-  <script src="./effect-size-math.js?v=20260924effect1"></script>
+  <script src="./effect-size-math.js?v=20260924effect2"></script>
   <style>
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--surface-0); color: var(--text-primary); }
     .st-calc-main { min-height: 0; overflow: hidden; }
@@ -38,22 +38,30 @@
     html[data-theme="light"] .field label { color: #1e293b; }
     .field input, .field select { width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.06); color: var(--text-primary); font: 600 0.88rem/1.2 "Montserrat", "Segoe UI", sans-serif; padding: 6px 8px; }
     html[data-theme="light"] .field input, html[data-theme="light"] .field select { background: #fff; }
-    .hint { margin: 0 0 8px; font-size: 0.75rem; line-height: 1.4; color: #c5d4e8; }
-    html[data-theme="light"] .hint { color: #334155; }
-    .result-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: rgba(14, 20, 27, 0.35); }
+    .hint, .direction { margin: 0 0 8px; font-size: 0.75rem; line-height: 1.4; color: #c5d4e8; }
+    html[data-theme="light"] .hint, html[data-theme="light"] .direction { color: #334155; }
+    .direction { font-family: "Cambria Math", Georgia, serif; color: #f0b27a; }
+    .summary { margin: 0 0 8px; font-size: 0.78rem; font-weight: 700; color: #d5e2f2; }
+    html[data-theme="light"] .summary { color: #1e3a5f; }
+    .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .more-label { grid-column: 1 / -1; margin: 4px 0 0; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 800; color: #d5e2f2; }
+    .result-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: rgba(14, 20, 27, 0.35); min-width: 0; }
     html[data-theme="light"] .result-card { background: #f8fafc; }
-    .result-card.blocked { opacity: 0.92; border-style: dashed; }
-    .result-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .result-card.blocked { border-style: dashed; }
     .result-label { font-size: 0.78rem; font-weight: 800; color: #d5e2f2; }
     html[data-theme="light"] .result-label { color: #1e3a5f; }
-    .result-value { font-size: 1.35rem; font-weight: 800; }
-    .badge { display: inline-block; margin-top: 4px; border-radius: 999px; padding: 2px 8px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+    .result-value { margin-top: 2px; font-size: 1.85rem; font-weight: 800; line-height: 1; }
+    .badge { display: inline-block; margin-top: 6px; border-radius: 999px; padding: 2px 8px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
     .badge.exact { color: #042f2e; background: #5eead4; }
     .badge.approximation { color: #431407; background: #fdba74; }
-    .badge.missing { color: #e8eef8; background: #475569; }
     .result-card p { margin: 6px 0 0; font-size: 0.78rem; line-height: 1.4; color: #e8eef8; }
     html[data-theme="light"] .result-card p { color: #1e293b; }
     .formula { font-family: "Cambria Math", Georgia, serif; color: #f0b27a; }
+    details.more { margin-top: 6px; }
+    details.more summary { cursor: pointer; font-size: 0.72rem; font-weight: 800; color: #9fd8ff; }
+    .unlock { margin-top: 8px; border: 0; background: transparent; color: #5eead4; font: 700 0.78rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; padding: 0; text-align: left; }
+    .field.flash input, .field.flash select { outline: 2px solid #2dd4bf; box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.25); }
+    @media (max-width: 1100px) { .result-grid { grid-template-columns: 1fr; } }
     .effect-actions { flex: 0 0 auto; display: flex; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
     .effect-btn { border: 0; border-radius: 9px; padding: 8px 10px; font: 700 0.78rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
     .effect-btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -78,21 +86,24 @@
     <section class="st-calc-workspace effect-workspace">
       <div class="effect-layout">
         <div class="effect-panel">
-          <h2 class="effect-panel-title"><i class="fa-solid fa-sliders"></i> What you have</h2>
+          <h2 class="effect-panel-title"><i class="fa-solid fa-sliders"></i> Source effect</h2>
           <div class="inputs-scroll">
-            <div class="control-label">Section</div>
+            <p class="hint">Select the effect measure you have. Statistico shows valid conversions and requests additional information only when required.</p>
+            <div class="control-label">Effect family</div>
             <div class="seg" id="sectionSeg" role="tablist"></div>
             <p class="hint" id="sectionHint"></p>
             <div class="effect-block">
               <h3>Source measure</h3>
               <div class="field"><label for="source">Convert from</label><select id="source"></select></div>
-              <div class="field"><label for="value" id="valueLabel">Value</label><input id="value" type="number" step="any" value="0.5"/></div>
+              <div class="field"><label for="value" id="valueLabel">Cohen’s d</label><input id="value" type="number" step="any" value="0.5"/></div>
+              <p class="direction" id="directionNote">d = (Group 1 − Group 2) / pooled SD</p>
             </div>
             <div class="effect-block" id="extraBlock"></div>
           </div>
         </div>
         <div class="effect-panel">
           <h2 class="effect-panel-title"><i class="fa-solid fa-list-check"></i> Converted measures</h2>
+          <p class="summary" id="summary"></p>
           <div class="results-scroll" id="results"></div>
           <div class="effect-actions">
             <button class="effect-btn effect-btn-primary" id="powerBtn" type="button">Use in Power Calculator</button>
@@ -114,12 +125,12 @@
   var POWER = "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html";
   var sections = {
     mean: {
-      hint: "Cohen's d, Hedges' g, and r stay in the mean-difference family. An odds ratio is shown only as a logistic approximation, and only with a baseline risk.",
+      hint: "",
       sources: [["d", "Cohen's d"], ["g", "Hedges' g"], ["r", "Correlation r"]],
       extras: [
         ["n1", "Group 1 sample size", ""],
         ["n2", "Group 2 sample size", ""],
-        ["baseline", "Baseline risk (0–1), only for an odds-ratio approximation", ""]
+        ["baseline", "Reference-group event risk", ""]
       ]
     },
     anova: {
@@ -140,7 +151,7 @@
       hint: "Risk ratio, risk difference, and NNT need the reference group's baseline risk. Odds ratio to Cohen's d is an approximation and is labeled as one.",
       sources: [["or", "Odds ratio"], ["rr", "Risk ratio"], ["rd", "Risk difference"], ["nnt", "NNT"]],
       extras: [
-        ["baseline", "Baseline risk (0–1)", ""],
+        ["baseline", "Reference-group event risk", ""],
         ["direction", "If the source is NNT", "decrease", [["decrease", "Treatment lowers risk"], ["increase", "Treatment raises risk"]]]
       ]
     }
@@ -171,7 +182,8 @@
 
   function renderInputs() {
     var spec = sections[section];
-    document.getElementById("sectionHint").textContent = spec.hint;
+    var hint = document.getElementById("sectionHint");
+    if (hint) hint.textContent = spec.hint;
     var source = document.getElementById("source");
     source.textContent = "";
     spec.sources.forEach(function (item) {
@@ -179,7 +191,7 @@
     });
     var extra = document.getElementById("extraBlock");
     extra.textContent = "";
-    extra.appendChild(el("h3", {}, "Required only when the conversion needs them"));
+    extra.appendChild(el("h3", {}, "Additional information"));
     spec.extras.forEach(function (item) {
       var field = el("div", { class: "field" });
       field.appendChild(el("label", { for: item[0] }, item[1]));
@@ -215,37 +227,104 @@
     return n.toFixed(3);
   }
 
+  function sourceLabel() {
+    var select = document.getElementById("source");
+    var option = select.options[select.selectedIndex];
+    return option ? option.textContent : "Value";
+  }
+
+  function focusFields(ids) {
+    var first = null;
+    (ids || []).forEach(function (id) {
+      var field = document.getElementById(id);
+      if (!field) return;
+      var wrap = field.closest(".field");
+      if (wrap) {
+        wrap.classList.add("flash");
+        setTimeout(function () { wrap.classList.remove("flash"); }, 1600);
+      }
+      if (!first) first = field;
+    });
+    if (first) {
+      first.focus();
+      first.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function cardFor(row) {
+    var blocked = row.missing && row.missing.length;
+    var card = el("article", { class: "result-card" + (blocked ? " blocked" : "") });
+    card.appendChild(el("div", { class: "result-label" }, row.label));
+    if (!blocked) card.appendChild(el("div", { class: "result-value" }, fmt(row.value)));
+    if (!blocked && row.kind === "exact") card.appendChild(el("span", { class: "badge exact" }, "Exact conversion"));
+    if (!blocked && row.kind !== "exact") card.appendChild(el("span", { class: "badge approximation" }, "Approximation"));
+    if (row.interpretation && !blocked) card.appendChild(el("p", {}, row.interpretation));
+    if (blocked && row.action) {
+      var button = el("button", { type: "button", class: "unlock" }, row.action + " →");
+      button.addEventListener("click", function () { focusFields(row.focus); });
+      card.appendChild(button);
+    } else if (blocked) {
+      card.appendChild(el("p", {}, row.missing.join(" ")));
+    }
+    if ((row.formula || (row.assumptions && row.assumptions.length)) && !blocked) {
+      var details = el("details", { class: "more" });
+      details.appendChild(el("summary", {}, "Formula and assumptions"));
+      if (row.formula) details.appendChild(el("p", { class: "formula" }, row.formula));
+      if (row.assumptions && row.assumptions.length) details.appendChild(el("p", {}, row.assumptions.join(" ")));
+      card.appendChild(details);
+    }
+    return card;
+  }
+
   function convert() {
     var source = document.getElementById("source").value;
+    document.getElementById("valueLabel").textContent = sourceLabel();
+    var note = document.getElementById("directionNote");
+    note.hidden = !(section === "mean" && source === "d");
     var out = math.convert(section, source, document.getElementById("value").value, extras());
     last = out;
     var host = document.getElementById("results");
     host.textContent = "";
+    var rows = out.results || [];
+    var ready = rows.filter(function (row) { return !(row.missing && row.missing.length); });
+    var waiting = rows.filter(function (row) { return row.missing && row.missing.length; });
+    var summary = document.getElementById("summary");
     if (out.error) {
+      summary.textContent = "";
       host.appendChild(el("p", { class: "hint" }, out.error));
+    } else {
+      var readyText = ready.length + (ready.length === 1 ? " conversion available" : " conversions available");
+      var waitText = waiting.length ? " · " + waiting.length + " require additional information" : "";
+      summary.textContent = readyText + waitText;
+      var grid = el("div", { class: "result-grid" });
+      ready.forEach(function (row) { grid.appendChild(cardFor(row)); });
+      if (waiting.length) {
+        var more = el("div", { class: "more-label" }, "More conversions");
+        grid.appendChild(more);
+        waiting.forEach(function (row) { grid.appendChild(cardFor(row)); });
+      }
+      host.appendChild(grid);
     }
-    (out.results || []).forEach(function (row) {
-      var card = el("article", { class: "result-card" + (row.missing && row.missing.length ? " blocked" : "") });
-      var top = el("div", { class: "result-top" });
-      top.appendChild(el("div", { class: "result-label" }, row.label));
-      top.appendChild(el("div", { class: "result-value" }, row.missing && row.missing.length ? "Needs input" : fmt(row.value)));
-      card.appendChild(top);
-      if (row.missing && row.missing.length) card.appendChild(el("span", { class: "badge missing" }, "Missing input"));
-      else if (row.kind === "exact") card.appendChild(el("span", { class: "badge exact" }, "Exact conversion"));
-      else card.appendChild(el("span", { class: "badge approximation" }, "Approximation"));
-      if (row.missing && row.missing.length) card.appendChild(el("p", {}, row.missing.join(" ")));
-      if (row.assumptions && row.assumptions.length) card.appendChild(el("p", {}, row.assumptions.join(" ")));
-      if (row.formula) card.appendChild(el("p", { class: "formula" }, row.formula));
-      if (row.interpretation) card.appendChild(el("p", {}, row.interpretation));
-      host.appendChild(card);
-    });
     var power = out.power;
     var powerBtn = document.getElementById("powerBtn");
-    powerBtn.disabled = !power || !!power.missing;
-    powerBtn.title = power && power.missing ? power.missing.join(" ") : "";
-    var meta = (out.results || []).filter(function (row) { return row.id === "meta"; })[0];
-    document.getElementById("metaBtn").disabled = !meta || !!(meta.missing && meta.missing.length);
-    document.getElementById("actionStatus").textContent = power && power.missing ? power.missing[0] : "";
+    var powerReady = power && !power.missing;
+    powerBtn.disabled = !powerReady;
+    var shown = power ? power.effectSize : null;
+    if (power && shown == null) shown = power.effectSizeF;
+    if (power && shown == null) shown = power.rho;
+    if (power && shown == null) shown = power.rsquared;
+    powerBtn.textContent = powerReady ? "Use " + (power.symbol || power.label) + " = " + fmt(shown) + " in Power Calculator" : "Use in Power Calculator";
+    var meta = rows.filter(function (row) { return row.id === "meta"; })[0];
+    var metaReady = meta && !(meta.missing && meta.missing.length);
+    var metaBtn = document.getElementById("metaBtn");
+    metaBtn.disabled = !metaReady;
+    var shortMeasure = meta && meta.measure === "Hedges' g" ? "g" : meta && meta.measure === "Cohen's d" ? "d" : meta && meta.measure === "Fisher's z" ? "z" : (meta && meta.measure) || "the effect";
+    metaBtn.textContent = metaReady ? "Prepare " + shortMeasure + " and SE for Meta-analysis" : "Prepare for Meta-analysis";
+    var status = document.getElementById("actionStatus");
+    if (power && power.missing) status.textContent = power.missing[0];
+    else if (section === "mean" && meta && !metaReady) status.textContent = "Enter both sample sizes to calculate a meta-analysis-ready effect and standard error.";
+    else if (meta && !metaReady && meta.action) status.textContent = meta.action + " to calculate a meta-analysis-ready effect and standard error.";
+    else status.textContent = "";
   }
 
   function powerUrl() {

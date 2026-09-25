@@ -129,10 +129,22 @@
     .erlang-btn-ghost { background: transparent; color: #d7e3f2; border: 1px solid #5d738c; }
     html[data-theme="light"] .erlang-btn-ghost { color: #1f2937; }
     .hero-card { border: 1px solid rgba(45, 212, 191, 0.45); border-left: 3px solid #14b8a6; border-radius: 10px; background: rgba(20, 184, 166, 0.1); padding: 10px 12px; margin-bottom: 8px; }
-    .hero-main { display: flex; gap: 16px; align-items: flex-start; }
+    .hero-main { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
     .hero-card .k { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #d5e2f2; }
     html[data-theme="light"] .hero-card .k { color: #134e4a; }
-    .hero-card .v { margin-top: 2px; font-size: 2.2rem; font-weight: 800; line-height: 1; color: var(--text-primary); }
+    .hero-card .v { margin-top: 2px; font-size: 2.2rem; font-weight: 800; line-height: 1.05; color: var(--text-primary); }
+    .headline-rest { margin-left: 0.35rem; font-size: 1.05rem; font-weight: 700; }
+    .hero-card.evaluating .v { font-size: 1.85rem; }
+    .staff-context { display: none; gap: 18px; margin-top: 8px; }
+    .hero-card.evaluating .staff-context { display: flex; }
+    .staff-context strong { font-size: 0.95rem; }
+    .sl-gauge { display: none; position: relative; margin-top: 10px; height: 28px; }
+    .hero-card.evaluating .sl-gauge { display: block; }
+    .sl-gauge-track { position: relative; height: 8px; border-radius: 999px; background: rgba(148, 163, 184, 0.28); }
+    .sl-gauge-fill { height: 100%; border-radius: 999px; background: #6ee7b7; }
+    .hero-card.below .sl-gauge-fill { background: #fdba74; }
+    .sl-gauge-mark { position: absolute; top: -4px; width: 2px; height: 16px; background: #f59e0b; }
+    .sl-gauge-label { position: absolute; top: 14px; transform: translateX(-50%); font-size: 0.68rem; font-weight: 800; color: #f0b27a; white-space: nowrap; }
     .hero-facts { flex: 1; min-width: 0; }
     .hero-facts p { margin: 0 0 4px; font-size: 0.86rem; line-height: 1.35; color: #e8eef8; font-weight: 650; }
     html[data-theme="light"] .hero-facts p { color: #1e293b; }
@@ -142,11 +154,7 @@
     .status-line.below { color: #fdba74; }
     .hero-card.meets { border-color: rgba(52, 211, 153, 0.5); }
     .hero-card.below { border-color: rgba(251, 146, 60, 0.55); }
-    .eval-facts { display: none; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
-    .hero-card.evaluating .eval-facts { display: grid; }
-    .eval-facts div { border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 6px 8px; }
-    .eval-facts span { display: block; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #94a3b8; }
-    .eval-facts strong { display: block; margin-top: 2px; font-size: 0.92rem; }
+    .hero-card .k:empty { display: none; }
     #staffBasis { display: none; margin-top: 8px; }
     body.dir-fixed.shrink-on #staffBasis { display: grid; gap: 4px; }
     #staffBasis label { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 700; }
@@ -326,21 +334,26 @@
             <div class="hero-main">
               <div>
                 <div class="k" id="heroLabel">Available agents</div>
-                <div class="v" id="heroValue">—</div>
+                <div class="v"><span id="heroValue">—</span><span class="headline-rest" id="heroSuffix"></span></div>
                 <span class="result-badge" id="heroBadge" hidden></span>
               </div>
               <div class="hero-facts">
                 <p id="statusLine" class="status-line" hidden></p>
-                <p id="scheduleLine"></p>
                 <p id="slLine"></p>
+                <p id="scheduleLine"></p>
                 <p id="gapLine"></p>
               </div>
             </div>
-            <div class="eval-facts" id="evalFacts">
-              <div><span>Current active agents</span><strong id="factCurrent">—</strong></div>
-              <div><span>Service level achieved</span><strong id="factLevel">—</strong></div>
-              <div><span>Minimum agents required</span><strong id="factMinimum">—</strong></div>
-              <div><span>Staffing gap</span><strong id="factGap">—</strong></div>
+            <div class="staff-context" id="staffContext">
+              <strong id="factCurrent">—</strong>
+              <strong id="factMinimum">—</strong>
+            </div>
+            <div class="sl-gauge" id="slGauge" aria-hidden="true">
+              <div class="sl-gauge-track">
+                <div class="sl-gauge-fill" id="slGaugeFill"></div>
+                <div class="sl-gauge-mark" id="slGaugeMark"></div>
+              </div>
+              <span class="sl-gauge-label" id="slGaugeLabel">80% target</span>
             </div>
           </div>
           <p class="metrics-caption" id="metricsCaption"></p>
@@ -484,6 +497,20 @@
       : "Current staffing: " + agents + " available agents. Shrinkage is off.";
   }
 
+  function paintGauge(show, level, targetPct) {
+    var gauge = document.getElementById("slGauge");
+    gauge.hidden = !show;
+    if (!show || !isFinite(level) || !isFinite(targetPct)) return;
+    var pct = Math.max(0, Math.min(100, level * 100));
+    var mark = Math.max(0, Math.min(100, targetPct));
+    document.getElementById("slGaugeFill").style.width = pct + "%";
+    document.getElementById("slGaugeMark").style.left = mark + "%";
+    var label = document.getElementById("slGaugeLabel");
+    label.style.left = mark + "%";
+    label.textContent = targetPct + "% target";
+    gauge.setAttribute("aria-label", pct1(level) + " service level, target " + targetPct + "%");
+  }
+
   function render(model) {
     displayed = model;
     if (!model || !model.ok) {
@@ -518,59 +545,62 @@
     var status = document.getElementById("statusLine");
     status.hidden = finding;
     status.className = "status-line " + (meets ? "meets" : "below");
+    paintGauge(!finding, model.serviceLevel, target);
     document.getElementById("resultsPanel").classList.toggle("results-dim", provisional || resultsStale);
     document.getElementById("heroCard").classList.toggle("provisional", provisional);
     document.getElementById("staleBanner").hidden = !resultsStale;
     document.getElementById("resultsTitle").lastChild.textContent = provisional ? " Preliminary staffing estimate" : (model.source === "simulation" ? " Simulation result" : " Staffing results");
     var badge = document.getElementById("heroBadge");
     var spread = model.source === "simulation" && model.serviceLevelLow != null && model.replications > 1 ? " Replication range " + pct1(model.serviceLevelLow) + "–" + pct1(model.serviceLevelHigh) + "." : "";
-    status.hidden = finding;
+    setText("heroSuffix", "");
     if (provisional && finding) {
       setText("heroLabel", "Starting estimate");
       setText("heroValue", model.availableAgents + " active agents");
       badge.hidden = false;
       badge.textContent = "Erlang C baseline";
+      setText("slLine", pct1(model.serviceLevel) + " answered within " + wait + " seconds.");
       setText("scheduleLine", input.shrinkageEnabled ? "Shrinkage would schedule " + staff.scheduledAgents + " agents." : "Shrinkage is off.");
-      setText("slLine", "Service level: " + pct1(model.serviceLevel) + " within " + wait + " seconds.");
       setText("gapLine", "Target: " + target + "%");
     } else if (!finding) {
-      setText("heroLabel", "Current staffing");
-      setText("heroValue", currentActive + " active agents");
+      setText("heroLabel", "");
+      setText("heroValue", pct1(model.serviceLevel));
+      setText("heroSuffix", "answered within " + wait + " seconds");
       badge.hidden = !(provisional || model.source === "simulation");
       if (!badge.hidden) badge.textContent = provisional ? "Erlang C baseline" : ("Mean across " + (model.replications || 1) + " replications");
-      status.textContent = meets ? "Meets target" : "Below target";
+      var margin = Math.abs(gap).toFixed(1);
+      status.textContent = Number(margin) === 0
+        ? "Meets the " + target + "% target"
+        : (meets ? "Meets the " + target + "% target by " + margin + " percentage points" : "Below the " + target + "% target by " + margin + " percentage points");
+      setText("slLine", "");
       if (input.staffBasis === "scheduled") {
         setText("scheduleLine", input.enteredAgents + " scheduled agents. " + shrink + "% shrinkage → " + currentActive + " active agents available.");
       } else if (input.shrinkageEnabled) {
         setText("scheduleLine", staff.scheduledAgents + " agents to schedule at " + shrink + "% shrinkage.");
       } else {
-        setText("scheduleLine", "Entered as active agents. Shrinkage is off.");
+        setText("scheduleLine", "");
       }
-      setText("slLine", "Service level: " + pct1(model.serviceLevel) + " versus target " + target + "%");
       var agentGap = model.minimumAgents == null ? null : model.minimumAgents - currentActive;
       if (!meets && agentGap > 0) setText("gapLine", "Staffing gap: " + agentGap + " additional active agents");
-      else if (meets && agentGap < 0) setText("gapLine", Math.abs(agentGap) + " agents above the minimum required");
-      else setText("gapLine", "Margin: " + (gap > 0 ? "+" : "") + gap.toFixed(1) + " percentage points");
-      setText("factCurrent", String(currentActive));
-      setText("factLevel", pct1(model.serviceLevel));
-      setText("factMinimum", model.minimumAgents == null ? "—" : String(model.minimumAgents));
-      setText("factGap", agentGap == null ? "—" : (agentGap > 0 ? "+" + agentGap + " agents needed" : (agentGap < 0 ? Math.abs(agentGap) + " above the minimum" : "At the minimum")));
+      else if (agentGap < 0) setText("gapLine", Math.abs(agentGap) + " agents above the minimum required");
+      else setText("gapLine", "");
+      setText("factCurrent", currentActive + " active agents");
+      setText("factMinimum", (model.minimumAgents == null ? "—" : model.minimumAgents) + " minimum required");
       setText("metricsCaption", "Metrics at " + currentActive + " current agents");
     } else if (model.source === "simulation") {
       setText("heroLabel", "Agents required");
       setText("heroValue", String(model.availableAgents));
       badge.hidden = false;
       badge.textContent = "Mean across " + (model.replications || 1) + " replications";
+      setText("slLine", pct1(model.serviceLevel) + " answered within " + wait + " seconds." + spread);
       setText("scheduleLine", "Minimum active agents that meet " + target + "% within " + wait + " seconds.");
-      setText("slLine", "Mean service level: " + pct1(model.serviceLevel) + " within " + wait + " seconds." + spread);
       setText("gapLine", input.shrinkageEnabled ? staff.scheduledAgents + " agents to schedule at " + shrink + "% shrinkage." : "Shrinkage is off.");
       setText("metricsCaption", "Metrics at " + model.availableAgents + " required agents");
     } else {
       badge.hidden = true;
       setText("heroLabel", "Agents required");
       setText("heroValue", String(model.availableAgents));
+      setText("slLine", pct1(model.serviceLevel) + " answered within " + wait + " seconds.");
       setText("scheduleLine", "Minimum active agents that meet " + target + "% within " + wait + " seconds.");
-      setText("slLine", "Service level: " + pct1(model.serviceLevel) + " within " + wait + " seconds.");
       setText("gapLine", input.shrinkageEnabled ? staff.scheduledAgents + " agents to schedule at " + shrink + "% shrinkage." : "Shrinkage is off.");
       setText("metricsCaption", "Metrics at " + model.availableAgents + " required agents");
     }
@@ -631,6 +661,12 @@
     setText("abandonValue", mode === "simulation" ? "Not simulated" : "—");
     setText("trafficValue", isFinite(traffic) && traffic > 0 ? traffic.toFixed(2) + " Erl" : "—");
     stopQueuePlayback(true);
+    document.getElementById("heroCard").classList.remove("evaluating", "meets", "below");
+    document.getElementById("slGauge").hidden = true;
+    setText("heroSuffix", "");
+    var status = document.getElementById("statusLine");
+    status.hidden = true;
+    status.textContent = "";
     if (unstable && direction === "fixedAgents" && agents >= 1 && isFinite(traffic)) {
       var shrink = input.shrinkageEnabled ? Number(input.shrinkagePercent) : 0;
       setText("heroLabel", "Available agents");
@@ -643,6 +679,7 @@
         : model.error);
       return;
     }
+    setText("heroLabel", "Available agents");
     setText("heroValue", "—");
     setText("scheduleLine", "");
     setText("slLine", "");

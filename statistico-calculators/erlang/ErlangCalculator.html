@@ -151,8 +151,9 @@
     html[data-theme="light"] .insight { color: #1e293b; }
     .insight i { color: #2dd4bf; margin-top: 2px; }
     .insight p { margin: 0; }
-    .chart-panel { flex: 1 1 auto; min-height: 260px; margin-top: 8px; border: 1px solid var(--border); border-radius: 10px; background: rgba(14, 20, 27, 0.42); padding: 4px 8px 6px; display: flex; flex-direction: column; }
-    html[data-theme="light"] .chart-panel { background: #f8fafc; }
+    #summaryView { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    .chart-panel { flex: 1 1 auto; width: 75%; margin: 8px auto 0; min-height: 280px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(14, 20, 27, 0.2)); padding: 10px 16px 8px; display: flex; flex-direction: column; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+    html[data-theme="light"] .chart-panel { background: #fff; border-color: rgba(15, 23, 42, 0.08); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04); }
     .result-tabs { display: none; gap: 6px; margin: 8px 0; }
     body.mode-simulation .result-tabs { display: flex; }
     .result-tabs button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 6px 10px; font: 700 0.75rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
@@ -638,27 +639,43 @@
     var rows = math.serviceCurve(model.traffic, Number(input.ahtSeconds), Number(input.maxWaitSeconds), model.availableAgents);
     var host = document.getElementById("staffingChart");
     host.textContent = "";
-    var W = 640, H = 176, L = 52, R = 12, T = 34, B = 36;
+    var W = 640, H = 228, L = 46, R = 18, T = 36, B = 44;
     var x0 = rows[0].agents;
     var x1 = rows[rows.length - 1].agents;
     function px(n) { return L + ((n - x0) / Math.max(1, x1 - x0)) * (W - L - R); }
     function py(level) { return T + (1 - Math.max(0, Math.min(1, level))) * (H - T - B); }
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Service level by available agents" });
-    var title = svgEl("text", { x: (L + W - R) / 2, y: 14, "text-anchor": "middle", fill: ink(), "font-size": "13", "font-weight": "700" });
+    var title = svgEl("text", { x: (L + W - R) / 2, y: 16, "text-anchor": "middle", fill: muted(), "font-size": "12", "font-weight": "600", "letter-spacing": "0.02em" });
     title.textContent = mode === "simulation" && model.source !== "simulation" ? "Preliminary Erlang C service-level curve" : (model.source === "simulation" ? "Simulation result" : "Service level by available agents");
     svg.appendChild(title);
-    [0, 0.5, 1].forEach(function (level) {
-      svg.appendChild(svgEl("line", { x1: L, y1: py(level), x2: W - R, y2: py(level), stroke: isLight() ? "rgba(30,41,59,0.12)" : "rgba(232,238,248,0.12)", "stroke-width": "1" }));
-      var tick = svgEl("text", { x: L - 6, y: py(level) + 3, "text-anchor": "end", fill: muted(), "font-size": "10" });
-      tick.textContent = Math.round(level * 100) + "%";
-      svg.appendChild(tick);
-    });
+    var yStep;
+    for (yStep = 0; yStep <= 10; yStep++) {
+      var level = yStep / 10;
+      var major = yStep % 2 === 0;
+      svg.appendChild(svgEl("line", { x1: L, y1: py(level), x2: W - R, y2: py(level), stroke: isLight() ? (major ? "rgba(15,23,42,0.12)" : "rgba(15,23,42,0.05)") : (major ? "rgba(226,232,240,0.16)" : "rgba(226,232,240,0.07)"), "stroke-width": "1" }));
+      if (major) {
+        var tick = svgEl("text", { x: L - 8, y: py(level) + 3, "text-anchor": "end", fill: muted(), "font-size": "10" });
+        tick.textContent = Math.round(level * 100) + "%";
+        svg.appendChild(tick);
+      }
+    }
+    var agent;
+    var span = x1 - x0;
+    var xEvery = span > 16 ? 2 : 1;
+    for (agent = x0; agent <= x1; agent++) {
+      svg.appendChild(svgEl("line", { x1: px(agent), y1: T, x2: px(agent), y2: H - B, stroke: isLight() ? "rgba(15,23,42,0.06)" : "rgba(226,232,240,0.08)", "stroke-width": "1" }));
+      if ((agent - x0) % xEvery === 0) {
+        var xTick = svgEl("text", { x: px(agent), y: H - 22, "text-anchor": "middle", fill: muted(), "font-size": "10" });
+        xTick.textContent = String(agent);
+        svg.appendChild(xTick);
+      }
+    }
     var target = Number(input.targetServiceLevel) / 100;
     var wait = Number(input.maxWaitSeconds);
     var accent = mode === "simulation" ? "#8ec8ef" : "#f59e0b";
     var targetStroke = mode === "simulation" ? "rgb(142, 200, 239)" : "rgb(255,165,120)";
     if (isFinite(target)) {
-      svg.appendChild(svgEl("line", { x1: L, y1: py(target), x2: W - R, y2: py(target), stroke: targetStroke, "stroke-dasharray": "4 4", "stroke-width": "1.5" }));
+      svg.appendChild(svgEl("line", { x1: L, y1: py(target), x2: W - R, y2: py(target), stroke: targetStroke, "stroke-dasharray": "3 4", "stroke-width": "1" }));
       var targetLabel = svgEl("text", { x: W - R, y: py(target) - 4, "text-anchor": "end", fill: targetStroke, "font-size": "10", "font-weight": "700" });
       targetLabel.textContent = "Target: " + input.targetServiceLevel + "% within " + wait + " seconds";
       svg.appendChild(targetLabel);
@@ -666,7 +683,9 @@
     var d = "";
     if (model.source !== "simulation") {
       rows.forEach(function (row, i) { d += (i ? " L " : "M ") + px(row.agents) + " " + py(row.serviceLevel); });
-      svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: "rgb(120,200,255)", "stroke-width": "2.2" }));
+      var area = d + " L " + px(x1) + " " + py(0) + " L " + px(x0) + " " + py(0) + " Z";
+      svg.appendChild(svgEl("path", { d: area, fill: "rgba(120,200,255,0.08)", stroke: "none" }));
+      svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: "rgb(147,197,253)", "stroke-width": "1.75", "stroke-linejoin": "round", "stroke-linecap": "round" }));
     } else if (model.serviceLevelLow != null && model.serviceLevelHigh != null) {
       svg.appendChild(svgEl("line", { x1: px(model.availableAgents), y1: py(model.serviceLevelLow), x2: px(model.availableAgents), y2: py(model.serviceLevelHigh), stroke: "#8ec8ef", "stroke-width": "6", "stroke-linecap": "round" }));
     }
@@ -682,20 +701,16 @@
       svg.appendChild(hit);
     });
     var markY = py(model.serviceLevel);
-    svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: "4.5", fill: accent }));
+    svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: "7", fill: "none", stroke: accent, "stroke-width": "1.25" }));
+    svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: "2.6", fill: accent }));
     var labelX = px(model.availableAgents);
     var anchor = labelX > W * 0.62 ? "end" : "start";
-    var chosen = svgEl("text", { x: anchor === "end" ? labelX - 8 : labelX + 8, y: Math.min(H - B - 4, Math.max(T + 12, markY - 8)), "text-anchor": anchor, fill: accent, "font-size": "11", "font-weight": "700" });
+    var chosen = svgEl("text", { x: anchor === "end" ? labelX - 10 : labelX + 10, y: Math.min(H - B - 8, Math.max(T + 14, markY - 10)), "text-anchor": anchor, fill: accent, "font-size": "11", "font-weight": "600" });
     chosen.textContent = model.availableAgents + " agents · " + pct1(model.serviceLevel);
     svg.appendChild(chosen);
-    var xLabel = svgEl("text", { x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle", fill: muted(), "font-size": "11", "font-weight": "700" });
+    var xLabel = svgEl("text", { x: (L + W - R) / 2, y: H - 6, "text-anchor": "middle", fill: muted(), "font-size": "10", "font-weight": "600" });
     xLabel.textContent = "Available agents";
     svg.appendChild(xLabel);
-    [x0, model.availableAgents, x1].forEach(function (n) {
-      var label = svgEl("text", { x: px(n), y: H - 16, "text-anchor": "middle", fill: muted(), "font-size": "11" });
-      label.textContent = String(n);
-      svg.appendChild(label);
-    });
     host.appendChild(svg);
   }
 

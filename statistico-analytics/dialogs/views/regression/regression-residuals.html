@@ -1218,8 +1218,10 @@
           showEmptyState();
         }
       } else {
-        // Standalone browser preview: show demo diagnostics instead of empty screen.
-        if (typeof Office === 'undefined' && !isInIframe) {
+        const retained = residualRetentionMessage();
+        if (retained) {
+          showEmptyState(retained);
+        } else if (typeof Office === 'undefined' && !isInIframe) {
           console.log('🧪 No payload found; loading standalone demo residual data');
           loadDemoResidualData();
         } else {
@@ -1260,9 +1262,24 @@
       displayDiagnostics();
     }
 
-    function showEmptyState() {
+    function residualRetentionMessage() {
+      try {
+        const status = JSON.parse(sessionStorage.getItem('regressionStorageStatus') || 'null');
+        if (!status || !Array.isArray(status.failed) || status.failed.indexOf('residualData') === -1) return '';
+      } catch (_e) {
+        return '';
+      }
+      return 'Residual diagnostics were not kept because browser storage is full. Open Diagnostics in the Regression results window, which still has the fitted model.';
+    }
+
+    function showEmptyState(message) {
       document.getElementById('loadingState').style.display = 'none';
-      document.getElementById('emptyState').style.display = 'block';
+      const empty = document.getElementById('emptyState');
+      if (message) {
+        const note = empty.querySelector('p');
+        if (note) note.textContent = message;
+      }
+      empty.style.display = 'block';
     }
 
     function displayDiagnostics() {

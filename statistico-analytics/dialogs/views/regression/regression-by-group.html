@@ -3015,6 +3015,19 @@
           || (Array.isArray(payload.sourceRows) && payload.sourceRows.length)));
     }
 
+    function retentionMessage(key) {
+      try {
+        const status = JSON.parse(sessionStorage.getItem('regressionStorageStatus') || 'null');
+        if (!status || !Array.isArray(status.failed) || status.failed.indexOf(key) === -1) return '';
+      } catch (_e) {
+        return '';
+      }
+      if (key === 'regressionNavData') {
+        return 'By Group needs the regression source rows, and they were not kept because browser storage is full. The model results are still on the Regression results page. Re-run on a smaller range if you need this view.';
+      }
+      return 'This view needs data that was not kept because browser storage is full. The model results are still on the Regression results page.';
+    }
+
     function tryLoadStored() {
       try {
         const raw = sessionStorage.getItem('regressionNavData') || localStorage.getItem('regressionNavData');
@@ -3041,7 +3054,8 @@
         window.StatisticoByGroup.applyPageTitles();
       }
       if (!tryLoadStored()) {
-        setEmpty('Run a regression analysis first, then open Regression by Group.');
+        setEmpty(retentionMessage('regressionNavData')
+          || 'Run a regression analysis first, then open Regression by Group.');
       }
     }
 

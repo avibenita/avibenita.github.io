@@ -136,7 +136,20 @@
     .hero-facts { flex: 1; min-width: 0; }
     .hero-facts p { margin: 0 0 4px; font-size: 0.86rem; line-height: 1.35; color: #e8eef8; font-weight: 650; }
     html[data-theme="light"] .hero-facts p { color: #1e293b; }
-    .hero-facts p:last-child { margin-bottom: 0; color: #f0b27a; }
+    .metrics-caption { margin: 8px 0 4px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em; color: #c5d4e8; }
+    .status-line { margin: 0 0 4px; font-size: 1.05rem; font-weight: 800; }
+    .status-line.meets { color: #6ee7b7; }
+    .status-line.below { color: #fdba74; }
+    .hero-card.meets { border-color: rgba(52, 211, 153, 0.5); }
+    .hero-card.below { border-color: rgba(251, 146, 60, 0.55); }
+    .eval-facts { display: none; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+    .hero-card.evaluating .eval-facts { display: grid; }
+    .eval-facts div { border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 6px 8px; }
+    .eval-facts span { display: block; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #94a3b8; }
+    .eval-facts strong { display: block; margin-top: 2px; font-size: 0.92rem; }
+    #staffBasis { display: none; margin-top: 8px; }
+    body.dir-fixed.shrink-on #staffBasis { display: grid; gap: 4px; }
+    #staffBasis label { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 700; }
     .metric-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
     .metric { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: rgba(14, 20, 27, 0.35); }
     html[data-theme="light"] .metric { background: #f8fafc; }
@@ -260,7 +273,14 @@
             </div>
             <div class="erlang-block">
               <h3>Staffing</h3>
-              <div class="field" id="agentsField"><label for="agents">Agents available to take calls</label><input id="agents" type="number" min="1" step="1" value="12"/></div>
+              <div class="field" id="agentsField">
+                <label for="agents" id="agentsLabel">Agents available to take calls</label>
+                <input id="agents" type="number" min="1" step="1" value="12"/>
+                <div id="staffBasis">
+                  <label><input type="radio" name="staffBasis" id="basisActive" value="active" checked/> This number is active agents available</label>
+                  <label><input type="radio" name="staffBasis" id="basisScheduled" value="scheduled"/> This number is scheduled agents</label>
+                </div>
+              </div>
             </div>
             <div class="erlang-block">
               <h3>Staffing adjustment</h3>
@@ -310,12 +330,20 @@
                 <span class="result-badge" id="heroBadge" hidden></span>
               </div>
               <div class="hero-facts">
+                <p id="statusLine" class="status-line" hidden></p>
                 <p id="scheduleLine"></p>
                 <p id="slLine"></p>
                 <p id="gapLine"></p>
               </div>
             </div>
+            <div class="eval-facts" id="evalFacts">
+              <div><span>Current active agents</span><strong id="factCurrent">—</strong></div>
+              <div><span>Service level achieved</span><strong id="factLevel">—</strong></div>
+              <div><span>Minimum agents required</span><strong id="factMinimum">—</strong></div>
+              <div><span>Staffing gap</span><strong id="factGap">—</strong></div>
+            </div>
           </div>
+          <p class="metrics-caption" id="metricsCaption"></p>
           <div class="metric-grid" id="metricGrid">
             <div class="metric"><div class="metric-label">Average wait</div><div class="metric-value" id="waitValue">—</div></div>
             <div class="metric"><div class="metric-label">Average queue length <span class="info-dot" tabindex="0" data-tip="Mean number of callers waiting for an agent. Callers already on a call are not included. It equals calls per second times average wait.">i</span></div><div class="metric-value" id="queueLengthValue">—</div></div>
@@ -415,6 +443,16 @@
       shrinkagePercent: document.getElementById("shrink").value
     };
   }
+  function staffingInput() {
+    var input = read();
+    var scheduledBasis = document.getElementById("basisScheduled").checked && input.shrinkageEnabled && input.direction === "fixedAgents";
+    input.enteredAgents = Math.floor(Number(input.agents));
+    input.staffBasis = scheduledBasis ? "scheduled" : "active";
+    if (scheduledBasis) input.activeAgents = Math.max(1, Math.round(input.enteredAgents * (1 - Number(input.shrinkagePercent) / 100)));
+    else input.activeAgents = Math.max(1, input.enteredAgents || 1);
+    input.agents = String(input.activeAgents);
+    return input;
+  }
   function setText(id, text) { document.getElementById(id).textContent = text; }
   function pct1(fraction) { return (fraction * 100).toFixed(1) + "%"; }
   function formatQueueLength(length) {
@@ -452,7 +490,7 @@
       showUnsolved(model);
       return;
     }
-    var input = read();
+    var input = staffingInput();
     var shrink = input.shrinkageEnabled ? Number(input.shrinkagePercent) : 0;
     var target = Number(input.targetServiceLevel);
     var wait = Number(input.maxWaitSeconds);
@@ -463,54 +501,81 @@
       setText("insightText", staff.error);
       return;
     }
-    model.scheduledAgents = staff.scheduledAgents;
+    model.scheduledAgents = input.staffBasis === "scheduled" ? input.enteredAgents : staff.scheduledAgents;
     var provisional = mode === "simulation" && model.source !== "simulation";
+    model.evaluating = !finding;
+    var seek = staffingInput();
+    seek.direction = "findAgents";
+    var minimum = !finding ? math.analyze(seek) : null;
+    model.minimumAgents = minimum && minimum.ok ? minimum.baseAgents : null;
+    model.minimumServiceLevel = minimum && minimum.ok ? minimum.serviceLevel : null;
+    var currentActive = finding ? model.availableAgents : input.activeAgents;
+    var meets = model.serviceLevel * 100 + 0.05 >= target;
+    var heroCard = document.getElementById("heroCard");
+    heroCard.classList.toggle("evaluating", !finding);
+    heroCard.classList.toggle("meets", !finding && meets);
+    heroCard.classList.toggle("below", !finding && !meets);
+    var status = document.getElementById("statusLine");
+    status.hidden = finding;
+    status.className = "status-line " + (meets ? "meets" : "below");
     document.getElementById("resultsPanel").classList.toggle("results-dim", provisional || resultsStale);
     document.getElementById("heroCard").classList.toggle("provisional", provisional);
     document.getElementById("staleBanner").hidden = !resultsStale;
     document.getElementById("resultsTitle").lastChild.textContent = provisional ? " Preliminary staffing estimate" : (model.source === "simulation" ? " Simulation result" : " Staffing results");
     var badge = document.getElementById("heroBadge");
-    if (provisional) {
+    var spread = model.source === "simulation" && model.serviceLevelLow != null && model.replications > 1 ? " Replication range " + pct1(model.serviceLevelLow) + "–" + pct1(model.serviceLevelHigh) + "." : "";
+    status.hidden = finding;
+    if (provisional && finding) {
       setText("heroLabel", "Starting estimate");
       setText("heroValue", model.availableAgents + " active agents");
       badge.hidden = false;
       badge.textContent = "Erlang C baseline";
       setText("scheduleLine", input.shrinkageEnabled ? "Shrinkage would schedule " + staff.scheduledAgents + " agents." : "Shrinkage is off.");
+      setText("slLine", "Service level: " + pct1(model.serviceLevel) + " within " + wait + " seconds.");
+      setText("gapLine", "Target: " + target + "%");
+    } else if (!finding) {
+      setText("heroLabel", "Current staffing");
+      setText("heroValue", currentActive + " active agents");
+      badge.hidden = !(provisional || model.source === "simulation");
+      if (!badge.hidden) badge.textContent = provisional ? "Erlang C baseline" : ("Mean across " + (model.replications || 1) + " replications");
+      status.textContent = meets ? "Meets target" : "Below target";
+      if (input.staffBasis === "scheduled") {
+        setText("scheduleLine", input.enteredAgents + " scheduled agents. " + shrink + "% shrinkage → " + currentActive + " active agents available.");
+      } else if (input.shrinkageEnabled) {
+        setText("scheduleLine", staff.scheduledAgents + " agents to schedule at " + shrink + "% shrinkage.");
+      } else {
+        setText("scheduleLine", "Entered as active agents. Shrinkage is off.");
+      }
+      setText("slLine", "Service level: " + pct1(model.serviceLevel) + " versus target " + target + "%");
+      var agentGap = model.minimumAgents == null ? null : model.minimumAgents - currentActive;
+      if (!meets && agentGap > 0) setText("gapLine", "Staffing gap: " + agentGap + " additional active agents");
+      else if (meets && agentGap < 0) setText("gapLine", Math.abs(agentGap) + " agents above the minimum required");
+      else setText("gapLine", "Margin: " + (gap > 0 ? "+" : "") + gap.toFixed(1) + " percentage points");
+      setText("factCurrent", String(currentActive));
+      setText("factLevel", pct1(model.serviceLevel));
+      setText("factMinimum", model.minimumAgents == null ? "—" : String(model.minimumAgents));
+      setText("factGap", agentGap == null ? "—" : (agentGap > 0 ? "+" + agentGap + " agents needed" : (agentGap < 0 ? Math.abs(agentGap) + " above the minimum" : "At the minimum")));
+      setText("metricsCaption", "Metrics at " + currentActive + " current agents");
     } else if (model.source === "simulation") {
-      setText("heroLabel", finding ? "Simulation staffing" : "Active agents");
+      setText("heroLabel", "Agents required");
       setText("heroValue", String(model.availableAgents));
       badge.hidden = false;
       badge.textContent = "Mean across " + (model.replications || 1) + " replications";
-      setText("scheduleLine", finding && input.shrinkageEnabled
-        ? "Agents to schedule: " + staff.scheduledAgents + " at " + shrink + "% shrinkage."
-        : (finding ? "Shrinkage is off." : (input.shrinkageEnabled ? "Agents to schedule: " + staff.scheduledAgents + "." : "Current staffing: " + model.availableAgents + " active agents.")));
-    } else if (finding && input.shrinkageEnabled) {
-      badge.hidden = true;
-      setText("heroLabel", "Active agents required");
-      setText("scheduleLine", "Agents to schedule: " + staff.scheduledAgents + ". Shrinkage assumption: " + shrink + "%. Additional scheduled agents: " + staff.additionalAgents + ".");
-    } else if (finding) {
-      badge.hidden = true;
-      setText("heroLabel", "Agents required");
-      setText("scheduleLine", "Shrinkage is off.");
-    } else if (input.shrinkageEnabled) {
-      badge.hidden = true;
-      setText("heroLabel", "Active agents");
-      setText("scheduleLine", "Agents to schedule: " + staff.scheduledAgents + ". Shrinkage assumption: " + shrink + "%.");
+      setText("scheduleLine", "Minimum active agents that meet " + target + "% within " + wait + " seconds.");
+      setText("slLine", "Mean service level: " + pct1(model.serviceLevel) + " within " + wait + " seconds." + spread);
+      setText("gapLine", input.shrinkageEnabled ? staff.scheduledAgents + " agents to schedule at " + shrink + "% shrinkage." : "Shrinkage is off.");
+      setText("metricsCaption", "Metrics at " + model.availableAgents + " required agents");
     } else {
-      setText("heroLabel", "Agents required");
-      setText("scheduleLine", "Current staffing: " + model.availableAgents + " active agents. Shrinkage is off.");
       badge.hidden = true;
+      setText("heroLabel", "Agents required");
+      setText("heroValue", String(model.availableAgents));
+      setText("scheduleLine", "Minimum active agents that meet " + target + "% within " + wait + " seconds.");
+      setText("slLine", "Service level: " + pct1(model.serviceLevel) + " within " + wait + " seconds.");
+      setText("gapLine", input.shrinkageEnabled ? staff.scheduledAgents + " agents to schedule at " + shrink + "% shrinkage." : "Shrinkage is off.");
+      setText("metricsCaption", "Metrics at " + model.availableAgents + " required agents");
     }
-    if (!provisional && model.source !== "simulation") setText("heroValue", String(model.availableAgents));
-    var spread = "";
-    if (model.source === "simulation" && model.serviceLevelLow != null && model.serviceLevelHigh != null && model.replications > 1) {
-      spread = " Replication range " + pct1(model.serviceLevelLow) + "–" + pct1(model.serviceLevelHigh) + ".";
-    }
-    setText("slLine", (model.source === "simulation" ? "Mean service level: " : "Service level: ") + pct1(model.serviceLevel) + " within " + wait + " seconds." + spread);
+    if (finding) setText("metricsCaption", "Metrics at " + model.availableAgents + " required agents");
     document.getElementById("slLine").title = "Service level = calls answered within the target time ÷ calls offered.";
-    setText("gapLine", Math.abs(gap) < 0.05
-      ? "Target: " + target + "% · at target"
-      : "Target: " + target + "% · " + Math.abs(gap).toFixed(1) + " percentage points " + (gap > 0 ? "above" : "below") + " target");
     setText("waitValue", model.avgWaitSeconds == null ? "—" : model.avgWaitSeconds.toFixed(1) + "s");
     setText("queueLengthValue", formatQueueLength(model.averageQueueLength));
     setText("occValue", model.occupancy == null ? "—" : pct1(model.occupancy));
@@ -636,7 +701,7 @@
 
   function drawCurve(model) {
     var input = read();
-    var rows = math.serviceCurve(model.traffic, Number(input.ahtSeconds), Number(input.maxWaitSeconds), model.availableAgents);
+    var rows = math.serviceCurve(model.traffic, Number(input.ahtSeconds), Number(input.maxWaitSeconds), Math.max(model.availableAgents, model.minimumAgents || 0));
     var host = document.getElementById("staffingChart");
     host.textContent = "";
     var W = 640, H = 228, L = 46, R = 18, T = 36, B = 44;
@@ -672,6 +737,16 @@
     }
     var target = Number(input.targetServiceLevel) / 100;
     var wait = Number(input.maxWaitSeconds);
+    var meetAgent = model.evaluating ? model.minimumAgents : null;
+    if (meetAgent == null) {
+      rows.forEach(function (row) {
+        if (meetAgent == null && row.serviceLevel + 1e-12 >= target) meetAgent = row.agents;
+      });
+    }
+    if (meetAgent != null && meetAgent >= x0 && meetAgent <= x1) {
+      svg.appendChild(svgEl("rect", { x: L, y: T, width: Math.max(0, px(meetAgent) - L), height: H - T - B, fill: "rgba(251,146,60,0.10)" }));
+      svg.appendChild(svgEl("rect", { x: px(meetAgent), y: T, width: Math.max(0, W - R - px(meetAgent)), height: H - T - B, fill: "rgba(52,211,153,0.08)" }));
+    }
     var accent = mode === "simulation" ? "#8ec8ef" : "#f59e0b";
     var targetStroke = mode === "simulation" ? "rgb(142, 200, 239)" : "rgb(255,165,120)";
     if (isFinite(target)) {
@@ -701,13 +776,22 @@
       svg.appendChild(hit);
     });
     var markY = py(model.serviceLevel);
-    svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: "7", fill: "none", stroke: accent, "stroke-width": "1.25" }));
-    svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: "2.6", fill: accent }));
+    function markerLabel(x, y, text, fill, anchor) {
+      var node = svgEl("text", { x: x, y: y, "text-anchor": anchor, fill: fill, "font-size": "11", "font-weight": "600" });
+      node.textContent = text;
+      svg.appendChild(node);
+    }
+    if (model.evaluating && model.minimumAgents && model.minimumAgents !== model.availableAgents) {
+      var minY = py(model.minimumServiceLevel == null ? 0 : model.minimumServiceLevel);
+      svg.appendChild(svgEl("circle", { cx: px(model.minimumAgents), cy: minY, r: "3.2", fill: "#34d399" }));
+      markerLabel(px(model.minimumAgents) + 8, Math.max(T + 12, minY - 8), model.minimumAgents + " minimum required · " + pct1(model.minimumServiceLevel || 0), "#34d399", "start");
+    }
+    var currentFill = model.evaluating ? "#f59e0b" : accent;
+    svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: model.evaluating ? "8" : "7", fill: "none", stroke: currentFill, "stroke-width": "1.5" }));
+    svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: "3", fill: currentFill }));
     var labelX = px(model.availableAgents);
     var anchor = labelX > W * 0.62 ? "end" : "start";
-    var chosen = svgEl("text", { x: anchor === "end" ? labelX - 10 : labelX + 10, y: Math.min(H - B - 8, Math.max(T + 14, markY - 10)), "text-anchor": anchor, fill: accent, "font-size": "11", "font-weight": "600" });
-    chosen.textContent = model.availableAgents + " agents · " + pct1(model.serviceLevel);
-    svg.appendChild(chosen);
+    markerLabel(anchor === "end" ? labelX - 10 : labelX + 10, Math.min(H - B - 8, Math.max(T + 14, markY - 12)), (model.evaluating ? model.availableAgents + " current agents · " : model.availableAgents + " agents · ") + pct1(model.serviceLevel), currentFill, anchor);
     var xLabel = svgEl("text", { x: (L + W - R) / 2, y: H - 6, "text-anchor": "middle", fill: muted(), "font-size": "10", "font-weight": "600" });
     xLabel.textContent = "Available agents";
     svg.appendChild(xLabel);
@@ -721,7 +805,7 @@
 
   function refreshLocal() {
     if (mode === "simulation" && displayed && displayed.source === "simulation") return;
-    render(fromLocal(math.analyze(read())));
+    render(fromLocal(math.analyze(staffingInput())));
   }
 
   function fromQueueSim(summary, agents) {
@@ -874,6 +958,15 @@
   document.getElementById("dirFixed").addEventListener("click", function () { setDirection("fixedAgents"); });
   document.getElementById("shrinkOn").addEventListener("change", function () {
     document.body.classList.toggle("shrink-on", document.getElementById("shrinkOn").checked);
+    document.getElementById("agentsLabel").textContent = document.getElementById("basisScheduled").checked && this.checked ? "Scheduled agents" : "Agents available to take calls";
+    noteInputChange();
+  });
+  document.getElementById("basisActive").addEventListener("change", function () {
+    document.getElementById("agentsLabel").textContent = "Agents available to take calls";
+    noteInputChange();
+  });
+  document.getElementById("basisScheduled").addEventListener("change", function () {
+    document.getElementById("agentsLabel").textContent = "Scheduled agents";
     noteInputChange();
   });
   document.getElementById("abandonOn").addEventListener("change", function () {

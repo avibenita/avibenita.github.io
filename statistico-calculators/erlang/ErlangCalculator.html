@@ -135,7 +135,14 @@
     .charts-modal.open { display: flex; }
     .charts-dialog { width: min(1100px, 100%); max-height: min(860px, 100%); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #121a24; padding: 12px 14px 16px; }
     html[data-theme="light"] .charts-dialog { background: #fff; }
-    .charts-section { margin-top: 14px; }
+    .charts-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+    .charts-bar button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 7px 10px; font: 700 0.74rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
+    .charts-bar button.active { border-color: #2dd4bf; background: rgba(20, 184, 166, 0.22); color: #f4fffd; }
+    html[data-theme="light"] .charts-bar button { color: #1f2937; border-color: #94a3b8; }
+    html[data-theme="light"] .charts-bar button.active { color: #064e3b; }
+    .charts-modal:not(.view-all) .hc-box { height: 380px; }
+    .charts-modal.view-all .hc-box { height: 220px; }
+    .charts-modal:not(.view-all) .charts-grid { grid-template-columns: 1fr 1fr; }
     .charts-section h3 { margin: 0 0 8px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .charts-grid .dist-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -1708,21 +1715,37 @@
       var scaled = math.analyze({ callsPerHour: calls, ahtSeconds: input.ahtSeconds, maxWaitSeconds: input.maxWaitSeconds, direction: "fixedAgents", agents: agents, targetServiceLevel: input.targetServiceLevel, shrinkageEnabled: false });
       if (scaled.ok) trafficRows.push(Object.assign({ label: scale === 1 ? "Baseline" : (scale > 1 ? "+" : "") + Math.round((scale - 1) * 100) + "%" }, scaled));
     });
-    function section(title) {
-      var block = el("section", { class: "charts-section" });
+    var bar = el("div", { class: "charts-bar" });
+    host.appendChild(bar);
+    function section(title, key) {
+      var block = el("section", { class: "charts-section", "data-chart": key });
       block.appendChild(el("h3", {}, title));
       var grid = el("div", { class: "charts-grid" });
       block.appendChild(grid);
       host.appendChild(block);
+      var button = el("button", { type: "button", "data-chart": key }, title);
+      button.addEventListener("click", function () { showChartType(key); });
+      bar.appendChild(button);
       return grid;
     }
-    var waitGrid = section("Waiting time");
+    function showChartType(key) {
+      var modal = document.getElementById("chartsModal");
+      modal.classList.toggle("view-all", key === "all");
+      host.querySelectorAll(".charts-section").forEach(function (node) {
+        node.hidden = key !== "all" && node.getAttribute("data-chart") !== key;
+      });
+      bar.querySelectorAll("button").forEach(function (button) {
+        button.classList.toggle("active", button.getAttribute("data-chart") === key);
+      });
+      chartInstances.forEach(function (chart) { if (chart) chart.reflow(); });
+    }
+    var waitGrid = section("Waiting time", "wait");
     chartCard(waitGrid, "Waiting-time probabilities", "Erlang C probabilities for this exact staffing. Not a simulated histogram.", "hcWait");
     chartCard(waitGrid, "Queue-size probabilities", "Probability the queue holds no caller, one, two, or three or more callers.", "hcQueue");
     var median = leave > 0 ? Math.log(2) / leave : Infinity;
     host.lastChild.appendChild(el("p", { class: "hint" }, "Among callers who wait, the median wait is " + (isFinite(median) ? median.toFixed(1) + " seconds" : "not finite") + "."));
-    function sensitivity(title, rows, tip, prefix) {
-      var grid = section(title);
+    function sensitivity(title, rows, tip, prefix, key) {
+      var grid = section(title, key);
       var cats = rows.map(function (row) { return row.label || (row.baseAgents + ""); });
       var specs = [
         ["Service level", "Percent answered within the target time.", function (row) { return +(row.serviceLevel * 100).toFixed(1); }, "Service level (%)", 0, 100],
@@ -1735,11 +1758,11 @@
       });
       return { cats: cats, specs: specs, rows: rows };
     }
-    var staffPack = sensitivity("Staffing sensitivity", staffRows, "Each point is the Erlang C result at that headcount. The highlighted point is the current staffing.", "hcStaff");
-    var trafficPack = sensitivity("Traffic sensitivity", trafficRows, "Call volume moves around the entered rate while active agents stay fixed. The highlighted point is the baseline volume.", "hcTraffic");
+    var staffPack = sensitivity("Staffing sensitivity", staffRows, "Each point is the Erlang C result at that headcount. The highlighted point is the current staffing.", "hcStaff", "staff");
+    var trafficPack = sensitivity("Traffic sensitivity", trafficRows, "Call volume moves around the entered rate while active agents stay fixed. The highlighted point is the baseline volume.", "hcTraffic", "traffic");
     var samples = displayed.samples || [];
     if (mode === "simulation") {
-      var varGrid = section("Variability across replications");
+      var varGrid = section("Variability", "variability");
       if (!samples.length) varGrid.parentNode.appendChild(el("p", { class: "hint" }, "Run the simulation to add the replication distributions."));
       else {
         if (displayed.replications < 100) varGrid.parentNode.insertBefore(el("p", { class: "dist-warn" }, "Distribution estimates are unstable with only " + displayed.replications + " replications. Use 100 for an ordinary assessment and 500–1,000 for planning."), varGrid);
@@ -1755,6 +1778,9 @@
         histos.forEach(function (spec, index) { chartCard(varGrid, spec[0], spec[1], "hcVar" + index); });
       }
     }
+    var allButton = el("button", { type: "button", "data-chart": "all" }, "All");
+    allButton.addEventListener("click", function () { showChartType("all"); });
+    bar.appendChild(allButton);
     document.getElementById("chartsModal").classList.add("open");
     function lineOptions(pack, specIndex) {
       var spec = pack.specs[specIndex];
@@ -1801,6 +1827,7 @@
         drawHc("hcVar" + index, { chart: { type: "column" }, xAxis: { categories: labels, title: { text: spec[1] ? "Percent" : "Value" }, plotLines: plotLines }, yAxis: { min: 0, allowDecimals: false, title: { text: "Replications" } }, series: [{ data: counts, color: "#8ec8ef" }] });
       });
     }
+    showChartType("wait");
   }
   function showResultView(name) {
     if (name === "replay") {

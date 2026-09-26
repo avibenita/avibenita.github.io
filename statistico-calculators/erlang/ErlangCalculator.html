@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="../shared/analytics-lnf.css?v=20260924erlang2"/>
   <script src="../shared/shared-brand-logo.js?v=20260923logo1"></script>
   <script src="../shared/theme-toggle-component.js?v=20260922calc1"></script>
+  <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="./erlang-math.js?v=20260923erlang1"></script>
   <script src="./queue-playback.js?v=20260924queue1"></script>
   <script src="./queue-sim.js?v=20260924sim1"></script>
@@ -130,7 +131,16 @@
     .deeper-nav button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 6px 10px; font: 700 0.72rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
     .deeper-nav button.active { border-color: #2dd4bf; background: rgba(20, 184, 166, 0.22); color: #f4fffd; }
     body.mode-simulation .deeper-nav button.active { border-color: rgba(120, 200, 255, 0.7); background: rgba(120, 200, 255, 0.16); color: #d7ecfa; }
-    .deeper-nav .erlang-view { display: none; }
+    .charts-modal { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(2, 8, 20, 0.72); align-items: center; justify-content: center; padding: 24px; }
+    .charts-modal.open { display: flex; }
+    .charts-dialog { width: min(1100px, 100%); max-height: min(860px, 100%); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #121a24; padding: 12px 14px 16px; }
+    html[data-theme="light"] .charts-dialog { background: #fff; }
+    .charts-section { margin-top: 14px; }
+    .charts-section h3 { margin: 0 0 8px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .charts-grid .dist-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .hc-box { height: 240px; }
+    .charts-modal .info-dot::after { z-index: 120; }
     .deeper-nav .sim-view { display: none; }
     body.mode-erlang .deeper-nav .erlang-view { display: inline-flex; }
     body.mode-simulation .deeper-nav .sim-view { display: inline-flex; }
@@ -386,10 +396,7 @@
           <div class="insight"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="insightText">Erlang C updates as you type. Simulation runs when you ask it to.</p></div>
           <div class="deeper-nav" id="deeperNav">
             <button type="button" data-view="summary" class="active">Staffing summary</button>
-            <button type="button" data-view="wait" class="erlang-view">Waiting-time probabilities</button>
-            <button type="button" data-view="staff" class="erlang-view">Staffing sensitivity</button>
-            <button type="button" data-view="traffic" class="erlang-view">Traffic sensitivity</button>
-            <button type="button" data-view="variability" class="sim-view" id="variabilityBtn" disabled>Variability</button>
+            <button type="button" id="openCharts">Charts</button>
             <button type="button" data-view="replay" class="sim-view" id="replayNav" disabled>Simulation replay</button>
           </div>
           <div id="summaryView">
@@ -397,6 +404,15 @@
           <div class="chart-panel" id="chartPanel"><div id="staffingChart"></div></div>
           </div>
           <div id="deeperView" hidden></div>
+          <div class="charts-modal" id="chartsModal">
+            <div class="charts-dialog" role="dialog" aria-modal="true" aria-labelledby="chartsTitle">
+              <div class="replay-dialog-head">
+                <h2 class="erlang-panel-title" id="chartsTitle"><i class="fa-solid fa-chart-column"></i> Charts</h2>
+                <button type="button" class="erlang-btn erlang-btn-ghost" id="closeCharts">Close</button>
+              </div>
+              <div id="chartsBody"></div>
+            </div>
+          </div>
           <div class="replay-modal" id="replayModal">
             <div class="replay-dialog" role="dialog" aria-modal="true" aria-labelledby="replayTitle">
               <div class="replay-dialog-head">
@@ -651,7 +667,6 @@
     drawCurve(model);
     var replayBtn = document.getElementById("openReplay");
     var canVary = model.source === "simulation" && !resultsStale && model.samples && model.samples.length;
-    document.getElementById("variabilityBtn").disabled = !canVary;
     document.getElementById("replayNav").disabled = !canVary;
     if (!canVary && resultView === "variability") showResultView("summary");
     if (model.source === "simulation" && !resultsStale) {
@@ -997,7 +1012,6 @@
     if (mode === "simulation" && displayed && displayed.source === "simulation") {
       resultsStale = true;
       document.getElementById("resultsPanel").classList.add("results-dim");
-      document.getElementById("variabilityBtn").disabled = true;
       document.getElementById("replayNav").disabled = true;
       document.getElementById("staleBanner").hidden = false;
       document.getElementById("openReplay").disabled = true;
@@ -1613,6 +1627,181 @@
     lineCard("Occupancy (%)", function (row) { return row.occupancy * 100; }, 1);
     lineCard("Probability of waiting (%)", function (row) { return row.probabilityOfWait * 100; }, 1);
   }
+  var chartInstances = [];
+  function closeCharts() {
+    chartInstances.forEach(function (chart) { if (chart) chart.destroy(); });
+    chartInstances = [];
+    document.getElementById("chartsModal").classList.remove("open");
+  }
+  function drawHc(id, options) {
+    var light = document.documentElement.getAttribute("data-theme") === "light";
+    var label = light ? "#1e293b" : "#e2e8f0";
+    var grid = light ? "rgba(15,23,42,0.08)" : "rgba(226,232,240,0.14)";
+    var axis = light ? "#64748b" : "#94a3b8";
+    chartInstances.push(Highcharts.chart(id, Highcharts.merge({
+      chart: { backgroundColor: "transparent", style: { fontFamily: "Montserrat, Segoe UI, sans-serif" } },
+      title: { text: null },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: { lineColor: axis, tickColor: axis, gridLineWidth: 1, gridLineColor: grid, labels: { style: { color: label, fontSize: "11px" } }, title: { style: { color: label, fontWeight: "700", fontSize: "12px" } } },
+      yAxis: { gridLineColor: grid, lineWidth: 1, lineColor: axis, tickColor: axis, labels: { style: { color: label, fontSize: "11px" } }, title: { style: { color: label, fontWeight: "700", fontSize: "12px" } } },
+      tooltip: { backgroundColor: light ? "#fff" : "#0b1b33", borderColor: axis, style: { color: label } },
+      plotOptions: { column: { borderWidth: 0, color: "#2dd4bf" }, line: { color: "#2dd4bf", marker: { radius: 4 } } }
+    }, options)));
+  }
+  function chartCard(grid, title, tip, id) {
+    var box = el("div", { class: "dist-card" });
+    var heading = el("h3", {});
+    heading.appendChild(document.createTextNode(title));
+    heading.appendChild(el("span", { class: "info-dot", tabindex: "0", "data-tip": tip }, "i"));
+    box.appendChild(heading);
+    box.appendChild(el("div", { class: "hc-box", id: id }));
+    grid.appendChild(box);
+  }
+  function openCharts() {
+    closeCharts();
+    var host = document.getElementById("chartsBody");
+    host.textContent = "";
+    if (!window.Highcharts) {
+      host.appendChild(el("p", {}, "Highcharts did not load."));
+      document.getElementById("chartsModal").classList.add("open");
+      return;
+    }
+    if (!displayed || !displayed.ok) {
+      host.appendChild(el("p", {}, "Enter a staffing level Erlang C can solve."));
+      document.getElementById("chartsModal").classList.add("open");
+      return;
+    }
+    var input = read();
+    var agents = displayed.availableAgents;
+    var traffic = displayed.traffic;
+    var aht = Number(input.ahtSeconds);
+    var lambda = Number(input.callsPerHour) / 3600;
+    var mu = 1 / aht;
+    var delay = math.erlangC(traffic, agents);
+    var rho = agents > 0 ? traffic / agents : 1;
+    var leave = agents * mu - lambda;
+    var waits = [0, 20, 30, 60].map(function (t) {
+      var p = leave > 0 ? delay * Math.exp(-leave * t) : 1;
+      return { name: t === 0 ? "Must wait" : "Wait > " + t + "s", y: +(p * 100).toFixed(1) };
+    });
+    waits.unshift({ name: "Answered immediately", y: +((1 - delay) * 100).toFixed(1) });
+    var q0 = 1 - delay;
+    var q1 = delay * Math.max(0, 1 - rho);
+    var q2 = q1 * Math.max(0, rho);
+    var q3 = Math.max(0, delay - q1 - q2);
+    var queue = [
+      { name: "0 waiting", y: +(q0 * 100).toFixed(1) },
+      { name: "1 waiting", y: +(q1 * 100).toFixed(1) },
+      { name: "2 waiting", y: +(q2 * 100).toFixed(1) },
+      { name: "3 or more", y: +(q3 * 100).toFixed(1) }
+    ];
+    var staffRows = [];
+    var n;
+    for (n = Math.max(Math.floor(traffic) + 1, agents - 4); n <= agents + 4; n++) {
+      var point = math.analyze({ callsPerHour: input.callsPerHour, ahtSeconds: input.ahtSeconds, maxWaitSeconds: input.maxWaitSeconds, direction: "fixedAgents", agents: n, targetServiceLevel: input.targetServiceLevel, shrinkageEnabled: false });
+      if (point.ok) staffRows.push(point);
+    }
+    var trafficRows = [];
+    [0.8, 0.9, 1, 1.1, 1.2].forEach(function (scale) {
+      var calls = Number(input.callsPerHour) * scale;
+      var scaled = math.analyze({ callsPerHour: calls, ahtSeconds: input.ahtSeconds, maxWaitSeconds: input.maxWaitSeconds, direction: "fixedAgents", agents: agents, targetServiceLevel: input.targetServiceLevel, shrinkageEnabled: false });
+      if (scaled.ok) trafficRows.push(Object.assign({ label: scale === 1 ? "Baseline" : (scale > 1 ? "+" : "") + Math.round((scale - 1) * 100) + "%" }, scaled));
+    });
+    function section(title) {
+      var block = el("section", { class: "charts-section" });
+      block.appendChild(el("h3", {}, title));
+      var grid = el("div", { class: "charts-grid" });
+      block.appendChild(grid);
+      host.appendChild(block);
+      return grid;
+    }
+    var waitGrid = section("Waiting time");
+    chartCard(waitGrid, "Waiting-time probabilities", "Erlang C probabilities for this exact staffing. Not a simulated histogram.", "hcWait");
+    chartCard(waitGrid, "Queue-size probabilities", "Probability the queue holds no caller, one, two, or three or more callers.", "hcQueue");
+    var median = leave > 0 ? Math.log(2) / leave : Infinity;
+    host.lastChild.appendChild(el("p", { class: "hint" }, "Among callers who wait, the median wait is " + (isFinite(median) ? median.toFixed(1) + " seconds" : "not finite") + "."));
+    function sensitivity(title, rows, tip, prefix) {
+      var grid = section(title);
+      var cats = rows.map(function (row) { return row.label || (row.baseAgents + ""); });
+      var specs = [
+        ["Service level", "Percent answered within the target time.", function (row) { return +(row.serviceLevel * 100).toFixed(1); }, "Service level (%)", 0, 100],
+        ["Average wait", "Mean wait of callers who reach an agent, in seconds.", function (row) { return +row.avgWaitSeconds.toFixed(1); }, "Seconds", 0, null],
+        ["Occupancy", "Offered load divided by active agents.", function (row) { return +(row.occupancy * 100).toFixed(1); }, "Occupancy (%)", 0, 100],
+        ["Probability of waiting", "Chance a call waits at all before service.", function (row) { return +(row.probabilityOfWait * 100).toFixed(1); }, "Probability (%)", 0, 100]
+      ];
+      specs.forEach(function (spec, index) {
+        chartCard(grid, spec[0], tip + " " + spec[1], prefix + index);
+      });
+      return { cats: cats, specs: specs, rows: rows };
+    }
+    var staffPack = sensitivity("Staffing sensitivity", staffRows, "Each point is the Erlang C result at that headcount. The highlighted point is the current staffing.", "hcStaff");
+    var trafficPack = sensitivity("Traffic sensitivity", trafficRows, "Call volume moves around the entered rate while active agents stay fixed. The highlighted point is the baseline volume.", "hcTraffic");
+    var samples = displayed.samples || [];
+    if (mode === "simulation") {
+      var varGrid = section("Variability across replications");
+      if (!samples.length) varGrid.parentNode.appendChild(el("p", { class: "hint" }, "Run the simulation to add the replication distributions."));
+      else {
+        if (displayed.replications < 100) varGrid.parentNode.insertBefore(el("p", { class: "dist-warn" }, "Distribution estimates are unstable with only " + displayed.replications + " replications. Use 100 for an ordinary assessment and 500–1,000 for planning."), varGrid);
+        var target = Number(input.targetServiceLevel) / 100;
+        var maxAbandon = Number(document.getElementById("maxAbandon").value) / 100;
+        var waitTarget = Number(input.maxWaitSeconds);
+        var histos = [
+          ["Service level", "Share of replications in each service-level band. The dashed line is the target.", "serviceLevel", true, target],
+          ["Abandonment rate", "Share of replications in each abandonment band. The dashed line is the maximum abandonment rate.", "abandonmentRate", true, maxAbandon],
+          ["Average wait", "Share of replications in each average-wait band. The dashed line is the answer-within target.", "averageWait", false, waitTarget],
+          ["Maximum queue length", "Share of replications in each maximum-queue band.", "maximumQueueLength", false, null]
+        ];
+        histos.forEach(function (spec, index) { chartCard(varGrid, spec[0], spec[1], "hcVar" + index); });
+      }
+    }
+    document.getElementById("chartsModal").classList.add("open");
+    function lineOptions(pack, specIndex) {
+      var spec = pack.specs[specIndex];
+      var ys = pack.rows.map(spec[2]);
+      var yMax = spec[5] != null ? spec[5] : Math.max.apply(null, ys.concat([1])) * 1.1;
+      return {
+        xAxis: { categories: pack.cats, title: { text: pack === staffPack ? "Active agents" : "Call volume" } },
+        yAxis: { min: spec[4], max: yMax, title: { text: spec[3] } },
+        series: [{ data: ys.map(function (y, i) {
+          var row = pack.rows[i];
+          var mark = row.label ? row.label === "Baseline" : row.baseAgents === agents;
+          return { y: y, color: mark ? "#f0b27a" : "#2dd4bf" };
+        }) }]
+      };
+    }
+    drawHc("hcWait", { chart: { type: "column" }, xAxis: { categories: waits.map(function (row) { return row.name; }), title: { text: "Outcome" } }, yAxis: { min: 0, max: 100, title: { text: "Probability (%)" } }, series: [{ data: waits }] });
+    drawHc("hcQueue", { chart: { type: "column" }, xAxis: { categories: queue.map(function (row) { return row.name; }), title: { text: "Callers waiting" } }, yAxis: { min: 0, max: 100, title: { text: "Probability (%)" } }, series: [{ data: queue }] });
+    staffPack.specs.forEach(function (spec, index) { drawHc("hcStaff" + index, lineOptions(staffPack, index)); });
+    trafficPack.specs.forEach(function (spec, index) { drawHc("hcTraffic" + index, lineOptions(trafficPack, index)); });
+    if (mode === "simulation" && samples.length) {
+      var targetLevel = Number(input.targetServiceLevel) / 100;
+      var abandonLimit = Number(document.getElementById("maxAbandon").value) / 100;
+      var answerWithin = Number(input.maxWaitSeconds);
+      [["serviceLevel", true, targetLevel], ["abandonmentRate", true, abandonLimit], ["averageWait", false, answerWithin], ["maximumQueueLength", false, null]].forEach(function (spec, index) {
+        var stats = distStats(samples.map(function (row) { return row[spec[0]]; }));
+        var lo = Math.min(stats.p5, spec[2] != null ? spec[2] : stats.values[0] || 0);
+        var hi = Math.max(stats.p95, spec[2] != null ? spec[2] : stats.values[stats.values.length - 1] || 1);
+        if (hi <= lo) hi = lo + 1;
+        var bins = 8;
+        var width = (hi - lo) / bins;
+        var counts = [];
+        var labels = [];
+        var b;
+        for (b = 0; b < bins; b++) {
+          counts.push(0);
+          var start = lo + b * width;
+          labels.push(spec[1] ? (start * 100).toFixed(0) + "%" : start.toFixed(0));
+        }
+        stats.values.forEach(function (v) {
+          counts[Math.min(bins - 1, Math.max(0, Math.floor((v - lo) / width)))] += 1;
+        });
+        var plotLines = [];
+        if (spec[2] != null) plotLines.push({ value: Math.min(bins - 1, Math.max(0, Math.floor((spec[2] - lo) / width))), color: "#f0b27a", width: 2, dashStyle: "Dash", zIndex: 4 });
+        drawHc("hcVar" + index, { chart: { type: "column" }, xAxis: { categories: labels, title: { text: spec[1] ? "Percent" : "Value" }, plotLines: plotLines }, yAxis: { min: 0, allowDecimals: false, title: { text: "Replications" } }, series: [{ data: counts, color: "#8ec8ef" }] });
+      });
+    }
+  }
   function showResultView(name) {
     if (name === "replay") {
       if (!document.getElementById("replayNav").disabled) document.getElementById("openReplay").click();
@@ -1628,13 +1817,19 @@
     document.querySelectorAll("#deeperNav button").forEach(function (button) {
       button.classList.toggle("active", button.getAttribute("data-view") === name);
     });
-    if (name === "variability") paintVariability(false);
-    else if (name === "wait" || name === "staff" || name === "traffic") paintErlangDeeper(name);
+    if (name === "variability") openCharts();
+    else if (name === "wait" || name === "staff" || name === "traffic") openCharts();
   }
+  document.getElementById("closeCharts").addEventListener("click", closeCharts);
+  document.getElementById("chartsModal").addEventListener("click", function (event) {
+    if (event.target.id === "chartsModal") closeCharts();
+  });
   document.getElementById("deeperNav").addEventListener("click", function (event) {
     var button = event.target.closest("button");
     if (!button || button.disabled) return;
-    showResultView(button.getAttribute("data-view"));
+    if (button.id === "openCharts") { openCharts(); return; }
+    var view = button.getAttribute("data-view");
+    if (view) showResultView(view);
   });
   new MutationObserver(function () { if (displayed) drawCurve(displayed); else refreshLocal(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   refreshLocal();

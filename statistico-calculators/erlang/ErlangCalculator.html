@@ -1653,15 +1653,21 @@
     var grid = light ? "rgba(15,23,42,0.08)" : "rgba(226,232,240,0.14)";
     var axis = light ? "#64748b" : "#94a3b8";
     var merged = Highcharts.merge({
-      chart: { backgroundColor: "transparent", height: 240, spacingTop: 16, style: { fontFamily: "Montserrat, Segoe UI, sans-serif" } },
+      chart: { backgroundColor: "transparent", height: 240, spacingTop: 28, style: { fontFamily: "Montserrat, Segoe UI, sans-serif" } },
       title: { text: null },
       credits: { enabled: false },
       legend: { enabled: false },
       xAxis: { lineColor: axis, tickColor: axis, gridLineWidth: 1, gridLineColor: grid, labels: { style: { color: label, fontSize: "11px" } }, title: { style: { color: label, fontWeight: "700", fontSize: "12px" } } },
       yAxis: { gridLineColor: grid, lineWidth: 1, lineColor: axis, tickColor: axis, labels: { style: { color: label, fontSize: "11px" } }, title: { style: { color: label, fontWeight: "700", fontSize: "12px" } } },
       tooltip: { backgroundColor: light ? "#fff" : "#0b1b33", borderColor: axis, style: { color: label } },
-      plotOptions: { column: { borderWidth: 0, color: "#2dd4bf" }, line: { color: "#2dd4bf", marker: { radius: 4 } } }
+      plotOptions: {
+        column: { borderWidth: 0, color: "#2dd4bf", dataLabels: { enabled: true, crop: false, overflow: "allow", style: { color: label, fontSize: "11px", fontWeight: "700", textOutline: "none" } } },
+        line: { color: "#2dd4bf", marker: { radius: 4 }, dataLabels: { enabled: true, style: { color: label, fontSize: "10px", fontWeight: "700", textOutline: "none" } } }
+      }
     }, options);
+    var labelFormat = merged.yAxis && merged.yAxis.max === 100 ? "{y}%" : "{y}";
+    merged.plotOptions.column.dataLabels.format = labelFormat;
+    merged.plotOptions.line.dataLabels.format = labelFormat;
     if (merged.yAxis && merged.yAxis.max === 100) {
       merged.yAxis.labels = Highcharts.merge(merged.yAxis.labels || {}, { format: "{value}%" });
       if (merged.yAxis.title && typeof merged.yAxis.title.text === "string") merged.yAxis.title.text = merged.yAxis.title.text.replace(" (%)", "");
@@ -1700,11 +1706,18 @@
     var delay = math.erlangC(traffic, agents);
     var rho = agents > 0 ? traffic / agents : 1;
     var leave = agents * mu - lambda;
-    var waits = [0, 20, 30, 60].map(function (t) {
-      var p = leave > 0 ? delay * Math.exp(-leave * t) : 1;
-      return { name: t === 0 ? "Must wait" : "Wait > " + t + "s", y: +(p * 100).toFixed(1) };
-    });
-    waits.unshift({ name: "Answered immediately", y: +((1 - delay) * 100).toFixed(1) });
+    function tail(t) { return leave > 0 ? delay * Math.exp(-leave * t) : 1; }
+    function pct(p) { return +(Math.max(0, p) * 100).toFixed(1); }
+    var p20 = tail(20);
+    var p30 = tail(30);
+    var p60 = tail(60);
+    var waits = [
+      { name: "Answered immediately", y: pct(1 - delay) },
+      { name: "Wait up to 20s", y: pct(delay - p20) },
+      { name: "Wait 20–30s", y: pct(p20 - p30) },
+      { name: "Wait 30–60s", y: pct(p30 - p60) },
+      { name: "Wait > 60s", y: pct(p60) }
+    ];
     var q0 = 1 - delay;
     var q1 = delay * Math.max(0, 1 - rho);
     var q2 = q1 * Math.max(0, rho);
@@ -1756,7 +1769,7 @@
       drawGroup(key);
     }
     var waitGrid = section("Waiting time", "wait");
-    chartCard(waitGrid, "Waiting-time distribution", "Erlang C probabilities for this exact staffing. Not a simulated histogram.", "hcWait");
+    chartCard(waitGrid, "Waiting-time distribution", "Share of calls in each waiting-time range. The ranges do not overlap, so the bars sum to 100%.", "hcWait");
     chartCard(waitGrid, "Queue-length distribution", "Probability the queue holds no caller, one, two, or three or more callers.", "hcQueue");
     var median = leave > 0 ? Math.log(2) / leave : Infinity;
     host.lastChild.appendChild(el("p", { class: "hint" }, "Among callers who wait, the median wait is " + (isFinite(median) ? median.toFixed(1) + " seconds" : "not finite") + "."));

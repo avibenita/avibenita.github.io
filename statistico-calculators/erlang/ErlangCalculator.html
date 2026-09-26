@@ -129,8 +129,10 @@
     .results-dim #deeperView { opacity: 0.72; }
     .deeper-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
     .deeper-nav button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 6px 10px; font: 700 0.72rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
-    .deeper-nav button.active { border-color: #2dd4bf; background: rgba(20, 184, 166, 0.22); color: #f4fffd; }
-    body.mode-simulation .deeper-nav button.active { border-color: rgba(120, 200, 255, 0.7); background: rgba(120, 200, 255, 0.16); color: #d7ecfa; }
+    .deeper-nav button.active { border-color: #2dd4bf; background: rgba(20, 184, 166, 0.32); color: #f4fffd; box-shadow: inset 0 0 0 1px #2dd4bf; }
+    .deeper-nav button:hover:not(.active):not(:disabled) { border-color: #7d93ab; color: #f4fffd; }
+    html[data-theme="light"] .deeper-nav button:hover:not(.active):not(:disabled) { color: #134e4a; }
+    #openCharts { display: inline-flex; align-items: center; gap: 8px; }
     .charts-modal { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(2, 8, 20, 0.72); align-items: center; justify-content: center; padding: 24px; }
     .charts-modal.open { display: flex; }
     .charts-dialog { width: min(1180px, calc(100% - 32px)); height: calc(100vh - 48px); max-height: calc(100vh - 48px); overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; background: var(--sb-bg); padding: 12px 14px 14px; }
@@ -158,11 +160,7 @@
     .deeper-nav .sim-view { display: none; }
     body.mode-erlang .deeper-nav .erlang-view { display: inline-flex; }
     body.mode-simulation .deeper-nav .sim-view { display: inline-flex; }
-    #openCharts { display: inline-flex; align-items: center; gap: 8px; border-color: #2dd4bf; background: rgba(20, 184, 166, 0.32); color: #f4fffd; padding: 8px 14px; font-size: 0.82rem; box-shadow: inset 0 0 0 1px #2dd4bf; }
-    #openCharts i { font-size: 1rem; }
-    body.mode-simulation #openCharts { border-color: #8ec8ef; background: rgba(120, 200, 255, 0.24); color: #f4fbff; box-shadow: inset 0 0 0 1px #8ec8ef; }
-    html[data-theme="light"] #openCharts { color: #064e3b; }
-    html[data-theme="light"] body.mode-simulation #openCharts { color: #1d4e89; }
+    #openCharts i { font-size: 0.9rem; }
     .deeper-nav button:disabled { opacity: 0.45; cursor: not-allowed; }
     #deeperView { flex: 1 1 auto; min-height: 0; overflow: auto; }
     .dist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -415,7 +413,7 @@
           <div class="insight"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="insightText">Erlang C updates as you type. Simulation runs when you ask it to.</p></div>
           <div class="deeper-nav" id="deeperNav">
             <button type="button" data-view="summary" class="active">Staffing summary</button>
-            <button type="button" id="openCharts" title="Waiting-time and queue-size probabilities, plus how service level, wait, occupancy, and the chance of waiting change with staffing and call volume."><i class="fa-solid fa-chart-line" aria-hidden="true"></i> How the queue responds</button>
+            <button type="button" id="openCharts" title="Waiting-time distribution, queue-length distribution, and chance of waiting. Simulation also includes abandonment and variation across replications."><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Queue probabilities &amp; distributions</button>
             <button type="button" data-view="replay" class="sim-view" id="replayNav" disabled>Simulation replay</button>
           </div>
           <div id="summaryView">
@@ -426,7 +424,7 @@
           <div class="charts-modal" id="chartsModal">
             <div class="charts-dialog" role="dialog" aria-modal="true" aria-labelledby="chartsTitle">
               <div class="replay-dialog-head">
-                <h2 class="erlang-panel-title" id="chartsTitle"><i class="fa-solid fa-chart-line"></i> How the queue responds</h2>
+                <h2 class="erlang-panel-title" id="chartsTitle"><i class="fa-solid fa-chart-line"></i> Queue probabilities &amp; distributions</h2>
                 <button type="button" class="erlang-btn erlang-btn-ghost" id="closeCharts">Close</button>
               </div>
               <div id="chartsBody"></div>
@@ -1651,6 +1649,8 @@
     chartInstances.forEach(function (chart) { if (chart) chart.destroy(); });
     chartInstances = [];
     document.getElementById("chartsModal").classList.remove("open");
+    document.getElementById("openCharts").classList.remove("active");
+    document.querySelector("#deeperNav button[data-view='summary']").classList.add("active");
   }
   function drawHc(id, options) {
     var light = document.documentElement.getAttribute("data-theme") === "light";
@@ -1764,8 +1764,8 @@
       });
     }
     var waitGrid = section("Waiting time", "wait");
-    chartCard(waitGrid, "Waiting-time probabilities", "Erlang C probabilities for this exact staffing. Not a simulated histogram.", "hcWait");
-    chartCard(waitGrid, "Queue-size probabilities", "Probability the queue holds no caller, one, two, or three or more callers.", "hcQueue");
+    chartCard(waitGrid, "Waiting-time distribution", "Erlang C probabilities for this exact staffing. Not a simulated histogram.", "hcWait");
+    chartCard(waitGrid, "Queue-length distribution", "Probability the queue holds no caller, one, two, or three or more callers.", "hcQueue");
     var median = leave > 0 ? Math.log(2) / leave : Infinity;
     host.lastChild.appendChild(el("p", { class: "hint" }, "Among callers who wait, the median wait is " + (isFinite(median) ? median.toFixed(1) + " seconds" : "not finite") + "."));
     function sensitivity(title, rows, tip, prefix, key) {
@@ -1775,7 +1775,7 @@
         ["Service level", "Percent answered within the target time.", function (row) { return +(row.serviceLevel * 100).toFixed(1); }, "Service level (%)", 0, 100],
         ["Average wait", "Mean wait of callers who reach an agent, in seconds.", function (row) { return +row.avgWaitSeconds.toFixed(1); }, "Seconds", 0, null],
         ["Occupancy", "Offered load divided by active agents.", function (row) { return +(row.occupancy * 100).toFixed(1); }, "Occupancy (%)", 0, 100],
-        ["Probability of waiting", "Chance a call waits at all before service.", function (row) { return +(row.probabilityOfWait * 100).toFixed(1); }, "Probability (%)", 0, 100]
+        ["Chance of waiting", "Chance a call waits at all before service.", function (row) { return +(row.probabilityOfWait * 100).toFixed(1); }, "Chance of waiting (%)", 0, 100]
       ];
       specs.forEach(function (spec, index) {
         chartCard(grid, spec[0], tip + " " + spec[1], prefix + index);
@@ -1786,7 +1786,7 @@
     var trafficPack = sensitivity("Traffic sensitivity", trafficRows, "Call volume moves around the entered rate while active agents stay fixed. The highlighted point is the baseline volume.", "hcTraffic", "traffic");
     var samples = displayed.samples || [];
     if (mode === "simulation") {
-      var varGrid = section("Variability", "variability");
+      var varGrid = section("Variation across replications", "variability");
       if (!samples.length) varGrid.parentNode.appendChild(el("p", { class: "hint" }, "Run the simulation to add the replication distributions."));
       else {
         if (displayed.replications < 100) varGrid.parentNode.insertBefore(el("p", { class: "dist-warn" }, "Distribution estimates are unstable with only " + displayed.replications + " replications. Use 100 for an ordinary assessment and 500–1,000 for planning."), varGrid);
@@ -1795,7 +1795,7 @@
         var waitTarget = Number(input.maxWaitSeconds);
         var histos = [
           ["Service level", "Share of replications in each service-level band. The dashed line is the target.", "serviceLevel", true, target],
-          ["Abandonment rate", "Share of replications in each abandonment band. The dashed line is the maximum abandonment rate.", "abandonmentRate", true, maxAbandon],
+          ["Abandonment", "Share of replications in each abandonment band. The dashed line is the maximum abandonment rate.", "abandonmentRate", true, maxAbandon],
           ["Average wait", "Share of replications in each average-wait band. The dashed line is the answer-within target.", "averageWait", false, waitTarget],
           ["Maximum queue length", "Share of replications in each maximum-queue band.", "maximumQueueLength", false, null]
         ];
@@ -1878,7 +1878,12 @@
   document.getElementById("deeperNav").addEventListener("click", function (event) {
     var button = event.target.closest("button");
     if (!button || button.disabled) return;
-    if (button.id === "openCharts") { openCharts(); return; }
+    if (button.id === "openCharts") {
+      document.querySelectorAll("#deeperNav button").forEach(function (item) { item.classList.remove("active"); });
+      button.classList.add("active");
+      openCharts();
+      return;
+    }
     var view = button.getAttribute("data-view");
     if (view) showResultView(view);
   });

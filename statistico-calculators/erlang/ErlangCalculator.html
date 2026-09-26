@@ -133,20 +133,27 @@
     body.mode-simulation .deeper-nav button.active { border-color: rgba(120, 200, 255, 0.7); background: rgba(120, 200, 255, 0.16); color: #d7ecfa; }
     .charts-modal { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(2, 8, 20, 0.72); align-items: center; justify-content: center; padding: 24px; }
     .charts-modal.open { display: flex; }
-    .charts-dialog { width: min(1100px, 100%); max-height: min(860px, 100%); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #121a24; padding: 12px 14px 16px; }
-    html[data-theme="light"] .charts-dialog { background: #fff; }
+    .charts-dialog { width: min(1180px, calc(100% - 32px)); height: calc(100vh - 48px); max-height: calc(100vh - 48px); overflow: hidden; display: flex; flex-direction: column; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; background: var(--sb-bg); padding: 12px 14px 14px; }
+    html[data-theme="light"] .charts-dialog { background: var(--sb-bg); border-color: rgba(15, 23, 42, 0.12); }
+    #chartsBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .charts-section { margin-top: 8px; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .charts-section[hidden] { display: none; }
+    .charts-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .charts-modal .dist-card { min-height: 0; display: flex; flex-direction: column; background: transparent; border-color: rgba(255, 255, 255, 0.14); }
+    html[data-theme="light"] .charts-modal .dist-card { background: transparent; border-color: rgba(15, 23, 42, 0.12); }
+    .charts-modal .hc-box { flex: 1 1 auto; height: auto; min-height: 0; width: 100%; }
+    .charts-modal.view-all #chartsBody { overflow: hidden; }
+    .charts-modal.view-all .charts-section { flex: 1 1 0; }
     .charts-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
     .charts-bar button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 7px 10px; font: 700 0.74rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
     .charts-bar button.active { border-color: #2dd4bf; background: rgba(20, 184, 166, 0.22); color: #f4fffd; }
     html[data-theme="light"] .charts-bar button { color: #1f2937; border-color: #94a3b8; }
     html[data-theme="light"] .charts-bar button.active { color: #064e3b; }
-    .charts-modal:not(.view-all) .hc-box { height: 380px; }
-    .charts-modal.view-all .hc-box { height: 220px; }
     .charts-modal:not(.view-all) .charts-grid { grid-template-columns: 1fr 1fr; }
     .charts-section h3 { margin: 0 0 8px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .charts-grid .dist-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .hc-box { height: 240px; }
+    .hc-box { height: 240px; width: 100%; overflow: hidden; }
     .charts-modal .info-dot::after { z-index: 120; }
     .deeper-nav .sim-view { display: none; }
     body.mode-erlang .deeper-nav .erlang-view { display: inline-flex; }
@@ -1651,7 +1658,7 @@
     var grid = light ? "rgba(15,23,42,0.08)" : "rgba(226,232,240,0.14)";
     var axis = light ? "#64748b" : "#94a3b8";
     chartInstances.push(Highcharts.chart(id, Highcharts.merge({
-      chart: { backgroundColor: "transparent", style: { fontFamily: "Montserrat, Segoe UI, sans-serif" } },
+      chart: { backgroundColor: "transparent", height: null, style: { fontFamily: "Montserrat, Segoe UI, sans-serif" } },
       title: { text: null },
       credits: { enabled: false },
       legend: { enabled: false },
@@ -1742,7 +1749,19 @@
       bar.querySelectorAll("button").forEach(function (button) {
         button.classList.toggle("active", button.getAttribute("data-chart") === key);
       });
-      chartInstances.forEach(function (chart) { if (chart) chart.reflow(); });
+      requestAnimationFrame(function () {
+        var sections = host.querySelectorAll(".charts-section:not([hidden])");
+        var boxes = host.querySelectorAll(".charts-section:not([hidden]) .hc-box");
+        var rows = 0;
+        sections.forEach(function (section) {
+          rows += Math.ceil(section.querySelectorAll(".hc-box").length / 2) || 1;
+        });
+        var barH = bar.offsetHeight || 40;
+        var available = Math.max(220, host.clientHeight - barH - 12);
+        var height = Math.max(200, Math.floor(available / Math.max(1, rows)) - 46);
+        boxes.forEach(function (box) { box.style.height = height + "px"; });
+        chartInstances.forEach(function (chart) { if (chart) chart.reflow(); });
+      });
     }
     var waitGrid = section("Waiting time", "wait");
     chartCard(waitGrid, "Waiting-time probabilities", "Erlang C probabilities for this exact staffing. Not a simulated histogram.", "hcWait");

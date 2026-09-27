@@ -220,8 +220,12 @@
     .result-tabs button { border: 1px solid #5d738c; background: transparent; color: #d7e3f2; border-radius: 8px; padding: 6px 10px; font: 700 0.75rem "Montserrat", "Segoe UI", sans-serif; cursor: pointer; }
     .result-tabs button.active { border-color: rgba(120, 200, 255, 0.55); background: rgba(120, 200, 255, 0.16); color: #d7ecfa; }
     .live-queue { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 8px; }
-    .replay-open { display: none; margin: 8px 0; }
-    body.mode-simulation .replay-open { display: inline-flex; }
+    #replayNav:not(:disabled) .fa-play { animation: replay-pulse 1.6s ease-in-out infinite; }
+    @keyframes replay-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { #replayNav .fa-play { animation: none; } }
+    .sim-mark { color: #8ec8ef; font-size: 0.85rem; }
+    .chart-panel { position: relative; }
+    .sim-chart-mark { position: absolute; top: 12px; right: 18px; z-index: 2; margin: 0; }
     .replay-modal { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(2, 8, 20, 0.72); align-items: center; justify-content: center; padding: 24px; }
     .replay-modal.open { display: flex; }
     .replay-dialog { width: min(980px, 100%); max-height: min(760px, 100%); overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #121a24; padding: 12px; }
@@ -370,7 +374,7 @@
           </div>
         </div>
         <div class="erlang-panel" id="resultsPanel">
-          <h2 class="erlang-panel-title" id="resultsTitle"><i class="fa-solid fa-chart-column"></i><span id="resultsTitleText"> Staffing results</span><span class="result-badge" id="heroBadge" hidden></span></h2>
+          <h2 class="erlang-panel-title" id="resultsTitle"><i class="fa-solid fa-chart-column"></i><i class="fa-solid fa-cloud sim-mark" id="simMark" hidden aria-hidden="true"></i><span id="resultsTitleText"> Staffing results</span><span class="result-badge" id="heroBadge" hidden></span></h2>
           <p class="stale-banner" id="staleBanner" hidden>Results out of date — rerun simulation</p>
           <div class="hero-card" id="heroCard">
             <div class="hero-main">
@@ -409,11 +413,10 @@
           <div class="deeper-nav" id="deeperNav">
             <button type="button" data-view="summary" class="active"><i class="fa-solid fa-users" aria-hidden="true"></i> Staffing summary</button>
             <button type="button" id="openCharts" title="Waiting-time distribution, queue-length distribution, and chance of waiting. Simulation also includes abandonment and variation across replications."><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Queue probabilities &amp; distributions</button>
-            <button type="button" data-view="replay" class="sim-view" id="replayNav" disabled>Simulation replay</button>
+            <button type="button" data-view="replay" class="sim-view" id="replayNav" disabled><i class="fa-solid fa-play" aria-hidden="true"></i> Simulation replay</button>
           </div>
           <div id="summaryView">
-          <button type="button" class="erlang-btn erlang-btn-primary replay-open" id="openReplay" disabled>Open simulation replay</button>
-          <div class="chart-panel" id="chartPanel"><div id="staffingChart"></div></div>
+          <div class="chart-panel" id="chartPanel"><p class="sim-chart-mark" id="simChartMark" hidden><i class="fa-solid fa-cloud sim-mark" aria-hidden="true"></i></p><div id="staffingChart"></div></div>
           </div>
           <div id="deeperView" hidden></div>
           <div class="charts-modal" id="chartsModal">
@@ -597,6 +600,8 @@
     document.getElementById("heroCard").classList.toggle("provisional", provisional);
     document.getElementById("staleBanner").hidden = !resultsStale;
     document.getElementById("resultsTitleText").textContent = provisional ? " Preliminary staffing estimate" : (model.source === "simulation" ? " Simulation result" : " Staffing results");
+    document.getElementById("simMark").hidden = model.source !== "simulation";
+    document.getElementById("simChartMark").hidden = model.source !== "simulation";
     var badge = document.getElementById("heroBadge");
     var spread = model.source === "simulation" && model.serviceLevelLow != null && model.replications > 1 ? " Replication range " + pct1(model.serviceLevelLow) + "–" + pct1(model.serviceLevelHigh) + "." : "";
     setText("heroSuffix", "");
@@ -677,16 +682,13 @@
     document.getElementById("heroAgentsIcon").hidden = !/agent/i.test(heroLabel.textContent);
     heroLabel.parentElement.hidden = !heroLabel.textContent.trim();
     drawCurve(model);
-    var replayBtn = document.getElementById("openReplay");
     var canVary = model.source === "simulation" && !resultsStale && model.samples && model.samples.length;
     document.getElementById("replayNav").disabled = !canVary;
     if (!canVary && resultView === "variability") showResultView("summary");
     if (model.source === "simulation" && !resultsStale) {
       replayReady = model;
-      replayBtn.disabled = false;
     } else {
       if (model.source !== "simulation") replayReady = null;
-      replayBtn.disabled = true;
       if (!resultsStale) {
         closeReplay();
         stopQueuePlayback(true);
@@ -697,6 +699,8 @@
   function showUnsolved(model) {
     document.getElementById("resultsPanel").classList.toggle("results-dim", mode === "simulation");
     document.getElementById("heroBadge").hidden = true;
+    document.getElementById("simMark").hidden = true;
+    document.getElementById("simChartMark").hidden = true;
     var input = read();
     var calls = Number(input.callsPerHour);
     var aht = Number(input.ahtSeconds);
@@ -1026,7 +1030,6 @@
       document.getElementById("resultsPanel").classList.add("results-dim");
       document.getElementById("replayNav").disabled = true;
       document.getElementById("staleBanner").hidden = false;
-      document.getElementById("openReplay").disabled = true;
       closeReplay();
       return;
     }
@@ -1392,10 +1395,15 @@
     var playBtn = document.getElementById("queuePlay");
     if (playBtn && !playBtn.disabled) playBtn.textContent = (queue.done || queue.timelineComplete) ? "Replay" : "Play";
   }
-  document.getElementById("openReplay").addEventListener("click", function () {
-    if (this.disabled || !replayReady) return;
+  function openReplayModal() {
+    var nav = document.getElementById("replayNav");
+    if (nav.disabled || !replayReady) return;
     document.getElementById("replayModal").classList.add("open");
     startQueuePlayback(replayReady);
+  }
+  document.getElementById("replayNav").addEventListener("click", function (event) {
+    event.stopPropagation();
+    openReplayModal();
   });
   document.getElementById("closeReplay").addEventListener("click", closeReplay);
   document.getElementById("queuePlay").addEventListener("click", function () {
@@ -1748,7 +1756,9 @@
       var grid = el("div", { class: "charts-grid" });
       block.appendChild(grid);
       host.appendChild(block);
-      var button = el("button", { type: "button", "data-chart": key }, title);
+      var button = el("button", { type: "button", "data-chart": key });
+      if (key === "variability") button.appendChild(el("i", { class: "fa-solid fa-cloud sim-mark", "aria-hidden": "true" }));
+      button.appendChild(document.createTextNode(key === "variability" ? " " + title : title));
       button.addEventListener("click", function () { showChartType(key); });
       bar.appendChild(button);
       return grid;
@@ -1872,7 +1882,7 @@
   }
   function showResultView(name) {
     if (name === "replay") {
-      if (!document.getElementById("replayNav").disabled) document.getElementById("openReplay").click();
+      if (!document.getElementById("replayNav").disabled) openReplayModal();
       return;
     }
     resultView = name;

@@ -115,6 +115,9 @@
     .erlang-btn-primary { background: rgba(120, 200, 255, 0.1); color: #8ec8ef; border: 1px solid rgba(120, 200, 255, 0.4); }
     html[data-theme="light"] .erlang-btn-primary { color: #1d4e89; background: rgba(120, 200, 255, 0.16); }
     body.mode-simulation #runBtn { padding: 12px 14px; font-size: 0.95rem; background: rgba(120, 200, 255, 0.28); border-color: #8ec8ef; color: #f4fbff; box-shadow: 0 0 0 2px rgba(120, 200, 255, 0.35); }
+    #runBtn.needs-run { animation: run-cue 1.8s ease-in-out infinite; }
+    @keyframes run-cue { 0%, 100% { opacity: 1; } 50% { opacity: 0.62; } }
+    @media (prefers-reduced-motion: reduce) { #runBtn.needs-run { animation: none; } }
     .result-badge { display: inline-flex; align-items: center; margin: 0 0 0 8px; border: 1px solid rgba(120, 200, 255, 0.55); border-radius: 999px; padding: 2px 8px; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #8ec8ef; }
     #resultsTitle { color: var(--text-primary); opacity: 1; }
     body.mode-simulation #resultsTitle,
@@ -231,6 +234,7 @@
     @keyframes replay-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
     @media (prefers-reduced-motion: reduce) { #replayNav .fa-play { animation: none; } }
     .sim-mark { color: #8ec8ef; font-size: 0.85rem; }
+    .sim-mark[hidden], .sim-chart-mark[hidden] { display: none !important; }
     .chart-panel { position: relative; }
     .sim-chart-mark { position: absolute; top: 12px; right: 18px; z-index: 2; margin: 0; }
     .replay-modal { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(2, 8, 20, 0.72); align-items: center; justify-content: center; padding: 24px; }
@@ -579,6 +583,12 @@
     gauge.setAttribute("aria-label", pct1(level) + " service level, target " + targetPct + "%");
   }
 
+  function syncRunCue() {
+    var stale = !document.getElementById("staleBanner").hidden;
+    var prelim = !document.getElementById("prelimBanner").hidden;
+    document.getElementById("runBtn").classList.toggle("needs-run", stale || prelim);
+  }
+
   function render(model) {
     displayed = model;
     if (!model || !model.ok) {
@@ -618,6 +628,7 @@
     document.getElementById("heroCard").classList.toggle("provisional", provisional);
     document.getElementById("staleBanner").hidden = !resultsStale;
     document.getElementById("prelimBanner").hidden = !provisional || resultsStale;
+    syncRunCue();
     document.getElementById("resultsTitleText").textContent = provisional ? " Preliminary staffing estimate" : (model.source === "simulation" ? " Simulation result" : " Staffing results");
     document.getElementById("simMark").hidden = model.source !== "simulation";
     document.getElementById("simChartMark").hidden = model.source !== "simulation";
@@ -727,6 +738,7 @@
     document.getElementById("simMark").hidden = true;
     document.getElementById("simChartMark").hidden = true;
     document.getElementById("prelimBanner").hidden = true;
+    syncRunCue();
     var input = read();
     var calls = Number(input.callsPerHour);
     var aht = Number(input.ahtSeconds);
@@ -1177,6 +1189,7 @@
       document.getElementById("openSimDist").disabled = true;
       document.getElementById("staleBanner").hidden = false;
       document.getElementById("prelimBanner").hidden = true;
+      syncRunCue();
       closeReplay();
       closeSimDist();
       return;
@@ -1853,7 +1866,7 @@
   }
   function openCharts() {
     closeCharts();
-    document.getElementById("chartsSimMark").hidden = !(displayed && displayed.source === "simulation");
+    document.getElementById("chartsSimMark").hidden = mode !== "simulation" || !(displayed && displayed.source === "simulation");
     var host = document.getElementById("chartsBody");
     host.textContent = "";
     if (!window.Highcharts) {

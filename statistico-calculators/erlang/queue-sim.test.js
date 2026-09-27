@@ -23,8 +23,8 @@ assert.strictEqual(off.abandonedCalls, 0);
 assert.strictEqual(off.abandonmentRate, 0);
 assert.strictEqual(off.offeredCalls, off.answeredCalls + off.stillWaiting);
 
-var longPatience = sim.run(base({ meanPatienceSeconds: 100000, agents: 4 }));
-var offSame = sim.run(base({ abandonmentEnabled: false, agents: 4 }));
+var longPatience = sim.run(base({ meanPatienceSeconds: 100000, agents: 4, warmupSeconds: 0 }));
+var offSame = sim.run(base({ abandonmentEnabled: false, agents: 4, warmupSeconds: 0 }));
 assert.ok(longPatience.abandonmentRate < 0.03, "long patience abandon " + longPatience.abandonmentRate);
 assert.ok(Math.abs(longPatience.serviceLevel - offSame.serviceLevel) < 0.08, "long patience near no-abandon");
 
@@ -94,6 +94,31 @@ var one = sim.run(base({ replications: 1, seed: 3 }));
 var two = sim.run(base({ replications: 2, seed: 3 }));
 assert.ok(two.offeredCalls >= one.offeredCalls);
 assert.ok(Math.abs(two.abandonmentRate - (two.abandonedCalls / two.offeredCalls)) < 1e-12);
+
+var warmed = sim.run(base({
+  replications: 1,
+  simSeconds: 3600,
+  seed: 5,
+  abandonmentEnabled: false,
+  agents: 4,
+  recordReplay: true
+}));
+var raw = sim.run(base({
+  replications: 1,
+  simSeconds: 3600,
+  seed: 5,
+  abandonmentEnabled: false,
+  agents: 4,
+  warmupSeconds: 0,
+  recordReplay: false
+}));
+assert.ok(warmed.warmupSeconds > 0 && warmed.warmupSeconds <= 1800, "warmup " + warmed.warmupSeconds);
+assert.strictEqual(warmed.offeredCalls, warmed.answeredCalls + warmed.abandonedCalls + warmed.stillWaiting);
+assert.ok(warmed.offeredCalls < raw.offeredCalls, "warmup drops the opening arrivals");
+assert.ok(Array.isArray(warmed.events) && warmed.events.length > 0, "replay comes from the replication");
+var maxReplay = 0;
+warmed.events.forEach(function (ev) { if (ev.time > maxReplay) maxReplay = ev.time; });
+assert.ok(maxReplay <= 1800 + 1e-6, "replay stays inside 30 minutes " + maxReplay);
 
 console.log("queue-sim ok", {
   off: off.abandonmentRate,

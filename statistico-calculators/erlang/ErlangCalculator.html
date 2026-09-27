@@ -10,8 +10,8 @@
   <script src="../shared/theme-toggle-component.js?v=20260922calc1"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="./erlang-math.js?v=20260923erlang1"></script>
-  <script src="./queue-playback.js?v=20260924queue1"></script>
-  <script src="./queue-sim.js?v=20260924sim1"></script>
+  <script src="./queue-playback.js?v=20260927queue2"></script>
+  <script src="./queue-sim.js?v=20260927sim2"></script>
   <style>
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--surface-0); color: var(--text-primary); }
     .st-calc-main { min-height: 0; overflow: hidden; }
@@ -440,7 +440,7 @@
               <strong>No simulation replay yet</strong>
               <p>Run the simulation to generate arrivals, queues, agent assignments and abandonments.</p>
             </div>
-            <p class="replay-note">Representative 30-minute replay. Summary cards use every replication.</p>
+            <p class="replay-note" id="replayNote">30-minute segment after warm-up, taken from the first replication. Summary statistics omit that warm-up.</p>
             <div class="queue-controls">
               <button type="button" id="queuePlay" disabled>Play</button>
               <button type="button" id="queueRestart" disabled>Restart</button>
@@ -659,6 +659,11 @@
     }
     if (finding) setText("metricsCaption", "Metrics at " + model.availableAgents + " required agents");
     document.getElementById("slLine").title = "Service level = calls answered within the target time ÷ calls offered.";
+    if (model.source === "simulation") {
+      document.getElementById("replayNote").textContent = (model.warmupSeconds || 0) >= 60
+        ? "30-minute segment after a " + Math.round(model.warmupSeconds / 60) + "-minute warm-up, taken from the first replication. Summary statistics omit that warm-up."
+        : "30-minute segment from the first replication. Summary statistics use the full run.";
+    }
     setText("waitValue", model.avgWaitSeconds == null ? "—" : model.avgWaitSeconds.toFixed(1) + "s");
     setText("queueLengthValue", formatQueueLength(model.averageQueueLength));
     setText("occValue", model.occupancy == null ? "—" : pct1(model.occupancy));
@@ -807,7 +812,7 @@
     function py(level) { return T + (1 - Math.max(0, Math.min(1, level))) * (H - T - B); }
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Service level by available agents" });
     var title = svgEl("text", { x: (L + W - R) / 2, y: 16, "text-anchor": "middle", fill: muted(), "font-size": "12", "font-weight": "600", "letter-spacing": "0.02em" });
-    title.textContent = mode === "simulation" && model.source !== "simulation" ? "Preliminary Erlang C service-level curve" : (model.source === "simulation" ? "Simulation result" : "Service level by available agents");
+    title.textContent = mode === "simulation" && model.source !== "simulation" ? "Preliminary Erlang C service-level curve" : (model.source === "simulation" ? "Simulation result · Erlang C reference curve" : "Service level by available agents");
     svg.appendChild(title);
     var yStep;
     for (yStep = 0; yStep <= 10; yStep++) {
@@ -883,7 +888,7 @@
     svg.appendChild(svgEl("circle", { cx: px(model.availableAgents), cy: markY, r: "3", fill: accent }));
     var labelX = px(model.availableAgents);
     var anchor = labelX > W * 0.62 ? "end" : "start";
-    markerLabel(anchor === "end" ? labelX - 10 : labelX + 10, Math.min(H - B - 8, Math.max(T + 14, markY - 12)), model.availableAgents + " agents · " + pct1(model.serviceLevel), accent, anchor);
+    markerLabel(anchor === "end" ? labelX - 10 : labelX + 10, Math.min(H - B - 8, Math.max(T + 14, markY - 12)), (model.source === "simulation" ? "Simulation · " : "") + model.availableAgents + " agents · " + pct1(model.serviceLevel), accent, anchor);
     var xLabel = svgEl("text", { x: (L + W - R) / 2, y: H - 6, "text-anchor": "middle", fill: muted(), "font-size": "10", "font-weight": "600" });
     xLabel.textContent = "Available agents";
     svg.appendChild(xLabel);
@@ -906,7 +911,7 @@
     function py(n) { return T + ((y1 - n) / Math.max(1, y1 - y0)) * (H - T - B); }
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Available agents by service level" });
     var title = svgEl("text", { x: (L + W - R) / 2, y: 16, "text-anchor": "middle", fill: muted(), "font-size": "12", "font-weight": "600", "letter-spacing": "0.02em" });
-    title.textContent = mode === "simulation" && model.source !== "simulation" ? "Preliminary Erlang C service-level curve" : (model.source === "simulation" ? "Simulation result" : "Agents by service level");
+    title.textContent = mode === "simulation" && model.source !== "simulation" ? "Preliminary Erlang C service-level curve" : (model.source === "simulation" ? "Simulation result · Erlang C reference curve" : "Agents by service level");
     svg.appendChild(title);
     var yLabel = svgEl("text", { x: 14, y: (T + H - B) / 2, "text-anchor": "middle", fill: muted(), "font-size": "10", "font-weight": "600", transform: "rotate(-90 14 " + ((T + H - B) / 2) + ")" });
     yLabel.textContent = "Agents";
@@ -997,7 +1002,7 @@
     svg.appendChild(svgEl("circle", { cx: markX, cy: markY, r: model.evaluating ? "8" : "7", fill: "none", stroke: currentFill, "stroke-width": "1.5" }));
     svg.appendChild(svgEl("circle", { cx: markX, cy: markY, r: "3", fill: currentFill }));
     var anchor = markX > (L + W - R) * 0.62 ? "end" : "start";
-    markerLabel(anchor === "end" ? markX - 10 : markX + 10, Math.min(H - B - 8, Math.max(T + 14, markY - 12)), (model.evaluating ? model.availableAgents + " current agents · " : model.availableAgents + " agents · ") + pct1(model.serviceLevel), currentFill, anchor);
+    markerLabel(anchor === "end" ? markX - 10 : markX + 10, Math.min(H - B - 8, Math.max(T + 14, markY - 12)), (model.source === "simulation" ? "Simulation · " : "") + (model.evaluating ? model.availableAgents + " current agents · " : model.availableAgents + " agents · ") + pct1(model.serviceLevel), currentFill, anchor);
     var xLabel = svgEl("text", { x: (L + W - R) / 2, y: H - 6, "text-anchor": "middle", fill: muted(), "font-size": "10", "font-weight": "600" });
     xLabel.textContent = "Service level";
     svg.appendChild(xLabel);
@@ -1038,6 +1043,7 @@
       ahtSeconds: Number(input.ahtSeconds),
       patienceSeconds: abandonOn ? Number(document.getElementById("patience").value) : null,
       simSeconds: Number(document.getElementById("simTime").value) * 60,
+      warmupSeconds: summary.warmupSeconds || 0,
       abandonment: {
         enabled: abandonOn,
         patienceDistribution: abandonOn ? "exponential" : null,
@@ -1111,7 +1117,7 @@
         }
         resultsStale = false;
         render(fromQueueSim(summary, agents));
-        if (summary.targetsMet === false) {
+        if (direction !== "fixedAgents" && summary.targetsMet === false) {
           setText("insightText", document.getElementById("insightText").textContent + " No staffing level within range met both the service level and the abandonment target.");
         }
       } catch (err) {
@@ -1350,28 +1356,38 @@
     if (queue.timer) clearInterval(queue.timer);
     queue.timer = 0;
     document.getElementById("queuePlay").textContent = "Replay";
-    document.getElementById("queueStatus").textContent = "30-minute replay complete.";
+    document.getElementById("queueStatus").textContent = "30-minute segment complete.";
     paintQueue();
   }
   function applyEvent(ev) {
     var call = queue.calls[ev.callId] || { id: ev.callId, state: "incoming", arrival: ev.time, wait: 0, agentId: null };
     queue.calls[ev.callId] = call;
     if (ev.type === "arrival") {
-      call.state = "incoming";
       call.arrival = ev.time;
+      if (ev.seed) {
+        call.state = "queue";
+        call.seed = true;
+        return;
+      }
+      call.state = "incoming";
       queue.arrived += 1;
       queue.arrivalOrder.push(ev.callId);
       queue.arrivalHolds[ev.callId] = Date.now() + arrivalHoldMs();
     } else if (ev.type === "queue_enter") call.state = "queue";
-    else if (ev.type === "service_start") { call.state = "service"; call.agentId = ev.agentId; call.wait = ev.waitSeconds || 0; }
+    else if (ev.type === "service_start") {
+      call.state = "service";
+      call.agentId = ev.agentId;
+      call.wait = ev.waitSeconds || 0;
+      if (ev.seed) call.seed = true;
+      if (!call.seed) queue.answered += 1;
+    }
     else if (ev.type === "service_end") {
       call.state = "answered";
-      queue.answered += 1;
       dropVisual(ev.callId);
     } else if (ev.type === "abandon") {
       call.state = "abandoned";
       call.wait = ev.waitSeconds || 0;
-      queue.abandoned += 1;
+      if (!call.seed) queue.abandoned += 1;
       dropVisual(ev.callId);
       var callerNo = String(ev.callId || "").replace(/\D/g, "") || ev.callId;
       queue.notice = "Customer " + callerNo + " abandoned after " + Math.round(ev.waitSeconds || 0) + " seconds";
@@ -1413,12 +1429,7 @@
     });
     var liveIncoming = calls.filter(function (c) { return c.state === "incoming"; });
     var incoming = liveIncoming.slice(0, 5);
-    var incomingMore = "";
-    if (queue.done && !liveIncoming.length) {
-      incoming = queue.arrivalOrder.slice(-3).map(function (id) { return queue.calls[id]; }).filter(Boolean);
-    } else if (liveIncoming.length > 5) {
-      incomingMore = "+" + (liveIncoming.length - 5) + " arriving";
-    }
+    var incomingMore = liveIncoming.length > 5 ? "+" + (liveIncoming.length - 5) + " arriving" : "";
     var waiting = calls.filter(function (c) { return c.state === "queue"; });
     var busy = {};
     calls.forEach(function (c) { if (c.state === "service" && c.agentId) busy[c.agentId] = c; });
@@ -1466,7 +1477,7 @@
     document.getElementById("queueClock").textContent = clockText(queue.time);
     var status = document.getElementById("queueStatus");
     if (!queue.events.length) status.textContent = "";
-    else if (queue.done) status.textContent = "30-minute replay complete.";
+    else if (queue.done) status.textContent = "30-minute segment complete.";
     else if (queue.notice && Date.now() < queue.noticeUntil) status.textContent = queue.notice;
     else if (queue.playing) status.textContent = "Playing the recorded call flow.";
     var playBtn = document.getElementById("queuePlay");

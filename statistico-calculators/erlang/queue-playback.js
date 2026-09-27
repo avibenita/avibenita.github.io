@@ -15,7 +15,8 @@
       type: raw.type,
       callId: String(raw.callId || raw.call_id || ""),
       agentId: raw.agentId != null ? Number(raw.agentId) : (raw.agent_id != null ? Number(raw.agent_id) : undefined),
-      waitSeconds: raw.waitSeconds != null ? Number(raw.waitSeconds) : (raw.wait_seconds != null ? Number(raw.wait_seconds) : undefined)
+      waitSeconds: raw.waitSeconds != null ? Number(raw.waitSeconds) : (raw.wait_seconds != null ? Number(raw.wait_seconds) : undefined),
+      seed: raw.seed === true
     };
   }
 

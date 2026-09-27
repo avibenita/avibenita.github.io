@@ -58,6 +58,20 @@
     return { ok: true, activeAgents: active, scheduledAgents: scheduled, additionalAgents: scheduled - active };
   }
 
+  function steadyWarmupSeconds(spec) {
+    var agents = Math.max(1, Math.floor(Number(spec.agents) || 1));
+    var meanService = Math.max(1, Number(spec.ahtSeconds) || 1);
+    var lambda = Number(spec.callsPerHour) / 3600;
+    if (!(lambda > 0)) lambda = 1 / 3600;
+    var slack = agents / meanService - lambda;
+    var horizon = Math.max(1, Number(spec.simSeconds) || 1);
+    var relaxation = slack > 1e-4 ? 1 / slack : meanService * 10;
+    var raw = Math.max(1800, Math.ceil(120 * relaxation));
+    var cap = Math.floor(horizon / 2);
+    if (cap < 60) return 0;
+    return Math.min(raw, cap);
+  }
+
   function simulateReplication(spec, random, recordEvents) {
     var agents = Math.max(1, Math.floor(spec.agents));
     var horizon = Math.max(1, spec.simSeconds);
@@ -70,11 +84,17 @@
     if (!(arrivalRate > 0)) arrivalRate = 1 / 3600;
     var freeAt = [];
     var serviceStart = [];
+    var serving = [];
     var i;
     for (i = 0; i < agents; i++) {
       freeAt.push(0);
       serviceStart.push(0);
+      serving.push(null);
     }
+    var warmup = spec.warmupSeconds != null ? Math.max(0, spec.warmupSeconds) : steadyWarmupSeconds(spec);
+    if (warmup >= horizon - 1) warmup = 0;
+    var replaySpan = Math.max(1, spec.replaySeconds || 1800);
+    var measuring = warmup <= 0;
     var queue = [];
     var t = 0;
     var nextArrival = exponential(1 / arrivalRate, random);
@@ -92,7 +112,64 @@
     var events = recordEvents ? [] : null;
     var stillWaiting = 0;
 
-    function emit(ev) { if (events) events.push(ev); }
+    function emit(ev) {
+      if (!events) return;
+      var replayEnd = warmup + replaySpan;
+      if (ev.time < warmup - 1e-9 || ev.time > replayEnd + 1e-6) return;
+      var copy = {
+        time: Math.max(0, ev.time - warmup),
+        type: ev.type,
+        callId: ev.callId,
+        agentId: ev.agentId,
+        waitSeconds: ev.waitSeconds
+      };
+      events.push(copy);
+    }
+
+    function addArea(to) {
+      queueArea += queue.length * Math.max(0, to - lastT);
+      busyArea += busyOverlap(lastT, to);
+      lastT = to;
+    }
+
+    function seedReplay() {
+      if (!events) return;
+      var k;
+      for (k = 0; k < agents; k++) {
+        if (freeAt[k] > warmup + 1e-6 && serving[k]) {
+          events.push({ time: 0, type: "service_start", callId: serving[k], agentId: k + 1, waitSeconds: 0, seed: true });
+        }
+      }
+      for (k = 0; k < queue.length; k++) {
+        events.push({ time: 0, type: "arrival", callId: queue[k].callId, seed: true });
+      }
+    }
+
+    function openMeasurement() {
+      offered = 0;
+      answered = 0;
+      abandoned = 0;
+      answeredWithin = 0;
+      waitAnswered = 0;
+      waitAbandoned = 0;
+      maxQueue = queue.length;
+      queueArea = 0;
+      busyArea = 0;
+      measuring = true;
+      seedReplay();
+    }
+
+    function advance(to) {
+      if (to < lastT) to = lastT;
+      if (!measuring && warmup > 0 && to + 1e-9 >= warmup) {
+        if (to > warmup) addArea(warmup);
+        openMeasurement();
+        if (to > warmup) addArea(to);
+        else lastT = warmup;
+        return;
+      }
+      addArea(to);
+    }
 
     function nextFreeTime() {
       var best = Infinity;
@@ -120,10 +197,13 @@
       var wait = Math.max(0, time - call.arrival);
       var handle = serviceTime(meanService, distribution, random);
       serviceStart[agent] = time;
+      serving[agent] = call.callId;
       freeAt[agent] = time + handle;
-      answered += 1;
-      waitAnswered += wait;
-      if (wait <= target + 1e-9) answeredWithin += 1;
+      if (call.measured) {
+        answered += 1;
+        waitAnswered += wait;
+        if (wait <= target + 1e-9) answeredWithin += 1;
+      }
       emit({ time: time, type: "service_start", callId: call.callId, agentId: agent + 1, waitSeconds: wait });
       emit({ time: time + handle, type: "service_end", callId: call.callId, agentId: agent + 1, waitSeconds: wait });
       call.served = true;
@@ -140,11 +220,11 @@
         if (queue[soonest].abandonAt > until + 1e-9) break;
         var call = queue.splice(soonest, 1)[0];
         var when = call.abandonAt;
-        queueArea += queue.length * Math.max(0, when - lastT);
-        busyArea += busyOverlap(lastT, when);
-        lastT = when;
-        abandoned += 1;
-        waitAbandoned += Math.max(0, when - call.arrival);
+        advance(when);
+        if (call.measured) {
+          abandoned += 1;
+          waitAbandoned += Math.max(0, when - call.arrival);
+        }
         emit({ time: when, type: "abandon", callId: call.callId, waitSeconds: Math.max(0, when - call.arrival) });
       }
     }
@@ -174,13 +254,13 @@
         if (nextFreeTime() > until + 1e-9) break;
         var time = Math.max(nextFreeTime(), queue[0].arrival);
         if (time > until + 1e-9) break;
-        queueArea += queue.length * Math.max(0, time - lastT);
-        busyArea += busyOverlap(lastT, time);
-        lastT = time;
+        advance(time);
         var call = queue.shift();
         if (call.abandonAt <= time + 1e-9) {
-          abandoned += 1;
-          waitAbandoned += Math.max(0, call.abandonAt - call.arrival);
+          if (call.measured) {
+            abandoned += 1;
+            waitAbandoned += Math.max(0, call.abandonAt - call.arrival);
+          }
           emit({ time: call.abandonAt, type: "abandon", callId: call.callId, waitSeconds: Math.max(0, call.abandonAt - call.arrival) });
           continue;
         }
@@ -191,17 +271,16 @@
     while (nextArrival <= horizon) {
       assignReady(nextArrival);
       expirePatience(nextArrival);
-      queueArea += queue.length * Math.max(0, nextArrival - lastT);
-      busyArea += busyOverlap(lastT, nextArrival);
-      lastT = nextArrival;
+      advance(nextArrival);
       callSerial += 1;
-      offered += 1;
       var call = {
         callId: "c" + callSerial,
         arrival: nextArrival,
         abandonAt: Infinity,
-        served: false
+        served: false,
+        measured: measuring
       };
+      if (call.measured) offered += 1;
       emit({ time: nextArrival, type: "arrival", callId: call.callId });
       if (!startService(call, nextArrival)) {
         if (abandonOn) {
@@ -216,9 +295,9 @@
     }
     assignReady(horizon);
     expirePatience(horizon);
-    queueArea += queue.length * Math.max(0, horizon - lastT);
-    busyArea += busyOverlap(lastT, horizon);
-    stillWaiting = queue.length;
+    advance(horizon);
+    stillWaiting = 0;
+    queue.forEach(function (waitingCall) { if (waitingCall.measured) stillWaiting += 1; });
     if (events) {
       events.sort(function (a, b) {
         if (a.time !== b.time) return a.time - b.time;
@@ -238,8 +317,9 @@
       maxQueueLength: maxQueue,
       queueArea: queueArea,
       busyArea: busyArea,
-      horizon: horizon,
+      horizon: warmup > 0 ? horizon - warmup : horizon,
       agents: agents,
+      warmupSeconds: warmup,
       events: events
     };
   }
@@ -310,23 +390,24 @@
   function run(spec) {
     var reps = Math.max(1, Math.floor(spec.replications || 1));
     var seed = spec.seed == null ? 1 : spec.seed;
+    var warmup = spec.warmupSeconds != null ? spec.warmupSeconds : steadyWarmupSeconds(spec);
     var parts = [];
     var replayEvents = null;
     var r;
     for (r = 0; r < reps; r++) {
       var random = mulberry32((seed + r * 9973) >>> 0);
-      var part = simulateReplication(spec, random, false);
+      var one = {};
+      Object.keys(spec).forEach(function (key) { one[key] = spec[key]; });
+      one.warmupSeconds = warmup;
+      var record = !!(spec.recordReplay && r === 0);
+      var part = simulateReplication(one, random, record);
       parts.push(part);
+      if (record) replayEvents = part.events;
     }
     var summary = pool(parts);
-    if (spec.recordReplay) {
-      var replaySpec = {};
-      Object.keys(spec).forEach(function (key) { replaySpec[key] = spec[key]; });
-      replaySpec.simSeconds = Math.min(spec.simSeconds, spec.replaySeconds || 1800);
-      replayEvents = simulateReplication(replaySpec, mulberry32((seed + 17) >>> 0), true).events;
-    }
     summary.events = replayEvents;
     summary.replications = reps;
+    summary.warmupSeconds = parts.length ? parts[0].warmupSeconds : warmup;
     return summary;
   }
 
@@ -390,6 +471,7 @@
     exponential: exponential,
     scheduledAgents: scheduledAgents,
     simulateReplication: simulateReplication,
+    steadyWarmupSeconds: steadyWarmupSeconds,
     run: run,
     findActiveAgents: findActiveAgents,
     agentsRequiredSamples: agentsRequiredSamples,

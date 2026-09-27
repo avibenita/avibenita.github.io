@@ -164,7 +164,7 @@
     .dist-card p { margin: 4px 0 0; font-size: 0.72rem; line-height: 1.35; color: #c5d4e8; }
     /* Size only the older, hand-drawn SVGs directly inside these cards. */
     #deeperView .dist-card > svg { width: 100%; height: 120px; display: block; }
-    .dist-warn { margin: 0 0 8px; font-size: 0.78rem; color: #fdba74; }
+    .dist-warn { margin: 0 0 8px; font-size: 0.82rem; font-weight: 700; color: #fdba74; }
     .show-more { margin-top: 8px; }
     .erlang-btn-ghost { background: transparent; color: #d7e3f2; border: 1px solid #5d738c; }
     html[data-theme="light"] .erlang-btn-ghost { color: #1f2937; }
@@ -412,7 +412,7 @@
           <div class="insight"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="insightText">Erlang C updates as you type. Simulation runs when you ask it to.</p></div>
           <div class="deeper-nav" id="deeperNav">
             <button type="button" data-view="summary" class="active"><i class="fa-solid fa-users" aria-hidden="true"></i> Staffing summary</button>
-            <button type="button" id="openCharts" title="Waiting-time distribution, queue-length distribution, and chance of waiting. Simulation also includes abandonment and variation across replications."><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Queue probabilities &amp; distributions</button>
+            <button type="button" id="openCharts" title="Waiting time, queue length, staffing sensitivity, and traffic sensitivity. In Simulation mode those charts are an Erlang C reference. Variation across replications comes from the simulation."><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Queue performance &amp; distributions</button>
             <button type="button" data-view="replay" class="sim-view" id="replayNav" disabled><i class="fa-solid fa-play" aria-hidden="true"></i> Simulation replay</button>
           </div>
           <div id="summaryView">
@@ -422,7 +422,7 @@
           <div class="charts-modal" id="chartsModal">
             <div class="charts-dialog" role="dialog" aria-modal="true" aria-labelledby="chartsTitle">
               <div class="replay-dialog-head">
-                <h2 class="erlang-panel-title" id="chartsTitle"><i class="fa-solid fa-chart-line"></i><i class="fa-solid fa-cloud sim-mark" id="chartsSimMark" hidden aria-hidden="true"></i> Queue probabilities &amp; distributions</h2>
+                <h2 class="erlang-panel-title" id="chartsTitle"><i class="fa-solid fa-chart-line"></i><i class="fa-solid fa-cloud sim-mark" id="chartsSimMark" hidden aria-hidden="true"></i> Queue performance &amp; distributions</h2>
                 <button type="button" class="erlang-btn erlang-btn-ghost" id="closeCharts">Close</button>
               </div>
               <div id="chartsBody"></div>
@@ -1854,8 +1854,9 @@
     var bar = el("div", { class: "charts-bar" });
     host.appendChild(bar);
     function section(title, key) {
+      var reference = mode === "simulation" && key !== "variability";
       var block = el("section", { class: "charts-section", "data-chart": key });
-      block.appendChild(el("h3", {}, title));
+      block.appendChild(el("h3", {}, reference ? title + " · Erlang C reference" : title));
       var grid = el("div", { class: "charts-grid" });
       block.appendChild(grid);
       host.appendChild(block);
@@ -1880,8 +1881,9 @@
       drawGroup(key);
     }
     var waitGrid = section("Waiting time", "wait");
-    chartCard(waitGrid, "Waiting-time distribution", "Share of calls in each waiting-time range. The ranges do not overlap, so the bars sum to 100%.", "hcWait");
-    chartCard(waitGrid, "Queue-length distribution", "Probability the queue holds no caller, one, two, or three or more callers.", "hcQueue");
+    var erlangNote = mode === "simulation" ? "Erlang C reference, not a simulation result. " : "";
+    chartCard(waitGrid, "Waiting-time distribution", erlangNote + "Share of calls in each waiting-time range. The ranges do not overlap, so the bars sum to 100%.", "hcWait");
+    chartCard(waitGrid, "Queue-length distribution", erlangNote + "Probability the queue holds no caller, one, two, or three or more callers.", "hcQueue");
     var median = leave > 0 ? Math.log(2) / leave : Infinity;
     host.lastChild.appendChild(el("p", { class: "hint" }, "Among callers who wait, the median wait is " + (isFinite(median) ? median.toFixed(1) + " seconds" : "not finite") + "."));
     function sensitivity(title, rows, tip, prefix, key) {
@@ -1901,21 +1903,23 @@
     var staffPack = sensitivity("Staffing sensitivity", staffRows, "Each point is the Erlang C result at that headcount. The highlighted point is the current staffing.", "hcStaff", "staff");
     var trafficPack = sensitivity("Traffic sensitivity", trafficRows, "Call volume moves around the entered rate while active agents stay fixed. The highlighted point is the baseline volume.", "hcTraffic", "traffic");
     var samples = displayed.samples || [];
+    var varSpecs = [];
     if (mode === "simulation") {
       var varGrid = section("Variation across replications", "variability");
       if (!samples.length) varGrid.parentNode.appendChild(el("p", { class: "hint" }, "Run the simulation to add the replication distributions."));
       else {
         if (displayed.replications < 100) varGrid.parentNode.insertBefore(el("p", { class: "dist-warn" }, "Distribution estimates are unstable with only " + displayed.replications + " replications. Use 100 for an ordinary assessment and 500–1,000 for planning."), varGrid);
         var target = Number(input.targetServiceLevel) / 100;
-        var maxAbandon = Number(document.getElementById("maxAbandon").value) / 100;
         var waitTarget = Number(input.maxWaitSeconds);
-        var histos = [
+        varSpecs = [
           ["Service level", "Share of replications in each service-level band. The dashed line is the target.", "serviceLevel", true, target],
-          ["Abandonment", "Share of replications in each abandonment band. The dashed line is the maximum abandonment rate.", "abandonmentRate", true, maxAbandon],
           ["Average wait", "Share of replications in each average-wait band. The dashed line is the answer-within target.", "averageWait", false, waitTarget],
           ["Maximum queue length", "Share of replications in each maximum-queue band.", "maximumQueueLength", false, null]
         ];
-        histos.forEach(function (spec, index) { chartCard(varGrid, spec[0], spec[1], "hcVar" + index); });
+        if (document.getElementById("abandonOn").checked) {
+          varSpecs.splice(1, 0, ["Abandonment", "Share of replications in each abandonment band. The dashed line is the maximum abandonment rate.", "abandonmentRate", true, Number(document.getElementById("maxAbandon").value) / 100]);
+        }
+        varSpecs.forEach(function (spec, index) { chartCard(varGrid, spec[0], spec[1], "hcVar" + index); });
       }
     }
     var allButton = el("button", { type: "button", "data-chart": "all" }, "All");
@@ -1926,9 +1930,13 @@
       var spec = pack.specs[specIndex];
       var ys = pack.rows.map(spec[2]);
       var yMax = spec[5] != null ? spec[5] : Math.max.apply(null, ys.concat([1])) * 1.1;
+      var yAxis = { min: spec[4], max: yMax, title: { text: spec[3] } };
+      if (specIndex === 0) {
+        yAxis.plotLines = [{ value: Number(input.targetServiceLevel), color: "#f0b27a", dashStyle: "Dash", width: 2, zIndex: 5, label: { text: Number(input.targetServiceLevel) + "% target", align: "right", y: -6, style: { color: "#f0b27a", fontSize: "10px", fontWeight: "700" } } }];
+      }
       return {
         xAxis: { categories: pack.cats, title: { text: pack === staffPack ? "Active agents" : "Call volume" } },
-        yAxis: { min: spec[4], max: yMax, title: { text: spec[3] } },
+        yAxis: yAxis,
         series: [{ data: ys.map(function (y, i) {
           var row = pack.rows[i];
           var mark = row.label ? row.label === "Baseline" : row.baseAgents === agents;
@@ -1949,13 +1957,10 @@
       if (showStaff) staffPack.specs.forEach(function (spec, index) { drawHc("hcStaff" + index, lineOptions(staffPack, index)); });
       if (showTraffic) trafficPack.specs.forEach(function (spec, index) { drawHc("hcTraffic" + index, lineOptions(trafficPack, index)); });
       if (showVar && mode === "simulation" && samples.length) {
-        var targetLevel = Number(input.targetServiceLevel) / 100;
-        var abandonLimit = Number(document.getElementById("maxAbandon").value) / 100;
-        var answerWithin = Number(input.maxWaitSeconds);
-      [["serviceLevel", true, targetLevel], ["abandonmentRate", true, abandonLimit], ["averageWait", false, answerWithin], ["maximumQueueLength", false, null]].forEach(function (spec, index) {
-        var stats = distStats(samples.map(function (row) { return row[spec[0]]; }));
-        var lo = Math.min(stats.p5, spec[2] != null ? spec[2] : stats.values[0] || 0);
-        var hi = Math.max(stats.p95, spec[2] != null ? spec[2] : stats.values[stats.values.length - 1] || 1);
+        varSpecs.forEach(function (spec, index) {
+        var stats = distStats(samples.map(function (row) { return row[spec[2]]; }));
+        var lo = Math.min(stats.p5, spec[4] != null ? spec[4] : stats.values[0] || 0);
+        var hi = Math.max(stats.p95, spec[4] != null ? spec[4] : stats.values[stats.values.length - 1] || 1);
         if (hi <= lo) hi = lo + 1;
         var bins = 8;
         var width = (hi - lo) / bins;
@@ -1965,14 +1970,14 @@
         for (b = 0; b < bins; b++) {
           counts.push(0);
           var start = lo + b * width;
-          labels.push(spec[1] ? (start * 100).toFixed(0) + "%" : start.toFixed(0));
+          labels.push(spec[3] ? (start * 100).toFixed(0) + "%" : start.toFixed(0));
         }
         stats.values.forEach(function (v) {
           counts[Math.min(bins - 1, Math.max(0, Math.floor((v - lo) / width)))] += 1;
         });
         var plotLines = [];
-        if (spec[2] != null) plotLines.push({ value: Math.min(bins - 1, Math.max(0, Math.floor((spec[2] - lo) / width))), color: "#f0b27a", width: 2, dashStyle: "Dash", zIndex: 4 });
-        drawHc("hcVar" + index, { chart: { type: "column" }, xAxis: { categories: labels, title: { text: spec[1] ? "Percent" : "Value" }, plotLines: plotLines }, yAxis: { min: 0, allowDecimals: false, title: { text: "Replications" } }, series: [{ data: counts, color: "#8ec8ef" }] });
+        if (spec[4] != null) plotLines.push({ value: Math.min(bins - 1, Math.max(0, Math.floor((spec[4] - lo) / width))), color: "#f0b27a", width: 2, dashStyle: "Dash", zIndex: 4 });
+        drawHc("hcVar" + index, { chart: { type: "column" }, xAxis: { categories: labels, title: { text: spec[3] ? "Percent" : "Value" }, plotLines: plotLines }, yAxis: { min: 0, allowDecimals: false, title: { text: "Replications" } }, series: [{ data: counts, color: "#8ec8ef" }] });
       });
       }
       requestAnimationFrame(function () {

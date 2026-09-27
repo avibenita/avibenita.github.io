@@ -120,6 +120,23 @@ var maxReplay = 0;
 warmed.events.forEach(function (ev) { if (ev.time > maxReplay) maxReplay = ev.time; });
 assert.ok(maxReplay <= 1800 + 1e-6, "replay stays inside 30 minutes " + maxReplay);
 
+var dist = sim.simulateReplication(base({
+  simSeconds: 2000,
+  warmupSeconds: 0,
+  abandonmentEnabled: true,
+  meanPatienceSeconds: 30,
+  agents: 3
+}), sim.mulberry32(9), false);
+var answeredBins = 0;
+var abandonedBins = 0;
+(dist.answeredWaitBins || []).forEach(function (n) { answeredBins += n; });
+(dist.abandonedWaitBins || []).forEach(function (n) { abandonedBins += n; });
+assert.strictEqual(answeredBins, dist.answeredCalls);
+assert.strictEqual(abandonedBins, dist.abandonedCalls);
+var occupied = 0;
+Object.keys(dist.queueOccupancy || {}).forEach(function (key) { occupied += dist.queueOccupancy[key]; });
+assert.ok(Math.abs(occupied - dist.horizon) < 1, "queue time " + occupied + " vs " + dist.horizon);
+
 console.log("queue-sim ok", {
   off: off.abandonmentRate,
   short: Number(shortPatience.abandonmentRate.toFixed(3)),

@@ -11,7 +11,7 @@
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="./erlang-math.js?v=20260923erlang1"></script>
   <script src="./queue-playback.js?v=20260927queue2"></script>
-  <script src="./queue-sim.js?v=20260927sim2"></script>
+  <script src="./queue-sim.js?v=20260927sim3"></script>
   <style>
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--surface-0); color: var(--text-primary); }
     .st-calc-main { min-height: 0; overflow: hidden; }
@@ -138,6 +138,8 @@
     .charts-dialog { width: min(1180px, calc(100% - 32px)); height: auto; max-height: calc(100vh - 48px); overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); padding: 12px 14px 14px; }
     html[data-theme="light"] .charts-dialog { background: var(--surface-1); }
     #chartsBody { overflow: visible; }
+    #simDistModal #simDistBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; max-height: calc(100vh - 160px); }
+    #simDistBody .charts-grid { grid-template-columns: 1fr; }
     .charts-modal.view-all #chartsBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
     .charts-section { margin-top: 8px; }
     .charts-section[hidden] { display: none; }
@@ -417,6 +419,7 @@
           <div class="deeper-nav" id="deeperNav">
             <button type="button" data-view="summary" class="active"><i class="fa-solid fa-users" aria-hidden="true"></i> Staffing summary</button>
             <button type="button" id="openCharts" title="Waiting time, queue length, staffing sensitivity, and traffic sensitivity. In Simulation mode those charts are an Erlang C reference. Variation across replications comes from the simulation."><i class="fa-solid fa-chart-line" aria-hidden="true"></i> Queue performance &amp; distributions</button>
+            <button type="button" id="openSimDist" class="sim-view" disabled title="Wait times, queue length, and one result per replication, from the full simulation. The replay is a 30-minute illustration of one run."><i class="fa-solid fa-cloud" aria-hidden="true"></i> Simulation distributions</button>
             <button type="button" data-view="replay" class="sim-view" id="replayNav" disabled><i class="fa-solid fa-play" aria-hidden="true"></i> Simulation replay</button>
           </div>
           <div id="summaryView">
@@ -430,6 +433,15 @@
                 <button type="button" class="erlang-btn erlang-btn-ghost" id="closeCharts">Close</button>
               </div>
               <div id="chartsBody"></div>
+            </div>
+          </div>
+          <div class="charts-modal" id="simDistModal">
+            <div class="charts-dialog" role="dialog" aria-modal="true" aria-labelledby="simDistTitle">
+              <div class="replay-dialog-head">
+                <h2 class="erlang-panel-title" id="simDistTitle"><i class="fa-solid fa-cloud sim-mark" aria-hidden="true"></i> Simulation distributions</h2>
+                <button type="button" class="erlang-btn erlang-btn-ghost" id="closeSimDist">Close</button>
+              </div>
+              <div id="simDistBody"></div>
             </div>
           </div>
           <div class="replay-modal" id="replayModal">
@@ -693,6 +705,7 @@
     drawCurve(model);
     var canVary = model.source === "simulation" && !resultsStale && model.samples && model.samples.length;
     document.getElementById("replayNav").disabled = !canVary;
+    document.getElementById("openSimDist").disabled = !canVary;
     if (!canVary && resultView === "variability") showResultView("summary");
     if (model.source === "simulation" && !resultsStale) {
       replayReady = model;
@@ -1037,6 +1050,10 @@
       serviceLevelHigh: summary.serviceLevelHigh,
       replications: summary.replications,
       samples: summary.samples || [],
+      answeredWaitBins: summary.answeredWaitBins || [],
+      abandonedWaitBins: summary.abandonedWaitBins || [],
+      immediateAnswered: summary.immediateAnswered || 0,
+      queueOccupancy: summary.queueOccupancy || {},
       occupancy: summary.occupancy,
       avgWaitSeconds: summary.averageWaitAnsweredSeconds,
       averageQueueLength: summary.averageQueueLength,
@@ -1153,8 +1170,10 @@
       resultsStale = true;
       document.getElementById("resultsPanel").classList.add("results-dim");
       document.getElementById("replayNav").disabled = true;
+      document.getElementById("openSimDist").disabled = true;
       document.getElementById("staleBanner").hidden = false;
       closeReplay();
+      closeSimDist();
       return;
     }
     resultsStale = false;
@@ -1782,6 +1801,10 @@
     chartInstances = [];
     document.getElementById("chartsModal").classList.remove("open");
     document.getElementById("openCharts").classList.remove("active");
+    var simModal = document.getElementById("simDistModal");
+    if (simModal) simModal.classList.remove("open");
+    var simBtn = document.getElementById("openSimDist");
+    if (simBtn) simBtn.classList.remove("active");
     document.querySelector("#deeperNav button[data-view='summary']").classList.add("active");
   }
   function axisTitle(icon, text) {
@@ -2017,6 +2040,220 @@
     }
     showChartType("wait");
   }
+  function closeSimDist() {
+    if (document.getElementById("chartsModal").classList.contains("open")) {
+      document.getElementById("simDistModal").classList.remove("open");
+      document.getElementById("openSimDist").classList.remove("active");
+      return;
+    }
+    closeCharts();
+  }
+  function openSimDist() {
+    if (!displayed || displayed.source !== "simulation") return;
+    closeCharts();
+    document.querySelectorAll("#deeperNav button").forEach(function (item) { item.classList.remove("active"); });
+    document.getElementById("openSimDist").classList.add("active");
+    var host = document.getElementById("simDistBody");
+    host.textContent = "";
+    host.appendChild(el("p", { class: "hint" }, "Taken from the full simulation runs, after warm-up. The replay is a 30-minute illustration of one run, not this distribution."));
+    var input = read();
+    var targetSeconds = Number(input.maxWaitSeconds);
+    var targetLevel = Number(input.targetServiceLevel);
+    var abandonOn = document.getElementById("abandonOn").checked;
+    var samples = displayed.samples || [];
+    var runs = samples.length;
+    function binTotal(bins) {
+      var total = 0;
+      var i;
+      for (i = 0; i < bins.length; i++) total += bins[i] || 0;
+      return total;
+    }
+    function percentile(bins, p) {
+      var total = binTotal(bins);
+      if (!total) return null;
+      var need = Math.max(1, Math.ceil(p * total));
+      var acc = 0;
+      var i;
+      for (i = 0; i < bins.length; i++) {
+        acc += bins[i] || 0;
+        if (acc >= need) return i;
+      }
+      return bins.length - 1;
+    }
+    function cdfPoints(bins, mark) {
+      var total = binTotal(bins);
+      var points = [];
+      if (!total) return points;
+      var acc = 0;
+      var end = mark;
+      var i;
+      for (i = 0; i < bins.length; i++) {
+        acc += bins[i] || 0;
+        if (i >= mark && acc / total >= 0.995) { end = i; break; }
+        end = i;
+      }
+      acc = 0;
+      for (i = 0; i <= end; i++) {
+        acc += (bins[i] || 0);
+        points.push([i, +(100 * acc / total).toFixed(1)]);
+      }
+      return points;
+    }
+    function waitSection(title, bins, tip, id, sla) {
+      var grid = el("div", { class: "charts-grid" });
+      var block = el("section", { class: "charts-section" });
+      block.appendChild(el("h3", {}, title));
+      block.appendChild(grid);
+      host.appendChild(block);
+      var total = binTotal(bins);
+      if (!total) {
+        grid.appendChild(el("p", { class: "hint" }, "No callers in this group."));
+        return;
+      }
+      chartCard(grid, title, tip, id);
+      var p50 = percentile(bins, 0.5);
+      var p90 = percentile(bins, 0.9);
+      var p95 = percentile(bins, 0.95);
+      var within = 0;
+      var i;
+      for (i = 0; i <= sla && i < bins.length; i++) within += bins[i] || 0;
+      block.appendChild(el("p", { class: "hint" }, "Median " + p50 + "s · 90th " + p90 + "s · 95th " + p95 + "s. " + (100 * within / total).toFixed(1) + "% waited " + sla + "s or less."));
+      return { id: id, points: cdfPoints(bins, sla), p50: p50, p90: p90, p95: p95 };
+    }
+    var answeredPack = waitSection("Answered callers", displayed.answeredWaitBins || [], "Share of answered callers whose wait is within each second. Abandoned callers are not included. The curve uses every measured call from the full runs, grouped in 1-second steps.", "hcWaitAns", targetSeconds);
+    if (answeredPack && displayed.immediateAnswered) {
+      host.lastChild.appendChild(el("p", { class: "hint" }, (100 * displayed.immediateAnswered / binTotal(displayed.answeredWaitBins || [])).toFixed(1) + "% of answered callers connected immediately."));
+    }
+    var abandonedPack = null;
+    if (abandonOn) {
+      abandonedPack = waitSection("Abandoned callers", displayed.abandonedWaitBins || [], "Share of abandoned callers by how long they waited before leaving. Answered callers are not included.", "hcWaitAb", targetSeconds);
+    } else {
+      host.appendChild(el("p", { class: "hint" }, "Abandonment is off, so there is no separate curve for callers who leave."));
+    }
+    var occ = displayed.queueOccupancy || {};
+    var occKeys = Object.keys(occ).map(Number).filter(function (n) { return isFinite(n); }).sort(function (a, b) { return a - b; });
+    var occTotal = 0;
+    occKeys.forEach(function (key) { occTotal += occ[key]; });
+    var occBlock = el("section", { class: "charts-section" });
+    occBlock.appendChild(el("h3", {}, "Queue length over time"));
+    var occGrid = el("div", { class: "charts-grid" });
+    occBlock.appendChild(occGrid);
+    host.appendChild(occBlock);
+    var occCats = [];
+    var occVals = [];
+    if (occTotal > 0) {
+      var covered = 0;
+      var k;
+      for (k = 0; k < occKeys.length; k++) {
+        var share = 100 * occ[occKeys[k]] / occTotal;
+        covered += share;
+        if (k >= 12 && covered >= 99) break;
+        occCats.push(String(occKeys[k]));
+        occVals.push(+share.toFixed(1));
+      }
+      if (k < occKeys.length) {
+        var restFrom = occKeys[k];
+        var rest = 0;
+        for (; k < occKeys.length; k++) rest += occ[occKeys[k]];
+        occCats.push(restFrom + "+");
+        occVals.push(+(100 * rest / occTotal).toFixed(1));
+      }
+    }
+    chartCard(occGrid, "Time spent at each queue length", "Percentage of simulated time, after warm-up, with this many callers waiting. Callers already speaking with an agent are not in the queue.", "hcQueueOcc");
+    var levelBlock = el("section", { class: "charts-section" });
+    levelBlock.appendChild(el("h3", {}, "Service level by run"));
+    var levelGrid = el("div", { class: "charts-grid" });
+    levelBlock.appendChild(levelGrid);
+    host.appendChild(levelBlock);
+    var met = samples.filter(function (row) { return row.serviceLevel * 100 + 0.05 >= targetLevel; }).length;
+    var levelNote = runs >= 100
+      ? "Estimated chance of meeting the " + targetLevel + "% target: " + (100 * met / Math.max(1, runs)).toFixed(0) + "%, based on " + runs + " runs."
+      : met + " of " + runs + " runs met the " + targetLevel + "% target. With this few runs, read the points themselves rather than a smooth curve.";
+    chartCard(levelGrid, runs >= 100 ? "Service level across runs" : "Service level of each run", "Each replication is one full run of this scenario. " + levelNote, "hcRunSl");
+    levelBlock.appendChild(el("p", { class: "hint" }, levelNote));
+    var abandonPack = null;
+    if (abandonOn) {
+      var maxAbandon = Number(document.getElementById("maxAbandon").value);
+      var abMet = samples.filter(function (row) { return row.abandonmentRate * 100 <= maxAbandon + 0.05; }).length;
+      var abNote = runs >= 100
+        ? "Estimated chance of staying at or below " + maxAbandon + "% abandonment: " + (100 * abMet / Math.max(1, runs)).toFixed(0) + "%, based on " + runs + " runs."
+        : abMet + " of " + runs + " runs stayed at or below " + maxAbandon + "% abandonment.";
+      var abBlock = el("section", { class: "charts-section" });
+      abBlock.appendChild(el("h3", {}, "Abandonment by run"));
+      var abGrid = el("div", { class: "charts-grid" });
+      abBlock.appendChild(abGrid);
+      host.appendChild(abBlock);
+      chartCard(abGrid, runs >= 100 ? "Abandonment across runs" : "Abandonment of each run", "Abandonment rate in each replication. " + abNote, "hcRunAb");
+      abBlock.appendChild(el("p", { class: "hint" }, abNote));
+      abandonPack = { maxAbandon: maxAbandon };
+    }
+    document.getElementById("simDistModal").classList.add("open");
+    function runSeries(key, digits) {
+      if (runs >= 100) {
+        var values = samples.map(function (row) { return row[key] * (digits ? 100 : 1); });
+        var lo = Math.min.apply(null, values);
+        var hi = Math.max.apply(null, values);
+        if (hi <= lo) hi = lo + 1;
+        var bins = 12;
+        var width = (hi - lo) / bins;
+        var counts = [];
+        var labels = [];
+        var b;
+        for (b = 0; b < bins; b++) {
+          counts.push(0);
+          labels.push((lo + b * width).toFixed(digits ? 0 : 1) + (digits ? "%" : ""));
+        }
+        values.forEach(function (v) { counts[Math.min(bins - 1, Math.max(0, Math.floor((v - lo) / width)))] += 1; });
+        return { chart: { type: "column" }, xAxis: { categories: labels, title: { text: digits ? "Percent" : "Value" } }, yAxis: { min: 0, allowDecimals: false, title: { text: "Runs" } }, plotOptions: { column: { dataLabels: { enabled: false } } }, series: [{ data: counts, color: "#8ec8ef" }] };
+      }
+      return {
+        chart: { type: "scatter" },
+        xAxis: { min: 0.5, max: runs + 0.5, allowDecimals: false, title: { text: "Replication" } },
+        yAxis: { min: 0, title: { text: digits ? "Percent" : "Value" } },
+        plotOptions: { scatter: { marker: { radius: 5, symbol: "circle" } } },
+        series: [{ data: samples.map(function (row, index) { return [index + 1, +((row[key] * (digits ? 100 : 1)).toFixed(1))]; }), color: "#8ec8ef" }]
+      };
+    }
+    function drawWait(pack, sla) {
+      if (!pack) return;
+      var lines = [
+        { value: pack.p50, color: "#94a3b8", dashStyle: "Dash", width: 1, zIndex: 4, label: { text: "Median", style: { color: "#94a3b8", fontSize: "10px" } } },
+        { value: pack.p90, color: "#94a3b8", dashStyle: "Dash", width: 1, zIndex: 4, label: { text: "90th", style: { color: "#94a3b8", fontSize: "10px" } } },
+        { value: pack.p95, color: "#94a3b8", dashStyle: "Dash", width: 1, zIndex: 4, label: { text: "95th", style: { color: "#94a3b8", fontSize: "10px" } } }
+      ];
+      if (sla != null) lines.push({ value: sla, color: "#f0b27a", dashStyle: "Dash", width: 2, zIndex: 5, label: { text: sla + "s", style: { color: "#f0b27a", fontSize: "10px", fontWeight: "700" } } });
+      drawHc(pack.id, {
+        xAxis: { title: axisTitle("fa-clock", "Wait (seconds)"), plotLines: lines },
+        yAxis: { min: 0, max: 100, title: { text: "Callers at or below this wait (%)" } },
+        plotOptions: { line: { dataLabels: { enabled: false }, marker: { enabled: false, radius: 2 } } },
+        series: [{ data: pack.points, color: "#8ec8ef" }]
+      });
+    }
+    drawWait(answeredPack, targetSeconds);
+    drawWait(abandonedPack, null);
+    drawHc("hcQueueOcc", {
+      chart: { type: "column" },
+      xAxis: { categories: occCats, title: axisTitle("fa-user-clock", "Callers waiting") },
+      yAxis: { min: 0, max: 100, title: { text: "Share of simulated time (%)" } },
+      plotOptions: { column: { dataLabels: { enabled: occVals.length <= 12 } } },
+      series: [{ data: occVals, color: "#8ec8ef" }]
+    });
+    var slOptions = runSeries("serviceLevel", true);
+    slOptions.yAxis.max = 100;
+    slOptions.yAxis.plotLines = [{ value: targetLevel, color: "#f0b27a", dashStyle: "Dash", width: 2, zIndex: 5, label: { text: targetLevel + "% target", align: "right", style: { color: "#f0b27a", fontSize: "10px", fontWeight: "700" } } }];
+    drawHc("hcRunSl", slOptions);
+    if (abandonPack) {
+      var abOptions = runSeries("abandonmentRate", true);
+      var abTop = abandonPack.maxAbandon;
+      samples.forEach(function (row) { abTop = Math.max(abTop, row.abandonmentRate * 100); });
+      abOptions.yAxis.max = Math.max(5, Math.ceil(abTop + 1));
+      abOptions.yAxis.plotLines = [{ value: abandonPack.maxAbandon, color: "#f0b27a", dashStyle: "Dash", width: 2, zIndex: 5, label: { text: abandonPack.maxAbandon + "% limit", align: "right", style: { color: "#f0b27a", fontSize: "10px", fontWeight: "700" } } }];
+      drawHc("hcRunAb", abOptions);
+    }
+    requestAnimationFrame(function () {
+      chartInstances.forEach(function (chart) { if (chart) chart.reflow(); });
+    });
+  }
   function showResultView(name) {
     if (name === "replay") {
       if (!document.getElementById("replayNav").disabled) openReplayModal();
@@ -2039,9 +2276,19 @@
   document.getElementById("chartsModal").addEventListener("click", function (event) {
     if (event.target.id === "chartsModal") closeCharts();
   });
+  document.getElementById("closeSimDist").addEventListener("click", closeSimDist);
+  document.getElementById("simDistModal").addEventListener("click", function (event) {
+    if (event.target.id === "simDistModal") closeSimDist();
+  });
   document.getElementById("deeperNav").addEventListener("click", function (event) {
     var button = event.target.closest("button");
     if (!button || button.disabled) return;
+    if (button.id === "openSimDist") {
+      document.querySelectorAll("#deeperNav button").forEach(function (item) { item.classList.remove("active"); });
+      button.classList.add("active");
+      openSimDist();
+      return;
+    }
     if (button.id === "openCharts") {
       document.querySelectorAll("#deeperNav button").forEach(function (item) { item.classList.remove("active"); });
       button.classList.add("active");

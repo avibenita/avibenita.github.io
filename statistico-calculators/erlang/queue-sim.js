@@ -111,6 +111,15 @@
     var busyArea = 0;
     var events = recordEvents ? [] : null;
     var stillWaiting = 0;
+    var answeredWaitBins = [];
+    var abandonedWaitBins = [];
+    var queueOccupancy = {};
+    var immediateAnswered = 0;
+
+    function bumpBin(bins, seconds) {
+      var idx = Math.max(0, Math.min(600, Math.floor(seconds)));
+      bins[idx] = (bins[idx] || 0) + 1;
+    }
 
     function emit(ev) {
       if (!events) return;
@@ -127,7 +136,9 @@
     }
 
     function addArea(to) {
-      queueArea += queue.length * Math.max(0, to - lastT);
+      var dt = Math.max(0, to - lastT);
+      if (measuring && dt > 0) queueOccupancy[queue.length] = (queueOccupancy[queue.length] || 0) + dt;
+      queueArea += queue.length * dt;
       busyArea += busyOverlap(lastT, to);
       lastT = to;
     }
@@ -155,6 +166,10 @@
       maxQueue = queue.length;
       queueArea = 0;
       busyArea = 0;
+      answeredWaitBins = [];
+      abandonedWaitBins = [];
+      queueOccupancy = {};
+      immediateAnswered = 0;
       measuring = true;
       seedReplay();
     }
@@ -202,6 +217,8 @@
       if (call.measured) {
         answered += 1;
         waitAnswered += wait;
+        bumpBin(answeredWaitBins, wait);
+        if (wait <= 1e-9) immediateAnswered += 1;
         if (wait <= target + 1e-9) answeredWithin += 1;
       }
       emit({ time: time, type: "service_start", callId: call.callId, agentId: agent + 1, waitSeconds: wait });
@@ -224,6 +241,7 @@
         if (call.measured) {
           abandoned += 1;
           waitAbandoned += Math.max(0, when - call.arrival);
+          bumpBin(abandonedWaitBins, Math.max(0, when - call.arrival));
         }
         emit({ time: when, type: "abandon", callId: call.callId, waitSeconds: Math.max(0, when - call.arrival) });
       }
@@ -260,6 +278,7 @@
           if (call.measured) {
             abandoned += 1;
             waitAbandoned += Math.max(0, call.abandonAt - call.arrival);
+            bumpBin(abandonedWaitBins, Math.max(0, call.abandonAt - call.arrival));
           }
           emit({ time: call.abandonAt, type: "abandon", callId: call.callId, waitSeconds: Math.max(0, call.abandonAt - call.arrival) });
           continue;
@@ -320,6 +339,10 @@
       horizon: warmup > 0 ? horizon - warmup : horizon,
       agents: agents,
       warmupSeconds: warmup,
+      answeredWaitBins: answeredWaitBins,
+      abandonedWaitBins: abandonedWaitBins,
+      immediateAnswered: immediateAnswered,
+      queueOccupancy: queueOccupancy,
       events: events
     };
   }
@@ -383,8 +406,31 @@
           maximumQueueLength: part.maxQueueLength,
           occupancy: part.horizon * part.agents > 0 ? part.busyArea / (part.horizon * part.agents) : 0
         };
-      })
+      }),
+      answeredWaitBins: mergeBins(parts, "answeredWaitBins"),
+      abandonedWaitBins: mergeBins(parts, "abandonedWaitBins"),
+      immediateAnswered: parts.reduce(function (sum, part) { return sum + (part.immediateAnswered || 0); }, 0),
+      queueOccupancy: mergeOcc(parts)
     };
+  }
+
+  function mergeBins(parts, key) {
+    var out = [];
+    parts.forEach(function (part) {
+      var bins = part[key] || [];
+      var i;
+      for (i = 0; i < bins.length; i++) if (bins[i]) out[i] = (out[i] || 0) + bins[i];
+    });
+    return out;
+  }
+
+  function mergeOcc(parts) {
+    var out = {};
+    parts.forEach(function (part) {
+      var occ = part.queueOccupancy || {};
+      Object.keys(occ).forEach(function (key) { out[key] = (out[key] || 0) + occ[key]; });
+    });
+    return out;
   }
 
   function run(spec) {

@@ -876,9 +876,10 @@
 
     .scatter-draw-note {
       min-height: 18px;
-      margin: 6px 0 0;
+      margin: 0 0 8px;
       color: var(--text-muted);
       font-size: 12px;
+      line-height: 1.45;
     }
 
     .scatter-stats {
@@ -1198,8 +1199,8 @@
         <div class="scatter-stat"><div class="scatter-stat-value" id="scatterP">--</div><div class="scatter-stat-label">p-value</div></div>
         <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR2">--</div><div class="scatter-stat-label">R²</div></div>
       </div>
-      <div id="scatterChart" class="scatter-chart"></div>
       <p id="scatterDrawNote" class="scatter-draw-note"></p>
+      <div id="scatterChart" class="scatter-chart"></div>
       <div class="scatter-controls">
         <div class="scatter-panel">
           <div class="scatter-panel-title"><i class="fas fa-sliders-h"></i>Axis Controls</div>
@@ -2718,6 +2719,16 @@
     if (note) note.textContent = message || '';
   }
 
+  function describeScatterSample(total, limit) {
+    const totalLabel = total.toLocaleString();
+    if (total <= limit) return 'Drawing all ' + totalLabel + ' complete pairs.';
+    const every = total / limit;
+    const everyLabel = Number.isInteger(every) ? String(every) : every.toFixed(1);
+    return 'Selecting ' + limit.toLocaleString() + ' of ' + totalLabel
+      + ' points: every ' + everyLabel + 'th complete pair, in file order. '
+      + 'Correlation, N, and p use all ' + totalLabel + ' pairs.';
+  }
+
   function openScatterModal(rowVar, colVar, rValue) {
     if (!correlationData || !correlationData.data) return;
 
@@ -2726,7 +2737,7 @@
     const cacheKey = rowVar + '__' + colVar;
 
     titleEl.textContent = 'Scatter Plot: ' + rowVar + ' vs ' + colVar;
-    setScatterDrawNote('Preparing the scatter plot…');
+    setScatterDrawNote('Counting complete pairs…');
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
 
@@ -2753,9 +2764,15 @@
       scatterState.chart = null;
       scatterState.xRange = null;
       scatterState.yRange = null;
+      scatterState.transformedPoints = null;
+      scatterState.transformedKey = '';
 
-      resetScatterControls();
-      refreshScatter();
+      const drawCount = Math.min(points.length, SCATTER_DRAW_LIMIT);
+      setScatterDrawNote(describeScatterSample(points.length, drawCount));
+      setTimeout(function () {
+        resetScatterControls();
+        refreshScatter();
+      }, 50);
     }, 30);
   }
 
@@ -2784,10 +2801,23 @@
     }
   }
 
+  function transformKey() {
+    return scatterState.xTransform + '|' + scatterState.yTransform;
+  }
+
   function getTransformedPoints() {
-    return scatterState.rawPoints
-      .map(([x, y]) => [transformValue(x, scatterState.xTransform), transformValue(y, scatterState.yTransform)])
-      .filter(([x, y]) => x !== null && y !== null && isFinite(x) && isFinite(y));
+    const key = transformKey();
+    if (scatterState.transformedPoints && scatterState.transformedKey === key) return scatterState.transformedPoints;
+    const raw = scatterState.rawPoints || [];
+    const out = [];
+    for (let i = 0; i < raw.length; i++) {
+      const x = transformValue(raw[i][0], scatterState.xTransform);
+      const y = transformValue(raw[i][1], scatterState.yTransform);
+      if (x !== null && y !== null && isFinite(x) && isFinite(y)) out.push([x, y]);
+    }
+    scatterState.transformedPoints = out;
+    scatterState.transformedKey = key;
+    return out;
   }
 
   function getVisiblePoints() {
@@ -2808,11 +2838,7 @@
     const vis = getVisiblePoints();
     updateScatterStats(vis);
     applyFit(scatterState.fitType, vis);
-    if (drawn.length < pts.length) {
-      setScatterDrawNote('Showing ' + drawn.length.toLocaleString() + ' of ' + pts.length.toLocaleString() + ' points. Correlation, N, and p use all ' + pts.length.toLocaleString() + ' pairs.');
-    } else {
-      setScatterDrawNote('');
-    }
+    setScatterDrawNote(describeScatterSample(pts.length, drawn.length));
   }
 
   function updateScatterStats(points) {
@@ -2912,20 +2938,31 @@
     const val = parseFloat(value);
     if (axis === 'x') { scatterState.xRange[which] = val; document.getElementById(which==='min' ? 'xMinVal' : 'xMaxVal').textContent = val.toFixed(2); }
     else               { scatterState.yRange[which] = val; document.getElementById(which==='min' ? 'yMinVal' : 'yMaxVal').textContent = val.toFixed(2); }
-    const vis = getVisiblePoints();
-    updateScatterStats(vis);
-    applyFit(scatterState.fitType, vis);
     updateScatterAdjustmentIndicator();
     updateChartExtremes();
+    if (scatterState.axisStatsTimer) clearTimeout(scatterState.axisStatsTimer);
+    scatterState.axisStatsTimer = setTimeout(recomputeVisibleStats, 180);
+  }
+
+  function recomputeVisibleStats() {
+    scatterState.axisStatsTimer = 0;
+    const vis = getVisiblePoints();
+    updateScatterStats(vis);
+    if (scatterState.fitType && scatterState.fitType !== 'none') applyFit(scatterState.fitType, vis);
   }
 
   function updateChartExtremes() {
     if (!scatterState.chart) return;
-    const { min: xMin, max: xMax } = scatterState.xRange;
-    const { min: yMin, max: yMax } = scatterState.yRange;
-    scatterState.chart.xAxis[0].setExtremes(Math.min(xMin, xMax), Math.max(xMin, xMax), false);
-    scatterState.chart.yAxis[0].setExtremes(Math.min(yMin, yMax), Math.max(yMin, yMax), false);
-    scatterState.chart.redraw();
+    if (scatterState.extremesFrame) return;
+    scatterState.extremesFrame = requestAnimationFrame(function () {
+      scatterState.extremesFrame = 0;
+      if (!scatterState.chart || !scatterState.xRange || !scatterState.yRange) return;
+      const { min: xMin, max: xMax } = scatterState.xRange;
+      const { min: yMin, max: yMax } = scatterState.yRange;
+      scatterState.chart.xAxis[0].setExtremes(Math.min(xMin, xMax), Math.max(xMin, xMax), false);
+      scatterState.chart.yAxis[0].setExtremes(Math.min(yMin, yMax), Math.max(yMin, yMax), false);
+      scatterState.chart.redraw();
+    });
   }
 
   function applyFit(type, pointsOverride = null) {

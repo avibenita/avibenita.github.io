@@ -919,10 +919,12 @@
       border-radius: 99px;
     }
 
+    .scatter-chart-frame { position: relative; }
+
     .scatter-chart-status {
       position: absolute;
       inset: 0;
-      z-index: 2;
+      z-index: 20;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1267,7 +1269,8 @@
       <div id="scatterProgress" class="scatter-progress" hidden>
         <div id="scatterProgressFill" class="scatter-progress-fill"></div>
       </div>
-      <div id="scatterChart" class="scatter-chart">
+      <div class="scatter-chart-frame">
+        <div id="scatterChart" class="scatter-chart"></div>
         <div id="scatterChartStatus" class="scatter-chart-status" hidden>
           <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
           <span id="scatterChartStatusText">Drawing the chart…</span>
@@ -1280,21 +1283,21 @@
             <div class="axis-row">
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>X Min</span><span id="xMinVal">--</span></div>
-                <input type="range" id="xMinRange" oninput="previewAxisRange('x','min', this.value)" onchange="commitAxisRange()">
+                <input type="range" id="xMinRange" oninput="previewAxisRange('x','min', this.value)" onpointerup="commitAxisRange()" onchange="commitAxisRange()">
               </div>
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>X Max</span><span id="xMaxVal">--</span></div>
-                <input type="range" id="xMaxRange" oninput="previewAxisRange('x','max', this.value)" onchange="commitAxisRange()">
+                <input type="range" id="xMaxRange" oninput="previewAxisRange('x','max', this.value)" onpointerup="commitAxisRange()" onchange="commitAxisRange()">
               </div>
             </div>
             <div class="axis-row">
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>Y Min</span><span id="yMinVal">--</span></div>
-                <input type="range" id="yMinRange" oninput="previewAxisRange('y','min', this.value)" onchange="commitAxisRange()">
+                <input type="range" id="yMinRange" oninput="previewAxisRange('y','min', this.value)" onpointerup="commitAxisRange()" onchange="commitAxisRange()">
               </div>
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>Y Max</span><span id="yMaxVal">--</span></div>
-                <input type="range" id="yMaxRange" oninput="previewAxisRange('y','max', this.value)" onchange="commitAxisRange()">
+                <input type="range" id="yMaxRange" oninput="previewAxisRange('y','max', this.value)" onpointerup="commitAxisRange()" onchange="commitAxisRange()">
               </div>
             </div>
           </div>
@@ -3207,13 +3210,19 @@
   }
 
   function commitAxisRange() {
+    if (scatterState.axisCommitPending) return;
+    scatterState.axisCommitPending = true;
     setScatterChartBusy('Updating the axis range…');
     setTimeout(function () {
-      updateScatterAdjustmentIndicator();
-      updateChartExtremes();
-      recomputeVisibleStats();
-      finishScatterChartBusy();
-    }, 30);
+      try {
+        updateScatterAdjustmentIndicator();
+        updateChartExtremes();
+        recomputeVisibleStats();
+      } finally {
+        scatterState.axisCommitPending = false;
+        finishScatterChartBusy();
+      }
+    }, 50);
   }
 
   function recomputeVisibleStats() {

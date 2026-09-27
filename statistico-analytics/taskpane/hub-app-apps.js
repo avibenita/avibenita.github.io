@@ -57,6 +57,7 @@ let hubCorrelationFlowActive = false;
 let hubCorrelationDialog = null;
 let hubCorrelationResultsDialog = null;
 let hubCorrelationMatrixData = null;
+let hubCorrelationSnapshot = null;
 let hubPendingCorrelationRunData = null;
 let hubPendingCorrelationViewUrl = null;
 let hubParetoFlowActive = false;
@@ -1918,12 +1919,299 @@ function buildHubCorrelationMatrixData(runData, gr) {
   };
 }
 
+function retainHubCorrelationSnapshot(matrixData) {
+  if (!matrixData || !matrixData.sourceRowsAll && !(matrixData.sourceRows && matrixData.sourceRows.length)) {
+    hubCorrelationSnapshot = null;
+    hubCorrelationMatrixData = matrixData || null;
+    return null;
+  }
+  var rows = matrixData.sourceRowsAll || matrixData.sourceRows || [];
+  var sameRows = hubCorrelationSnapshot && hubCorrelationSnapshot.rows === rows;
+  hubCorrelationSnapshot = {
+    id: sameRows ? hubCorrelationSnapshot.id : ("corr-" + Date.now().toString(36)),
+    address: matrixData.address || "",
+    columnNames: (matrixData.sourceHeaders || matrixData.headers || []).slice(),
+    analysisColumns: (matrixData.selectedVariables || matrixData.headers || []).slice(),
+    method: matrixData.method || "pearson",
+    filter: matrixData.rowFilterActive ? { active: true } : null,
+    rows: rows,
+    retainedAt: Date.now()
+  };
+  hubCorrelationMatrixData = matrixData;
+  hubCorrelationMatrixData.analysisId = hubCorrelationSnapshot.id;
+  return hubCorrelationSnapshot;
+}
+
+function releaseHubCorrelationSnapshot() {
+  hubCorrelationSnapshot = null;
+  hubCorrelationMatrixData = null;
+}
+
+function hubToNumber(value) {
+  if (typeof value === "number" && isFinite(value)) return value;
+  if (value == null || value === "") return null;
+  var n = parseFloat(value);
+  return isFinite(n) ? n : null;
+}
+
+function hubNormalTwoTail(z) {
+  var abs = Math.abs(z);
+  var t = 1 / (1 + 0.2316419 * abs);
+  var d = 0.3989422804014327 * Math.exp(-0.5 * abs * abs);
+  var p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return Math.max(0, Math.min(1, 2 * p));
+}
+
+function hubPearson(xs, ys) {
+  var n = Math.min(xs.length, ys.length);
+  if (n < 3) return { r: null, p: null, n: n };
+  var mx = 0, my = 0, i;
+  for (i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+  mx /= n; my /= n;
+  var num = 0, dx2 = 0, dy2 = 0;
+  for (i = 0; i < n; i++) {
+    var dx = xs[i] - mx, dy = ys[i] - my;
+    num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
+  }
+  if (!dx2 || !dy2) return { r: null, p: null, n: n };
+  var r = num / Math.sqrt(dx2 * dy2);
+  var df = n - 2;
+  var t = Math.abs(r) * Math.sqrt(df / Math.max(1e-15, 1 - r * r));
+  return { r: r, p: hubNormalTwoTail(t), n: n };
+}
+
+function hubRanks(values) {
+  var order = values.map(function (val, idx) { return { val: val, idx: idx }; });
+  order.sort(function (a, b) { return a.val - b.val; });
+  var ranks = new Array(values.length);
+  for (var i = 0; i < order.length; i++) {
+    var j = i;
+    while (j < order.length - 1 && order[j].val === order[j + 1].val) j++;
+    var avg = (i + j + 2) / 2;
+    for (var k = i; k <= j; k++) ranks[order[k].idx] = avg;
+    i = j;
+  }
+  return ranks;
+}
+
+function hubCorrelate(xs, ys, method) {
+  if (String(method || "").toLowerCase() === "spearman") {
+    return hubPearson(hubRanks(xs), hubRanks(ys));
+  }
+  return hubPearson(xs, ys);
+}
+
+function hubPairColumns(rows, indexes, colA, colB) {
+  var xs = [], ys = [];
+  for (var i = 0; i < indexes.length; i++) {
+    var row = rows[indexes[i]];
+    var a = hubToNumber(row[colA]);
+    var b = hubToNumber(row[colB]);
+    if (a != null && b != null) { xs.push(a); ys.push(b); }
+  }
+  return { xs: xs, ys: ys };
+}
+
+function hubLevelKey(value) {
+  return value == null || value === "" ? "(blank)" : String(value);
+}
+
+function hubColumnMeta(snapshot) {
+  var analysis = {};
+  (snapshot.analysisColumns || []).forEach(function (name) { analysis[name] = true; });
+  return snapshot.columnNames.map(function (name, idx) {
+    var counts = {};
+    var missing = 0;
+    for (var r = 0; r < snapshot.rows.length; r++) {
+      var value = snapshot.rows[r][idx];
+      if (value == null || value === "") missing++;
+      var key = hubLevelKey(value);
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    var levels = Object.keys(counts).map(function (level) { return { level: level, n: counts[level] }; });
+    levels.sort(function (a, b) {
+      return String(a.level).localeCompare(String(b.level), undefined, { numeric: true });
+    });
+    return {
+      name: name,
+      analysis: !!analysis[name],
+      missing: missing,
+      levelCount: levels.length,
+      groupable: levels.length >= 2 && levels.length <= 40,
+      levels: levels.length <= 40 ? levels : []
+    };
+  });
+}
+
+function sendCorrelationChild(message) {
+  if (!hubCorrelationResultsDialog) return;
+  try {
+    hubCorrelationResultsDialog.messageChild(JSON.stringify(message));
+  } catch (e) {
+    console.warn("Correlation dialog message failed", e);
+  }
+}
+
+function sendCorrelationSnapshotMeta() {
+  var snap = hubCorrelationSnapshot;
+  if (!snap || !snap.rows || !snap.rows.length) {
+    sendCorrelationChild({ type: "CORRELATION_SNAPSHOT_META", ok: false });
+    return;
+  }
+  sendCorrelationChild({
+    type: "CORRELATION_SNAPSHOT_META",
+    ok: true,
+    analysisId: snap.id,
+    address: snap.address,
+    method: snap.method,
+    rowCount: snap.rows.length,
+    retainedAt: snap.retainedAt,
+    analysisColumns: snap.analysisColumns,
+    columns: hubColumnMeta(snap)
+  });
+}
+
+function computeGroupedCorrelations(msg) {
+  var snap = hubCorrelationSnapshot;
+  if (!snap || !snap.rows || !msg || msg.analysisId !== snap.id) {
+    return { type: "GROUPED_CORRELATION_RESULTS", ok: false };
+  }
+  var groupName = msg.groupVariable;
+  var groupIdx = snap.columnNames.indexOf(groupName);
+  if (groupIdx < 0) return { type: "GROUPED_CORRELATION_RESULTS", ok: false, error: "missing-group" };
+  var included = Array.isArray(msg.includedLevels) && msg.includedLevels.length
+    ? msg.includedLevels.map(String)
+    : null;
+  var buckets = {};
+  var allIndexes = [];
+  for (var r = 0; r < snap.rows.length; r++) {
+    var level = hubLevelKey(snap.rows[r][groupIdx]);
+    if (included && included.indexOf(level) === -1) continue;
+    allIndexes.push(r);
+    if (!buckets[level]) buckets[level] = [];
+    buckets[level].push(r);
+  }
+  var groups = Object.keys(buckets).map(function (level) {
+    return { group: level, n: buckets[level].length };
+  }).sort(function (a, b) {
+    return String(a.group).localeCompare(String(b.group), undefined, { numeric: true });
+  });
+  var cols = snap.analysisColumns.filter(function (name) { return snap.columnNames.indexOf(name) >= 0; });
+  var method = msg.method || snap.method || "pearson";
+  var pairs = [];
+  for (var i = 0; i < cols.length; i++) {
+    for (var j = i + 1; j < cols.length; j++) {
+      var ia = snap.columnNames.indexOf(cols[i]);
+      var ib = snap.columnNames.indexOf(cols[j]);
+      var overallVals = hubPairColumns(snap.rows, allIndexes, ia, ib);
+      var overall = hubCorrelate(overallVals.xs, overallVals.ys, method);
+      var groupResults = groups.map(function (g) {
+        var vals = hubPairColumns(snap.rows, buckets[g.group], ia, ib);
+        var result = hubCorrelate(vals.xs, vals.ys, method);
+        return { group: g.group, r: result.r, p: result.p, n: result.n };
+      });
+      pairs.push({
+        pair: cols[i] + "–" + cols[j],
+        varA: cols[i],
+        varB: cols[j],
+        overall: overall,
+        groupResults: groupResults
+      });
+    }
+  }
+  return {
+    type: "GROUPED_CORRELATION_RESULTS",
+    ok: true,
+    analysisId: snap.id,
+    method: method,
+    groupVariable: groupName,
+    rowCount: allIndexes.length,
+    groups: groups,
+    pairs: pairs
+  };
+}
+
+function samplePointIndexes(count, limit, seed) {
+  var n = count;
+  var take = Math.min(limit, n);
+  var randState = seed >>> 0;
+  function nextRand() {
+    randState = (randState + 0x6D2B79F5) | 0;
+    var t = Math.imul(randState ^ (randState >>> 15), 1 | randState);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  var order = new Array(n);
+  for (var i = 0; i < n; i++) order[i] = i;
+  for (var k = 0; k < take; k++) {
+    var j = k + Math.floor(nextRand() * (n - k));
+    var swap = order[k];
+    order[k] = order[j];
+    order[j] = swap;
+  }
+  return order.slice(0, take);
+}
+
+function computeGroupedScatterSample(msg) {
+  var snap = hubCorrelationSnapshot;
+  if (!snap || !snap.rows || !msg || msg.analysisId !== snap.id) {
+    return { type: "GROUPED_SCATTER_SAMPLE", ok: false };
+  }
+  var groupIdx = snap.columnNames.indexOf(msg.groupVariable);
+  var colA = snap.columnNames.indexOf(msg.varA);
+  var colB = snap.columnNames.indexOf(msg.varB);
+  if (groupIdx < 0 || colA < 0 || colB < 0) return { type: "GROUPED_SCATTER_SAMPLE", ok: false };
+  var limit = Math.max(200, Math.min(2000, msg.limit || 2000));
+  var included = Array.isArray(msg.includedLevels) && msg.includedLevels.length ? msg.includedLevels.map(String) : null;
+  var buckets = { __all: [] };
+  for (var r = 0; r < snap.rows.length; r++) {
+    var row = snap.rows[r];
+    var a = hubToNumber(row[colA]);
+    var b = hubToNumber(row[colB]);
+    if (a == null || b == null) continue;
+    var level = hubLevelKey(row[groupIdx]);
+    if (included && included.indexOf(level) === -1) continue;
+    buckets.__all.push([a, b]);
+    if (!buckets[level]) buckets[level] = [];
+    buckets[level].push([a, b]);
+  }
+  function take(points, salt) {
+    var idx = samplePointIndexes(points.length, limit, (msg.seed >>> 0) ^ salt);
+    var out = new Array(idx.length);
+    for (var i = 0; i < idx.length; i++) out[i] = points[idx[i]];
+    return { shown: out.length, total: points.length, points: out };
+  }
+  var seed = 20260927;
+  var text = String(snap.id) + "|" + msg.varA + "|" + msg.varB;
+  for (var c = 0; c < text.length; c++) seed = Math.imul(seed ^ text.charCodeAt(c), 16777619);
+  msg.seed = seed >>> 0;
+  var groups = Object.keys(buckets).filter(function (key) { return key !== "__all"; }).sort(function (a, b) {
+    return String(a).localeCompare(String(b), undefined, { numeric: true });
+  }).map(function (level, index) {
+    var sample = take(buckets[level], index + 1);
+    return { group: level, n: sample.total, shown: sample.shown, points: sample.points };
+  });
+  var overall = take(buckets.__all, 0);
+  return {
+    type: "GROUPED_SCATTER_SAMPLE",
+    ok: true,
+    analysisId: snap.id,
+    varA: msg.varA,
+    varB: msg.varB,
+    seed: msg.seed,
+    overall: overall,
+    groups: groups
+  };
+}
+
 function sendHubCorrelationResultsData() {
   if (!hubCorrelationResultsDialog || !hubCorrelationMatrixData) return;
   var m = hubCorrelationMatrixData;
+  var snap = hubCorrelationSnapshot;
   hubCorrelationResultsDialog.messageChild(JSON.stringify({
     type: "CORRELATION_DATA",
     payload: {
+      analysisId: snap && snap.id,
       data: m.data,
       headers: m.headers,
       selectedVariables: m.selectedVariables,
@@ -1957,6 +2245,7 @@ function openHubCorrelationResultsAt(dialogUrl) {
           setTimeout(function () { openHubCorrelationResultsAt(next); }, 120);
           return;
         }
+        releaseHubCorrelationSnapshot();
         finishHubCorrelationFlow();
       };
       if (window.StatisticoDialogHost) {
@@ -1966,6 +2255,9 @@ function openHubCorrelationResultsAt(dialogUrl) {
         try {
           var msg = JSON.parse(arg.message || "{}");
           if (msg.action === "ready") sendHubCorrelationResultsData();
+          else if (msg.action === "requestCorrelationSnapshotMeta") sendCorrelationSnapshotMeta();
+          else if (msg.action === "requestGroupedCorrelations") sendCorrelationChild(computeGroupedCorrelations(msg));
+          else if (msg.action === "requestGroupedScatterSample") sendCorrelationChild(computeGroupedScatterSample(msg));
           else if (msg.action === "switchView" && msg.view) {
             queueHubCorrelationViewSwitch(msg.view);
           } else if (msg.action === "close" || msg.action === "closeDialog") {
@@ -2006,8 +2298,8 @@ function openCorrelationResultsFromHub(runData) {
     finishHubCorrelationFlow();
     return;
   }
-  hubCorrelationMatrixData = matrixData;
-  try { sessionStorage.setItem("correlationMatrixData", JSON.stringify(matrixData)); } catch (e) {}
+  retainHubCorrelationSnapshot(matrixData);
+  try { sessionStorage.setItem("correlationAnalysisId", hubCorrelationSnapshot ? hubCorrelationSnapshot.id : ""); } catch (e) {}
   openHubCorrelationResultsAt(getDialogsBaseUrl() + "correlations/correlation-matrix-v2.html?v=" + Date.now());
 }
 
@@ -2926,6 +3218,7 @@ function dismissAllHubDialogs() {
   hubPendingCorrelationRunData = null;
   hubPendingCorrelationViewUrl = null;
   hubCorrelationMatrixData = null;
+  hubCorrelationSnapshot = null;
   hubParetoConfigDialog = null;
   hubParetoResultsDialog = null;
   hubBuilderDialog = null;

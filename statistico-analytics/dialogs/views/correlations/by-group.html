@@ -1076,6 +1076,10 @@
     let sourceHeaders = [];
     let analysisHeaders = [];
     let sourceRows = [];
+    let columnMeta = [];
+    let remoteSnapshot = null;
+    let useRemoteSnapshot = false;
+    let pendingScatter = null;
     let groupIndex = null;
     let previewGroupIndex = null;
     let previewLevels = [];
@@ -1206,6 +1210,9 @@
     }
 
     function getLevelCounts(idx) {
+      if ((!sourceRows || !sourceRows.length) && columnMeta[idx] && Array.isArray(columnMeta[idx].levels)) {
+        return columnMeta[idx].levels.slice();
+      }
       const counts = new Map();
       sourceRows.forEach((row) => {
         const key = levelKey(rowValue(row, idx, sourceHeaders[idx]));
@@ -1246,10 +1253,28 @@
       return ensureLevelSelection(idx)[level] !== false;
     }
 
-    function setEmpty(message) {
+    function setEmpty(message, busy) {
       document.getElementById('emptyState').style.display = 'block';
-      document.getElementById('emptyState').innerHTML = `<i class="fa-solid fa-sitemap"></i>${escapeHtml(message)}`;
+      const icon = busy ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-layer-group';
+      document.getElementById('emptyState').innerHTML = `<i class="${icon}"></i>${escapeHtml(message)}`;
       document.getElementById('mainContent').style.display = 'none';
+    }
+
+    function setHeaderCount(n) {
+      const show = Number(n) > 0;
+      if (typeof StatisticoHeader !== 'undefined') StatisticoHeader.sampleSize = show ? Number(n) : 0;
+      const el = document.getElementById('headerSampleSize');
+      if (el) el.textContent = show ? `(n=${Number(n).toLocaleString()})` : '';
+    }
+
+    function canMessageParent() {
+      return typeof Office !== 'undefined' && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function';
+    }
+
+    function postParent(payload) {
+      if (!canMessageParent()) return false;
+      Office.context.ui.messageParent(JSON.stringify(payload));
+      return true;
     }
 
     function populateGroupChoices() {
@@ -1275,6 +1300,7 @@
 
     function countMissingGroupValues() {
       if (!isValidGroupIndex(groupIndex)) return 0;
+      if ((!sourceRows || !sourceRows.length) && columnMeta[groupIndex]) return columnMeta[groupIndex].missing || 0;
       return sourceRows.reduce((sum, row) => {
         const raw = rowValue(row, groupIndex, sourceHeaders[groupIndex]);
         return sum + (raw === null || raw === undefined || raw === '' ? 1 : 0);
@@ -1561,7 +1587,7 @@
     function openGroupDialog() {
       if (!sourceHeaders.length) return;
       applySelectionToken += 1;
-      if (!isValidGroupIndex(groupIndex)) {
+      if (!useRemoteSnapshot && !isValidGroupIndex(groupIndex)) {
         const fallback = findDefaultGroupIndex();
         if (isValidGroupIndex(fallback)) {
           groupIndex = Number(fallback);
@@ -1977,6 +2003,23 @@
     function openScatterPopup(varA, varB) {
       const row = tableRows.find((item) => item.varA === varA && item.varB === varB);
       if (!row) return;
+      if (useRemoteSnapshot) {
+        pendingScatter = { varA, varB, row };
+        document.getElementById('scatterDialogTitle').textContent = `${varA} vs ${varB}`;
+        document.getElementById('scatterDialogSubtitle').textContent = 'Loading a sample of points…';
+        document.getElementById('scatterDialog').classList.add('is-visible');
+        const levels = getLevelCounts(groupIndex).filter((item) => isLevelIncluded(groupIndex, item.level)).map((item) => item.level);
+        postParent({
+          action: 'requestGroupedScatterSample',
+          analysisId: remoteSnapshot.id,
+          groupVariable: sourceHeaders[groupIndex],
+          varA,
+          varB,
+          includedLevels: levels,
+          limit: 2000
+        });
+        return;
+      }
       const panels = [{
         label: 'Overall',
         points: extractPairPoints(sourceRows, varA, varB),
@@ -2913,7 +2956,11 @@
     }
 
     function renderByGroup() {
-      if (!isValidGroupIndex(groupIndex)) return setEmpty('Choose a grouping column to compare correlations across levels.');
+      if (useRemoteSnapshot) {
+        requestRemoteGrouped();
+        return;
+      }
+      if (!isValidGroupIndex(groupIndex)) return setEmpty('Choose a grouping variable.');
       activeGroups = buildIncludedGroups();
       if (!activeGroups.length) return setEmpty('No rows remain for the selected group levels. Adjust level filters or the row filter.');
 
@@ -2956,9 +3003,12 @@
 
     function syncHeaderSample() {
       if (typeof StatisticoHeader === 'undefined') return;
-      StatisticoHeader.sampleSize = sourceRows.length;
+      const n = useRemoteSnapshot && remoteSnapshot ? remoteSnapshot.rowCount : sourceRows.length;
+      if (!n) return;
+      StatisticoHeader.sampleSize = n;
       StatisticoHeader.variableName = `${analysisHeaders.length} Variables · By Group`;
       if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
+      setHeaderCount(n);
     }
 
     function corrSimNotice() {
@@ -3089,6 +3139,124 @@
       return false;
     }
 
+    function unavailableMessage() {
+      return 'The original rows are no longer available; select the Excel range again. Your correlation matrix remains available.';
+    }
+
+    function includedLevelsForRequest() {
+      return getLevelCounts(groupIndex)
+        .filter((item) => isLevelIncluded(groupIndex, item.level))
+        .map((item) => item.level);
+    }
+
+    function requestRemoteGrouped() {
+      if (!remoteSnapshot) return setEmpty(unavailableMessage());
+      if (!isValidGroupIndex(groupIndex)) return setEmpty('Choose a grouping variable.');
+      setEmpty('Loading grouped correlations…', true);
+      postParent({
+        action: 'requestGroupedCorrelations',
+        analysisId: remoteSnapshot.id,
+        method: corrType,
+        groupVariable: sourceHeaders[groupIndex],
+        includedLevels: includedLevelsForRequest()
+      });
+    }
+
+    function paintGroupedResults() {
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'flex';
+      document.getElementById('metricPairs').textContent = getFilteredRows().length;
+      document.getElementById('metricGroups').textContent = activeGroups.length;
+      document.getElementById('metricGroupCol').textContent = sourceHeaders[groupIndex] || '—';
+      document.getElementById('metricRows').textContent = remoteSnapshot ? remoteSnapshot.rowCount : sourceRows.length;
+      renderTable();
+      renderCorrSimilarity();
+      registerHeaderActions();
+      syncHeaderSample();
+      showCorrByGroupPanel(corrByGroupPanel);
+      syncByGroupStandard();
+      try { StatisticoHeader._renderUnivariateResultsTabs(); } catch (_e) {}
+    }
+
+    function applySnapshotMeta(msg) {
+      if (!msg || !msg.ok) {
+        useRemoteSnapshot = false;
+        remoteSnapshot = null;
+        if (!tryLoadStored()) {
+          setHeaderCount(null);
+          setEmpty(unavailableMessage());
+        }
+        return;
+      }
+      useRemoteSnapshot = true;
+      remoteSnapshot = msg;
+      columnMeta = msg.columns || [];
+      sourceHeaders = columnMeta.map((col) => col.name);
+      analysisHeaders = (msg.analysisColumns || []).slice();
+      sourceRows = [];
+      corrType = msg.method || corrType;
+      const typeSelect = document.getElementById('corrTypeSelect');
+      if (typeSelect && msg.method) typeSelect.value = msg.method;
+      const note = document.getElementById('subtitle');
+      if (note) {
+        note.hidden = false;
+        note.textContent = 'Using the rows captured for this correlation' + (msg.address ? ` (${msg.address})` : '') + '. Not a new read of the sheet.';
+      }
+      setHeaderCount(msg.rowCount);
+      setEmpty('Choose a grouping variable.');
+      openGroupDialog();
+    }
+
+    function applyRemoteGrouped(msg) {
+      if (!msg || !msg.ok) {
+        setHeaderCount(remoteSnapshot && remoteSnapshot.rowCount);
+        return setEmpty(unavailableMessage());
+      }
+      activeGroups = (msg.groups || []).map((g) => ({ group: g.group, n: g.n, rows: [] }));
+      tableRows = msg.pairs || [];
+      paintGroupedResults();
+    }
+
+    function applyRemoteScatter(msg) {
+      if (!pendingScatter || !msg || !msg.ok || msg.varA !== pendingScatter.varA || msg.varB !== pendingScatter.varB) return;
+      const row = pendingScatter.row;
+      const panels = [{
+        label: 'Overall',
+        points: (msg.overall && msg.overall.points) || [],
+        stats: row.overall,
+        variant: 'overall'
+      }];
+      (msg.groups || []).forEach((g, i) => {
+        const match = (row.groupResults || []).find((item) => item.group === g.group);
+        panels.push({
+          label: groupLevelWithN(g.group, g.n),
+          points: g.points || [],
+          stats: match || { r: NaN, p: null, n: g.n },
+          variant: 'group'
+        });
+      });
+      scatterPopupState = {
+        panels,
+        varA: msg.varA,
+        varB: msg.varB,
+        combined: scatterPopupState.combined,
+        hiddenKeys: { overall: true }
+      };
+      const shown = msg.overall ? msg.overall.shown : 0;
+      const total = msg.overall ? msg.overall.total : 0;
+      document.getElementById('scatterDialogSubtitle').textContent =
+        `${corrType} · ${sourceHeaders[groupIndex] || 'group'} · showing ${shown.toLocaleString()} of ${total.toLocaleString()} complete pairs`;
+      renderScatterDialogContent();
+    }
+
+    function onParentMessage(arg) {
+      let msg;
+      try { msg = JSON.parse(arg.message || '{}'); } catch (_e) { return; }
+      if (msg.type === 'CORRELATION_SNAPSHOT_META') applySnapshotMeta(msg);
+      else if (msg.type === 'GROUPED_CORRELATION_RESULTS') applyRemoteGrouped(msg);
+      else if (msg.type === 'GROUPED_SCATTER_SAMPLE') applyRemoteScatter(msg);
+    }
+
     function boot() {
       console.log('[by-group] boot', document.body && document.body.getAttribute('data-page-version'));
       bindScatterCombinedToggle();
@@ -3100,8 +3268,22 @@
       if (window.StatisticoByGroup) {
         window.StatisticoByGroup.applyPageTitles();
       }
+      setHeaderCount(null);
+      setEmpty('Loading the analysis…', true);
+      if (canMessageParent()) {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage);
+        postParent({ action: 'requestCorrelationSnapshotMeta' });
+        setTimeout(() => {
+          if (!remoteSnapshot && !sourceRows.length) {
+            setHeaderCount(null);
+            setEmpty(unavailableMessage());
+          }
+        }, 4000);
+        return;
+      }
       if (!tryLoadStored()) {
-        setEmpty('Run a correlation analysis first, then open Correlations by Group.');
+        setHeaderCount(null);
+        setEmpty(unavailableMessage());
       }
     }
 
@@ -3112,14 +3294,12 @@
       boot();
     }
 
-    if (document.readyState === 'loading') {
+    if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
+      try { Office.onReady(bootOnce); } catch (_officeErr) { bootOnce(); }
+    } else if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', bootOnce, { once: true });
     } else {
       bootOnce();
-    }
-
-    if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
-      try { Office.onReady(bootOnce); } catch (_officeErr) { bootOnce(); }
     }
 
     window.openGroupDialog = openGroupDialog;

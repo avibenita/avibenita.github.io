@@ -3102,7 +3102,8 @@ function openContingencyConfigFromHub() {
     onModel: function (msg) {
       var data = msg.payload || msg.data || {};
       var spec = (data && data.spec) ? data.spec : data;
-      sessionStorage.setItem("contingencyModelSpec", JSON.stringify(spec || {}));
+      window.__hubContingencySpec = spec || {};
+      try { sessionStorage.setItem("contingencyModelSpec", JSON.stringify(window.__hubContingencySpec)); } catch (e) {}
     },
     hubResultsKey: "contingency",
     nextDelayMs: 450,

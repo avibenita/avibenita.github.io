@@ -87,8 +87,9 @@ function sendContingencyDialogData() {
   }));
 }
 
-function handleContingencyModel(spec) {
-  sessionStorage.setItem('contingencyModelSpec', JSON.stringify(spec || {}));
+  function handleContingencyModel(spec) {
+  window.__hubContingencySpec = spec || {};
+  try { sessionStorage.setItem('contingencyModelSpec', JSON.stringify(window.__hubContingencySpec)); } catch (_specErr) {}
   var range = getContingencyRangeValues();
   if (!range) return;
   var headers = range.values[0];
@@ -96,13 +97,20 @@ function handleContingencyModel(spec) {
   try { sessionStorage.setItem('contingencySource', JSON.stringify({ headers: headers, rows: rows })); } catch (_e) {}
   ensureContingencyEngine(function () {
     var bundle = buildContingencyBundle(headers, rows, spec);
-    bundle.source = { headers: headers, rows: rows };
     openContingencyResultsDialog(bundle);
   });
 }
 
+var contingencyLiveBundle = null;
+
+function rememberContingencyBundle(bundle) {
+  contingencyLiveBundle = slimContingencyBundle(bundle);
+  try { sessionStorage.setItem('contingencyBundle', JSON.stringify(contingencyLiveBundle)); } catch (_e) {}
+  return contingencyLiveBundle;
+}
+
 function openContingencyResultsDialog(bundle) {
-  sessionStorage.setItem('contingencyBundle', JSON.stringify(bundle));
+  rememberContingencyBundle(bundle);
   var url = getContingencyDialogsBaseUrl() + 'contingency/contingency-results.html?v=' + Date.now();
   Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.RESULTS, function (result) {
     if (result.status === Office.AsyncResultStatus.Failed) {
@@ -132,11 +140,24 @@ function slimContingencyBundle(bundle) {
   if (!bundle || typeof bundle !== 'object') return bundle;
   var slim = Object.assign({}, bundle);
   delete slim.source;
+  var viewN = Math.max(
+    Array.isArray(slim.allViewRows) ? slim.allViewRows.length : 0,
+    Array.isArray(slim.usedViewRows) ? slim.usedViewRows.length : 0
+  );
+  if (viewN > 8000) {
+    delete slim.allViewRows;
+    delete slim.usedViewRows;
+  }
   return slim;
 }
 
 function contingencyViewPayload(bundle) {
   if (!bundle || typeof bundle !== 'object') return null;
+  var viewN = Math.max(
+    Array.isArray(bundle.allViewRows) ? bundle.allViewRows.length : 0,
+    Array.isArray(bundle.usedViewRows) ? bundle.usedViewRows.length : 0
+  );
+  if (viewN > 8000) return null;
   var headers = bundle.viewHeaders || [bundle.rowVar, bundle.colVar].filter(Boolean);
   var freqName = bundle.frequencyColumn || bundle.weightVar;
   if (freqName && headers.indexOf(freqName) < 0) headers = headers.concat([freqName]);
@@ -149,10 +170,11 @@ function contingencyViewPayload(bundle) {
 
 function sendContingencyBundle() {
   if (!contingencyResultsDialog) return;
-  var bundleStr = sessionStorage.getItem('contingencyBundle');
-  if (!bundleStr) return;
-  var payload = null;
-  try { payload = JSON.parse(bundleStr); } catch (_e) { return; }
+  var payload = contingencyLiveBundle;
+  if (!payload) {
+    try { payload = JSON.parse(sessionStorage.getItem('contingencyBundle') || 'null'); } catch (_e) { payload = null; }
+  }
+  if (!payload) return;
   var viewData = contingencyViewPayload(payload);
   try {
     contingencyResultsDialog.messageChild(JSON.stringify({
@@ -175,7 +197,7 @@ function sendContingencyBundle() {
   if (!source) {
     try { source = JSON.parse(sessionStorage.getItem('contingencySource') || 'null'); } catch (_e4) { source = null; }
   }
-  if (source && source.headers && source.rows) {
+  if (source && source.headers && source.rows && source.rows.length <= 8000) {
     setTimeout(function () {
       if (!contingencyResultsDialog) return;
       try {
@@ -196,14 +218,14 @@ function sendContingencyBundle() {
     return fn(gr);
   };
 })('contingency', function (gr) {
-  var spec = {};
-  try { spec = JSON.parse(sessionStorage.getItem('contingencyModelSpec') || '{}'); } catch (_e) {}
+  var spec = window.__hubContingencySpec || {};
+  if (!spec.rowVar) {
+    try { spec = JSON.parse(sessionStorage.getItem('contingencyModelSpec') || '{}'); } catch (_e) { spec = {}; }
+  }
   var headers = gr.values[0];
   var rows = gr.values.slice(1);
-  try { sessionStorage.setItem('contingencySource', JSON.stringify({ headers: headers, rows: rows })); } catch (_e2) {}
   ensureContingencyEngine(function () {
     var bundle = buildContingencyBundle(headers, rows, spec);
-    bundle.source = { headers: headers, rows: rows };
     openContingencyResultsDialog(bundle);
   });
   return true;

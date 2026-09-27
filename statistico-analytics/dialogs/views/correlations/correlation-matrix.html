@@ -899,6 +899,29 @@
       border-radius: 99px;
     }
 
+    .scatter-chart-status {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(14, 20, 27, 0.78);
+      color: var(--text-secondary);
+      font-size: 13px;
+      text-align: center;
+      padding: 12px;
+    }
+
+    .scatter-chart-status[hidden] { display: none; }
+
+    .scatter-chart-status i {
+      font-size: 28px;
+      color: var(--accent-1);
+    }
+
     .scatter-stats {
       display: grid;
       grid-template-columns: repeat(4, minmax(120px, 1fr));
@@ -1220,7 +1243,12 @@
       <div id="scatterProgress" class="scatter-progress" hidden>
         <div id="scatterProgressFill" class="scatter-progress-fill"></div>
       </div>
-      <div id="scatterChart" class="scatter-chart"></div>
+      <div id="scatterChart" class="scatter-chart">
+        <div id="scatterChartStatus" class="scatter-chart-status" hidden>
+          <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+          <span id="scatterChartStatusText">Drawing the chart…</span>
+        </div>
+      </div>
       <div class="scatter-controls">
         <div class="scatter-panel">
           <div class="scatter-panel-title"><i class="fas fa-sliders-h"></i>Axis Controls</div>
@@ -1228,21 +1256,21 @@
             <div class="axis-row">
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>X Min</span><span id="xMinVal">--</span></div>
-                <input type="range" id="xMinRange" oninput="updateAxisRange('x','min', this.value)">
+                <input type="range" id="xMinRange" oninput="previewAxisRange('x','min', this.value)" onchange="commitAxisRange()">
               </div>
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>X Max</span><span id="xMaxVal">--</span></div>
-                <input type="range" id="xMaxRange" oninput="updateAxisRange('x','max', this.value)">
+                <input type="range" id="xMaxRange" oninput="previewAxisRange('x','max', this.value)" onchange="commitAxisRange()">
               </div>
             </div>
             <div class="axis-row">
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>Y Min</span><span id="yMinVal">--</span></div>
-                <input type="range" id="yMinRange" oninput="updateAxisRange('y','min', this.value)">
+                <input type="range" id="yMinRange" oninput="previewAxisRange('y','min', this.value)" onchange="commitAxisRange()">
               </div>
               <div class="scatter-slider">
                 <div class="scatter-slider-header"><span>Y Max</span><span id="yMaxVal">--</span></div>
-                <input type="range" id="yMaxRange" oninput="updateAxisRange('y','max', this.value)">
+                <input type="range" id="yMaxRange" oninput="previewAxisRange('y','max', this.value)" onchange="commitAxisRange()">
               </div>
             </div>
           </div>
@@ -2012,25 +2040,30 @@
       return;
     }
 
-    // Transition: hide loading, show main content
-    document.getElementById('loadingMessage').style.display = 'none';
-    const mc = document.getElementById('mainContent');
-    mc.style.display   = 'flex';
-    mc.style.flex      = '1';
-    mc.style.minHeight = '0';
-    mc.style.flexDirection = 'column';
+    // Keep the spinner up until the matrix is actually built.
+    const loading = document.getElementById('loadingMessage');
+    const loadingText = loading ? loading.querySelector('p') : null;
+    const rowCount = (correlationData.data && correlationData.data.length) || 0;
+    if (loadingText) loadingText.textContent = 'Computing correlations for ' + rowCount.toLocaleString() + ' rows…';
 
-    try {
-      // Build all tabs
-      buildCorrelationMatrix();
-      updateCorrelationHeaderSummary();
-      setMatrixView(currentView);
-      buildExploreTab();
-    } catch (e) {
-      console.error('Correlation render failed:', e);
-      document.getElementById('loadingMessage').style.display = 'flex';
-      showCorrelationLoadError('Correlation data loaded, but rendering failed. Please reload or re-run the analysis.');
-    }
+    const mc = document.getElementById('mainContent');
+    setTimeout(function () {
+      try {
+        buildCorrelationMatrix();
+        updateCorrelationHeaderSummary();
+        setMatrixView(currentView);
+        buildExploreTab();
+        if (loading) loading.style.display = 'none';
+        mc.style.display   = 'flex';
+        mc.style.flex      = '1';
+        mc.style.minHeight = '0';
+        mc.style.flexDirection = 'column';
+      } catch (e) {
+        console.error('Correlation render failed:', e);
+        if (loading) loading.style.display = 'flex';
+        showCorrelationLoadError('Correlation data loaded, but rendering failed. Please reload or re-run the analysis.');
+      }
+    }, 30);
   }
 
   /* ════════════════════════════════════════════
@@ -2739,6 +2772,24 @@
     if (note) note.textContent = message || '';
   }
 
+  function setScatterChartBusy(message) {
+    const el = document.getElementById('scatterChartStatus');
+    const text = document.getElementById('scatterChartStatusText');
+    if (!el) return;
+    if (!message) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    if (text) text.textContent = message;
+  }
+
+  function finishScatterChartBusy() {
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { setScatterChartBusy(''); });
+    });
+  }
+
   function setScatterProgress(fraction) {
     const wrap = document.getElementById('scatterProgress');
     const fill = document.getElementById('scatterProgressFill');
@@ -2794,7 +2845,7 @@
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
 
-    function showChart(points, tracking) {
+    function showChart(points) {
       scatterState.rawPoints = points;
       scatterState.xVar      = rowVar;
       scatterState.yVar      = colVar;
@@ -2810,18 +2861,20 @@
 
       const drawCount = Math.min(points.length, SCATTER_DRAW_LIMIT);
       setScatterDrawNote(describeScatterSample(points.length, drawCount));
-      if (tracking) setScatterProgress(0.92);
+      setScatterProgress(null);
+      setScatterChartBusy('Drawing ' + drawCount.toLocaleString() + ' points…');
       setTimeout(function () {
         resetScatterControls();
         refreshScatter();
         setScatterProgress(null);
+        finishScatterChartBusy();
       }, 40);
     }
 
     const cached = scatterPointsCache.get(cacheKey);
     if (cached) {
       setScatterDrawNote(describeScatterSample(cached.length, Math.min(cached.length, SCATTER_DRAW_LIMIT)));
-      setTimeout(function () { showChart(cached, false); }, 30);
+      setTimeout(function () { showChart(cached); }, 30);
       return;
     }
 
@@ -2834,7 +2887,7 @@
         setScatterDrawNote('Counting complete pairs… ' + index.toLocaleString() + ' of ' + total.toLocaleString() + ' rows');
       }, function (points) {
         scatterPointsCache.set(cacheKey, points);
-        showChart(points, true);
+        showChart(points);
       });
     }, 30);
   }
@@ -2844,6 +2897,7 @@
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
     setScatterProgress(null);
+    setScatterChartBusy('');
   }
 
   function resetScatterControls() {
@@ -2989,7 +3043,6 @@
     setupAxisRange('xMaxRange', 'xMaxVal', minX, maxX, maxX);
     setupAxisRange('yMinRange', 'yMinVal', minY, maxY, minY);
     setupAxisRange('yMaxRange', 'yMaxVal', minY, maxY, maxY);
-    updateChartExtremes();
   }
 
   function setupAxisRange(id, labelId, min, max, value) {
@@ -2998,14 +3051,17 @@
     document.getElementById(labelId).textContent = Number(value).toFixed(2);
   }
 
-  function updateAxisRange(axis, which, value) {
+  function previewAxisRange(axis, which, value) {
     const val = parseFloat(value);
+    if (!scatterState.xRange || !scatterState.yRange || !isFinite(val)) return;
     if (axis === 'x') { scatterState.xRange[which] = val; document.getElementById(which==='min' ? 'xMinVal' : 'xMaxVal').textContent = val.toFixed(2); }
     else               { scatterState.yRange[which] = val; document.getElementById(which==='min' ? 'yMinVal' : 'yMaxVal').textContent = val.toFixed(2); }
+  }
+
+  function commitAxisRange() {
     updateScatterAdjustmentIndicator();
     updateChartExtremes();
-    if (scatterState.axisStatsTimer) clearTimeout(scatterState.axisStatsTimer);
-    scatterState.axisStatsTimer = setTimeout(recomputeVisibleStats, 180);
+    recomputeVisibleStats();
   }
 
   function recomputeVisibleStats() {
@@ -3016,17 +3072,12 @@
   }
 
   function updateChartExtremes() {
-    if (!scatterState.chart) return;
-    if (scatterState.extremesFrame) return;
-    scatterState.extremesFrame = requestAnimationFrame(function () {
-      scatterState.extremesFrame = 0;
-      if (!scatterState.chart || !scatterState.xRange || !scatterState.yRange) return;
-      const { min: xMin, max: xMax } = scatterState.xRange;
-      const { min: yMin, max: yMax } = scatterState.yRange;
-      scatterState.chart.xAxis[0].setExtremes(Math.min(xMin, xMax), Math.max(xMin, xMax), false);
-      scatterState.chart.yAxis[0].setExtremes(Math.min(yMin, yMax), Math.max(yMin, yMax), false);
-      scatterState.chart.redraw();
-    });
+    if (!scatterState.chart || !scatterState.xRange || !scatterState.yRange) return;
+    const { min: xMin, max: xMax } = scatterState.xRange;
+    const { min: yMin, max: yMax } = scatterState.yRange;
+    scatterState.chart.xAxis[0].setExtremes(Math.min(xMin, xMax), Math.max(xMin, xMax), false);
+    scatterState.chart.yAxis[0].setExtremes(Math.min(yMin, yMax), Math.max(yMin, yMax), false);
+    scatterState.chart.redraw();
   }
 
   function applyFit(type, pointsOverride = null) {
@@ -3083,7 +3134,11 @@
     else scatterState.yTransform = type;
     updateTransformButtons();
     updateScatterAdjustmentIndicator();
-    refreshScatter();
+    setScatterChartBusy('Updating the chart…');
+    setTimeout(function () {
+      refreshScatter();
+      finishScatterChartBusy();
+    }, 30);
   }
 
   function updateScatterAdjustmentIndicator() {

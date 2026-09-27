@@ -882,6 +882,23 @@
       line-height: 1.45;
     }
 
+    .scatter-progress {
+      height: 6px;
+      margin: 0 0 8px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .scatter-progress[hidden] { display: none; }
+
+    .scatter-progress-fill {
+      height: 100%;
+      width: 0;
+      background: var(--accent-1, #f59e0b);
+      border-radius: 99px;
+    }
+
     .scatter-stats {
       display: grid;
       grid-template-columns: repeat(4, minmax(120px, 1fr));
@@ -1200,6 +1217,9 @@
         <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR2">--</div><div class="scatter-stat-label">R²</div></div>
       </div>
       <p id="scatterDrawNote" class="scatter-draw-note"></p>
+      <div id="scatterProgress" class="scatter-progress" hidden>
+        <div id="scatterProgressFill" class="scatter-progress-fill"></div>
+      </div>
       <div id="scatterChart" class="scatter-chart"></div>
       <div class="scatter-controls">
         <div class="scatter-panel">
@@ -2719,6 +2739,39 @@
     if (note) note.textContent = message || '';
   }
 
+  function setScatterProgress(fraction) {
+    const wrap = document.getElementById('scatterProgress');
+    const fill = document.getElementById('scatterProgressFill');
+    if (!wrap || !fill) return;
+    if (fraction == null) {
+      wrap.hidden = true;
+      fill.style.width = '0%';
+      return;
+    }
+    wrap.hidden = false;
+    fill.style.width = Math.round(Math.max(0, Math.min(1, fraction)) * 100) + '%';
+  }
+
+  function collectScatterPairs(data, rowVar, colVar, onProgress, done) {
+    const total = data.length;
+    const points = [];
+    let index = 0;
+    const chunk = 4000;
+    function step() {
+      const end = Math.min(total, index + chunk);
+      for (; index < end; index++) {
+        const row = data[index];
+        const x = row[rowVar];
+        const y = row[colVar];
+        if (typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y)) points.push([x, y]);
+      }
+      if (onProgress) onProgress(total ? index / total : 1, index, total);
+      if (index < total) setTimeout(step, 0);
+      else done(points);
+    }
+    step();
+  }
+
   function describeScatterSample(total, limit) {
     const totalLabel = total.toLocaleString();
     if (total <= limit) return 'Drawing all ' + totalLabel + ' complete pairs.';
@@ -2737,23 +2790,11 @@
     const cacheKey = rowVar + '__' + colVar;
 
     titleEl.textContent = 'Scatter Plot: ' + rowVar + ' vs ' + colVar;
-    setScatterDrawNote('Counting complete pairs…');
+    setScatterProgress(null);
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
 
-    setTimeout(function () {
-      let points = scatterPointsCache.get(cacheKey);
-      if (!points) {
-        points = [];
-        const data = correlationData.data;
-        for (let i = 0; i < data.length; i++) {
-          const x = data[i][rowVar];
-          const y = data[i][colVar];
-          if (typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y)) points.push([x, y]);
-        }
-        scatterPointsCache.set(cacheKey, points);
-      }
-
+    function showChart(points, tracking) {
       scatterState.rawPoints = points;
       scatterState.xVar      = rowVar;
       scatterState.yVar      = colVar;
@@ -2769,10 +2810,32 @@
 
       const drawCount = Math.min(points.length, SCATTER_DRAW_LIMIT);
       setScatterDrawNote(describeScatterSample(points.length, drawCount));
+      if (tracking) setScatterProgress(0.92);
       setTimeout(function () {
         resetScatterControls();
         refreshScatter();
-      }, 50);
+        setScatterProgress(null);
+      }, 40);
+    }
+
+    const cached = scatterPointsCache.get(cacheKey);
+    if (cached) {
+      setScatterDrawNote(describeScatterSample(cached.length, Math.min(cached.length, SCATTER_DRAW_LIMIT)));
+      setTimeout(function () { showChart(cached, false); }, 30);
+      return;
+    }
+
+    const rowCount = correlationData.data.length;
+    setScatterDrawNote('Counting complete pairs… 0 of ' + rowCount.toLocaleString() + ' rows');
+    setScatterProgress(0);
+    setTimeout(function () {
+      collectScatterPairs(correlationData.data, rowVar, colVar, function (fraction, index, total) {
+        setScatterProgress(fraction * 0.9);
+        setScatterDrawNote('Counting complete pairs… ' + index.toLocaleString() + ' of ' + total.toLocaleString() + ' rows');
+      }, function (points) {
+        scatterPointsCache.set(cacheKey, points);
+        showChart(points, true);
+      });
     }, 30);
   }
 
@@ -2780,6 +2843,7 @@
     const modal = document.getElementById('scatterModal');
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
+    setScatterProgress(null);
   }
 
   function resetScatterControls() {

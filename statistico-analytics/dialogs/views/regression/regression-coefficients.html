@@ -4725,7 +4725,7 @@
   <!-- Loading Overlay -->
   <div class="loading-overlay" id="loadingOverlay">
     <div class="loading-spinner"></div>
-    <div class="loading-text">Computing regression analysis...</div>
+    <div class="loading-text">Loading the regression…</div>
   </div>
 
   <div class="wrap">
@@ -7414,16 +7414,36 @@ ${sectionsHtml}
       });
     }
 
+    var analysisLoadingShownAt = Date.now();
+    var MIN_ANALYSIS_LOADING_MS = 800;
+
+    function showAnalysisLoading(message) {
+      const overlay = document.getElementById('loadingOverlay');
+      if (!overlay) return;
+      const text = overlay.querySelector('.loading-text');
+      if (text && message) text.textContent = message;
+      if (!analysisLoadingShownAt || overlay.classList.contains('hidden')) {
+        analysisLoadingShownAt = Date.now();
+      }
+      overlay.classList.remove('hidden');
+    }
+
+    function hideAnalysisLoading() {
+      const overlay = document.getElementById('loadingOverlay');
+      if (!overlay) return;
+      const elapsed = analysisLoadingShownAt ? (Date.now() - analysisLoadingShownAt) : 0;
+      const wait = Math.max(0, MIN_ANALYSIS_LOADING_MS - elapsed);
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        analysisLoadingShownAt = 0;
+      }, wait);
+    }
+
     // Initialize Office.js
     if (typeof Office !== 'undefined') {
       Office.onReady((info) => {
         console.log('✅ Office.js ready in regression coefficients dialog');
-        
-        // Hide loading overlay initially
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) {
-          loadingOverlay.classList.add('hidden');
-        }
+        showAnalysisLoading('Waiting for the model data…');
         
         // Signal that dialog is ready to receive data
         if (Office.context && Office.context.ui) {
@@ -7494,11 +7514,7 @@ ${sectionsHtml}
         return;
       }
       
-      // Show loading overlay
-      const loadingOverlay = document.getElementById('loadingOverlay');
-      if (loadingOverlay) {
-        loadingOverlay.classList.remove('hidden');
-      }
+      showAnalysisLoading('Computing the regression…');
       
       // Use setTimeout to allow UI to render the loading overlay before heavy computation
       setTimeout(() => {
@@ -7506,9 +7522,7 @@ ${sectionsHtml}
           processRegressionDataInternal();
         } catch (error) {
           console.error('❌ Error processing regression data:', error);
-          if (loadingOverlay) {
-            loadingOverlay.classList.add('hidden');
-          }
+          hideAnalysisLoading();
         }
       }, 50);
     }
@@ -7596,6 +7610,7 @@ ${sectionsHtml}
         console.error('❌ Y variable not found in headers');
         console.error('   Looking for:', y);
         console.error('   Available:', headers);
+        hideAnalysisLoading();
         return;
       }
       
@@ -7768,12 +7783,14 @@ ${sectionsHtml}
             <i class="fa-solid fa-exclamation-triangle"></i> No valid observations after removing missing values
           </td></tr>`;
         }
+        hideAnalysisLoading();
         return;
       }
       
       if (xMatrix.length !== yVector.length) {
         console.error('❌ Length mismatch between X and Y');
         console.error('   X rows:', xMatrix.length, 'Y rows:', yVector.length);
+        hideAnalysisLoading();
         return;
       }
       
@@ -7888,11 +7905,7 @@ ${sectionsHtml}
         // Display results in the UI
         displayRegressionResults(results, y, xn, xc, interactions, interactionColumnNames, interactionInfo);
         
-        // Hide loading overlay after successful computation
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) {
-          loadingOverlay.classList.add('hidden');
-        }
+        hideAnalysisLoading();
         
       } catch (error) {
         console.error('❌ Error computing regression:', error);
@@ -7905,11 +7918,7 @@ ${sectionsHtml}
           </td></tr>`;
         }
         
-        // Hide loading overlay after error
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) {
-          loadingOverlay.classList.add('hidden');
-        }
+        hideAnalysisLoading();
       }
     }
     
@@ -13132,9 +13141,7 @@ ${sectionsHtml}
             StatisticoHeader.updateTitle('Sales Drivers — Linear Regression');
           }
         } catch (_e) {}
-        // Office.onReady normally hides this; in embed/demo mode there is no Office host.
-        var loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        if (typeof showAnalysisLoading === 'function') showAnalysisLoading('Loading the case study…');
         var worker = document.createElement('iframe');
         worker.src = 'regression-demo-worker.html';
         worker.style.display = 'none';

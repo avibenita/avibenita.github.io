@@ -1915,7 +1915,8 @@ function buildHubCorrelationMatrixData(runData, gr) {
     address: (data.data && data.data.address) || (gr && gr.address) || "",
     sourceHeaders: headers,
     sourceRowsAll: rows,
-    sourceRows: rows
+    sourceRows: rows,
+    sampleInfo: data.sample || null
   };
 }
 
@@ -1935,6 +1936,7 @@ function retainHubCorrelationSnapshot(matrixData) {
     method: matrixData.method || "pearson",
     filter: matrixData.rowFilterActive ? { active: true } : null,
     rows: rows,
+    sampleInfo: matrixData.sampleInfo || null,
     retainedAt: Date.now()
   };
   hubCorrelationMatrixData = matrixData;
@@ -2067,7 +2069,8 @@ function sendCorrelationSnapshotMeta() {
     rowCount: snap.rows.length,
     retainedAt: snap.retainedAt,
     analysisColumns: snap.analysisColumns,
-    columns: hubColumnMeta(snap)
+    columns: hubColumnMeta(snap),
+    sample: snap.sampleInfo || null
   });
 }
 
@@ -2219,7 +2222,8 @@ function sendHubCorrelationResultsData() {
       address: m.address,
       sourceHeaders: m.sourceHeaders,
       sourceRowsAll: m.sourceRowsAll,
-      sourceRows: m.sourceRows
+      sourceRows: m.sourceRows,
+      sampleInfo: (snap && snap.sampleInfo) || m.sampleInfo || null
     }
   }));
 }

@@ -160,6 +160,38 @@
     }
     .reg-obs-strip strong { font-weight: 700; }
     .reg-obs-strip .warn { color: #dc2626; font-size: 10px; }
+
+    .sample-proposal {
+      border: 1px solid rgba(249,115,22,.45);
+      border-radius: 8px;
+      background: rgba(249,115,22,.08);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .sample-proposal h3 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--corr-accent);
+    }
+    .sample-proposal p {
+      margin: 0;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--cfg-text);
+    }
+    .sample-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1.35;
+      color: var(--cfg-text);
+    }
+    .sample-choice input { margin-top: 2px; }
   </style>
 </head>
 <body>
@@ -235,6 +267,19 @@
             <span class="warn" id="selectionWarn">Need at least 2</span>
           </div>
 
+          <div class="sample-proposal" id="sampleProposal" hidden>
+            <h3 id="sampleProposalTitle">This range is too large for later views</h3>
+            <p id="sampleProposalBody"></p>
+            <label class="sample-choice">
+              <input type="radio" name="rowScope" id="scopeSample" value="sample" checked>
+              <span id="scopeSampleLabel">Use the sample</span>
+            </label>
+            <label class="sample-choice">
+              <input type="radio" name="rowScope" id="scopeAll" value="all">
+              <span id="scopeAllLabel">Use every row</span>
+            </label>
+          </div>
+
         </div>
       </div>
     </div>
@@ -259,6 +304,10 @@
     var variableStats = {};
     var variableOrder = [];
     var draggedElement = null;
+    var STORAGE_LIMIT = 4500000;
+    var SAMPLE_SEED = 20260927;
+    var SAMPLE_BUDGET = 2800000;
+    var samplePlan = null;
 
     Office.onReady(function() {
       var storedData = sessionStorage.getItem('correlationRawData');
@@ -283,6 +332,9 @@
       });
       document.getElementById('btnAddAllNumeric').addEventListener('click', selectAllNumeric);
       document.getElementById('btnClearAll').addEventListener('click', clearAllSelected);
+      document.querySelectorAll('input[name="rowScope"]').forEach(function(input) {
+        input.addEventListener('change', updateSelectionSummary);
+      });
       Office.context.ui.messageParent(JSON.stringify({ action: 'ready' }));
       setInterval(function() {
         if (correlationData && correlationData.values) return;
@@ -330,6 +382,7 @@
 
       renderVariables();
       renderAssignment();
+      updateSampleProposal(values);
       updateSelectionSummary();
 
       document.getElementById('loadingSpinner').style.display = 'none';
@@ -532,6 +585,13 @@
       var ok = selected >= 2;
       document.getElementById('selectionWarn').style.display = ok ? 'none' : 'inline';
       document.getElementById('btnRun').disabled = !ok;
+      var runLabel = 'Run Correlation Analysis';
+      if (ok && samplePlan && document.getElementById('scopeSample').checked) {
+        runLabel = 'Run on ' + samplePlan.n.toLocaleString() + '-row sample';
+      } else if (ok && samplePlan && document.getElementById('scopeAll').checked) {
+        runLabel = 'Run on all ' + samplePlan.sourceRows.toLocaleString() + ' rows';
+      }
+      document.getElementById('btnRun').innerHTML = '<i class="fa-solid fa-play"></i> ' + runLabel;
       var saveBtn = document.getElementById('btnSaveConfig');
       if (saveBtn) saveBtn.disabled = !ok;
       var loadBtn = document.getElementById('btnLoadPrev');
@@ -570,16 +630,109 @@
       });
     }
 
+    function formatMillions(chars) {
+      return (chars / 1000000).toFixed(1) + ' million';
+    }
+
+    function estimateObjectChars(values) {
+      var headers = values[0] || [];
+      var rows = values.slice(1);
+      if (!rows.length) return 0;
+      var take = Math.min(24, rows.length);
+      var step = Math.max(1, Math.floor(rows.length / take));
+      var total = 0;
+      var counted = 0;
+      for (var i = 0; i < rows.length && counted < take; i += step) {
+        var obj = {};
+        for (var c = 0; c < headers.length; c++) obj[headers[c] || ('Col ' + (c + 1))] = rows[i][c];
+        total += JSON.stringify(obj).length + 1;
+        counted++;
+      }
+      return counted ? Math.round((total / counted) * rows.length) : 0;
+    }
+
+    function proposeSampleSize(rowCount, estimatedChars) {
+      var perRow = estimatedChars / Math.max(1, rowCount);
+      var n = Math.floor(SAMPLE_BUDGET / Math.max(perRow, 1));
+      n = Math.min(5000, rowCount, n);
+      return Math.max(500, n);
+    }
+
+    function updateSampleProposal(values) {
+      var panel = document.getElementById('sampleProposal');
+      var rows = Math.max(0, (values || []).length - 1);
+      var estimated = estimateObjectChars(values || []);
+      var proposed = proposeSampleSize(rows, estimated);
+      if (!rows || estimated <= 3500000 || proposed >= rows) {
+        samplePlan = null;
+        panel.hidden = true;
+        return;
+      }
+      samplePlan = { n: proposed, seed: SAMPLE_SEED, sourceRows: rows, estimatedChars: estimated };
+      panel.hidden = false;
+      document.getElementById('sampleProposalBody').textContent =
+        rows.toLocaleString() + ' rows are about ' + formatMillions(estimated) +
+        ' characters. Later views, including By Group, cannot store a second copy once that passes ' +
+        formatMillions(STORAGE_LIMIT) + ' characters, so they show a reload note. ' +
+        'A random sample of ' + proposed.toLocaleString() + ' rows, drawn without replacement with seed ' +
+        SAMPLE_SEED + ', keeps every column. Correlation, p-value, and N will describe that sample.';
+      document.getElementById('scopeSampleLabel').textContent =
+        'Use the ' + proposed.toLocaleString() + '-row sample (recommended)';
+      document.getElementById('scopeAllLabel').textContent =
+        'Use all ' + rows.toLocaleString() + ' rows. The matrix will run. By Group will not have the rows.';
+    }
+
+    function mulberry32(seed) {
+      var state = seed >>> 0;
+      return function() {
+        state = (state + 0x6D2B79F5) | 0;
+        var t = Math.imul(state ^ (state >>> 15), 1 | state);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function drawSampleRows(values, n, seed) {
+      var header = values[0];
+      var rows = values.slice(1);
+      var take = Math.min(n, rows.length);
+      var rand = mulberry32(seed);
+      var order = new Array(rows.length);
+      for (var i = 0; i < rows.length; i++) order[i] = i;
+      for (var k = 0; k < take; k++) {
+        var j = k + Math.floor(rand() * (rows.length - k));
+        var swap = order[k];
+        order[k] = order[j];
+        order[j] = swap;
+      }
+      var picked = order.slice(0, take).sort(function(a, b) { return a - b; });
+      var out = [header];
+      for (var p = 0; p < picked.length; p++) out.push(rows[picked[p]]);
+      return out;
+    }
+
     function runAnalysis() {
       var selectedVars = getSelectedVars();
-      if (selectedVars.length < 2) return;
+      if (selectedVars.length < 2 || !correlationData) return;
+      var values = correlationData.values;
+      var sampleInfo = null;
+      if (samplePlan && document.getElementById('scopeSample').checked) {
+        values = drawSampleRows(correlationData.values, samplePlan.n, samplePlan.seed);
+        sampleInfo = {
+          method: 'random-without-replacement',
+          seed: samplePlan.seed,
+          sampledRows: values.length - 1,
+          sourceRows: samplePlan.sourceRows
+        };
+      }
       Office.context.ui.messageParent(JSON.stringify({
         action: 'runAnalysis',
         data: {
           variables: selectedVars,
           method: 'pearson',
           viewType: 'matrix',
-          data: correlationData
+          sample: sampleInfo,
+          data: { values: values, address: correlationData.address || '' }
         }
       }));
     }

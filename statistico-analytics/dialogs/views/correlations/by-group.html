@@ -3119,6 +3119,14 @@
         sourceRows = payload.data.map((row) => sourceHeaders.map((h) => row[h]));
       }
       if (!sourceRows.length) return setEmpty('No source rows available. Re-run the correlation analysis or clear filters.');
+      const sampleText = describeSample(payload.sampleInfo);
+      if (sampleText) {
+        const note = document.getElementById('subtitle');
+        if (note) {
+          note.hidden = false;
+          note.textContent = sampleText;
+        }
+      }
       populateGroupChoices();
       groupIndex = null;
       updateGroupChoiceLabel();
@@ -3141,6 +3149,13 @@
 
     function unavailableMessage() {
       return 'The original rows are no longer available; select the Excel range again. Your correlation matrix remains available.';
+    }
+
+    function describeSample(info) {
+      if (!info || !info.sampledRows || !info.sourceRows) return '';
+      return 'Results use a random sample of ' + Number(info.sampledRows).toLocaleString() +
+        ' of ' + Number(info.sourceRows).toLocaleString() +
+        ' rows, drawn without replacement (seed ' + info.seed + '). Correlation, p-value, and N describe the sample.';
     }
 
     function includedLevelsForRequest() {
@@ -3200,7 +3215,8 @@
       const note = document.getElementById('subtitle');
       if (note) {
         note.hidden = false;
-        note.textContent = 'Using the rows captured for this correlation' + (msg.address ? ` (${msg.address})` : '') + '. Not a new read of the sheet.';
+        const sampleText = describeSample(msg.sample);
+        note.textContent = sampleText || ('Using the rows captured for this correlation' + (msg.address ? ` (${msg.address})` : '') + '. Not a new read of the sheet.');
       }
       setHeaderCount(msg.rowCount);
       setEmpty('Choose a grouping variable.');
@@ -3271,14 +3287,21 @@
       setHeaderCount(null);
       setEmpty('Loading the analysis…', true);
       if (canMessageParent()) {
-        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage);
-        postParent({ action: 'requestCorrelationSnapshotMeta' });
+        Office.context.ui.addHandlerAsync(
+          Office.EventType.DialogParentMessageReceived,
+          onParentMessage,
+          () => postParent({ action: 'requestCorrelationSnapshotMeta' })
+        );
         setTimeout(() => {
-          if (!remoteSnapshot && !sourceRows.length) {
+          if (!remoteSnapshot && !sourceRows.length) postParent({ action: 'requestCorrelationSnapshotMeta' });
+        }, 1500);
+        setTimeout(() => {
+          if (remoteSnapshot || sourceRows.length) return;
+          if (!tryLoadStored()) {
             setHeaderCount(null);
             setEmpty(unavailableMessage());
           }
-        }, 4000);
+        }, 8000);
         return;
       }
       if (!tryLoadStored()) {

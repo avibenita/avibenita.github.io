@@ -386,8 +386,42 @@
     return parts.a1 || address || "";
   }
 
+  function formatCount(n) {
+    return Number(n).toLocaleString("en-US");
+  }
+
   function unitLabel(n, singular, plural) {
-    return n + " " + (n === 1 ? singular : plural);
+    return formatCount(n) + " " + (n === 1 ? singular : plural);
+  }
+
+  function addressOnly(headline) {
+    var text = headline || "";
+    var sep = text.lastIndexOf(" · ");
+    return sep >= 0 ? text.slice(sep + 3) : text;
+  }
+
+  function syncCompactSummary() {
+    var bar = document.getElementById("hubWdataBar");
+    var summary = document.getElementById("hubDataSummaryText");
+    var summaryBtn = document.getElementById("hubDataSummaryBtn");
+    var warn = document.getElementById("hubDataWarn");
+    var warnCount = document.getElementById("hubDataWarnCount");
+    if (!bar || !summary) return;
+    var addr = (document.getElementById("hubRangeBadgeText") || {}).textContent || "";
+    var issue = (document.getElementById("hubDataIssueText") || {}).textContent || "";
+    var ready = bar.classList.contains("is-ready");
+    var digits = String(issue).replace(/,/g, "").match(/^(\d+)/);
+    var count = digits ? Number(digits[1]) : 0;
+    var label;
+    if (ready) label = "Worksheet data · " + addressOnly(addr);
+    else if (bar.classList.contains("is-error") || /select a range/i.test(addr)) label = "Select data";
+    else label = "Detecting…";
+    summary.textContent = label;
+    if (warn) warn.hidden = !(ready && count > 0);
+    if (warnCount) warnCount.textContent = count > 0 ? formatCount(count) : "";
+    if (summaryBtn) {
+      summaryBtn.setAttribute("aria-label", issue ? label + ", " + issue : label);
+    }
   }
 
   function formatRangeSize(dim) {
@@ -469,6 +503,7 @@
     if (reviewBtn) {
       reviewBtn.setAttribute("aria-label", label ? label + " · Review data" : "Review data");
     }
+    syncCompactSummary();
   }
 
   function setRangeSize(text) {
@@ -572,17 +607,42 @@
     if (okIcon) {
       okIcon.style.display = isError || pending ? "none" : "";
     }
+    if (bar) {
+      bar.classList.toggle("is-error", !!isError);
+      bar.classList.toggle("is-ready", !isError && !pending);
+      if (isError || pending) {
+        bar.classList.toggle("is-open", false);
+        var details = document.getElementById("hubDataDetails");
+        if (details) details.hidden = true;
+        var summaryBtn = document.getElementById("hubDataSummaryBtn");
+        if (summaryBtn) summaryBtn.setAttribute("aria-expanded", "false");
+      }
+    }
     if (isError || pending) {
       setRangeSize("");
       syncDataPrepShortcut("");
     } else updateSourceLabel();
-    if (bar) {
-      bar.classList.toggle("is-error", !!isError);
-      bar.classList.toggle("is-ready", !isError && !pending);
-    }
+    syncCompactSummary();
     if (isError && window.StatisticoGlobalRange) {
       StatisticoGlobalRange.clear();
     }
+  }
+
+  function toggleDataCard(event) {
+    if (event) event.stopPropagation();
+    var bar = document.getElementById("hubWdataBar");
+    if (!bar || !bar.classList.contains("is-ready")) {
+      toggleRangePicker(event);
+      return;
+    }
+    closeRangeInfo();
+    var open = !bar.classList.contains("is-open");
+    bar.classList.toggle("is-open", open);
+    var details = document.getElementById("hubDataDetails");
+    if (details) details.hidden = !open;
+    var summaryBtn = document.getElementById("hubDataSummaryBtn");
+    if (summaryBtn) summaryBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) closeRangePicker();
   }
 
   function toggleRangePicker(event) {
@@ -642,6 +702,7 @@
   window.hubPickRangeMode = pickRangeMode;
   window.hubRefreshGlobalRange = refreshGlobalRange;
   window.hubLoadFromNamedRange = loadFromNamedRange;
+  window.hubToggleDataCard = toggleDataCard;
   window.hubToggleRangePicker = toggleRangePicker;
   window.hubToggleRangeInfo = toggleRangeInfo;
   window.hubCaptureRange = captureRangeForDialog;
@@ -660,8 +721,16 @@
     var customizeBtn = document.getElementById("hubRangeCustomizeBtn");
     var infoBox = document.getElementById("hubRangeInfo");
     var infoBtn = document.getElementById("hubRangeInfoBtn");
-    if (pop && customizeBtn && !pop.contains(ev.target) && !customizeBtn.contains(ev.target)) {
+    var summaryBtn = document.getElementById("hubDataSummaryBtn");
+    var details = document.getElementById("hubDataDetails");
+    var bar = document.getElementById("hubWdataBar");
+    if (pop && customizeBtn && !pop.contains(ev.target) && !customizeBtn.contains(ev.target) && !(summaryBtn && summaryBtn.contains(ev.target))) {
       closeRangePicker();
+    }
+    if (bar && bar.classList.contains("is-open") && details && !details.contains(ev.target) && !(summaryBtn && summaryBtn.contains(ev.target)) && !(pop && pop.contains(ev.target))) {
+      bar.classList.remove("is-open");
+      details.hidden = true;
+      if (summaryBtn) summaryBtn.setAttribute("aria-expanded", "false");
     }
     if (infoBox && infoBtn && !infoBox.contains(ev.target) && !infoBtn.contains(ev.target)) {
       closeRangeInfo();

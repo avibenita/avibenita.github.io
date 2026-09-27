@@ -27,7 +27,12 @@ function makeEl() {
   "hubRangeSizeLabel",
   "hubRangeSourceLabel",
   "hubDataIssueText",
-  "hubDataReviewBtn"
+  "hubDataReviewBtn",
+  "hubDataSummaryText",
+  "hubDataSummaryBtn",
+  "hubDataWarn",
+  "hubDataWarnCount",
+  "hubDataDetails"
 ].forEach(function (id) { elements[id] = makeEl(); });
 
 global.window = global;
@@ -126,6 +131,16 @@ describe("prepare shortcut on the data card", () => {
     expect(document.getElementById("hubDataReviewBtn").getAttribute("aria-label")).toBe(
       "60 records with missing values · Review data"
     );
+    expect(document.getElementById("hubDataSummaryText").textContent).toBe("Worksheet data · A1:J151");
+    expect(document.getElementById("hubDataWarn").hidden).toBe(false);
+    expect(document.getElementById("hubDataWarnCount").textContent).toBe("60");
+  });
+
+  test("labels a missing range as Select data", () => {
+    hub.applyRangeData([["header only"]], "Sheet1!A1:J1");
+    expect(document.getElementById("hubWdataBar").classList.contains("is-ready")).toBe(false);
+    expect(document.getElementById("hubDataSummaryText").textContent).toBe("Select data");
+    expect(document.getElementById("hubDataWarn").hidden).toBe(true);
   });
 
   test("clears the prominent shortcut when the next range is clean", () => {
@@ -134,6 +149,8 @@ describe("prepare shortcut on the data card", () => {
     const bar = document.getElementById("hubWdataBar");
     expect(bar.classList.contains("has-data-issues")).toBe(false);
     expect(document.getElementById("hubDataIssueText").textContent).toBe("");
+    expect(document.getElementById("hubDataWarn").hidden).toBe(true);
+    expect(document.getElementById("hubDataSummaryText").textContent).toBe("Worksheet data · A1:J5");
   });
 });
 

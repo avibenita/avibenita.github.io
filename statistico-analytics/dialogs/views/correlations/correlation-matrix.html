@@ -874,6 +874,13 @@
       position: relative;
     }
 
+    .scatter-draw-note {
+      min-height: 18px;
+      margin: 6px 0 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
     .scatter-stats {
       display: grid;
       grid-template-columns: repeat(4, minmax(120px, 1fr));
@@ -1192,6 +1199,7 @@
         <div class="scatter-stat"><div class="scatter-stat-value" id="scatterR2">--</div><div class="scatter-stat-label">R²</div></div>
       </div>
       <div id="scatterChart" class="scatter-chart"></div>
+      <p id="scatterDrawNote" class="scatter-draw-note"></p>
       <div class="scatter-controls">
         <div class="scatter-panel">
           <div class="scatter-panel-title"><i class="fas fa-sliders-h"></i>Axis Controls</div>
@@ -2683,6 +2691,33 @@
   /* ════════════════════════════════════════════
      SCATTER MODAL
   ════════════════════════════════════════════ */
+  var SCATTER_DRAW_LIMIT = 5000;
+
+  function pairExtent(points, index) {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < points.length; i++) {
+      const value = points[i][index];
+      if (value < min) min = value;
+      if (value > max) max = value;
+    }
+    return { min: min, max: max };
+  }
+
+  /** Evenly spaced points for drawing. Correlation stats stay on the full set. */
+  function sampleScatterPoints(points, limit) {
+    if (points.length <= limit) return points;
+    const step = points.length / limit;
+    const drawn = new Array(limit);
+    for (let i = 0; i < limit; i++) drawn[i] = points[Math.floor(i * step)];
+    return drawn;
+  }
+
+  function setScatterDrawNote(message) {
+    const note = document.getElementById('scatterDrawNote');
+    if (note) note.textContent = message || '';
+  }
+
   function openScatterModal(rowVar, colVar, rValue) {
     if (!correlationData || !correlationData.data) return;
 
@@ -2690,32 +2725,38 @@
     const titleEl  = document.getElementById('scatterTitle');
     const cacheKey = rowVar + '__' + colVar;
 
-    let points = scatterPointsCache.get(cacheKey);
-    if (!points) {
-      points = correlationData.data
-        .map(row => [row[rowVar], row[colVar]])
-        .filter(([x, y]) => typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y));
-      scatterPointsCache.set(cacheKey, points);
-    }
-
     titleEl.textContent = 'Scatter Plot: ' + rowVar + ' vs ' + colVar;
-
-    scatterState.rawPoints = points;
-    scatterState.xVar      = rowVar;
-    scatterState.yVar      = colVar;
-    scatterState.xTransform = 'none';
-    scatterState.yTransform = 'none';
-    scatterState.fitType    = 'none';
-    scatterState.activeTransformAxis = 'x';
-    scatterState.chart = null;
-    scatterState.xRange = null;
-    scatterState.yRange = null;
-
-    resetScatterControls();
-    refreshScatter();
-
+    setScatterDrawNote('Preparing the scatter plot…');
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
+
+    setTimeout(function () {
+      let points = scatterPointsCache.get(cacheKey);
+      if (!points) {
+        points = [];
+        const data = correlationData.data;
+        for (let i = 0; i < data.length; i++) {
+          const x = data[i][rowVar];
+          const y = data[i][colVar];
+          if (typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y)) points.push([x, y]);
+        }
+        scatterPointsCache.set(cacheKey, points);
+      }
+
+      scatterState.rawPoints = points;
+      scatterState.xVar      = rowVar;
+      scatterState.yVar      = colVar;
+      scatterState.xTransform = 'none';
+      scatterState.yTransform = 'none';
+      scatterState.fitType    = 'none';
+      scatterState.activeTransformAxis = 'x';
+      scatterState.chart = null;
+      scatterState.xRange = null;
+      scatterState.yRange = null;
+
+      resetScatterControls();
+      refreshScatter();
+    }, 30);
   }
 
   function closeScatterModal() {
@@ -2761,11 +2802,17 @@
 
   function refreshScatter() {
     const pts = getTransformedPoints();
-    renderScatterChart(pts);
+    const drawn = sampleScatterPoints(pts, SCATTER_DRAW_LIMIT);
+    renderScatterChart(drawn);
     initAxisControls(pts);
     const vis = getVisiblePoints();
     updateScatterStats(vis);
     applyFit(scatterState.fitType, vis);
+    if (drawn.length < pts.length) {
+      setScatterDrawNote('Showing ' + drawn.length.toLocaleString() + ' of ' + pts.length.toLocaleString() + ' points. Correlation, N, and p use all ' + pts.length.toLocaleString() + ' pairs.');
+    } else {
+      setScatterDrawNote('');
+    }
   }
 
   function updateScatterStats(points) {
@@ -2817,7 +2864,7 @@
   }
 
   function renderScatterChart(points) {
-    const series = [{ type: 'scatter', name: 'Observations', data: points, color: 'rgba(255,165,120,0.75)', marker: { radius: 4 } }];
+    const series = [{ type: 'scatter', name: 'Observations', data: points, color: 'rgba(255,165,120,0.75)', marker: { radius: points.length > 2000 ? 2 : 4 } }];
 
     if (!scatterState.chart) {
       scatterState.chart = Highcharts.chart('scatterChart', {
@@ -2840,9 +2887,10 @@
 
   function initAxisControls(points) {
     if (!points.length) return;
-    const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const xExtent = pairExtent(points, 0);
+    const yExtent = pairExtent(points, 1);
+    const minX = xExtent.min, maxX = xExtent.max;
+    const minY = yExtent.min, maxY = yExtent.max;
     scatterState.xRange     = { min: minX, max: maxX };
     scatterState.yRange     = { min: minY, max: maxY };
     scatterState.xRangeFull = { min: minX, max: maxX };
@@ -2905,8 +2953,8 @@
     if (type === 'power')       model = regression.power(points);
     if (!model || !model.predict) return null;
 
-    const xs = points.map(p => p[0]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const xExtent = pairExtent(points, 0);
+    const minX = xExtent.min, maxX = xExtent.max;
     const line = [];
     for (let i = 0; i <= 50; i++) {
       const x = minX + (maxX - minX) * (i / 50);

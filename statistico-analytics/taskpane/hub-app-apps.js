@@ -2076,7 +2076,7 @@ function sendCorrelationSnapshotMeta() {
 
 function computeGroupedCorrelations(msg) {
   var snap = hubCorrelationSnapshot;
-  if (!snap || !snap.rows || !msg || msg.analysisId !== snap.id) {
+  if (!snap || !snap.rows || !msg || (msg.analysisId && msg.analysisId !== snap.id)) {
     return { type: "GROUPED_CORRELATION_RESULTS", ok: false };
   }
   var groupName = msg.groupVariable;
@@ -2157,7 +2157,7 @@ function samplePointIndexes(count, limit, seed) {
 
 function computeGroupedScatterSample(msg) {
   var snap = hubCorrelationSnapshot;
-  if (!snap || !snap.rows || !msg || msg.analysisId !== snap.id) {
+  if (!snap || !snap.rows || !msg || (msg.analysisId && msg.analysisId !== snap.id)) {
     return { type: "GROUPED_SCATTER_SAMPLE", ok: false };
   }
   var groupIdx = snap.columnNames.indexOf(msg.groupVariable);

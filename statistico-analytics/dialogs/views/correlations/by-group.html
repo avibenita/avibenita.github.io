@@ -2012,7 +2012,7 @@
         const levels = getLevelCounts(groupIndex).filter((item) => isLevelIncluded(groupIndex, item.level)).map((item) => item.level);
         postParent({
           action: 'requestGroupedScatterSample',
-          analysisId: remoteSnapshot.id,
+          analysisId: remoteSnapshot.analysisId || remoteSnapshot.id,
           groupVariable: sourceHeaders[groupIndex],
           varA,
           varB,
@@ -3171,7 +3171,7 @@
       setEmpty('Loading grouped correlations…', true);
       postParent({
         action: 'requestGroupedCorrelations',
-        analysisId: remoteSnapshot.id,
+        analysisId: remoteSnapshot.analysisId || remoteSnapshot.id,
         method: corrType,
         groupVariable: sourceHeaders[groupIndex],
         includedLevels: includedLevelsForRequest()
@@ -3206,13 +3206,14 @@
       }
       useRemoteSnapshot = true;
       remoteSnapshot = msg;
+      remoteSnapshot.id = msg.analysisId || msg.id;
       columnMeta = msg.columns || [];
       sourceHeaders = columnMeta.map((col) => col.name);
       analysisHeaders = (msg.analysisColumns || []).slice();
       sourceRows = [];
-      corrType = msg.method || corrType;
+      corrType = normalizeCorrMethod(msg.method || corrType);
       const typeSelect = document.getElementById('corrTypeSelect');
-      if (typeSelect && msg.method) typeSelect.value = msg.method;
+      if (typeSelect) typeSelect.value = corrType;
       const note = document.getElementById('subtitle');
       if (note) {
         note.hidden = false;
@@ -3224,9 +3225,18 @@
       openGroupDialog();
     }
 
+    function normalizeCorrMethod(method) {
+      return String(method || '').toLowerCase() === 'spearman' ? 'Spearman' : 'Pearson';
+    }
+
     function applyRemoteGrouped(msg) {
       if (!msg || !msg.ok) {
         setHeaderCount(remoteSnapshot && remoteSnapshot.rowCount);
+        if (remoteSnapshot) {
+          setEmpty('Choose a grouping variable.');
+          openGroupDialog();
+          return;
+        }
         return setEmpty(unavailableMessage());
       }
       activeGroups = (msg.groups || []).map((g) => ({ group: g.group, n: g.n, rows: [] }));

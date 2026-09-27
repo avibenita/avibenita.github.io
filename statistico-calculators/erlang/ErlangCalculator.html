@@ -142,7 +142,7 @@
     .charts-section { margin-top: 8px; }
     .charts-section[hidden] { display: none; }
     .charts-modal .hc-box { height: 240px; min-height: 240px; width: 100%; }
-    .charts-section h3 { margin: 0 0 8px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+    .charts-section h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
     .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
     .charts-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
@@ -160,7 +160,7 @@
     .dist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .dist-card { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: rgba(14, 20, 27, 0.35); }
     html[data-theme="light"] .dist-card { background: #f8fafc; }
-    .dist-card h3 { margin: 0 0 4px; font-size: 0.78rem; color: #d7e3f2; }
+    .dist-card h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 0.78rem; color: #d7e3f2; }
     .dist-card p { margin: 4px 0 0; font-size: 0.72rem; line-height: 1.35; color: #c5d4e8; }
     /* Size only the older, hand-drawn SVGs directly inside these cards. */
     #deeperView .dist-card > svg { width: 100%; height: 120px; display: block; }
@@ -1682,9 +1682,10 @@
     }
     chartInstances.push(Highcharts.chart(id, merged));
   }
-  function chartCard(grid, title, tip, id) {
+  function chartCard(grid, title, tip, id, cloud) {
     var box = el("div", { class: "dist-card" });
     var heading = el("h3", {});
+    if (cloud) heading.appendChild(el("i", { class: "fa-solid fa-cloud sim-mark", "aria-hidden": "true" }));
     heading.appendChild(document.createTextNode(title));
     heading.appendChild(el("span", { class: "info-dot", tabindex: "0", "data-tip": tip }, "i"));
     box.appendChild(heading);
@@ -1752,13 +1753,14 @@
     host.appendChild(bar);
     function section(title, key) {
       var block = el("section", { class: "charts-section", "data-chart": key });
-      block.appendChild(el("h3", {}, title));
+      var heading = el("h3", {});
+      if (key === "variability") heading.appendChild(el("i", { class: "fa-solid fa-cloud sim-mark", "aria-hidden": "true" }));
+      heading.appendChild(document.createTextNode(title));
+      block.appendChild(heading);
       var grid = el("div", { class: "charts-grid" });
       block.appendChild(grid);
       host.appendChild(block);
-      var button = el("button", { type: "button", "data-chart": key });
-      if (key === "variability") button.appendChild(el("i", { class: "fa-solid fa-cloud sim-mark", "aria-hidden": "true" }));
-      button.appendChild(document.createTextNode(key === "variability" ? " " + title : title));
+      var button = el("button", { type: "button", "data-chart": key }, title);
       button.addEventListener("click", function () { showChartType(key); });
       bar.appendChild(button);
       return grid;
@@ -1814,7 +1816,7 @@
           ["Average wait", "Share of replications in each average-wait band. The dashed line is the answer-within target.", "averageWait", false, waitTarget],
           ["Maximum queue length", "Share of replications in each maximum-queue band.", "maximumQueueLength", false, null]
         ];
-        histos.forEach(function (spec, index) { chartCard(varGrid, spec[0], spec[1], "hcVar" + index); });
+        histos.forEach(function (spec, index) { chartCard(varGrid, spec[0], spec[1], "hcVar" + index, true); });
       }
     }
     var allButton = el("button", { type: "button", "data-chart": "all" }, "All");

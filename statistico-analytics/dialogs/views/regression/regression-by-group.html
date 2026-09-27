@@ -3023,9 +3023,63 @@
         return '';
       }
       if (key === 'regressionNavData') {
-        return 'By Group needs the regression source rows, and they were not kept because browser storage is full. The model results are still on the Regression results page. Re-run on a smaller range if you need this view.';
+        return 'The original rows are no longer available. Select the Excel range and run the regression again. The model results remain on the Regression results page.';
       }
-      return 'This view needs data that was not kept because browser storage is full. The model results are still on the Regression results page.';
+      return 'This view needs data that was not kept. The model results remain on the Regression results page.';
+    }
+
+    function clearUnsetSampleSize() {
+      const el = document.getElementById('headerSampleSize');
+      if (el && !sourceRows.length) el.textContent = '';
+    }
+
+    function applyParentPayload(payload) {
+      if (!payload) return false;
+      const normalized = {
+        headers: payload.headers || [],
+        rows: payload.rows || payload.sourceRows || [],
+        sourceRows: payload.sourceRows || payload.rows || [],
+        modelSpec: payload.modelSpec || null,
+        address: payload.address || ''
+      };
+      if (!isValidRegressionPayload(normalized)) return false;
+      initializeFromPayload(normalized);
+      return true;
+    }
+
+    let parentRequestStarted = false;
+    function requestParentRows() {
+      if (sourceRows.length || parentRequestStarted) return;
+      const ui = (typeof Office !== 'undefined' && Office.context && Office.context.ui) ? Office.context.ui : null;
+      if (!ui || typeof ui.messageParent !== 'function') {
+        setEmpty('Run a regression analysis first, then open Regression by Group.');
+        clearUnsetSampleSize();
+        return;
+      }
+      parentRequestStarted = true;
+      setEmpty('Loading the regression rows…');
+      clearUnsetSampleSize();
+      Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+        try {
+          const message = JSON.parse(arg.message || '{}');
+          if (message.type !== 'REGRESSION_RESULTS' || !message.payload) return;
+          if (!applyParentPayload(message.payload)) {
+            setEmpty(retentionMessage('regressionNavData')
+              || 'The original rows are no longer available. Select the Excel range and run the regression again. The model results remain on the Regression results page.');
+            clearUnsetSampleSize();
+          }
+        } catch (_e) {}
+      }, function () {
+        try {
+          Office.context.ui.messageParent(JSON.stringify({ action: 'requestData', status: 'ready' }));
+        } catch (_e2) {}
+      });
+      setTimeout(function () {
+        if (sourceRows.length) return;
+        setEmpty(retentionMessage('regressionNavData')
+          || 'The original rows are no longer available. Select the Excel range and run the regression again. The model results remain on the Regression results page.');
+        clearUnsetSampleSize();
+      }, 12000);
     }
 
     function tryLoadStored() {
@@ -3053,10 +3107,9 @@
       if (window.StatisticoByGroup) {
         window.StatisticoByGroup.applyPageTitles();
       }
-      if (!tryLoadStored()) {
-        setEmpty(retentionMessage('regressionNavData')
-          || 'Run a regression analysis first, then open Regression by Group.');
-      }
+      if (tryLoadStored()) return;
+      setEmpty('Loading the regression rows…');
+      clearUnsetSampleSize();
     }
 
     let appStarted = false;
@@ -3073,7 +3126,14 @@
     }
 
     if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
-      try { Office.onReady(bootOnce); } catch (_officeErr) { bootOnce(); }
+      try {
+        Office.onReady(function () {
+          bootOnce();
+          requestParentRows();
+        });
+      } catch (_officeErr) {
+        bootOnce();
+      }
     }
 
     window.openPrepareDataOverview = openPrepareDataOverview;

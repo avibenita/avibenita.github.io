@@ -174,7 +174,7 @@ function sendContingencyBundle() {
   if (!payload) {
     try { payload = JSON.parse(sessionStorage.getItem('contingencyBundle') || 'null'); } catch (_e) { payload = null; }
   }
-  if (!payload) return;
+  if (payload) {
   var viewData = contingencyViewPayload(payload);
   try {
     contingencyResultsDialog.messageChild(JSON.stringify({
@@ -193,17 +193,31 @@ function sendContingencyBundle() {
       } catch (_e3) {}
     }, 300);
   }
+  }
   var source = payload && payload.source;
   if (!source) {
     try { source = JSON.parse(sessionStorage.getItem('contingencySource') || 'null'); } catch (_e4) { source = null; }
   }
-  if (source && source.headers && source.rows && source.rows.length <= 8000) {
+  if (!source && window.__hubContingencyLive && window.__hubContingencyLive.headers) {
+    source = window.__hubContingencyLive;
+  }
+  if (!source || !source.rows || !source.rows.length) {
+    var range = getContingencyRangeValues();
+    if (range && range.values && range.values.length > 1) {
+      source = { headers: range.values[0], rows: range.values.slice(1) };
+    }
+  }
+  if (source && source.headers && source.rows) {
     setTimeout(function () {
       if (!contingencyResultsDialog) return;
       try {
         contingencyResultsDialog.messageChild(JSON.stringify({
           type: 'CONTINGENCY_SOURCE',
-          payload: { headers: source.headers, rows: source.rows }
+          payload: {
+            headers: source.headers,
+            rows: source.rows,
+            spec: (window.__hubContingencyLive && window.__hubContingencyLive.spec) || window.__hubContingencySpec || null
+          }
         }));
       } catch (_e5) {}
     }, 80);
@@ -224,6 +238,7 @@ function sendContingencyBundle() {
   }
   var headers = gr.values[0];
   var rows = gr.values.slice(1);
+  window.__hubContingencyLive = { headers: headers, rows: rows, spec: spec };
   ensureContingencyEngine(function () {
     var bundle = buildContingencyBundle(headers, rows, spec);
     openContingencyResultsDialog(bundle);

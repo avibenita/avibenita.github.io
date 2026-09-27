@@ -1752,6 +1752,12 @@
         try { nav = JSON.parse(sessionStorage.getItem('contingencyNavData') || 'null'); } catch (_e) { nav = null; }
       }
       if (nav && Array.isArray(nav.headers) && Array.isArray(nav.rows)) {
+        if (!isExplicitDemoPage() && isBuiltInDemoTable(nav.headers, nav.rows)) {
+          try { sessionStorage.removeItem('contingencyNavData'); } catch (_demo) {}
+          nav = null;
+        }
+      }
+      if (nav && Array.isArray(nav.headers) && Array.isArray(nav.rows)) {
         sourceHeaders = nav.headers.slice();
         sourceRows = nav.rows.map(function (row) { return Array.isArray(row) ? row.slice() : row; });
         spec = nav.spec || {};
@@ -1781,10 +1787,18 @@
       return false;
     }
 
-    function bootDemoFallback() {
-      if (typeof StatisticoContingencySamples === 'undefined') return false;
+    function isExplicitDemoPage() {
       var q = (location.search || '').toLowerCase();
-      if (q.indexOf('demo=1') < 0 && q.indexOf('embed=1') < 0 && sourceHeaders.length) return false;
+      return q.indexOf('demo=1') >= 0 || q.indexOf('embed=1') >= 0;
+    }
+
+    function isBuiltInDemoTable(headers, rows) {
+      if (!headers || headers.join('|') !== 'Treatment|Response|Site') return false;
+      return Array.isArray(rows) && rows.length === 100;
+    }
+
+    function bootDemoFallback() {
+      if (!isExplicitDemoPage() || typeof StatisticoContingencySamples === 'undefined') return false;
       var ex = StatisticoContingencySamples.defaultPayload();
       sourceHeaders = ex.headers.slice();
       sourceRows = ex.rows.map(function (r) { return r.slice(); });
@@ -1805,6 +1819,7 @@
               if (msg.type === 'CONTINGENCY_SOURCE' && msg.payload && msg.payload.headers) {
                 sourceHeaders = msg.payload.headers.slice();
                 sourceRows = (msg.payload.rows || []).slice();
+                if (msg.payload.spec && msg.payload.spec.rowVar) spec = msg.payload.spec;
                 window.contingencyNavData = Object.assign({}, window.contingencyNavData || {}, {
                   headers: sourceHeaders,
                   rows: sourceRows,
@@ -1853,7 +1868,11 @@
       var ok = loadNavData() || bootDemoFallback();
       startBridge();
       if (!ok) {
-        setEmpty('Run Frequencies & Crosstabs first, then open By Group.');
+        setEmpty('Loading the contingency rows…');
+        setTimeout(function () {
+          if (sourceHeaders.length) return;
+          setEmpty('The rows for this table did not arrive. Return to the contingency results and open By Group again.');
+        }, 4000);
         return;
       }
       populateGroupChoices();

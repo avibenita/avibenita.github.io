@@ -482,34 +482,55 @@ const CALCULATOR_CATEGORY_TILES = [
     ]
   },
   {
-    id: "sample-planning",
-    section: "Power & Sample Size",
-    sectionId: "sample-size",
-    title: "Sample planning",
-    icon: "fa-ruler-combined",
+    id: "precision-sample",
+    section: "Precision-Based Sample Size",
+    sectionId: "precision-sample",
+    title: "Precision-based sample size",
+    icon: "fa-bullseye",
     accent: "#38bdf8",
     accentDark: "#0284c7",
-    color: "#0ea5e9",
-    colorDark: "#0369a1",
-    subtitle: "Precision and power oriented sample size tools",
-    desc: "Plan how large a sample you need — either for a target precision (margin of error) or for a desired statistical power.",
+    color: "#38bdf8",
+    colorDark: "#0284c7",
+    subtitle: "Sample size from a margin of error",
+    desc: "Find the sample size that keeps a confidence interval within a chosen margin of error, or the margin of error a known sample size will produce.",
     info: [
-      "Precision-based sample size estimation",
-      "Power-based sample size calculation",
-      "Common test families and effect-size inputs",
-      "Standalone planning tools — no Active Range needed"
+      "Means, proportions, and differences",
+      "Margin of error and confidence level",
+      "Works in either direction: n from E, or E from n",
+      "Standalone calculator — no Active Range needed"
     ],
     modules: [
       {
         id: "calc-precision",
-        label: "Sample Size — Precision",
-        tip: "Estimate sample size by target precision.",
+        label: "Open precision calculator",
+        tip: "Sample size from a margin of error, or the reverse.",
         dialogUrl: "https://statistico.live/statistico-calculators/Precision-Based%20-Sample/PrecisionSampleCalculator.html"
-      },
+      }
+    ]
+  },
+  {
+    id: "power-sample",
+    section: "Power & Sample Size",
+    sectionId: "power-sample",
+    title: "Power-based sample size",
+    icon: "fa-bolt",
+    accent: "#818cf8",
+    accentDark: "#4f46e5",
+    color: "#818cf8",
+    colorDark: "#4f46e5",
+    subtitle: "Sample size for a target statistical power",
+    desc: "Find how many observations a test needs to detect an effect of a given size at a chosen power and significance level.",
+    info: [
+      "t-tests, proportions, ANOVA, and regression",
+      "Target power, significance level, and effect size",
+      "Solve for sample size or for achieved power",
+      "Standalone calculator — no Active Range needed"
+    ],
+    modules: [
       {
         id: "calc-power",
-        label: "Sample Size — Power",
-        tip: "Power-based sample size calculator.",
+        label: "Open power calculator",
+        tip: "Sample size for a target statistical power.",
         dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html"
       }
     ]
@@ -641,8 +662,8 @@ let HUB_CLUSTER_META = {
   },
   calculators: {
     eyebrow: "Statistico calculators",
-    name: "Calculators",
-    tagline: "Probabilities, distributions, power, sample size, and planning calculations",
+    name: "Interactive Calculators",
+    tagline: "Explore distributions, plan sample sizes, and compare scenarios.",
     color: "#7dd3fc",
     colorDark: "#0369a1",
     icon: "fa-calculator",
@@ -730,13 +751,21 @@ var CALC_SECTION_META = {
     color: "#38bdf8",
     colorDark: "#0284c7"
   },
-  "sample-size": {
-    id: "sample-size",
+  "precision-sample": {
+    id: "precision-sample",
+    label: "Precision-Based Sample Size",
+    subtitle: "Sample size from a margin of error, or the reverse.",
+    icon: "fa-bullseye",
+    color: "#38bdf8",
+    colorDark: "#0284c7"
+  },
+  "power-sample": {
+    id: "power-sample",
     label: "Power & Sample Size",
-    subtitle: "Plan samples by precision or by statistical power.",
-    icon: "fa-ruler-combined",
-    color: "#0ea5e9",
-    colorDark: "#0369a1"
+    subtitle: "Sample size for a target statistical power.",
+    icon: "fa-bolt",
+    color: "#818cf8",
+    colorDark: "#4f46e5"
   },
   "effect-sizes": {
     id: "effect-sizes",
@@ -763,7 +792,7 @@ var CALC_SECTION_META = {
     colorDark: "#0f766e"
   }
 };
-var CALC_SECTION_ORDER = ["distributions", "sample-size", "effect-sizes", "staffing", "capability"];
+var CALC_SECTION_ORDER = ["distributions", "precision-sample", "power-sample", "effect-sizes", "staffing", "capability"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {
@@ -1558,6 +1587,12 @@ function syncClusterHeader() {
     : ACTIVE_CLUSTER === "calculators" ? "#7dd3fc"
     : "#c4b5fd";
   document.documentElement.setAttribute("data-hub-cluster", ACTIVE_CLUSTER);
+  var lead = document.getElementById("hubClusterLead");
+  if (lead) {
+    var showLead = ACTIVE_CLUSTER === "calculators" && !!meta.tagline;
+    lead.textContent = showLead ? meta.tagline : "";
+    lead.classList.toggle("is-visible", showLead);
+  }
   document.documentElement.style.setProperty("--hub-tab-accent", tabAccent);
   document.documentElement.style.setProperty("--hub-brand-color", meta.colorDark || meta.color || "#f97316");
   document.documentElement.style.setProperty("--hub-brand-from", meta.brandFrom || meta.color || "#f97316");

@@ -271,12 +271,12 @@
             <h3 id="sampleProposalTitle">This range is too large for later views</h3>
             <p id="sampleProposalBody"></p>
             <label class="sample-choice">
-              <input type="radio" name="rowScope" id="scopeSample" value="sample" checked>
-              <span id="scopeSampleLabel">Use the sample</span>
+              <input type="radio" name="rowScope" id="scopeAll" value="all" checked>
+              <span id="scopeAllLabel">Analyze all rows</span>
             </label>
             <label class="sample-choice">
-              <input type="radio" name="rowScope" id="scopeAll" value="all">
-              <span id="scopeAllLabel">Use every row</span>
+              <input type="radio" name="rowScope" id="scopeSample" value="sample">
+              <span id="scopeSampleLabel">Analyze a random sample</span>
             </label>
           </div>
 
@@ -304,7 +304,6 @@
     var variableStats = {};
     var variableOrder = [];
     var draggedElement = null;
-    var STORAGE_LIMIT = 4500000;
     var SAMPLE_SEED = 20260927;
     var SAMPLE_BUDGET = 2800000;
     var samplePlan = null;
@@ -447,6 +446,7 @@
         if (s.missing > 0) statsText += ' · <span class="reg-var-miss">' + s.missing + ' miss</span>';
         if (isNum && s.isValid) statsText += ' · μ ' + fmt(s.avg) + ' · SD ' + fmt(s.std);
         if (isNum && !s.isValid) statsText += ' · needs n≥5 & SD>0';
+        if (isRecordIdColumn(name)) statsText += ' · not included by Add all numeric';
 
         row.innerHTML =
           '<div class="reg-var-icon ' + iconClass + '">' + iconLetter + '</div>' +
@@ -559,9 +559,13 @@
       el.innerHTML = '<strong>' + count + '</strong> variables · Pearson · ' + preview;
     }
 
+    function isRecordIdColumn(name) {
+      return String(name || '').trim().toLowerCase().replace(/[\s_-]+/g, '') === 'recordid';
+    }
+
     function selectAllNumeric() {
       variableOrder.forEach(function(name) {
-        if (variableStats[name] && variableStats[name].isValid) {
+        if (variableStats[name] && variableStats[name].isValid && !isRecordIdColumn(name)) {
           variableStats[name].selected = true;
         }
       });
@@ -587,9 +591,9 @@
       document.getElementById('btnRun').disabled = !ok;
       var runLabel = 'Run Correlation Analysis';
       if (ok && samplePlan && document.getElementById('scopeSample').checked) {
-        runLabel = 'Run on ' + samplePlan.n.toLocaleString() + '-row sample';
+        runLabel = 'Analyze a random sample of ' + samplePlan.n.toLocaleString() + ' rows';
       } else if (ok && samplePlan && document.getElementById('scopeAll').checked) {
-        runLabel = 'Run on all ' + samplePlan.sourceRows.toLocaleString() + ' rows';
+        runLabel = 'Analyze all ' + samplePlan.sourceRows.toLocaleString() + ' rows';
       }
       document.getElementById('btnRun').innerHTML = '<i class="fa-solid fa-play"></i> ' + runLabel;
       var saveBtn = document.getElementById('btnSaveConfig');
@@ -630,10 +634,6 @@
       });
     }
 
-    function formatMillions(chars) {
-      return (chars / 1000000).toFixed(1) + ' million';
-    }
-
     function estimateObjectChars(values) {
       var headers = values[0] || [];
       var rows = values.slice(1);
@@ -670,16 +670,15 @@
       }
       samplePlan = { n: proposed, seed: SAMPLE_SEED, sourceRows: rows, estimatedChars: estimated };
       panel.hidden = false;
+      document.getElementById('scopeAll').checked = true;
+      document.getElementById('sampleProposalTitle').textContent = 'This range has ' + rows.toLocaleString() + ' rows';
       document.getElementById('sampleProposalBody').textContent =
-        rows.toLocaleString() + ' rows are about ' + formatMillions(estimated) +
-        ' characters. Later views, including By Group, cannot store a second copy once that passes ' +
-        formatMillions(STORAGE_LIMIT) + ' characters, so they show a reload note. ' +
-        'A random sample of ' + proposed.toLocaleString() + ' rows, drawn without replacement with seed ' +
-        SAMPLE_SEED + ', keeps every column. Correlation, p-value, and N will describe that sample.';
+        'Analyze all ' + rows.toLocaleString() + ' rows so the correlation, p-value, and N stay exact. By Group is calculated from those same rows. ' +
+        'A random sample of ' + proposed.toLocaleString() + ' rows is available if you want a smaller run. It is drawn without replacement (seed ' +
+        SAMPLE_SEED + '), and every reported correlation, p-value, and N then uses the sample.';
+      document.getElementById('scopeAllLabel').textContent = 'Analyze all ' + rows.toLocaleString() + ' rows';
       document.getElementById('scopeSampleLabel').textContent =
-        'Use the ' + proposed.toLocaleString() + '-row sample (recommended)';
-      document.getElementById('scopeAllLabel').textContent =
-        'Use all ' + rows.toLocaleString() + ' rows. The matrix will run. By Group will not have the rows.';
+        'Analyze a random sample of ' + proposed.toLocaleString() + ' rows (seed ' + SAMPLE_SEED + ')';
     }
 
     function mulberry32(seed) {

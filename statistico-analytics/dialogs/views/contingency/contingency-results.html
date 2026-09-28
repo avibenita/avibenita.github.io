@@ -334,6 +334,7 @@
       color:var(--text-muted);
     }
     .viz-controls select.ct-sel { min-width:148px; text-transform:none; letter-spacing:0; font-weight:700; }
+    #vizAxis { min-width:220px; }
     .viz-seg {
       display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface-2);
     }
@@ -448,6 +449,9 @@
             <div class="viz-controls">
               <label>Y axis
                 <select class="ct-sel" id="vizMetric"></select>
+              </label>
+              <label>X axis
+                <select class="ct-sel" id="vizAxis"></select>
               </label>
               <label>Chart type
                 <select class="ct-sel" id="vizType"></select>
@@ -829,6 +833,8 @@
         mSel.value = 'observed';
         mSel.onchange = function () { syncVizScaleOptions(); renderVizChart(); };
       }
+      var xSel = document.getElementById('vizAxis');
+      if (xSel) xSel.onchange = function () { renderVizChart(); };
       if (tSel) {
         tSel.innerHTML = VIZ_TYPES.map(function (t) {
           return '<option value="' + t.id + '">' + esc(t.label) + '</option>';
@@ -906,6 +912,24 @@
       COLOR_METRICS.forEach(function (m) { if (m.id === id) found = m.label; });
       return found || id;
     }
+    function vizPoint(matrix, i, j, isLog) {
+      var v = matrix[i] && matrix[i][j];
+      if (!isFinite(v)) return null;
+      if (isLog && v <= 0) return null;
+      return Math.round(v * 1000) / 1000;
+    }
+    function syncVizAxisOptions(src) {
+      var sel = document.getElementById('vizAxis');
+      if (!sel) return 'col';
+      var prev = sel.value === 'row' ? 'row' : 'col';
+      var rowName = (src && src.rowVar) || 'Rows';
+      var colName = (src && src.colVar) || 'Columns';
+      sel.innerHTML =
+        '<option value="col">' + esc(colName) + ' · legend: ' + esc(rowName) + '</option>' +
+        '<option value="row">' + esc(rowName) + ' · legend: ' + esc(colName) + '</option>';
+      sel.value = prev;
+      return prev;
+    }
     function renderVizChart() {
       if (!bundle || !bundle.analyzable) return;
       if (typeof Highcharts === 'undefined') return;
@@ -918,7 +942,13 @@
       var rows = rowIdxs(src);
       var cols = colIdxs(src);
       var matrix = vizMatrix(src, metric) || [];
-      var cats = cols.map(function (j) { return src.colLabels[j]; });
+      var xOnRows = syncVizAxisOptions(src) === 'row';
+      var cats = xOnRows
+        ? rows.map(function (i) { return src.rowLabels[i]; })
+        : cols.map(function (j) { return src.colLabels[j]; });
+      var xTitle = xOnRows ? (src.rowVar || '') : (src.colVar || '');
+      var seriesVar = xOnRows ? (src.colVar || 'Columns') : (src.rowVar || 'Rows');
+      var categoryVar = xOnRows ? (src.rowVar || 'rows') : (src.colVar || 'columns');
       var stacking = null;
       var hcType = 'column';
       if (typeId === 'column-stack') { hcType = 'column'; stacking = 'normal'; }
@@ -931,23 +961,26 @@
       else if (typeId === 'area-stack') { hcType = 'area'; stacking = 'normal'; }
       var isLog = scale === 'log' && metric !== 'stdResiduals';
       var isPctAxis = scale === 'pct' && stacking !== 'percent';
-      var series = rows.map(function (i, si) {
-        return {
-          name: src.rowLabels[i],
-          color: VIZ_COLORS[si % VIZ_COLORS.length],
-          data: cols.map(function (j) {
-            var v = matrix[i] && matrix[i][j];
-            if (!isFinite(v)) return null;
-            if (isLog && v <= 0) return null;
-            return Math.round(v * 1000) / 1000;
-          })
-        };
-      });
+      var series = xOnRows
+        ? cols.map(function (j, si) {
+          return {
+            name: src.colLabels[j],
+            color: VIZ_COLORS[si % VIZ_COLORS.length],
+            data: rows.map(function (i) { return vizPoint(matrix, i, j, isLog); })
+          };
+        })
+        : rows.map(function (i, si) {
+          return {
+            name: src.rowLabels[i],
+            color: VIZ_COLORS[si % VIZ_COLORS.length],
+            data: cols.map(function (j) { return vizPoint(matrix, i, j, isLog); })
+          };
+        });
       var yTitle = vizMetricLabel(metric);
       if (!vizWeighted && freqCol(bundle)) yTitle += ' (input rows)';
       var cap = document.getElementById('vizCaption');
       if (cap) {
-        cap.textContent = (src.rowVar || 'Rows') + ' as series · X = ' + (src.colVar || 'columns') +
+        cap.textContent = seriesVar + ' as series · X = ' + categoryVar +
           (freqCol(bundle) ? (vizWeighted ? ' · Frequency: ' + freqCol(bundle) : ' · one case per input row') : '');
       }
       var wLabel = document.getElementById('vizWeightLabel');
@@ -985,7 +1018,7 @@
         credits: { enabled: false },
         xAxis: {
           categories: cats,
-          title: { text: src.colVar || '', style: { color: axis } },
+          title: { text: xTitle, style: { color: axis } },
           labels: { style: { color: axis, fontSize: '12px', fontWeight: '700' }, rotation: cats.length > 8 ? -35 : 0 },
           lineColor: grid
         },

@@ -668,6 +668,16 @@
     }
     .chart-toggle-btn:hover{ border-color:var(--accent-1); color:var(--accent-1); }
     .chart-toggle-btn.active{ background:var(--accent-1); color:#fff; border-color:var(--accent-1); }
+    .factor-radios{
+      display:inline-flex; align-items:center; gap:16px;
+    }
+    .factor-radios label{
+      display:inline-flex; align-items:center; gap:6px;
+      cursor:pointer; font-size:15px; font-weight:700; color:var(--text-primary);
+    }
+    .factor-radios input{
+      width:16px; height:16px; margin:0; cursor:pointer; accent-color:#f59e0b;
+    }
 
     /* ── Drilldown modal ────────────────────────────────────── */
     #drillModal{
@@ -1545,7 +1555,12 @@
             <!-- Panel: Times (two-way only, injected into grid via JS) -->
             <div class="results-panel chart-solo" id="panelTimes" style="display:none;margin-bottom:0;">
               <div class="results-panel-heading">
-                <span><i class="fa-solid fa-clock"></i>&nbsp;<span id="timTitle">Times</span>
+                <span style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                  <span class="factor-radios" id="factorRadioGroup">
+                    <label><input type="radio" name="anovaFactorChart" id="factorRadioA" value="a" checked onchange="switchFactorChart('a')"><span id="factorRadioALabel">Group</span></label>
+                    <label><input type="radio" name="anovaFactorChart" id="factorRadioB" value="b" onchange="switchFactorChart('b')"><span id="factorRadioBLabel">Time</span></label>
+                  </span>
+                  <span id="factorChartTitle" style="display:none;"></span>
                   <span id="timEtaBadge" class="vis-eta-badge"></span>
                 </span>
                 <div style="display:flex;gap:5px;">
@@ -1571,14 +1586,8 @@
               <div class="patterns-dual-grid">
                 <div class="patterns-card">
                   <div class="patterns-card-title">
-                    <span><i class="fa-solid fa-users"></i> Means by Group</span>
-                    <span style="display:flex;gap:5px;">
-                      <button class="chart-toggle-btn active" id="meansModeBarBtn" onclick="switchMeansMode('bar')"><i class="fa-solid fa-chart-column"></i> Bar</button>
-                      <button class="chart-toggle-btn" id="meansModeBoxBtn" onclick="switchMeansMode('box')"><i class="fa-solid fa-box-open"></i> Box</button>
-                    </span>
+                    <span><i class="fa-solid fa-users"></i> <span id="meansCardTitle">Means</span></span>
                   </div>
-                  <div id="meansByGroupBarChart" class="patterns-mini-chart"></div>
-                  <div id="meansByGroupBoxChart" class="patterns-mini-chart" style="display:none;"></div>
                   <div id="meansByGroupTableWrap" class="patterns-mini-table" style="display:block;">
                     <div id="meansByGroupTable"></div>
                   </div>
@@ -1799,6 +1808,8 @@
   <script>
   /* ── Global state ────────────────────────────────────────── */
   var _bundle   = null;
+  var _factorChartWhich = 'a';
+  var _factorChartMode = 'bar';
   /* Original (host-precomputed) bundle preserved for two reasons: a clean
      restore when the user clears the row filter, and access to spec /
      posthoc / descriptive blocks we don't recompute on filter changes. */
@@ -2843,6 +2854,7 @@
     var btnBarEl = document.getElementById(ids.btnBar);
     var btnBoxEl = document.getElementById(ids.btnBox);
     if (!barEl || !boxEl || !btnBarEl || !btnBoxEl) return;
+    _factorChartMode = mode === 'box' ? 'box' : 'bar';
     barEl.style.display = mode === 'bar' ? '' : 'none';
     boxEl.style.display = mode === 'box' ? '' : 'none';
     btnBarEl.classList.toggle('active', mode === 'bar');
@@ -2988,6 +3000,105 @@
     });
   }
 
+  function _factorChartView(b, which) {
+    var isTwoWay = b && b.type === 'two-way';
+    var useB = isTwoWay && which === 'b';
+    var name = useB
+      ? ((b.spec && b.spec.factor2) || 'Time')
+      : (isTwoWay ? ((b.spec && b.spec.factor1) || 'Group') : ((b.spec && b.spec.factor) || 'Group'));
+    var other = useB
+      ? ((b.spec && b.spec.factor1) || 'Group')
+      : ((b.spec && b.spec.factor2) || 'Time');
+    var desc = useB ? (b.descB || []) : ((b.descA && b.descA.length) ? b.descA : (b.descriptives || []));
+    return { name: name, other: other, desc: desc, useB: useB };
+  }
+
+  function renderFactorMeansChart(b, which) {
+    if (!b) return;
+    var isTwoWay = b.type === 'two-way';
+    which = (isTwoWay && which === 'b') ? 'b' : 'a';
+    _factorChartWhich = which;
+    var view = _factorChartView(b, which);
+    var t = _visTheme();
+    var dv = (b.spec && b.spec.dv) || 'Mean';
+    var has = view.desc && view.desc.length;
+    var row = document.getElementById('mainEffectsRow');
+    var panel = document.getElementById('panelTimes');
+    var radios = document.getElementById('factorRadioGroup');
+    var titleEl = document.getElementById('factorChartTitle');
+    if (row) row.style.display = has ? 'grid' : 'none';
+    if (panel) panel.style.display = has ? '' : 'none';
+    if (radios) radios.style.display = isTwoWay ? 'inline-flex' : 'none';
+    if (titleEl) {
+      titleEl.style.display = isTwoWay ? 'none' : '';
+      titleEl.textContent = view.name;
+    }
+    var labA = document.getElementById('factorRadioALabel');
+    var labB = document.getElementById('factorRadioBLabel');
+    if (labA) labA.textContent = isTwoWay ? ((b.spec && b.spec.factor1) || 'Group') : view.name;
+    if (labB) labB.textContent = (b.spec && b.spec.factor2) || 'Time';
+    var radioA = document.getElementById('factorRadioA');
+    var radioB = document.getElementById('factorRadioB');
+    if (radioA) radioA.checked = which !== 'b';
+    if (radioB) radioB.checked = which === 'b';
+
+    var eta = (isTwoWay && b.twoWay) ? (which === 'b' ? b.twoWay.etaSqB : b.twoWay.etaSqA) : NaN;
+    _setEtaBadge('timEtaBadge', eta, _etaLabel(eta));
+
+    if (_charts.timBar) { try { _charts.timBar.destroy(); } catch (_e) {} _charts.timBar = null; }
+    if (_charts.timBox) { try { _charts.timBox.destroy(); } catch (_e) {} _charts.timBox = null; }
+    var barHost = document.getElementById('timBarChart');
+    var boxHost = document.getElementById('timBoxChart');
+    if (!has) {
+      if (barHost) barHost.innerHTML = '<div class="patterns-empty">No means for ' + view.name + '.</div>';
+      if (boxHost) boxHost.innerHTML = '';
+      return;
+    }
+
+    var cats = view.desc.map(function (d) { return String(d.level); });
+    var series = [{
+      name: dv,
+      color: t.colors[1],
+      data: view.desc.map(function (d) { return isFinite(d.mean) ? +d.mean.toFixed(4) : null; }),
+      cursor: isTwoWay ? 'pointer' : 'default'
+    }];
+    var click = isTwoWay ? {
+      pointEvents: {
+        click: function () {
+          if (which === 'b') openDrillTimes(this.category, b);
+          else openDrillGroups(this.category, b);
+        }
+      }
+    } : {};
+    var cfg = _colCfg(cats, series, dv, t.tc, t.gc, click);
+    cfg.xAxis.title = { text: view.name, style: _axisTitleStyle(t.tc) };
+    if (isTwoWay) cfg.plotOptions.column.cursor = 'pointer';
+    _charts.timBar = Highcharts.chart('timBarChart', cfg);
+    _charts.timBox = Highcharts.chart('timBoxChart',
+      _boxCfg(cats, _descToBoxData(view.desc), dv, t.tc, t.gc, t.colors[1]));
+    if (_charts.timBox && _charts.timBox.xAxis && _charts.timBox.xAxis[0]) {
+      _charts.timBox.xAxis[0].setTitle({ text: view.name, style: _axisTitleStyle(t.tc) }, false);
+      _charts.timBox.redraw();
+    }
+    switchVisPanel('tim', _factorChartMode || 'bar');
+    var hint = document.getElementById('hintTim');
+    if (hint) {
+      if (isTwoWay && _factorChartMode !== 'box') {
+        hint.style.display = '';
+        hint.innerHTML = '<i class="fa-solid fa-magnifying-glass-chart"></i> Click any bar to drill into <strong>' + view.other + '</strong> breakdown';
+      } else {
+        hint.style.display = 'none';
+      }
+    }
+  }
+
+  function switchFactorChart(which) {
+    _factorChartWhich = which === 'b' ? 'b' : 'a';
+    if (!_bundle) return;
+    renderFactorMeansChart(_bundle, _factorChartWhich);
+    renderPatternsCompare(_bundle);
+  }
+
   /* ── Main entry: render all visuals panels ── */
   function renderAllVisuals(b) {
     var t = _visTheme();
@@ -2998,15 +3109,7 @@
     var f1 = isTwoWay ? ((b.spec && b.spec.factor1) || 'Group') : ((b.spec && b.spec.factor) || 'Group');
     var f2 = isTwoWay ? ((b.spec && b.spec.factor2) || 'Time')  : null;
 
-    /* Update panel titles */
-    var el2 = document.getElementById('timTitle'); if (el2) el2.textContent = f2 || 'Times';
-
-    /* Times panel row is two-way only (group panel removed by design) */
-    var row = document.getElementById('mainEffectsRow');
-    if (row) row.style.display = isTwoWay ? 'grid' : 'none';
-
     /* Show/hide panels */
-    document.getElementById('panelTimes').style.display       = isTwoWay ? '' : 'none';
     document.getElementById('panelInteraction').style.display = isTwoWay ? '' : 'none';
     var interactionEmpty = document.getElementById('interactionEmpty');
     if (interactionEmpty) interactionEmpty.style.display = isTwoWay ? 'none' : '';
@@ -3018,26 +3121,7 @@
       _setEtaBadge('abEtaBadge',   b.twoWay.etaSqAB, _etaLabel(b.twoWay.etaSqAB));
     }
 
-    /* ─────── Times panel (Factor B, two-way only) ─────────── */
-    if (isTwoWay) {
-      var descB = b.descB || [];
-      if (descB.length) {
-        var catsB = descB.map(function(d){ return d.level; });
-        var timSeries = [{
-          name: dv, color: t.colors[1],
-          data: descB.map(function(d){ return isFinite(d.mean) ? +d.mean.toFixed(4) : null; }),
-          cursor:'pointer'
-        }];
-        var timCfg = _colCfg(catsB, timSeries, dv, t.tc, t.gc,
-          { pointEvents:{ click: function(){ openDrillTimes(this.category, b); } } });
-        timCfg.plotOptions.column.cursor = 'pointer';
-        _charts.timBar = Highcharts.chart('timBarChart', timCfg);
-
-        var boxDataB = _descToBoxData(descB);
-        _charts.timBox = Highcharts.chart('timBoxChart',
-          _boxCfg(catsB, boxDataB, dv, t.tc, t.gc, t.colors[1]));
-      }
-    }
+    renderFactorMeansChart(b, isTwoWay ? _factorChartWhich : 'a');
 
     /* ─────── Interaction panel (two-way only) ─────────────── */
     if (isTwoWay && b.cellDesc && b.aLevels && b.bLevels) {
@@ -3201,74 +3285,26 @@
   }
 
   function renderPatternsCompare(b) {
-    var meansBarEl = document.getElementById('meansByGroupBarChart');
-    var meansBoxEl = document.getElementById('meansByGroupBoxChart');
     var meansTableEl = document.getElementById('meansByGroupTable');
     var ranksChartEl = document.getElementById('meanRanksByGroupChart');
     var ranksTableEl = document.getElementById('meanRanksByGroupTable');
-    if (!meansBarEl || !meansBoxEl || !meansTableEl || !ranksChartEl || !ranksTableEl) return;
+    if (!meansTableEl || !ranksChartEl || !ranksTableEl) return;
 
     var t = _visTheme();
-    var dv = (b.spec && b.spec.dv) || 'Mean';
-    var factor = (b.spec && b.spec.factor1) || (b.spec && b.spec.factor) || 'Group';
-    var means = b.descA || b.descriptives || [];
+    var view = _factorChartView(b, _factorChartWhich);
+    var factor = view.name;
+    var means = view.desc || [];
+    var rankFactor = (b.spec && (b.spec.factor1 || b.spec.factor)) || 'Group';
     var rawSeriesByLevel = _getRawSeriesByLevel(b, factor);
     var ranks = (b.kruskalWallis && Array.isArray(b.kruskalWallis.meanRanks)) ? b.kruskalWallis.meanRanks : [];
+    var meansTitle = document.getElementById('meansCardTitle');
+    if (meansTitle) meansTitle.textContent = 'Means by ' + factor;
 
     if (_charts.meansMini) { try { _charts.meansMini.destroy(); } catch (_e) {} _charts.meansMini = null; }
     if (_charts.meansMiniBox) { try { _charts.meansMiniBox.destroy(); } catch (_e) {} _charts.meansMiniBox = null; }
     if (_charts.ranksMini) { try { _charts.ranksMini.destroy(); } catch (_e) {} _charts.ranksMini = null; }
 
     if (means.length) {
-      var meanCats = means.map(function (d) {
-        var nTxt = isFinite(d.n) ? d.n : '?';
-        return String(d.level) + ' (n=' + nTxt + ')';
-      });
-      var meanVals = means.map(function (d) { return isFinite(d.mean) ? +d.mean.toFixed(4) : null; });
-      var meanCIs = means.map(function (d) {
-        return [isFinite(d.ciLow) ? +d.ciLow.toFixed(4) : null, isFinite(d.ciHigh) ? +d.ciHigh.toFixed(4) : null];
-      });
-
-      _charts.meansMini = Highcharts.chart('meansByGroupBarChart', {
-        chart: { type: 'column', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI,sans-serif', fontSize: '16px' }, spacingTop: 28 },
-        title: { text: '' },
-        credits: { enabled: false },
-        legend: { enabled: false },
-        xAxis: {
-          categories: meanCats,
-          title: { text: factor, style: _axisTitleStyle(t.tc) },
-          labels: { style: _axisLabelStyle(t.tc) },
-          lineColor: t.gc
-        },
-        yAxis: { title: { text: dv, style: _axisTitleStyle(t.tc) }, labels: { style: _axisLabelStyle(t.tc) }, gridLineColor: t.gc, maxPadding: 0.22 },
-        plotOptions: {
-          column: {
-            color: t.colors[0], borderRadius: 4, borderWidth: 0,
-            dataLabels: _colValueLabel(t.tc)
-          }
-        },
-        series: [
-          { name: dv, data: meanVals },
-          { name: '95% CI', type: 'errorbar', data: meanCIs, color: t.isDark ? 'rgba(255,255,255,.55)' : '#334155', stemWidth: 2, whiskerWidth: 8, tooltip: { pointFormat: 'CI: <b>{point.low:.2f}</b> to <b>{point.high:.2f}</b><br/>' } }
-        ],
-        tooltip: {
-          backgroundColor: t.isDark ? '#1e293b' : '#fff',
-          style: { color: t.isDark ? '#f1f5f9' : '#1f2937' },
-          formatter: function () {
-            var d = means[this.point.index];
-            return '<b>' + this.key + '</b><br>Mean: <b>' + fmt(this.y) + '</b>' + (d && isFinite(d.sd) ? '<br>SD: ' + fmt(d.sd) : '');
-          }
-        }
-      });
-
-      var boxData = _descToBoxData(means);
-      _charts.meansMiniBox = Highcharts.chart('meansByGroupBoxChart',
-        _boxCfg(meanCats, boxData, dv, t.tc, t.gc, t.colors[0]));
-      if (_charts.meansMiniBox && _charts.meansMiniBox.xAxis && _charts.meansMiniBox.xAxis[0]) {
-        _charts.meansMiniBox.xAxis[0].setTitle({ text: factor, style: _axisTitleStyle(t.tc) }, false);
-        _charts.meansMiniBox.redraw();
-      }
-
       meansTableEl.innerHTML =
         '<table><thead><tr><th class="tbl-hist-cell"><i class="fa-solid fa-chart-simple" title="Distribution"></i></th><th>' + factor + '</th><th class="num">n</th><th class="num">Mean</th><th class="num">SD</th><th class="num">95% CI Low</th><th class="num">95% CI High</th></tr></thead><tbody>' +
         means.map(function (d) {
@@ -3277,10 +3313,7 @@
           return '<tr><td class="tbl-hist-cell">' + renderTableHistSparkline(levelVals) + '</td><td>' + d.level + '</td><td class="num">' + (d.n || '—') + '</td><td class="num">' + fmt(d.mean) + '</td><td class="num">' + fmt(d.sd) + '</td><td class="num">' + fmt(d.ciLow) + '</td><td class="num">' + fmt(d.ciHigh) + '</td></tr>';
         }).join('') +
         '</tbody></table>';
-      switchMeansMode('bar');
     } else {
-      meansBarEl.innerHTML = '<div class="patterns-empty">No mean data available.</div>';
-      meansBoxEl.innerHTML = '';
       meansTableEl.innerHTML = '';
     }
 
@@ -3294,7 +3327,7 @@
         legend: { enabled: false },
         xAxis: {
           categories: rankCats,
-          title: { text: factor, style: _axisTitleStyle(t.tc) },
+          title: { text: rankFactor, style: _axisTitleStyle(t.tc) },
           labels: { style: _axisLabelStyle(t.tc) },
           lineColor: t.gc
         },
@@ -3308,7 +3341,7 @@
         }
       });
       ranksTableEl.innerHTML =
-        '<table><thead><tr><th>' + factor + '</th><th class="num">Mean Rank</th></tr></thead><tbody>' +
+        '<table><thead><tr><th>' + rankFactor + '</th><th class="num">Mean Rank</th></tr></thead><tbody>' +
         ranks.map(function (r) {
           return '<tr><td>' + r.level + '</td><td class="num">' + fmt(r.meanRank,2) + '</td></tr>';
         }).join('') +

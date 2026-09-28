@@ -1958,12 +1958,7 @@ const StatisticoHeader = {
             title: 'Results',
             items: resultItems
           }
-        ],
-        pinnedNav: this._byGroupPinnedNav({
-          type: 'navigate',
-          view: 'contingency-by-group',
-          file: 'contingency/by-group.html'
-        })
+        ]
       };
     }
 

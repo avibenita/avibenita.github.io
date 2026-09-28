@@ -239,6 +239,52 @@
       border:none;
       box-shadow:none;
       overflow:visible;
+      height:auto;
+      min-height:0;
+    }
+    #interactionChart{ height:280px; }
+    .ix-caption{
+      margin:4px 2px 0;
+      font-size:13px;
+      line-height:1.45;
+      color:var(--text-muted);
+    }
+    .ix-layout{
+      display:grid;
+      grid-template-columns:minmax(0,1.7fr) minmax(220px,.85fr);
+      gap:14px;
+      margin-top:12px;
+      align-items:start;
+    }
+    @media (max-width:980px){
+      .ix-layout{ grid-template-columns:1fr; }
+    }
+    .ix-table-wrap{ overflow-x:auto; }
+    #interactionResults tr[data-cohort]{ cursor:pointer; }
+    #interactionResults tr[data-cohort]:hover{ background:rgba(245,158,11,.10); }
+    #interactionResults tr.is-on{ background:rgba(245,158,11,.18); }
+    .ix-test{
+      background:var(--surface-2);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:12px 14px;
+    }
+    .ix-test h3{
+      margin:0 0 8px;
+      font-size:14px;
+      color:var(--accent-1);
+    }
+    .ix-test-line{
+      font-size:16px;
+      font-weight:800;
+      color:var(--text-primary);
+      margin-bottom:6px;
+    }
+    .ix-test p{
+      margin:8px 0 0;
+      font-size:13px;
+      line-height:1.5;
+      color:var(--text-secondary);
     }
     #panelInteraction .results-panel-heading,
     #panelTimes .results-panel-heading{
@@ -1615,10 +1661,11 @@
               <span><i class="fa-solid fa-chart-line"></i>&nbsp;Interaction Plot
                 <span id="abEtaBadge" class="vis-eta-badge"></span>
               </span>
-              <span style="font-size:13px;color:var(--text-muted);">Non-parallel lines → interaction effect</span>
+              <span id="interactionCaption" style="font-size:13px;color:var(--text-muted);">Compare the changes across groups; use the test and confidence intervals to assess the interaction</span>
             </div>
-            <div class="results-panel-body" style="padding:8px;">
+            <div class="results-panel-body" style="padding:8px 8px 14px;">
               <div class="chart-wrap-tall" id="interactionChart"></div>
+              <div class="ix-layout" id="interactionResults"></div>
             </div>
           </div>
           <div id="interactionEmpty" class="patterns-empty" style="display:none;">Interaction plot is available for two-way ANOVA.</div>
@@ -1810,6 +1857,7 @@
   var _bundle   = null;
   var _factorChartWhich = 'a';
   var _factorChartMode = 'bar';
+  var _ixHighlight = '';
   /* Original (host-precomputed) bundle preserved for two reasons: a clean
      restore when the user clears the row filter, and access to spec /
      posthoc / descriptive blocks we don't recompute on filter changes. */
@@ -3000,6 +3048,136 @@
     });
   }
 
+  function _escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function _fmtCount(n) {
+    if (!isFinite(n)) return '—';
+    return Math.round(n).toLocaleString();
+  }
+  function _tCrit95(df) {
+    if (isFinite(df) && df > 0 && typeof jStat !== 'undefined' && jStat.studentt && jStat.studentt.inv) {
+      var t = jStat.studentt.inv(0.975, df);
+      if (isFinite(t)) return t;
+    }
+    return 1.96;
+  }
+  function _cellMean(b, aLevel, bLevel) {
+    return (b.cellDesc || []).find(function (c) {
+      return String(c.a) === String(aLevel) && String(c.b) === String(bLevel);
+    }) || null;
+  }
+  function _changeCi(b, c0, c1) {
+    var n0 = c0 && isFinite(c0.n) ? c0.n : 0;
+    var n1 = c1 && isFinite(c1.n) ? c1.n : 0;
+    var m0 = c0 && isFinite(c0.mean) ? c0.mean : NaN;
+    var m1 = c1 && isFinite(c1.mean) ? c1.mean : NaN;
+    if (!(n0 > 0 && n1 > 0 && isFinite(m0) && isFinite(m1))) return null;
+    var diff = m1 - m0;
+    var tw = b.twoWay || {};
+    var se = NaN;
+    var df = isFinite(tw.dfError) ? tw.dfError : NaN;
+    if (isFinite(tw.msError) && tw.msError >= 0) {
+      se = Math.sqrt(tw.msError * (1 / n0 + 1 / n1));
+    }
+    if (!isFinite(se) && isFinite(c0.sd) && isFinite(c1.sd)) {
+      var v0 = (c0.sd * c0.sd) / n0;
+      var v1 = (c1.sd * c1.sd) / n1;
+      se = Math.sqrt(v0 + v1);
+      var denom = (v0 * v0) / Math.max(n0 - 1, 1) + (v1 * v1) / Math.max(n1 - 1, 1);
+      df = denom > 0 ? ((v0 + v1) * (v0 + v1)) / denom : df;
+    }
+    if (!isFinite(se)) return { diff: diff, lo: NaN, hi: NaN };
+    var half = _tCrit95(df) * se;
+    return { diff: diff, lo: diff - half, hi: diff + half };
+  }
+  function highlightInteractionCohort(level) {
+    level = level == null ? '' : String(level);
+    if (level && level === _ixHighlight) level = '';
+    _ixHighlight = level;
+    document.querySelectorAll('#interactionResults tr[data-cohort]').forEach(function (tr) {
+      tr.classList.toggle('is-on', level && tr.getAttribute('data-cohort') === level);
+    });
+    var chart = _charts.interaction;
+    if (!chart || !chart.series) return;
+    chart.series.forEach(function (s) {
+      var lv = s.options && s.options.custom ? s.options.custom.level : '';
+      var on = !level || String(lv) === level;
+      s.update({
+        opacity: on ? 1 : 0.2,
+        lineWidth: on && level ? 3.5 : 2.5,
+        marker: { enabled: true, radius: on ? 5 : 3 }
+      }, false);
+    });
+    chart.redraw();
+  }
+  function renderInteractionResults(b) {
+    var host = document.getElementById('interactionResults');
+    var cap = document.getElementById('interactionCaption');
+    if (!host || !b) return;
+    var f1 = (b.spec && b.spec.factor1) || 'Group';
+    var f2 = (b.spec && b.spec.factor2) || 'Level';
+    var levelsB = b.bLevels || [];
+    var levelsA = b.aLevels || [];
+    if (cap) {
+      cap.textContent = 'Compare the changes across ' + f1 + '; use the test and confidence intervals to assess the interaction';
+    }
+    if (levelsB.length < 2 || !levelsA.length) {
+      host.innerHTML = '';
+      return;
+    }
+    var b0 = levelsB[0];
+    var b1 = levelsB[levelsB.length - 1];
+    var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
+    var tw = b.twoWay || {};
+    var rows = levelsA.map(function (aLv) {
+      var c0 = _cellMean(b, aLv, b0);
+      var c1 = _cellMean(b, aLv, b1);
+      var ci = _changeCi(b, c0, c1);
+      return '<tr class="ix-row" data-cohort="' + _escHtml(aLv) + '" onclick="highlightInteractionCohort(this.getAttribute(\'data-cohort\'))">' +
+        '<td>' + _escHtml(aLv) + '</td>' +
+        '<td class="num">' + fmt(c0 && c0.mean) + '</td>' +
+        '<td class="num">' + fmt(c1 && c1.mean) + '</td>' +
+        '<td class="num">' + fmt(ci && ci.diff) + '</td>' +
+        '<td class="num">' + (ci && isFinite(ci.lo) ? (fmt(ci.lo) + ' to ' + fmt(ci.hi)) : '—') + '</td>' +
+        '<td class="num">' + _fmtCount(c0 && c0.n) + ' / ' + _fmtCount(c1 && c1.n) + '</td>' +
+      '</tr>';
+    }).join('');
+    var eta = tw.etaSqAB;
+    var etaName = _etaLabel(eta);
+    var sig = isFinite(tw.pAB) && tw.pAB < alpha;
+    var hasTest = isFinite(tw.FAB) && isFinite(tw.pAB);
+    var interpret = !hasTest
+      ? 'The interaction F test is not available for this result. The table still shows how the cell means change.'
+      : (sig
+        ? ('The interaction is statistically significant. The change from ' + b0 + ' to ' + b1 + ' is not the same size in every ' + f1 + '. η² = ' + fmt(eta, 3) + (etaName ? ' (' + etaName + ')' : '') + ', the share of total variance (SS interaction / SS total) associated with ' + f1 + ' × ' + f2 + '.')
+        : ('The interaction is not statistically significant at α = ' + alpha + '. A common change from ' + b0 + ' to ' + b1 + ' across ' + f1 + ' remains plausible. The confidence intervals show how large a difference in that change is still compatible with the data. η² = ' + fmt(eta, 3) + (etaName ? ' (' + etaName + ')' : '') + ' (SS interaction / SS total).'));
+    var testBody = hasTest
+      ? ('<div class="ix-test-line">F(' + tw.dfAB + ', ' + tw.dfError + ') = ' + fmt(tw.FAB, 2) + '</div>' +
+         '<div>p ' + fmtP(tw.pAB) + ' · η² = ' + fmt(eta, 3) + (etaName ? ' (' + etaName + ')' : '') + '</div>' +
+         '<div style="margin-top:6px;">' + sigBadge(tw.pAB, alpha) + '</div>')
+      : '';
+    var spanNote = levelsB.length > 2
+      ? ('<p class="ix-caption">Change compares the first ' + _escHtml(f2) + ' level (' + _escHtml(b0) + ') with the last (' + _escHtml(b1) + ').</p>')
+      : '';
+    host.innerHTML = spanNote +
+      '<div class="ix-table-wrap"><table><thead><tr>' +
+        '<th>' + _escHtml(f1) + '</th>' +
+        '<th class="num">Mean at ' + _escHtml(b0) + '</th>' +
+        '<th class="num">Mean at ' + _escHtml(b1) + '</th>' +
+        '<th class="num">Change (' + _escHtml(b1) + ' − ' + _escHtml(b0) + ')</th>' +
+        '<th class="num">95% CI</th>' +
+        '<th class="num">n at ' + _escHtml(b0) + ' / ' + _escHtml(b1) + '</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="ix-test">' +
+        '<h3>Overall interaction test</h3>' +
+        testBody +
+        '<p>' + _escHtml(interpret) + '</p>' +
+      '</div>';
+    _ixHighlight = '';
+  }
+
   function _factorChartView(b, which) {
     var isTwoWay = b && b.type === 'two-way';
     var useB = isTwoWay && which === 'b';
@@ -3136,13 +3314,16 @@
                 gridLineColor:t.gc, labels:{style:_axisLabelStyle(t.tc)} },
         legend:{ itemStyle:{color:t.tc,fontSize:'14px'} },
         plotOptions:{ line:{
+          cursor:'pointer',
           marker:{ enabled:true, radius:5, symbol:'circle' }, lineWidth:2.5,
           dataLabels:{ enabled:true, format:'{point.y:.2f}',
-            style:{color:t.tc,fontSize:'11px',fontWeight:'600',textOutline:'none'} }
+            style:{color:t.tc,fontSize:'11px',fontWeight:'600',textOutline:'none'} },
+          events:{ click:function(){ highlightInteractionCohort(this.options.custom && this.options.custom.level); } }
         }},
         series: b.aLevels.map(function(aLv, ai){
           return {
             name: f1 + ': ' + aLv,
+            custom:{ level:aLv },
             color: t.colors[ai % t.colors.length],
             data: b.bLevels.map(function(bLv){
               var cell = (b.cellDesc||[]).find(function(c){ return c.a===aLv && c.b===bLv; });
@@ -3162,6 +3343,10 @@
           }
         }
       });
+      renderInteractionResults(b);
+    } else {
+      var ixEmpty = document.getElementById('interactionResults');
+      if (ixEmpty) ixEmpty.innerHTML = '';
     }
 
     renderOverallHistogram(b);

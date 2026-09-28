@@ -65,7 +65,13 @@
       text-transform:uppercase; padding:10px 6px 4px;
     }
     .group-list-section + .group-list-section { margin-top:4px; padding-top:4px; border-top:1px solid var(--border); }
-    .group-list-loading, .group-list-empty { padding:28px 12px; text-align:center; color:var(--text-secondary); font-size:12px; line-height:1.45; }
+    .group-list-empty { padding:28px 12px; text-align:center; color:var(--text-secondary); font-size:12px; line-height:1.45; }
+    .group-list-loading {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      min-height:220px; gap:12px; padding:28px 12px; text-align:center;
+      color:var(--text-secondary); font-size:13px; line-height:1.45;
+    }
+    .group-list-loading i { color:var(--accent-1); font-size:28px; }
     .table-wrap { border:1px solid var(--border); border-radius:10px; overflow:auto; background:var(--surface-2); }
     #statsTableWrap.is-capped { max-height:calc(36px + 8 * 33px); }
     table { width:100%; border-collapse:collapse; min-width:1170px; }
@@ -994,10 +1000,28 @@
       btn.disabled = !ok;
     }
 
+    function showGroupListLoading(done, total) {
+      const list = document.getElementById('groupDialogList');
+      if (!list) return;
+      let box = list.querySelector('.group-list-loading');
+      if (!box) {
+        list.innerHTML = '<div class="group-list-loading" role="status" aria-live="polite">' +
+          '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>' +
+          '<span></span></div>';
+        box = list.querySelector('.group-list-loading');
+      }
+      const label = box && box.querySelector('span');
+      if (label) {
+        label.textContent = total
+          ? ('Scoring grouping variables… ' + done + ' of ' + total)
+          : 'Scoring grouping variables…';
+      }
+    }
+
     function populateGroupChoices() {
       const list = document.getElementById('groupDialogList');
       if (!list) return;
-      list.innerHTML = '<div class="group-list-loading" role="status">Scoring grouping variables…</div>';
+      showGroupListLoading(0, headers.length);
       Object.keys(groupColumnMeta).forEach((key) => { delete groupColumnMeta[key]; });
       fillGroupChoiceNotes();
     }
@@ -1012,6 +1036,7 @@
           return;
         }
         if (i < headers.length) {
+          showGroupListLoading(i, headers.length);
           const idx = i++;
           const levels = idx === analysisIndex ? [] : getLevelCounts(idx);
           groupColumnMeta[String(idx)] = classifyGroupColumn(idx, levels);

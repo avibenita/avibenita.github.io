@@ -4096,6 +4096,7 @@ const StatisticoHeader = {
     if (!nav || !this._isSharedSidebarModule()) return;
     const cfg = this._getSharedSidebarConfig();
     if (!cfg) return;
+    const hadFooter = !!nav.querySelector('#sbNavFooter');
     nav.setAttribute('aria-label', 'Analyses');
 
     const groupsHtml = (cfg.groups || []).map((group) => {
@@ -4119,6 +4120,7 @@ const StatisticoHeader = {
     if (typeof StatisticoBrandLogo !== 'undefined' && StatisticoBrandLogo.mountAll) {
       StatisticoBrandLogo.mountAll(nav);
     }
+    if (hadFooter) this._mountSidebarUtilities();
   },
 
   /**

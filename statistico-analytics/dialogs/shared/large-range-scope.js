@@ -201,10 +201,23 @@
     if (original) btn.innerHTML = original;
   }
 
-  function findAnchor() {
-    return document.getElementById("obsMonitor")
-      || document.getElementById("metaBadge")
-      || document.querySelector(".cfg-footer");
+  function placePanel(panel) {
+    var col = document.querySelector(".reg-model-col");
+    if (col) {
+      col.insertBefore(panel, col.firstChild);
+      return;
+    }
+    var body = document.querySelector(".cfg-body");
+    if (body) {
+      body.insertBefore(panel, body.firstChild);
+      return;
+    }
+    var footer = document.querySelector(".cfg-footer");
+    if (footer && footer.parentNode) {
+      footer.parentNode.insertBefore(panel, footer);
+      return;
+    }
+    document.body.appendChild(panel);
   }
 
   function render(headers, rows) {
@@ -217,8 +230,9 @@
     var count = rows.length;
     var estimated = estimateChars(headers, rows);
     var proposed = proposeSampleSize(count, estimated);
-    var offer = copy.offerSample !== false && count > 0 && estimated > CHAR_LIMIT && proposed < count;
-    var noteOnly = copy.offerSample === false && estimated > CHAR_LIMIT && count > 0;
+    var large = count >= 8000 || estimated > CHAR_LIMIT;
+    var offer = copy.offerSample !== false && large && proposed < count;
+    var noteOnly = copy.offerSample === false && large;
     if (!offer && !noteOnly) {
       plan = null;
       var old = panelEl();
@@ -232,13 +246,7 @@
       panel = document.createElement("div");
       panel.className = "sample-proposal";
       panel.id = "sampleProposal";
-      var anchor = findAnchor();
-      if (anchor && anchor.parentNode) {
-        if (anchor.id === "metaBadge") anchor.parentNode.insertBefore(panel, anchor.parentNode.firstChild);
-        else anchor.parentNode.insertBefore(panel, anchor.nextSibling);
-      } else {
-        document.body.appendChild(panel);
-      }
+      placePanel(panel);
     }
     panel.hidden = false;
     var noun = nounOf(copy);

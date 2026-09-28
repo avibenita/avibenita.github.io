@@ -398,7 +398,4 @@
     autoSyncConfigButtons();
   }
 
-  if (!window.StatisticoLargeRange) {
-    document.write('<script src="' + resolveAssetUrl('dialogs/shared/large-range-scope.js?v=20260928range1') + '"><\/script>');
-  }
 })();

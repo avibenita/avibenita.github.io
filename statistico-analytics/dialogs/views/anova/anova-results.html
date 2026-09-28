@@ -25,7 +25,7 @@
   <link rel="stylesheet" href="../shared-power-template.css?v=20260913f" />
   <script src="../shared-power-template.js?v=20260913e"></script>
   <script src="../shared-power-analysis.js?v=20260913e"></script>
-  <script src="../shared-header.js?v=20260928range1"></script>
+  <script src="../shared-header.js?v=20260928anova2"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -210,15 +210,17 @@
       min-height: 0;
     }
 
-    /* Visuals tab scrolls inside the shell. A 100vh min-height made this
-       panel taller than the clipped column, so the lower charts were cut off. */
-    #tab-visuals{
+    /* Visuals / interactions tabs scroll inside the shell. A 100vh min-height
+       made this panel taller than the clipped column, so the lower charts were cut off. */
+    #tab-visuals,
+    #tab-interactions{
       display:none; padding:12px 16px 20px;
       min-height:0;
       overflow-y:auto;
       overflow-x:hidden;
     }
-    #tab-visuals.active{
+    #tab-visuals.active,
+    #tab-interactions.active{
       display:flex; flex-direction:column;
       flex:1 1 auto;
       min-height:0;
@@ -227,7 +229,8 @@
       flex:0 0 auto;
       min-height:0;
     }
-    #tab-visuals > .results-panel{
+    #tab-visuals > .results-panel,
+    #tab-interactions > .results-panel{
       flex:0 0 auto;
     }
     /* Interaction / times charts: no outer frame, no rule under the title */
@@ -1527,6 +1530,16 @@
         <!-- ── PATTERNS (Plots + Effect Sizes) ──────────────── -->
         <div class="tab-panel" id="tab-visuals" style="display:none;">
 
+          <div class="results-panel" id="panelOverallHist" style="margin-bottom:10px;">
+            <div class="results-panel-heading">
+              <span><i class="fa-solid fa-chart-area"></i>&nbsp;Overall Histogram</span>
+              <span id="overallHistSubtitle" style="font-size:13px;font-weight:600;color:var(--text-muted);"></span>
+            </div>
+            <div class="results-panel-body" style="padding:8px;">
+              <div class="chart-wrap-std" id="overallHistChart"></div>
+            </div>
+          </div>
+
           <!-- ── Row 1: Times panel (two-way only) ───────────── -->
           <div id="mainEffectsRow" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px;">
             <!-- Panel: Times (two-way only, injected into grid via JS) -->
@@ -1548,19 +1561,6 @@
             </div>
 
           </div><!-- /mainEffectsRow -->
-
-          <!-- ── Panel C: Interaction (two-way only) ──────────── -->
-          <div class="results-panel chart-solo" id="panelInteraction" style="display:none;margin-bottom:10px;">
-            <div class="results-panel-heading">
-              <span><i class="fa-solid fa-chart-line"></i>&nbsp;Interaction Plot
-                <span id="abEtaBadge" class="vis-eta-badge"></span>
-              </span>
-              <span style="font-size:12px;color:var(--text-muted);">Non-parallel lines → interaction effect</span>
-            </div>
-              <div class="results-panel-body" style="padding:8px;">
-              <div class="chart-wrap-tall" id="interactionChart"></div>
-            </div>
-          </div>
 
           <div class="results-panel" id="panelMeansRanks" style="margin-bottom:10px;">
             <div class="results-panel-heading">
@@ -1597,6 +1597,22 @@
             </div>
           </div>
 
+        </div>
+
+        <!-- ── INTERACTIONS (two-way only) ─────────────────── -->
+        <div class="tab-panel" id="tab-interactions" style="display:none;">
+          <div class="results-panel chart-solo" id="panelInteraction" style="display:none;margin-bottom:10px;">
+            <div class="results-panel-heading">
+              <span><i class="fa-solid fa-chart-line"></i>&nbsp;Interaction Plot
+                <span id="abEtaBadge" class="vis-eta-badge"></span>
+              </span>
+              <span style="font-size:13px;color:var(--text-muted);">Non-parallel lines → interaction effect</span>
+            </div>
+            <div class="results-panel-body" style="padding:8px;">
+              <div class="chart-wrap-tall" id="interactionChart"></div>
+            </div>
+          </div>
+          <div id="interactionEmpty" class="patterns-empty" style="display:none;">Interaction plot is available for two-way ANOVA.</div>
         </div>
 
         <!-- ── Power & Sample Size Modal ───────────────────── -->
@@ -1862,6 +1878,7 @@
     'results':     'Results',
     'comparisons': 'Comparisons',
     'patterns':    'Descriptives',
+    'interactions':'Interactions',
     'power':       'Power & Sample Size',
     'details':     'Details',
     'report':      'Report',
@@ -1875,6 +1892,7 @@
     'results':     ['tab-inference'],
     'comparisons': ['tab-posthoc'],
     'patterns':    ['tab-visuals'],
+    'interactions':['tab-interactions'],
     'power':       ['tab-power'],
     'details':     ['tab-details'],
     'report':      ['tab-report'],
@@ -1907,17 +1925,17 @@
       var p = document.getElementById(pid);
       if (p) {
         /* visuals tab uses flex layout */
-        p.style.display = (pid === 'tab-visuals' || pid === 'tab-power') ? 'flex' : 'block';
+        p.style.display = (pid === 'tab-visuals' || pid === 'tab-interactions' || pid === 'tab-power') ? 'flex' : 'block';
         p.classList.add('active');
       }
     });
     var btn = document.querySelector('.sb-item[data-tab="' + id + '"]');
     if (btn) btn.classList.add('active');
 
-    if (id === 'patterns' || id === 'visuals') {
+    if (id === 'patterns' || id === 'visuals' || id === 'interactions') {
       setTimeout(function() {
         /* reflow all visible charts after tab becomes visible */
-        ['grpBar','grpBox','timBar','timBox','interaction','meansMini','ranksMini'].forEach(function(k){
+        ['grpBar','grpBox','timBar','timBox','interaction','meansMini','ranksMini','overallHist'].forEach(function(k){
           if (_charts[k]) try { _charts[k].reflow(); } catch(e){}
         });
       }, 60);
@@ -2663,49 +2681,50 @@
     };
   }
 
+  function _axisLabelStyle(tc) {
+    return { color: tc, fontSize: '16px', fontWeight: '600' };
+  }
+  function _axisTitleStyle(tc) {
+    return { color: tc, fontSize: '16px', fontWeight: '700' };
+  }
+  /* Value sits fully above the column, not inside the bar. */
+  function _colValueLabel(tc) {
+    return {
+      enabled: true,
+      format: '{point.y:.2f}',
+      align: 'center',
+      verticalAlign: 'bottom',
+      inside: false,
+      y: -8,
+      crop: false,
+      overflow: 'allow',
+      style: { color: tc, fontSize: '14px', fontWeight: '700', textOutline: 'none' }
+    };
+  }
+
   /* shared column-chart config builder */
   function _colCfg(categories, series, yTitle, tc, gc, opts) {
     opts = opts || {};
     var drillable = !!(opts.pointEvents && opts.pointEvents.click);
+    var valueLabel = _colValueLabel(tc);
     return {
       chart:{ type:'column', backgroundColor:'transparent',
-              style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:400},
-              spacingTop:36, spacingBottom:10 },
+              style:{fontFamily:'Segoe UI,sans-serif', fontSize:'16px'}, animation:{duration:400},
+              spacingTop:28, spacingBottom:12 },
       title:{ text:'' }, credits:{ enabled:false },
-      xAxis:{ categories:categories, labels:{style:{color:tc,fontSize:'12px'}},
+      xAxis:{ categories:categories, labels:{style:_axisLabelStyle(tc)},
               lineColor:gc, tickColor:gc },
-      yAxis:{ title:{text:yTitle,style:{color:tc,fontSize:'12px'}},
-              gridLineColor:gc, labels:{style:{color:tc}},
-              maxPadding:0.15 },
-      legend:{ enabled: series.length > 1, itemStyle:{color:tc,fontSize:'12px'} },
+      yAxis:{ title:{text:yTitle,style:_axisTitleStyle(tc)},
+              gridLineColor:gc, labels:{style:_axisLabelStyle(tc)},
+              maxPadding:0.22 },
+      legend:{ enabled: series.length > 1, itemStyle:{color:tc,fontSize:'14px'} },
       plotOptions:{ column:{
         borderRadius:5, borderWidth:0, groupPadding:.1, pointPadding:.08,
-        /* default OFF — each series sets its own dataLabels */
         dataLabels:{ enabled:false },
         point: opts.pointEvents ? { events: opts.pointEvents } : {}
       }},
-      /* add a second series shadow just for the drill icon label (same data, invisible columns) */
-      series: drillable
-        ? series.slice(0,1).map(function(s){
-            /* main series: value on TOP of bar */
-            return Object.assign({}, s, {
-              dataLabels:{
-                enabled:true, format:'{point.y:.2f}',
-                style:{color:tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
-                verticalAlign:'top', inside:false, y:-6,
-                crop:false, overflow:'allow'
-              }
-            });
-          }).concat(series.slice(1))
-        : series.slice(0,1).map(function(s){
-            return Object.assign({}, s, {
-              dataLabels:{
-                enabled:true, format:'{point.y:.2f}',
-                style:{color:tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
-                verticalAlign:'top', inside:false, y:-6,
-                crop:false, overflow:'allow'
-              }
-            });
+      series: series.slice(0,1).map(function(s){
+            return Object.assign({}, s, { dataLabels: valueLabel });
           }).concat(series.slice(1)),
       tooltip:{ backgroundColor: tc === '#1f2937' ? '#fff' : '#1e293b',
                 style:{color: tc === '#1f2937' ? '#1f2937' : '#f1f5f9'},
@@ -2723,13 +2742,13 @@
     var col = accentColor || '#10b981';
     return {
       chart:{ type:'boxplot', backgroundColor:'transparent',
-              style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:400},
-              spacingTop:10, spacingBottom:10 },
+              style:{fontFamily:'Segoe UI,sans-serif', fontSize:'16px'}, animation:{duration:400},
+              spacingTop:10, spacingBottom:12 },
       title:{ text:'' }, credits:{ enabled:false },
-      xAxis:{ categories:categories, labels:{style:{color:tc,fontSize:'12px'}},
+      xAxis:{ categories:categories, labels:{style:_axisLabelStyle(tc)},
               lineColor:gc, tickColor:gc },
-      yAxis:{ title:{text:yTitle,style:{color:tc,fontSize:'12px'}},
-              gridLineColor:gc, labels:{style:{color:tc}} },
+      yAxis:{ title:{text:yTitle,style:_axisTitleStyle(tc)},
+              gridLineColor:gc, labels:{style:_axisLabelStyle(tc)} },
       legend:{ enabled:false },
       plotOptions:{ boxplot:{
         fillColor: col === '#3b82f6' ? 'rgba(59,130,246,.15)' : 'rgba(16,185,129,.15)',
@@ -2839,6 +2858,136 @@
     }, 40);
   }
 
+  function _collectOverallDvValues(bundle) {
+    var rows = (Array.isArray(_vdFiltered) && _vdFiltered.length ? _vdFiltered : _vdRows) || [];
+    var cols = Array.isArray(_vdCols) ? _vdCols : [];
+    var dv = bundle && bundle.spec ? bundle.spec.dv : null;
+    var dvIdx = dv ? cols.indexOf(dv) : -1;
+    var vals = [];
+    if (rows.length && dvIdx >= 0) {
+      rows.forEach(function (r) {
+        if (!Array.isArray(r)) return;
+        var v = parseFloat(r[dvIdx]);
+        if (isFinite(v)) vals.push(v);
+      });
+      if (vals.length) return vals;
+    }
+    var factor = bundle && bundle.spec ? (bundle.spec.factor1 || bundle.spec.factor) : null;
+    if (factor) {
+      var byLevel = _getRawSeriesByLevel(bundle, factor);
+      Object.keys(byLevel).forEach(function (k) {
+        vals = vals.concat(byLevel[k] || []);
+      });
+    }
+    if (!vals.length && bundle && bundle.groups && typeof bundle.groups === 'object') {
+      Object.keys(bundle.groups).forEach(function (k) {
+        var arr = bundle.groups[k];
+        if (!Array.isArray(arr)) return;
+        vals = vals.concat(arr.filter(function (v) { return isFinite(v); }).map(function (v) { return +v; }));
+      });
+    }
+    return vals;
+  }
+
+  function _histogramBins(values) {
+    var nums = values.filter(function (v) { return isFinite(v); }).slice().sort(function (a, b) { return a - b; });
+    var n = nums.length;
+    if (!n) return null;
+    var min = nums[0];
+    var max = nums[n - 1];
+    var bins = 16;
+    if (n > 1 && max > min) {
+      var q1 = nums[Math.floor(n * 0.25)];
+      var q3 = nums[Math.floor(n * 0.75)];
+      var iqr = q3 - q1;
+      var width = iqr > 0 ? (2 * iqr * Math.pow(n, -1 / 3)) : 0;
+      if (width > 0) bins = Math.ceil((max - min) / width);
+    }
+    if (!isFinite(bins) || bins < 8) bins = 8;
+    if (bins > 24) bins = 24;
+    if (min === max) bins = 1;
+    var span = max - min;
+    var binWidth = bins === 1 ? 1 : span / bins;
+    var counts = new Array(bins).fill(0);
+    nums.forEach(function (v) {
+      var idx = bins === 1 ? 0 : Math.floor((v - min) / binWidth);
+      if (idx < 0) idx = 0;
+      if (idx >= bins) idx = bins - 1;
+      counts[idx] += 1;
+    });
+    var digits = span >= 100 ? 0 : span >= 10 ? 1 : 2;
+    var categories = counts.map(function (_, i) {
+      var lo = min + i * binWidth;
+      var hi = (i === bins - 1) ? max : (min + (i + 1) * binWidth);
+      return lo.toFixed(digits) + '–' + hi.toFixed(digits);
+    });
+    return { categories: categories, counts: counts, min: min, max: max };
+  }
+
+  function renderOverallHistogram(b) {
+    var el = document.getElementById('overallHistChart');
+    if (!el || !b) return;
+    var t = _visTheme();
+    var dv = (b.spec && b.spec.dv) || 'Value';
+    var vals = _collectOverallDvValues(b);
+    var sub = document.getElementById('overallHistSubtitle');
+    if (_charts.overallHist) {
+      try { _charts.overallHist.destroy(); } catch (_e) {}
+      _charts.overallHist = null;
+    }
+    if (!vals.length) {
+      el.innerHTML = '<div class="patterns-empty">Overall histogram appears when the outcome values are available.</div>';
+      if (sub) sub.textContent = '';
+      return;
+    }
+    var hist = _histogramBins(vals);
+    if (!hist) return;
+    if (sub) sub.textContent = dv + '  ·  n=' + vals.length.toLocaleString();
+    var step = hist.categories.length > 12 ? 2 : 1;
+    _charts.overallHist = Highcharts.chart('overallHistChart', {
+      chart: {
+        type: 'column',
+        backgroundColor: 'transparent',
+        style: { fontFamily: 'Segoe UI,sans-serif', fontSize: '16px' },
+        spacingTop: 16,
+        spacingBottom: 12
+      },
+      title: { text: '' },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: {
+        categories: hist.categories,
+        title: { text: dv, style: _axisTitleStyle(t.tc) },
+        labels: { style: _axisLabelStyle(t.tc), step: step, rotation: hist.categories.length > 10 ? -35 : 0 },
+        lineColor: t.gc,
+        tickColor: t.gc
+      },
+      yAxis: {
+        title: { text: 'Count', style: _axisTitleStyle(t.tc) },
+        labels: { style: _axisLabelStyle(t.tc) },
+        gridLineColor: t.gc,
+        allowDecimals: false
+      },
+      plotOptions: {
+        column: {
+          color: t.colors[0],
+          borderWidth: 0,
+          borderRadius: 2,
+          groupPadding: 0,
+          pointPadding: 0.04
+        }
+      },
+      series: [{ name: 'Count', data: hist.counts }],
+      tooltip: {
+        backgroundColor: t.isDark ? '#1e293b' : '#fff',
+        style: { color: t.isDark ? '#f1f5f9' : '#1f2937' },
+        borderRadius: 8,
+        headerFormat: '',
+        pointFormat: '<b>{point.category}</b><br>Count: <b>{point.y}</b>'
+      }
+    });
+  }
+
   /* ── Main entry: render all visuals panels ── */
   function renderAllVisuals(b) {
     var t = _visTheme();
@@ -2859,6 +3008,8 @@
     /* Show/hide panels */
     document.getElementById('panelTimes').style.display       = isTwoWay ? '' : 'none';
     document.getElementById('panelInteraction').style.display = isTwoWay ? '' : 'none';
+    var interactionEmpty = document.getElementById('interactionEmpty');
+    if (interactionEmpty) interactionEmpty.style.display = isTwoWay ? 'none' : '';
 
     /* ── Effect size badges ── */
     if (isTwoWay && b.twoWay) {
@@ -2892,14 +3043,14 @@
     if (isTwoWay && b.cellDesc && b.aLevels && b.bLevels) {
       _charts.interaction = Highcharts.chart('interactionChart', {
         chart:{ type:'line', backgroundColor:'transparent',
-                style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:500} },
+                style:{fontFamily:'Segoe UI,sans-serif', fontSize:'16px'}, animation:{duration:500} },
         title:{ text:'' }, credits:{ enabled:false },
         xAxis:{ categories: b.bLevels,
-                title:{ text: f2, style:{color:t.tc,fontSize:'12px'} },
-                labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
-        yAxis:{ title:{ text:dv, style:{color:t.tc,fontSize:'12px'} },
-                gridLineColor:t.gc, labels:{style:{color:t.tc}} },
-        legend:{ itemStyle:{color:t.tc,fontSize:'12px'} },
+                title:{ text: f2, style:_axisTitleStyle(t.tc) },
+                labels:{style:_axisLabelStyle(t.tc)}, lineColor:t.gc },
+        yAxis:{ title:{ text:dv, style:_axisTitleStyle(t.tc) },
+                gridLineColor:t.gc, labels:{style:_axisLabelStyle(t.tc)} },
+        legend:{ itemStyle:{color:t.tc,fontSize:'14px'} },
         plotOptions:{ line:{
           marker:{ enabled:true, radius:5, symbol:'circle' }, lineWidth:2.5,
           dataLabels:{ enabled:true, format:'{point.y:.2f}',
@@ -2928,6 +3079,8 @@
         }
       });
     }
+
+    renderOverallHistogram(b);
   }
 
   /* ── Drill-down: click a Group bar → show times for that group ── */
@@ -2953,16 +3106,14 @@
         chart:{ type:'column', backgroundColor:'transparent',
                 style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:300}, spacingTop:36, spacingBottom:10 },
         title:{ text:'' }, credits:{ enabled:false },
-        xAxis:{ categories:cats, title:{text:f2,style:{color:t.tc}},
-                labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
-        yAxis:{ title:{text:dv,style:{color:t.tc}},
-                gridLineColor:t.gc, labels:{style:{color:t.tc}}, maxPadding:0.15 },
+        xAxis:{ categories:cats, title:{text:f2,style:_axisTitleStyle(t.tc)},
+                labels:{style:_axisLabelStyle(t.tc)}, lineColor:t.gc },
+        yAxis:{ title:{text:dv,style:_axisTitleStyle(t.tc)},
+                gridLineColor:t.gc, labels:{style:_axisLabelStyle(t.tc)}, maxPadding:0.22 },
         legend:{ enabled:false },
         plotOptions:{ column:{
-          color: t.colors[1], borderRadius:5, borderWidth:0,   /* blue = times colour */
-          dataLabels:{ enabled:true, format:'{point.y:.2f}',
-            style:{color:t.tc,fontSize:'11px',fontWeight:'700',textOutline:'none'},
-            verticalAlign:'top', inside:false, y:-8, crop:false, overflow:'allow' }
+          color: t.colors[1], borderRadius:5, borderWidth:0,
+          dataLabels: _colValueLabel(t.tc)
         }},
         series:[{ name:dv, data:data }],
         tooltip:{ backgroundColor: t.isDark?'#1e293b':'#fff',
@@ -3079,24 +3230,21 @@
       });
 
       _charts.meansMini = Highcharts.chart('meansByGroupBarChart', {
-        chart: { type: 'column', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI,sans-serif' } },
+        chart: { type: 'column', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI,sans-serif', fontSize: '16px' }, spacingTop: 28 },
         title: { text: '' },
         credits: { enabled: false },
         legend: { enabled: false },
         xAxis: {
           categories: meanCats,
-          title: { text: factor, style: { color: t.tc, fontSize: '11px' } },
-          labels: { style: { color: t.tc, fontSize: '11px' } },
+          title: { text: factor, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc) },
           lineColor: t.gc
         },
-        yAxis: { title: { text: dv, style: { color: t.tc } }, labels: { style: { color: t.tc } }, gridLineColor: t.gc, maxPadding: 0.14 },
+        yAxis: { title: { text: dv, style: _axisTitleStyle(t.tc) }, labels: { style: _axisLabelStyle(t.tc) }, gridLineColor: t.gc, maxPadding: 0.22 },
         plotOptions: {
           column: {
             color: t.colors[0], borderRadius: 4, borderWidth: 0,
-            dataLabels: {
-              enabled: true, format: '{point.y:.2f}', crop: false, overflow: 'allow',
-              style: { color: t.tc, fontSize: '11px', fontWeight: '700', textOutline: 'none' }
-            }
+            dataLabels: _colValueLabel(t.tc)
           }
         },
         series: [
@@ -3117,7 +3265,7 @@
       _charts.meansMiniBox = Highcharts.chart('meansByGroupBoxChart',
         _boxCfg(meanCats, boxData, dv, t.tc, t.gc, t.colors[0]));
       if (_charts.meansMiniBox && _charts.meansMiniBox.xAxis && _charts.meansMiniBox.xAxis[0]) {
-        _charts.meansMiniBox.xAxis[0].setTitle({ text: factor, style: { color: t.tc, fontSize: '11px' } }, false);
+        _charts.meansMiniBox.xAxis[0].setTitle({ text: factor, style: _axisTitleStyle(t.tc) }, false);
         _charts.meansMiniBox.redraw();
       }
 
@@ -3146,11 +3294,11 @@
         legend: { enabled: false },
         xAxis: {
           categories: rankCats,
-          title: { text: factor, style: { color: t.tc, fontSize: '11px' } },
-          labels: { style: { color: t.tc, fontSize: '11px' } },
+          title: { text: factor, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc) },
           lineColor: t.gc
         },
-        yAxis: { title: { text: 'Mean Rank', style: { color: t.tc } }, labels: { style: { color: t.tc } }, gridLineColor: t.gc },
+        yAxis: { title: { text: 'Mean Rank', style: _axisTitleStyle(t.tc) }, labels: { style: _axisLabelStyle(t.tc) }, gridLineColor: t.gc },
         plotOptions: { bar: { color: t.colors[1], borderRadius: 4, borderWidth: 0, dataLabels: { enabled: true, format: '{point.y:.2f}', style: { color: t.tc, fontSize: '11px', fontWeight: '700', textOutline: 'none' } } } },
         series: [{ name: 'Mean Rank', data: rankVals }],
         tooltip: {
@@ -3220,18 +3368,16 @@
       if (_charts.drill) { try{ _charts.drill.destroy(); }catch(e){} }
       _charts.drill = Highcharts.chart('drillChart', {
         chart:{ type:'column', backgroundColor:'transparent',
-                style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:300}, spacingTop:36, spacingBottom:10 },
+                style:{fontFamily:'Segoe UI,sans-serif', fontSize:'16px'}, animation:{duration:300}, spacingTop:28, spacingBottom:12 },
         title:{ text:'' }, credits:{ enabled:false },
-        xAxis:{ categories:cats, title:{text:f1,style:{color:t.tc}},
-                labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
-        yAxis:{ title:{text:dv,style:{color:t.tc}},
-                gridLineColor:t.gc, labels:{style:{color:t.tc}}, maxPadding:0.15 },
+        xAxis:{ categories:cats, title:{text:f1,style:_axisTitleStyle(t.tc)},
+                labels:{style:_axisLabelStyle(t.tc)}, lineColor:t.gc },
+        yAxis:{ title:{text:dv,style:_axisTitleStyle(t.tc)},
+                gridLineColor:t.gc, labels:{style:_axisLabelStyle(t.tc)}, maxPadding:0.22 },
         legend:{ enabled:false },
         plotOptions:{ column:{
-          color: t.colors[0], borderRadius:5, borderWidth:0,   /* blue = groups colour */
-          dataLabels:{ enabled:true, format:'{point.y:.2f}',
-            style:{color:t.tc,fontSize:'11px',fontWeight:'700',textOutline:'none'},
-            verticalAlign:'top', inside:false, y:-8, crop:false, overflow:'allow' }
+          color: t.colors[0], borderRadius:5, borderWidth:0,
+          dataLabels: _colValueLabel(t.tc)
         }},
         series:[{ name:dv, data:data }],
         tooltip:{ backgroundColor: t.isDark?'#1e293b':'#fff',
@@ -3276,16 +3422,14 @@
         if (!desc.length) { title.textContent = f1 + ' — no data'; return; }
         title.textContent = f1 + ' — marginal means';
         _charts.drill = Highcharts.chart('drillChart', {
-          chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:350}, spacingTop:36, spacingBottom:10 },
+          chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif', fontSize:'16px'}, animation:{duration:350}, spacingTop:28, spacingBottom:12 },
           title:{ text:'' }, credits:{ enabled:false },
-          xAxis:{ categories: desc.map(function(d){ return d.level; }), labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
-          yAxis:{ title:{text:dv,style:{color:t.tc}}, gridLineColor:t.gc, labels:{style:{color:t.tc}}, maxPadding:0.15 },
+          xAxis:{ categories: desc.map(function(d){ return d.level; }), labels:{style:_axisLabelStyle(t.tc)}, lineColor:t.gc },
+          yAxis:{ title:{text:dv,style:_axisTitleStyle(t.tc)}, gridLineColor:t.gc, labels:{style:_axisLabelStyle(t.tc)}, maxPadding:0.22 },
           legend:{ enabled:false },
           plotOptions:{ column:{
             color: t.colors[0], borderRadius:5, borderWidth:0,
-            dataLabels:{ enabled:true, format:'{point.y:.2f}',
-              style:{color:t.tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
-              verticalAlign:'top', inside:false, y:-8, crop:false, overflow:'allow' }
+            dataLabels: _colValueLabel(t.tc)
           }},
           series:[{ name:dv, data: desc.map(function(d){ return isFinite(d.mean) ? +d.mean.toFixed(4) : null; }) }],
           tooltip:{ backgroundColor: t.isDark?'#1e293b':'#fff', style:{color:t.isDark?'#f1f5f9':'#1f2937'}, borderRadius:8,
@@ -3301,16 +3445,14 @@
         if (!desc.length) { title.textContent = f2 + ' — no data'; return; }
         title.textContent = f2 + ' — marginal means';
         _charts.drill = Highcharts.chart('drillChart', {
-          chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:350}, spacingTop:36, spacingBottom:10 },
+          chart:{ type:'column', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif', fontSize:'16px'}, animation:{duration:350}, spacingTop:28, spacingBottom:12 },
           title:{ text:'' }, credits:{ enabled:false },
-          xAxis:{ categories: desc.map(function(d){ return d.level; }), labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
-          yAxis:{ title:{text:dv,style:{color:t.tc}}, gridLineColor:t.gc, labels:{style:{color:t.tc}}, maxPadding:0.15 },
+          xAxis:{ categories: desc.map(function(d){ return d.level; }), labels:{style:_axisLabelStyle(t.tc)}, lineColor:t.gc },
+          yAxis:{ title:{text:dv,style:_axisTitleStyle(t.tc)}, gridLineColor:t.gc, labels:{style:_axisLabelStyle(t.tc)}, maxPadding:0.22 },
           legend:{ enabled:false },
           plotOptions:{ column:{
             color: t.colors[1], borderRadius:5, borderWidth:0,
-            dataLabels:{ enabled:true, format:'{point.y:.2f}',
-              style:{color:t.tc,fontSize:'12px',fontWeight:'700',textOutline:'none'},
-              verticalAlign:'top', inside:false, y:-8, crop:false, overflow:'allow' }
+            dataLabels: _colValueLabel(t.tc)
           }},
           series:[{ name:dv, data: desc.map(function(d){ return isFinite(d.mean) ? +d.mean.toFixed(4) : null; }) }],
           tooltip:{ backgroundColor: t.isDark?'#1e293b':'#fff', style:{color:t.isDark?'#f1f5f9':'#1f2937'}, borderRadius:8,
@@ -3327,10 +3469,10 @@
         _charts.drill = Highcharts.chart('drillChart', {
           chart:{ type:'line', backgroundColor:'transparent', style:{fontFamily:'Segoe UI,sans-serif'}, animation:{duration:400} },
           title:{ text:'' }, credits:{ enabled:false },
-          xAxis:{ categories: b.bLevels, title:{text:f2,style:{color:t.tc,fontSize:'12px'}},
-                  labels:{style:{color:t.tc,fontSize:'12px'}}, lineColor:t.gc },
-          yAxis:{ title:{text:dv,style:{color:t.tc,fontSize:'12px'}}, gridLineColor:t.gc, labels:{style:{color:t.tc}} },
-          legend:{ itemStyle:{color:t.tc,fontSize:'12px'} },
+          xAxis:{ categories: b.bLevels, title:{text:f2,style:_axisTitleStyle(t.tc)},
+                  labels:{style:_axisLabelStyle(t.tc)}, lineColor:t.gc },
+          yAxis:{ title:{text:dv,style:_axisTitleStyle(t.tc)}, gridLineColor:t.gc, labels:{style:_axisLabelStyle(t.tc)} },
+          legend:{ itemStyle:{color:t.tc,fontSize:'14px'} },
           plotOptions:{ line:{
             marker:{ enabled:true, radius:5, symbol:'circle' }, lineWidth:2.5,
             dataLabels:{ enabled:true, format:'{point.y:.2f}',
@@ -3380,6 +3522,7 @@
     if (_bundle) {
       setTimeout(function () {
         try { renderPatternsCompare(_bundle); } catch (_e) {}
+        try { renderOverallHistogram(_bundle); } catch (_e2) {}
       }, 0);
     }
   }

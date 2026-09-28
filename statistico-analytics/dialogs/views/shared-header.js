@@ -2183,6 +2183,7 @@ const StatisticoHeader = {
       const anovaType = String(ctx.type || '').toLowerCase();
       const conditionCount = Number(ctx.conditionCount || 0);
       const isRepeated = anovaType === 'repeated';
+      const isTwoWay = anovaType === 'two-way';
       const isPaired = isRepeated && conditionCount === 2;
       const isRepeatedKplus = isRepeated && conditionCount >= 3;
       const resultLabel = isPaired ? 'Paired Test' : 'Test Results';
@@ -2206,11 +2207,21 @@ const StatisticoHeader = {
         }
       ];
       if (!isRepeatedKplus) {
+        const toolItems = [
+          { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Descriptives', description: 'Compare group descriptives visually.' }
+        ];
+        if (isTwoWay) {
+          toolItems.push({
+            type: 'tab',
+            tab: 'interactions',
+            icon: 'fa-chart-line',
+            label: 'Interactions',
+            description: 'Interaction plot across the two factors.'
+          });
+        }
         groups.push({
           title: 'Tools',
-          items: [
-            { type: 'tab', tab: 'patterns', icon: 'fa-chart-column', label: 'Descriptives', description: 'Compare group descriptives visually.' }
-          ]
+          items: toolItems
         });
       }
 

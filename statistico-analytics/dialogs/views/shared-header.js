@@ -7,6 +7,16 @@
 console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
 (function () {
+  if (typeof Storage === 'undefined' || Storage.prototype.__statisticoOptionalWrite) return;
+  var nativeSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (key, value) {
+    try { return nativeSetItem.call(this, key, value); }
+    catch (error) { console.warn('Optional storage write skipped for ' + key); }
+  };
+  Storage.prototype.__statisticoOptionalWrite = true;
+})();
+
+(function () {
   function sanitizeDialogHostInfoParam() {
     try {
       if (!window.location || !window.location.search) return;
@@ -697,6 +707,8 @@ const StatisticoHeader = {
     this.ensureLaptopFrame();
     
     this.render();
+    this.showSampleNote();
+    this._listenForAnalysisSample();
     this._installPreviewChartHook();
     this._previewReady = true;
     this._restorePreviewTemplate();
@@ -746,6 +758,71 @@ const StatisticoHeader = {
   /**
    * Update variable name and sample size
    */
+  formatHeaderN() {
+    const n = Number(String(this.sampleSize == null ? '' : this.sampleSize).replace('*', ''));
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const star = String(this.sampleSize).indexOf('*') >= 0;
+    return star ? `(n=${n.toLocaleString()}*)` : `(n=${n.toLocaleString()})`;
+  },
+
+  findAnalysisSample(message) {
+    if (!message || typeof message !== 'object') return null;
+    const bodies = [message.sample, message.sampleInfo, message.payload, message.data];
+    for (let i = 0; i < bodies.length; i++) {
+      const body = bodies[i];
+      if (!body || typeof body !== 'object') continue;
+      if ((body.mode === 'sample' || body.method) && (body.n || body.sampledRows) && body.sourceRows) return body;
+      if (body.sample && (body.sample.n || body.sample.sampledRows)) return body.sample;
+      if (body.sampleInfo && (body.sampleInfo.n || body.sampleInfo.sampledRows)) return body.sampleInfo;
+      if (body.modelSpec && body.modelSpec.sample) return body.modelSpec.sample;
+      if (body.spec && body.spec.sample) return body.spec.sample;
+    }
+    return null;
+  },
+
+  showSampleNote(sample) {
+    if (document.getElementById('sampleNotice')) return;
+    const existing = document.getElementById('statisticoSampleBanner');
+    if (!sample) {
+      try { sample = JSON.parse(sessionStorage.getItem('statisticoAnalysisSample') || 'null'); } catch (e) { sample = null; }
+    }
+    const n = sample && (sample.sampledRows || sample.n);
+    const source = sample && sample.sourceRows;
+    if (!n || !source) {
+      if (existing) existing.remove();
+      return;
+    }
+    const noun = this.module === 'meta-analysis' ? 'studies' : 'rows';
+    const text = 'This analysis uses a random sample of ' + Number(n).toLocaleString() + ' of ' + Number(source).toLocaleString()
+      + ' ' + noun + ', drawn without replacement'
+      + (sample.seed ? ' (seed ' + sample.seed + ')' : '')
+      + '. Every reported statistic describes that sample.';
+    let bar = existing;
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'statisticoSampleBanner';
+      bar.style.cssText = 'margin:0;padding:8px 14px;background:rgba(249,115,22,.12);color:inherit;border-bottom:1px solid rgba(249,115,22,.45);font-size:12px;line-height:1.4;';
+      const header = document.querySelector('.statistico-header');
+      if (header && header.parentNode) header.insertAdjacentElement('afterend', bar);
+      else document.body.insertBefore(bar, document.body.firstChild);
+    }
+    bar.textContent = text;
+    try { sessionStorage.setItem('statisticoAnalysisSample', JSON.stringify(sample)); } catch (e) {}
+  },
+
+  _listenForAnalysisSample() {
+    if (this._sampleListenerInstalled) return;
+    if (typeof Office === 'undefined' || !Office.context || !Office.context.ui || typeof Office.context.ui.addHandlerAsync !== 'function') return;
+    this._sampleListenerInstalled = true;
+    const self = this;
+    Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+      try {
+        const sample = self.findAnalysisSample(JSON.parse(arg.message || '{}'));
+        if (sample) self.showSampleNote(sample);
+      } catch (e) {}
+    });
+  },
+
   updateVariable(variableName, sampleSize) {
     this.variableName = variableName;
     this.sampleSize = sampleSize;
@@ -758,12 +835,11 @@ const StatisticoHeader = {
     const hasAsterisk = sampleSizeStr.includes('*');
 
     if (nEl) {
-      if (hasAsterisk) {
-        // Use innerHTML with superscript for asterisk
+      if (hasAsterisk && Number(sampleSizeStr.replace('*', '')) > 0) {
         const numericPart = sampleSizeStr.replace('*', '');
         nEl.innerHTML = `(n=${numericPart}<sup>*</sup>)`;
       } else {
-        nEl.textContent = `(n=${sampleSize})`;
+        nEl.textContent = this.formatHeaderN();
       }
     }
 
@@ -954,7 +1030,7 @@ const StatisticoHeader = {
           <div class="header-view-name" id="headerViewName">${viewTitles[this.currentView] || 'Analysis'}</div>
           <div class="header-variable">
             <span id="headerVariableName">${this.variableName}</span>
-            <span id="headerSampleSize">(n=${this.sampleSize})</span>
+            <span id="headerSampleSize">${this.formatHeaderN()}</span>
           </div>
         </div>
         <div class="header-right">
@@ -6909,7 +6985,7 @@ const StatisticoHeader = {
       const varEl = document.getElementById('headerVariableName');
       if (varEl) varEl.textContent = this.variableName || 'Variable';
       const nEl = document.getElementById('headerSampleSize');
-      if (nEl) nEl.textContent = `(n=${this.sampleSize || 0})`;
+      if (nEl) nEl.textContent = this.formatHeaderN();
       return;
     }
 

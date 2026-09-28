@@ -389,7 +389,7 @@ function openResultsDialog(results) {
       dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message);
-          if (message.status === 'ready') {
+          if (message.status === 'ready' || message.action === 'ready' || message.action === 'requestData') {
             hideUnivariateResultsLoading();
             sendData();
           } else if (message.action === 'switchView') {
@@ -463,7 +463,7 @@ function openNewView(dialogUrl, results) {
       dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg) => {
         try {
           const message = JSON.parse(arg.message);
-          if (message.status === 'ready') {
+          if (message.status === 'ready' || message.action === 'ready' || message.action === 'requestData') {
             hideUnivariateResultsLoading();
             sendData();
           } else if (message.action === 'switchView') {

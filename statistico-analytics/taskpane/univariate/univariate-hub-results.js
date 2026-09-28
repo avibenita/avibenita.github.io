@@ -78,7 +78,7 @@
       dialog.addEventHandler(global.Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var message = JSON.parse(arg.message || '{}');
-          if (message.status === 'ready') {
+          if (message.status === 'ready' || message.action === 'ready' || message.action === 'requestData') {
             sendData();
           } else if (message.action === 'switchView') {
             if (dialog !== resultsDialog) return;
@@ -122,7 +122,8 @@
   }
 
   function openUnivariateResultsFromHub(startViewPath) {
-    var results = loadStoredResults();
+    var live = global.__hubUnivariateLive && global.__hubUnivariateLive.data;
+    var results = live || loadStoredResults();
     if (!results) return false;
     try { global.sessionStorage.removeItem('univariateHubRunData'); } catch (_e) {}
     var viewPath = startViewPath || resolveUnivariateStartViewPath();

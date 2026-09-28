@@ -1854,6 +1854,56 @@ function getGlobalRangePayload() {
   }
 }
 
+function rememberAnalysisSample(sample) {
+  window.__hubAnalysisSample = sample || null;
+  try {
+    if (!sample) sessionStorage.removeItem("statisticoAnalysisSample");
+    else sessionStorage.setItem("statisticoAnalysisSample", JSON.stringify(sample));
+  } catch (e) {}
+}
+
+function sampleFromMessage(msg) {
+  if (!msg || typeof msg !== "object") return null;
+  var bodies = [msg.sample, msg.payload, msg.data, msg.spec];
+  var i;
+  for (i = 0; i < bodies.length; i++) {
+    var body = bodies[i];
+    if (!body || typeof body !== "object") continue;
+    if (body.mode === "sample" && body.n) return body;
+    if (body.sample && body.sample.mode === "sample") return body.sample;
+    if (body.spec && body.spec.sample && body.spec.sample.mode === "sample") return body.spec.sample;
+  }
+  return null;
+}
+
+function rangeForNewAnalysis() {
+  if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.endRun === "function") {
+    StatisticoGlobalRange.endRun();
+  }
+  rememberAnalysisSample(null);
+  return getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+}
+
+function adoptAnalysisScope(gr, msg) {
+  var sample = sampleFromMessage(msg);
+  if (!sample || !gr || !gr.values || !window.StatisticoGlobalRange || typeof StatisticoGlobalRange.drawSample !== "function") {
+    rememberAnalysisSample(null);
+    return gr;
+  }
+  var values = StatisticoGlobalRange.drawSample(gr.values, sample.n, sample.seed);
+  var info = {
+    mode: "sample",
+    method: "random-without-replacement",
+    n: Math.max(0, values.length - 1),
+    sampledRows: Math.max(0, values.length - 1),
+    seed: sample.seed,
+    sourceRows: sample.sourceRows || Math.max(0, gr.values.length - 1)
+  };
+  StatisticoGlobalRange.beginRun(values, gr.address, gr.mode, info);
+  rememberAnalysisSample(info);
+  return { values: values, address: gr.address || "", mode: gr.mode || "used", sample: info };
+}
+
 function setSelectedModuleCard(moduleId, active) {
   document.querySelectorAll('[data-module-id="' + moduleId + '"]').forEach(function (el) {
     el.classList.toggle("selected", !!active);
@@ -2320,7 +2370,7 @@ function sendUnivariateDialogData() {
 }
 
 function openUnivariateConfigFromHub(moduleId, startView) {
-  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  var gr = rangeForNewAnalysis();
   hubUnivariateModuleId = moduleId || "univariate";
   hubUnivariateStartView = startView || null;
   hubUnivariateFlowActive = true;
@@ -2344,9 +2394,23 @@ function openUnivariateConfigFromHub(moduleId, startView) {
           } else if (message.action === "univariateResults" && message.data) {
             var runSpec = Object.assign({}, message.spec || {});
             if (hubUnivariateStartView) runSpec.startView = hubUnivariateStartView;
+            var uniData = message.data;
+            if (uniData.sample && uniData.sample.mode === "sample" && Array.isArray(uniData.sourceRows) && uniData.sourceRows.length && window.StatisticoGlobalRange) {
+              StatisticoGlobalRange.beginRun([uniData.sourceHeaders || []].concat(uniData.sourceRows), gr.address, gr.mode, uniData.sample);
+              rememberAnalysisSample(uniData.sample);
+            } else if (uniData.sample && uniData.sample.mode === "sample") {
+              var uniScoped = adoptAnalysisScope(gr, { sample: uniData.sample });
+              uniData.sourceHeaders = uniScoped.values[0] || uniData.sourceHeaders;
+              uniData.sourceRows = uniScoped.values.slice(1);
+            } else if (gr && gr.values && (!uniData.sourceRows || !uniData.sourceRows.length)) {
+              uniData.sourceHeaders = uniData.sourceHeaders || gr.values[0] || [];
+              uniData.sourceRows = gr.values.slice(1);
+              rememberAnalysisSample(null);
+            }
+            window.__hubUnivariateLive = { data: uniData, spec: runSpec };
             try {
               sessionStorage.setItem("univariateHubRunData", JSON.stringify({
-                data: message.data,
+                data: uniData,
                 spec: runSpec
               }));
               sessionStorage.setItem("univariateModelSpec", JSON.stringify(runSpec));
@@ -2386,7 +2450,8 @@ function sendRegressionResultsDataFromHub() {
       headers: hubRegressionDataPayload.headers || [],
       rows: hubRegressionDataPayload.rows || [],
       address: hubRegressionDataPayload.address || "",
-      modelSpec: hubRegressionModelSpec || {}
+      modelSpec: hubRegressionModelSpec || {},
+      sample: (hubRegressionDataPayload && hubRegressionDataPayload.sample) || (hubRegressionModelSpec && hubRegressionModelSpec.sample) || null
     }
   }));
 }
@@ -2423,7 +2488,7 @@ function openRegressionResultsFromHub() {
 }
 
 function openRegressionConfigFromHub() {
-  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  var gr = rangeForNewAnalysis();
   hubRegressionDataPayload = {
     headers: gr.values[0] || [],
     rows: gr.values.slice(1),
@@ -2452,6 +2517,14 @@ function openRegressionConfigFromHub() {
             sendRegressionBuilderDataFromHub();
           } else if (msg.action === "regressionModel") {
             hubRegressionModelSpec = msg.payload || msg.data || {};
+            var regScoped = adoptAnalysisScope(gr, msg);
+            hubRegressionDataPayload = {
+              headers: regScoped.values[0] || [],
+              rows: regScoped.values.slice(1),
+              address: regScoped.address || "",
+              sample: regScoped.sample || null,
+              savedModelSpec: null
+            };
             hubRegressionConfigDialog.close();
             hubRegressionConfigDialog = null;
             setTimeout(openRegressionResultsFromHub, 500);
@@ -2472,7 +2545,7 @@ function openRegressionConfigFromHub() {
 }
 
 function openAnovaConfigFromHub() {
-  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  var gr = rangeForNewAnalysis();
   hubAnovaFlowActive = true;
   setSelectedModuleCard("anova", true);
   Office.context.ui.displayDialogAsync(
@@ -2504,7 +2577,8 @@ function openAnovaConfigFromHub() {
           if (msg.action === "ready" || msg.action === "requestData") {
             sendAnovaData();
           } else if (msg.action === "anovaModel") {
-            sessionStorage.setItem("anovaModelSpec", JSON.stringify(msg.data || msg.payload || {}));
+            gr = adoptAnalysisScope(gr, msg);
+            try { sessionStorage.setItem("anovaModelSpec", JSON.stringify(msg.data || msg.payload || {})); } catch (e) {}
             try { hubAnovaDialog.close(); } catch (e) {}
             hubAnovaDialog = null;
             if (window.HubResultsBridge) HubResultsBridge.open("anova", 500);
@@ -2525,7 +2599,7 @@ function openAnovaConfigFromHub() {
 }
 
 function openIndependentConfigFromHub() {
-  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  var gr = rangeForNewAnalysis();
   hubIndependentFlowActive = true;
   setSelectedModuleCard("independent", true);
   Office.context.ui.displayDialogAsync(
@@ -2557,7 +2631,8 @@ function openIndependentConfigFromHub() {
           if (msg.action === "ready" || msg.action === "requestData") {
             sendIndependentData();
           } else if (msg.action === "independentModel") {
-            sessionStorage.setItem("independentModelSpec", JSON.stringify(msg.data || msg.payload || {}));
+            gr = adoptAnalysisScope(gr, msg);
+            try { sessionStorage.setItem("independentModelSpec", JSON.stringify(msg.data || msg.payload || {})); } catch (e) {}
             try { hubIndependentDialog.close(); } catch (e) {}
             hubIndependentDialog = null;
             if (window.HubResultsBridge) HubResultsBridge.open("independent", 500);
@@ -2578,7 +2653,7 @@ function openIndependentConfigFromHub() {
 }
 
 function openCorrelationConfigFromHub() {
-  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  var gr = rangeForNewAnalysis();
   hubCorrelationFlowActive = true;
   setSelectedModuleCard("correlations", true);
   Office.context.ui.displayDialogAsync(
@@ -2605,6 +2680,7 @@ function openCorrelationConfigFromHub() {
             sendCorrelationData();
           } else if (msg.action === "runAnalysis") {
             hubPendingCorrelationRunData = msg.data || {};
+            rememberAnalysisSample(hubPendingCorrelationRunData.sample || null);
             try { hubCorrelationDialog.close(); } catch (e) {}
             hubCorrelationDialog = null;
             setTimeout(function () {
@@ -2748,7 +2824,7 @@ function openMultivariableSampleFromHub() {
 }
 
 function openBuilderDialogFromHub(options) {
-  var gr = getGlobalRangePayload() || { values: [], address: "", mode: "used" };
+  var gr = rangeForNewAnalysis();
   var handedOffToResults = false;
   setSelectedModuleCard(options.moduleId, true);
   Office.context.ui.displayDialogAsync(
@@ -2816,6 +2892,7 @@ function openBuilderDialogFromHub(options) {
           }
           var modelActions = options.modelActions || [];
           if (modelActions.indexOf(msg.action) >= 0) {
+            gr = adoptAnalysisScope(gr, msg);
             if (typeof options.onModel === "function") options.onModel(msg);
             handedOffToResults = !!(options.hubResultsKey && window.HubResultsBridge);
             try { dlg.close(); } catch (e) {}

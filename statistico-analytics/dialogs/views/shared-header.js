@@ -824,6 +824,14 @@ const StatisticoHeader = {
     });
   },
 
+  updateGroupLabel(groupName) {
+    this.groupLabel = groupName == null ? '' : String(groupName).trim();
+    const el = document.getElementById('headerGroupLabel');
+    const nameEl = document.getElementById('headerGroupName');
+    if (nameEl) nameEl.textContent = this.groupLabel;
+    if (el) el.hidden = !this.groupLabel;
+  },
+
   updateVariable(variableName, sampleSize) {
     this.variableName = variableName;
     this.sampleSize = sampleSize;
@@ -1021,6 +1029,8 @@ const StatisticoHeader = {
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
     const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation');
 
+    const groupName = String(this.groupLabel || '').trim()
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const topHeader = `
       <div class="statistico-header">
         <div class="header-left">
@@ -1031,6 +1041,10 @@ const StatisticoHeader = {
         </div>
         <div class="header-center">
           <div class="header-view-name" id="headerViewName">${viewTitles[this.currentView] || 'Analysis'}</div>
+          <div class="header-group-label" id="headerGroupLabel"${groupName ? '' : ' hidden'}>
+            <span class="header-group-kicker">By group</span>
+            <span class="header-group-name" id="headerGroupName">${groupName}</span>
+          </div>
           <div class="header-variable">
             <span id="headerVariableName">${this.variableName}</span>
             <span id="headerSampleSize">${this.formatHeaderN()}</span>

@@ -664,6 +664,7 @@ const StatisticoHeader = {
     this.currentView = viewName;
     this.variableName = variableName;
     this.sampleSize = sampleSize;
+    this._publishedAnalysisN = Number(sampleSize) > 0 ? Number(sampleSize) : 0;
     
     // Auto-detect module from view name if not specified
     if (module) {
@@ -826,6 +827,8 @@ const StatisticoHeader = {
   updateVariable(variableName, sampleSize) {
     this.variableName = variableName;
     this.sampleSize = sampleSize;
+    const published = Number(String(sampleSize == null ? '' : sampleSize).replace('*', ''));
+    if (Number.isFinite(published) && published > 0) this._publishedAnalysisN = published;
     const varEl = document.getElementById('headerVariableName');
     const nEl = document.getElementById('headerSampleSize');
     if (varEl) varEl.textContent = variableName;
@@ -5847,6 +5850,20 @@ const StatisticoHeader = {
     }, 2000);
   },
 
+  _dropMismatchedUniStore(liveN) {
+    try {
+      const raw = sessionStorage.getItem('univariateResults') || localStorage.getItem('univariateResults');
+      if (!raw) return;
+      const stored = JSON.parse(raw);
+      const storedN = stored && Array.isArray(stored.values) ? stored.values.length : 0;
+      const demo = stored && /demo sample|local browser test/i.test(String(stored.dataSource || ''));
+      if (demo || (storedN > 0 && storedN !== liveN)) {
+        sessionStorage.removeItem('univariateResults');
+        localStorage.removeItem('univariateResults');
+      }
+    } catch (e) {}
+  },
+
   _getUniStored() {
     try {
       const sessionRaw = sessionStorage.getItem('univariateResults');
@@ -7000,7 +7017,12 @@ const StatisticoHeader = {
       return;
     }
 
-    payload = payload || (this.module === 'univariate' ? this._getUniStored() : this._getHeaderRowFilterData());
+    const explicitPayload = arguments.length > 0 && payload && typeof payload === 'object';
+    if (!explicitPayload) {
+      // A refresh with no payload must not replace the live analysis
+      // with a leftover saved run (for example an old n=150 demo).
+      payload = null;
+    }
     const meta = typeof UniRowFilter !== 'undefined' ? UniRowFilter.getSourceMeta() : null;
     const hasSource = !!(payload && payload.sourceRowsAll && payload.sourceRowsAll.length) ||
       !!(payload && payload.allRows && payload.allRows.length) ||
@@ -7019,17 +7041,25 @@ const StatisticoHeader = {
     const showing = (meta && Array.isArray(meta.filteredRows) && meta.filteredRows.length)
       ? meta.filteredRows.length
       : (payload && payload.sourceRows ? payload.sourceRows.length : (payload && payload.usedRows ? payload.usedRows.length : 0));
-    const isByGroup = this.module === 'univariate' && this.currentView === 'by-group';
     const headerIdx = payload && payload.columnIndex != null ? Number(payload.columnIndex) : null;
     const headerVarName = (payload && Array.isArray(payload.sourceHeaders) && headerIdx != null && payload.sourceHeaders[headerIdx])
       ? payload.sourceHeaders[headerIdx]
       : null;
-    const varName = isByGroup
-      ? (this.variableName || headerVarName || (payload && (payload.column || payload.variableName)) || 'Variable')
-      : ((payload && (payload.column || payload.variableName)) || this.variableName || headerVarName || 'Variable');
-    const n = isByGroup
-      ? (this.sampleSize || 0)
-      : (payload && payload.values ? payload.values.length : this.sampleSize);
+    if (explicitPayload && payload) {
+      const nextName = payload.column || payload.variableName || headerVarName;
+      if (nextName) this.variableName = nextName;
+      const fromPayload = Number(payload.n);
+      const fromValues = Array.isArray(payload.values) ? payload.values.length : 0;
+      const nextN = Number.isFinite(fromPayload) && fromPayload > 0 ? fromPayload : fromValues;
+      if (nextN > 0) {
+        this.sampleSize = nextN;
+        this._publishedAnalysisN = nextN;
+        if (this.module === 'univariate') this._dropMismatchedUniStore(nextN);
+      }
+    }
+    const published = Number(this._publishedAnalysisN);
+    if (published > 0) this.sampleSize = published;
+    const varName = this.variableName || headerVarName || 'Variable';
 
     const varEl = document.getElementById('headerVariableName');
     if (varEl) {
@@ -7038,21 +7068,7 @@ const StatisticoHeader = {
         : varName;
     }
     const nEl = document.getElementById('headerSampleSize');
-    if (nEl) {
-      if (this.module === 'univariate') {
-        // Univariate views recompute on filter (see rebuildFromSourceRows
-        // in histogram), so payload.values.length IS the analysis N.
-        nEl.textContent = `(n=${n})`;
-      } else {
-        // For everyone else (correlations, ANOVA, regression, PCA, …)
-        // the page is the source of truth for what N means in the title:
-        // it calls updateVariable() whenever its analysis N changes.
-        // Don't override with the row-filter `showing` count — modules
-        // that don't recompute on filter (ANOVA, factor, …) would then
-        // show a lie next to their precomputed stats.
-        nEl.textContent = `(n=${this.sampleSize || showing || n || 0})`;
-      }
-    }
+    if (nEl) nEl.textContent = this.formatHeaderN();
 
     let notice = document.getElementById('uni-filter-active-notice');
     if (!notice) {
@@ -7194,7 +7210,7 @@ const StatisticoHeader = {
         view: this.currentView
       }, 'univariate');
     }
-    this.updateUniFilterChrome(data);
+    this.updateUniFilterChrome();
   },
 
   _installUniFilterChangeListener() {

@@ -11,6 +11,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
+  var MAX_SELECTABLE_GROUP_LEVELS = 15;
   var SIDEBAR_SECTION = 'GROUP COMPARISON';
   var SIDEBAR_LABEL = 'By Group';
   var SIDEBAR_DESCRIPTION = 'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.';
@@ -280,6 +281,10 @@
     return el;
   }
 
+  function tooManyGroupLevels(count) {
+    return Number(count) > MAX_SELECTABLE_GROUP_LEVELS;
+  }
+
   function hideEntryWait() {
     if (typeof document === 'undefined') return;
     var el = document.getElementById('byGroupNavWait');
@@ -535,6 +540,8 @@
   }
 
   return {
+    MAX_SELECTABLE_GROUP_LEVELS: MAX_SELECTABLE_GROUP_LEVELS,
+    tooManyGroupLevels: tooManyGroupLevels,
     SIDEBAR_SECTION: SIDEBAR_SECTION,
     SIDEBAR_LABEL: SIDEBAR_LABEL,
     SIDEBAR_DESCRIPTION: SIDEBAR_DESCRIPTION,

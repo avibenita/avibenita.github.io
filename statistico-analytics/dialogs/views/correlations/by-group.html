@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260922closeread" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260929wait1"></script>
+  <script src="../../shared/by-group-standard.js?v=20260929levels15"></script>
   <script src="../shared-header.js?v=20260928wait1"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -732,6 +732,8 @@
     .group-dialog-body { display:grid; grid-template-columns:minmax(250px, 1fr) minmax(280px, 1fr); gap:0; min-height:0; overflow:hidden; }
     .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
     .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
+    .group-option.is-dimmed, .group-option:disabled { opacity:.42; cursor:not-allowed; pointer-events:none; }
+    .group-option.is-dimmed:hover, .group-option:disabled:hover { border-color:var(--border); box-shadow:none; }
     .group-option:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
     .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
     .group-option small { color:var(--text-secondary); font-weight:500; }
@@ -1292,13 +1294,23 @@
     }
 
     let groupListToken = 0;
+    function tooManyGroupLevels(count) {
+      const BG = window.StatisticoByGroup;
+      if (BG && BG.tooManyGroupLevels) return BG.tooManyGroupLevels(count);
+      return Number(count) > 15;
+    }
     function groupOptionHtml(header, idx) {
       const analysisSet = new Set(analysisHeaders);
       const levels = getLevelCounts(idx);
-      const note = analysisSet.has(header)
+      const tooMany = tooManyGroupLevels(levels.length);
+      let note = analysisSet.has(header)
         ? `${levels.length} level${levels.length === 1 ? '' : 's'} · analysis variable`
         : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
-      return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
+      if (tooMany) note += ' · more than 15 levels';
+      const dim = tooMany ? ' is-dimmed' : '';
+      const disabled = tooMany ? ' disabled' : '';
+      const click = tooMany ? '' : ` onclick="selectGroupColumn(${idx}, true)"`;
+      return `<button type="button" class="group-option${dim}" data-group-index="${idx}"${disabled}${click}>
         <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
       </button>`;
     }
@@ -1443,7 +1455,7 @@
       sourceHeaders.forEach((header, idx) => {
         if (analysisSet.has(header)) return;
         const nLevels = getLevelCounts(idx).length;
-        if (nLevels < 2 || nLevels > 40) return;
+        if (nLevels < 2 || tooManyGroupLevels(nLevels)) return;
         if (nLevels < bestLevels) {
           bestLevels = nLevels;
           bestIdx = idx;
@@ -1658,6 +1670,7 @@
 
     function selectGroupColumn(idx, keepDialogOpen) {
       if (!isValidGroupIndex(idx)) return;
+      if (tooManyGroupLevels(getLevelCounts(idx).length)) return;
       groupIndex = Number(idx);
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();

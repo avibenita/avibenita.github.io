@@ -34,14 +34,22 @@ describe('Group column suitability', () => {
     expect(out.indicator).toBe('5 groups');
   });
 
-  test('City with 19 groups is eligible with a many-groups caution', () => {
+  test('City with 15 groups stays selectable', () => {
+    const out = Suit.classify({
+      name: 'City',
+      levels: nLevels(15, 9)
+    });
+    expect(out.disabled).toBe(false);
+  });
+
+  test('City with 19 groups is dimmed because it has more than 15 levels', () => {
     const out = Suit.classify({
       name: 'City',
       levels: nLevels(19, 9)
     });
-    expect(out.bucket).toBe('other');
-    expect(out.disabled).toBe(false);
-    expect(out.indicator).toBe('19 groups · many groups');
+    expect(out.bucket).toBe('disabled');
+    expect(out.disabled).toBe(true);
+    expect(out.indicator).toBe('19 groups · not recommended');
   });
 
   test('email with many addresses is not recommended', () => {

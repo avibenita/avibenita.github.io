@@ -4,6 +4,9 @@ const BG = require('./by-group-standard.js');
 describe('StatisticoByGroup contract', () => {
   test('keeps sidebar wording unchanged across modules', () => {
     expect(BG.SIDEBAR_SECTION).toBe('GROUP COMPARISON');
+    expect(BG.MAX_SELECTABLE_GROUP_LEVELS).toBe(15);
+    expect(BG.tooManyGroupLevels(15)).toBe(false);
+    expect(BG.tooManyGroupLevels(16)).toBe(true);
     expect(BG.SIDEBAR_LABEL).toBe('By Group');
     expect(BG.SIDEBAR_DESCRIPTION).toBe(
       'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.'

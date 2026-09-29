@@ -10,7 +10,7 @@
   'use strict';
 
   var RECOMMENDED_MAX_GROUPS = 12;
-  var MANY_GROUPS_MAX = 30;
+  var MANY_GROUPS_MAX = 15;
   var UNIQUE_RATIO_DISABLE = 0.85;
   var ID_UNIQUE_RATIO_DISABLE = 0.55;
 

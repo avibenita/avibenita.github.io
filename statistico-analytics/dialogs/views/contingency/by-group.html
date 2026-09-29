@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260922closeread" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260929wait1"></script>
+  <script src="../../shared/by-group-standard.js?v=20260929levels15"></script>
   <script src="../shared-header.js?v=20260928wait1"></script>
   <script src="contingency-engine.js?v=20260911freq1"></script>
   <script src="contingency-sample-data.js?v=20260909ctsim"></script>
@@ -283,6 +283,8 @@
     .group-dialog-list { padding:10px; overflow:auto; border-right:1px solid var(--border); }
     .group-option { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; margin:4px 0; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); color:var(--text-primary); text-align:left; cursor:pointer; }
     .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
+    .group-option.is-dimmed, .group-option:disabled { opacity:.42; cursor:not-allowed; pointer-events:none; }
+    .group-option.is-dimmed:hover, .group-option:disabled:hover { border-color:var(--border); box-shadow:none; }
     .group-option small { color:var(--text-secondary); font-weight:500; }
     .level-preview { padding:12px; overflow:auto; min-height:360px; }
     .level-preview.is-hidden { display:none; }
@@ -704,11 +706,21 @@
         onDone: finish
       });
     }
+    function tooManyGroupLevels(count) {
+      var BG = window.StatisticoByGroup;
+      if (BG && BG.tooManyGroupLevels) return BG.tooManyGroupLevels(count);
+      return Number(count) > 15;
+    }
     function groupOptionHtml(header, idx) {
       if (isAnalysisHeader(header)) return '';
       var levels = getLevelCounts(idx);
+      var tooMany = tooManyGroupLevels(levels.length);
       var note = levels.length + ' level' + (levels.length === 1 ? '' : 's') + ', n=' + levels.reduce(function (s, item) { return s + item.n; }, 0);
-      return '<button type="button" class="group-option" data-group-index="' + idx + '" onclick="selectGroupColumn(' + idx + ', true)">' +
+      if (tooMany) note += ' · more than 15 levels';
+      var dim = tooMany ? ' is-dimmed' : '';
+      var disabled = tooMany ? ' disabled' : '';
+      var click = tooMany ? '' : ' onclick="selectGroupColumn(' + idx + ', true)"';
+      return '<button type="button" class="group-option' + dim + '" data-group-index="' + idx + '"' + disabled + click + '>' +
         '<span>' + escapeHtml(header) + '</span><small>' + escapeHtml(note) + '</small></button>';
     }
 
@@ -841,6 +853,7 @@
 
     function selectGroupColumn(idx, keepDialogOpen) {
       if (!isValidGroupIndex(idx)) return;
+      if (tooManyGroupLevels(getLevelCounts(idx).length)) return;
       groupIndex = Number(idx);
       updateGroupChoiceLabel();
       refreshGroupDialogSelection();

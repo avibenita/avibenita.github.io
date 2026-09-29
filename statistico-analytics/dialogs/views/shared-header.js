@@ -7589,6 +7589,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (this.module === 'univariate' || this.module === 'correlations') {
       return this._sbAiGlobalInterpret();
     }
+    if (this.module === 'contingency') return this._sbAiContingencyInterpret();
     return this._sbAiPerViewInterpret();
   },
 
@@ -9361,6 +9362,128 @@ Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
 ${this._localAiReplyFormat()}`;
+  },
+
+  _contingencyOverallSource() {
+    let payload = null;
+    if (typeof window.buildAIPayload === 'function') {
+      try { payload = window.buildAIPayload(); } catch (_) { payload = null; }
+    }
+    let bundle = window.__contingencyResult || null;
+    if (!bundle) {
+      try { bundle = JSON.parse(sessionStorage.getItem('contingencyBundle') || 'null'); } catch (_) { bundle = null; }
+    }
+    if (!payload && bundle && bundle.tests) {
+      const tests = bundle.tests || {};
+      payload = {
+        rowVar: bundle.rowVar,
+        colVar: bundle.colVar,
+        representedN: Number.isFinite(bundle.representedN) ? bundle.representedN : bundle.N,
+        nRows: bundle.nRows,
+        nCols: bundle.nCols,
+        tests: {
+          pearson: tests.pearson || null,
+          likelihoodRatio: tests.likelihoodRatio || null,
+          fisher: tests.fisher || null,
+          cramersV: tests.cramersV,
+          phi: tests.phi,
+          contingencyC: tests.contingencyC
+        },
+        diagnostics: bundle.diagnostics || null,
+        measures2x2: bundle.measures2x2 || null,
+        interpretation: bundle.interpretation || null
+      };
+    }
+    return { payload: payload, bundle: bundle };
+  },
+
+  _contingencyResidualHighlights(bundle) {
+    const mat = bundle && bundle.stdResiduals;
+    const rows = (bundle && bundle.rowLabels) || [];
+    const cols = (bundle && bundle.colLabels) || [];
+    if (!mat || !rows.length || !cols.length) return [];
+    const cells = [];
+    rows.forEach((row, i) => {
+      cols.forEach((col, j) => {
+        const v = mat[i] && mat[i][j];
+        if (Number.isFinite(v)) cells.push({ row: row, column: col, adjustedResidual: Number(v.toFixed(2)) });
+      });
+    });
+    cells.sort((a, b) => Math.abs(b.adjustedResidual) - Math.abs(a.adjustedResidual));
+    return cells.slice(0, 8);
+  },
+
+  _buildContingencyOverallPrompt() {
+    const source = this._contingencyOverallSource();
+    const payload = source.payload;
+    const bundle = source.bundle;
+    if (!payload && !bundle) return null;
+    const highlights = this._contingencyResidualHighlights(bundle);
+    const compact = this._roundAiPayload(Object.assign({}, payload || {}, {
+      rowLabels: bundle && bundle.rowLabels,
+      colLabels: bundle && bundle.colLabels,
+      largestAdjustedResiduals: highlights
+    }), 4);
+    const nCells = (bundle && bundle.nRows && bundle.nCols) ? bundle.nRows * bundle.nCols : 0;
+    if (nCells > 36) {
+      delete compact.observed;
+      delete compact.expected;
+    }
+    const views = ['Overview', 'Contingency table', 'Diagnostics & visualization'];
+    if (compact.measures2x2) views.push('2×2 measures');
+    const groupCtx = globalThis.__byGroupStandardContext;
+    if (groupCtx && groupCtx.status) views.push('By Group');
+    this._lastAiMeta = {
+      primarySignal: compact.rowVar && compact.colVar ? (compact.rowVar + ' × ' + compact.colVar) : 'Contingency table',
+      viewsBrowsed: views,
+      strengthLevel: null,
+      strengthNote: null
+    };
+    return `You are writing the overall assessment of a Statistico contingency-table analysis.
+
+Synthesize the association test, strength, adjusted-residual pattern, expected-count checks, 2×2 measures when present, and group consistency into one decision. This is the whole analysis, not an explanation of the tab that happens to be open.
+Do not recompute statistics. Do not invent numbers that are absent. Adjusted residuals describe cells inside the table: orange/positive means more cases than independence, blue/negative means fewer. They are not a test that groups differ.
+A |residual| around 2 is a large cell departure. Expected counts below 5 weaken the chi-square approximation.
+
+Views covered: ${views.join(', ')}
+
+Computed results:
+${JSON.stringify(compact, null, 2)}
+
+${this._overallAssessmentEmphasis()}
+
+${this._groupConsistencyAiInstruction()}
+
+${this._overallAiReplyFormat()}`;
+  },
+
+  async _sbAiContingencyInterpret() {
+    const btn = document.getElementById('sbAiBtn');
+    const setBusy = (busy) => {
+      if (!btn) return;
+      btn.disabled = busy;
+      btn.innerHTML = busy
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>'
+        : this._sidebarAiButtonInnerHtml(false);
+    };
+    this._lastAiInvoke = { mode: 'full', kind: 'contingency' };
+    if (this._openCachedAi('overall', 'full', this.currentView)) {
+      this._aiForceRefresh = false;
+      return;
+    }
+    setBusy(true);
+    try {
+      const prompt = this._buildContingencyOverallPrompt();
+      if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
+      const raw = await this._callAiForSidebar(prompt);
+      const sections = this._parseAiStructured(raw);
+      this._showAiOverlay(sections, this.currentView, 'full', this._lastAiMeta);
+    } catch (err) {
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'full', this._lastAiMeta);
+    } finally {
+      this._aiForceRefresh = false;
+      setBusy(false);
+    }
   },
 
   /**

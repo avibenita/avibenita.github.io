@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>2×2 comparison – Statistico</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+  <script>
+    (function () {
+      var pref = 'dark';
+      try { pref = localStorage.getItem('statistico-theme') || 'dark'; } catch (_e) {}
+      var light = pref === 'light' || (pref === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+      document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+    })();
+  </script>
+  <style>
+    :root {
+      --surface-0:#0E141B; --surface-1:#242C37; --surface-2:#1b2430; --border:rgba(255,255,255,.14);
+      --text:#f8fafc; --text-soft:#e2e8f0; --muted:rgba(226,232,240,.78);
+      --accent:#c4b5fd; --accent-2:#7dd3fc; --fill:#8b5cf6; --fill-2:#0284c7;
+      --warn-bg:rgba(251,191,36,.12); --warn-bd:rgba(251,191,36,.4); --warn:#fde68a;
+      --scenario:#fb923c;
+    }
+    :root[data-theme="light"] {
+      --surface-0:#e8eef6; --surface-1:#fff; --surface-2:#f8fafc; --border:#cbd5e1;
+      --text:#0f172a; --text-soft:#1e293b; --muted:#475569;
+      --accent:#6d28d9; --accent-2:#0369a1; --fill:#7c3aed; --fill-2:#0284c7;
+      --warn-bg:#fffbeb; --warn-bd:#fcd34d; --warn:#92400e;
+      --scenario:#c2410c;
+    }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html, body { margin:0; height:100%; }
+    body {
+      background:var(--surface-0); color:var(--text);
+      font-family:'Segoe UI', system-ui, sans-serif; font-size:14px;
+      display:flex; flex-direction:column; min-height:100%;
+    }
+    header {
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:12px 16px; background:var(--surface-1); border-bottom:1px solid var(--border);
+    }
+    header h1 { margin:0; font-size:16px; font-weight:750; display:flex; align-items:center; gap:8px; }
+    header h1 i { color:var(--accent); }
+    header p { margin:2px 0 0; color:var(--muted); font-size:12px; }
+    .linkish {
+      border:1px solid var(--border); background:var(--surface-2); color:var(--text-soft);
+      border-radius:8px; padding:8px 12px; font-weight:700; cursor:pointer; font-size:12.5px;
+    }
+    .linkish:hover { border-color:var(--accent); color:var(--text); }
+    main { flex:1; overflow:auto; padding:14px 16px 28px; display:flex; flex-direction:column; gap:12px; }
+    .card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
+    .seg { display:flex; flex-wrap:wrap; gap:6px; }
+    .seg button, .mini {
+      border:1px solid var(--border); background:var(--surface-2); color:var(--text-soft);
+      border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; cursor:pointer;
+    }
+    .seg button.active { background:linear-gradient(135deg,#8b5cf6,#6d28d9); color:#fff; border-color:transparent; }
+    .design-note { margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.45; }
+    .headline { position:relative; }
+    .flag {
+      display:inline-flex; align-items:center; gap:6px; margin-bottom:8px;
+      background:rgba(251,146,60,.16); color:var(--scenario); border-radius:999px;
+      padding:3px 10px; font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+    }
+    .lead { margin:0; font-size:26px; line-height:1.25; font-weight:750; letter-spacing:-.02em; }
+    .detail { margin:8px 0 0; font-size:15px; color:var(--text-soft); line-height:1.45; }
+    .split { display:grid; grid-template-columns:minmax(320px,1.15fr) minmax(260px,.85fr); gap:12px; }
+    @media (max-width:860px) { .split { grid-template-columns:1fr; } .lead { font-size:22px; } }
+    .card-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+    .card-title { font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+    .map { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+    .map label, .scenario label, .names label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); font-weight:700; }
+    select, input[type="text"], input[type="number"] {
+      background:var(--surface-2); color:var(--text); border:1px solid var(--border);
+      border-radius:8px; padding:6px 8px; font:inherit; font-size:13px;
+    }
+    input[type="number"] { width:72px; text-align:right; }
+    input[type="text"] { min-width:0; }
+    table.grid { width:100%; border-collapse:separate; border-spacing:0; }
+    table.grid th, table.grid td { border-bottom:1px solid var(--border); padding:8px 6px; text-align:center; }
+    table.grid th.stub { text-align:left; width:34%; }
+    table.grid thead th { color:var(--muted); font-size:12px; font-weight:700; }
+    .stub input { width:100%; }
+    .head-input { width:100%; text-align:center; }
+    .step { display:inline-flex; align-items:center; gap:4px; }
+    .step button {
+      width:26px; height:26px; border-radius:7px; border:1px solid var(--border);
+      background:var(--surface-2); color:var(--text); font-size:16px; cursor:pointer; line-height:1;
+    }
+    .step button:hover { border-color:var(--accent); }
+    td.hot { outline:2px solid var(--accent); outline-offset:-2px; border-radius:8px; }
+    .alt { font-variant-numeric:tabular-nums; font-weight:700; color:var(--accent); }
+    .hover-box { min-height:2.6em; margin:10px 0 0; color:var(--muted); font-size:13px; line-height:1.4; }
+    .scenario { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+    .scenario .grow { color:var(--muted); font-size:13px; padding-bottom:6px; }
+    button.reset {
+      border:1px solid var(--border); background:transparent; color:var(--text-soft);
+      border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer;
+    }
+    button.reset:disabled { opacity:.4; cursor:default; }
+    .bar-row { display:grid; grid-template-columns:minmax(90px,120px) 1fr auto; gap:8px; align-items:center; margin:10px 0; }
+    .bar-name { font-size:13px; font-weight:700; }
+    .bar-meta { font-size:11.5px; color:var(--muted); font-weight:600; }
+    .track { position:relative; height:28px; background:var(--surface-2); border-radius:8px; overflow:hidden; }
+    .fill { position:absolute; left:0; top:0; bottom:0; border-radius:8px; }
+    .fill.a { background:linear-gradient(90deg,#8b5cf6,#6d28d9); }
+    .fill.b { background:linear-gradient(90deg,#38bdf8,#0369a1); }
+    .whisker {
+      position:absolute; top:50%; height:2px; background:var(--text); transform:translateY(-50%);
+    }
+    .whisker:before, .whisker:after {
+      content:''; position:absolute; top:-5px; width:2px; height:12px; background:var(--text);
+    }
+    .whisker:before { left:0; }
+    .whisker:after { right:0; }
+    .bar-val { font-variant-numeric:tabular-nums; font-weight:800; min-width:52px; text-align:right; }
+    .chart-note { margin:4px 0 0; color:var(--muted); font-size:12.5px; line-height:1.4; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+    .kpi { background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:12px; }
+    .kpi.use { border-color:var(--accent); }
+    .kpi .k { font-size:11px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:6px; }
+    .badge { color:var(--accent); font-size:10px; letter-spacing:.04em; }
+    .kpi .v { margin-top:4px; font-size:22px; font-weight:750; color:var(--accent); }
+    .kpi .s { margin-top:4px; font-size:12.5px; color:var(--text-soft); line-height:1.35; }
+    .warn { display:none; padding:10px 12px; border-radius:10px; background:var(--warn-bg); border:1px solid var(--warn-bd); color:var(--warn); font-size:13.5px; line-height:1.45; }
+    .warn.show { display:block; }
+    .names { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px; }
+    .names input { width:160px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1><i class="fa-solid fa-table-cells"></i> 2×2 comparison</h1>
+      <p>Four counts. The practical difference updates as you edit.</p>
+    </div>
+    <button type="button" class="linkish" id="openFull">Open full contingency view</button>
+  </header>
+  <main>
+    <section class="card">
+      <div class="card-title">How were the data collected?</div>
+      <div class="seg" id="designSeg" style="margin-top:8px;">
+        <button type="button" class="active" data-design="independent">Independent groups</button>
+        <button type="button" data-design="case-control">Case–control</button>
+        <button type="button" data-design="paired">Paired before / after</button>
+      </div>
+      <p class="design-note" id="designNote"></p>
+    </section>
+
+    <section class="card headline">
+      <div class="flag" id="scenarioFlag" hidden>Scenario</div>
+      <h2 class="lead" id="lead"></h2>
+      <p class="detail" id="detail"></p>
+    </section>
+
+    <div class="split">
+      <section class="card">
+        <div class="card-head">
+          <div class="card-title">Table</div>
+          <div class="seg" id="viewSeg">
+            <button type="button" class="active" data-view="counts">Counts</button>
+            <button type="button" data-view="rowPct">Row %</button>
+            <button type="button" data-view="expected">Expected</button>
+          </div>
+        </div>
+        <div class="names">
+          <label>Row variable <input type="text" id="rowVar" value="Group" maxlength="40"></label>
+          <label>Column variable <input type="text" id="colVar" value="Outcome" maxlength="40"></label>
+        </div>
+        <div class="map" id="mapBox">
+          <label id="labIndex">Group of interest
+            <select id="selIndex"></select>
+          </label>
+          <label id="labEvent">Event
+            <select id="selEvent"></select>
+          </label>
+        </div>
+        <table class="grid" id="grid">
+          <thead>
+            <tr>
+              <th class="stub"></th>
+              <th><input class="head-input" id="labC0" type="text" maxlength="40" aria-label="First column"></th>
+              <th><input class="head-input" id="labC1" type="text" maxlength="40" aria-label="Second column"></th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th class="stub"><input id="labR0" type="text" maxlength="40" aria-label="First row"></th>
+              <td data-i="0" data-j="0"></td>
+              <td data-i="0" data-j="1"></td>
+              <td id="totR0"></td>
+            </tr>
+            <tr>
+              <th class="stub"><input id="labR1" type="text" maxlength="40" aria-label="Second row"></th>
+              <td data-i="1" data-j="0"></td>
+              <td data-i="1" data-j="1"></td>
+              <td id="totR1"></td>
+            </tr>
+            <tr>
+              <th class="stub">Total</th>
+              <td id="totC0"></td>
+              <td id="totC1"></td>
+              <td id="totN"></td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="hover-box" id="hoverBox">Hover a cell to see its observed count, expected count, and contribution to χ².</p>
+        <div class="scenario">
+          <label>Explore a scenario
+            <select id="scenarioGroup"></select>
+          </label>
+          <div class="step" id="scenarioStep">
+            <button type="button" id="scenDown" aria-label="Fewer events">−</button>
+            <input type="number" id="scenarioEvents" min="0" step="1" inputmode="numeric">
+            <button type="button" id="scenUp" aria-label="More events">+</button>
+          </div>
+          <div class="grow" id="scenarioHint"></div>
+          <button type="button" class="reset" id="resetBtn" disabled>Reset</button>
+        </div>
+      </section>
+      <section class="card">
+        <div class="card-title" id="chartTitle">Event percentage</div>
+        <div id="bars"></div>
+        <p class="chart-note" id="chartNote"></p>
+      </section>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+    <div class="warn" id="warn"></div>
+  </main>
+  <script src="contingency-engine.js?v=20260929ct2x2"></script>
+  <script>
+    (function () {
+      var PRESETS = {
+        independent: {
+          rowVar: 'Group', colVar: 'Outcome',
+          rows: ['Group A', 'Group B'], cols: ['Event', 'No event'],
+          note: 'Each person belongs to one group. Row percentages estimate the event risk in that group, so the risk difference and risk ratio are meaningful.'
+        },
+        'case-control': {
+          rowVar: 'Sample', colVar: 'Exposure',
+          rows: ['Cases', 'Controls'], cols: ['Exposed', 'Unexposed'],
+          note: 'Cases and controls were sampled separately. The odds ratio is the comparison to report. Row percentages are not population risks, and a risk ratio is not shown.'
+        },
+        paired: {
+          rowVar: 'First measurement', colVar: 'Second measurement',
+          rows: ['Before: event', 'Before: no event'], cols: ['After: event', 'After: no event'],
+          note: 'The same people were observed twice. McNemar’s test uses the discordant pairs (the off-diagonal counts). Pearson χ² and Fisher’s exact test are for independent groups, so they are not used here.'
+        }
+      };
+
+      var state = {
+        design: 'independent',
+        view: 'counts',
+        labelsCustom: false,
+        rowVar: 'Group',
+        colVar: 'Outcome',
+        rowLabels: ['Group A', 'Group B'],
+        colLabels: ['Event', 'No event'],
+        counts: [[40, 60], [20, 80]],
+        baseline: [[40, 60], [20, 80]],
+        scenario: false,
+        indexRow: 0,
+        eventCol: 0
+      };
+
+      function esc(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+      function cloneCounts(src) { return src.map(function (row) { return row.slice(); }); }
+      function sameCounts(a, b) {
+        return a[0][0] === b[0][0] && a[0][1] === b[0][1] && a[1][0] === b[1][0] && a[1][1] === b[1][1];
+      }
+      function clampCount(v) {
+        var n = Math.round(Number(v));
+        if (!isFinite(n) || n < 0) return 0;
+        if (n > 10000000) return 10000000;
+        return n;
+      }
+      function fmtInt(n) { return String(Math.round(n)); }
+      function fmtFixed(n, d) { return isFinite(n) ? Number(n).toFixed(d) : '—'; }
+      function fmtP(p) {
+        if (!isFinite(p)) return '—';
+        if (p < 0.001) return '< .001';
+        return p.toFixed(3);
+      }
+
+      function margins() {
+        var a = state.counts[0][0], b = state.counts[0][1], c = state.counts[1][0], d = state.counts[1][1];
+        var rt0 = a + b, rt1 = c + d, ct0 = a + c, ct1 = b + d, N = rt0 + rt1;
+        return { rt: [rt0, rt1], ct: [ct0, ct1], N: N };
+      }
+      function expectedAt(i, j, m) {
+        if (!(m.N > 0)) return NaN;
+        return m.rt[i] * m.ct[j] / m.N;
+      }
+      function contribution(i, j, m) {
+        var E = expectedAt(i, j, m);
+        var O = state.counts[i][j];
+        if (!(E > 0)) return NaN;
+        return (O - E) * (O - E) / E;
+      }
+
+      function orientedResult() {
+        var rI = state.design === 'paired' ? 0 : state.indexRow;
+        var cE = state.design === 'paired' ? 0 : state.eventCol;
+        var rR = 1 - rI;
+        var cN = 1 - cE;
+        var rows = [state.rowLabels[rI] || 'Group 1', state.rowLabels[rR] || 'Group 2'];
+        var cols = [state.colLabels[cE] || 'Event', state.colLabels[cN] || 'Other'];
+        if (rows[0] === rows[1]) rows[1] = rows[1] + ' (2)';
+        if (cols[0] === cols[1]) cols[1] = cols[1] + ' (2)';
+        var obs = [
+          [state.counts[rI][cE], state.counts[rI][cN]],
+          [state.counts[rR][cE], state.counts[rR][cN]]
+        ];
+        return StatisticoContingency.analyzeCounts(obs, rows, cols, { confidence: 0.95 });
+      }
+
+      function writeIfIdle(el, value) {
+        if (!el || document.activeElement === el) return;
+        if (el.value !== value) el.value = value;
+      }
+
+      function buildSelect(sel, labels, value) {
+        var html = '';
+        labels.forEach(function (lab, i) {
+          html += '<option value="' + i + '">' + esc(lab || ('Level ' + (i + 1))) + '</option>';
+        });
+        sel.innerHTML = html;
+        sel.value = String(value);
+      }
+
+      function syncSelects() {
+        buildSelect(document.getElementById('selIndex'), state.rowLabels, state.indexRow);
+        buildSelect(document.getElementById('selEvent'), state.colLabels, state.eventCol);
+        buildSelect(document.getElementById('scenarioGroup'), state.rowLabels, document.getElementById('scenarioGroup').value || 0);
+      }
+
+      function paintCells() {
+        var m = margins();
+        document.querySelectorAll('#grid td[data-i]').forEach(function (td) {
+          var i = +td.getAttribute('data-i');
+          var j = +td.getAttribute('data-j');
+          var count = state.counts[i][j];
+          var input = td.querySelector('input[data-count]');
+          if (state.view === 'counts') {
+            if (!input) {
+              td.innerHTML =
+                '<div class="step"><button type="button" data-step="-1" aria-label="Decrease">−</button>' +
+                '<input type="number" min="0" step="1" inputmode="numeric" data-count="1" value="' + count + '">' +
+                '<button type="button" data-step="1" aria-label="Increase">+</button></div>';
+            } else {
+              writeIfIdle(input, String(count));
+            }
+          } else if (state.view === 'rowPct') {
+            var pct = m.rt[i] > 0 ? (100 * count / m.rt[i]) : NaN;
+            td.innerHTML = '<div class="alt">' + (isFinite(pct) ? fmtFixed(pct, 1) + '%' : '—') + '</div>';
+          } else {
+            td.innerHTML = '<div class="alt">' + fmtFixed(expectedAt(i, j, m), 2) + '</div>';
+          }
+        });
+        document.getElementById('totR0').textContent = fmtInt(m.rt[0]);
+        document.getElementById('totR1').textContent = fmtInt(m.rt[1]);
+        document.getElementById('totC0').textContent = fmtInt(m.ct[0]);
+        document.getElementById('totC1').textContent = fmtInt(m.ct[1]);
+        document.getElementById('totN').textContent = fmtInt(m.N);
+      }
+
+      function kpi(title, value, sub, use) {
+        return '<div class="kpi' + (use ? ' use' : '') + '"><div class="k"><span>' + esc(title) + '</span>' +
+          (use ? '<span class="badge">Use this</span>' : '') + '</div><div class="v">' + esc(value) +
+          '</div><div class="s">' + esc(sub) + '</div></div>';
+      }
+
+      function render() {
+        var result = orientedResult();
+        var summary = StatisticoContingency.summary2x2(result, { design: state.design });
+        var m = margins();
+        document.getElementById('designNote').textContent = PRESETS[state.design].note;
+        document.getElementById('scenarioFlag').hidden = !state.scenario;
+        var lead = result && result.analyzable ? summary.lead : ((result && result.error) || 'Enter nonnegative counts.');
+        var detail = result && result.analyzable ? summary.detail : '';
+        document.getElementById('lead').textContent = lead;
+        document.getElementById('detail').textContent = detail;
+
+        var map = document.getElementById('mapBox');
+        map.hidden = state.design === 'paired';
+        document.getElementById('labIndex').firstChild.nodeValue = state.design === 'case-control' ? 'Group of interest ' : 'Group of interest ';
+        document.getElementById('labEvent').firstChild.nodeValue = state.design === 'case-control' ? 'Exposure column ' : 'Event ';
+
+        writeIfIdle(document.getElementById('rowVar'), state.rowVar);
+        writeIfIdle(document.getElementById('colVar'), state.colVar);
+        writeIfIdle(document.getElementById('labR0'), state.rowLabels[0]);
+        writeIfIdle(document.getElementById('labR1'), state.rowLabels[1]);
+        writeIfIdle(document.getElementById('labC0'), state.colLabels[0]);
+        writeIfIdle(document.getElementById('labC1'), state.colLabels[1]);
+        paintCells();
+
+        var eventCol = state.design === 'paired' ? 0 : state.eventCol;
+        var group = +document.getElementById('scenarioGroup').value || 0;
+        if (group !== 0 && group !== 1) group = 0;
+        var baseTotal = state.baseline[group][0] + state.baseline[group][1];
+        var other = 1 - eventCol;
+        document.getElementById('scenarioEvents').max = String(baseTotal);
+        writeIfIdle(document.getElementById('scenarioEvents'), String(state.counts[group][eventCol]));
+        var eventName = state.colLabels[eventCol] || 'event';
+        document.getElementById('scenarioHint').textContent =
+          'Change ' + eventName + ' in ' + (state.rowLabels[group] || 'this row') + ' while keeping ' + baseTotal + ' fixed.';
+        document.getElementById('resetBtn').disabled = !state.scenario;
+
+        var showRisks = state.design === 'independent';
+        document.getElementById('chartTitle').textContent = showRisks ? 'Event percentage' : (state.design === 'paired' ? 'Second-measurement share' : 'Sample share');
+        document.getElementById('chartNote').textContent = showRisks
+          ? 'Each bar is the event percentage in that group. Whiskers are 95% Wilson confidence intervals.'
+          : (state.design === 'case-control'
+            ? 'Each bar is the share of the exposure column inside that sampled row. These shares are not population risks.'
+            : 'Each bar is the share in the second-measurement event column. Whiskers are 95% Wilson intervals. They are transition shares, not a risk ratio.');
+
+        var props = (result.measures2x2 && result.measures2x2.proportions) || {};
+        var bars = '';
+        [0, 1].forEach(function (i) {
+          var prop = i === (state.design === 'paired' ? 0 : state.indexRow) ? props.index : props.reference;
+          if (state.design !== 'paired' && i !== state.indexRow) prop = props.reference;
+          if (state.design !== 'paired' && i === state.indexRow) prop = props.index;
+          if (state.design === 'paired') prop = i === 0 ? props.index : props.reference;
+          var pct = prop && prop.available ? prop.p * 100 : 0;
+          var lo = prop && prop.available ? prop.ciLower * 100 : 0;
+          var hi = prop && prop.available ? prop.ciUpper * 100 : 0;
+          bars += '<div class="bar-row"><div><div class="bar-name">' + esc(state.rowLabels[i]) + '</div><div class="bar-meta">' +
+            fmtInt(state.counts[i][eventCol]) + ' / ' + fmtInt(m.rt[i]) + '</div></div><div class="track">' +
+            (prop && prop.available
+              ? '<div class="fill ' + (i === 0 ? 'a' : 'b') + '" style="width:' + pct.toFixed(2) + '%"></div>' +
+                '<div class="whisker" style="left:' + lo.toFixed(2) + '%;width:' + Math.max(0, hi - lo).toFixed(2) + '%"></div>'
+              : '') +
+            '</div><div class="bar-val">' + (prop && prop.available ? fmtFixed(pct, 1) + '%' : '—') + '</div></div>';
+        });
+        document.getElementById('bars').innerHTML = bars;
+
+        var cards = '';
+        var measures = result.measures2x2;
+        if (result.analyzable && state.design === 'paired' && summary.mcnemar) {
+          var mc = summary.mcnemar;
+          if (mc.available) {
+            var or = mc.oddsRatio;
+            cards += kpi('Discordant pairs', fmtInt(mc.b) + ' : ' + fmtInt(mc.c),
+              mc.b + ' one way, ' + mc.c + ' the other. Total discordant pairs: ' + mc.discordant + '.',
+              false);
+            cards += kpi('McNemar exact p', fmtP(mc.pExact),
+              'Two-sided exact test on the discordant pairs.',
+              summary.recommendedTest === 'mcnemar-exact');
+            cards += kpi('McNemar χ² p', fmtP(mc.pContinuity),
+              'Continuity-corrected χ² = ' + fmtFixed(mc.statisticContinuity, 2) + ' on 1 df.',
+              summary.recommendedTest === 'mcnemar');
+            if (or && or.available) {
+              cards += kpi('Discordant odds ratio', fmtFixed(or.value, 2),
+                '95% CI ' + fmtFixed(or.ciLower, 2) + '–' + fmtFixed(or.ciUpper, 2) +
+                (or.continuityCorrection ? '. A 0.5 correction was applied because a discordant count is zero.' : '.'),
+                false);
+            }
+          }
+        } else if (result.analyzable && measures) {
+          var rd = measures.riskDifference;
+          var rr = measures.riskRatio;
+          var odds = measures.oddsRatio;
+          if (showRisks && rd && rd.available) {
+            cards += kpi('Risk difference', fmtFixed(Math.abs(rd.value) * 100, 1) + ' pp',
+              '95% CI ' + fmtFixed(rd.ciLower * 100, 1) + ' to ' + fmtFixed(rd.ciUpper * 100, 1) + ' percentage points.',
+              false);
+          }
+          if (showRisks) {
+            cards += kpi('Risk ratio', rr && rr.available ? fmtFixed(rr.value, 2) : '—',
+              rr && rr.available
+                ? '95% CI ' + fmtFixed(rr.ciLower, 2) + '–' + fmtFixed(rr.ciUpper, 2) + '.'
+                : ((rr && rr.reason) || 'Not estimable.'),
+              false);
+          }
+          cards += kpi('Odds ratio', odds && odds.available ? fmtFixed(odds.value, 2) : '—',
+            odds && odds.available
+              ? '95% CI ' + fmtFixed(odds.ciLower, 2) + '–' + fmtFixed(odds.ciUpper, 2) + '.' +
+                (odds.continuityCorrection ? ' A 0.5 correction was applied because a cell is zero.' : '')
+              : ((odds && odds.reason) || 'Not estimable.'),
+            false);
+          var pearson = result.tests.pearson;
+          var fisher = result.tests.fisher;
+          cards += kpi('Pearson χ²', fmtP(pearson.p),
+            'χ² = ' + fmtFixed(pearson.stat, 2) + ', df = ' + pearson.df + '.',
+            summary.recommendedTest === 'pearson');
+          cards += kpi('Fisher’s exact p', fisher && fisher.available ? fmtP(fisher.p) : '—',
+            fisher && fisher.available ? 'Exact two-sided p-value for this 2×2 table.' : ((fisher && fisher.reason) || 'Not available.'),
+            summary.recommendedTest === 'fisher');
+        }
+        document.getElementById('kpis').innerHTML = cards;
+
+        var warn = document.getElementById('warn');
+        var warnText = '';
+        if (result.analyzable && state.design !== 'paired' && summary.sparse) {
+          warnText = 'Expected counts are small, so the Pearson χ² p-value is less reliable. Fisher’s exact test is the exact option for this 2×2 table.';
+          if (result.tests.fisher && !result.tests.fisher.available && result.tests.fisher.reason) {
+            warnText = result.tests.fisher.reason;
+          }
+        }
+        warn.textContent = warnText;
+        warn.classList.toggle('show', !!warnText);
+      }
+
+      function commitCount(i, j, value, fromScenario) {
+        state.counts[i][j] = clampCount(value);
+        if (fromScenario) {
+          var group = +document.getElementById('scenarioGroup').value || 0;
+          var eventCol = state.design === 'paired' ? 0 : state.eventCol;
+          var other = 1 - eventCol;
+          var total = state.baseline[group][0] + state.baseline[group][1];
+          var events = clampCount(state.counts[group][eventCol]);
+          if (events > total) events = total;
+          state.counts[group][eventCol] = events;
+          state.counts[group][other] = total - events;
+          state.counts[1 - group][0] = state.baseline[1 - group][0];
+          state.counts[1 - group][1] = state.baseline[1 - group][1];
+          state.scenario = !sameCounts(state.counts, state.baseline);
+        } else {
+          state.baseline = cloneCounts(state.counts);
+          state.scenario = false;
+        }
+        render();
+      }
+
+      function applyPreset(design) {
+        var preset = PRESETS[design];
+        state.rowVar = preset.rowVar;
+        state.colVar = preset.colVar;
+        state.rowLabels = preset.rows.slice();
+        state.colLabels = preset.cols.slice();
+        state.indexRow = 0;
+        state.eventCol = 0;
+        syncSelects();
+      }
+
+      document.getElementById('designSeg').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-design]');
+        if (!btn) return;
+        state.design = btn.getAttribute('data-design');
+        document.querySelectorAll('#designSeg button').forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+        });
+        if (!state.labelsCustom) applyPreset(state.design);
+        else syncSelects();
+        render();
+      });
+
+      document.getElementById('viewSeg').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-view]');
+        if (!btn) return;
+        state.view = btn.getAttribute('data-view');
+        document.querySelectorAll('#viewSeg button').forEach(function (b) {
+          b.classList.toggle('active', b === btn);
+        });
+        render();
+      });
+
+      document.getElementById('grid').addEventListener('input', function (e) {
+        var t = e.target;
+        if (t.id === 'labR0' || t.id === 'labR1' || t.id === 'labC0' || t.id === 'labC1') {
+          state.labelsCustom = true;
+          if (t.id === 'labR0') state.rowLabels[0] = t.value;
+          if (t.id === 'labR1') state.rowLabels[1] = t.value;
+          if (t.id === 'labC0') state.colLabels[0] = t.value;
+          if (t.id === 'labC1') state.colLabels[1] = t.value;
+          syncSelects();
+          render();
+          return;
+        }
+        if (t.getAttribute('data-count') === '1') {
+          if (t.value.trim() === '') return;
+          var td = t.closest('td');
+          commitCount(+td.getAttribute('data-i'), +td.getAttribute('data-j'), t.value, false);
+        }
+      });
+
+      document.getElementById('grid').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-step]');
+        if (!btn) return;
+        var td = btn.closest('td');
+        var i = +td.getAttribute('data-i');
+        var j = +td.getAttribute('data-j');
+        commitCount(i, j, state.counts[i][j] + (+btn.getAttribute('data-step')), false);
+      });
+
+      document.getElementById('grid').addEventListener('focusout', function (e) {
+        var t = e.target;
+        if (t.getAttribute && t.getAttribute('data-count') === '1' && t.value.trim() === '') {
+          var td = t.closest('td');
+          commitCount(+td.getAttribute('data-i'), +td.getAttribute('data-j'), 0, false);
+        }
+      });
+
+      document.getElementById('grid').addEventListener('mouseover', function (e) {
+        var td = e.target.closest('td[data-i]');
+        if (!td) return;
+        document.querySelectorAll('#grid td[data-i]').forEach(function (cell) { cell.classList.remove('hot'); });
+        td.classList.add('hot');
+        var i = +td.getAttribute('data-i');
+        var j = +td.getAttribute('data-j');
+        var m = margins();
+        var E = expectedAt(i, j, m);
+        var chi = contribution(i, j, m);
+        document.getElementById('hoverBox').textContent =
+          (state.rowLabels[i] || 'Row') + ' × ' + (state.colLabels[j] || 'Column') +
+          ' — observed ' + fmtInt(state.counts[i][j]) +
+          ', expected ' + fmtFixed(E, 2) +
+          ', contribution to χ² ' + fmtFixed(chi, 2) + '.';
+      });
+
+      document.getElementById('rowVar').addEventListener('input', function () {
+        state.labelsCustom = true;
+        state.rowVar = this.value;
+      });
+      document.getElementById('colVar').addEventListener('input', function () {
+        state.labelsCustom = true;
+        state.colVar = this.value;
+      });
+      document.getElementById('selIndex').addEventListener('change', function () {
+        state.indexRow = +this.value;
+        render();
+      });
+      document.getElementById('selEvent').addEventListener('change', function () {
+        state.eventCol = +this.value;
+        render();
+      });
+      document.getElementById('scenarioGroup').addEventListener('change', render);
+
+      function applyScenario(events) {
+        var group = +document.getElementById('scenarioGroup').value || 0;
+        var eventCol = state.design === 'paired' ? 0 : state.eventCol;
+        commitCount(group, eventCol, events, true);
+      }
+      document.getElementById('scenarioEvents').addEventListener('input', function () {
+        if (this.value.trim() === '') return;
+        applyScenario(this.value);
+      });
+      document.getElementById('scenDown').addEventListener('click', function () {
+        var group = +document.getElementById('scenarioGroup').value || 0;
+        var eventCol = state.design === 'paired' ? 0 : state.eventCol;
+        applyScenario(state.counts[group][eventCol] - 1);
+      });
+      document.getElementById('scenUp').addEventListener('click', function () {
+        var group = +document.getElementById('scenarioGroup').value || 0;
+        var eventCol = state.design === 'paired' ? 0 : state.eventCol;
+        applyScenario(state.counts[group][eventCol] + 1);
+      });
+      document.getElementById('resetBtn').addEventListener('click', function () {
+        state.counts = cloneCounts(state.baseline);
+        state.scenario = false;
+        render();
+      });
+
+      document.getElementById('openFull').addEventListener('click', function () {
+        var result = orientedResult();
+        if (!result || !result.analyzable) return;
+        result.rowVar = state.rowVar || 'Group';
+        result.colVar = state.colVar || 'Outcome';
+        try { sessionStorage.setItem('contingencyBundle', JSON.stringify(result)); } catch (_e) {}
+        var opened = window.open('contingency-results.html?embed=1&tab=twobytwo', '_blank');
+        if (!opened) {
+          document.getElementById('detail').textContent = 'The full contingency view was blocked by the browser. Allow pop-ups, then try again.';
+        }
+      });
+
+      syncSelects();
+      render();
+    })();
+  </script>
+</body>
+</html>

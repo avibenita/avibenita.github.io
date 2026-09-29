@@ -332,6 +332,12 @@
     }
     var minA = Math.max(0, n1 + n - N);
     var maxA = Math.min(n1, n);
+    if (maxA - minA > 10000) {
+      return {
+        available: false,
+        reason: 'Fisher’s exact test is not computed when a margin exceeds 10,000. The Pearson chi-square p-value is still reported.'
+      };
+    }
     var logPobs = logHyper2x2(a, n1, n2, n, N);
     var pTwo = 0, pOneLess = 0, pOneGreater = 0;
     for (var x = minA; x <= maxA; x++) {
@@ -430,7 +436,188 @@
         formula: 'RD = P(event | ' + rowLabels[0] + ') − P(event | ' + rowLabels[1] + ')'
       };
     }
+    out.proportions = {
+      index: wilsonProportion(a, n1, z),
+      reference: wilsonProportion(c, n2, z)
+    };
     return out;
+  }
+
+  function wilsonProportion(events, n, z) {
+    if (!(n > 0) || !isFinite(events) || events < 0 || events > n + 1e-9) {
+      return { available: false, p: NaN, n: n, events: events, ciLower: NaN, ciUpper: NaN, method: 'wilson' };
+    }
+    var p = events / n;
+    var z2 = z * z;
+    var denom = 1 + z2 / n;
+    var center = (p + z2 / (2 * n)) / denom;
+    var half = z * Math.sqrt((p * (1 - p) / n) + (z2 / (4 * n * n))) / denom;
+    return {
+      available: true,
+      p: p,
+      n: n,
+      events: events,
+      ciLower: Math.max(0, center - half),
+      ciUpper: Math.min(1, center + half),
+      method: 'wilson'
+    };
+  }
+
+  function mcnemar2x2(b, c, z) {
+    if (!isIntegerCount(b) || !isIntegerCount(c)) {
+      return { available: false, reason: 'McNemar’s test requires integer discordant counts.' };
+    }
+    b = Math.round(b);
+    c = Math.round(c);
+    var n = b + c;
+    if (n <= 0) {
+      return { available: false, reason: 'McNemar’s test needs at least one discordant pair.' };
+    }
+    var diff = b - c;
+    var stat = (diff * diff) / n;
+    var statCc = Math.pow(Math.max(Math.abs(diff) - 1, 0), 2) / n;
+    var pExact = NaN;
+    var preferred = n < 25 ? 'exact' : 'continuity';
+    if (n <= 5000) {
+      var logPobs = logChoose(n, b) - n * Math.LN2;
+      pExact = 0;
+      for (var k = 0; k <= n; k++) {
+        var lp = logChoose(n, k) - n * Math.LN2;
+        if (lp <= logPobs + 1e-10) pExact += Math.exp(lp);
+      }
+      pExact = Math.min(1, Math.max(0, pExact));
+    } else {
+      preferred = 'continuity';
+    }
+    var bb = b;
+    var cc = c;
+    var corrected = false;
+    if (bb === 0 || cc === 0) {
+      bb += 0.5;
+      cc += 0.5;
+      corrected = true;
+    }
+    var or = bb / cc;
+    var se = Math.sqrt(1 / bb + 1 / cc);
+    var logOr = Math.log(or);
+    var zz = isFinite(z) ? z : zCrit(0.95);
+    return {
+      available: true,
+      b: b,
+      c: c,
+      discordant: n,
+      statistic: stat,
+      statisticContinuity: statCc,
+      df: 1,
+      p: chiSquareUpperP(stat, 1),
+      pContinuity: chiSquareUpperP(statCc, 1),
+      pExact: pExact,
+      preferred: preferred,
+      oddsRatio: {
+        available: isFinite(or) && or > 0,
+        value: or,
+        ciLower: Math.exp(logOr - zz * se),
+        ciUpper: Math.exp(logOr + zz * se),
+        continuityCorrection: corrected,
+        formula: 'OR = b / c on the discordant pairs'
+      }
+    };
+  }
+
+  function fmtPctLabel(p) {
+    if (!isFinite(p)) return '—';
+    var t = Math.round(p * 1000) / 10;
+    if (Math.abs(t - Math.round(t)) < 1e-9) return String(Math.round(t)) + '%';
+    return t.toFixed(1) + '%';
+  }
+
+  function fmtPpLabel(diff) {
+    var t = Math.round(Math.abs(diff) * 1000) / 10;
+    if (Math.abs(t - Math.round(t)) < 1e-9) return String(Math.round(t));
+    return t.toFixed(1);
+  }
+
+  function fmtRatioLabel(x) {
+    if (!isFinite(x)) return '—';
+    var r = Math.round(x * 100) / 100;
+    if (Math.abs(r - Math.round(r)) < 1e-9) return String(Math.round(r));
+    return r.toFixed(2);
+  }
+
+  function fmtPLabel(p) {
+    if (!isFinite(p)) return 'p unavailable';
+    if (p < 0.001) return 'p < .001';
+    return 'p = ' + p.toFixed(3);
+  }
+
+  function summary2x2(result, options) {
+    options = options || {};
+    var design = options.design === 'case-control' || options.design === 'paired' ? options.design : 'independent';
+    var empty = {
+      design: design,
+      lead: 'Enter counts in all four cells.',
+      detail: '',
+      showRisks: design === 'independent',
+      mcnemar: null,
+      sparse: false,
+      recommendedTest: design === 'paired' ? 'mcnemar' : 'pearson'
+    };
+    if (!result || !result.analyzable || !result.measures2x2 || !result.measures2x2.layout) return empty;
+    var m = result.measures2x2;
+    var lay = m.layout;
+    var rd = m.riskDifference;
+    var rr = m.riskRatio;
+    var or = m.oddsRatio;
+    var showRisks = design === 'independent';
+    var lead = '';
+    var detail = '';
+    var mcnemar = null;
+    if (design === 'paired') {
+      mcnemar = mcnemar2x2(lay.cells.b, lay.cells.c, zCrit(result.confidence));
+      if (mcnemar.available) {
+        lead = mcnemar.b + ' pairs moved from ' + lay.rowIndex + ' to ' + lay.colReference +
+          ', and ' + mcnemar.c + ' moved from ' + lay.rowReference + ' to ' + lay.colEvent + '.';
+        var pShow = mcnemar.preferred === 'exact' ? mcnemar.pExact : mcnemar.pContinuity;
+        var pName = mcnemar.preferred === 'exact' ? 'McNemar exact' : 'McNemar continuity-corrected';
+        detail = pName + ' ' + fmtPLabel(pShow) + '. Independent-groups tests are not used for a paired table.';
+      } else {
+        lead = mcnemar.reason || 'Paired comparison is not estimable.';
+        detail = 'Independent-groups tests are not used for a paired table.';
+      }
+    } else if (rd && rd.available && showRisks) {
+      if (Math.abs(rd.value) < 1e-12) {
+        lead = fmtPctLabel(rd.pIndex) + ' versus ' + fmtPctLabel(rd.pReference) + ' · no percentage-point difference';
+      } else {
+        var dir = rd.value > 0 ? 'higher' : 'lower';
+        lead = fmtPctLabel(rd.pIndex) + ' versus ' + fmtPctLabel(rd.pReference) + ' · ' +
+          fmtPpLabel(rd.value) + ' percentage points ' + dir;
+      }
+      var bits = [];
+      if (rr && rr.available) bits.push('Risk ratio ' + fmtRatioLabel(rr.value));
+      else if (rr && rr.reason) bits.push(rr.reason);
+      if (or && or.available) bits.push('Odds ratio ' + fmtRatioLabel(or.value));
+      detail = bits.join(' · ');
+    } else if (design === 'case-control') {
+      lead = 'Odds ratio ' + (or && or.available ? fmtRatioLabel(or.value) : 'not estimable');
+      detail = 'These row percentages describe the sample. They are not population risks, and a risk ratio is not reported.';
+    } else {
+      lead = 'This table cannot be compared yet.';
+    }
+    var diag = result.diagnostics || {};
+    var fisher = (result.tests && result.tests.fisher) || {};
+    var sparse = !!(diag.nExpectedBelow1 > 0 || (diag.pctExpectedBelow5 > 20) || (diag.minExpected < 5));
+    var recommended = design === 'paired'
+      ? (mcnemar && mcnemar.preferred === 'exact' ? 'mcnemar-exact' : 'mcnemar')
+      : (fisher.available && sparse ? 'fisher' : 'pearson');
+    return {
+      design: design,
+      lead: lead,
+      detail: detail,
+      showRisks: showRisks,
+      mcnemar: mcnemar,
+      sparse: sparse,
+      recommendedTest: recommended
+    };
   }
 
   function buildInterpretation(result) {
@@ -854,6 +1041,9 @@
     analyze: analyze,
     analyzeCounts: analyzeCounts,
     remap2x2: remap2x2,
+    wilsonProportion: wilsonProportion,
+    mcnemar2x2: mcnemar2x2,
+    summary2x2: summary2x2,
     residualBand: residualBand,
     chiSquareUpperP: chiSquareUpperP,
     zCrit: zCrit,

@@ -277,6 +277,76 @@ describe('Contingency frequency/count column', () => {
     expect(profiles.find((p) => p.name === 'Performance').frequencyCandidate).toBe(false);
   });
 
+  test('2×2 headline leads with the percentage-point difference', () => {
+    const r = CT.analyzeCounts(
+      [[40, 60], [20, 80]],
+      ['Group A', 'Group B'],
+      ['Event', 'No event'],
+      { confidence: 0.95 }
+    );
+    const summary = CT.summary2x2(r, { design: 'independent' });
+    expect(r.measures2x2.riskRatio.value).toBeCloseTo(2, 10);
+    expect(r.measures2x2.oddsRatio.value).toBeCloseTo(8 / 3, 10);
+    expect(r.measures2x2.riskDifference.value).toBeCloseTo(0.2, 10);
+    expect(summary.lead).toBe('40% versus 20% · 20 percentage points higher');
+    expect(summary.detail).toBe('Risk ratio 2 · Odds ratio 2.67');
+    expect(summary.showRisks).toBe(true);
+    const index = r.measures2x2.proportions.index;
+    expect(index.method).toBe('wilson');
+    expect(index.p).toBeCloseTo(0.4, 10);
+    expect(index.ciLower).toBeLessThan(0.4);
+    expect(index.ciUpper).toBeGreaterThan(0.4);
+    expect(index.ciLower).toBeGreaterThan(0);
+    expect(index.ciUpper).toBeLessThan(1);
+  });
+
+  test('case-control summary reports the odds ratio and withholds the risk ratio', () => {
+    const r = CT.analyzeCounts([[40, 60], [20, 80]], ['Cases', 'Controls'], ['Exposed', 'Unexposed']);
+    const summary = CT.summary2x2(r, { design: 'case-control' });
+    expect(summary.lead).toBe('Odds ratio 2.67');
+    expect(summary.detail).toMatch(/not population risks/);
+    expect(summary.detail).toMatch(/risk ratio is not reported/);
+    expect(summary.showRisks).toBe(false);
+    expect(summary.detail).not.toMatch(/Risk ratio/);
+  });
+
+  test('paired 2×2 uses McNemar on the discordant counts', () => {
+    const r = CT.analyzeCounts(
+      [[30, 12], [4, 54]],
+      ['Before: event', 'Before: no event'],
+      ['After: event', 'After: no event']
+    );
+    const mc = CT.mcnemar2x2(12, 4, CT.zCrit(0.95));
+    expect(mc.available).toBe(true);
+    expect(mc.statistic).toBeCloseTo(4, 10);
+    expect(mc.discordant).toBe(16);
+    expect(mc.pExact).toBeCloseTo(5034 / 65536, 6);
+    expect(mc.preferred).toBe('exact');
+    expect(mc.oddsRatio.value).toBeCloseTo(3, 10);
+    const summary = CT.summary2x2(r, { design: 'paired' });
+    expect(summary.lead).toBe('12 pairs moved from Before: event to After: no event, and 4 moved from Before: no event to After: event.');
+    expect(summary.detail).toMatch(/McNemar exact/);
+    expect(summary.detail).toMatch(/not used for a paired table/);
+    expect(summary.recommendedTest).toBe('mcnemar-exact');
+    expect(summary.showRisks).toBe(false);
+  });
+
+  test('sparse 2×2 recommends Fisher’s exact test', () => {
+    const r = CT.analyzeCounts([[2, 2], [2, 8]], ['A', 'B'], ['Yes', 'No']);
+    const summary = CT.summary2x2(r, { design: 'independent' });
+    expect(summary.sparse).toBe(true);
+    expect(r.tests.fisher.available).toBe(true);
+    expect(summary.recommendedTest).toBe('fisher');
+  });
+
+  test('Fisher is skipped when a 2×2 margin is huge', () => {
+    const r = CT.analyzeCounts([[20000, 20000], [20000, 20000]], ['A', 'B'], ['Yes', 'No']);
+    expect(r.analyzable).toBe(true);
+    expect(r.tests.pearson.stat).toBeCloseTo(0, 8);
+    expect(r.tests.fisher.available).toBe(false);
+    expect(r.tests.fisher.reason).toMatch(/10,000/);
+  });
+
   test('weighted 2×2 demo matches the expanded association example', () => {
     const headers = ['Treatment', 'Response', 'Freq'];
     const rows = [

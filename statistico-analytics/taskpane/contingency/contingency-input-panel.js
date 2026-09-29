@@ -44,6 +44,29 @@ function buildContingencyBundle(headers, rows, spec) {
 var contingencyDialog = null;
 var contingencyResultsDialog = null;
 
+function openContingency2x2() {
+  var url = getContingencyDialogsBaseUrl() + 'contingency/contingency-2x2.html?v=' + Date.now();
+  var size = (typeof DIALOG_SIZES !== 'undefined' && DIALOG_SIZES.RESULTS) ? DIALOG_SIZES.RESULTS : { height: 92, width: 70 };
+  Office.context.ui.displayDialogAsync(url, size, function (result) {
+    if (result.status === Office.AsyncResultStatus.Failed) {
+      console.error('Failed to open 2×2 calculator:', result.error && result.error.message);
+      return;
+    }
+    var dialog = result.value;
+    dialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+      var msg = {};
+      try { msg = JSON.parse(arg.message || '{}'); } catch (_e) {}
+      if (msg.action === 'close' || msg.action === 'closeDialog') {
+        try { dialog.close(); } catch (_close) {}
+        if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+      }
+    });
+    dialog.addEventHandler(Office.EventType.DialogEventReceived, function (arg) {
+      if (arg.error === 12006 && window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+    });
+  });
+}
+
 function openContingencyBuilder() {
   var url = getContingencyDialogsBaseUrl() + 'contingency/contingency-input.html?v=' + Date.now();
   Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.REGRESSION_BUILDER, function (result) {

@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260922closeread" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260919bygrp4"></script>
-  <script src="../shared-header.js?v=20260928n1"></script>
+  <script src="../../shared/by-group-standard.js?v=20260929wait1"></script>
+  <script src="../shared-header.js?v=20260928wait1"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <script src="../../shared/correlation-similarity.js?v=20260919pair0"></script>
@@ -794,6 +794,8 @@
   </style>
 </head>
 <body data-page-version="20260919-corr-pair0">
+  <style id="byGroupNavWaitStyle">#byGroupNavWait{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;background:rgba(6,12,22,.78)}#byGroupNavWait.is-on{display:flex}#byGroupNavWait .by-group-nav-wait-card{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 28px;border-radius:14px;background:#1b2433;color:#f8fafc;border:1px solid rgba(196,181,253,.45);font:700 14px/1.3 "Segoe UI",sans-serif}#byGroupNavWait i{font-size:28px;color:#c4b5fd}</style>
+  <div id="byGroupNavWait" class="is-on" role="status" aria-live="polite"><div class="by-group-nav-wait-card"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>Opening group selection…</span></div></div>
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -1209,18 +1211,26 @@
       };
     }
 
+    let levelCountMemo = null;
+    function clearLevelCountCache() { levelCountMemo = Object.create(null); }
     function getLevelCounts(idx) {
+      if (!levelCountMemo) levelCountMemo = Object.create(null);
+      const memoKey = String(idx);
+      if (levelCountMemo[memoKey]) return levelCountMemo[memoKey];
       if ((!sourceRows || !sourceRows.length) && columnMeta[idx] && Array.isArray(columnMeta[idx].levels)) {
-        return columnMeta[idx].levels.slice();
+        levelCountMemo[memoKey] = columnMeta[idx].levels.slice();
+        return levelCountMemo[memoKey];
       }
       const counts = new Map();
       sourceRows.forEach((row) => {
         const key = levelKey(rowValue(row, idx, sourceHeaders[idx]));
         counts.set(key, (counts.get(key) || 0) + 1);
       });
-      return Array.from(counts.entries())
+      const result = Array.from(counts.entries())
         .map(([level, n]) => ({ level, n }))
         .sort((a, b) => String(a.level).localeCompare(String(b.level), undefined, { numeric: true }));
+      levelCountMemo[memoKey] = result;
+      return result;
     }
 
     function currentMinGroupN() {
@@ -1253,11 +1263,15 @@
       return ensureLevelSelection(idx)[level] !== false;
     }
 
+    function releaseByGroupWait() {
+      if (window.StatisticoByGroup && StatisticoByGroup.hideEntryWait) StatisticoByGroup.hideEntryWait();
+    }
     function setEmpty(message, busy) {
       document.getElementById('emptyState').style.display = 'block';
       const icon = busy ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-layer-group';
       document.getElementById('emptyState').innerHTML = `<i class="${icon}"></i>${escapeHtml(message)}`;
       document.getElementById('mainContent').style.display = 'none';
+      if (!busy && !/^Loading\b/i.test(String(message || ''))) releaseByGroupWait();
     }
 
     function setHeaderCount(n) {
@@ -1277,19 +1291,38 @@
       return true;
     }
 
-    function populateGroupChoices() {
-      const list = document.getElementById('groupDialogList');
+    let groupListToken = 0;
+    function groupOptionHtml(header, idx) {
       const analysisSet = new Set(analysisHeaders);
-      list.innerHTML = sourceHeaders.map((header, idx) => {
-        const levels = getLevelCounts(idx);
-        const note = analysisSet.has(header)
-          ? `${levels.length} level${levels.length === 1 ? '' : 's'} · analysis variable`
-          : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
-        return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
-          <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
-        </button>`;
-      }).join('');
-      refreshGroupDialogSelection();
+      const levels = getLevelCounts(idx);
+      const note = analysisSet.has(header)
+        ? `${levels.length} level${levels.length === 1 ? '' : 's'} · analysis variable`
+        : `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
+      return `<button type="button" class="group-option" data-group-index="${idx}" onclick="selectGroupColumn(${idx}, true)">
+        <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
+      </button>`;
+    }
+    function populateGroupChoices(onReady) {
+      const list = document.getElementById('groupDialogList');
+      const token = ++groupListToken;
+      clearLevelCountCache();
+      const BG = window.StatisticoByGroup;
+      function finish(parts) {
+        if (token !== groupListToken || !list) return;
+        list.innerHTML = (parts || []).join('');
+        refreshGroupDialogSelection();
+        if (typeof onReady === 'function') onReady();
+      }
+      if (!BG || !BG.scanColumns) {
+        finish(sourceHeaders.map((header, idx) => groupOptionHtml(header, idx)));
+        return;
+      }
+      BG.scanColumns({
+        count: sourceHeaders.length,
+        listEl: list,
+        onIndex: (idx) => groupOptionHtml(sourceHeaders[idx], idx),
+        onDone: finish
+      });
     }
 
     function updateGroupChoiceLabel() {
@@ -1585,20 +1618,25 @@
     window.applyPreviewMinGroupSize = applyPreviewMinGroupSize;
 
     function openGroupDialog() {
-      if (!sourceHeaders.length) return;
-      populateGroupChoices();
-      applySelectionToken += 1;
-      if (!useRemoteSnapshot && !isValidGroupIndex(groupIndex)) {
-        const fallback = findDefaultGroupIndex();
-        if (isValidGroupIndex(fallback)) {
-          groupIndex = Number(fallback);
-          updateGroupChoiceLabel();
-        }
+      if (!sourceHeaders.length) {
+        releaseByGroupWait();
+        return;
       }
-      refreshGroupDialogSelection();
-      if (isValidGroupIndex(groupIndex)) renderLevelPreview(groupIndex);
-      else hideLevelPreview();
+      applySelectionToken += 1;
+      hideLevelPreview();
       document.getElementById('groupDialog').classList.add('is-visible');
+      releaseByGroupWait();
+      populateGroupChoices(function () {
+        if (!useRemoteSnapshot && !isValidGroupIndex(groupIndex)) {
+          const fallback = findDefaultGroupIndex();
+          if (isValidGroupIndex(fallback)) {
+            groupIndex = Number(fallback);
+            updateGroupChoiceLabel();
+          }
+        }
+        refreshGroupDialogSelection();
+        if (isValidGroupIndex(groupIndex)) renderLevelPreview(groupIndex);
+      });
     }
 
     function closeGroupDialog() {
@@ -3128,7 +3166,6 @@
           note.textContent = sampleText;
         }
       }
-      populateGroupChoices();
       groupIndex = null;
       updateGroupChoiceLabel();
       hideLevelPreview();
@@ -3325,7 +3362,7 @@
     function bootOnce() {
       if (appStarted) return;
       appStarted = true;
-      boot();
+      setTimeout(boot, 0);
     }
 
     if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {

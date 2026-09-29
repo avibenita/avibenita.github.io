@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260922closeread" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260919bygrp4"></script>
-  <script src="../shared-header.js?v=20260928n1"></script>
+  <script src="../../shared/by-group-standard.js?v=20260929wait1"></script>
+  <script src="../shared-header.js?v=20260928wait1"></script>
   <script src="../../shared/regression-similarity.js?v=20260919pair0"></script>
   <script src="../../shared/regression-pred-labels.js?v=20260916pred2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -574,6 +574,8 @@
   </style>
 </head>
 <body data-page-version="20260916-reg-bygroup-v35">
+  <style id="byGroupNavWaitStyle">#byGroupNavWait{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;background:rgba(6,12,22,.78)}#byGroupNavWait.is-on{display:flex}#byGroupNavWait .by-group-nav-wait-card{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 28px;border-radius:14px;background:#1b2433;color:#f8fafc;border:1px solid rgba(196,181,253,.45);font:700 14px/1.3 "Segoe UI",sans-serif}#byGroupNavWait i{font-size:28px;color:#c4b5fd}</style>
+  <div id="byGroupNavWait" class="is-on" role="status" aria-live="polite"><div class="by-group-nav-wait-card"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>Opening group selection…</span></div></div>
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -1365,15 +1367,22 @@
       return value > 0 ? 'coef-pos' : 'coef-neg';
     }
 
+    let levelCountMemo = null;
+    function clearLevelCountCache() { levelCountMemo = Object.create(null); }
     function getLevelCounts(idx) {
+      if (!levelCountMemo) levelCountMemo = Object.create(null);
+      const memoKey = String(idx);
+      if (levelCountMemo[memoKey]) return levelCountMemo[memoKey];
       const counts = new Map();
       sourceRows.forEach((row) => {
         const key = levelKey(rowValue(row, idx, sourceHeaders[idx]));
         counts.set(key, (counts.get(key) || 0) + 1);
       });
-      return Array.from(counts.entries())
+      const result = Array.from(counts.entries())
         .map(([level, n]) => ({ level, n }))
         .sort((a, b) => String(a.level).localeCompare(String(b.level), undefined, { numeric: true }));
+      levelCountMemo[memoKey] = result;
+      return result;
     }
 
     function ensureLevelSelection(idx) {
@@ -1393,10 +1402,14 @@
       return ensureLevelSelection(idx)[level] !== false;
     }
 
+    function releaseByGroupWait() {
+      if (window.StatisticoByGroup && StatisticoByGroup.hideEntryWait) StatisticoByGroup.hideEntryWait();
+    }
     function setEmpty(message) {
       document.getElementById('emptyState').style.display = 'block';
       document.getElementById('emptyState').innerHTML = `<i class="fa-solid fa-sitemap"></i>${escapeHtml(message)}`;
       document.getElementById('mainContent').style.display = 'none';
+      if (!/^Loading\b/i.test(String(message || ''))) releaseByGroupWait();
     }
 
     function modelVariableNames() {
@@ -1421,28 +1434,44 @@
       window.open('https://statistico.live/Statistico-Website/analytics/data-manipulation.html', '_blank', 'noopener,noreferrer');
     }
 
+    let groupListToken = 0;
+    function groupOptionHtml(header, idx) {
+      const levels = getLevelCounts(idx);
+      const inModel = isModelVariable(header);
+      const tooMany = levels.length > MAX_GROUP_LEVELS;
+      const dimmed = inModel || tooMany;
+      let note = `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
+      if (inModel && tooMany) note = `In the model · ${levels.length} levels`;
+      else if (inModel) note = `In the model · ${levels.length} level${levels.length === 1 ? '' : 's'}`;
+      else if (tooMany) note = `${levels.length} levels · recode in Prepare Data`;
+      const dimCls = dimmed ? ' is-dimmed' : '';
+      const disabled = dimmed ? ' disabled' : '';
+      const click = dimmed ? '' : ` onclick="selectGroupColumn(${idx}, true)"`;
+      return `<button type="button" class="group-option${dimCls}" data-group-index="${idx}"${disabled}${click}>
+        <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
+      </button>`;
+    }
     function populateGroupChoices() {
       const list = document.getElementById('groupDialogList');
-      const rows = sourceHeaders.map((header, idx) => {
-        const levels = getLevelCounts(idx);
-        const inModel = isModelVariable(header);
-        const tooMany = levels.length > MAX_GROUP_LEVELS;
-        const dimmed = inModel || tooMany;
-        let note = `${levels.length} level${levels.length === 1 ? '' : 's'}, n=${levels.reduce((s, item) => s + item.n, 0)}`;
-        if (inModel && tooMany) note = `In the model · ${levels.length} levels`;
-        else if (inModel) note = `In the model · ${levels.length} level${levels.length === 1 ? '' : 's'}`;
-        else if (tooMany) note = `${levels.length} levels · recode in Prepare Data`;
-        const dimCls = dimmed ? ' is-dimmed' : '';
-        const disabled = dimmed ? ' disabled' : '';
-        const click = dimmed ? '' : ` onclick="selectGroupColumn(${idx}, true)"`;
-        return `<button type="button" class="group-option${dimCls}" data-group-index="${idx}"${disabled}${click}>
-          <span>${escapeHtml(header)}</span><small>${escapeHtml(note)}</small>
-        </button>`;
+      const token = ++groupListToken;
+      clearLevelCountCache();
+      const BG = window.StatisticoByGroup;
+      function finish(parts) {
+        if (token !== groupListToken || !list) return;
+        const html = (parts || []).join('');
+        list.innerHTML = html || `<div class="group-dialog-empty">No columns available.</div>`;
+        refreshGroupDialogSelection();
+      }
+      if (!BG || !BG.scanColumns) {
+        finish(sourceHeaders.map((header, idx) => groupOptionHtml(header, idx)));
+        return;
+      }
+      BG.scanColumns({
+        count: sourceHeaders.length,
+        listEl: list,
+        onIndex: (idx) => groupOptionHtml(sourceHeaders[idx], idx),
+        onDone: finish
       });
-      list.innerHTML = rows.length
-        ? rows.join('')
-        : `<div class="group-dialog-empty">No columns available.</div>`;
-      refreshGroupDialogSelection();
     }
 
     function updateGroupChoiceLabel() {
@@ -1585,12 +1614,16 @@
     }
 
     function openGroupDialog() {
-      if (!sourceHeaders.length) return;
+      if (!sourceHeaders.length) {
+        releaseByGroupWait();
+        return;
+      }
       applySelectionToken += 1;
-      refreshGroupDialogSelection();
       if (groupIndex == null) hideLevelPreview();
       else renderLevelPreview(groupIndex);
       document.getElementById('groupDialog').classList.add('is-visible');
+      releaseByGroupWait();
+      populateGroupChoices();
     }
 
     function closeGroupDialog() {
@@ -2999,7 +3032,6 @@
       if (!sourceHeaders.length || !sourceRows.length) {
         return setEmpty('No source rows available. Re-run the regression or clear filters.');
       }
-      populateGroupChoices();
       groupIndex = null;
       updateGroupChoiceLabel();
       hideLevelPreview();
@@ -3116,7 +3148,7 @@
     function bootOnce() {
       if (appStarted) return;
       appStarted = true;
-      boot();
+      setTimeout(boot, 0);
     }
 
     if (document.readyState === 'loading') {

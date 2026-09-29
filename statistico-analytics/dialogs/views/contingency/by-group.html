@@ -17,8 +17,8 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260922closeread" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../../shared/by-group-standard.js?v=20260919bygrp4"></script>
-  <script src="../shared-header.js?v=20260928bygroup1"></script>
+  <script src="../../shared/by-group-standard.js?v=20260929wait1"></script>
+  <script src="../shared-header.js?v=20260928wait1"></script>
   <script src="contingency-engine.js?v=20260911freq1"></script>
   <script src="contingency-sample-data.js?v=20260909ctsim"></script>
   <script src="../../shared/contingency-similarity.js?v=20260919pair0"></script>
@@ -315,6 +315,8 @@
   </style>
 </head>
 <body data-page-version="20260909-ctsim-v1">
+  <style id="byGroupNavWaitStyle">#byGroupNavWait{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;background:rgba(6,12,22,.78)}#byGroupNavWait.is-on{display:flex}#byGroupNavWait .by-group-nav-wait-card{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 28px;border-radius:14px;background:#1b2433;color:#f8fafc;border:1px solid rgba(196,181,253,.45);font:700 14px/1.3 "Segoe UI",sans-serif}#byGroupNavWait i{font-size:28px;color:#c4b5fd}</style>
+  <div id="byGroupNavWait" class="is-on" role="status" aria-live="polite"><div class="by-group-nav-wait-card"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>Opening group selection…</span></div></div>
   <nav class="sb-nav" id="sidebarNav"></nav>
   <div class="right-col">
     <div id="header-container"></div>
@@ -559,15 +561,22 @@
       return h === String(spec.rowVar || '') || h === String(spec.colVar || '') || (freq && h === String(freq));
     }
 
+    var levelCountMemo = null;
+    function clearLevelCountCache() { levelCountMemo = Object.create(null); }
     function getLevelCounts(idx) {
+      if (!levelCountMemo) levelCountMemo = Object.create(null);
+      var memoKey = String(idx);
+      if (levelCountMemo[memoKey]) return levelCountMemo[memoKey];
       var counts = new Map();
       sourceRows.forEach(function (row) {
         var key = levelKey(rowValue(row, idx));
         counts.set(key, (counts.get(key) || 0) + 1);
       });
-      return Array.from(counts.entries())
+      var result = Array.from(counts.entries())
         .map(function (entry) { return { level: entry[0], n: entry[1] }; })
         .sort(function (a, b) { return String(a.level).localeCompare(String(b.level), undefined, { numeric: true }); });
+      levelCountMemo[memoKey] = result;
+      return result;
     }
 
     function ensureLevelSelection(idx) {
@@ -644,10 +653,14 @@
       });
     }
 
+    function releaseByGroupWait() {
+      if (window.StatisticoByGroup && StatisticoByGroup.hideEntryWait) StatisticoByGroup.hideEntryWait();
+    }
     function setEmpty(message) {
       document.getElementById('emptyState').style.display = 'flex';
       document.getElementById('emptyState').innerHTML = '<i class="fa-solid fa-layer-group"></i>' + escapeHtml(message);
       document.getElementById('mainContent').style.display = 'none';
+      if (!/^Loading\b/i.test(String(message || ''))) releaseByGroupWait();
     }
 
     function updateGroupChoiceLabel() {
@@ -667,18 +680,36 @@
       }
     }
 
+    var groupListToken = 0;
     function populateGroupChoices() {
       var list = document.getElementById('groupDialogList');
-      var options = sourceHeaders.map(function (header, idx) {
-        if (isAnalysisHeader(header)) return '';
-        var levels = getLevelCounts(idx);
-        var note = levels.length + ' level' + (levels.length === 1 ? '' : 's') + ', n=' + levels.reduce(function (s, item) { return s + item.n; }, 0);
-        return '<button type="button" class="group-option" data-group-index="' + idx + '" onclick="selectGroupColumn(' + idx + ', true)">' +
-          '<span>' + escapeHtml(header) + '</span><small>' + escapeHtml(note) + '</small></button>';
-      }).join('');
-      list.innerHTML = options || '<div class="empty" style="min-height:160px;"><i class="fa-solid fa-circle-info"></i>No extra columns available to group by.</div>';
-      refreshGroupDialogSelection();
-      updateGroupDialogConfirmState();
+      var token = ++groupListToken;
+      clearLevelCountCache();
+      var BG = window.StatisticoByGroup;
+      function finish(parts) {
+        if (token !== groupListToken || !list) return;
+        var options = (parts || []).join('');
+        list.innerHTML = options || '<div class="empty" style="min-height:160px;"><i class="fa-solid fa-circle-info"></i>No extra columns available to group by.</div>';
+        refreshGroupDialogSelection();
+        updateGroupDialogConfirmState();
+      }
+      if (!BG || !BG.scanColumns) {
+        finish(sourceHeaders.map(function (header, idx) { return groupOptionHtml(header, idx); }));
+        return;
+      }
+      BG.scanColumns({
+        count: sourceHeaders.length,
+        listEl: list,
+        onIndex: function (idx) { return groupOptionHtml(sourceHeaders[idx], idx); },
+        onDone: finish
+      });
+    }
+    function groupOptionHtml(header, idx) {
+      if (isAnalysisHeader(header)) return '';
+      var levels = getLevelCounts(idx);
+      var note = levels.length + ' level' + (levels.length === 1 ? '' : 's') + ', n=' + levels.reduce(function (s, item) { return s + item.n; }, 0);
+      return '<button type="button" class="group-option" data-group-index="' + idx + '" onclick="selectGroupColumn(' + idx + ', true)">' +
+        '<span>' + escapeHtml(header) + '</span><small>' + escapeHtml(note) + '</small></button>';
     }
 
     function updateGroupDialogConfirmState() {
@@ -780,14 +811,16 @@
     }
 
     function openGroupDialog() {
-      if (!sourceHeaders.length) return;
-      populateGroupChoices();
+      if (!sourceHeaders.length) {
+        releaseByGroupWait();
+        return;
+      }
       updateGroupChoiceLabel();
-      refreshGroupDialogSelection();
-      updateGroupDialogConfirmState();
       if (isValidGroupIndex(groupIndex)) renderLevelPreview(groupIndex);
       else hideLevelPreview();
       document.getElementById('groupDialog').classList.add('is-visible');
+      releaseByGroupWait();
+      populateGroupChoices();
     }
 
     function hideGroupDialog() {
@@ -1888,7 +1921,6 @@
         return;
       }
       groupIndex = null;
-      populateGroupChoices();
       promptForGroup();
     }
 
@@ -1906,8 +1938,9 @@
     window.closeCtSimHelp = closeCtSimHelp;
     window.openDspHelp = openCtSimHelp;
 
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
-    else boot();
+    function startBoot() { setTimeout(boot, 0); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startBoot, { once: true });
+    else startBoot();
   </script>
 </body>
 </html>

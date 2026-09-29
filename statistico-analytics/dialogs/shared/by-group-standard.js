@@ -280,6 +280,49 @@
     return el;
   }
 
+  function hideEntryWait() {
+    if (typeof document === 'undefined') return;
+    var el = document.getElementById('byGroupNavWait');
+    if (!el) return;
+    el.classList.remove('is-on');
+    el.hidden = true;
+  }
+
+  function groupListWaitHtml(done, total) {
+    return '<div class="group-list-loading" role="status" aria-live="polite" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:180px;color:#cbd5e1;font-weight:700;text-align:center;">'
+      + '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true" style="font-size:26px;color:#c4b5fd;"></i>'
+      + '<span>Preparing grouping columns… ' + done + ' of ' + total + '</span></div>';
+  }
+
+  function scanColumns(opts) {
+    opts = opts || {};
+    var count = opts.count || 0;
+    var listEl = opts.listEl;
+    var parts = new Array(count);
+    var i = 0;
+    function paint() {
+      if (listEl) listEl.innerHTML = groupListWaitHtml(i, count);
+    }
+    function finish() {
+      if (typeof opts.onDone === 'function') opts.onDone(parts);
+    }
+    function step() {
+      var start = Date.now();
+      while (i < count && (Date.now() - start) < 32) {
+        parts[i] = opts.onIndex(i) || '';
+        i += 1;
+      }
+      if (i < count) {
+        paint();
+        setTimeout(step, 0);
+        return;
+      }
+      finish();
+    }
+    paint();
+    setTimeout(step, 0);
+  }
+
   function applyPageTitles(root) {
     if (typeof document === 'undefined') return;
     var scope = root && root.querySelector ? root : document;
@@ -530,6 +573,8 @@
     mountResultFirst: mountResultFirst,
     mount: mount,
     applyPageTitles: applyPageTitles,
+    hideEntryWait: hideEntryWait,
+    scanColumns: scanColumns,
     publishContext: publishContext,
     openMethod: openMethod,
     aiPromptBlock: aiPromptBlock

@@ -4232,11 +4232,51 @@ const StatisticoHeader = {
     return appendPreservedParams(`./${filename}`);
   },
   
+  showByGroupWait(message) {
+    let style = document.getElementById('byGroupNavWaitStyle');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'byGroupNavWaitStyle';
+      style.textContent = '#byGroupNavWait{position:fixed;inset:0;z-index:12000;display:none;align-items:center;justify-content:center;background:rgba(6,12,22,.78)}#byGroupNavWait.is-on{display:flex}#byGroupNavWait .by-group-nav-wait-card{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px 28px;border-radius:14px;background:#1b2433;color:#f8fafc;border:1px solid rgba(196,181,253,.45);font:700 14px/1.3 Segoe UI,sans-serif}#byGroupNavWait i{font-size:28px;color:#c4b5fd}';
+      document.head.appendChild(style);
+    }
+    let el = document.getElementById('byGroupNavWait');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'byGroupNavWait';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      el.innerHTML = '<div class="by-group-nav-wait-card"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span></span></div>';
+      (document.body || document.documentElement).appendChild(el);
+    }
+    const span = el.querySelector('span');
+    if (span) span.textContent = message || 'Opening group selection…';
+    el.hidden = false;
+    el.classList.add('is-on');
+  },
+
+  hideByGroupWait() {
+    const el = document.getElementById('byGroupNavWait');
+    if (!el) return;
+    el.classList.remove('is-on');
+    el.hidden = true;
+  },
+
   /**
    * Navigate to another view
    */
   navigateTo(filename) {
     console.log('🔄 Navigating to:', filename);
+    const go = () => this._navigateToNow(filename);
+    if (/by-group\.html/i.test(String(filename || ''))) {
+      this.showByGroupWait('Opening group selection…');
+      requestAnimationFrame(() => setTimeout(go, 0));
+      return;
+    }
+    go();
+  },
+
+  _navigateToNow(filename) {
     const targetUrlRaw = this.resolveDialogUrl(filename);
     let targetUrl = targetUrlRaw;
     try {

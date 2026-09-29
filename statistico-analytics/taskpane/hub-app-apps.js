@@ -455,6 +455,34 @@ const TOOLS_CATEGORY_TILES = [
    worksheet range. Own top-level cluster; mirrors the website's Calculators Hub. */
 const CALCULATOR_CATEGORY_TILES = [
   {
+    id: "two-by-two",
+    section: "2×2 Comparison",
+    sectionId: "two-by-two",
+    sectionSubtitle: "Two groups and a yes/no outcome, from four typed counts",
+    title: "2×2 calculator",
+    icon: "fa-calculator",
+    accent: "#c4b5fd",
+    accentDark: "#6d28d9",
+    color: "#a78bfa",
+    colorDark: "#6d28d9",
+    subtitle: "Compare two groups by typing four counts",
+    desc: "Enter the four cell counts yourself. The percentage-point difference, risk ratio, odds ratio, and p-values update as you type. No worksheet range is used.",
+    info: [
+      "Manual counts only — nothing is read from Excel",
+      "Event percentage, risk difference, risk ratio, and odds ratio",
+      "Case–control and paired before/after modes",
+      "Standalone calculator — no Active Range needed"
+    ],
+    modules: [
+      {
+        id: "calc-2x2",
+        label: "Open 2×2 calculator",
+        tip: "Type four counts and compare two groups on a yes/no outcome.",
+        dialogPath: "contingency/contingency-2x2.html"
+      }
+    ]
+  },
+  {
     id: "distribution-tools",
     section: "Distributions",
     sectionId: "distributions",
@@ -744,6 +772,14 @@ var TOOLS_SECTION_META = {
 var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "delivery", "survey"];
 var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "survey"];
 var CALC_SECTION_META = {
+  "two-by-two": {
+    id: "two-by-two",
+    label: "2×2 Comparison",
+    subtitle: "Two groups and a yes/no outcome, from four typed counts.",
+    icon: "fa-calculator",
+    color: "#a78bfa",
+    colorDark: "#6d28d9"
+  },
   distributions: {
     id: "distributions",
     label: "Distributions",
@@ -793,7 +829,7 @@ var CALC_SECTION_META = {
     colorDark: "#0f766e"
   }
 };
-var CALC_SECTION_ORDER = ["distributions", "precision-sample", "power-sample", "effect-sizes", "staffing", "capability"];
+var CALC_SECTION_ORDER = ["two-by-two", "distributions", "precision-sample", "power-sample", "effect-sizes", "staffing", "capability"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {
@@ -1816,6 +1852,11 @@ function runHubModuleAction(actionKey) {
   if (module.browserUrl) {
     dismissAllHubDialogs();
     openInUserBrowser(module.browserUrl);
+    return;
+  }
+  if (module.dialogPath) {
+    dismissAllHubDialogs();
+    openExternalDialogUrl(getDialogsBaseUrl() + module.dialogPath, module.dialogOptions || DIALOG_SIZES.RESULTS);
     return;
   }
   if (module.dialogUrl) {

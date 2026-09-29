@@ -74,16 +74,41 @@
     }
     input[type="number"]::-webkit-outer-spin-button,
     input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-    td input[type="number"] { width:96px; }
     input[type="text"] { min-width:0; }
-    table.grid { width:100%; border-collapse:separate; border-spacing:0; }
-    table.grid th, table.grid td { border-bottom:1px solid var(--border); padding:8px 6px; text-align:center; }
-    table.grid th.stub { text-align:left; width:34%; }
-    table.grid thead th { color:var(--text-muted); font-size:12px; font-weight:700; }
-    .stub input { width:100%; }
-    .head-input { width:100%; text-align:center; }
-    td.hot { outline:2px solid var(--accent-1); outline-offset:-2px; border-radius:8px; }
-    .alt { font-variant-numeric:tabular-nums; font-weight:700; color:var(--accent-1); }
+    table.grid { width:100%; border-collapse:collapse; table-layout:fixed; }
+    table.grid th, table.grid td {
+      border:1px solid var(--border); padding:8px; text-align:center; vertical-align:middle;
+    }
+    table.grid thead th { background:var(--surface-2); color:var(--text-primary); font-size:13px; font-weight:800; }
+    table.grid th.stub { text-align:left; width:30%; background:var(--surface-2); }
+    table.grid th.stub input, table.grid thead input.head-input {
+      width:100%; background:transparent; border:1px solid transparent; border-radius:8px;
+      font-weight:800; font-size:14px; padding:8px 10px;
+    }
+    table.grid thead input.head-input { text-align:center; }
+    table.grid th.stub input:hover, table.grid thead input.head-input:hover,
+    table.grid th.stub input:focus, table.grid thead input.head-input:focus {
+      background:var(--surface-0); border-color:var(--border);
+    }
+    table.grid td[data-i] { background:var(--surface-0); padding:6px; }
+    table.grid td[data-i] input[type="number"] {
+      width:100%; height:52px; text-align:center; font-size:22px; font-weight:800;
+      border-radius:8px; border:1px solid color-mix(in srgb, var(--accent-1) 55%, var(--border));
+      background:var(--surface-2); color:var(--text-primary);
+    }
+    table.grid td[data-i] input[type="number"]:focus,
+    table.grid td.hot input[type="number"] {
+      border-color:var(--accent-1); outline:none; box-shadow:0 0 0 2px color-mix(in srgb, var(--accent-1) 45%, transparent);
+    }
+    table.grid td.tot, table.grid tr.totals th, table.grid tr.totals td {
+      background:color-mix(in srgb, var(--surface-2) 70%, transparent);
+      font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--text-secondary);
+    }
+    table.grid tr.totals th { text-align:left; }
+    table.grid td[data-i] .alt {
+      display:flex; align-items:center; justify-content:center; min-height:52px;
+      font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--accent-1);
+    }
     .hover-box { min-height:2.6em; margin:10px 0 0; color:var(--text-muted); font-size:13px; line-height:1.4; }
     .scenario { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
     .scenario .grow { color:var(--text-muted); font-size:13px; padding-bottom:6px; }
@@ -148,6 +173,13 @@
     .ct2-help-box h3 i { color:var(--accent-1); }
     .ct2-help-box p { margin:0 0 10px; color:var(--text-secondary); font-size:14px; line-height:1.5; }
     .ct2-help-box h4 { margin:12px 0 4px; font-size:13px; }
+    .ct2-help-box table.ex { width:100%; border-collapse:collapse; margin:0 0 10px; font-size:13px; }
+    .ct2-help-box table.ex th, .ct2-help-box table.ex td {
+      border:1px solid var(--border); padding:6px 8px; text-align:center;
+    }
+    .ct2-help-box table.ex th { background:var(--surface-2); font-weight:800; }
+    .ct2-help-box table.ex th.stub { text-align:left; color:var(--text-secondary); }
+    .ct2-help-box table.ex td { font-weight:800; color:var(--accent-1); font-variant-numeric:tabular-nums; }
     .ct2-help-close {
       position:absolute; top:12px; right:12px; width:28px; height:28px; border-radius:50%;
       background:var(--surface-2); border:1px solid var(--border); color:var(--text-secondary); cursor:pointer;
@@ -228,19 +260,19 @@
               <th class="stub"><input id="labR0" type="text" maxlength="40" aria-label="First row"></th>
               <td data-i="0" data-j="0"></td>
               <td data-i="0" data-j="1"></td>
-              <td id="totR0"></td>
+              <td class="tot" id="totR0"></td>
             </tr>
             <tr>
               <th class="stub"><input id="labR1" type="text" maxlength="40" aria-label="Second row"></th>
               <td data-i="1" data-j="0"></td>
               <td data-i="1" data-j="1"></td>
-              <td id="totR1"></td>
+              <td class="tot" id="totR1"></td>
             </tr>
-            <tr>
+            <tr class="totals">
               <th class="stub">Total</th>
-              <td id="totC0"></td>
-              <td id="totC1"></td>
-              <td id="totN"></td>
+              <td class="tot" id="totC0"></td>
+              <td class="tot" id="totC1"></td>
+              <td class="tot" id="totN"></td>
             </tr>
           </tbody>
         </table>
@@ -274,11 +306,44 @@
         <h4>Group of interest and event</h4>
         <p>The headline, risk ratio, and odds ratio compare the group of interest with the other row, for the column you mark as the event. Changing either control reverses the direction of the comparison.</p>
         <h4>How the data were collected</h4>
-        <p><b>Independent groups.</b> Each person is in one group, so row percentages estimate risk. Example: group A has 40 events and 60 non-events; group B has 20 events and 80 non-events. The headline is “40% versus 20% · 20 percentage points higher”, the risk ratio is 2, and the odds ratio is 2.67.</p>
-        <p><b>Case–control.</b> Cases and controls were sampled separately, so report the odds ratio and not a risk ratio. Example: 40 cases exposed and 60 unexposed, against 20 controls exposed and 80 unexposed. The odds ratio is 2.67. The 40% and 20% shares describe the samples, not population risks.</p>
-        <p><b>Paired before / after.</b> The same people were measured twice. McNemar’s test uses only the pairs that changed. Example: 12 people had the event before and not after, and 4 had it after but not before. The comparison is 12 versus 4. Pairs that stayed the same are not used. Pearson χ² and Fisher’s exact test are not used.</p>
+        <p><b>Independent groups.</b> Each person is in one group, so row percentages estimate risk. Type this table:</p>
+        <table class="ex">
+          <thead><tr><th class="stub"></th><th>Event</th><th>No event</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><th class="stub">Group A</th><td>40</td><td>60</td><td>100</td></tr>
+            <tr><th class="stub">Group B</th><td>20</td><td>80</td><td>100</td></tr>
+          </tbody>
+        </table>
+        <p>The headline is “40% versus 20% · 20 percentage points higher”. The risk ratio is 2 and the odds ratio is 2.67.</p>
+        <p><b>Case–control.</b> Cases and controls were sampled separately, so report the odds ratio and not a risk ratio. Type this table:</p>
+        <table class="ex">
+          <thead><tr><th class="stub"></th><th>Exposed</th><th>Unexposed</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><th class="stub">Cases</th><td>40</td><td>60</td><td>100</td></tr>
+            <tr><th class="stub">Controls</th><td>20</td><td>80</td><td>100</td></tr>
+          </tbody>
+        </table>
+        <p>The odds ratio is 2.67. The 40% and 20% shares describe the samples, not population risks.</p>
+        <p><b>Paired before / after.</b> The same people were measured twice. McNemar’s test uses only the pairs that changed. Type this table:</p>
+        <table class="ex">
+          <thead><tr><th class="stub"></th><th>After: event</th><th>After: no event</th></tr></thead>
+          <tbody>
+            <tr><th class="stub">Before: event</th><td>30</td><td>12</td></tr>
+            <tr><th class="stub">Before: no event</th><td>4</td><td>54</td></tr>
+          </tbody>
+        </table>
+        <p>The comparison is 12 versus 4. The 30 and 54 pairs that stayed the same are not used. Pearson χ² and Fisher’s exact test are not used.</p>
         <h4>Scenario</h4>
         <p>After both counts in a row are typed, change that row’s event count. The row total stays fixed and the other cell adjusts. A Scenario label appears. Reset returns to the counts from your last direct edit.</p>
+        <p>From the independent example, change Group A’s event count from 40 to 50. No event in that row becomes 50, because the row total stays 100:</p>
+        <table class="ex">
+          <thead><tr><th class="stub"></th><th>Event</th><th>No event</th><th>Total</th></tr></thead>
+          <tbody>
+            <tr><th class="stub">Group A</th><td>50</td><td>50</td><td>100</td></tr>
+            <tr><th class="stub">Group B</th><td>20</td><td>80</td><td>100</td></tr>
+          </tbody>
+        </table>
+        <p>The headline becomes “50% versus 20% · 30 percentage points higher”.</p>
         <h4>Which p-value</h4>
         <p>The card marked “Use this” is the one to report. When expected counts are small, that is Fisher’s exact test. The <b>i</b> beside each metric explains what that number is.</p>
       </div>

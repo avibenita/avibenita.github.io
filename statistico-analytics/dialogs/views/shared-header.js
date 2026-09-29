@@ -893,7 +893,8 @@ const StatisticoHeader = {
       'mixed-model': 'Linear Mixed Model',
       'meta-analysis': 'Meta-Analysis',
       'contingency': 'Contingency Tables',
-      'segmentation': 'Survey Segmentation Matrix'
+      'segmentation': 'Survey Segmentation Matrix',
+      'pareto': 'Pareto Analysis'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -1018,7 +1019,8 @@ const StatisticoHeader = {
       'mixed-model': 'Linear Mixed Model',
       'meta-analysis': 'Meta-Analysis',
       'contingency': 'Contingency Tables',
-      'segmentation': 'Survey Segmentation Matrix'
+      'segmentation': 'Survey Segmentation Matrix',
+      'pareto': 'Pareto Analysis'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -7572,25 +7574,17 @@ REPORT: [one polished paragraph suitable for a report]`;
 
   _sidebarAiOnClick() {
     if (this.module === 'independent') return this._sbAiIndependentInterpret();
-    if (this.module === 'dependent' && this.currentView === 'dependent-results-kplus') {
-      return this._sbAiDependentKplusInterpret();
-    }
     if (typeof window.requestMixedModelAI === 'function') return window.requestMixedModelAI();
     if (typeof window.requestFactorModuleAI === 'function') return window.requestFactorModuleAI();
     if (typeof window.requestReliabilityModuleAI === 'function') return window.requestReliabilityModuleAI();
     if (typeof window.requestClusterModuleAI === 'function') return window.requestClusterModuleAI();
     if (typeof window.requestMetaModuleAI === 'function') return window.requestMetaModuleAI();
-    if (typeof window.requestRegressionAI === 'function') return window.requestRegressionAI();
     if (typeof window.runParetoAI === 'function') return window.runParetoAI();
-    if (typeof window.requestAIInterpretation === 'function'
-        && this.module === 'univariate' && this.currentView === 'hypothesis') {
-      return window.requestAIInterpretation();
-    }
     if (this.module === 'univariate' || this.module === 'correlations') {
       return this._sbAiGlobalInterpret();
     }
     if (this.module === 'contingency') return this._sbAiContingencyInterpret();
-    return this._sbAiPerViewInterpret();
+    return this._sbAiModuleOverallInterpret();
   },
 
   _mountSidebarUtilities() {
@@ -9362,6 +9356,122 @@ Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
 ${this._localAiReplyFormat()}`;
+  },
+
+  _trimAiValue(value, depth) {
+    if (depth > 5) return null;
+    if (Array.isArray(value)) {
+      if (value.length > 24) return { omittedItems: value.length };
+      return value.slice(0, 24).map((item) => this._trimAiValue(item, depth + 1));
+    }
+    if (value && typeof value === 'object') {
+      const out = {};
+      Object.keys(value).slice(0, 40).forEach((key) => {
+        out[key] = this._trimAiValue(value[key], depth + 1);
+      });
+      return out;
+    }
+    return value;
+  },
+
+  _moduleOverallSources() {
+    const sources = [];
+    const take = (label, value) => {
+      if (value == null) return;
+      try {
+        const json = JSON.stringify(this._roundAiPayload(this._trimAiValue(value, 0), 4));
+        if (json && json !== '{}' && json !== 'null' && json !== '[]') sources.push(label + ':\n' + json.slice(0, 7000));
+      } catch (_) {}
+    };
+    if (typeof window.buildAIPayload === 'function') {
+      try { take('Computed analysis', window.buildAIPayload()); } catch (_) {}
+    }
+    if (this.module === 'anova' && window._bundle) take('ANOVA results', window._bundle);
+    if (this.module === 'pca' && window.__pcaResult) take('PCA results', window.__pcaResult);
+    if (this.module === 'logistic' && window.__logisticState) {
+      const s = window.__logisticState;
+      take('Logistic results', {
+        results: s.results,
+        coefficients: s.coefficients,
+        diagnostics: s.diagnostics,
+        descriptives: s.descriptives
+      });
+    }
+    if (this.module === 'regression') take('Regression results', window.regressionResultsForAI || window.regressionResults);
+    if (this.module === 'segmentation' && window.__segmentationBundle) take('Segmentation results', window.__segmentationBundle);
+    let panels = Array.from(document.querySelectorAll('.tab-panel, .ct-bg-panel, .by-group-panel, .reg-bg-panel, .corr-bg-panel'));
+    if (!panels.length) {
+      const wrap = document.querySelector('.wrap, .view-container, .main-content');
+      if (wrap) panels = [wrap];
+    }
+    const texts = panels.map((el) => {
+      const name = el.id || 'panel';
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 700);
+      return text ? name + ': ' + text : '';
+    }).filter(Boolean).slice(0, 8);
+    return { sources: sources, panelText: texts.join('\n') };
+  },
+
+  _buildModuleOverallPrompt() {
+    const packed = this._moduleOverallSources();
+    const moduleName = this._getModuleDisplayName();
+    const views = Array.from(document.querySelectorAll('#sidebarNav .sb-item-label'))
+      .map((el) => (el.textContent || '').trim())
+      .filter((label) => label && label !== 'Analyze all results' && label !== 'Explain this view')
+      .slice(0, 12);
+    if (!packed.sources.length && !packed.panelText) return null;
+    this._lastAiMeta = {
+      primarySignal: moduleName,
+      viewsBrowsed: views,
+      strengthLevel: null,
+      strengthNote: null
+    };
+    return `You are writing the overall assessment of a Statistico ${moduleName} analysis.
+
+This is the whole analysis, not an explanation of the tab that happens to be open. Synthesize the main result, effect size or model quality, diagnostics, and whether the finding holds across groups.
+Do not recompute statistics. Do not invent numbers that are absent. Do not describe only the current screen.
+
+Views in this module: ${views.join(', ') || moduleName}
+
+${packed.sources.join('\n\n') || '(No structured payload was exposed.)'}
+
+VISIBLE RESULTS ACROSS PANELS:
+${packed.panelText || '(No panel text captured.)'}
+
+${this._overallAssessmentEmphasis()}
+
+${this._groupConsistencyAiInstruction()}
+
+${this._overallAiReplyFormat()}`;
+  },
+
+  async _sbAiModuleOverallInterpret() {
+    const btn = document.getElementById('sbAiBtn');
+    const setBusy = (busy) => {
+      if (!btn) return;
+      btn.disabled = busy;
+      btn.innerHTML = busy
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>'
+        : this._sidebarAiButtonInnerHtml(false);
+    };
+    this._lastAiInvoke = { mode: 'full', kind: this.module || 'module' };
+    if (this._openCachedAi('overall', 'full', this.currentView)) {
+      this._aiForceRefresh = false;
+      return;
+    }
+    setBusy(true);
+    try {
+      const prompt = this._buildModuleOverallPrompt();
+      if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
+      const raw = await this._callAiForSidebar(prompt);
+      const sections = this._parseAiStructured(raw);
+      this._showAiOverlay(sections, this.currentView, 'full', this._lastAiMeta);
+    } catch (err) {
+      this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'full', this._lastAiMeta);
+    } finally {
+      this._aiForceRefresh = false;
+      setBusy(false);
+    }
   },
 
   _contingencyOverallSource() {

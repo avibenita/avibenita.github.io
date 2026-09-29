@@ -20,7 +20,7 @@
   <!-- Shared sidebar / header styles -->
   <link rel="stylesheet" href="../shared-header.css?v=20260921export2" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
-  <script src="../shared-header.js?v=20260928wait1"></script>
+  <script src="../shared-header.js?v=20260929overallall"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -2628,7 +2628,10 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
       '2. Class A focus (what the vital few items reveal)\n' +
       '3. Business recommendation (actionable advice)\n' +
       '4. Risk or caveats (one point)\n' +
-      'Use plain text with clear section headings.';
+      'Use plain text. This is the overall Pareto assessment, not a note about one control.\n' +
+      (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._overallAiReplyFormat === 'function'
+        ? StatisticoHeader._overallAiReplyFormat()
+        : 'Use plain text with clear section headings.');
 
     try {
       var PROXY = 'https://statistico-ai.statistico.workers.dev/';
@@ -2645,7 +2648,13 @@ Top20 = Σ value(1..k) / T × 100   ← expressed as %</div>
           if (raw) break;
         } catch (e2) { /* try next model */ }
       }
-      prtShowAi(raw || 'No response received. Please try again.');
+      if (raw && typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._showAiOverlay === 'function') {
+        var sections = StatisticoHeader._parseAiStructured(raw);
+        StatisticoHeader._lastAiMeta = { primarySignal: 'Pareto concentration', viewsBrowsed: ['Pareto chart'] };
+        StatisticoHeader._showAiOverlay(sections, 'pareto', 'full', StatisticoHeader._lastAiMeta);
+      } else {
+        prtShowAi(raw || 'No response received. Please try again.');
+      }
     } catch (err) {
       prtShowAi('Error: ' + err.message);
     } finally {

@@ -18,7 +18,7 @@
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20260922closeread" />
   <script src="../shared-brand-logo.js?v=20260716cover"></script>
   <script src="../../shared/by-group-standard.js?v=20260929levels15"></script>
-  <script src="../shared-header.js?v=20260929simscheme"></script>
+  <script src="../shared-header.js?v=20260929colnest"></script>
   <script src="contingency-engine.js?v=20260911freq1"></script>
   <script src="contingency-sample-data.js?v=20260909ctsim"></script>
   <script src="../../shared/contingency-similarity.js?v=20260919pair0"></script>
@@ -123,6 +123,7 @@
     .measure-chips { display:flex; flex-wrap:wrap; gap:6px; }
     .measure-chip { border-radius:8px; padding:6px 11px; font-size:12px; font-weight:700; }
     .measure-chip.is-on { border-color:var(--accent-ct); color:var(--text-primary); background:color-mix(in srgb, var(--accent-ct) 18%, var(--surface-2)); }
+    .nest-label { align-self:center; color:var(--text-secondary); font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
     .table-wrap.is-wide { overflow-x:auto; }
     .ct-combined { --cat-row-h:40px; width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; }
     .ct-combined thead th { white-space:nowrap; }
@@ -399,6 +400,7 @@
               </div>
               <div class="table-toolbar">
                 <div class="measure-chips" id="tableMeasureChips"></div>
+                <div class="measure-chips" id="tableNestChips" hidden></div>
               </div>
               <div class="group-chips" id="tableGroupChips"></div>
               <div class="table-wrap" id="crosstabWrap"></div>
@@ -595,6 +597,7 @@
     var groupResults = [];
     var tableGroupKey = null;
     var tableMeasure = 'colPct';
+    var tableColNest = 'group';
     var chartMode = 'distribution';
     var facetCharts = [];
     var chartRenderToken = 0;
@@ -1138,7 +1141,11 @@
         if (title) title.textContent = 'Compare groups';
         if (line) {
           var nLevels = includedLevelItems().length;
-          line.innerHTML = 'All groups together <span>· ' + nLevels + ' levels · ' + escapeHtml(measureLabel(tableMeasure)) + ' · n = ' + escapeHtml(String(displayedNForTogether())) + '</span>';
+          var frameNow = canonicalFrame();
+          var groupNameNow = isValidGroupIndex(groupIndex) ? sourceHeaders[groupIndex] : 'Group';
+          var mainName = tableColNest === 'column' ? (frameNow.colVar || 'Column') : groupNameNow;
+          var subName = tableColNest === 'column' ? groupNameNow : (frameNow.colVar || 'Column');
+          line.innerHTML = 'All groups together <span>· ' + nLevels + ' levels · main ' + escapeHtml(mainName) + ' · sub ' + escapeHtml(subName) + ' · ' + escapeHtml(measureLabel(tableMeasure)) + ' · n = ' + escapeHtml(String(displayedNForTogether())) + '</span>';
         }
         return;
       }
@@ -1174,6 +1181,23 @@
       host.innerHTML = TABLE_MEASURES.map(function (m) {
         return '<button type="button" class="measure-chip' + (m.id === tableMeasure ? ' is-on' : '') + '" onclick="selectTableMeasure(\'' + m.id + '\')">' + escapeHtml(m.label) + '</button>';
       }).join('');
+    }
+
+    function renderNestChips() {
+      var host = document.getElementById('tableNestChips');
+      if (!host) return;
+      if (tableGroupKey !== 'together') {
+        host.hidden = true;
+        host.innerHTML = '';
+        return;
+      }
+      var frame = canonicalFrame();
+      var groupName = isValidGroupIndex(groupIndex) ? sourceHeaders[groupIndex] : 'Group';
+      var colName = frame.colVar || 'Column';
+      host.hidden = false;
+      host.innerHTML = '<span class="nest-label">Main columns</span>' +
+        '<button type="button" class="measure-chip' + (tableColNest !== 'column' ? ' is-on' : '') + '" onclick="selectTableNest(\'group\')">' + escapeHtml(groupName) + '</button>' +
+        '<button type="button" class="measure-chip' + (tableColNest === 'column' ? ' is-on' : '') + '" onclick="selectTableNest(\'column\')">' + escapeHtml(colName) + '</button>';
     }
 
     function renderGroupChips() {
@@ -1257,6 +1281,62 @@
       wrap.innerHTML = '<table class="ct-grid ct-combined"><thead>' + cat.join('') + met.join('') + '</thead><tbody>' + body + foot.join('') + '</tbody></table>';
     }
 
+    function renderCombinedByColumn(wrap, levels, frame) {
+      if (!levels.length || !frame.rowLabels.length || !frame.colLabels.length) {
+        wrap.innerHTML = '<div class="empty"><i class="fa-solid fa-table"></i>No combined table for these groups.</div>';
+        return;
+      }
+      var overall = groupResults.find(function (item) { return item.key === 'overall'; }) || null;
+      var maxAbs = sharedResidMax(overall ? levels.concat([overall]) : levels);
+      var nSub = levels.length + 1;
+      var cat = ['<tr class="group-category-row"><th class="stub" rowspan="2">' + escapeHtml(frame.rowVar) + '</th>'];
+      frame.colLabels.forEach(function (c) {
+        cat.push('<th class="block-end" colspan="' + nSub + '">' + escapeHtml(c) + '</th>');
+      });
+      cat.push('<th class="total-col" colspan="' + nSub + '">Total</th></tr>');
+      var met = ['<tr class="group-metric-row">'];
+      function metricSubs(isLastBlock) {
+        levels.forEach(function (item) { met.push('<th>' + escapeHtml(item.label) + '</th>'); });
+        met.push('<th class="total-col' + (isLastBlock ? '' : ' block-end') + '">Total</th>');
+      }
+      frame.colLabels.forEach(function () { metricSubs(false); });
+      metricSubs(true);
+      met.push('</tr>');
+      function cell(item, measureFn, extra) {
+        var res = item && item.result;
+        return measureCellHtml(tableMeasure, res ? measureFn(res) : null, maxAbs, extra);
+      }
+      var body = frame.rowLabels.map(function (r) {
+        var row = ['<tr><td class="stub">' + escapeHtml(r) + '</td>'];
+        frame.colLabels.forEach(function (c) {
+          levels.forEach(function (item) {
+            row.push(cell(item, function (res) { return cellMeasure(res, tableMeasure, r, c); }, ''));
+          });
+          row.push(cell(overall, function (res) { return cellMeasure(res, tableMeasure, r, c); }, 'total-col block-end'));
+        });
+        levels.forEach(function (item) {
+          row.push(cell(item, function (res) { return rowTotalMeasure(res, tableMeasure, r); }, 'total-col'));
+        });
+        row.push(cell(overall, function (res) { return rowTotalMeasure(res, tableMeasure, r); }, 'total-col'));
+        row.push('</tr>');
+        return row.join('');
+      }).join('');
+      var foot = ['<tr class="total-row"><td class="stub">Total</td>'];
+      frame.colLabels.forEach(function (c) {
+        levels.forEach(function (item) {
+          foot.push(cell(item, function (res) { return colTotalMeasure(res, tableMeasure, c); }, 'total-col'));
+        });
+        foot.push(cell(overall, function (res) { return colTotalMeasure(res, tableMeasure, c); }, 'total-col block-end'));
+      });
+      levels.forEach(function (item) {
+        foot.push(cell(item, function (res) { return grandMeasure(res, tableMeasure); }, 'total-col'));
+      });
+      foot.push(cell(overall, function (res) { return grandMeasure(res, tableMeasure); }, 'total-col'));
+      foot.push('</tr>');
+      wrap.classList.toggle('is-wide', frame.colLabels.length >= 4 || levels.length >= 4);
+      wrap.innerHTML = '<table class="ct-grid ct-combined"><thead>' + cat.join('') + met.join('') + '</thead><tbody>' + body + foot.join('') + '</tbody></table>';
+    }
+
     function renderCrosstab() {
       var wrap = document.getElementById('crosstabWrap');
       resolveTableGroupKey();
@@ -1265,9 +1345,12 @@
       updateSummaryCards();
       if (!wrap) return;
       if (tableGroupKey === 'together') {
-        renderCombinedCrosstab(wrap);
+        renderNestChips();
+        if (tableColNest === 'column') renderCombinedByColumn(wrap, includedLevelItems(), canonicalFrame());
+        else renderCombinedCrosstab(wrap);
         return;
       }
+      renderNestChips();
       var current = groupResults.find(function (item) { return item.key === tableGroupKey; }) || groupResults[0];
       renderSingleCrosstab(current, wrap);
     }
@@ -1279,6 +1362,11 @@
 
     function selectTableMeasure(id) {
       tableMeasure = id;
+      renderCrosstab();
+    }
+
+    function selectTableNest(mode) {
+      tableColNest = mode === 'column' ? 'column' : 'group';
       renderCrosstab();
     }
 

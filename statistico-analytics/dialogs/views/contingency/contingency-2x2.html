@@ -44,6 +44,14 @@
     }
     .card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
     .seg { display:flex; flex-wrap:wrap; gap:6px; }
+    .design-seg { align-items:flex-start; gap:12px 16px; }
+    .design-choice { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .seg button.design-help {
+      border:none; background:transparent; border-radius:0; padding:1px 2px;
+      color:var(--accent-2); font-size:11.5px; font-weight:800;
+      display:inline-flex; align-items:center; gap:4px;
+    }
+    .seg button.design-help:hover { color:var(--accent-1); }
     .seg button, .mini {
       border:1px solid var(--border); background:var(--surface-2); color:var(--text-secondary);
       border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:700; cursor:pointer;
@@ -230,10 +238,19 @@
     <section class="st-calc-workspace ct2-workspace">
     <section class="card">
       <div class="card-title">How were the data collected?</div>
-      <div class="seg" id="designSeg" style="margin-top:8px;">
-        <button type="button" class="active" data-design="independent">Independent groups</button>
-        <button type="button" data-design="case-control">Case–control</button>
-        <button type="button" data-design="paired">Paired before / after</button>
+      <div class="seg design-seg" id="designSeg" style="margin-top:8px;">
+        <div class="design-choice">
+          <button type="button" class="active" data-design="independent">Independent groups</button>
+          <button type="button" class="design-help" data-help="independent"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
+        <div class="design-choice">
+          <button type="button" data-design="case-control">Case–control</button>
+          <button type="button" class="design-help" data-help="case-control"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
+        <div class="design-choice">
+          <button type="button" data-design="paired">Paired before / after</button>
+          <button type="button" class="design-help" data-help="paired"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
       </div>
       <p class="design-note" id="designNote"></p>
       <div class="design-shift" id="designShift" hidden>
@@ -350,12 +367,15 @@
       if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
       if (window.StatisticoThemeToggle) StatisticoThemeToggle.mount({ container: document.querySelector('.st-calc-header-right') });
       var helpModal = document.getElementById('helpModal');
-      document.getElementById('helpBtn').addEventListener('click', function () {
-        paintHelp();
+      var helpDesign = 'independent';
+      function openHelp(design) {
+        helpDesign = design || state.design;
+        paintHelp(helpDesign);
         helpModal.hidden = false;
         var box = helpModal.querySelector('.ct2-help-box');
         if (box) box.scrollTop = 0;
-      });
+      }
+      document.getElementById('helpBtn').addEventListener('click', function () { openHelp(state.design); });
       document.getElementById('helpClose').addEventListener('click', function () { helpModal.hidden = true; });
       helpModal.addEventListener('click', function (e) { if (e.target === helpModal) helpModal.hidden = true; });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape') helpModal.hidden = true; });
@@ -766,7 +786,7 @@
             ? 'Hover a cell. Outlined cells are the discordant pairs used by McNemar’s test.'
             : 'Hover a cell to see its observed count, expected count, and contribution to χ².';
         }
-        if (!helpModal.hidden) paintHelp();
+        if (!helpModal.hidden) paintHelp(helpDesign);
       }
 
       function marginalBar(name, events, n, klass) {
@@ -799,20 +819,21 @@
         return html + '</tbody></table>';
       }
 
-      function paintHelp() {
+      function paintHelp(design) {
+        design = design || state.design;
         var titles = {
           independent: 'Independent groups',
           'case-control': 'Case–control',
           paired: 'Paired before / after'
         };
-        document.getElementById('helpTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> ' + titles[state.design];
+        document.getElementById('helpTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> ' + titles[design];
         var shared =
           '<div class="help-shared"><h4>Entering counts</h4>' +
           '<p>Type four counts. The cells start empty, and nothing is read from a worksheet. The headline updates as you edit.</p>' +
           '<p>Counts and row % are available in every design. Expected counts are available for independent groups and case–control data. They are hidden for paired data, because Pearson χ² is not used.</p>' +
           '<p>Where Group of interest and Event are shown, switching the group inverts the ratio. In the aspirin trial the heart-attack ratio for aspirin versus placebo is about 0.58, and placebo versus aspirin is about 1.72. Switching the column from heart attack to no heart attack does not invert it: 10,898/11,037 divided by 10,795/11,034 is about 1.01, not 1.72.</p></div>';
         var body = '';
-        if (state.design === 'case-control') {
+        if (design === 'case-control') {
           body =
             '<h4>Example</h4>' +
             '<p>In 1948 and 1949, Richard Doll and Austin Bradford Hill interviewed men in London hospitals. 649 had lung cancer. 649 others, in the same hospitals, had different diseases. They asked who had ever smoked. The report is in the British Medical Journal, 1950.</p>' +
@@ -826,7 +847,7 @@
             '<p>Original 647, hypothetical 620. Never smoked among the lung-cancer patients becomes 29. The other row stays 622 and 27. Reset restores 647 and 2.</p>' +
             '<h4>Recommended test</h4>' +
             '<p>Report the odds ratio. The smallest expected count in this table is 14.5, so the card marked “Use this” is the Pearson χ² p-value. Fisher’s exact p-value is also shown.</p>';
-        } else if (state.design === 'paired') {
+        } else if (design === 'paired') {
           body =
             '<h4>Example</h4>' +
             '<p>Researchers studying Hodgkin’s disease found 85 patients who each had a sibling of the same sex, within about five years of age, who did not have the disease. They compared tonsillectomy in the patient with tonsillectomy in that sibling. The pair is one observation. John Rice reprints the table in Mathematical Statistics and Data Analysis: 26 pairs both had a tonsillectomy, 15 patients had one and the sibling did not, 7 siblings had one and the patient did not, and 37 pairs had neither.</p>' +
@@ -904,6 +925,11 @@
       }
 
       document.getElementById('designSeg').addEventListener('click', function (e) {
+        var help = e.target.closest('button[data-help]');
+        if (help) {
+          openHelp(help.getAttribute('data-help'));
+          return;
+        }
         var btn = e.target.closest('button[data-design]');
         if (!btn) return;
         state.design = btn.getAttribute('data-design');

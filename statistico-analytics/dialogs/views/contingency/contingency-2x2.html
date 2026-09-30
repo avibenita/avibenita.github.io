@@ -77,9 +77,7 @@
       background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border);
       border-radius:8px; padding:6px 8px; font:inherit; font-size:13px;
     }
-    input[type="number"] {
-      width:88px; text-align:right; -moz-appearance:textfield; appearance:textfield;
-    }
+    #scenarioEvents { width:96px; text-align:right; }
     input[type="number"]::-webkit-outer-spin-button,
     input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
     input[type="text"] { min-width:0; }
@@ -99,13 +97,14 @@
       background:var(--surface-0); border-color:var(--border);
     }
     table.grid td[data-i] { background:var(--surface-0); padding:6px; }
-    table.grid td[data-i] input[type="number"] {
+    table.grid td[data-i] input[data-count] {
       width:100%; height:52px; text-align:center; font-size:22px; font-weight:800;
+      border-radius:8px; border:1px solid color-mix(in srgb, var(--accent-1) 55%, var(--border));
       background:var(--surface-2); color:var(--text-primary); caret-color:var(--accent-1);
     }
-    table.grid td.discordant input[type="number"] { border-color:var(--accent-2); }
-    table.grid td[data-i] input[type="number"]:focus,
-    table.grid td.hot input[type="number"] {
+    table.grid td.discordant input[data-count] { border-color:var(--accent-2); }
+    table.grid td[data-i] input[data-count]:focus,
+    table.grid td.hot input[data-count] {
       border-color:var(--accent-1); outline:none; box-shadow:0 0 0 2px color-mix(in srgb, var(--accent-1) 45%, transparent);
     }
     .pair-legend { margin:8px 0 0; color:var(--accent-2); font-size:12.5px; font-weight:700; line-height:1.4; }
@@ -212,6 +211,9 @@
       .st-calc-header.ct2-header { grid-template-columns:110px 1fr auto; height:auto; min-height:72px; }
       .st-calc-header.ct2-header .st-calc-header-title { font-size:1.05rem; }
     }
+    .cell-rule { margin:8px 0 0; color:var(--text-muted); font-size:12.5px; line-height:1.45; }
+    .count-error { margin:8px 0 0; padding:10px 12px; border-radius:10px; background:var(--warn-bg); border:1px solid var(--warn-bd); color:var(--warn); font-size:13.5px; line-height:1.45; }
+    table.grid td[data-i] input[aria-invalid="true"], #scenarioEvents[aria-invalid="true"] { border-color:#f87171; box-shadow:0 0 0 2px rgba(248,113,113,.35); }
     .warn { display:none; padding:10px 12px; border-radius:10px; background:var(--warn-bg); border:1px solid var(--warn-bd); color:var(--warn); font-size:13.5px; line-height:1.45; }
     .warn.show { display:block; }
     .names { display:flex; flex-wrap:wrap; gap:10px 16px; margin-bottom:8px; align-items:flex-end; }
@@ -319,6 +321,8 @@
             </tr>
           </tbody>
         </table>
+        <p class="cell-rule" id="cellRule"></p>
+        <p class="count-error" id="countError" hidden></p>
         <p class="hover-box" id="hoverBox">Hover a cell to see its observed count, expected count, and contribution to χ².</p>
         <p class="pair-legend" id="pairLegend" hidden>The outlined cells are the discordant pairs: one changed from event to no event, the other from no event to event. McNemar’s test uses only those two counts.</p>
         <div class="scenario">
@@ -327,7 +331,7 @@
           </label>
           <label><span class="lab-line">Hypothetical count <span class="info-dot ex up" id="tipHyp" tabindex="0" data-tip="" aria-label="">i</span></span>
             <span class="hyp-row">
-              <input type="number" id="scenarioEvents" min="0" step="1" inputmode="numeric" aria-label="Hypothetical count">
+              <input type="text" id="scenarioEvents" inputmode="numeric" autocomplete="off" aria-label="Hypothetical count">
               <span id="scenarioOriginal"></span>
             </span>
           </label>
@@ -411,7 +415,8 @@
         scenario: false,
         indexRow: 0,
         eventCol: 0,
-        countsEnteredAs: null
+        countsEnteredAs: null,
+        countError: null
       };
       var DESIGN_LABEL = {
         independent: 'independent groups',
@@ -427,12 +432,26 @@
       function sameCounts(a, b) {
         return a[0][0] === b[0][0] && a[0][1] === b[0][1] && a[1][0] === b[1][0] && a[1][1] === b[1][1];
       }
-      function parseCount(v) {
-        if (v == null || String(v).trim() === '') return null;
-        var n = Math.round(Number(v));
-        if (!isFinite(n) || n < 0) return null;
-        if (n > 10000000) return 10000000;
-        return n;
+      function readCount(raw, bounds) {
+        var text = raw == null ? '' : String(raw).trim();
+        if (text === '') return { empty: true };
+        if (/^-/.test(text)) {
+          return { error: 'Enter 0 or a positive whole number. ' + text + ' is negative and was not used.' };
+        }
+        if (/[.,]/.test(text)) {
+          return { error: text + ' is not a whole number and was not rounded.' };
+        }
+        if (!/^\d+$/.test(text)) {
+          return { error: 'Enter 0 or a positive whole number. A cell counts observations, not a percentage, a probability, text, or a missing-value code.' };
+        }
+        var n = Number(text);
+        if (n > 10000000) {
+          return { error: text + ' is above 10,000,000 and was not reduced to that limit.' };
+        }
+        if (bounds && bounds.max != null && n > bounds.max) {
+          return { error: 'Enter a whole number from 0 to ' + bounds.max + ', this row’s fixed total. ' + text + ' is above that total, so the other cell was not changed.' };
+        }
+        return { value: n };
       }
       function countsComplete() {
         return state.counts.every(function (row) {
@@ -526,12 +545,15 @@
           var input = td.querySelector('input[data-count]');
           var discordant = state.design === 'paired' && i !== j;
           td.classList.toggle('discordant', discordant);
+          var rejected = state.countError && state.countError.source === 'cell' && state.countError.i === i && state.countError.j === j;
+          var fieldValue = rejected ? state.countError.raw : shown;
           if (state.view === 'counts') {
             if (!input) {
               td.innerHTML =
-                '<input type="number" min="0" step="1" inputmode="numeric" data-count="1" value="' + shown + '" aria-label="Count">';
+                '<input type="text" inputmode="numeric" autocomplete="off" data-count="1" value="' + esc(fieldValue) + '" aria-label="Count" aria-invalid="' + (rejected ? 'true' : 'false') + '">';
             } else {
-              writeIfIdle(input, shown);
+              if (!rejected) writeIfIdle(input, shown);
+              input.setAttribute('aria-invalid', rejected ? 'true' : 'false');
             }
           } else if (state.view === 'rowPct') {
             var pct = count != null && m.rt[i] > 0 ? (100 * count / m.rt[i]) : NaN;
@@ -586,6 +608,15 @@
         var summary = ready ? StatisticoContingency.summary2x2(result, { design: state.design }) : null;
         var m = margins();
         document.getElementById('designNote').textContent = PRESETS[state.design].note;
+        var cellRules = {
+          independent: 'Each cell counts people in that group who had the event, or who did not. Enter 0 or a positive whole number. A blank cell means the table is incomplete. Zero is allowed.',
+          'case-control': 'Each cell counts cases or controls who were exposed, or who were not. Enter 0 or a positive whole number. A blank cell means the table is incomplete. Zero is allowed.',
+          paired: 'Each cell counts people with that specific before-and-after combination. Enter 0 or a positive whole number. A blank cell means the table is incomplete. Zero is allowed.'
+        };
+        document.getElementById('cellRule').textContent = cellRules[state.design] || cellRules.independent;
+        var countError = document.getElementById('countError');
+        countError.hidden = !state.countError;
+        countError.textContent = state.countError ? state.countError.message : '';
         var sectionTips = SECTION_TIPS[state.design] || SECTION_TIPS.independent;
         setTip('tipNames', sectionTips.names);
         setTip('tipTable', sectionTips.table);
@@ -634,10 +665,13 @@
         scen.disabled = !rowReady;
         if (rowReady) {
           scen.max = String(baseTotal);
-          writeIfIdle(scen, state.counts[group][eventCol] == null ? '' : String(state.counts[group][eventCol]));
+          var scenarioRejected = state.countError && state.countError.source === 'scenario';
+          if (!scenarioRejected) writeIfIdle(scen, state.counts[group][eventCol] == null ? '' : String(state.counts[group][eventCol]));
+          scen.setAttribute('aria-invalid', scenarioRejected ? 'true' : 'false');
         } else {
           scen.removeAttribute('max');
           writeIfIdle(scen, '');
+          scen.setAttribute('aria-invalid', 'false');
         }
         var eventName = state.colLabels[eventCol] || 'event';
         var rowName = state.rowLabels[group] || 'this row';
@@ -647,13 +681,13 @@
         if (!rowReady) {
           hint = 'Type both counts in this row first. Then enter a hypothetical count. The row total stays fixed, and Reset restores the original.';
         } else if (state.design === 'case-control') {
-          hint = 'Changes the exposed count in ' + rowName + ' while that sample total stays ' + baseTotal + '. This does not simulate population disease risk.';
+          hint = 'Changes the exposed count in ' + rowName + ' while that sample total stays ' + baseTotal + '. This does not simulate population disease risk. Use a whole number from 0 to ' + baseTotal + '. The other cell becomes the remainder.';
         } else if (state.design === 'paired' && group === 0) {
-          hint = 'In this before-event row, changing ' + eventName + ' trades pairs that remained an event against pairs that lost the event. The row total stays ' + baseTotal + '.';
+          hint = 'In this before-event row, changing ' + eventName + ' trades pairs that remained an event against pairs that lost the event. The row total stays ' + baseTotal + '. Use a whole number from 0 to ' + baseTotal + '. The other cell becomes the remainder.';
         } else if (state.design === 'paired') {
-          hint = 'In this before-no-event row, changing ' + eventName + ' trades pairs that gained the event against pairs that remained no event. The row total stays ' + baseTotal + '.';
+          hint = 'In this before-no-event row, changing ' + eventName + ' trades pairs that gained the event against pairs that remained no event. The row total stays ' + baseTotal + '. Use a whole number from 0 to ' + baseTotal + '. The other cell becomes the remainder.';
         } else {
-          hint = 'Changes the event count in ' + rowName + ' while that group total stays ' + baseTotal + '. This explores a changed table, not a prediction.';
+          hint = 'Changes the event count in ' + rowName + ' while that group total stays ' + baseTotal + '. This explores a changed table, not a prediction. Use a whole number from 0 to ' + baseTotal + '. The other cell becomes the remainder.';
         }
         document.getElementById('scenarioHint').textContent = hint;
         document.getElementById('resetBtn').disabled = !state.scenario;
@@ -829,14 +863,18 @@
         document.getElementById('helpTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> ' + titles[design];
         var shared =
           '<div class="help-shared"><h4>Entering counts</h4>' +
-          '<p>Type four counts. The cells start empty, and nothing is read from a worksheet. The headline updates as you edit.</p>' +
+          '<p>Each of the four cells is a count of observations, and each observation belongs in exactly one cell. Enter 0 or a positive whole number. Do not enter a percentage, a probability, a row total, or a missing-value code.</p>' +
+          '<p>A blank cell means the table is incomplete. Zero is a real count; some ratios then cannot be estimated, and the result says so. A negative number, a decimal such as 2.6, text, or a count above 10,000,000 is rejected. The calculator does not round 2.6 to 3, and it does not reduce a larger number to 10,000,000.</p>' +
+          '<p>Independent groups: each cell counts people in that group who had the event, or who did not. Case–control: each cell counts cases or controls who were exposed, or who were not. Paired before / after: each cell counts people with that specific before-and-after combination.</p>' +
+          '<p>A hypothetical count must be a whole number from 0 through that row’s fixed total. The other cell in the row becomes the remainder. A number above the total is rejected, and the row is left unchanged.</p>' +
+          '<p>The cells start empty, and nothing is read from a worksheet. The headline updates as you edit.</p>' +
           '<p>Counts and row % are available in every design. Expected counts are available for independent groups and case–control data. They are hidden for paired data, because Pearson χ² is not used.</p>' +
           '<p>Where Group of interest and Event are shown, switching the group inverts the ratio. In the aspirin trial the heart-attack ratio for aspirin versus placebo is about 0.58, and placebo versus aspirin is about 1.72. Switching the column from heart attack to no heart attack does not invert it: 10,898/11,037 divided by 10,795/11,034 is about 1.01, not 1.72.</p></div>';
         var body = '';
         if (design === 'case-control') {
           body =
             '<h4>Example</h4>' +
-            '<p>In 1948 and 1949, Richard Doll and Austin Bradford Hill interviewed men in London hospitals. 649 had lung cancer. 649 others, in the same hospitals, had different diseases. They asked who had ever smoked. The report is in the British Medical Journal, 1950.</p>' +
+            '<p>In 1948 and 1949, Richard Doll and Austin Bradford Hill interviewed men in London hospitals. 649 had lung cancer. 649 others, in the same hospitals, had different diseases. They asked who had ever smoked. The report is in the British Medical Journal, 1950. Each cell counts men in that hospital group who smoked, or who never smoked.</p>' +
             exTable(['', 'Smoked', 'Never smoked', 'Total'], [['Lung cancer', '647', '2', '649'], ['Other disease', '622', '27', '649']]) +
             '<h4>What it means</h4>' +
             '<p>Exposure odds are 647/2 among the men with lung cancer and 622/27 among the other patients. The odds ratio is (647 × 27) / (2 × 622) = 14.04. Only 2 of the 649 men with lung cancer had never smoked, against 27 of the 649 other men.</p>' +
@@ -850,7 +888,7 @@
         } else if (design === 'paired') {
           body =
             '<h4>Example</h4>' +
-            '<p>Researchers studying Hodgkin’s disease found 85 patients who each had a sibling of the same sex, within about five years of age, who did not have the disease. They compared tonsillectomy in the patient with tonsillectomy in that sibling. The pair is one observation. John Rice reprints the table in Mathematical Statistics and Data Analysis: 26 pairs both had a tonsillectomy, 15 patients had one and the sibling did not, 7 siblings had one and the patient did not, and 37 pairs had neither.</p>' +
+            '<p>Researchers studying Hodgkin’s disease found 85 patients who each had a sibling of the same sex, within about five years of age, who did not have the disease. They compared tonsillectomy in the patient with tonsillectomy in that sibling. The pair is one observation. Each cell counts sibling pairs with that tonsillectomy combination. John Rice reprints the table in Mathematical Statistics and Data Analysis: 26 pairs both had a tonsillectomy, 15 patients had one and the sibling did not, 7 siblings had one and the patient did not, and 37 pairs had neither.</p>' +
             exTable(['', 'Sibling: removed', 'Sibling: not removed', 'Total'], [
               ['Patient: removed', '26', '15', '41'],
               ['Patient: not removed', '7', '37', '44'],
@@ -871,7 +909,7 @@
         } else {
           body =
             '<h4>Example</h4>' +
-            '<p>Starting in 1982, the Physicians’ Health Study randomly assigned healthy male physicians in the United States to aspirin or placebo, 325 mg every other day. The aspirin arm was stopped early. The final report (New England Journal of Medicine, 1989) counted a first heart attack in 139 of 11,037 physicians on aspirin and 239 of 11,034 on placebo.</p>' +
+            '<p>Starting in 1982, the Physicians’ Health Study randomly assigned healthy male physicians in the United States to aspirin or placebo, 325 mg every other day. The aspirin arm was stopped early. The final report (New England Journal of Medicine, 1989) counted a first heart attack in 139 of 11,037 physicians on aspirin and 239 of 11,034 on placebo. Each cell counts physicians in that arm who had a heart attack, or who did not.</p>' +
             exTable(['', 'Heart attack', 'No heart attack', 'Total'], [['Aspirin', '139', '10898', '11037'], ['Placebo', '239', '10795', '11034']]) +
             '<h4>What it means</h4>' +
             '<p>139 / 11,037 = 1.26%. 239 / 11,034 = 2.17%. Aspirin was 0.91 percentage points lower. The ratio of those proportions is about 0.58. The odds ratio is about 0.58 as well. Because these physicians were randomized and then followed, these percentages are risks, not just separate-group shares. The trial’s published rate ratio, using time at risk, was 0.56.</p>' +
@@ -886,9 +924,7 @@
       }
 
       function commitCount(i, j, value, fromScenario) {
-        var parsed = parseCount(value);
         if (fromScenario) {
-          if (parsed == null) return;
           var group = +document.getElementById('scenarioGroup').value || 0;
           var eventCol = state.design === 'paired' ? 0 : state.eventCol;
           var other = 1 - eventCol;
@@ -896,19 +932,18 @@
           var totalB = state.baseline[group][1];
           if (totalA == null || totalB == null) return;
           var total = totalA + totalB;
-          var events = parsed;
-          if (events > total) events = total;
-          state.counts[group][eventCol] = events;
-          state.counts[group][other] = total - events;
+          if (value > total) return;
+          state.counts[group][eventCol] = value;
+          state.counts[group][other] = total - value;
           state.counts[1 - group][0] = state.baseline[1 - group][0];
           state.counts[1 - group][1] = state.baseline[1 - group][1];
           state.scenario = !sameCounts(state.counts, state.baseline);
         } else {
-          state.counts[i][j] = parsed;
+          state.counts[i][j] = value;
           state.baseline = cloneCounts(state.counts);
           state.scenario = false;
           if (!anyFilled()) state.countsEnteredAs = null;
-          else if (!state.countsEnteredAs) state.countsEnteredAs = state.design;
+          else if (!state.countsEnteredAs && value != null) state.countsEnteredAs = state.design;
         }
         render();
       }
@@ -965,7 +1000,18 @@
         }
         if (t.getAttribute('data-count') === '1') {
           var td = t.closest('td');
-          commitCount(+td.getAttribute('data-i'), +td.getAttribute('data-j'), t.value, false);
+          var i = +td.getAttribute('data-i');
+          var j = +td.getAttribute('data-j');
+          var read = readCount(t.value);
+          if (read.error) {
+            state.countError = { source: 'cell', i: i, j: j, raw: t.value, message: read.error };
+            render();
+            return;
+          }
+          if (state.countError && state.countError.source === 'cell' && state.countError.i === i && state.countError.j === j) {
+            state.countError = null;
+          }
+          commitCount(i, j, read.empty ? null : read.value, false);
         }
       });
 
@@ -1026,8 +1072,22 @@
         commitCount(group, eventCol, events, true);
       }
       document.getElementById('scenarioEvents').addEventListener('input', function () {
-        if (this.value.trim() === '') return;
-        applyScenario(this.value);
+        var group = +document.getElementById('scenarioGroup').value || 0;
+        var baseA = state.baseline[group][0];
+        var baseB = state.baseline[group][1];
+        if (baseA == null || baseB == null) return;
+        var read = readCount(this.value, { max: baseA + baseB });
+        if (read.error) {
+          state.countError = { source: 'scenario', raw: this.value, message: read.error };
+          render();
+          return;
+        }
+        if (state.countError && state.countError.source === 'scenario') state.countError = null;
+        if (read.empty) {
+          render();
+          return;
+        }
+        applyScenario(read.value);
       });
       document.getElementById('scenarioEvents').addEventListener('focusout', function () {
         if (this.value.trim() === '') render();
@@ -1035,6 +1095,7 @@
       document.getElementById('resetBtn').addEventListener('click', function () {
         state.counts = cloneCounts(state.baseline);
         state.scenario = false;
+        state.countError = null;
         render();
       });
       document.getElementById('clearCountsBtn').addEventListener('click', function () {
@@ -1042,6 +1103,7 @@
         state.baseline = cloneCounts(state.counts);
         state.scenario = false;
         state.countsEnteredAs = state.design;
+        state.countError = null;
         render();
       });
       document.getElementById('keepCountsBtn').addEventListener('click', function () {

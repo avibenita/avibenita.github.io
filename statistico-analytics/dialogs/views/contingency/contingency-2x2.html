@@ -169,6 +169,8 @@
       color:#eaf2ff; font-size:11px; font-weight:600; line-height:1.35; text-align:left;
       white-space:normal; opacity:0; pointer-events:none; z-index:40;
     }
+    .info-dot.ex::after { min-width:280px; max-width:440px; z-index:50; }
+    .info-dot.ex.flip::after { left:auto; right:0; }
     .info-dot:hover::after, .info-dot:focus-visible::after { opacity:1; }
     html[data-theme="light"] .info-dot { color:#1e3a5f; background:#e8f1fb; border-color:#93c5fd; }
     html[data-theme="light"] .info-dot::after { background:#fff; color:#1f2937; border-color:#93c5fd; }
@@ -205,8 +207,12 @@
     }
     .warn { display:none; padding:10px 12px; border-radius:10px; background:var(--warn-bg); border:1px solid var(--warn-bd); color:var(--warn); font-size:13.5px; line-height:1.45; }
     .warn.show { display:block; }
-    .names { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px; }
-    .names input { width:160px; }
+    .names { display:flex; flex-wrap:wrap; gap:10px 16px; margin-bottom:8px; align-items:flex-end; }
+    .names label { flex:1 1 220px; min-width:0; }
+    .names input { width:100%; }
+    .lab-line { display:inline-flex; align-items:center; gap:6px; }
+    #tipNames { margin-bottom:10px; }
+    .info-dot.up::after { top:auto; bottom:calc(100% + 8px); }
   </style>
 </head>
 <body>
@@ -247,7 +253,7 @@
     <div class="split">
       <section class="card">
         <div class="card-head">
-          <div class="card-title">Table</div>
+          <div class="card-title">Table <span class="info-dot ex" id="tipTable" tabindex="0" data-tip="" aria-label="">i</span></div>
           <div class="seg" id="viewSeg">
             <button type="button" class="active" data-view="counts">Counts</button>
             <button type="button" data-view="rowPct">Row %</button>
@@ -257,6 +263,7 @@
         <div class="names">
           <label>Row variable <input type="text" id="rowVar" value="Group" maxlength="40"></label>
           <label>Column variable <input type="text" id="colVar" value="Outcome" maxlength="40"></label>
+          <span class="info-dot ex" id="tipNames" tabindex="0" data-tip="" aria-label="">i</span>
         </div>
         <div class="map" id="mapBox">
           <label id="labIndex">Group of interest
@@ -302,7 +309,7 @@
           <label>Row
             <select id="scenarioGroup"></select>
           </label>
-          <label>Hypothetical count
+          <label><span class="lab-line">Hypothetical count <span class="info-dot ex up" id="tipHyp" tabindex="0" data-tip="" aria-label="">i</span></span>
             <span class="hyp-row">
               <input type="number" id="scenarioEvents" min="0" step="1" inputmode="numeric" aria-label="Hypothetical count">
               <span id="scenarioOriginal"></span>
@@ -530,6 +537,29 @@
           '</div><div class="s">' + esc(sub) + '</div></div>';
       }
 
+      function setTip(id, text) {
+        var el = document.getElementById(id);
+        el.setAttribute('data-tip', text);
+        el.setAttribute('aria-label', text);
+      }
+      var SECTION_TIPS = {
+        independent: {
+          names: 'Row variable is the grouping. Type Group, then name the rows Group A and Group B. Column variable is the outcome. Type Outcome, then name the columns Event and No event.',
+          table: 'Type 40 under Event and 60 under No event for Group A. Type 20 and 80 for Group B. Group A is 40/100 = 40%. Group B is 20/100 = 20%. The difference is +20 percentage points. The ratio is 0.40 / 0.20 = 2.00. The odds ratio is (40/60) / (20/80) = 2.67.',
+          hyp: 'Group A starts as 40 events and 60 non-events. The label beside the field is Original 40. Type 50. Non-events become 50 and the row total stays 100. Group B stays 20 and 80. Reset restores 40 and 60. This explores a changed table. It does not predict what would happen.'
+        },
+        'case-control': {
+          names: 'Row variable is the sample. Type Sample, then name the rows Cases and Controls. Column variable is the exposure. Type Exposure, then name the columns Exposed and Unexposed.',
+          table: 'Type 40 Exposed and 60 Unexposed for Cases. Type 20 and 80 for Controls. Exposure odds are 40/60 among cases and 20/80 among controls, so the odds ratio is 2.67. The 40% and 20% are the shares exposed inside those samples, not the risk of disease.',
+          hyp: 'Cases start as 40 exposed and 60 unexposed. The label beside the field is Original 40. Type 50. Unexposed cases become 50 and that sample total stays 100. Controls stay 20 and 80. The odds ratio changes from 2.67 to (50/50) / (20/80) = 4.00. This does not simulate population disease risk.'
+        },
+        paired: {
+          names: 'Row variable is the first measurement. Type First measurement, then name the rows Before: event and Before: no event. Column variable is the second measurement. Type Second measurement, then name the columns After: event and After: no event.',
+          table: 'On Before: event, type 30 under After: event and 12 under After: no event. On Before: no event, type 4 and 54. 12 pairs changed from event to no event. 4 changed from no event to event. Before, 30 + 12 = 42 of 100 had the event. After, 30 + 4 = 34 of 100 did. McNemar compares 12 with 4. The 30 and 54 unchanged pairs stay in those totals.',
+          hyp: 'On the Before: event row the original After: event count is 30. Type 20. After: no event in that row becomes 22, because the row total stays 42. That trades pairs that remained an event against pairs that lost the event. Before is still 42/100. After becomes 20 + 4 = 24/100. Reset restores 30 and 12.'
+        }
+      };
+
       function render() {
         if (state.design === 'paired' && state.view === 'expected') state.view = 'counts';
         var ready = countsComplete();
@@ -537,6 +567,10 @@
         var summary = ready ? StatisticoContingency.summary2x2(result, { design: state.design }) : null;
         var m = margins();
         document.getElementById('designNote').textContent = PRESETS[state.design].note;
+        var sectionTips = SECTION_TIPS[state.design] || SECTION_TIPS.independent;
+        setTip('tipNames', sectionTips.names);
+        setTip('tipTable', sectionTips.table);
+        setTip('tipHyp', sectionTips.hyp);
         var shift = anyFilled() && state.countsEnteredAs && state.countsEnteredAs !== state.design;
         var shiftBox = document.getElementById('designShift');
         shiftBox.hidden = !shift;

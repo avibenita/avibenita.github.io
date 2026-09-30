@@ -96,10 +96,12 @@
       border-radius:8px; border:1px solid color-mix(in srgb, var(--accent-1) 55%, var(--border));
       background:var(--surface-2); color:var(--text-primary);
     }
+    table.grid td.discordant input[type="number"] { border-color:var(--accent-2); }
     table.grid td[data-i] input[type="number"]:focus,
     table.grid td.hot input[type="number"] {
       border-color:var(--accent-1); outline:none; box-shadow:0 0 0 2px color-mix(in srgb, var(--accent-1) 45%, transparent);
     }
+    .pair-legend { margin:8px 0 0; color:var(--accent-2); font-size:12.5px; font-weight:700; line-height:1.4; }
     table.grid td.tot, table.grid tr.totals th, table.grid tr.totals td {
       background:color-mix(in srgb, var(--surface-2) 70%, transparent);
       font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--text-secondary);
@@ -111,7 +113,18 @@
     }
     .hover-box { min-height:2.6em; margin:10px 0 0; color:var(--text-muted); font-size:13px; line-height:1.4; }
     .scenario { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
-    .scenario .grow { color:var(--text-muted); font-size:13px; padding-bottom:6px; }
+    .scenario .grow { color:var(--text-muted); font-size:13px; padding-bottom:6px; flex:1 1 220px; }
+    .hyp-row { display:flex; align-items:center; gap:8px; }
+    #scenarioOriginal { font-size:13px; font-weight:800; color:var(--text-secondary); white-space:nowrap; }
+    .design-shift {
+      display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 0; padding:10px 12px;
+      border-radius:10px; background:var(--warn-bg); border:1px solid var(--warn-bd); color:var(--warn);
+      font-size:13.5px; line-height:1.45;
+    }
+    .design-shift button {
+      border:1px solid var(--warn-bd); background:transparent; color:inherit; border-radius:8px;
+      padding:6px 10px; font-weight:800; cursor:pointer;
+    }
     button.reset {
       border:1px solid var(--border); background:transparent; color:var(--text-secondary);
       border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer;
@@ -173,6 +186,8 @@
     .ct2-help-box h3 i { color:var(--accent-1); }
     .ct2-help-box p { margin:0 0 10px; color:var(--text-secondary); font-size:14px; line-height:1.5; }
     .ct2-help-box h4 { margin:12px 0 4px; font-size:13px; }
+    .ct2-help-box .help-shared { margin-top:14px; padding-top:10px; border-top:1px solid var(--border); }
+    .ct2-help-box .help-shared p { font-size:13px; }
     .ct2-help-box table.ex { width:100%; border-collapse:collapse; margin:0 0 10px; font-size:13px; }
     .ct2-help-box table.ex th, .ct2-help-box table.ex td {
       border:1px solid var(--border); padding:6px 8px; text-align:center;
@@ -216,10 +231,15 @@
         <button type="button" data-design="paired">Paired before / after</button>
       </div>
       <p class="design-note" id="designNote"></p>
+      <div class="design-shift" id="designShift" hidden>
+        <span id="designShiftText"></span>
+        <button type="button" id="clearCountsBtn">Clear counts</button>
+        <button type="button" id="keepCountsBtn">Keep these counts</button>
+      </div>
     </section>
 
     <section class="card headline">
-      <div class="flag" id="scenarioFlag" hidden>Scenario</div>
+      <div class="flag" id="scenarioFlag" hidden>Hypothetical</div>
       <h2 class="lead" id="lead"></h2>
       <p class="detail" id="detail"></p>
     </section>
@@ -277,11 +297,17 @@
           </tbody>
         </table>
         <p class="hover-box" id="hoverBox">Hover a cell to see its observed count, expected count, and contribution to χ².</p>
+        <p class="pair-legend" id="pairLegend" hidden>The outlined cells are the discordant pairs: one changed from event to no event, the other from no event to event. McNemar’s test uses only those two counts.</p>
         <div class="scenario">
-          <label>Explore a scenario
+          <label>Row
             <select id="scenarioGroup"></select>
           </label>
-          <input type="number" id="scenarioEvents" min="0" step="1" inputmode="numeric" aria-label="Event count in the scenario">
+          <label>Hypothetical count
+            <span class="hyp-row">
+              <input type="number" id="scenarioEvents" min="0" step="1" inputmode="numeric" aria-label="Hypothetical count">
+              <span id="scenarioOriginal"></span>
+            </span>
+          </label>
           <div class="grow" id="scenarioHint"></div>
           <button type="button" class="reset" id="resetBtn" disabled>Reset</button>
         </div>
@@ -299,53 +325,8 @@
     <div class="ct2-help-modal" id="helpModal" hidden>
       <div class="ct2-help-box" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
         <button type="button" class="ct2-help-close" id="helpClose" aria-label="Close">×</button>
-        <h3 id="helpTitle"><i class="fa-solid fa-circle-question"></i> How to use this calculator</h3>
-        <p>Type four counts. Nothing is read from a worksheet, and the cells start empty. The headline updates as you edit.</p>
-        <h4>The table</h4>
-        <p>Each row is a group and each column is an outcome. Type a count in each cell. Switch the view among counts, row percentages, and expected counts. Hover a cell to see its observed count, expected count, and contribution to χ².</p>
-        <h4>Group of interest and event</h4>
-        <p>The headline, risk ratio, and odds ratio compare the group of interest with the other row, for the column you mark as the event. Changing either control reverses the direction of the comparison.</p>
-        <h4>How the data were collected</h4>
-        <p><b>Independent groups.</b> Each person is in one group, so row percentages estimate risk. Type this table:</p>
-        <table class="ex">
-          <thead><tr><th class="stub"></th><th>Event</th><th>No event</th><th>Total</th></tr></thead>
-          <tbody>
-            <tr><th class="stub">Group A</th><td>40</td><td>60</td><td>100</td></tr>
-            <tr><th class="stub">Group B</th><td>20</td><td>80</td><td>100</td></tr>
-          </tbody>
-        </table>
-        <p>The headline is “40% versus 20% · 20 percentage points higher”. The risk ratio is 2 and the odds ratio is 2.67.</p>
-        <p><b>Case–control.</b> Cases and controls were sampled separately, so report the odds ratio and not a risk ratio. Type this table:</p>
-        <table class="ex">
-          <thead><tr><th class="stub"></th><th>Exposed</th><th>Unexposed</th><th>Total</th></tr></thead>
-          <tbody>
-            <tr><th class="stub">Cases</th><td>40</td><td>60</td><td>100</td></tr>
-            <tr><th class="stub">Controls</th><td>20</td><td>80</td><td>100</td></tr>
-          </tbody>
-        </table>
-        <p>The odds ratio is 2.67. The 40% and 20% shares describe the samples, not population risks.</p>
-        <p><b>Paired before / after.</b> The same people were measured twice. McNemar’s test uses only the pairs that changed. Type this table:</p>
-        <table class="ex">
-          <thead><tr><th class="stub"></th><th>After: event</th><th>After: no event</th></tr></thead>
-          <tbody>
-            <tr><th class="stub">Before: event</th><td>30</td><td>12</td></tr>
-            <tr><th class="stub">Before: no event</th><td>4</td><td>54</td></tr>
-          </tbody>
-        </table>
-        <p>The comparison is 12 versus 4. The 30 and 54 pairs that stayed the same are not used. Pearson χ² and Fisher’s exact test are not used.</p>
-        <h4>Scenario</h4>
-        <p>After both counts in a row are typed, change that row’s event count. The row total stays fixed and the other cell adjusts. A Scenario label appears. Reset returns to the counts from your last direct edit.</p>
-        <p>From the independent example, change Group A’s event count from 40 to 50. No event in that row becomes 50, because the row total stays 100:</p>
-        <table class="ex">
-          <thead><tr><th class="stub"></th><th>Event</th><th>No event</th><th>Total</th></tr></thead>
-          <tbody>
-            <tr><th class="stub">Group A</th><td>50</td><td>50</td><td>100</td></tr>
-            <tr><th class="stub">Group B</th><td>20</td><td>80</td><td>100</td></tr>
-          </tbody>
-        </table>
-        <p>The headline becomes “50% versus 20% · 30 percentage points higher”.</p>
-        <h4>Which p-value</h4>
-        <p>The card marked “Use this” is the one to report. When expected counts are small, that is Fisher’s exact test. The <b>i</b> beside each metric explains what that number is.</p>
+        <h3 id="helpTitle"><i class="fa-solid fa-circle-question"></i> Independent groups</h3>
+        <div id="helpBody"></div>
       </div>
     </div>
     </div>
@@ -363,7 +344,12 @@
       if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
       if (window.StatisticoThemeToggle) StatisticoThemeToggle.mount({ container: document.querySelector('.st-calc-header-right') });
       var helpModal = document.getElementById('helpModal');
-      document.getElementById('helpBtn').addEventListener('click', function () { helpModal.hidden = false; });
+      document.getElementById('helpBtn').addEventListener('click', function () {
+        paintHelp();
+        helpModal.hidden = false;
+        var box = helpModal.querySelector('.ct2-help-box');
+        if (box) box.scrollTop = 0;
+      });
       document.getElementById('helpClose').addEventListener('click', function () { helpModal.hidden = true; });
       helpModal.addEventListener('click', function (e) { if (e.target === helpModal) helpModal.hidden = true; });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape') helpModal.hidden = true; });
@@ -372,17 +358,17 @@
         independent: {
           rowVar: 'Group', colVar: 'Outcome',
           rows: ['Group A', 'Group B'], cols: ['Event', 'No event'],
-          note: 'Each person belongs to one group. Row percentages estimate the event risk in that group, so the risk difference and risk ratio are meaningful.'
+          note: 'Each person is in one group. The row percentages are event proportions. Call them risks only when the sampling and follow-up were designed to estimate risk.'
         },
         'case-control': {
           rowVar: 'Sample', colVar: 'Exposure',
           rows: ['Cases', 'Controls'], cols: ['Exposed', 'Unexposed'],
-          note: 'Cases and controls were sampled separately. The odds ratio is the comparison to report. Row percentages are not population risks, and a risk ratio is not shown.'
+          note: 'Cases and controls were sampled separately. Report the odds ratio. The row percentages are exposure shares inside those samples, not disease risks, so a risk ratio is not shown.'
         },
         paired: {
           rowVar: 'First measurement', colVar: 'Second measurement',
           rows: ['Before: event', 'Before: no event'], cols: ['After: event', 'After: no event'],
-          note: 'The same people were observed twice. McNemar’s test uses the discordant pairs (the off-diagonal counts). Pearson χ² and Fisher’s exact test are for independent groups, so they are not used here.'
+          note: 'The same people were measured twice. McNemar’s test uses only the two discordant cells. Unchanged pairs are left out of that test and still count in the before and after totals.'
         }
       };
 
@@ -398,7 +384,13 @@
         baseline: [[null, null], [null, null]],
         scenario: false,
         indexRow: 0,
-        eventCol: 0
+        eventCol: 0,
+        countsEnteredAs: null
+      };
+      var DESIGN_LABEL = {
+        independent: 'independent groups',
+        'case-control': 'case–control samples',
+        paired: 'paired before / after observations'
       };
 
       function esc(s) {
@@ -420,6 +412,16 @@
         return state.counts.every(function (row) {
           return row.every(function (v) { return v != null; });
         });
+      }
+      function anyFilled() {
+        return state.counts.some(function (row) {
+          return row.some(function (v) { return v != null; });
+        });
+      }
+      function fmtSignedPp(proportion) {
+        var pp = proportion * 100;
+        var text = pp.toFixed(1);
+        return (pp > 0 ? '+' + text : text) + ' pp';
       }
       function fmtCell(v) { return v == null ? '—' : fmtInt(v); }
       function fmtTotal(v) { return v == null ? '—' : fmtInt(v); }
@@ -496,6 +498,8 @@
           var count = state.counts[i][j];
           var shown = count == null ? '' : String(count);
           var input = td.querySelector('input[data-count]');
+          var discordant = state.design === 'paired' && i !== j;
+          td.classList.toggle('discordant', discordant);
           if (state.view === 'counts') {
             if (!input) {
               td.innerHTML =
@@ -527,11 +531,26 @@
       }
 
       function render() {
+        if (state.design === 'paired' && state.view === 'expected') state.view = 'counts';
         var ready = countsComplete();
         var result = orientedResult();
         var summary = ready ? StatisticoContingency.summary2x2(result, { design: state.design }) : null;
         var m = margins();
         document.getElementById('designNote').textContent = PRESETS[state.design].note;
+        var shift = anyFilled() && state.countsEnteredAs && state.countsEnteredAs !== state.design;
+        var shiftBox = document.getElementById('designShift');
+        shiftBox.hidden = !shift;
+        if (shift) {
+          document.getElementById('designShiftText').textContent =
+            'These counts were entered as ' + DESIGN_LABEL[state.countsEnteredAs] +
+            '. They are now being read as ' + DESIGN_LABEL[state.design] +
+            '. Clear them unless these same four numbers were collected that way.';
+        }
+        document.getElementById('pairLegend').hidden = state.design !== 'paired';
+        document.querySelector('#viewSeg button[data-view="expected"]').hidden = state.design === 'paired';
+        document.querySelectorAll('#viewSeg button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-view') === state.view);
+        });
         document.getElementById('scenarioFlag').hidden = !state.scenario;
         var lead = !ready ? 'Type a count in each cell.' : (result && result.analyzable ? summary.lead : ((result && result.error) || 'Enter nonnegative counts.'));
         var detail = ready && result && result.analyzable ? summary.detail : '';
@@ -568,46 +587,69 @@
           writeIfIdle(scen, '');
         }
         var eventName = state.colLabels[eventCol] || 'event';
-        document.getElementById('scenarioHint').textContent = rowReady
-          ? 'Change ' + eventName + ' in ' + (state.rowLabels[group] || 'this row') + ' while keeping ' + baseTotal + ' fixed.'
-          : 'Type both counts in this row first. Then change the event count while the row total stays fixed.';
+        var rowName = state.rowLabels[group] || 'this row';
+        var original = rowReady ? state.baseline[group][eventCol] : null;
+        document.getElementById('scenarioOriginal').textContent = original == null ? '' : 'Original ' + original;
+        var hint;
+        if (!rowReady) {
+          hint = 'Type both counts in this row first. Then enter a hypothetical count. The row total stays fixed, and Reset restores the original.';
+        } else if (state.design === 'case-control') {
+          hint = 'Changes the exposed count in ' + rowName + ' while that sample total stays ' + baseTotal + '. This does not simulate population disease risk.';
+        } else if (state.design === 'paired' && group === 0) {
+          hint = 'In this before-event row, changing ' + eventName + ' trades pairs that remained an event against pairs that lost the event. The row total stays ' + baseTotal + '.';
+        } else if (state.design === 'paired') {
+          hint = 'In this before-no-event row, changing ' + eventName + ' trades pairs that gained the event against pairs that remained no event. The row total stays ' + baseTotal + '.';
+        } else {
+          hint = 'Changes the event count in ' + rowName + ' while that group total stays ' + baseTotal + '. This explores a changed table, not a prediction.';
+        }
+        document.getElementById('scenarioHint').textContent = hint;
         document.getElementById('resetBtn').disabled = !state.scenario;
 
         var showRisks = state.design === 'independent';
         var chartTips = {
-          independent: 'Each bar is the percentage who had the event in that group. Whiskers are 95% Wilson confidence intervals.',
-          'case-control': 'Each bar is the share of the exposure column inside that sampled row. These shares are not population risks.',
-          paired: 'Each bar is the share who had the event at the second measurement, within each first-measurement row. These are transition shares, not risks.'
+          independent: 'Each bar is the event proportion in that group. These percentages are risks only when the sampling and follow-up were designed to estimate risk. Whiskers are 95% Wilson confidence intervals.',
+          'case-control': 'Each bar is the share exposed inside that selected sample. These shares are not disease risks.',
+          paired: 'Percentage of pairs with the event before, and after. Lost means event then no event. Gained means no event then event. These are not the percentages inside each before-row.'
         };
-        document.getElementById('chartTitle').textContent = showRisks ? 'Event percentage' : (state.design === 'paired' ? 'Second-measurement share' : 'Sample share');
+        document.getElementById('chartTitle').textContent = state.design === 'paired'
+          ? 'Before and after'
+          : (state.design === 'case-control' ? 'Exposure share' : 'Event proportion');
         var chartTip = document.getElementById('chartTip');
         var tip = chartTips[state.design] || chartTips.independent;
         chartTip.setAttribute('data-tip', tip);
         chartTip.setAttribute('aria-label', tip);
-        document.getElementById('chartNote').textContent = showRisks
-          ? 'Each bar is the event percentage in that group. Whiskers are 95% Wilson confidence intervals.'
-          : (state.design === 'case-control'
-            ? 'Each bar is the share of the exposure column inside that sampled row. These shares are not population risks.'
-            : 'Each bar is the share in the second-measurement event column. Whiskers are 95% Wilson intervals. They are transition shares, not a risk ratio.');
+        document.getElementById('chartNote').textContent = state.design === 'paired'
+          ? ''
+          : (showRisks
+            ? 'Each bar is the event proportion in that group. Whiskers are 95% Wilson confidence intervals.'
+            : 'Each bar is the share exposed inside that selected sample. These shares are not disease risks.');
 
         var props = (result.measures2x2 && result.measures2x2.proportions) || {};
         var bars = '';
-        [0, 1].forEach(function (i) {
-          var prop = i === (state.design === 'paired' ? 0 : state.indexRow) ? props.index : props.reference;
-          if (state.design !== 'paired' && i !== state.indexRow) prop = props.reference;
-          if (state.design !== 'paired' && i === state.indexRow) prop = props.index;
-          if (state.design === 'paired') prop = i === 0 ? props.index : props.reference;
-          var pct = prop && prop.available ? prop.p * 100 : 0;
-          var lo = prop && prop.available ? prop.ciLower * 100 : 0;
-          var hi = prop && prop.available ? prop.ciUpper * 100 : 0;
-          bars += '<div class="bar-row"><div><div class="bar-name">' + esc(state.rowLabels[i]) + '</div><div class="bar-meta">' +
-            fmtCell(state.counts[i][eventCol]) + ' / ' + fmtTotal(m.rt[i]) + '</div></div><div class="track">' +
-            (prop && prop.available
-              ? '<div class="fill ' + (i === 0 ? 'a' : 'b') + '" style="width:' + pct.toFixed(2) + '%"></div>' +
-                '<div class="whisker" style="left:' + lo.toFixed(2) + '%;width:' + Math.max(0, hi - lo).toFixed(2) + '%"></div>'
-              : '') +
-            '</div><div class="bar-val">' + (prop && prop.available ? fmtFixed(pct, 1) + '%' : '—') + '</div></div>';
-        });
+        if (state.design === 'paired') {
+          var stayed = state.counts[0][0], lost = state.counts[0][1], gained = state.counts[1][0];
+          var Npair = countsComplete() ? state.counts[0][0] + state.counts[0][1] + state.counts[1][0] + state.counts[1][1] : null;
+          var beforeEv = sumPair(stayed, lost);
+          var afterEv = sumPair(stayed, gained);
+          bars = marginalBar('Before', beforeEv, Npair, 'a') + marginalBar('After', afterEv, Npair, 'b');
+          document.getElementById('chartNote').textContent = (lost != null && gained != null)
+            ? (fmtInt(lost) + ' lost · ' + fmtInt(gained) + ' gained. Before and after include the unchanged pairs. McNemar’s test leaves those pairs out.')
+            : 'Before is the first measurement. After is the second. Lost and gained are the two discordant cells.';
+        } else {
+          [0, 1].forEach(function (i) {
+            var prop = i === state.indexRow ? props.index : props.reference;
+            var pct = prop && prop.available ? prop.p * 100 : 0;
+            var lo = prop && prop.available ? prop.ciLower * 100 : 0;
+            var hi = prop && prop.available ? prop.ciUpper * 100 : 0;
+            bars += '<div class="bar-row"><div><div class="bar-name">' + esc(state.rowLabels[i]) + '</div><div class="bar-meta">' +
+              fmtCell(state.counts[i][eventCol]) + ' / ' + fmtTotal(m.rt[i]) + '</div></div><div class="track">' +
+              (prop && prop.available
+                ? '<div class="fill ' + (i === 0 ? 'a' : 'b') + '" style="width:' + pct.toFixed(2) + '%"></div>' +
+                  '<div class="whisker" style="left:' + lo.toFixed(2) + '%;width:' + Math.max(0, hi - lo).toFixed(2) + '%"></div>'
+                : '') +
+              '</div><div class="bar-val">' + (prop && prop.available ? fmtFixed(pct, 1) + '%' : '—') + '</div></div>';
+          });
+        }
         document.getElementById('bars').innerHTML = bars;
 
         var cards = '';
@@ -618,10 +660,10 @@
           var mc = summary.mcnemar;
           if (mc.available) {
             var or = mc.oddsRatio;
-            cards += kpi('Discordant pairs', fmtInt(mc.b) + ' : ' + fmtInt(mc.c),
-              mc.b + ' one way, ' + mc.c + ' the other. Total discordant pairs: ' + mc.discordant + '.',
+            cards += kpi('Discordant pairs', fmtInt(mc.b) + ' lost · ' + fmtInt(mc.c) + ' gained',
+              mc.b + ' changed from event to no event, and ' + mc.c + ' changed from no event to event. Total discordant pairs: ' + mc.discordant + '.',
               false,
-              'Pairs whose two measurements disagree. McNemar’s test uses only these off-diagonal counts.');
+              'Pairs whose two measurements disagree. McNemar’s test uses only these off-diagonal counts. Unchanged pairs stay in the before and after totals.');
             cards += kpi('McNemar exact p', fmtP(mc.pExact),
               'Two-sided exact test on the discordant pairs.',
               summary.recommendedTest === 'mcnemar-exact',
@@ -643,10 +685,10 @@
           var rr = measures.riskRatio;
           var odds = measures.oddsRatio;
           if (showRisks && rd && rd.available) {
-            cards += kpi('Risk difference', fmtFixed(Math.abs(rd.value) * 100, 1) + ' pp',
+            cards += kpi('Risk difference', fmtSignedPp(rd.value),
               '95% CI ' + fmtFixed(rd.ciLower * 100, 1) + ' to ' + fmtFixed(rd.ciUpper * 100, 1) + ' percentage points.',
               false,
-              'Event percentage in the group of interest minus the event percentage in the reference group. 0 means no difference.');
+              'Event proportion in the group of interest minus the event proportion in the reference group. Negative means the group of interest is lower. 0 means no difference.');
           }
           if (showRisks) {
             cards += kpi('Risk ratio', rr && rr.available ? fmtFixed(rr.value, 2) : '—',
@@ -654,7 +696,7 @@
                 ? '95% CI ' + fmtFixed(rr.ciLower, 2) + '–' + fmtFixed(rr.ciUpper, 2) + '.'
                 : ((rr && rr.reason) || 'Not estimable.'),
               false,
-              'Event percentage in the group of interest divided by the event percentage in the reference group. 1 means no difference.');
+              'Ratio of event proportions. 1 means no difference. Call this a risk ratio when the sampling and follow-up support a risk.');
           }
           cards += kpi('Odds ratio', odds && odds.available ? fmtFixed(odds.value, 2) : '—',
             odds && odds.available
@@ -665,7 +707,7 @@
             'Odds of the event in the group of interest divided by the odds in the reference group. Formula: (a × d) / (b × c). 1 means no association.');
           var pearson = result.tests.pearson;
           var fisher = result.tests.fisher;
-          cards += kpi('Pearson χ²', fmtP(pearson.p),
+          cards += kpi('Pearson χ² p-value', fmtP(pearson.p),
             'χ² = ' + fmtFixed(pearson.stat, 2) + ', df = ' + pearson.df + '.',
             summary.recommendedTest === 'pearson',
             'Large-sample test of no association. This p-value is less reliable when expected counts are small.');
@@ -686,6 +728,105 @@
         }
         warn.textContent = warnText;
         warn.classList.toggle('show', !!warnText);
+        if (!document.querySelector('#grid td.hot')) {
+          document.getElementById('hoverBox').textContent = state.design === 'paired'
+            ? 'Hover a cell. Outlined cells are the discordant pairs used by McNemar’s test.'
+            : 'Hover a cell to see its observed count, expected count, and contribution to χ².';
+        }
+        if (!helpModal.hidden) paintHelp();
+      }
+
+      function marginalBar(name, events, n, klass) {
+        var prop = (events != null && n > 0) ? StatisticoContingency.wilsonProportion(events, n, StatisticoContingency.zCrit(0.95)) : null;
+        var pct = prop && prop.available ? prop.p * 100 : 0;
+        var lo = prop && prop.available ? prop.ciLower * 100 : 0;
+        var hi = prop && prop.available ? prop.ciUpper * 100 : 0;
+        return '<div class="bar-row"><div><div class="bar-name">' + esc(name) + '</div><div class="bar-meta">' +
+          fmtCell(events) + ' / ' + fmtTotal(n) + '</div></div><div class="track">' +
+          (prop && prop.available
+            ? '<div class="fill ' + klass + '" style="width:' + pct.toFixed(2) + '%"></div>' +
+              '<div class="whisker" style="left:' + lo.toFixed(2) + '%;width:' + Math.max(0, hi - lo).toFixed(2) + '%"></div>'
+            : '') +
+          '</div><div class="bar-val">' + (prop && prop.available ? fmtFixed(pct, 1) + '%' : '—') + '</div></div>';
+      }
+
+      function exTable(headers, rows) {
+        var html = '<table class="ex"><thead><tr>';
+        headers.forEach(function (h, i) {
+          html += '<th' + (i === 0 ? ' class="stub"' : '') + '>' + esc(h) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        rows.forEach(function (row) {
+          html += '<tr>';
+          row.forEach(function (cell, i) {
+            html += (i === 0 ? '<th class="stub">' : '<td>') + esc(cell) + (i === 0 ? '</th>' : '</td>');
+          });
+          html += '</tr>';
+        });
+        return html + '</tbody></table>';
+      }
+
+      function paintHelp() {
+        var titles = {
+          independent: 'Independent groups',
+          'case-control': 'Case–control',
+          paired: 'Paired before / after'
+        };
+        document.getElementById('helpTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> ' + titles[state.design];
+        var shared =
+          '<div class="help-shared"><h4>Entering counts</h4>' +
+          '<p>Type four counts. The cells start empty, and nothing is read from a worksheet. The headline updates as you edit.</p>' +
+          '<p>Counts and row % are available in every design. Expected counts are available for independent groups and case–control data. They are hidden for paired data, because Pearson χ² is not used.</p>' +
+          '<p>Where Group of interest and Event are shown, switching the group inverts the ratio. In the 40 and 60 versus 20 and 80 table, the event ratio is 2.00 and the swapped-group ratio is 0.50. Switching the event measures the other outcome: the no-event ratio is 60/100 ÷ 80/100 = 0.75, not 0.50.</p></div>';
+        var body = '';
+        if (state.design === 'case-control') {
+          body =
+            '<h4>Example</h4>' +
+            exTable(['', 'Exposed', 'Unexposed', 'Total'], [['Cases', '40', '60', '100'], ['Controls', '20', '80', '100']]) +
+            '<h4>What it means</h4>' +
+            '<p>Exposure odds are 40/60 among cases and 20/80 among controls. The odds ratio is (40/60) / (20/80) = 2.67, so the cases were more often exposed than the controls.</p>' +
+            '<p>The displayed 40% and 20% are the shares exposed inside those two selected samples. They are not the risk of disease. A risk ratio is not reported.</p>' +
+            '<h4>Hypothetical count</h4>' +
+            '<p>The control changes the exposed count among cases or among controls while that sample’s total stays fixed. It does not simulate population disease risk. The number beside the field is the original count.</p>' +
+            exTable(['', 'Exposed', 'Unexposed', 'Total'], [['Cases', '40 → 50', '60 → 50', '100'], ['Controls', '20', '80', '100']]) +
+            '<p>Original 40 exposed cases, hypothetical 50. Unexposed cases go from 60 to 50. Controls stay 20 and 80. The odds ratio becomes (50/50) / (20/80) = 4.00. Reset restores 40 and 60. This is a changed table, not a prediction.</p>' +
+            '<h4>Recommended test</h4>' +
+            '<p>Report the odds ratio. Pearson χ² p-value or Fisher’s exact p-value, whichever card is marked “Use this”, tests the association. In this example the smallest expected count is 30, so Pearson χ² p-value is the one to report.</p>';
+        } else if (state.design === 'paired') {
+          body =
+            '<h4>Example</h4>' +
+            exTable(['', 'After: event', 'After: no event', 'Total'], [
+              ['Before: event', '30', '12', '42'],
+              ['Before: no event', '4', '54', '58'],
+              ['Total', '34', '66', '100']
+            ]) +
+            '<h4>What it means</h4>' +
+            '<p>12 pairs changed from event to no event. 4 pairs changed from no event to event. Before, 30 + 12 = 42 of 100 had the event (42%). After, 30 + 4 = 34 of 100 had the event (34%).</p>' +
+            '<p>McNemar’s test compares 12 with 4. The 30 pairs who stayed an event and the 54 who stayed no event are excluded from that calculation, and they still count in the 42 and the 34. The chart shows those before and after percentages, plus “12 lost · 4 gained”. It does not show the within-row shares 30/42 and 4/58.</p>' +
+            '<h4>Hypothetical count</h4>' +
+            '<p>In a before-event row, changing After: event trades pairs that remained an event against pairs that lost the event. In a before-no-event row, it trades pairs that gained the event against pairs that remained no event. The number beside the field is the original count.</p>' +
+            exTable(['', 'After: event', 'After: no event', 'Total'], [
+              ['Before: event', '30 → 20', '12 → 22', '42'],
+              ['Before: no event', '4', '54', '58']
+            ]) +
+            '<p>Original 30, hypothetical 20. The before-event row total stays 42, so pairs that lost the event go from 12 to 22. Before is still 42/100. After becomes 20 + 4 = 24/100. McNemar then compares 22 with 4. Reset restores 30 and 12. This is a changed table, not a prediction.</p>' +
+            '<h4>Recommended test</h4>' +
+            '<p>16 pairs changed, which is fewer than 25, so McNemar exact is marked “Use this”. Pearson χ² and Fisher’s exact test are not used, and Expected counts are hidden. The two outlined cells are the discordant pairs.</p>';
+        } else {
+          body =
+            '<h4>Example</h4>' +
+            exTable(['', 'Event', 'No event', 'Total'], [['Group A', '40', '60', '100'], ['Group B', '20', '80', '100']]) +
+            '<h4>What it means</h4>' +
+            '<p>Group A has 40 events out of 100, an event proportion of 40%. Group B has 20 out of 100, or 20%. The difference is +20 percentage points. The ratio of those proportions is 0.40 / 0.20 = 2.00. The odds are 40/60 in Group A and 20/80 in Group B, so the odds ratio is (40/60) / (20/80) = 2.67.</p>' +
+            '<p>Being in separate groups does not by itself make these percentages risks. Call them event proportions unless the sampling and follow-up were designed to estimate risk. The risk-difference and risk-ratio cards use risk language for that situation.</p>' +
+            '<h4>Hypothetical count</h4>' +
+            '<p>The control changes the event count in one group while that group’s total stays fixed. The number beside the field is the original count. This explores a changed table. It does not predict what would happen.</p>' +
+            exTable(['', 'Event', 'No event', 'Total'], [['Group A', '40 → 50', '60 → 50', '100'], ['Group B', '20', '80', '100']]) +
+            '<p>Original 40 events in Group A, hypothetical 50. Non-events go from 60 to 50 because the total stays 100. Group B stays 20 and 80. The headline becomes 50% versus 20%, +30 percentage points. Reset restores 40 and 60.</p>' +
+            '<h4>Recommended test</h4>' +
+            '<p>Report the card marked “Use this”. In this example the smallest expected count is 30, so that card is the Pearson χ² p-value. When expected counts are small, it is Fisher’s exact p-value.</p>';
+        }
+        document.getElementById('helpBody').innerHTML = body + shared;
       }
 
       function commitCount(i, j, value, fromScenario) {
@@ -710,6 +851,8 @@
           state.counts[i][j] = parsed;
           state.baseline = cloneCounts(state.counts);
           state.scenario = false;
+          if (!anyFilled()) state.countsEnteredAs = null;
+          else if (!state.countsEnteredAs) state.countsEnteredAs = state.design;
         }
         render();
       }
@@ -776,6 +919,20 @@
         var E = expectedAt(i, j, m);
         var chi = contribution(i, j, m);
         var observed = state.counts[i][j];
+        var hover = document.getElementById('hoverBox');
+        if (state.design === 'paired') {
+          if (observed == null) {
+            hover.textContent = i !== j
+              ? 'This discordant cell is empty. McNemar’s test uses it once a count is typed.'
+              : 'This cell is empty. Unchanged pairs are excluded from McNemar’s test and still count in the before and after totals.';
+          } else if (i !== j) {
+            hover.textContent = fmtCell(observed) + ' pairs changed from ' + (state.rowLabels[i] || 'the first measurement') +
+              ' to ' + (state.colLabels[j] || 'the second measurement') + '. McNemar’s test uses this discordant cell.';
+          } else {
+            hover.textContent = fmtCell(observed) + ' pairs stayed the same. This cell is excluded from McNemar’s test and still counts in the before and after totals.';
+          }
+          return;
+        }
         document.getElementById('hoverBox').textContent = observed == null
           ? 'Type a count to see the expected count and the contribution to χ².'
           : ((state.rowLabels[i] || 'Row') + ' × ' + (state.colLabels[j] || 'Column') +
@@ -817,6 +974,17 @@
       document.getElementById('resetBtn').addEventListener('click', function () {
         state.counts = cloneCounts(state.baseline);
         state.scenario = false;
+        render();
+      });
+      document.getElementById('clearCountsBtn').addEventListener('click', function () {
+        state.counts = [[null, null], [null, null]];
+        state.baseline = cloneCounts(state.counts);
+        state.scenario = false;
+        state.countsEnteredAs = state.design;
+        render();
+      });
+      document.getElementById('keepCountsBtn').addEventListener('click', function () {
+        state.countsEnteredAs = state.design;
         render();
       });
 

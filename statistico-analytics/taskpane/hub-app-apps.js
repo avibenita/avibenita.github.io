@@ -8,6 +8,8 @@
   var STYLE_ID = "hub-accordion-live-css";
   var css = [
     ".category-tiles{display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;gap:10px;align-items:stretch;}",
+    ".calc-group .category-section-header{padding:2px 2px 0;}",
+    ".calc-group .category-modules{margin-top:6px;}",
     ".hub-accordion-panel{width:100%;flex:0 0 auto;height:auto !important;max-height:none !important;box-sizing:border-box;border:1px solid rgba(180,156,255,.32);border-radius:10px;background:#152033;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease,transform .12s ease;}",
     ".hub-accordion-head{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:58px;padding:12px 14px;border:none;background:transparent;color:inherit;text-align:left;cursor:pointer;font-family:inherit;}",
     ".hub-accordion-panel:hover,.hub-accordion-panel:hover .hub-accordion-head{background:#243556 !important;}",
@@ -456,8 +458,8 @@ const TOOLS_CATEGORY_TILES = [
 const CALCULATOR_CATEGORY_TILES = [
   {
     id: "two-by-two",
-    section: "Contingency tables",
-    sectionId: "contingency",
+    section: "Probability & Inference",
+    sectionId: "inference",
     sectionSubtitle: "A 2×2 table, or a larger table up to 6×6, from typed counts",
     title: "Contingency calculator",
     icon: "fa-table-cells",
@@ -476,7 +478,7 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-2x2",
-        label: "Open contingency calculator",
+        label: "Contingency tables",
         tip: "Type a 2×2 table, or a larger table up to 6×6.",
         dialogPath: "contingency/contingency-2x2.html"
       }
@@ -484,8 +486,8 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "distribution-tools",
-    section: "Distributions",
-    sectionId: "distributions",
+    section: "Probability & Inference",
+    sectionId: "inference",
     sectionSubtitle: "Probabilities, quantiles, and critical values",
     title: "Distribution calculators",
     icon: "fa-chart-area",
@@ -504,7 +506,7 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-distribution-hub",
-        label: "Distribution Calculators",
+        label: "Distribution calculators",
         tip: "Open the distribution family hub in a dialog.",
         dialogUrl: "https://statistico.live/statistico-calculators/0Distribution_Calculators/index-distribution.html"
       }
@@ -512,7 +514,7 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "precision-sample",
-    section: "Study planning",
+    section: "Study Planning",
     sectionId: "planning",
     title: "Precision-based sample size",
     icon: "fa-bullseye",
@@ -531,7 +533,7 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-precision",
-        label: "Open precision calculator",
+        label: "Precision/sample size",
         tip: "Sample size from a margin of error, or the reverse.",
         dialogUrl: "https://statistico.live/statistico-calculators/Precision-Based%20-Sample/PrecisionSampleCalculator.html"
       }
@@ -539,7 +541,7 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "power-sample",
-    section: "Study planning",
+    section: "Study Planning",
     sectionId: "planning",
     title: "Power-based sample size",
     icon: "fa-bolt",
@@ -558,7 +560,7 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-power",
-        label: "Open power calculator",
+        label: "Power analysis",
         tip: "Sample size for a target statistical power.",
         dialogUrl: "https://statistico.live/statistico-calculators/power-sample-size-calculator/PowerCalculator.html"
       }
@@ -566,7 +568,7 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "effect-size-family",
-    section: "Study planning",
+    section: "Study Planning",
     sectionId: "planning",
     title: "Effect size converter",
     icon: "fa-right-left",
@@ -585,7 +587,7 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-effect-size",
-        label: "Effect size converter",
+        label: "Effect-size converter",
         tip: "Convert common effect-size measures, with assumptions shown.",
         dialogUrl: "https://statistico.live/statistico-calculators/effect-size/EffectSizeConverter.html"
       }
@@ -593,7 +595,7 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "erlang-family",
-    section: "Operations",
+    section: "Operations & Quality",
     sectionId: "operations",
     title: "Call center staffing",
     icon: "fa-headset",
@@ -620,7 +622,7 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "process-capability",
-    section: "Operations",
+    section: "Operations & Quality",
     sectionId: "operations",
     title: "Process capability",
     icon: "fa-gauge-high",
@@ -639,7 +641,7 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-cpk",
-        label: "Process Capability (Cp, Cpk)",
+        label: "Process Capability",
         tip: "Open the process capability calculator.",
         dialogUrl: "https://statistico.live/statistico-calculators/process-capability/CpkCalculator.html"
       }
@@ -772,40 +774,33 @@ var TOOLS_SECTION_META = {
 var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "delivery", "survey"];
 var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "survey"];
 var CALC_SECTION_META = {
-  contingency: {
-    id: "contingency",
-    label: "Contingency tables",
-    subtitle: "A 2×2 table, or a larger table up to 6×6, from typed counts.",
-    icon: "fa-table-cells",
-    color: "#a78bfa",
-    colorDark: "#6d28d9"
-  },
-  distributions: {
-    id: "distributions",
-    label: "Distributions",
-    subtitle: "Probabilities, quantiles, and critical values.",
+  inference: {
+    id: "inference",
+    label: "Probability & Inference",
+    subtitle: "",
     icon: "fa-chart-area",
     color: "#38bdf8",
     colorDark: "#0284c7"
   },
   planning: {
     id: "planning",
-    label: "Study planning",
-    subtitle: "Sample size by precision or power, and effect-size conversion.",
+    label: "Study Planning",
+    subtitle: "",
     icon: "fa-ruler-combined",
-    color: "#38bdf8",
-    colorDark: "#0284c7"
+    color: "#818cf8",
+    colorDark: "#4f46e5"
   },
   operations: {
     id: "operations",
-    label: "Operations",
-    subtitle: "Staff a queue, or judge a process against its limits.",
+    label: "Operations & Quality",
+    subtitle: "",
     icon: "fa-industry",
     color: "#f59e0b",
     colorDark: "#b45309"
   }
 };
-var CALC_SECTION_ORDER = ["contingency", "distributions", "planning", "operations"];
+var CALC_SECTION_ORDER = ["inference", "planning", "operations"];
+var CALC_BUTTON_ORDER = ["distribution-tools", "two-by-two", "precision-sample", "power-sample", "effect-size-family", "erlang-family", "process-capability"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {
@@ -1025,6 +1020,11 @@ function renderCategoryTiles(query) {
       return getClusterTileSectionId(ACTIVE_CLUSTER, c, allSource) === sectionId;
     });
     if (!familyTiles.length) return;
+    if (ACTIVE_CLUSTER === "calculators") {
+      familyTiles.sort(function (a, b) {
+        return CALC_BUTTON_ORDER.indexOf(a.id) - CALC_BUTTON_ORDER.indexOf(b.id);
+      });
+    }
     var tilesHtml = '<div class="category-modules">' + familyTiles.map(function (c) {
       var tabStyle = c.tabStyle === "soft" ? "soft" : "pill";
       var scopePrefix = ACTIVE_CLUSTER + ":" + c.id;
@@ -1033,7 +1033,11 @@ function renderCategoryTiles(query) {
         return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1);
       }).join("");
     }).join("") + "</div>";
-    html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
+    if (ACTIVE_CLUSTER === "calculators") {
+      html += '<div class="calc-group">' + renderCalcSectionHeader(sectionId, false) + tilesHtml + "</div>";
+    } else {
+      html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
+    }
   });
   if (ACTIVE_CLUSTER === "tools") {
     var standaloneTiles = list.filter(function (c) { return !!c.standalone; });
@@ -1221,6 +1225,11 @@ function syncHubExpandAllButton() {
   var btn = document.getElementById("hubExpandAllBtn");
   var label = document.getElementById("hubExpandAllBtnLabel");
   var icon = btn && btn.querySelector("i");
+  if (btn && ACTIVE_CLUSTER === "calculators") {
+    btn.hidden = true;
+    return;
+  }
+  if (btn) btn.hidden = false;
   var allOpen = areAllVisibleHubSectionsOpen();
   if (label) label.textContent = allOpen ? "Collapse All" : "Expand All";
   if (icon) icon.className = allOpen ? "fa-solid fa-angles-up" : "fa-solid fa-angles-down";
@@ -1288,6 +1297,17 @@ function syncAnalyticsAllBar(query) {
     if (typeof query === "string") input.value = query;
   }
   syncHubExpandAllButton();
+}
+
+function renderCalcSectionHeader(sectionId, withDivider) {
+  var meta = CALC_SECTION_META[sectionId];
+  if (!meta) return "";
+  return (
+    '<div class="category-section-header' + (withDivider ? " with-divider" : "") + '"' +
+    ' style="--section-color:' + escapeHtml(meta.color) + ';margin:0 0 6px;">' +
+    '<div class="category-section-title">' + escapeHtml(meta.label) + "</div>" +
+    "</div>"
+  );
 }
 
 function renderAnalyticsSectionHeader(sectionId, withDivider) {

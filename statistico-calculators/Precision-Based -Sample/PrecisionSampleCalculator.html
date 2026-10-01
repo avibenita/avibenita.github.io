@@ -500,6 +500,9 @@
         .precision-workspace {
             overflow: hidden;
             display: flex;
+            flex: 1 1 auto;
+            width: 100%;
+            min-width: 0;
             padding: 8px 10px;
         }
         .st-calc-sidebar .control-panel {
@@ -533,9 +536,20 @@
         .st-calc-sidebar .input-group label { margin-bottom: 4px; font-size: 0.82rem; }
         .st-calc-sidebar .input-field,
         .st-calc-sidebar .select-field { padding: 6px 8px; font-size: 0.88rem; }
-        .st-calc-sidebar .quick-presets { padding: 8px; margin-bottom: 0; }
+        .st-calc-sidebar .quick-presets { padding: 8px; margin-top: 36px; margin-bottom: 0; }
         .st-calc-sidebar .quick-presets h4 { margin-bottom: 4px !important; font-size: 0.82rem; }
         .st-calc-sidebar .preset-btn { padding: 4px 8px; margin: 2px; font-size: 0.75rem; }
+        .preset-btn.selected {
+            background: #f3e8ff;
+            color: #3b0764;
+            border-color: #ffffff;
+            box-shadow: inset 0 0 0 2px #7c3aed;
+        }
+        .preset-btn.selected:hover {
+            background: #f3e8ff;
+            color: #3b0764;
+            border-color: #ffffff;
+        }
         .st-calc-sidebar .btn-primary { margin-top: 8px; padding: 8px 12px; flex: 0 0 auto; }
         .field-error { display: none; color: #fca5a5; font-size: 0.75rem; line-height: 1.35; margin-top: 3px; }
         .field-error.show { display: block; }
@@ -560,6 +574,10 @@
             text-transform: uppercase;
         }
         .precision-workspace .visualization-panel {
+            flex: 1 1 auto;
+            width: 100%;
+            max-width: none;
+            min-width: 0;
             min-height: 0;
             height: 100%;
             overflow-x: hidden;
@@ -581,7 +599,7 @@
         .answer-kicker { color: rgb(255,165,120); }
         .inputs-kicker { color: var(--text-muted); }
         .answer-card {
-            width: min(560px, 100%); text-align: center;
+            width: 100%; text-align: center;
             background: var(--surface-2); border: 1px solid rgb(255,165,120); border-radius: 16px;
             padding: 14px 18px 12px; box-shadow: 0 0 0 4px rgba(255,165,120,.12);
         }
@@ -597,7 +615,7 @@
         .ci-line:after { right: 0; }
         .ci-dot { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid rgb(255,165,120); transform: translate(-50%, -50%); }
         .ci-caption { margin: 8px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); }
-        .input-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: min(560px, 100%); }
+        .input-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; }
         .input-chip { font-size: 12px; font-weight: 700; color: var(--text-secondary); border: 1px dashed var(--border); border-radius: 999px; padding: 4px 10px; }
         .live-note { margin: 6px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); }
         .conf-row { display: flex; align-items: center; gap: 10px; }
@@ -681,6 +699,13 @@
         html[data-theme="light"] .preset-btn:hover {
             background: #6d28d9;
             color: #ffffff;
+        }
+        html[data-theme="light"] .preset-btn.selected,
+        html[data-theme="light"] .preset-btn.selected:hover {
+            background: #4c1d95;
+            border-color: #4c1d95;
+            color: #ffffff;
+            box-shadow: 0 0 0 2px #ddd6fe;
         }
 
         @media (max-width: 767px) {
@@ -773,14 +798,14 @@
                         <div class="quick-presets">
                             <h4 style="color: #f3e8ff; margin-bottom: 10px;"><i class="fas fa-magic"></i> Quick Presets</h4>
                             <div id="meanPresets">
-                                <button type="button" class="preset-btn" onclick="setPreset(1)">High precision (E=1)</button>
-                                <button type="button" class="preset-btn" onclick="setPreset(2)">Medium precision (E=2)</button>
-                                <button type="button" class="preset-btn" onclick="setPreset(5)">Low precision (E=5)</button>
+                                <button type="button" class="preset-btn" data-margin="1" onclick="setPreset(1)">High precision (E=1)</button>
+                                <button type="button" class="preset-btn" data-margin="2" onclick="setPreset(2)">Medium precision (E=2)</button>
+                                <button type="button" class="preset-btn" data-margin="5" onclick="setPreset(5)">Low precision (E=5)</button>
                             </div>
                             <div id="proportionPresets" class="hidden">
-                                <button type="button" class="preset-btn" onclick="setPreset(1)">±1 percentage point</button>
-                                <button type="button" class="preset-btn" onclick="setPreset(3)">±3 percentage points</button>
-                                <button type="button" class="preset-btn" onclick="setPreset(5)">±5 percentage points</button>
+                                <button type="button" class="preset-btn" data-margin="1" onclick="setPreset(1)">±1 percentage point</button>
+                                <button type="button" class="preset-btn" data-margin="3" onclick="setPreset(3)">±3 percentage points</button>
+                                <button type="button" class="preset-btn" data-margin="5" onclick="setPreset(5)">±5 percentage points</button>
                             </div>
                         </div>
                     </div>
@@ -982,12 +1007,23 @@
             const pText = diffProp ? 'First proportion, p₁ (%)' : 'Expected proportion (%)';
             document.getElementById('propLabel').textContent = pText;
             document.getElementById('propLabel2').textContent = pText;
+            syncPresetSelection();
             calculate();
         }
 
         function setPreset(margin) {
             document.getElementById('marginOfError').value = margin;
             calculate();
+        }
+
+        function syncPresetSelection() {
+            const margin = parseFloat(document.getElementById('marginOfError').value);
+            document.querySelectorAll('.preset-btn').forEach(function (btn) {
+                const group = btn.parentElement;
+                const visible = group && !group.classList.contains('hidden');
+                btn.classList.toggle('selected', visible && margin === Number(btn.getAttribute('data-margin')));
+                btn.setAttribute('aria-pressed', btn.classList.contains('selected') ? 'true' : 'false');
+            });
         }
 
         function clearFieldErrors() {
@@ -1087,6 +1123,7 @@
 
         function calculate() {
             clearFieldErrors();
+            syncPresetSelection();
             const confidenceLevel = parseFloat(document.getElementById('confidenceLevel').value);
             const alpha = (100 - confidenceLevel) / 100;
             const zValue = normalInverse(1 - alpha / 2);

@@ -491,7 +491,8 @@
             max-width: 100%;
         }
         .st-calc-sidebar .st-calc-nav {
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             padding: 6px 10px 8px;
@@ -504,9 +505,8 @@
         .st-calc-sidebar .control-panel {
             background: transparent;
             box-shadow: none;
-            min-height: 0;
-            flex: 1 1 auto;
-            overflow: hidden;
+            flex: 0 0 auto;
+            overflow: visible;
             display: flex;
             flex-direction: column;
             gap: 6px;
@@ -536,7 +536,19 @@
         .st-calc-sidebar .quick-presets { padding: 8px; margin-bottom: 0; }
         .st-calc-sidebar .quick-presets h4 { margin-bottom: 4px !important; font-size: 0.82rem; }
         .st-calc-sidebar .preset-btn { padding: 4px 8px; margin: 2px; font-size: 0.75rem; }
-        .st-calc-sidebar .btn-primary { margin-top: auto; padding: 8px 12px; flex: 0 0 auto; }
+        .st-calc-sidebar .btn-primary { margin-top: 8px; padding: 8px 12px; flex: 0 0 auto; }
+        .field-error { display: none; color: #fca5a5; font-size: 0.75rem; line-height: 1.35; margin-top: 3px; }
+        .field-error.show { display: block; }
+        .input-field.invalid { border-color: #f87171; }
+        .conf-badge {
+            display: inline-flex; align-items: center; margin-left: 8px;
+            padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+            background: rgba(255,165,120,.18); color: rgb(255,165,120);
+        }
+        .method-details, .assumptions { margin-top: 8px; font-size: 0.84rem; color: var(--text-secondary); }
+        .method-details summary, .assumptions summary { cursor: pointer; font-weight: 700; color: var(--text-primary); }
+        .method-details p, .assumptions p { margin: 6px 0 0; line-height: 1.45; }
+        .assumptions a { color: rgb(255,165,120); }
         .st-calc-sidebar .panel-title {
             background: transparent;
             border: 0;
@@ -695,35 +707,43 @@
                         <h3 class="section-title">Target Precision</h3>
                         
                         <div class="input-group">
-                            <label for="marginOfError" id="marginLabel">Desired Margin of Error (E)</label>
-                            <input type="number" id="marginOfError" class="input-field" value="5" min="0.001" step="0.001">
+                            <label for="marginOfError" id="marginLabel">Margin of error (same units as the mean)</label>
+                            <input type="number" id="marginOfError" class="input-field" value="5" step="any">
+                            <span class="field-error" id="marginOfErrorError"></span>
                         </div>
 
                         <div id="meanParams">
                             <div class="input-group">
-                                <label for="populationSD">Population Standard Deviation (σ)</label>
-                                <input type="number" id="populationSD" class="input-field" value="10" min="0.001" step="0.001">
+                                <label for="populationSD" id="sdLabel">Population standard deviation (σ)</label>
+                                <input type="number" id="populationSD" class="input-field" value="10" step="any">
+                                <span class="field-error" id="populationSDError"></span>
                             </div>
                         </div>
 
                         <div id="proportionParams" class="hidden">
                             <div class="input-group">
-                                <label for="expectedProportion">Expected Proportion (p)</label>
-                                <input type="number" id="expectedProportion" class="input-field" value="0.5" min="0.01" max="0.99" step="0.01">
+                                <label for="expectedProportion" id="propLabel">Expected proportion (%)</label>
+                                <input type="number" id="expectedProportion" class="input-field" value="50" step="any">
+                                <span class="field-error" id="expectedProportionError"></span>
+                            </div>
+                            <div class="input-group hidden" id="p2Group">
+                                <label for="expectedProportionB">Second proportion, p₂ (%)</label>
+                                <input type="number" id="expectedProportionB" class="input-field" value="50" step="any">
+                                <span class="field-error" id="expectedProportionBError"></span>
                             </div>
                         </div>
 
                         <div class="quick-presets">
                             <h4 style="color: #f3e8ff; margin-bottom: 10px;"><i class="fas fa-magic"></i> Quick Presets</h4>
                             <div id="meanPresets">
-                                <button class="preset-btn" onclick="setPreset('mean', 1, 5)">High Precision (E=1, σ=5)</button>
-                                <button class="preset-btn" onclick="setPreset('mean', 2, 10)">Medium Precision (E=2, σ=10)</button>
-                                <button class="preset-btn" onclick="setPreset('mean', 5, 15)">Low Precision (E=5, σ=15)</button>
+                                <button type="button" class="preset-btn" onclick="setPreset(1)">High precision (E=1)</button>
+                                <button type="button" class="preset-btn" onclick="setPreset(2)">Medium precision (E=2)</button>
+                                <button type="button" class="preset-btn" onclick="setPreset(5)">Low precision (E=5)</button>
                             </div>
                             <div id="proportionPresets" class="hidden">
-                                <button class="preset-btn" onclick="setPreset('proportion', 0.01, null)">±1% (E=0.01)</button>
-                                <button class="preset-btn" onclick="setPreset('proportion', 0.03, null)">±3% (E=0.03)</button>
-                                <button class="preset-btn" onclick="setPreset('proportion', 0.05, null)">±5% (E=0.05)</button>
+                                <button type="button" class="preset-btn" onclick="setPreset(1)">±1 percentage point</button>
+                                <button type="button" class="preset-btn" onclick="setPreset(3)">±3 percentage points</button>
+                                <button type="button" class="preset-btn" onclick="setPreset(5)">±5 percentage points</button>
                             </div>
                         </div>
                     </div>
@@ -733,21 +753,29 @@
                         <h3 class="section-title">Known Sample Size</h3>
                         
                         <div class="input-group">
-                            <label for="knownSampleSize">Sample Size (n)</label>
-                            <input type="number" id="knownSampleSize" class="input-field" value="100" min="1" step="1">
+                            <label for="knownSampleSize" id="sampleSizeLabel">Sample size (n)</label>
+                            <input type="number" id="knownSampleSize" class="input-field" value="100" step="1">
+                            <span class="field-error" id="knownSampleSizeError"></span>
                         </div>
 
                         <div id="meanParams2">
                             <div class="input-group">
-                                <label for="populationSD2">Population Standard Deviation (σ)</label>
-                                <input type="number" id="populationSD2" class="input-field" value="10" min="0.001" step="0.001">
+                                <label for="populationSD2" id="sdLabel2">Population standard deviation (σ)</label>
+                                <input type="number" id="populationSD2" class="input-field" value="10" step="any">
+                                <span class="field-error" id="populationSD2Error"></span>
                             </div>
                         </div>
 
                         <div id="proportionParams2" class="hidden">
                             <div class="input-group">
-                                <label for="expectedProportion2">Expected Proportion (p)</label>
-                                <input type="number" id="expectedProportion2" class="input-field" value="0.5" min="0.01" max="0.99" step="0.01">
+                                <label for="expectedProportion2" id="propLabel2">Expected proportion (%)</label>
+                                <input type="number" id="expectedProportion2" class="input-field" value="50" step="any">
+                                <span class="field-error" id="expectedProportion2Error"></span>
+                            </div>
+                            <div class="input-group hidden" id="p2Group2">
+                                <label for="expectedProportionB2">Second proportion, p₂ (%)</label>
+                                <input type="number" id="expectedProportionB2" class="input-field" value="50" step="any">
+                                <span class="field-error" id="expectedProportionB2Error"></span>
                             </div>
                         </div>
                     </div>
@@ -783,21 +811,25 @@
 
                     <div id="results" class="results-section">
                         <div class="result-item">
-                            <div class="result-label" id="mainResultLabel">Required Sample Size</div>
-                            <div class="result-value" id="mainResult">-</div>
+                            <div class="result-label" id="mainResultLabel">Sample size</div>
+                            <div class="result-value" id="mainResult">—</div>
                             <div class="result-secondary" id="mainResultSecondary"></div>
                         </div>
                         <div class="result-item">
-                            <div class="result-label">Confidence Interval Width</div>
-                            <div class="result-value" id="intervalWidth">-</div>
-                            <div class="result-secondary" id="intervalWidthSecondary"></div>
+                            <div class="result-label">Margin of error</div>
+                            <div class="result-value" id="marginResult">—</div>
+                            <div class="result-secondary" id="marginResultSecondary"></div>
                         </div>
                         <div class="result-item">
-                            <div class="result-label">Critical Value (z)</div>
-                            <div class="result-value" id="criticalValue">-</div>
-                            <div class="result-secondary" id="criticalValueSecondary"></div>
+                            <div class="result-label">Interval width</div>
+                            <div class="result-value" id="intervalWidth">—</div>
+                            <div class="result-secondary" id="intervalWidthSecondary"></div>
                         </div>
                     </div>
+                    <details class="method-details">
+                        <summary>Method details <span class="conf-badge" id="confBadge">95% confidence</span></summary>
+                        <p>Critical value z = <span id="criticalValue">—</span>. <span id="methodNote"></span></p>
+                    </details>
 
                     <div class="chart-container">
                         <div id="precisionChart"></div>
@@ -805,7 +837,14 @@
 
                     <div class="info-box">
                         <h4><i class="fas fa-info-circle"></i> Interpretation</h4>
-                        <p id="interpretationText">Configure your parameters and click calculate to see the precision analysis.</p>
+                        <p id="interpretationText">Enter the planning values. Results update as soon as every field is valid.</p>
+                        <details class="assumptions">
+                            <summary>Assumptions and help</summary>
+                            <p>The margin of error is half the confidence-interval width. A margin of ±5 means the interval runs from 5 below the estimate to 5 above it, so the width is 10.</p>
+                            <p>The mean method uses a z calculation with a known standard deviation. If that standard deviation comes from earlier data, treat it as a planning assumption, not as a value this study has already measured. <a href="https://www.itl.nist.gov/div898/handbook/prc/section2/prc242.htm" target="_blank" rel="noopener noreferrer">NIST engineering statistics handbook</a>.</p>
+                            <p>The proportion method is a normal approximation. Be cautious with a small sample or with a proportion near 0% or 100%. <a href="https://www.itl.nist.gov/div898/handbook/prc/section2/prc243.htm" target="_blank" rel="noopener noreferrer">NIST engineering statistics handbook</a>.</p>
+                            <p>Both difference methods assume two independent groups of equal size. The sample size shown is the size of each group.</p>
+                        </details>
                     </div>
                 </div>
         </section>
@@ -849,258 +888,295 @@
                 (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
         }
 
+        function isProportionType(type) {
+            return type === 'proportion' || type === 'difference-proportions';
+        }
+        function isDifferenceType(type) {
+            return type === 'difference-means' || type === 'difference-proportions';
+        }
+
         function switchMode(mode) {
             currentMode = mode;
-            
-            // Update button states
             document.getElementById('sampleSizeMode').classList.toggle('active', mode === 'sampleSize');
             document.getElementById('marginErrorMode').classList.toggle('active', mode === 'marginError');
-            
-            // Update parameter sections
             document.getElementById('sampleSizeParams').classList.toggle('hidden', mode !== 'sampleSize');
             document.getElementById('marginErrorParams').classList.toggle('hidden', mode !== 'marginError');
-            
-            // Update description and button text
             if (mode === 'sampleSize') {
                 document.getElementById('modeDescription').textContent = 'Calculate required sample size from desired margin of error';
                 document.getElementById('calculateBtn').innerHTML = '<i class="fas fa-calculator"></i> Calculate Sample Size';
-                document.getElementById('mainResultLabel').textContent = 'Required Sample Size';
             } else {
                 document.getElementById('modeDescription').textContent = 'Calculate expected margin of error from known sample size';
                 document.getElementById('calculateBtn').innerHTML = '<i class="fas fa-calculator"></i> Calculate Margin of Error';
-                document.getElementById('mainResultLabel').textContent = 'Margin of Error';
             }
+            document.getElementById('mainResultLabel').textContent = 'Sample size';
+            calculate();
         }
 
         function updateParameterFields() {
             currentEstimationType = document.getElementById('estimationType').value;
-            
-            // Update visibility based on estimation type
-            const isMean = currentEstimationType === 'mean' || currentEstimationType === 'difference-means';
-            const isProportion = currentEstimationType === 'proportion' || currentEstimationType === 'difference-proportions';
-            
-            // Sample size mode parameters
+            const diffMean = currentEstimationType === 'difference-means';
+            const diffProp = currentEstimationType === 'difference-proportions';
+            const isMean = currentEstimationType === 'mean' || diffMean;
+            const isProportion = isProportionType(currentEstimationType);
+
             document.getElementById('meanParams').classList.toggle('hidden', !isMean);
             document.getElementById('proportionParams').classList.toggle('hidden', !isProportion);
             document.getElementById('meanPresets').classList.toggle('hidden', !isMean);
             document.getElementById('proportionPresets').classList.toggle('hidden', !isProportion);
-            
-            // Margin of error mode parameters
             document.getElementById('meanParams2').classList.toggle('hidden', !isMean);
             document.getElementById('proportionParams2').classList.toggle('hidden', !isProportion);
-            
-            // Update margin label
-            const marginLabel = document.getElementById('marginLabel');
-            if (currentEstimationType === 'proportion' || currentEstimationType === 'difference-proportions') {
-                marginLabel.textContent = 'Desired Margin of Error (E) - as proportion';
-            } else {
-                marginLabel.textContent = 'Desired Margin of Error (E) - same units as mean';
+            document.getElementById('p2Group').classList.toggle('hidden', !diffProp);
+            document.getElementById('p2Group2').classList.toggle('hidden', !diffProp);
+
+            document.getElementById('marginLabel').textContent = isProportion
+                ? 'Margin of error (± percentage points)'
+                : 'Margin of error (same units as the mean)';
+            const sdText = diffMean ? 'Common SD for both groups' : 'Population standard deviation (σ)';
+            document.getElementById('sdLabel').textContent = sdText;
+            document.getElementById('sdLabel2').textContent = sdText;
+            document.getElementById('sampleSizeLabel').textContent = isDifferenceType(currentEstimationType)
+                ? 'Sample size per group'
+                : 'Sample size (n)';
+            const pText = diffProp ? 'First proportion, p₁ (%)' : 'Expected proportion (%)';
+            document.getElementById('propLabel').textContent = pText;
+            document.getElementById('propLabel2').textContent = pText;
+            calculate();
+        }
+
+        function setPreset(margin) {
+            document.getElementById('marginOfError').value = margin;
+            calculate();
+        }
+
+        function clearFieldErrors() {
+            document.querySelectorAll('.field-error').forEach(function (el) {
+                el.textContent = '';
+                el.classList.remove('show');
+            });
+            document.querySelectorAll('.input-field.invalid').forEach(function (el) {
+                el.classList.remove('invalid');
+            });
+        }
+
+        function setFieldError(id, message) {
+            const input = document.getElementById(id);
+            const error = document.getElementById(id + 'Error');
+            if (input) input.classList.add('invalid');
+            if (error) {
+                error.textContent = message;
+                error.classList.add('show');
             }
         }
 
-        function setPreset(type, margin, sigma) {
-            if (type === 'mean') {
-                document.getElementById('marginOfError').value = margin;
-                document.getElementById('populationSD').value = sigma;
-            } else if (type === 'proportion') {
-                document.getElementById('marginOfError').value = margin;
-                document.getElementById('expectedProportion').value = 0.5;
+        function readPositive(id, label) {
+            const raw = document.getElementById(id).value.trim();
+            if (raw === '') {
+                setFieldError(id, 'Enter ' + label + '.');
+                return null;
+            }
+            const n = Number(raw);
+            if (!Number.isFinite(n)) {
+                setFieldError(id, 'Enter a number for ' + label + '.');
+                return null;
+            }
+            if (n <= 0) {
+                setFieldError(id, label.charAt(0).toUpperCase() + label.slice(1) + ' must be greater than zero.');
+                return null;
+            }
+            return n;
+        }
+
+        function readPercent(id, label) {
+            const n = readPositive(id, label);
+            if (n == null) return null;
+            if (n >= 100) {
+                setFieldError(id, label.charAt(0).toUpperCase() + label.slice(1) + ' must be greater than 0% and less than 100%.');
+                return null;
+            }
+            return n / 100;
+        }
+
+        function readCount(id, label) {
+            const raw = document.getElementById(id).value.trim();
+            if (raw === '') {
+                setFieldError(id, 'Enter ' + label + '.');
+                return null;
+            }
+            if (!/^\d+$/.test(raw) || Number(raw) < 1) {
+                setFieldError(id, label.charAt(0).toUpperCase() + label.slice(1) + ' must be a positive whole number.');
+                return null;
+            }
+            return Number(raw);
+        }
+
+        function marginAt(n, model) {
+            if (!(n > 0)) return NaN;
+            if (model.kind === 'mean') return model.z * model.sigma / Math.sqrt(n);
+            if (model.kind === 'proportion') return model.z * Math.sqrt(model.p * (1 - model.p) / n);
+            if (model.kind === 'difference-means') return model.z * model.sigma * Math.sqrt(2 / n);
+            const variance = model.p1 * (1 - model.p1) + model.p2 * (1 - model.p2);
+            return model.z * Math.sqrt(variance / n);
+        }
+
+        function displayUnits(margin, model) {
+            return isProportionType(model.kind) ? margin * 100 : margin;
+        }
+
+        function showInvalid(message) {
+            document.getElementById('mainResult').textContent = '—';
+            document.getElementById('mainResultSecondary').textContent = '';
+            document.getElementById('marginResult').textContent = '—';
+            document.getElementById('marginResultSecondary').textContent = '';
+            document.getElementById('intervalWidth').textContent = '—';
+            document.getElementById('intervalWidthSecondary').textContent = '';
+            document.getElementById('criticalValue').textContent = '—';
+            document.getElementById('interpretationText').textContent = message;
+            if (precisionChart) {
+                precisionChart.destroy();
+                precisionChart = null;
             }
         }
 
         function calculate() {
-            try {
-                const confidenceLevel = parseFloat(document.getElementById('confidenceLevel').value);
-                const alpha = (100 - confidenceLevel) / 100;
-                const zValue = normalInverse(1 - alpha/2);
-                
-                let result = {};
-                
-                if (currentMode === 'sampleSize') {
-                    result = calculateSampleSize(zValue, alpha);
-                } else {
-                    result = calculateMarginOfError(zValue, alpha);
+            clearFieldErrors();
+            const confidenceLevel = parseFloat(document.getElementById('confidenceLevel').value);
+            const alpha = (100 - confidenceLevel) / 100;
+            const zValue = normalInverse(1 - alpha / 2);
+            if (!Number.isFinite(zValue)) {
+                showInvalid('Choose a confidence level between 0 and 100.');
+                return;
+            }
+
+            const model = { kind: currentEstimationType, z: zValue };
+            let targetMargin = null;
+            let n = null;
+
+            if (currentMode === 'sampleSize') {
+                const marginInput = readPositive('marginOfError', 'a margin of error');
+                if (marginInput == null) {
+                    showInvalid('Fix the highlighted field. A margin of zero or less cannot produce a sample size.');
+                    return;
                 }
-                
-                displayResults(result, zValue, confidenceLevel);
-                createChart(result, zValue);
-                updateInterpretation(result, confidenceLevel);
-                
-            } catch (error) {
-                alert('Error in calculation: ' + error.message);
+                targetMargin = isProportionType(currentEstimationType) ? marginInput / 100 : marginInput;
+            } else {
+                n = readCount('knownSampleSize', 'a sample size');
+                if (n == null) {
+                    showInvalid('Fix the highlighted field before reading a margin of error.');
+                    return;
+                }
             }
+
+            if (currentEstimationType === 'mean' || currentEstimationType === 'difference-means') {
+                const sdId = currentMode === 'sampleSize' ? 'populationSD' : 'populationSD2';
+                model.sigma = readPositive(sdId, 'a standard deviation');
+                if (model.sigma == null) {
+                    showInvalid('Fix the highlighted field before calculating.');
+                    return;
+                }
+            } else {
+                const pId = currentMode === 'sampleSize' ? 'expectedProportion' : 'expectedProportion2';
+                const p = readPercent(pId, 'a proportion');
+                if (p == null) {
+                    showInvalid('Fix the highlighted field. A proportion must be greater than 0% and less than 100%.');
+                    return;
+                }
+                if (currentEstimationType === 'proportion') {
+                    model.p = p;
+                } else {
+                    const p2Id = currentMode === 'sampleSize' ? 'expectedProportionB' : 'expectedProportionB2';
+                    const p2 = readPercent(p2Id, 'a second proportion');
+                    if (p2 == null) {
+                        showInvalid('Fix the highlighted field. Both proportions must be greater than 0% and less than 100%.');
+                        return;
+                    }
+                    model.p1 = p;
+                    model.p2 = p2;
+                }
+            }
+
+            if (currentMode === 'sampleSize') {
+                const probe = marginAt(1, model);
+                const solved = Math.pow(zValue / targetMargin, 2) * Math.pow(probe / zValue, 2);
+                n = Math.ceil(solved);
+                if (!Number.isFinite(n) || n < 1) {
+                    showInvalid('These values do not produce a finite sample size.');
+                    return;
+                }
+            }
+
+            const achieved = marginAt(n, model);
+            const perGroup = isDifferenceType(currentEstimationType);
+            const result = {
+                sampleSize: n,
+                totalSampleSize: perGroup ? 2 * n : null,
+                targetMargin: targetMargin,
+                marginOfError: achieved,
+                intervalWidth: 2 * achieved,
+                model: model
+            };
+            displayResults(result, zValue, confidenceLevel);
+            createChart(result);
+            updateInterpretation(result, confidenceLevel);
         }
 
-        function calculateSampleSize(zValue, alpha) {
-            const marginOfError = parseFloat(document.getElementById('marginOfError').value);
-            
-            switch(currentEstimationType) {
-                case 'mean':
-                    const sigma = parseFloat(document.getElementById('populationSD').value);
-                    const n = Math.pow(zValue * sigma / marginOfError, 2);
-                    return {
-                        sampleSize: Math.ceil(n),
-                        marginOfError: marginOfError,
-                        type: 'Population Mean',
-                        standardError: sigma / Math.sqrt(Math.ceil(n)),
-                        intervalWidth: 2 * marginOfError,
-                        parameter: sigma
-                    };
-                    
-                case 'proportion':
-                    const p = parseFloat(document.getElementById('expectedProportion').value);
-                    const nProp = Math.pow(zValue, 2) * p * (1 - p) / Math.pow(marginOfError, 2);
-                    return {
-                        sampleSize: Math.ceil(nProp),
-                        marginOfError: marginOfError,
-                        type: 'Population Proportion',
-                        standardError: Math.sqrt(p * (1 - p) / Math.ceil(nProp)),
-                        intervalWidth: 2 * marginOfError,
-                        parameter: p
-                    };
-                    
-                case 'difference-means':
-                    const sigma1 = parseFloat(document.getElementById('populationSD').value);
-                    const nDiffMean = 2 * Math.pow(zValue * sigma1 * Math.sqrt(2) / marginOfError, 2);
-                    return {
-                        sampleSize: Math.ceil(nDiffMean / 2),
-                        totalSampleSize: Math.ceil(nDiffMean),
-                        marginOfError: marginOfError,
-                        type: 'Difference of Means',
-                        standardError: sigma1 * Math.sqrt(2 / (nDiffMean / 2)),
-                        intervalWidth: 2 * marginOfError,
-                        parameter: sigma1
-                    };
-                    
-                case 'difference-proportions':
-                    const p1 = parseFloat(document.getElementById('expectedProportion').value);
-                    const p2 = 0.5; // Conservative estimate for p2
-                    const nDiffProp = Math.pow(zValue, 2) * (p1 * (1 - p1) + p2 * (1 - p2)) / Math.pow(marginOfError, 2);
-                    return {
-                        sampleSize: Math.ceil(nDiffProp),
-                        totalSampleSize: Math.ceil(2 * nDiffProp),
-                        marginOfError: marginOfError,
-                        type: 'Difference of Proportions',
-                        standardError: Math.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / nDiffProp),
-                        intervalWidth: 2 * marginOfError,
-                        parameter: p1
-                    };
-            }
-        }
-
-        function calculateMarginOfError(zValue, alpha) {
-            const sampleSize = parseInt(document.getElementById('knownSampleSize').value);
-            
-            switch(currentEstimationType) {
-                case 'mean':
-                    const sigma = parseFloat(document.getElementById('populationSD2').value);
-                    const marginOfError = zValue * sigma / Math.sqrt(sampleSize);
-                    return {
-                        sampleSize: sampleSize,
-                        marginOfError: marginOfError,
-                        type: 'Population Mean',
-                        standardError: sigma / Math.sqrt(sampleSize),
-                        intervalWidth: 2 * marginOfError,
-                        parameter: sigma
-                    };
-                    
-                case 'proportion':
-                    const p = parseFloat(document.getElementById('expectedProportion2').value);
-                    const marginOfErrorProp = zValue * Math.sqrt(p * (1 - p) / sampleSize);
-                    return {
-                        sampleSize: sampleSize,
-                        marginOfError: marginOfErrorProp,
-                        type: 'Population Proportion',
-                        standardError: Math.sqrt(p * (1 - p) / sampleSize),
-                        intervalWidth: 2 * marginOfErrorProp,
-                        parameter: p
-                    };
-                    
-                case 'difference-means':
-                    const sigma1 = parseFloat(document.getElementById('populationSD2').value);
-                    const marginOfErrorDiffMean = zValue * sigma1 * Math.sqrt(2 / sampleSize);
-                    return {
-                        sampleSize: sampleSize,
-                        totalSampleSize: 2 * sampleSize,
-                        marginOfError: marginOfErrorDiffMean,
-                        type: 'Difference of Means',
-                        standardError: sigma1 * Math.sqrt(2 / sampleSize),
-                        intervalWidth: 2 * marginOfErrorDiffMean,
-                        parameter: sigma1
-                    };
-                    
-                case 'difference-proportions':
-                    const p1 = parseFloat(document.getElementById('expectedProportion2').value);
-                    const p2 = 0.5; // Conservative estimate
-                    const marginOfErrorDiffProp = zValue * Math.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / sampleSize);
-                    return {
-                        sampleSize: sampleSize,
-                        totalSampleSize: 2 * sampleSize,
-                        marginOfError: marginOfErrorDiffProp,
-                        type: 'Difference of Proportions',
-                        standardError: Math.sqrt((p1 * (1 - p1) + p2 * (1 - p2)) / sampleSize),
-                        intervalWidth: 2 * marginOfErrorDiffProp,
-                        parameter: p1
-                    };
-            }
-        }
+        function fmtMean(x) { return Number(x).toFixed(3); }
+        function fmtPp(x) { return (x * 100).toFixed(2); }
 
         function displayResults(result, zValue, confidenceLevel) {
-            if (currentMode === 'sampleSize') {
-                document.getElementById('mainResult').textContent = result.totalSampleSize ? 
-                    `n = ${result.sampleSize} per group` : `n = ${result.sampleSize}`;
-                document.getElementById('mainResultSecondary').textContent = result.totalSampleSize ? 
-                    `Total sample size: ${result.totalSampleSize}` : `Single sample`;
-            } else {
-                const marginText = currentEstimationType.includes('proportion') ? 
-                    `±${(result.marginOfError * 100).toFixed(2)}%` : 
-                    `±${result.marginOfError.toFixed(3)}`;
-                document.getElementById('mainResult').textContent = marginText;
-                document.getElementById('mainResultSecondary').textContent = `Standard Error: ${result.standardError.toFixed(4)}`;
-            }
-            
-            document.getElementById('intervalWidth').textContent = currentEstimationType.includes('proportion') ? 
-                `${(result.intervalWidth * 100).toFixed(2)}%` : 
-                result.intervalWidth.toFixed(3);
-            document.getElementById('intervalWidthSecondary').textContent = `Full width of ${confidenceLevel}% CI`;
-            
+            const prop = isProportionType(result.model.kind);
+            const perGroup = result.totalSampleSize != null;
+            document.getElementById('mainResult').textContent = perGroup
+                ? 'n = ' + result.sampleSize + ' per group'
+                : 'n = ' + result.sampleSize;
+            document.getElementById('mainResultSecondary').textContent = perGroup
+                ? 'Total N = ' + result.totalSampleSize
+                : 'Single sample';
+
+            document.getElementById('marginResult').textContent = prop
+                ? '±' + fmtPp(result.marginOfError) + ' pp'
+                : '±' + fmtMean(result.marginOfError);
+            document.getElementById('marginResultSecondary').textContent = result.targetMargin == null
+                ? 'Calculated from this sample size'
+                : 'Target was ±' + (prop ? fmtPp(result.targetMargin) + ' pp' : fmtMean(result.targetMargin));
+
+            document.getElementById('intervalWidth').textContent = prop
+                ? fmtPp(result.intervalWidth) + ' pp'
+                : fmtMean(result.intervalWidth);
+            document.getElementById('intervalWidthSecondary').textContent = result.targetMargin == null
+                ? 'Full width of the ' + confidenceLevel + '% interval'
+                : 'Achieved width. Target width was ' + (prop ? fmtPp(2 * result.targetMargin) + ' pp' : fmtMean(2 * result.targetMargin));
+
+            document.getElementById('confBadge').textContent = confidenceLevel + '% confidence';
             document.getElementById('criticalValue').textContent = zValue.toFixed(3);
-            document.getElementById('criticalValueSecondary').textContent = `${confidenceLevel}% confidence level`;
+            const notes = {
+                mean: 'This is a z interval that treats the standard deviation as known.',
+                proportion: 'This is the normal approximation for a proportion.',
+                'difference-means': 'Each group has this sample size. The two groups are independent and share one standard deviation.',
+                'difference-proportions': 'Each group has this sample size. The two groups are independent, and both proportions enter the variance.'
+            };
+            document.getElementById('methodNote').textContent = notes[result.model.kind] || '';
         }
 
-        function createChart(result, zValue) {
-            const chartTitle = currentMode === 'sampleSize' ? 
-                'Sample Size vs Margin of Error' : 
-                'Margin of Error vs Sample Size';
-            
-            let xData = [], yData = [];
-            
-            if (currentMode === 'sampleSize') {
-                // Show how margin of error changes with different sample sizes
-                for (let n = Math.max(10, Math.floor(result.sampleSize * 0.3)); n <= result.sampleSize * 2; n += Math.max(1, Math.floor(result.sampleSize * 0.05))) {
-                    xData.push(n);
-                    let margin;
-                    if (currentEstimationType === 'mean') {
-                        margin = zValue * result.parameter / Math.sqrt(n);
-                    } else {
-                        margin = zValue * Math.sqrt(result.parameter * (1 - result.parameter) / n);
-                    }
-                    yData.push(margin);
-                }
-            } else {
-                // Show how sample size affects margin of error
-                const maxN = result.sampleSize * 3;
-                for (let n = 10; n <= maxN; n += Math.max(1, Math.floor(maxN * 0.02))) {
-                    xData.push(n);
-                    let margin;
-                    if (currentEstimationType === 'mean') {
-                        margin = zValue * result.parameter / Math.sqrt(n);
-                    } else {
-                        margin = zValue * Math.sqrt(result.parameter * (1 - result.parameter) / n);
-                    }
-                    yData.push(margin);
-                }
+        function createChart(result) {
+            const model = result.model;
+            const prop = isProportionType(model.kind);
+            const xData = [];
+            const yData = [];
+            const start = Math.max(2, Math.floor(result.sampleSize * 0.3));
+            const end = Math.max(start + 1, result.sampleSize * 2);
+            const step = Math.max(1, Math.floor((end - start) / 40));
+            for (let n = start; n <= end; n += step) {
+                xData.push(n);
+                yData.push(displayUnits(marginAt(n, model), model));
             }
+            if (xData.indexOf(result.sampleSize) === -1) {
+                xData.push(result.sampleSize);
+                yData.push(displayUnits(result.marginOfError, model));
+            }
+            const pairs = xData.map(function (x, i) { return [x, yData[i]]; }).sort(function (a, b) { return a[0] - b[0]; });
+            const achievedY = displayUnits(result.marginOfError, model);
+            const targetY = result.targetMargin == null ? achievedY : displayUnits(result.targetMargin, model);
+            const yMax = Math.max.apply(null, pairs.map(function (p) { return p[1]; }).concat([targetY]));
 
             const lightChart = document.documentElement.getAttribute('data-theme') === 'light';
             const axisColor = lightChart ? '#405F73' : '#e8e8e8';
@@ -1109,20 +1185,28 @@
             const chartHost = document.getElementById('precisionChart');
             const chartBox = chartHost ? chartHost.parentElement : null;
             const chartHeight = Math.max(140, chartBox ? chartBox.clientHeight : 220);
+            if (precisionChart) {
+                precisionChart.destroy();
+                precisionChart = null;
+            }
+            if (typeof Highcharts === 'undefined') return;
             precisionChart = Highcharts.chart('precisionChart', {
                 title: {
-                    text: chartTitle,
+                    text: 'Margin of Error vs Sample Size',
                     style: { color: titleColor }
                 },
                 xAxis: {
-                    title: { text: 'Sample Size (n)', style: { color: axisColor } },
+                    title: {
+                        text: isDifferenceType(model.kind) ? 'Sample size per group' : 'Sample size (n)',
+                        style: { color: axisColor }
+                    },
                     labels: { style: { color: axisColor } },
                     gridLineColor: gridColor
                 },
                 yAxis: {
-                    title: { 
-                        text: currentEstimationType.includes('proportion') ? 'Margin of Error (proportion)' : 'Margin of Error', 
-                        style: { color: axisColor } 
+                    title: {
+                        text: prop ? 'Margin of error (percentage points)' : 'Margin of error',
+                        style: { color: axisColor }
                     },
                     labels: { style: { color: axisColor } },
                     gridLineColor: gridColor
@@ -1134,21 +1218,21 @@
                 },
                 legend: { itemStyle: { color: axisColor } },
                 series: [{
-                    name: 'Precision Curve',
-                    data: xData.map((x, i) => [x, yData[i]]),
+                    name: 'Precision curve',
+                    data: pairs,
                     type: 'line',
                     color: 'rgb(255,165,120)',
                     lineWidth: 3
                 }, {
-                    name: currentMode === 'sampleSize' ? 'Target Sample Size' : 'Current Sample Size',
-                    data: [[result.sampleSize, 0], [result.sampleSize, Math.max(...yData)]],
+                    name: currentMode === 'sampleSize' ? 'Required sample size' : 'Entered sample size',
+                    data: [[result.sampleSize, 0], [result.sampleSize, yMax]],
                     type: 'line',
                     color: '#e74c3c',
                     dashStyle: 'dash',
                     lineWidth: 2
                 }, {
-                    name: currentMode === 'sampleSize' ? 'Target Margin' : 'Current Margin',
-                    data: [[Math.min(...xData), result.marginOfError], [Math.max(...xData), result.marginOfError]],
+                    name: currentMode === 'sampleSize' ? 'Target margin' : 'Calculated margin',
+                    data: [[pairs[0][0], targetY], [pairs[pairs.length - 1][0], targetY]],
                     type: 'line',
                     color: '#27ae60',
                     dashStyle: 'dash',
@@ -1163,33 +1247,18 @@
         }
 
         function updateInterpretation(result, confidenceLevel) {
-            let interpretation = '';
-            
-            if (currentMode === 'sampleSize') {
-                if (currentEstimationType === 'mean') {
-                    interpretation = `To estimate the population mean with a margin of error of ±${result.marginOfError} and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants. `;
-                } else if (currentEstimationType === 'proportion') {
-                    interpretation = `To estimate the population proportion with a margin of error of ±${(result.marginOfError * 100).toFixed(1)}% and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants. `;
-                } else if (currentEstimationType === 'difference-means') {
-                    interpretation = `To estimate the difference between two means with a margin of error of ±${result.marginOfError} and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}). `;
-                } else {
-                    interpretation = `To estimate the difference between two proportions with a margin of error of ±${(result.marginOfError * 100).toFixed(1)}% and ${confidenceLevel}% confidence, you need ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}). `;
-                }
-                interpretation += `The confidence interval will span ${currentEstimationType.includes('proportion') ? (result.intervalWidth * 100).toFixed(1) + '%' : result.intervalWidth.toFixed(3)} units total.`;
-            } else {
-                if (currentEstimationType === 'mean') {
-                    interpretation = `With ${result.sampleSize} participants, your ${confidenceLevel}% confidence interval for the population mean will have a margin of error of ±${result.marginOfError.toFixed(3)}. `;
-                } else if (currentEstimationType === 'proportion') {
-                    interpretation = `With ${result.sampleSize} participants, your ${confidenceLevel}% confidence interval for the population proportion will have a margin of error of ±${(result.marginOfError * 100).toFixed(2)}%. `;
-                } else if (currentEstimationType === 'difference-means') {
-                    interpretation = `With ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}), your ${confidenceLevel}% confidence interval for the difference of means will have a margin of error of ±${result.marginOfError.toFixed(3)}. `;
-                } else {
-                    interpretation = `With ${result.sampleSize} participants per group (total N = ${result.totalSampleSize}), your ${confidenceLevel}% confidence interval for the difference of proportions will have a margin of error of ±${(result.marginOfError * 100).toFixed(2)}%. `;
-                }
-                interpretation += `The total width of your confidence interval will be ${currentEstimationType.includes('proportion') ? (result.intervalWidth * 100).toFixed(1) + '%' : result.intervalWidth.toFixed(3)}.`;
+            const prop = isProportionType(result.model.kind);
+            const marginText = prop ? '±' + fmtPp(result.marginOfError) + ' percentage points' : '±' + fmtMean(result.marginOfError);
+            const widthText = prop ? fmtPp(result.intervalWidth) + ' percentage points' : fmtMean(result.intervalWidth);
+            const who = result.totalSampleSize == null
+                ? result.sampleSize + ' participants'
+                : result.sampleSize + ' participants in each group (total N = ' + result.totalSampleSize + ')';
+            let text = 'At ' + confidenceLevel + '% confidence, ' + who + ' give a margin of error of ' + marginText + '. The interval width is ' + widthText + '.';
+            if (result.targetMargin != null) {
+                const targetText = prop ? '±' + fmtPp(result.targetMargin) + ' percentage points' : '±' + fmtMean(result.targetMargin);
+                text += ' The target margin was ' + targetText + '. Rounding the sample size up makes the achieved margin slightly smaller than that target.';
             }
-            
-            document.getElementById('interpretationText').textContent = interpretation;
+            document.getElementById('interpretationText').textContent = text;
         }
 
         // Initialize the page
@@ -1217,8 +1286,11 @@
                 });
             }
             if (backdrop) backdrop.addEventListener('click', closeDrawer);
+            ['marginOfError', 'populationSD', 'expectedProportion', 'expectedProportionB', 'knownSampleSize', 'populationSD2', 'expectedProportion2', 'expectedProportionB2'].forEach(function (id) {
+                document.getElementById(id).addEventListener('input', calculate);
+            });
+            document.getElementById('confidenceLevel').addEventListener('change', calculate);
             updateParameterFields();
-            calculate();
         });
     </script>
 </body>

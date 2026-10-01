@@ -262,9 +262,15 @@
     <section class="st-calc-workspace ct2-workspace">
     <section class="card" id="modeCard">
       <div class="card-title">Calculator</div>
-      <div class="seg" id="modeSeg" style="margin-top:6px;">
-        <button type="button" class="active" data-mode="2x2">2×2</button>
-        <button type="button" data-mode="larger">Larger tables</button>
+      <div class="seg design-seg" id="modeSeg" style="margin-top:6px;">
+        <div class="design-choice">
+          <button type="button" class="active" data-mode="2x2">2×2</button>
+          <button type="button" class="design-help" data-help="2x2"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
+        <div class="design-choice">
+          <button type="button" data-mode="larger">Larger tables</button>
+          <button type="button" class="design-help" data-help="larger"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
       </div>
       <p class="design-note" id="modeNote">Two rows and two columns. The buttons below describe how the observations were collected, not the size of the table.</p>
     </section>
@@ -295,10 +301,19 @@
 
     <section class="card" id="shapeCard" hidden>
       <div class="card-title">Table shape</div>
-      <div class="seg" id="shapeSeg" style="margin-top:6px;">
-        <button type="button" class="active" data-shape="binary">Groups × event</button>
-        <button type="button" data-shape="rc">General R×C</button>
-        <button type="button" data-shape="paired">Paired categories</button>
+      <div class="seg design-seg" id="shapeSeg" style="margin-top:6px;">
+        <div class="design-choice">
+          <button type="button" class="active" data-shape="binary">Groups × event</button>
+          <button type="button" class="design-help" data-help="larger-binary"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
+        <div class="design-choice">
+          <button type="button" data-shape="rc">General R×C</button>
+          <button type="button" class="design-help" data-help="larger-rc"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
+        <div class="design-choice">
+          <button type="button" data-shape="paired">Paired categories</button>
+          <button type="button" class="design-help" data-help="larger-paired"><i class="fa-solid fa-circle-question"></i> Help</button>
+        </div>
       </div>
       <p class="design-note" id="shapeNote"></p>
       <div class="size-row" id="sizeRow">
@@ -431,14 +446,17 @@
       var helpModal = document.getElementById('helpModal');
       var helpDesign = 'independent';
       function openHelp(design) {
-        if (state.mode === 'larger') helpDesign = 'larger-' + larger.shape;
-        else helpDesign = design || state.design;
+        if (design) helpDesign = design;
+        else if (state.mode === 'larger') helpDesign = 'larger-' + larger.shape;
+        else helpDesign = state.design;
         paintHelp(helpDesign);
         helpModal.hidden = false;
         var box = helpModal.querySelector('.ct2-help-box');
         if (box) box.scrollTop = 0;
       }
-      document.getElementById('helpBtn').addEventListener('click', function () { openHelp(state.design); });
+      document.getElementById('helpBtn').addEventListener('click', function () {
+        openHelp(state.mode === 'larger' ? ('larger-' + larger.shape) : state.design);
+      });
       document.getElementById('helpClose').addEventListener('click', function () { helpModal.hidden = true; });
       helpModal.addEventListener('click', function (e) { if (e.target === helpModal) helpModal.hidden = true; });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape') helpModal.hidden = true; });
@@ -915,7 +933,7 @@
         document.getElementById('calcTitle').textContent = '2×2 Calculator';
         document.title = '2×2 Calculator';
         document.getElementById('modeNote').textContent = 'Two rows and two columns. The buttons below describe how the observations were collected, not the size of the table.';
-        document.querySelectorAll('#modeSeg button').forEach(function (b) {
+        document.querySelectorAll('#modeSeg button[data-mode]').forEach(function (b) {
           b.classList.toggle('active', b.getAttribute('data-mode') === '2x2');
         });
         if (gridBuiltFor !== '2x2') {
@@ -1198,10 +1216,10 @@
         document.getElementById('calcTitle').textContent = 'Larger tables';
         document.title = 'Larger tables';
         document.getElementById('modeNote').textContent = 'Rows and columns do not have to match. A 3×2 table is three groups and two outcomes. This is separate from how a 2×2 study was collected.';
-        document.querySelectorAll('#modeSeg button').forEach(function (b) {
+        document.querySelectorAll('#modeSeg button[data-mode]').forEach(function (b) {
           b.classList.toggle('active', b.getAttribute('data-mode') === 'larger');
         });
-        document.querySelectorAll('#shapeSeg button').forEach(function (b) {
+        document.querySelectorAll('#shapeSeg button[data-shape]').forEach(function (b) {
           b.classList.toggle('active', b.getAttribute('data-shape') === larger.shape);
         });
         var shapeNotes = {
@@ -1487,6 +1505,10 @@
 
       function paintHelp(design) {
         design = design || state.design;
+        if (design === '2x2' || design === 'larger') {
+          paintModeHelp(design);
+          return;
+        }
         if (String(design).indexOf('larger-') === 0) {
           paintLargerHelp(design.slice(7));
           return;
@@ -1557,6 +1579,23 @@
             '<p>Report the card marked “Use this”. The expected counts in this table are all large, so that card is the Pearson χ² p-value.</p>';
         }
         document.getElementById('helpBody').innerHTML = body + shared;
+      }
+
+      function paintModeHelp(mode) {
+        if (mode === 'larger') {
+          document.getElementById('helpTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> Larger tables';
+          document.getElementById('helpBody').innerHTML =
+            '<p>Rows and columns do not have to match. A 3×2 table is three groups and two outcomes. A 2×4 table is two groups and four outcomes. Both are ordinary rectangular tables.</p>' +
+            '<p>Table shape chooses the question. Groups × event compares an event proportion across groups. General R×C describes the association and shows which cells drive it. Paired categories records the same categories twice.</p>' +
+            '<p>Type each count directly. A blank cell counts as zero. A row or column you have not typed in is left out. Changing one cell does not change another cell.</p>' +
+            '<p>The grid here goes up to 6×6. A larger dataset belongs in the Excel contingency analysis. Use the Help button under each table shape for what that shape reports.</p>';
+          return;
+        }
+        document.getElementById('helpTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> 2×2';
+        document.getElementById('helpBody').innerHTML =
+          '<p>A 2×2 table has two rows and two columns. Every observation falls in exactly one cell.</p>' +
+          '<p>The buttons under “How were the data collected?” choose the study, not the size of the table. Independent groups, case–control, and paired before / after each use a different result. Use the Help button under each method for its worked example.</p>' +
+          '<p>A blank cell means the table is incomplete. Zero is a real count. The hypothetical control changes one cell and reduces the other cell in that row, so the row total stays fixed.</p>';
       }
 
       function paintLargerHelp(shape) {
@@ -1822,12 +1861,22 @@
       });
 
       document.getElementById('modeSeg').addEventListener('click', function (e) {
+        var help = e.target.closest('button[data-help]');
+        if (help) {
+          openHelp(help.getAttribute('data-help'));
+          return;
+        }
         var btn = e.target.closest('button[data-mode]');
         if (!btn) return;
         state.mode = btn.getAttribute('data-mode') === 'larger' ? 'larger' : '2x2';
         render();
       });
       document.getElementById('shapeSeg').addEventListener('click', function (e) {
+        var help = e.target.closest('button[data-help]');
+        if (help) {
+          openHelp(help.getAttribute('data-help'));
+          return;
+        }
         var btn = e.target.closest('button[data-shape]');
         if (!btn) return;
         presetLarger(btn.getAttribute('data-shape'));

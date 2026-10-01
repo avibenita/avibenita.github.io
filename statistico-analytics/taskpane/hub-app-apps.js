@@ -456,28 +456,28 @@ const TOOLS_CATEGORY_TILES = [
 const CALCULATOR_CATEGORY_TILES = [
   {
     id: "two-by-two",
-    section: "2×2 Comparison",
-    sectionId: "two-by-two",
-    sectionSubtitle: "Two groups and a yes/no outcome, from four typed counts",
-    title: "2×2 calculator",
-    icon: "fa-calculator",
+    section: "Contingency tables",
+    sectionId: "contingency",
+    sectionSubtitle: "A 2×2 table, or a larger table up to 6×6, from typed counts",
+    title: "Contingency calculator",
+    icon: "fa-table-cells",
     accent: "#c4b5fd",
     accentDark: "#6d28d9",
     color: "#a78bfa",
     colorDark: "#6d28d9",
-    subtitle: "Compare two groups by typing four counts",
-    desc: "Enter the four cell counts yourself. The percentage-point difference, risk ratio, odds ratio, and p-values update as you type. No worksheet range is used.",
+    subtitle: "2×2 and larger tables, typed by hand",
+    desc: "Enter counts yourself. A 2×2 table compares two groups. Larger tables cover several groups with one event, a general R×C association, or the same categories measured twice. No worksheet range is used.",
     info: [
       "Manual counts only — nothing is read from Excel",
-      "Event percentage, risk difference, risk ratio, and odds ratio",
-      "Case–control and paired before/after modes",
+      "2×2: independent groups, case–control, and paired before/after",
+      "Larger tables up to 6×6: groups × event, general R×C, and paired categories",
       "Standalone calculator — no Active Range needed"
     ],
     modules: [
       {
         id: "calc-2x2",
-        label: "Open 2×2 calculator",
-        tip: "Type four counts and compare two groups on a yes/no outcome.",
+        label: "Open contingency calculator",
+        tip: "Type a 2×2 table, or a larger table up to 6×6.",
         dialogPath: "contingency/contingency-2x2.html"
       }
     ]
@@ -512,8 +512,8 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "precision-sample",
-    section: "Precision-Based Sample Size",
-    sectionId: "precision-sample",
+    section: "Study planning",
+    sectionId: "planning",
     title: "Precision-based sample size",
     icon: "fa-bullseye",
     accent: "#38bdf8",
@@ -539,8 +539,8 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "power-sample",
-    section: "Power & Sample Size",
-    sectionId: "power-sample",
+    section: "Study planning",
+    sectionId: "planning",
     title: "Power-based sample size",
     icon: "fa-bolt",
     accent: "#818cf8",
@@ -566,8 +566,8 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "effect-size-family",
-    section: "Effect Sizes",
-    sectionId: "effect-sizes",
+    section: "Study planning",
+    sectionId: "planning",
     title: "Effect size converter",
     icon: "fa-right-left",
     accent: "#38bdf8",
@@ -585,7 +585,7 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-effect-size",
-        label: "Open converter",
+        label: "Effect size converter",
         tip: "Convert common effect-size measures, with assumptions shown.",
         dialogUrl: "https://statistico.live/statistico-calculators/effect-size/EffectSizeConverter.html"
       }
@@ -593,8 +593,8 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "erlang-family",
-    section: "Staffing & Simulation",
-    sectionId: "staffing",
+    section: "Operations",
+    sectionId: "operations",
     title: "Call center staffing",
     icon: "fa-headset",
     accent: "#38bdf8",
@@ -620,8 +620,8 @@ const CALCULATOR_CATEGORY_TILES = [
   },
   {
     id: "process-capability",
-    section: "Process Capability",
-    sectionId: "capability",
+    section: "Operations",
+    sectionId: "operations",
     title: "Process capability",
     icon: "fa-gauge-high",
     accent: "#34d399",
@@ -772,11 +772,11 @@ var TOOLS_SECTION_META = {
 var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "delivery", "survey"];
 var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "survey"];
 var CALC_SECTION_META = {
-  "two-by-two": {
-    id: "two-by-two",
-    label: "2×2 Comparison",
-    subtitle: "Two groups and a yes/no outcome, from four typed counts.",
-    icon: "fa-calculator",
+  contingency: {
+    id: "contingency",
+    label: "Contingency tables",
+    subtitle: "A 2×2 table, or a larger table up to 6×6, from typed counts.",
+    icon: "fa-table-cells",
     color: "#a78bfa",
     colorDark: "#6d28d9"
   },
@@ -788,48 +788,24 @@ var CALC_SECTION_META = {
     color: "#38bdf8",
     colorDark: "#0284c7"
   },
-  "precision-sample": {
-    id: "precision-sample",
-    label: "Precision-Based Sample Size",
-    subtitle: "Sample size from a margin of error, or the reverse.",
-    icon: "fa-bullseye",
+  planning: {
+    id: "planning",
+    label: "Study planning",
+    subtitle: "Sample size by precision or power, and effect-size conversion.",
+    icon: "fa-ruler-combined",
     color: "#38bdf8",
     colorDark: "#0284c7"
   },
-  "power-sample": {
-    id: "power-sample",
-    label: "Power & Sample Size",
-    subtitle: "Sample size for a target statistical power.",
-    icon: "fa-bolt",
-    color: "#818cf8",
-    colorDark: "#4f46e5"
-  },
-  "effect-sizes": {
-    id: "effect-sizes",
-    label: "Effect Sizes",
-    subtitle: "Convert common effect-size measures, with assumptions shown.",
-    icon: "fa-right-left",
-    color: "#a855f7",
-    colorDark: "#7e22ce"
-  },
-  staffing: {
-    id: "staffing",
-    label: "Staffing & Simulation",
-    subtitle: "Erlang C staffing and service-level trade-offs.",
-    icon: "fa-headset",
+  operations: {
+    id: "operations",
+    label: "Operations",
+    subtitle: "Staff a queue, or judge a process against its limits.",
+    icon: "fa-industry",
     color: "#f59e0b",
     colorDark: "#b45309"
-  },
-  capability: {
-    id: "capability",
-    label: "Process Capability",
-    subtitle: "Cp and Cpk against specification limits.",
-    icon: "fa-gauge-high",
-    color: "#14b8a6",
-    colorDark: "#0f766e"
   }
 };
-var CALC_SECTION_ORDER = ["two-by-two", "distributions", "precision-sample", "power-sample", "effect-sizes", "staffing", "capability"];
+var CALC_SECTION_ORDER = ["contingency", "distributions", "planning", "operations"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {

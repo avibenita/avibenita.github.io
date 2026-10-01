@@ -1033,6 +1033,313 @@
     return result;
   }
 
+  function invertMatrix(source) {
+    var n = source.length;
+    if (!n) return null;
+    var m = source.map(function (row, i) {
+      var out = row.slice();
+      var j;
+      for (j = 0; j < n; j++) out.push(i === j ? 1 : 0);
+      return out;
+    });
+    var col, row, pivot, div, factor, j;
+    for (col = 0; col < n; col++) {
+      pivot = col;
+      for (row = col + 1; row < n; row++) {
+        if (Math.abs(m[row][col]) > Math.abs(m[pivot][col])) pivot = row;
+      }
+      if (!(Math.abs(m[pivot][col]) > 1e-10)) return null;
+      if (pivot !== col) {
+        var swap = m[col];
+        m[col] = m[pivot];
+        m[pivot] = swap;
+      }
+      div = m[col][col];
+      for (j = col; j < n * 2; j++) m[col][j] /= div;
+      for (row = 0; row < n; row++) {
+        if (row === col) continue;
+        factor = m[row][col];
+        if (factor === 0) continue;
+        for (j = col; j < n * 2; j++) m[row][j] -= factor * m[col][j];
+      }
+    }
+    return m.map(function (line) { return line.slice(n); });
+  }
+
+  function marginsOf(observed) {
+    var nRows = observed.length;
+    var nCols = observed[0] ? observed[0].length : 0;
+    var rowTotals = [];
+    var colTotals = [];
+    var N = 0;
+    var i, j;
+    for (j = 0; j < nCols; j++) colTotals[j] = 0;
+    for (i = 0; i < nRows; i++) {
+      var rt = 0;
+      for (j = 0; j < nCols; j++) {
+        var v = observed[i][j];
+        if (!isIntegerCount(v) || v < 0) return null;
+        v = Math.round(v);
+        rt += v;
+        colTotals[j] += v;
+      }
+      rowTotals[i] = rt;
+      N += rt;
+    }
+    return { nRows: nRows, nCols: nCols, rowTotals: rowTotals, colTotals: colTotals, N: N };
+  }
+
+  function chiSquareStatistic(observed, rowTotals, colTotals, N) {
+    if (!(N > 0)) return NaN;
+    var chi = 0;
+    for (var i = 0; i < observed.length; i++) {
+      for (var j = 0; j < observed[i].length; j++) {
+        var E = rowTotals[i] * colTotals[j] / N;
+        if (E > 0) {
+          var d = observed[i][j] - E;
+          chi += d * d / E;
+        }
+      }
+    }
+    return chi;
+  }
+
+  function sampleHypergeometric(population, marked, draws, rng) {
+    var lo = Math.max(0, draws - (population - marked));
+    var hi = Math.min(draws, marked);
+    if (lo >= hi) return lo;
+    var maxLog = -Infinity;
+    var logs = [];
+    var x;
+    for (x = lo; x <= hi; x++) {
+      var lp = logChoose(marked, x) + logChoose(population - marked, draws - x) - logChoose(population, draws);
+      logs.push(lp);
+      if (lp > maxLog) maxLog = lp;
+    }
+    var sum = 0;
+    var weights = logs.map(function (lp) {
+      var w = Math.exp(lp - maxLog);
+      sum += w;
+      return w;
+    });
+    var u = rng() * sum;
+    var acc = 0;
+    for (var i = 0; i < weights.length; i++) {
+      acc += weights[i];
+      if (u <= acc) return lo + i;
+    }
+    return hi;
+  }
+
+  function randomContingency(rowTotals, colTotals, rng) {
+    var nRows = rowTotals.length;
+    var nCols = colTotals.length;
+    var table = [];
+    var cs = colTotals.slice();
+    var i, j;
+    for (i = 0; i < nRows - 1; i++) {
+      table[i] = [];
+      var remainingRow = rowTotals[i];
+      var remainingN = 0;
+      for (j = 0; j < nCols; j++) remainingN += cs[j];
+      for (j = 0; j < nCols - 1; j++) {
+        var x = sampleHypergeometric(remainingN, cs[j], remainingRow, rng);
+        table[i][j] = x;
+        remainingRow -= x;
+        remainingN -= cs[j];
+        cs[j] -= x;
+      }
+      table[i][nCols - 1] = remainingRow;
+      cs[nCols - 1] -= remainingRow;
+    }
+    table[nRows - 1] = cs.slice();
+    return table;
+  }
+
+  function hashCounts(observed) {
+    var h = 2166136261;
+    for (var i = 0; i < observed.length; i++) {
+      for (var j = 0; j < observed[i].length; j++) {
+        h ^= (observed[i][j] + 1 + i * 131 + j * 17);
+        h = Math.imul(h, 16777619);
+      }
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function monteCarloIndependence(observed, options) {
+    options = options || {};
+    var margins = marginsOf(observed);
+    if (!margins) {
+      return { available: false, reason: 'Simulation needs whole-number cell counts.' };
+    }
+    if (margins.nRows < 2 || margins.nCols < 2 || !(margins.N > 0)) {
+      return { available: false, reason: 'Simulation needs a complete table with row and column totals.' };
+    }
+    if (margins.N > 800) {
+      return {
+        available: false,
+        reason: 'Simulation in this calculator is limited to tables of 800 observations. Larger tables belong in the Excel contingency analysis.'
+      };
+    }
+    var chiObs = chiSquareStatistic(observed, margins.rowTotals, margins.colTotals, margins.N);
+    var nSims = options.nSims || 1999;
+    var rng = mulberry32(options.seed != null ? options.seed : hashCounts(observed));
+    var extreme = 0;
+    for (var s = 0; s < nSims; s++) {
+      var sim = randomContingency(margins.rowTotals, margins.colTotals, rng);
+      var chi = chiSquareStatistic(sim, margins.rowTotals, margins.colTotals, margins.N);
+      if (chi + 1e-9 >= chiObs) extreme++;
+    }
+    return {
+      available: true,
+      method: 'monte-carlo-fixed-margins',
+      nSims: nSims,
+      nExtreme: extreme,
+      observedChi2: chiObs,
+      p: (extreme + 1) / (nSims + 1)
+    };
+  }
+
+  function binaryGroupComparisons(observed, rowLabels, colLabels, refRow, eventCol) {
+    var nRows = observed.length;
+    var nCols = observed[0] ? observed[0].length : 0;
+    if (nCols !== 2 || nRows < 2) {
+      return { available: false, reason: 'These comparisons need two outcome columns and at least two groups.' };
+    }
+    if (eventCol !== 0 && eventCol !== 1) eventCol = 0;
+    if (!(refRow >= 0 && refRow < nRows)) refRow = 0;
+    var other = 1 - eventCol;
+    var z = zCrit(0.95);
+    var groups = [];
+    for (var i = 0; i < nRows; i++) {
+      var events = Number(observed[i][eventCol]) || 0;
+      var complement = Number(observed[i][other]) || 0;
+      var n = events + complement;
+      var item = {
+        i: i,
+        row: rowLabels[i],
+        events: events,
+        n: n,
+        reference: i === refRow,
+        proportion: wilsonProportion(events, n, z)
+      };
+      if (i !== refRow) {
+        var a = observed[i][eventCol];
+        var b = observed[i][other];
+        var c = observed[refRow][eventCol];
+        var d = observed[refRow][other];
+        var rows = [rowLabels[i], rowLabels[refRow]];
+        var cols = [colLabels[eventCol], colLabels[other]];
+        var measures = measures2x2(a, b, c, d, z, rows, cols);
+        var sub = analyzeCounts([[a, b], [c, d]], rows, cols, { confidence: 0.95 });
+        item.versusReference = {
+          riskDifference: measures.riskDifference,
+          riskRatio: measures.riskRatio,
+          oddsRatio: measures.oddsRatio,
+          pearson: sub.analyzable ? sub.tests.pearson : null,
+          fisher: sub.analyzable ? sub.tests.fisher : null
+        };
+      }
+      groups.push(item);
+    }
+    return {
+      available: true,
+      reference: rowLabels[refRow],
+      referenceIndex: refRow,
+      event: colLabels[eventCol],
+      groups: groups
+    };
+  }
+
+  function stuartMaxwell(observed) {
+    var k = observed.length;
+    if (k < 2 || observed.some(function (row) { return !row || row.length !== k; })) {
+      return { available: false, reason: 'Stuart–Maxwell needs a square table of the same categories.' };
+    }
+    var margins = marginsOf(observed);
+    if (!margins) return { available: false, reason: 'Stuart–Maxwell needs whole-number cell counts.' };
+    var df = k - 1;
+    var d = [];
+    var i, j;
+    for (i = 0; i < df; i++) d.push(margins.rowTotals[i] - margins.colTotals[i]);
+    var V = [];
+    for (i = 0; i < df; i++) {
+      V[i] = [];
+      for (j = 0; j < df; j++) {
+        V[i][j] = i === j
+          ? margins.rowTotals[i] + margins.colTotals[i] - 2 * observed[i][i]
+          : -(observed[i][j] + observed[j][i]);
+      }
+    }
+    var inv = invertMatrix(V);
+    if (!inv) {
+      return {
+        available: false,
+        reason: 'The two margins do not vary enough for Stuart–Maxwell. That happens when almost every observation stayed on the diagonal.',
+        df: df
+      };
+    }
+    var stat = 0;
+    for (i = 0; i < df; i++) {
+      var acc = 0;
+      for (j = 0; j < df; j++) acc += inv[i][j] * d[j];
+      stat += d[i] * acc;
+    }
+    if (stat < 0 && stat > -1e-8) stat = 0;
+    return {
+      available: true,
+      name: 'Stuart–Maxwell',
+      statistic: stat,
+      df: df,
+      p: chiSquareUpperP(stat, df),
+      rowTotals: margins.rowTotals,
+      colTotals: margins.colTotals,
+      question: 'marginal homogeneity'
+    };
+  }
+
+  function bowkerSymmetry(observed) {
+    var k = observed.length;
+    if (k < 2 || observed.some(function (row) { return !row || row.length !== k; })) {
+      return { available: false, reason: 'Bowker’s test needs a square table.' };
+    }
+    if (!marginsOf(observed)) return { available: false, reason: 'Bowker’s test needs whole-number cell counts.' };
+    var stat = 0;
+    var df = 0;
+    for (var i = 0; i < k; i++) {
+      for (var j = i + 1; j < k; j++) {
+        var sum = observed[i][j] + observed[j][i];
+        if (sum > 0) {
+          var diff = observed[i][j] - observed[j][i];
+          stat += diff * diff / sum;
+          df++;
+        }
+      }
+    }
+    if (!(df > 0)) {
+      return { available: false, reason: 'Bowker’s test needs at least one pair of opposite off-diagonal counts.', df: 0 };
+    }
+    return {
+      available: true,
+      name: 'Bowker',
+      statistic: stat,
+      df: df,
+      p: chiSquareUpperP(stat, df),
+      question: 'symmetry'
+    };
+  }
+
   return {
     MAX_LEVELS: MAX_LEVELS,
     MAX_REPRESENTED_N: MAX_REPRESENTED_N,
@@ -1044,6 +1351,11 @@
     wilsonProportion: wilsonProportion,
     mcnemar2x2: mcnemar2x2,
     summary2x2: summary2x2,
+    binaryGroupComparisons: binaryGroupComparisons,
+    monteCarloIndependence: monteCarloIndependence,
+    stuartMaxwell: stuartMaxwell,
+    bowkerSymmetry: bowkerSymmetry,
+    randomContingency: randomContingency,
     residualBand: residualBand,
     chiSquareUpperP: chiSquareUpperP,
     zCrit: zCrit,

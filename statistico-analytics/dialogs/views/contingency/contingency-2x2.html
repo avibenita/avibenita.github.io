@@ -214,6 +214,21 @@
       .st-calc-header.ct2-header { grid-template-columns:110px 1fr auto; height:auto; min-height:72px; }
       .st-calc-header.ct2-header .st-calc-header-title { font-size:1.05rem; }
     }
+    .size-row { display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:8px; }
+    .size-ctrl { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:800; color:var(--text-secondary); }
+    .size-ctrl button {
+      width:28px; height:28px; border-radius:8px; border:1px solid var(--border);
+      background:var(--surface-2); color:var(--text-primary); font:inherit; font-weight:800; cursor:pointer;
+    }
+    .size-ctrl span { min-width:1.2em; text-align:center; font-variant-numeric:tabular-nums; }
+    table.grid.compact td[data-i] input[data-count] { height:32px; font-size:16px; }
+    .heat { display:grid; gap:4px; }
+    .heat button {
+      border:1px solid var(--border); border-radius:6px; min-height:34px; padding:4px 2px;
+      font-size:11px; font-weight:800; color:var(--text-primary); cursor:pointer;
+    }
+    .heat button.hot { outline:2px solid var(--accent-1); outline-offset:1px; }
+    .heat-scale { display:flex; justify-content:space-between; gap:8px; margin-top:4px; color:var(--text-muted); font-size:11px; font-weight:700; }
     .cell-rule { margin:4px 0 0; color:var(--text-muted); font-size:12px; line-height:1.3; }
     .count-error { margin:8px 0 0; padding:10px 12px; border-radius:10px; background:var(--warn-bg); border:1px solid var(--warn-bd); color:var(--warn); font-size:13.5px; line-height:1.45; }
     table.grid td[data-i] input[aria-invalid="true"], #scenarioEvents[aria-invalid="true"] { border-color:#f87171; box-shadow:0 0 0 2px rgba(248,113,113,.35); }
@@ -234,14 +249,23 @@
       <div class="ct2-header-logo">
         <div class="sb-logo-icon" data-statistico-brand-logo data-logo-cluster="calculators"></div>
       </div>
-      <div class="st-calc-header-title"><i class="fa-solid fa-calculator"></i> 2×2 Calculator</div>
+      <div class="st-calc-header-title"><i class="fa-solid fa-calculator"></i> <span id="calcTitle">2×2 Calculator</span></div>
       <div class="st-calc-header-right">
         <button type="button" class="ct2-help" id="helpBtn"><i class="fa-solid fa-circle-question"></i> Help</button>
       </div>
     </header>
     <div class="ct2-stage">
     <section class="st-calc-workspace ct2-workspace">
-    <section class="card">
+    <section class="card" id="modeCard">
+      <div class="card-title">Calculator</div>
+      <div class="seg" id="modeSeg" style="margin-top:6px;">
+        <button type="button" class="active" data-mode="2x2">2×2</button>
+        <button type="button" data-mode="larger">Larger tables</button>
+      </div>
+      <p class="design-note" id="modeNote">Two rows and two columns. The buttons below describe how the observations were collected, not the size of the table.</p>
+    </section>
+
+    <section class="card" id="designCard">
       <div class="card-title">How were the data collected?</div>
       <div class="seg design-seg" id="designSeg" style="margin-top:6px;">
         <div class="design-choice">
@@ -263,6 +287,29 @@
         <button type="button" id="clearCountsBtn">Clear counts</button>
         <button type="button" id="keepCountsBtn">Keep these counts</button>
       </div>
+    </section>
+
+    <section class="card" id="shapeCard" hidden>
+      <div class="card-title">Table shape</div>
+      <div class="seg" id="shapeSeg" style="margin-top:6px;">
+        <button type="button" class="active" data-shape="binary">Groups × event</button>
+        <button type="button" data-shape="rc">General R×C</button>
+        <button type="button" data-shape="paired">Paired categories</button>
+      </div>
+      <p class="design-note" id="shapeNote"></p>
+      <div class="size-row" id="sizeRow">
+        <label class="size-ctrl" id="rowSizeCtrl">Groups
+          <button type="button" data-dim="rows" data-delta="-1" aria-label="Fewer rows">−</button>
+          <span id="rowSizeVal">3</span>
+          <button type="button" data-dim="rows" data-delta="1" aria-label="More rows">+</button>
+        </label>
+        <label class="size-ctrl" id="colSizeCtrl">Columns
+          <button type="button" data-dim="cols" data-delta="-1" aria-label="Fewer columns">−</button>
+          <span id="colSizeVal">2</span>
+          <button type="button" data-dim="cols" data-delta="1" aria-label="More columns">+</button>
+        </label>
+      </div>
+      <p class="design-note" id="sizeNote">Type the table here up to 6×6. A larger dataset belongs in the Excel contingency analysis.</p>
     </section>
 
     <section class="card headline">
@@ -328,7 +375,7 @@
         <p class="count-error" id="countError" hidden></p>
         <p class="hover-box" id="hoverBox">Hover a cell to see its observed count, expected count, and contribution to χ².</p>
         <p class="pair-legend" id="pairLegend" hidden>The outlined cells are the discordant pairs: one changed from event to no event, the other from no event to event. McNemar’s test uses only those two counts.</p>
-        <div class="scenario">
+        <div class="scenario" id="scenarioPanel">
           <label>Row
             <select id="scenarioGroup"></select>
           </label>
@@ -346,6 +393,9 @@
       <section class="card">
         <div class="card-title"><span id="chartTitle">Event percentage</span><span class="info-dot" id="chartTip" tabindex="0" data-tip="Each bar is the percentage who had the event in that group. Whiskers are 95% Wilson confidence intervals." aria-label="Each bar is the percentage who had the event in that group. Whiskers are 95% Wilson confidence intervals.">i</span></div>
         <div id="bars"></div>
+        <div id="heat" class="heat" hidden></div>
+        <div class="heat-scale" id="heatScale" hidden><span>Blue: fewer than expected</span><span>Orange: more than expected</span></div>
+        <button type="button" class="reset" id="simBtn" hidden>Estimate simulation p-value</button>
         <p class="chart-note" id="chartNote"></p>
       </section>
       <div class="kpis" id="kpis"></div>
@@ -369,7 +419,7 @@
     </footer>
   </div>
 </div>
-  <script src="contingency-engine.js?v=20260929ct2x2"></script>
+  <script src="contingency-engine.js?v=20261001rxc"></script>
   <script>
     (function () {
       if (window.StatisticoBrandLogo && StatisticoBrandLogo.mountAll) StatisticoBrandLogo.mountAll(document);
@@ -377,7 +427,8 @@
       var helpModal = document.getElementById('helpModal');
       var helpDesign = 'independent';
       function openHelp(design) {
-        helpDesign = design || state.design;
+        if (state.mode === 'larger') helpDesign = 'larger-' + larger.shape;
+        else helpDesign = design || state.design;
         paintHelp(helpDesign);
         helpModal.hidden = false;
         var box = helpModal.querySelector('.ct2-help-box');
@@ -407,6 +458,7 @@
       };
 
       var state = {
+        mode: '2x2',
         design: 'independent',
         view: 'counts',
         labelsCustom: false,
@@ -422,6 +474,25 @@
         countsEnteredAs: null,
         countError: null
       };
+      var larger = {
+        shape: 'binary',
+        nRows: 3,
+        nCols: 2,
+        rowVar: 'Group',
+        colVar: 'Outcome',
+        rowLabels: ['Group A', 'Group B', 'Group C'],
+        colLabels: ['Event', 'No event'],
+        counts: [[null, null], [null, null], [null, null]],
+        refRow: 0,
+        eventCol: 0,
+        view: 'counts',
+        countError: null,
+        sim: null,
+        simulating: false,
+        gridSig: ''
+      };
+      var grid2x2Html = document.getElementById('grid').innerHTML;
+      var gridBuiltFor = '2x2';
       var DESIGN_LABEL = {
         independent: 'independent groups',
         'case-control': 'case–control samples',
@@ -606,6 +677,8 @@
       };
 
       function render() {
+        if (state.mode === 'larger') { renderLarger(); return; }
+        show2x2Chrome();
         if (state.design === 'paired' && state.view === 'expected') state.view = 'counts';
         var ready = countsComplete();
         var result = orientedResult();
@@ -827,6 +900,496 @@
         if (!helpModal.hidden) paintHelp(helpDesign);
       }
 
+      function show2x2Chrome() {
+        document.getElementById('designCard').hidden = false;
+        document.getElementById('shapeCard').hidden = true;
+        document.getElementById('scenarioPanel').hidden = false;
+        document.getElementById('heat').hidden = true;
+        document.getElementById('heatScale').hidden = true;
+        document.getElementById('simBtn').hidden = true;
+        document.getElementById('bars').hidden = false;
+        document.getElementById('calcTitle').textContent = '2×2 Calculator';
+        document.title = '2×2 Calculator';
+        document.getElementById('modeNote').textContent = 'Two rows and two columns. The buttons below describe how the observations were collected, not the size of the table.';
+        document.querySelectorAll('#modeSeg button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-mode') === '2x2');
+        });
+        if (gridBuiltFor !== '2x2') {
+          document.getElementById('grid').innerHTML = grid2x2Html;
+          document.getElementById('grid').classList.remove('compact');
+          gridBuiltFor = '2x2';
+        }
+      }
+
+      function largerLetter(index) { return 'ABCDEF'.charAt(index) || String(index + 1); }
+      function defaultLargerLabel(axis, index) {
+        if (larger.shape === 'binary') return axis === 'row' ? ('Group ' + largerLetter(index)) : (index === 0 ? 'Event' : 'No event');
+        if (larger.shape === 'paired') return 'Category ' + largerLetter(index);
+        return (axis === 'row' ? 'Row ' : 'Column ') + (index + 1);
+      }
+      function blankCounts(nRows, nCols) {
+        var rows = [];
+        for (var i = 0; i < nRows; i++) {
+          var line = [];
+          for (var j = 0; j < nCols; j++) line.push(null);
+          rows.push(line);
+        }
+        return rows;
+      }
+      function presetLarger(shape) {
+        larger.shape = shape;
+        larger.view = 'counts';
+        larger.countError = null;
+        larger.sim = null;
+        larger.gridSig = '';
+        larger.refRow = 0;
+        larger.eventCol = 0;
+        if (shape === 'binary') {
+          larger.nRows = 3;
+          larger.nCols = 2;
+          larger.rowVar = 'Group';
+          larger.colVar = 'Outcome';
+          larger.rowLabels = ['Group A', 'Group B', 'Group C'];
+          larger.colLabels = ['Event', 'No event'];
+        } else if (shape === 'paired') {
+          larger.nRows = 3;
+          larger.nCols = 3;
+          larger.rowVar = 'First measurement';
+          larger.colVar = 'Second measurement';
+          larger.rowLabels = ['Category A', 'Category B', 'Category C'];
+          larger.colLabels = larger.rowLabels.slice();
+        } else {
+          larger.nRows = 3;
+          larger.nCols = 3;
+          larger.rowVar = 'Row';
+          larger.colVar = 'Column';
+          larger.rowLabels = ['Row 1', 'Row 2', 'Row 3'];
+          larger.colLabels = ['Column 1', 'Column 2', 'Column 3'];
+        }
+        larger.counts = blankCounts(larger.nRows, larger.nCols);
+      }
+      function resizeLarger(nRows, nCols) {
+        nRows = Math.max(2, Math.min(6, nRows));
+        nCols = larger.shape === 'binary' ? 2 : Math.max(2, Math.min(6, nCols));
+        if (larger.shape === 'paired') nCols = nRows;
+        var rowLabels = [];
+        var colLabels = [];
+        var counts = [];
+        for (var i = 0; i < nRows; i++) {
+          rowLabels.push(larger.rowLabels[i] != null ? larger.rowLabels[i] : defaultLargerLabel('row', i));
+          var line = [];
+          for (var j = 0; j < nCols; j++) {
+            if (i === 0) colLabels.push(larger.colLabels[j] != null ? larger.colLabels[j] : defaultLargerLabel('col', j));
+            line.push(larger.counts[i] && j < larger.counts[i].length ? larger.counts[i][j] : null);
+          }
+          counts.push(line);
+        }
+        larger.nRows = nRows;
+        larger.nCols = nCols;
+        larger.rowLabels = rowLabels;
+        larger.colLabels = larger.shape === 'paired' ? rowLabels.slice() : colLabels;
+        larger.counts = counts;
+        if (larger.refRow >= nRows) larger.refRow = 0;
+        larger.sim = null;
+        larger.gridSig = '';
+      }
+      function largerComplete() {
+        return larger.counts.every(function (row) {
+          return row.every(function (v) { return v != null; });
+        });
+      }
+      function largerNumeric() {
+        return larger.counts.map(function (row) { return row.map(function (v) { return v == null ? 0 : v; }); });
+      }
+      function largerMargins() {
+        var rt = [];
+        var ct = [];
+        var N = 0;
+        var complete = true;
+        var j;
+        for (j = 0; j < larger.nCols; j++) ct[j] = null;
+        for (var i = 0; i < larger.nRows; i++) {
+          var rowSum = 0;
+          var rowKnown = true;
+          for (j = 0; j < larger.nCols; j++) {
+            var v = larger.counts[i][j];
+            if (v == null) { rowKnown = false; complete = false; }
+            else rowSum += v;
+          }
+          rt[i] = rowKnown ? rowSum : null;
+          if (rowKnown) N += rowSum;
+        }
+        for (j = 0; j < larger.nCols; j++) {
+          var colSum = 0;
+          var colKnown = true;
+          for (var i2 = 0; i2 < larger.nRows; i2++) {
+            if (larger.counts[i2][j] == null) colKnown = false;
+            else colSum += larger.counts[i2][j];
+          }
+          ct[j] = colKnown ? colSum : null;
+        }
+        return { rt: rt, ct: ct, N: complete ? N : null };
+      }
+      function largerZeroMargin(m) {
+        if (!m || m.N == null) return '';
+        for (var i = 0; i < m.rt.length; i++) {
+          if (m.rt[i] === 0) return (larger.rowLabels[i] || 'A row') + ' has no observations. Enter a count in that row, or remove it.';
+        }
+        for (var j = 0; j < m.ct.length; j++) {
+          if (m.ct[j] === 0) return (larger.colLabels[j] || 'A column') + ' has no observations. Enter a count in that column, or remove it.';
+        }
+        return '';
+      }
+      function simSignature() {
+        return JSON.stringify(larger.counts);
+      }
+      function heatColor(sr) {
+        if (!isFinite(sr)) return 'transparent';
+        var t = Math.max(-1, Math.min(1, sr / 3));
+        if (t >= 0) return 'rgba(251,146,60,' + (0.18 + 0.72 * t).toFixed(3) + ')';
+        return 'rgba(96,165,250,' + (0.18 + 0.72 * (-t)).toFixed(3) + ')';
+      }
+      function buildLargerGrid() {
+        var sig = larger.shape + ':' + larger.nRows + 'x' + larger.nCols;
+        if (gridBuiltFor === sig) return;
+        var html = '<thead><tr><th class="stub"></th>';
+        var j;
+        for (j = 0; j < larger.nCols; j++) {
+          html += '<th><input class="head-input" data-axis="col" data-index="' + j + '" maxlength="40" aria-label="Column ' + (j + 1) + '"></th>';
+        }
+        html += '<th>Total</th></tr></thead><tbody>';
+        for (var i = 0; i < larger.nRows; i++) {
+          html += '<tr><th class="stub"><input data-axis="row" data-index="' + i + '" maxlength="40" aria-label="Row ' + (i + 1) + '"></th>';
+          for (j = 0; j < larger.nCols; j++) html += '<td data-i="' + i + '" data-j="' + j + '"></td>';
+          html += '<td class="tot" data-total="r-' + i + '"></td></tr>';
+        }
+        html += '<tr class="totals"><th class="stub">Total</th>';
+        for (j = 0; j < larger.nCols; j++) html += '<td class="tot" data-total="c-' + j + '"></td>';
+        html += '<td class="tot" data-total="n"></td></tr></tbody>';
+        var grid = document.getElementById('grid');
+        grid.innerHTML = html;
+        grid.classList.toggle('compact', larger.nRows > 4 || larger.nCols > 4);
+        gridBuiltFor = sig;
+        larger.gridSig = sig;
+      }
+      function paintLargerCells(m) {
+        document.querySelectorAll('#grid td[data-i]').forEach(function (td) {
+          var i = +td.getAttribute('data-i');
+          var j = +td.getAttribute('data-j');
+          var count = larger.counts[i][j];
+          var shown = count == null ? '' : String(count);
+          var input = td.querySelector('input[data-count]');
+          var movement = larger.shape === 'paired' && i !== j;
+          td.classList.toggle('discordant', movement);
+          var rejected = larger.countError && larger.countError.source === 'cell' && larger.countError.i === i && larger.countError.j === j;
+          var fieldValue = rejected ? larger.countError.raw : shown;
+          if (larger.view === 'counts') {
+            if (!input) {
+              td.innerHTML = '<input type="text" inputmode="numeric" autocomplete="off" data-count="1" value="' + esc(fieldValue) + '" aria-label="Count" aria-invalid="' + (rejected ? 'true' : 'false') + '">';
+            } else if (!rejected) {
+              writeIfIdle(input, shown);
+              input.setAttribute('aria-invalid', 'false');
+            } else {
+              input.setAttribute('aria-invalid', 'true');
+            }
+          } else if (larger.view === 'rowPct') {
+            var pct = count != null && m.rt[i] > 0 ? (100 * count / m.rt[i]) : NaN;
+            td.innerHTML = '<div class="alt">' + (isFinite(pct) ? fmtFixed(pct, 1) + '%' : '—') + '</div>';
+          } else {
+            var E = (m.N > 0 && m.rt[i] != null && m.ct[j] != null) ? m.rt[i] * m.ct[j] / m.N : NaN;
+            td.innerHTML = '<div class="alt">' + fmtFixed(E, 2) + '</div>';
+          }
+        });
+        for (var i = 0; i < larger.nRows; i++) {
+          var rowTotal = document.querySelector('#grid [data-total="r-' + i + '"]');
+          if (rowTotal) rowTotal.textContent = fmtTotal(m.rt[i]);
+        }
+        for (var j = 0; j < larger.nCols; j++) {
+          var colTotal = document.querySelector('#grid [data-total="c-' + j + '"]');
+          if (colTotal) colTotal.textContent = fmtTotal(m.ct[j]);
+        }
+        var grand = document.querySelector('#grid [data-total="n"]');
+        if (grand) grand.textContent = fmtTotal(m.N);
+      }
+      function paintLargerHover(i, j, m) {
+        document.querySelectorAll('#grid td[data-i]').forEach(function (cell) { cell.classList.remove('hot'); });
+        var td = document.querySelector('#grid td[data-i="' + i + '"][data-j="' + j + '"]');
+        if (td) td.classList.add('hot');
+        document.querySelectorAll('#heat button').forEach(function (b) { b.classList.remove('hot'); });
+        var heatBtn = document.querySelector('#heat button[data-i="' + i + '"][data-j="' + j + '"]');
+        if (heatBtn) heatBtn.classList.add('hot');
+        var observed = larger.counts[i][j];
+        var hover = document.getElementById('hoverBox');
+        var rowName = larger.rowLabels[i] || 'Row';
+        var colName = larger.colLabels[j] || 'Column';
+        if (larger.shape === 'paired') {
+          if (observed == null) {
+            hover.textContent = i === j
+              ? 'This diagonal cell counts observations that stayed in the same category.'
+              : 'This cell counts observations that moved from ' + rowName + ' to ' + colName + '.';
+          } else if (i === j) {
+            hover.textContent = fmtCell(observed) + ' stayed in ' + rowName + '. Unchanged observations sit on the diagonal.';
+          } else {
+            hover.textContent = fmtCell(observed) + ' moved from ' + rowName + ' to ' + colName + '.';
+          }
+          return;
+        }
+        var E = (m && m.N > 0 && m.rt[i] != null && m.ct[j] != null) ? m.rt[i] * m.ct[j] / m.N : NaN;
+        var chi = (observed != null && E > 0) ? (observed - E) * (observed - E) / E : NaN;
+        hover.textContent = observed == null
+          ? 'Type a count in this cell. Other cells stay as they are.'
+          : (rowName + ' × ' + colName + ' — observed ' + fmtCell(observed) + ', expected ' + fmtFixed(E, 2) + ', contribution to χ² ' + fmtFixed(chi, 2) + '.');
+      }
+      function renderLarger() {
+        if (larger.shape === 'paired' && larger.view === 'expected') larger.view = 'counts';
+        document.getElementById('designCard').hidden = true;
+        document.getElementById('shapeCard').hidden = false;
+        document.getElementById('scenarioPanel').hidden = true;
+        document.getElementById('calcTitle').textContent = 'Larger tables';
+        document.title = 'Larger tables';
+        document.getElementById('modeNote').textContent = 'Rows and columns do not have to match. A 3×2 table is three groups and two outcomes. This is separate from how a 2×2 study was collected.';
+        document.querySelectorAll('#modeSeg button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-mode') === 'larger');
+        });
+        document.querySelectorAll('#shapeSeg button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-shape') === larger.shape);
+        });
+        var shapeNotes = {
+          binary: 'Each row is a group and the two columns are an event and its complement. The result is the event proportion in each group, one overall χ², and a comparison of every other group with the reference you select.',
+          rc: 'Any number of rows and columns up to 6. Results are the counts, row percentages, expected counts, χ², and Cramér’s V. The heatmap shows which cells drive the association.',
+          paired: 'The same categories were recorded twice, so the table is square. Diagonal cells stayed put. Other cells moved. Stuart–Maxwell tests the two margins. An ordinary independence χ² does not apply to paired observations.'
+        };
+        document.getElementById('shapeNote').textContent = shapeNotes[larger.shape];
+        var rowCtrl = document.getElementById('rowSizeCtrl');
+        rowCtrl.firstChild.nodeValue = larger.shape === 'binary' ? 'Groups ' : (larger.shape === 'paired' ? 'Categories ' : 'Rows ');
+        document.getElementById('colSizeCtrl').hidden = larger.shape !== 'rc';
+        document.getElementById('rowSizeVal').textContent = String(larger.nRows);
+        document.getElementById('colSizeVal').textContent = String(larger.nCols);
+        document.querySelectorAll('#sizeRow button').forEach(function (btn) {
+          var dim = btn.getAttribute('data-dim');
+          var current = (dim === 'cols' && larger.shape === 'rc') ? larger.nCols : larger.nRows;
+          var next = current + (+btn.getAttribute('data-delta'));
+          btn.disabled = next < 2 || next > 6;
+        });
+        document.querySelector('#viewSeg button[data-view="expected"]').hidden = larger.shape === 'paired';
+        document.querySelectorAll('#viewSeg button').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-view') === larger.view);
+        });
+        var rules = {
+          binary: 'Each cell counts observations in that group with that outcome. Type a count directly. Changing one cell does not change the others.',
+          rc: 'Each cell is a count. Type it directly. With three or more columns, the calculator does not decide which category gives up a count.',
+          paired: 'Each cell counts observations with that first category and that second category. The diagonal did not change. Type each count directly.'
+        };
+        document.getElementById('cellRule').textContent = rules[larger.shape];
+        var countError = document.getElementById('countError');
+        countError.hidden = !larger.countError;
+        countError.textContent = larger.countError ? larger.countError.message : '';
+        document.getElementById('pairLegend').hidden = larger.shape !== 'paired';
+        if (larger.shape === 'paired') {
+          document.getElementById('pairLegend').textContent = 'Outlined cells moved from one category to another. Diagonal cells stayed in the same category. Stuart–Maxwell uses the margins, not an independence χ².';
+        }
+        document.getElementById('scenarioFlag').hidden = true;
+        document.getElementById('designShift').hidden = true;
+        buildLargerGrid();
+        writeIfIdle(document.getElementById('rowVar'), larger.rowVar);
+        writeIfIdle(document.getElementById('colVar'), larger.colVar);
+        document.querySelectorAll('#grid input[data-axis="row"]').forEach(function (input) {
+          writeIfIdle(input, larger.rowLabels[+input.getAttribute('data-index')] || '');
+        });
+        document.querySelectorAll('#grid input[data-axis="col"]').forEach(function (input) {
+          var idx = +input.getAttribute('data-index');
+          writeIfIdle(input, (larger.shape === 'paired' ? larger.rowLabels[idx] : larger.colLabels[idx]) || '');
+          input.readOnly = false;
+        });
+        var m = largerMargins();
+        paintLargerCells(m);
+        var ready = largerComplete();
+        var zeroNote = ready ? largerZeroMargin(m) : '';
+        var result = (ready && !zeroNote) ? StatisticoContingency.analyzeCounts(largerNumeric(), larger.rowLabels.slice(), larger.colLabels.slice(), { confidence: 0.95 }) : null;
+        var map = document.getElementById('mapBox');
+        map.hidden = larger.shape !== 'binary';
+        if (larger.shape === 'binary') {
+          document.getElementById('labIndex').firstChild.nodeValue = 'Reference group ';
+          document.getElementById('labEvent').firstChild.nodeValue = 'Event ';
+          buildSelect(document.getElementById('selIndex'), larger.rowLabels, larger.refRow);
+          buildSelect(document.getElementById('selEvent'), larger.colLabels, larger.eventCol);
+        }
+        var lead = 'Type a count in each cell.';
+        var detail = ready ? '' : 'Cells are edited directly. A count you type does not reduce another cell.';
+        if (zeroNote) {
+          lead = zeroNote;
+          detail = '';
+        } else if (result && result.analyzable && larger.shape === 'binary') {
+          var pearson = result.tests.pearson;
+          lead = 'Overall χ² = ' + fmtFixed(pearson.stat, 2) + ' on ' + pearson.df + ' df, p ' + fmtP(pearson.p) + '.';
+          detail = 'Event proportions use ' + (larger.colLabels[larger.eventCol] || 'the event') + '. Other groups are compared with ' + (larger.rowLabels[larger.refRow] || 'the reference') + '. Those comparisons are not adjusted for how many groups were tested.';
+        } else if (result && result.analyzable && larger.shape === 'rc') {
+          lead = 'χ² = ' + fmtFixed(result.tests.pearson.stat, 2) + ' on ' + result.tests.pearson.df + ' df, p ' + fmtP(result.tests.pearson.p) + '. Cramér’s V = ' + fmtFixed(result.tests.cramersV, 2) + '.';
+          detail = 'V is 0 when the table matches independence and reaches 1 when rows and columns are perfectly associated. Orange heatmap cells are more than expected. Blue cells are fewer.';
+        } else if (result && result.analyzable && larger.shape === 'paired') {
+          var smLead = StatisticoContingency.stuartMaxwell(largerNumeric());
+          if (smLead.available) {
+            lead = 'Stuart–Maxwell χ² = ' + fmtFixed(smLead.statistic, 2) + ' on ' + smLead.df + ' df, p ' + fmtP(smLead.p) + '.';
+            detail = larger.nRows === 2
+              ? 'With two categories this is McNemar’s test of the two margins. Ordinary independence χ² is not used.'
+              : 'This asks whether the first-measurement margin matches the second. Ordinary independence χ² is not used.';
+          } else {
+            lead = smLead.reason || 'Stuart–Maxwell is not available for this table.';
+          }
+        } else if (result && result.error) {
+          lead = result.error;
+        }
+        document.getElementById('lead').textContent = lead;
+        document.getElementById('detail').textContent = detail;
+
+        var barsHost = document.getElementById('bars');
+        var heat = document.getElementById('heat');
+        var heatScale = document.getElementById('heatScale');
+        var chartTitle = document.getElementById('chartTitle');
+        var chartTip = document.getElementById('chartTip');
+        var chartNote = document.getElementById('chartNote');
+        barsHost.hidden = larger.shape === 'rc';
+        heat.hidden = larger.shape !== 'rc';
+        heatScale.hidden = larger.shape !== 'rc';
+        if (larger.shape === 'binary') {
+          chartTitle.textContent = 'Event proportion';
+          var tipB = 'Each bar is the event proportion in that group. Whiskers are 95% Wilson confidence intervals.';
+          chartTip.setAttribute('data-tip', tipB);
+          chartTip.setAttribute('aria-label', tipB);
+          var eventCol = larger.eventCol === 1 ? 1 : 0;
+          var z = StatisticoContingency.zCrit(0.95);
+          var bars = '';
+          for (var i = 0; i < larger.nRows; i++) {
+            var events = larger.counts[i][eventCol];
+            var n = m.rt[i];
+            bars += marginalBar(larger.rowLabels[i] || ('Group ' + (i + 1)), events, n, i % 2 === 0 ? 'a' : 'b');
+          }
+          barsHost.innerHTML = bars;
+          chartNote.textContent = 'Each bar is the event proportion in that group. Whiskers are 95% Wilson confidence intervals.';
+          heat.innerHTML = '';
+        } else if (larger.shape === 'paired') {
+          chartTitle.textContent = 'First and second margins';
+          var tipP = 'For each category, the first count is the row total and the second is the column total. Stuart–Maxwell tests whether those margins match.';
+          chartTip.setAttribute('data-tip', tipP);
+          chartTip.setAttribute('aria-label', tipP);
+          var lines = '';
+          for (var p = 0; p < larger.nRows; p++) {
+            lines += '<div class="bar-row"><div><div class="bar-name">' + esc(larger.rowLabels[p] || ('Category ' + (p + 1))) + '</div><div class="bar-meta">First ' +
+              fmtTotal(m.rt[p]) + ' · Second ' + fmtTotal(m.ct[p]) + '</div></div><div class="track"></div><div class="bar-val">' +
+              (m.N > 0 && m.rt[p] != null ? fmtFixed(100 * m.rt[p] / m.N, 1) + '%' : '—') + '</div></div>';
+          }
+          barsHost.innerHTML = lines;
+          var unchanged = 0;
+          if (ready) {
+            for (var d = 0; d < larger.nRows; d++) unchanged += larger.counts[d][d];
+          }
+          chartNote.textContent = ready
+            ? (fmtInt(unchanged) + ' stayed on the diagonal. ' + fmtInt(m.N - unchanged) + ' moved.')
+            : 'The percentage is the first measurement. The second count is that category at the later measurement.';
+          heat.innerHTML = '';
+        } else {
+          chartTitle.textContent = 'Adjusted residuals';
+          var tipR = 'Orange is more than expected under independence. Blue is fewer. A residual near 2 is large inside this table. It is not a comparison between tables.';
+          chartTip.setAttribute('data-tip', tipR);
+          chartTip.setAttribute('aria-label', tipR);
+          barsHost.innerHTML = '';
+          if (result && result.analyzable) {
+            heat.style.gridTemplateColumns = 'repeat(' + result.nCols + ', minmax(0, 1fr))';
+            heat.innerHTML = result.cells.map(function (cell) {
+              return '<button type="button" data-i="' + cell.i + '" data-j="' + cell.j + '" style="background:' + heatColor(cell.stdResidual) + '">' +
+                esc(fmtFixed(cell.stdResidual, 1)) + '</button>';
+            }).join('');
+            chartNote.textContent = 'Hover a cell in the table or the heatmap. Both show the same residual.';
+          } else {
+            heat.innerHTML = '';
+            chartNote.textContent = 'The heatmap appears when every cell has a count.';
+          }
+        }
+
+        var cards = '';
+        if (result && result.analyzable && larger.shape === 'binary') {
+          var cmp = StatisticoContingency.binaryGroupComparisons(largerNumeric(), larger.rowLabels.slice(), larger.colLabels.slice(), larger.refRow, larger.eventCol);
+          cards += kpi('Pearson χ²', fmtP(result.tests.pearson.p),
+            'χ² = ' + fmtFixed(result.tests.pearson.stat, 2) + ', df = ' + result.tests.pearson.df + '.',
+            true,
+            'Test of no association between group and outcome. It uses the whole table.');
+          cards += kpi('Cramér’s V', fmtFixed(result.tests.cramersV, 2),
+            '0 is independence. Larger values mean a stronger association.',
+            false,
+            'Strength of association for a table larger than 2×2. It does not say which group is higher.');
+          (cmp.groups || []).forEach(function (group) {
+            if (!group.versusReference) return;
+            var rd = group.versusReference.riskDifference;
+            var versus = group.row + ' vs ' + cmp.reference;
+            cards += kpi(versus, rd && rd.available ? fmtSignedPp(rd.value) : '—',
+              rd && rd.available
+                ? ('95% CI ' + fmtFixed(rd.ciLower * 100, 1) + ' to ' + fmtFixed(rd.ciUpper * 100, 1) + ' percentage points. Unadjusted.')
+                : 'The difference in event proportions is not estimable.',
+              false,
+              'Event proportion in ' + group.row + ' minus the event proportion in ' + cmp.reference + '. Not adjusted for the number of comparisons.');
+          });
+        } else if (result && result.analyzable && larger.shape === 'rc') {
+          cards += kpi('Pearson χ²', fmtP(result.tests.pearson.p),
+            'χ² = ' + fmtFixed(result.tests.pearson.stat, 2) + ', df = ' + result.tests.pearson.df + '.',
+            !(result.diagnostics && result.diagnostics.assumptionWarning),
+            'Large-sample test that the rows and columns are independent.');
+          cards += kpi('Cramér’s V', fmtFixed(result.tests.cramersV, 2),
+            'Scaled from the χ² statistic. 0 is independence.',
+            false,
+            'A 0-to-1 summary of association for an R×C table.');
+          var sig = simSignature();
+          if (larger.sim && larger.sim.sig === sig && larger.sim.result && larger.sim.result.available) {
+            var sim = larger.sim.result;
+            cards += kpi('Simulation p-value', fmtP(sim.p),
+              (sim.nExtreme) + ' of ' + sim.nSims + ' random tables with these margins had a χ² at least this large.',
+              !!(result.diagnostics && result.diagnostics.assumptionWarning),
+              'Monte Carlo test that keeps the row and column totals fixed. Use it when expected counts are small.');
+          }
+        } else if (result && result.analyzable && larger.shape === 'paired') {
+          var obs = largerNumeric();
+          var sm = StatisticoContingency.stuartMaxwell(obs);
+          var bowker = StatisticoContingency.bowkerSymmetry(obs);
+          var stayed = 0;
+          for (var s = 0; s < obs.length; s++) stayed += obs[s][s];
+          cards += kpi('Unchanged', fmtInt(stayed) + ' of ' + fmtInt(result.N),
+            'Diagonal cells. The other ' + fmtInt(result.N - stayed) + ' observations moved.',
+            false,
+            'Observations whose category was the same at both measurements.');
+          cards += kpi('Stuart–Maxwell p', sm.available ? fmtP(sm.p) : '—',
+            sm.available ? ('χ² = ' + fmtFixed(sm.statistic, 2) + ', df = ' + sm.df + '.') : (sm.reason || 'Not available.'),
+            !!(sm.available),
+            'Test of marginal homogeneity: whether the distribution of categories changed between the two measurements.');
+          cards += kpi('Bowker symmetry p', bowker.available ? fmtP(bowker.p) : '—',
+            bowker.available
+              ? ('χ² = ' + fmtFixed(bowker.statistic, 2) + ', df = ' + bowker.df + '. This is a different question from the margins.')
+              : (bowker.reason || 'Not available.'),
+            false,
+            'Tests whether movement from A to B matches movement from B to A. It does not test whether the overall margins changed.');
+        }
+        document.getElementById('kpis').innerHTML = cards;
+
+        var sparse = result && result.analyzable && result.diagnostics && result.diagnostics.assumptionWarning && larger.shape === 'rc';
+        var simBtn = document.getElementById('simBtn');
+        var haveSim = larger.sim && larger.sim.sig === simSignature() && larger.sim.result && larger.sim.result.available;
+        simBtn.hidden = !(sparse && !haveSim && result.N <= 800);
+        simBtn.disabled = !!larger.simulating;
+        simBtn.textContent = larger.simulating ? 'Simulating…' : 'Estimate simulation p-value';
+        var warn = document.getElementById('warn');
+        var warnText = '';
+        if (sparse) {
+          warnText = result.diagnostics.assumptionWarning.replace('For 2×2 tables, Fisher’s exact test is reported when counts are integers.', 'A simulation p-value keeps these margins fixed and is the check to use when expected counts are small.');
+          if (result.N > 800) warnText += ' This table has more than 800 observations, so the simulation is not run here.';
+        }
+        warn.textContent = warnText;
+        warn.classList.toggle('show', !!warnText);
+        if (!document.querySelector('#grid td.hot') && larger.shape !== 'rc') {
+          document.getElementById('hoverBox').textContent = larger.shape === 'paired'
+            ? 'Hover a cell. The diagonal stayed in the same category. Outlined cells moved.'
+            : 'Hover a cell to see its observed count, expected count, and contribution to χ².';
+        }
+        if (!helpModal.hidden) paintHelp(helpDesign);
+      }
+
       function marginalBar(name, events, n, klass) {
         var prop = (events != null && n > 0) ? StatisticoContingency.wilsonProportion(events, n, StatisticoContingency.zCrit(0.95)) : null;
         var pct = prop && prop.available ? prop.p * 100 : 0;
@@ -859,6 +1422,10 @@
 
       function paintHelp(design) {
         design = design || state.design;
+        if (String(design).indexOf('larger-') === 0) {
+          paintLargerHelp(design.slice(7));
+          return;
+        }
         var titles = {
           independent: 'Independent groups',
           'case-control': 'Case–control',
@@ -927,6 +1494,35 @@
         document.getElementById('helpBody').innerHTML = body + shared;
       }
 
+      function paintLargerHelp(shape) {
+        var titles = {
+          binary: 'Groups × event',
+          rc: 'General R×C',
+          paired: 'Paired categories'
+        };
+        document.getElementById('helpTitle').innerHTML = '<i class="fa-solid fa-circle-question"></i> ' + (titles[shape] || 'Larger tables');
+        var body = '';
+        if (shape === 'rc') {
+          body =
+            '<p>A general table can be 3×2, 2×4, or any other size up to 6×6. The rows and columns do not have to match. Three groups with two outcomes, and two groups with four outcomes, are both ordinary rectangular tables.</p>' +
+            '<p>Type each count directly. The calculator does not subtract from another cell, because with three or more columns it would have to guess which category gave up the observation.</p>' +
+            '<p>Pearson χ² tests independence. Cramér’s V summarizes the strength. The heatmap shows adjusted residuals: orange is more than expected, blue is fewer. When expected counts are small, estimate a simulation p-value. That simulation keeps the row and column totals fixed.</p>' +
+            '<p>A dataset larger than 6×6 belongs in the Excel contingency analysis.</p>';
+        } else if (shape === 'paired') {
+          body =
+            '<p>Use this when the same categories are measured twice, such as a rating before and after, or a diagnosis recorded at two visits. The table is square because the categories match.</p>' +
+            '<p>Diagonal cells did not change. Outlined cells moved. Stuart–Maxwell tests whether the overall mix of categories changed. For two categories that test is McNemar’s test.</p>' +
+            '<p>Bowker’s test is shown separately. It asks whether movement from A to B matches movement from B to A. That is not the same as a change in the margins.</p>' +
+            '<p>Do not read an ordinary independence χ² on these paired observations. Each person contributes to one cell of the transition, not to two independent rows.</p>';
+        } else {
+          body =
+            '<p>Use this when several groups share one binary outcome: three treatments and improved or not, or two groups and four outcome categories would be the general R×C table instead.</p>' +
+            '<p>The chart is the event proportion in each group, with a 95% Wilson interval. The overall χ² uses the whole table. Choose a reference group to see each other group’s difference in percentage points. Those comparisons are not adjusted for how many groups you test.</p>' +
+            '<p>Cells are typed directly. Adding an event in one group does not remove an event from another group.</p>';
+        }
+        document.getElementById('helpBody').innerHTML = body;
+      }
+
       function commitCount(i, j, value, fromScenario) {
         if (fromScenario) {
           var group = +document.getElementById('scenarioGroup').value || 0;
@@ -983,6 +1579,11 @@
       document.getElementById('viewSeg').addEventListener('click', function (e) {
         var btn = e.target.closest('button[data-view]');
         if (!btn) return;
+        if (state.mode === 'larger') {
+          larger.view = btn.getAttribute('data-view');
+          render();
+          return;
+        }
         state.view = btn.getAttribute('data-view');
         document.querySelectorAll('#viewSeg button').forEach(function (b) {
           b.classList.toggle('active', b === btn);
@@ -992,6 +1593,38 @@
 
       document.getElementById('grid').addEventListener('input', function (e) {
         var t = e.target;
+        if (state.mode === 'larger' && t.getAttribute('data-axis')) {
+          var axis = t.getAttribute('data-axis');
+          var idx = +t.getAttribute('data-index');
+          if (larger.shape === 'paired') {
+            larger.rowLabels[idx] = t.value;
+            larger.colLabels[idx] = t.value;
+            var twinAxis = axis === 'row' ? 'col' : 'row';
+            var twin = document.querySelector('#grid input[data-axis="' + twinAxis + '"][data-index="' + idx + '"]');
+            writeIfIdle(twin, t.value);
+          } else if (axis === 'row') larger.rowLabels[idx] = t.value;
+          else larger.colLabels[idx] = t.value;
+          render();
+          return;
+        }
+        if (state.mode === 'larger' && t.getAttribute('data-count') === '1') {
+          var cell = t.closest('td');
+          var ri = +cell.getAttribute('data-i');
+          var rj = +cell.getAttribute('data-j');
+          var readL = readCount(t.value);
+          if (readL.error) {
+            larger.countError = { source: 'cell', i: ri, j: rj, raw: t.value, message: readL.error };
+            render();
+            return;
+          }
+          if (larger.countError && larger.countError.source === 'cell' && larger.countError.i === ri && larger.countError.j === rj) {
+            larger.countError = null;
+          }
+          larger.counts[ri][rj] = readL.empty ? null : readL.value;
+          larger.sim = null;
+          render();
+          return;
+        }
         if (t.id === 'labR0' || t.id === 'labR1' || t.id === 'labC0' || t.id === 'labC1') {
           state.labelsCustom = true;
           if (t.id === 'labR0') state.rowLabels[0] = t.value;
@@ -1022,10 +1655,14 @@
       document.getElementById('grid').addEventListener('mouseover', function (e) {
         var td = e.target.closest('td[data-i]');
         if (!td) return;
-        document.querySelectorAll('#grid td[data-i]').forEach(function (cell) { cell.classList.remove('hot'); });
-        td.classList.add('hot');
         var i = +td.getAttribute('data-i');
         var j = +td.getAttribute('data-j');
+        if (state.mode === 'larger') {
+          paintLargerHover(i, j, largerMargins());
+          return;
+        }
+        document.querySelectorAll('#grid td[data-i]').forEach(function (cell) { cell.classList.remove('hot'); });
+        td.classList.add('hot');
         var m = margins();
         var E = expectedAt(i, j, m);
         var chi = contribution(i, j, m);
@@ -1053,18 +1690,22 @@
       });
 
       document.getElementById('rowVar').addEventListener('input', function () {
+        if (state.mode === 'larger') { larger.rowVar = this.value; return; }
         state.labelsCustom = true;
         state.rowVar = this.value;
       });
       document.getElementById('colVar').addEventListener('input', function () {
+        if (state.mode === 'larger') { larger.colVar = this.value; return; }
         state.labelsCustom = true;
         state.colVar = this.value;
       });
       document.getElementById('selIndex').addEventListener('change', function () {
+        if (state.mode === 'larger') { larger.refRow = +this.value; render(); return; }
         state.indexRow = +this.value;
         render();
       });
       document.getElementById('selEvent').addEventListener('change', function () {
+        if (state.mode === 'larger') { larger.eventCol = +this.value; larger.sim = null; render(); return; }
         state.eventCol = +this.value;
         render();
       });
@@ -1113,6 +1754,50 @@
       document.getElementById('keepCountsBtn').addEventListener('click', function () {
         state.countsEnteredAs = state.design;
         render();
+      });
+
+      document.getElementById('modeSeg').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-mode]');
+        if (!btn) return;
+        state.mode = btn.getAttribute('data-mode') === 'larger' ? 'larger' : '2x2';
+        render();
+      });
+      document.getElementById('shapeSeg').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-shape]');
+        if (!btn) return;
+        presetLarger(btn.getAttribute('data-shape'));
+        render();
+      });
+      document.getElementById('sizeRow').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-dim]');
+        if (!btn || btn.disabled) return;
+        var delta = +btn.getAttribute('data-delta');
+        if (larger.shape === 'paired' || btn.getAttribute('data-dim') === 'rows') resizeLarger(larger.nRows + delta, larger.nCols);
+        else resizeLarger(larger.nRows, larger.nCols + delta);
+        render();
+      });
+      document.getElementById('heat').addEventListener('mouseover', function (e) {
+        var btn = e.target.closest('button[data-i]');
+        if (!btn || state.mode !== 'larger') return;
+        paintLargerHover(+btn.getAttribute('data-i'), +btn.getAttribute('data-j'), largerMargins());
+      });
+      document.getElementById('heat').addEventListener('click', function (e) {
+        var btn = e.target.closest('button[data-i]');
+        if (!btn) return;
+        var input = document.querySelector('#grid td[data-i="' + btn.getAttribute('data-i') + '"][data-j="' + btn.getAttribute('data-j') + '"] input[data-count]');
+        if (input) input.focus();
+      });
+      document.getElementById('simBtn').addEventListener('click', function () {
+        if (state.mode !== 'larger' || larger.simulating || !largerComplete()) return;
+        larger.simulating = true;
+        render();
+        var obs = largerNumeric();
+        var sig = simSignature();
+        setTimeout(function () {
+          larger.sim = { sig: sig, result: StatisticoContingency.monteCarloIndependence(obs, { nSims: 999 }) };
+          larger.simulating = false;
+          render();
+        }, 30);
       });
 
       syncSelects();

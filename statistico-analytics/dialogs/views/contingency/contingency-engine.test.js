@@ -362,3 +362,76 @@ describe('Contingency frequency/count column', () => {
     expect(freq.tests.cramersV).toBeCloseTo(0.408, 2);
   });
 });
+
+describe('Larger contingency tables', () => {
+  test('Stuart–Maxwell on a 2×2 table matches McNemar without continuity correction', () => {
+    const table = [[26, 15], [7, 37]];
+    const sm = CT.stuartMaxwell(table);
+    const mc = CT.mcnemar2x2(15, 7, CT.zCrit(0.95));
+    expect(sm.available).toBe(true);
+    expect(sm.df).toBe(1);
+    expect(sm.statistic).toBeCloseTo(mc.statistic, 8);
+    expect(sm.p).toBeCloseTo(mc.p, 8);
+  });
+
+  test('equal margins make Stuart–Maxwell zero, and Bowker is a separate symmetry statistic', () => {
+    const symmetric = [[10, 2, 1], [2, 12, 3], [1, 3, 14]];
+    const sm = CT.stuartMaxwell(symmetric);
+    const bowker = CT.bowkerSymmetry(symmetric);
+    expect(sm.available).toBe(true);
+    expect(sm.statistic).toBeCloseTo(0, 8);
+    expect(sm.df).toBe(2);
+    expect(bowker.available).toBe(true);
+    expect(bowker.statistic).toBeCloseTo(0, 8);
+    expect(bowker.df).toBe(3);
+    expect(bowker.question).toBe('symmetry');
+    expect(sm.question).toBe('marginal homogeneity');
+  });
+
+  test('Bowker uses opposite off-diagonal pairs and drops empty pairs from the degrees of freedom', () => {
+    const table = [[5, 4, 0], [1, 6, 0], [0, 0, 8]];
+    const bowker = CT.bowkerSymmetry(table);
+    expect(bowker.df).toBe(1);
+    expect(bowker.statistic).toBeCloseTo((4 - 1) * (4 - 1) / 5, 8);
+  });
+
+  test('group comparisons contrast each group with the selected reference', () => {
+    const observed = [[20, 80], [40, 60], [10, 90]];
+    const cmp = CT.binaryGroupComparisons(observed, ['A', 'B', 'C'], ['Event', 'No event'], 0, 0);
+    expect(cmp.available).toBe(true);
+    expect(cmp.groups).toHaveLength(3);
+    expect(cmp.groups[0].reference).toBe(true);
+    expect(cmp.groups[0].versusReference).toBeUndefined();
+    expect(cmp.groups[1].proportion.p).toBeCloseTo(0.4, 8);
+    expect(cmp.groups[1].versusReference.riskDifference.value).toBeCloseTo(0.2, 8);
+    expect(cmp.groups[2].versusReference.riskDifference.value).toBeCloseTo(-0.1, 8);
+  });
+
+  test('a simulated table keeps the original margins', () => {
+    const rowTotals = [8, 7, 5];
+    const colTotals = [6, 9, 5];
+    const rng = (function () {
+      var a = 7;
+      return function () {
+        a = (a + 0x6D2B79F5) | 0;
+        var t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    })();
+    const table = CT.randomContingency(rowTotals, colTotals, rng);
+    const rowSums = table.map((row) => row.reduce((s, v) => s + v, 0));
+    const colSums = colTotals.map((_, j) => table.reduce((s, row) => s + row[j], 0));
+    expect(rowSums).toEqual(rowTotals);
+    expect(colSums).toEqual(colTotals);
+  });
+
+  test('Monte Carlo p-value is small for a strongly associated table and stable for a seed', () => {
+    const observed = [[20, 1, 1], [1, 18, 1], [1, 1, 16]];
+    const once = CT.monteCarloIndependence(observed, { nSims: 499, seed: 11 });
+    const twice = CT.monteCarloIndependence(observed, { nSims: 499, seed: 11 });
+    expect(once.available).toBe(true);
+    expect(once.p).toBe(twice.p);
+    expect(once.p).toBeLessThan(0.02);
+  });
+});

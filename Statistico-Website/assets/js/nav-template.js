@@ -1820,34 +1820,45 @@ footer#contact .footer-bottom {
   border-top: 1px solid var(--border, rgba(255,255,255,.11));
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1600px) {
   .nav-container {
     padding-left: 12px;
-    padding-right: 16px;
+    padding-right: 12px;
   }
 
   .nav-logo {
-    margin-right: 24px;
+    height: 58px;
+    margin-right: 16px;
+  }
+
+  .nav-logo-full-img {
+    height: 56px;
   }
 
   .nav-products-row .nav-link--product,
   .nav-products-row .nav-link--product-lite {
-    padding: 8px 12px;
-    font-size: 0.96rem;
+    min-height: 40px;
+    padding: 7px 10px;
+    font-size: 0.9rem;
   }
 
   .nav-link--secondary {
-    padding: 8px 10px;
-    font-size: 0.96rem;
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 0.88rem;
   }
 
   .nav-item--sep-left {
-    margin-left: 22px;
-    padding-left: 14px;
+    margin-left: 12px;
+    padding-left: 12px;
+  }
+
+  .theme-toggle-label {
+    display: none;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1360px) {
   .theme-toggle {
     display: inline-flex;
     padding: 6px 8px;
@@ -2023,7 +2034,13 @@ footer#contact .footer-bottom {
   }
 
   .nav-logo {
+    height: 48px;
+    margin-right: 12px;
     font-size: 0.96rem;
+  }
+
+  .nav-logo-full-img {
+    height: 46px;
   }
 
   body {

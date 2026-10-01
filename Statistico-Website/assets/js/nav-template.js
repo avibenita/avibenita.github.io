@@ -53,9 +53,10 @@ const NAV_TEMPLATE = `
             </a>
             <a href="/Statistico-Website/index-Addins.html" class="nav-link nav-link--product" data-page="addins" id="link-addins" title="Statistico Specialized Tools">
               <svg class="nav-product-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect x="3" y="1" width="10" height="14" rx="1.5"/>
-                <line x1="6" y1="5" x2="10" y2="5"/><line x1="6" y1="8" x2="10" y2="8"/>
-                <line x1="6" y1="11" x2="8.5" y2="11"/>
+                <path d="M2.2 6.3h11.6V13a1 1 0 0 1-1 1H3.2a1 1 0 0 1-1-1V6.3z"/>
+                <path d="M2.2 6.3V5.2c0-.66.54-1.2 1.2-1.2h9.2c.66 0 1.2.54 1.2 1.2v1.1"/>
+                <path d="M6.1 4V2.85a1.9 1.9 0 0 1 3.8 0V4"/>
+                <path d="M6.6 9.4h2.8"/>
               </svg>
               Specialized Tools
             </a>
@@ -65,7 +66,7 @@ const NAV_TEMPLATE = `
 
       <li class="nav-item nav-item--sep-left">
         <a href="/Statistico-Website/explore.html" class="nav-link nav-link--secondary" data-page="explore" id="link-explore">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="8" cy="8" r="5.2"/>
             <polygon points="8,4.4 8.7,7.3 11.6,8 8.7,8.7 8,11.6 7.3,8.7 4.4,8 7.3,7.3"/>
           </svg>
@@ -89,7 +90,7 @@ const NAV_TEMPLATE = `
       </li>
       <li class="nav-item">
         <a href="/Statistico-Website/contact.html" class="nav-link nav-link--secondary" data-page="contact" id="link-contact">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="1" y="3" width="14" height="10" rx="1.5"/>
             <polyline points="1,4 8,9 15,4"/>
           </svg>
@@ -197,7 +198,7 @@ const NAV_STYLE = `
   gap: 13px;
   margin-right: 36px;
   width: auto;
-  height: 66px;
+  height: 72px;
   transition: opacity 0.2s ease;
   flex-shrink: 0;
   position: relative;
@@ -208,11 +209,11 @@ const NAV_STYLE = `
 
 /* Full artwork logo: dark canvas melts into the dark nav via screen blend */
 .nav-logo-full-img {
-  height: 64px;
+  height: 70px;
   width: auto;
   display: block;
   mix-blend-mode: screen;
-  filter: brightness(1.12) contrast(1.04);
+  filter: brightness(1.32) contrast(1.08);
   transition: height 0.3s ease, filter 0.25s ease;
 }
 
@@ -299,34 +300,34 @@ const NAV_STYLE = `
 }
 
 .nav-products-label {
-  font-size: 0.58rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(140, 210, 255, 0.72);
+  color: rgba(198, 230, 255, 0.98);
   line-height: 1;
   padding-left: 3px;
 }
 
 :root[data-theme="light"] .nav-products-label {
-  color: rgba(29, 78, 216, 0.62);
+  color: rgba(29, 78, 216, 0.9);
 }
 
 .nav-products-row {
   display: flex;
   gap: 0;
   align-items: center;
-  background: #163456;
-  border: 1.5px solid rgba(120, 200, 255, 0.62);
-  border-radius: 5px;
-  padding: 3px 4px;
-  box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.14);
+  background: #1c5a90;
+  border: 1.5px solid rgba(176, 224, 255, 0.92);
+  border-radius: 6px;
+  padding: 4px 5px;
+  box-shadow: inset 0 0 0 1px rgba(190, 230, 255, 0.2);
 }
 
 :root[data-theme="light"] .nav-products-row {
-  background: #e4eefb;
-  border-color: rgba(37, 99, 235, 0.46);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.1);
+  background: #d5e6fb;
+  border-color: rgba(29, 78, 216, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
 }
 
 .nav-products-row .nav-link--product,
@@ -336,11 +337,11 @@ const NAV_STYLE = `
   box-shadow: none !important;
   border-radius: 3px;
   position: relative;
-  min-height: 42px;
-  padding: 8px 13px;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: #E4ECF6;
+  min-height: 46px;
+  padding: 9px 15px;
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: #ffffff;
 }
 
 .nav-products-row .nav-link--product:not(:first-child),
@@ -356,11 +357,11 @@ const NAV_STYLE = `
 }
 
 .nav-products-row .nav-product-icon {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   display: block;
-  color: rgba(140,210,255,0.92);
+  color: #ffffff;
   opacity: 1;
 }
 
@@ -373,7 +374,7 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-products-row .nav-product-icon {
-  color: rgba(37,99,235,0.7);
+  color: #1d4ed8;
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link:hover .nav-product-icon {
@@ -388,7 +389,7 @@ const NAV_STYLE = `
 .nav-item--sep-left {
   margin-left: 32px;
   padding-left: 18px;
-  border-left: 1px solid rgba(255,255,255,0.14);
+  border-left: 1px solid rgba(255,255,255,0.32);
   position: relative;
 }
 
@@ -409,10 +410,10 @@ const NAV_STYLE = `
   gap: 8px;
   min-height: 44px;
   padding: 8px 12px;
-  color: #C8D2E2;
+  color: #F4F7FC;
   text-decoration: none;
-  font-weight: 500;
-  font-size: 0.88rem;
+  font-weight: 600;
+  font-size: 0.95rem;
   border-radius: 8px;
   position: relative;
   background: transparent;
@@ -425,16 +426,22 @@ const NAV_STYLE = `
 }
 
 .nav-link--secondary {
-  min-height: 36px;
-  padding: 6px 9px;
-  gap: 6px;
-  font-size: 0.76rem;
-  font-weight: 500;
-  color: rgba(214, 224, 238, 0.78);
+  min-height: 44px;
+  padding: 8px 12px;
+  gap: 7px;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+  opacity: 1;
 }
 
 .nav-link--secondary svg {
-  opacity: 0.82;
+  width: 15px;
+  height: 15px;
+  color: #ffffff;
+  stroke: #ffffff;
+  opacity: 1;
 }
 
 .nav-link i,
@@ -459,8 +466,9 @@ const NAV_STYLE = `
 }
 
 .nav-link--secondary:hover {
-  color: rgba(244, 248, 255, 0.96);
-  background: rgba(120, 200, 255, 0.06);
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .nav-link.active {
@@ -518,12 +526,14 @@ const NAV_STYLE = `
 }
 
 :root[data-theme="light"] .nav-link--secondary {
-  color: rgba(15, 23, 42, 0.64);
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220;
 }
 
 :root[data-theme="light"] .nav-link--secondary:hover {
-  color: rgba(15, 23, 42, 0.86);
-  background: rgba(15, 23, 42, 0.04);
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220;
+  background: rgba(15, 23, 42, 0.06);
 }
 
 :root[data-theme="light"] .nav-link--secondary.active {
@@ -540,7 +550,7 @@ const NAV_STYLE = `
 
 :root[data-theme="light"] .nav-products-row .nav-link--product,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite {
-  color: rgba(15, 23, 42, 0.82);
+  color: #0b1220;
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product:hover,
@@ -1822,13 +1832,13 @@ footer#contact .footer-bottom {
 
   .nav-products-row .nav-link--product,
   .nav-products-row .nav-link--product-lite {
-    padding: 7px 10px;
-    font-size: 0.88rem;
+    padding: 8px 12px;
+    font-size: 0.96rem;
   }
 
   .nav-link--secondary {
-    padding: 6px 7px;
-    font-size: 0.72rem;
+    padding: 8px 10px;
+    font-size: 0.96rem;
   }
 
   .nav-item--sep-left {
@@ -2024,6 +2034,126 @@ footer#contact .footer-bottom {
     grid-template-columns: 1fr;
     gap: 18px;
   }
+}
+
+/* Product hub heroes — quieter grid, sans subtitles, one primary CTA */
+.product-hero.hero.grid::after {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(to right, rgba(170, 205, 230, .09) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(170, 205, 230, .09) 1px, transparent 1px);
+  opacity: 1;
+}
+
+.product-hero .hero-kicker-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.product-hero .hero-kicker-row .hero-kicker {
+  margin-bottom: 0;
+}
+
+.product-hero .hero-flagship {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 214, 170, 0.92);
+}
+
+.product-hero.hero.grid h2 {
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+}
+
+.product-hero .hero-meta {
+  margin: 14px 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(228, 236, 248, 0.62);
+}
+
+.product-hero .hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 18px;
+  margin-top: 20px;
+}
+
+.product-hero .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffbf9b 0%, #f2a277 100%);
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  border: none;
+  box-shadow: 0 10px 24px rgba(242, 162, 119, 0.26);
+  transition: transform .18s ease, filter .18s ease;
+}
+
+.product-hero .btn-primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.product-hero .btn-secondary {
+  color: rgba(228, 236, 248, 0.78);
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.product-hero .btn-secondary:hover {
+  color: #fff;
+}
+
+#analytics-modules,
+#calculator-families,
+#specialized-tools {
+  scroll-margin-top: 110px;
+}
+
+:root[data-theme="light"] .product-hero.hero.grid::after {
+  background-image:
+    linear-gradient(to right, rgba(15,23,42,.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15,23,42,.045) 1px, transparent 1px),
+    linear-gradient(to right, rgba(15,23,42,.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15,23,42,.07) 1px, transparent 1px);
+}
+
+:root[data-theme="light"] .product-hero .hero-flagship {
+  color: #9a3412;
+}
+
+:root[data-theme="light"] .product-hero .hero-meta {
+  color: rgba(15, 23, 42, 0.58);
+}
+
+:root[data-theme="light"] .product-hero .btn-secondary {
+  color: rgba(15, 23, 42, 0.72);
+}
+
+:root[data-theme="light"] .product-hero .btn-secondary:hover {
+  color: #0f172a;
 }
 `;
 

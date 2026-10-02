@@ -164,22 +164,22 @@ const NAV_STYLE = `
   left: 0;
   right: 0;
   z-index: 1000;
-  background: linear-gradient(90deg, #06152a 0%, #0a1730 55%, #141f38 100%);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  background: #183B46;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid #7ec8ff;
+  box-shadow: none;
+  transition: box-shadow 0.3s ease;
 }
 
 .sticky-nav.scrolled {
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 
 :root[data-theme="light"] .sticky-nav {
-  background: linear-gradient(90deg, #f8fbff 0%, #f0f6ff 58%, #e9f2ff 100%);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+  background: #e7f2f4;
+  border-bottom: 1px solid rgba(14, 116, 144, 0.55);
+  box-shadow: none;
 }
 
 .nav-container {
@@ -1218,6 +1218,7 @@ body {
 .si-trail,
 .lr-breadcrumb.si-trail,
 .pt-breadcrumb.si-trail,
+.hub-breadcrumb,
 .hub-breadcrumb.si-trail {
   position: relative;
   width: 100%;
@@ -1227,6 +1228,15 @@ body {
   box-sizing: border-box;
   z-index: 2;
   text-align: left;
+  background: #0a1321;
+}
+
+:root[data-theme="light"] .si-trail,
+:root[data-theme="light"] .lr-breadcrumb.si-trail,
+:root[data-theme="light"] .pt-breadcrumb.si-trail,
+:root[data-theme="light"] .hub-breadcrumb,
+:root[data-theme="light"] .hub-breadcrumb.si-trail {
+  background: #f4f7fb;
 }
 
 .si-trail ol {
@@ -1906,13 +1916,13 @@ footer#contact .footer-bottom {
     top: 74px;
     left: 0;
     right: 0;
-    background: linear-gradient(180deg, rgba(12, 22, 36, 0.98) 0%, rgba(26, 31, 46, 0.98) 100%);
-    backdrop-filter: blur(20px);
+    background: #183B46;
+    backdrop-filter: none;
     flex-direction: column;
     gap: 0;
     padding: 20px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    border-top: 1px solid rgba(255, 165, 120, 0.2);
+    border-top: 1px solid #7ec8ff;
     transform: translateY(-100vh);
     opacity: 0;
     visibility: hidden;

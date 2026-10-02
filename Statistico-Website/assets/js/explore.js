@@ -346,6 +346,7 @@
     state.goal = params.get('goal') || '';
     state.family = params.get('family') || '';
     state.product = params.get('product') || '';
+    if (state.product === 'specialized-tools') state.product = 'applications';
     state.kind = params.get('kind') || '';
     state.origin = params.get('origin') || '';
     state.outcome = params.get('outcome') || '';

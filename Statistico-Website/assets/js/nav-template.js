@@ -115,8 +115,12 @@ const NAV_TEMPLATE = `
       <span class="theme-toggle-label">Dark</span>
     </button>
 
-    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle mobile menu">
-      <i class="fa-solid fa-bars"></i>
+    <button class="mobile-toggle" id="mobileToggle" type="button" aria-label="Open menu" aria-expanded="false">
+      <svg class="mobile-toggle-icon" width="22" height="16" viewBox="0 0 22 16" aria-hidden="true">
+        <line x1="1" y1="1.5" x2="21" y2="1.5"/>
+        <line x1="1" y1="8" x2="21" y2="8"/>
+        <line x1="1" y1="14.5" x2="21" y2="14.5"/>
+      </svg>
     </button>
   </div>
 </nav>
@@ -315,19 +319,19 @@ const NAV_STYLE = `
 
 .nav-products-row {
   display: flex;
-  gap: 0;
+  gap: 4px;
   align-items: center;
-  background: #1c5a90;
-  border: 1.5px solid rgba(176, 224, 255, 0.92);
-  border-radius: 6px;
-  padding: 4px 5px;
-  box-shadow: inset 0 0 0 1px rgba(190, 230, 255, 0.2);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
 }
 
 :root[data-theme="light"] .nav-products-row {
-  background: #d5e6fb;
-  border-color: rgba(29, 78, 216, 0.62);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .nav-products-row .nav-link--product,
@@ -335,7 +339,7 @@ const NAV_STYLE = `
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;
-  border-radius: 3px;
+  border-radius: 8px;
   position: relative;
   min-height: 46px;
   padding: 9px 15px;
@@ -347,13 +351,13 @@ const NAV_STYLE = `
 .nav-products-row .nav-link--product:not(:first-child),
 .nav-products-row .nav-link--product-lite:not(:first-child) {
   margin-left: 0;
-  padding-left: 11px;
-  border-left: 1px solid rgba(120,200,255,0.28) !important;
+  padding-left: 15px;
+  border-left: none !important;
 }
 
 :root[data-theme="light"] .nav-products-row .nav-link--product:not(:first-child),
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite:not(:first-child) {
-  border-left-color: rgba(37,99,235,0.18);
+  border-left: none !important;
 }
 
 .nav-products-row .nav-product-icon {
@@ -508,10 +512,15 @@ const NAV_STYLE = `
 .nav-products-row .nav-link--product.active,
 .nav-products-row .nav-link--product-lite.active {
   color: #ffffff;
-  font-weight: 600;
-  background: rgba(120, 200, 255, 0.18) !important;
-  border: none !important;
+  font-weight: 700;
+  background: #1c5a90 !important;
+  border: 1px solid rgba(176, 224, 255, 0.7) !important;
   box-shadow: none !important;
+}
+
+.nav-products-row .nav-link--product.active::after,
+.nav-products-row .nav-link--product-lite.active::after {
+  display: none;
 }
 
 :root[data-theme="light"] .nav-logo { background: none; }
@@ -561,9 +570,10 @@ const NAV_STYLE = `
 
 :root[data-theme="light"] .nav-products-row .nav-link--product.active,
 :root[data-theme="light"] .nav-products-row .nav-link--product-lite.active {
-  color: #0f172a;
-  font-weight: 600;
-  background: rgba(37, 99, 235, 0.14) !important;
+  color: #0b1220;
+  font-weight: 700;
+  background: #d5e6fb !important;
+  border: 1px solid rgba(29, 78, 216, 0.45) !important;
   box-shadow: none !important;
 }
 
@@ -959,14 +969,32 @@ const NAV_STYLE = `
 
 .mobile-toggle {
   display: none;
-  background: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin-left: 8px;
+  padding: 0;
+  background: transparent;
   border: none;
-  color: #ffffff;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 8px;
   border-radius: 8px;
-  transition: all 0.3s ease;
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mobile-toggle-icon {
+  display: block;
+  width: 22px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+:root[data-theme="light"] .mobile-toggle {
+  color: #0b1220;
 }
 
 .mobile-toggle:hover {
@@ -1870,7 +1898,7 @@ footer#contact .footer-bottom {
   }
 
   .mobile-toggle {
-    display: block;
+    display: inline-flex;
   }
 
   .nav-menu {
@@ -2384,7 +2412,9 @@ const FOOTER_TEMPLATE = `
 
     // Mobile menu toggle
     mobileToggle.addEventListener('click', function() {
-      navMenu.classList.toggle('active');
+      const open = navMenu.classList.toggle('active');
+      mobileToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      mobileToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
     });
 
     // Set active page

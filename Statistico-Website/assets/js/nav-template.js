@@ -167,7 +167,7 @@ const NAV_STYLE = `
   background: #183B46;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-bottom: 1px solid #7ec8ff;
+  border-bottom: none;
   box-shadow: none;
   transition: box-shadow 0.3s ease;
 }
@@ -178,7 +178,7 @@ const NAV_STYLE = `
 
 :root[data-theme="light"] .sticky-nav {
   background: #e7f2f4;
-  border-bottom: 1px solid rgba(14, 116, 144, 0.55);
+  border-bottom: none;
   box-shadow: none;
 }
 
@@ -393,7 +393,7 @@ const NAV_STYLE = `
 .nav-item--sep-left {
   margin-left: 32px;
   padding-left: 18px;
-  border-left: 1px solid rgba(255,255,255,0.32);
+  border-left: none;
   position: relative;
 }
 
@@ -1922,7 +1922,7 @@ footer#contact .footer-bottom {
     gap: 0;
     padding: 20px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    border-top: 1px solid #7ec8ff;
+    border-top: none;
     transform: translateY(-100vh);
     opacity: 0;
     visibility: hidden;

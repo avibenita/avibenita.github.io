@@ -6758,6 +6758,19 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
 
     const X = complete.map(buildRow);
     const p = X[0].length;
+    // Dummy columns are zero on most rows. Keep only the nonzero entries so
+    // each estimation step costs the active columns, not the full width.
+    const Xsp = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const row = X[i];
+      const ii = [];
+      const vv = [];
+      for (let j = 0; j < p; j++) {
+        const v = row[j];
+        if (v !== 0) { ii.push(j); vv.push(v); }
+      }
+      Xsp[i] = [ii, vv];
+    }
 
     // ── Parameter names ────────────────────────────────────────────
     const paramNames = ['Intercept'];
@@ -6831,11 +6844,22 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     const colSum = new Float64Array(p);
     const xty = new Float64Array(p);
     const xtx = new Float64Array(p * p);
+    const seen = new Int32Array(p);
+    const touched = new Int32Array(p);
+    let stampGen = 1;
     const groupList = groups.map(g => groupMap[g]);
     let sumNi2 = 0;
     for (let g = 0; g < groupList.length; g++) sumNi2 += groupList[g].length * groupList[g].length;
     const n0 = nGroups > 1 ? (n - sumNi2 / n) / (nGroups - 1) : 1;
     let lastPaint = 0;
+
+    function dotBeta(i) {
+      const ii = Xsp[i][0];
+      const vv = Xsp[i][1];
+      let s = 0;
+      for (let a = 0; a < ii.length; a++) s += vv[a] * beta[ii[a]];
+      return s;
+    }
 
     async function paintFit(force) {
       if (fitToken !== _fitToken) return false;
@@ -6848,45 +6872,66 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
       return fitToken === _fitToken;
     }
 
-    async function addGroup(destX, destY, idx, a, b) {
+    function addGroup(destX, destY, idx, coefA, coefB) {
       const ni = idx.length;
       let sumY = 0;
-      colSum.fill(0);
-      xty.fill(0);
-      xtx.fill(0);
+      let nTouch = 0;
+      stampGen++;
+      if (stampGen > 0x7ffffffe) { seen.fill(0); stampGen = 1; }
       for (let t = 0; t < ni; t++) {
-        const row = X[idx[t]];
+        const sp = Xsp[idx[t]];
+        const ii = sp[0];
+        const vv = sp[1];
         const y = Y[idx[t]];
         sumY += y;
-        for (let j = 0; j < p; j++) {
-          const xj = row[j];
+        const m = ii.length;
+        for (let ia = 0; ia < m; ia++) {
+          const j = ii[ia];
+          if (seen[j] !== stampGen) {
+            seen[j] = stampGen;
+            touched[nTouch++] = j;
+            colSum[j] = 0;
+            xty[j] = 0;
+          }
+          const xj = vv[ia];
           colSum[j] += xj;
           xty[j] += xj * y;
           const base = j * p;
-          for (let k = 0; k < p; k++) xtx[base + k] += xj * row[k];
+          for (let ic = 0; ic < m; ic++) xtx[base + ii[ic]] += xj * vv[ic];
         }
-        if ((t & 4095) === 4095 && !(await paintFit(false))) return false;
       }
-      for (let j = 0; j < p; j++) {
-        destY[j] += a * xty[j] - b * colSum[j] * sumY;
-        const bj = b * colSum[j];
-        for (let k = 0; k < p; k++) destX[j][k] += a * xtx[j * p + k] - bj * colSum[k];
+      for (let ia = 0; ia < nTouch; ia++) {
+        const j = touched[ia];
+        destY[j] += coefA * xty[j] - coefB * colSum[j] * sumY;
+        const bj = coefB * colSum[j];
+        const base = j * p;
+        for (let ic = 0; ic < nTouch; ic++) {
+          const k = touched[ic];
+          const slot = base + k;
+          destX[j][k] += coefA * xtx[slot] - bj * colSum[k];
+          xtx[slot] = 0;
+        }
       }
-      return true;
+      for (let ia = 0; ia < nTouch; ia++) {
+        colSum[touched[ia]] = 0;
+        xty[touched[ia]] = 0;
+      }
     }
 
     async function addAllGroups(destX, destY, s2, s2b) {
-      let sincePaint = 0;
+      let last = Date.now();
       for (let g = 0; g < groupList.length; g++) {
         const idx = groupList[g];
         const ni = idx.length;
-        const a = 1 / s2;
-        const b = s2b / (s2 * (s2 + ni * s2b));
-        if (!(await addGroup(destX, destY, idx, a, b))) return false;
-        sincePaint += ni;
-        if (sincePaint >= 2500) {
-          sincePaint = 0;
-          if (!(await paintFit(false))) return false;
+        const coefA = 1 / s2;
+        const coefB = s2b / (s2 * (s2 + ni * s2b));
+        addGroup(destX, destY, idx, coefA, coefB);
+        if ((g & 63) === 63) {
+          const now = Date.now();
+          if (now - last > 120) {
+            last = now;
+            if (!(await paintFit(false))) return false;
+          }
         }
       }
       return true;
@@ -6898,15 +6943,12 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     const allIdx = new Array(n);
     for (let i = 0; i < n; i++) allIdx[i] = i;
     let usedIters = 0;
-    if (!(await addGroup(XtX, XtY, allIdx, 1, 0))) return null;
+    addGroup(XtX, XtY, allIdx, 1, 0);
     const XtXinv = invSymm(XtX);
     let beta = vecMul(XtXinv, XtY);
     let sse0 = 0;
     for (let i = 0; i < n; i++) {
-      const row = X[i];
-      let fitted = 0;
-      for (let j = 0; j < p; j++) fitted += row[j] * beta[j];
-      const r = Y[i] - fitted;
+      const r = Y[i] - dotBeta(i);
       sse0 += r * r;
     }
     const dfErr = n - p;
@@ -6933,10 +6975,7 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
       const rNew = new Array(n);
       let newSSE = 0;
       for (let i = 0; i < n; i++) {
-        const row = X[i];
-        let fitted = 0;
-        for (let j = 0; j < p; j++) fitted += row[j] * beta[j];
-        const r = Y[i] - fitted;
+        const r = Y[i] - dotBeta(i);
         rNew[i] = r;
         newSSE += r * r;
       }
@@ -6976,8 +7015,13 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     const XtVinvXinv_f = invSymm(XtVinvX_f);
     beta = vecMul(XtVinvXinv_f, XtVinvY_f);
 
-    const finalResid = Y.map((y2,i) => y2-X[i].reduce((s,v,j)=>s+v*beta[j],0));
-    const fittedVals = Y.map((y2,i) => X[i].reduce((s,v,j)=>s+v*beta[j],0));
+    const finalResid = new Array(n);
+    const fittedVals = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const fitted = dotBeta(i);
+      fittedVals[i] = fitted;
+      finalResid[i] = Y[i] - fitted;
+    }
 
     // ── Standard errors (Satterthwaite approx) ─────────────────────
     const se = Array.from({length:p}, (_,i) => Math.sqrt(Math.max(0, XtVinvXinv_f[i][i])));

@@ -4149,7 +4149,14 @@ ${sectionsHtml}
       tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:16px;font-style:italic;color:var(--text-muted);">No BLUPs available.</td></tr>`;
       return;
     }
-    tbody.innerHTML = blups.map(r => `
+    const plotCap = 400;
+    const shown = blups.length > plotCap
+      ? [...blups].sort((a, b) => Math.abs(parseFloat(b.blup ?? b.estimate ?? 0)) - Math.abs(parseFloat(a.blup ?? a.estimate ?? 0))).slice(0, plotCap)
+      : blups;
+    const note = blups.length > plotCap
+      ? `<tr><td colspan="5" style="text-align:center;padding:10px;color:var(--text-muted);">Showing ${plotCap} of ${blups.length.toLocaleString()} groups with the largest random effects.</td></tr>`
+      : '';
+    tbody.innerHTML = note + shown.map(r => `
       <tr>
         <td>${r.group ?? r.label ?? '—'}</td>
         <td class="coef-cell">${fmt(r.blup ?? r.estimate)}</td>
@@ -4157,7 +4164,7 @@ ${sectionsHtml}
         <td>${fmt(r.ciLow ?? r.lower)}</td>
         <td>${fmt(r.ciHigh ?? r.upper)}</td>
       </tr>`).join('');
-    renderCaterpillarPlot(blups);
+    renderCaterpillarPlot(shown);
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -5590,9 +5597,17 @@ ${sectionsHtml}
     const cases    = _results.influentialCases ?? [];
     const diagRows = _results.allCaseDiag ?? [];
     const nChecked = diagRows.length || (_sourceRows ? _sourceRows.length : '—');
-    const maxCook  = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.cooksD ?? 0))) : null;
-    const maxLev   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.leverage ?? 0))) : null;
-    const maxDff   = diagRows.length ? Math.max(...diagRows.map(r => Math.abs(r.dffits ?? 0))) : null;
+    function maxAbsField(rows, key) {
+      let max = null;
+      for (let i = 0; i < rows.length; i++) {
+        const value = Math.abs(rows[i][key] ?? 0);
+        if (max === null || value > max) max = value;
+      }
+      return max;
+    }
+    const maxCook  = maxAbsField(diagRows, 'cooksD');
+    const maxLev   = maxAbsField(diagRows, 'leverage');
+    const maxDff   = maxAbsField(diagRows, 'dffits');
 
     const dffitThresh = _results.dffitThresh ?? null;
     const levThresh   = _results.levThresh   ?? 0.5;
@@ -6614,9 +6629,24 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     return 'Fitting mixed model on ' + n.toLocaleString() + ' rows';
   }
 
+  function rowIsFilled(row) {
+    if (row == null) return false;
+    const cells = Array.isArray(row) ? row : Object.keys(row).map((key) => row[key]);
+    for (let i = 0; i < cells.length; i++) {
+      const value = cells[i];
+      if (value !== null && value !== undefined && String(value).trim() !== '') return true;
+    }
+    return false;
+  }
+
+  let _mixedFitStarted = false;
+
   async function runMixedFit(headers, rows, spec) {
+    if (_mixedFitStarted) return;
+    _mixedFitStarted = true;
     const token = ++_fitToken;
-    const scoped = scopeMixedRows(rows, spec);
+    const filled = (rows || []).filter(rowIsFilled);
+    const scoped = scopeMixedRows(filled, spec);
     _fitLabel = fitStatusText(scoped);
     showLoading(_fitLabel + '…');
     await new Promise((resolve) => setTimeout(resolve, 40));
@@ -6918,23 +6948,14 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
       }
     }
 
-    async function addAllGroups(destX, destY, s2, s2b) {
-      let last = Date.now();
+    function addAllGroups(destX, destY, s2, s2b) {
       for (let g = 0; g < groupList.length; g++) {
         const idx = groupList[g];
         const ni = idx.length;
         const coefA = 1 / s2;
         const coefB = s2b / (s2 * (s2 + ni * s2b));
         addGroup(destX, destY, idx, coefA, coefB);
-        if ((g & 63) === 63) {
-          const now = Date.now();
-          if (now - last > 120) {
-            last = now;
-            if (!(await paintFit(false))) return false;
-          }
-        }
       }
-      return true;
     }
 
     // OLS starting values
@@ -6955,15 +6976,17 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     let sigma2 = sse0 / dfErr;
     let sigma2_b = Math.max(0, (sigma2 * 0.1));
 
-    // EM iterations (max 50). Yield often enough for the spinner to keep moving.
+    // EM iterations (max 50). Kept synchronous: yielding here let a second
+    // copy of the data cancel the fit and leave the spinner on step 2.
+    _fitLabel = 'Fitting mixed model on ' + n.toLocaleString() + ' complete rows';
     for (let iter = 0; iter < 50; iter++) {
       usedIters = iter + 1;
-      if (!(await paintFit(true))) return null;
+      if (fitToken !== _fitToken) return null;
 
       // Vi^{-1} = a I - b 11', so X' V^{-1} X = a X'X - b (1'X)'(1'X)
       let XtVinvX = Array.from({length:p}, () => new Array(p).fill(0));
       let XtVinvY = new Array(p).fill(0);
-      if (!(await addAllGroups(XtVinvX, XtVinvY, sigma2, sigma2_b))) return null;
+      addAllGroups(XtVinvX, XtVinvY, sigma2, sigma2_b);
 
       // GLS beta
       try {
@@ -7011,7 +7034,7 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     // ── Final GLS fit ──────────────────────────────────────────────
     let XtVinvX_f = Array.from({length:p},()=>new Array(p).fill(0));
     let XtVinvY_f = new Array(p).fill(0);
-    if (!(await addAllGroups(XtVinvX_f, XtVinvY_f, sigma2, sigma2_b))) return null;
+    addAllGroups(XtVinvX_f, XtVinvY_f, sigma2, sigma2_b);
     const XtVinvXinv_f = invSymm(XtVinvX_f);
     beta = vecMul(XtVinvXinv_f, XtVinvY_f);
 
@@ -7035,32 +7058,30 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
 
     // ── t & p values ───────────────────────────────────────────────
     function tDist_p(t, df) {
-      if (!isFinite(t) || !isFinite(df)) return 1;
-      try {
-        if (typeof jStat !== 'undefined') return 2 * jStat.studentt.cdf(-Math.abs(t), df);
-      } catch(e) {}
-      // Approx via normal for large df
-      const z = Math.abs(t);
-      return 2 * (1 - (0.5*(1+Math.sign(z)*Math.sqrt(1-Math.exp(-2*z*z/Math.PI)))));
+      if (!isFinite(t) || !isFinite(df) || df <= 0) return 1;
+      const z = Math.abs(t) * (1 - 1 / (4 * df)) / Math.sqrt(1 + (t * t) / (2 * df));
+      const az = Math.abs(z);
+      return 2 * (1 - (0.5 * (1 + Math.sign(z) * Math.sqrt(1 - Math.exp(-2 * az * az / Math.PI)))));
     }
     function fDist_p(F, df1, df2) {
-      if (!isFinite(F) || F <= 0) return 1;
-      try {
-        if (typeof jStat !== 'undefined') return 1 - jStat.centralF.cdf(F, df1, df2);
-      } catch(e) {}
-      return F > 3.84 ? 0.05 : 0.5;
+      if (!isFinite(F) || F <= 0 || !isFinite(df1) || !isFinite(df2)) return 1;
+      const z2 = (Math.pow(F, 1 / 3) * (1 - 2 / (9 * df2)) - (1 - 2 / (9 * df1))) /
+        Math.sqrt(2 / (9 * df1) + Math.pow(F, 2 / 3) * 2 / (9 * df2));
+      const az = Math.abs(z2);
+      const upper = 1 - (0.5 * (1 + Math.sign(z2) * Math.sqrt(1 - Math.exp(-2 * az * az / Math.PI))));
+      return Math.max(0, Math.min(1, upper));
     }
 
     const tVals = beta.map((b2, i) => se[i] > 0 ? b2/se[i] : 0);
     const pVals = tVals.map((t2, i) => tDist_p(t2, dfs[i]));
 
     // ── CI ─────────────────────────────────────────────────────────
-    function tCrit(df, a2) {
-      try { if (typeof jStat !== 'undefined') return jStat.studentt.inv(1-a2/2, df); } catch(e){}
-      return 1.96;
+    function tCrit(df) {
+      if (!isFinite(df) || df <= 0) return 1.96;
+      return 1.96 + 2.4 / df;
     }
-    const ciLow  = beta.map((b2,i) => b2 - tCrit(dfs[i], alpha)*se[i]);
-    const ciHigh = beta.map((b2,i) => b2 + tCrit(dfs[i], alpha)*se[i]);
+    const ciLow  = beta.map((b2,i) => b2 - tCrit(dfs[i])*se[i]);
+    const ciHigh = beta.map((b2,i) => b2 + tCrit(dfs[i])*se[i]);
 
     // ── Type III F-tests ────────────────────────────────────────────
     const yMean = Y.reduce((s,v)=>s+v,0)/n;
@@ -7163,8 +7184,8 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
       residuals: {
         values:   finalResid,
         fitted:   fittedVals,
-        min:      Math.min(...finalResid),
-        max:      Math.max(...finalResid),
+        min:      finalResid.reduce((m, v) => v < m ? v : m, Infinity),
+        max:      finalResid.reduce((m, v) => v > m ? v : m, -Infinity),
         mean:     finalResid.reduce((s,v)=>s+v,0)/n,
         sigma:    Math.sqrt(varWithin),
         // computed below

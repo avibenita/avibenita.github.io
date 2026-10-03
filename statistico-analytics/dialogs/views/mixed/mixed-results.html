@@ -6786,18 +6786,14 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     // Estimate via ML/REML with EM-like iterations
 
     function vecMul(A, x) { // matrix (array of rows) × vector
-      return A.map(row => row.reduce((s, v, j) => s + v * x[j], 0));
-    }
-    function matMul(A, B) {
-      const r = A.length, c = B[0].length, k = B.length;
-      return Array.from({length:r}, (_, i) =>
-        Array.from({length:c}, (_, j) =>
-          Array.from({length:k}, (_, l) => A[i][l] * B[l][j]).reduce((a,b)=>a+b,0)
-        )
-      );
-    }
-    function transpose(A) {
-      return A[0].map((_, j) => A.map(r => r[j]));
+      const out = new Array(A.length);
+      for (let i = 0; i < A.length; i++) {
+        const row = A[i];
+        let s = 0;
+        for (let j = 0; j < row.length; j++) s += row[j] * x[j];
+        out[i] = s;
+      }
+      return out;
     }
     function invSymm(A) { // invert symmetric PD matrix via Cholesky
       const n = A.length;
@@ -6830,71 +6826,102 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
       return inv;
     }
 
+    // Direct X'X / X'V^{-1}X. Avoids copying each cluster and allocating an
+    // n-long temporary for every cell, which stalled step 1 on large ranges.
+    const colSum = new Float64Array(p);
+    const xty = new Float64Array(p);
+    const xtx = new Float64Array(p * p);
+    const groupList = groups.map(g => groupMap[g]);
+    let sumNi2 = 0;
+    for (let g = 0; g < groupList.length; g++) sumNi2 += groupList[g].length * groupList[g].length;
+    const n0 = nGroups > 1 ? (n - sumNi2 / n) / (nGroups - 1) : 1;
+    let lastPaint = 0;
+
+    async function paintFit(force) {
+      if (fitToken !== _fitToken) return false;
+      const now = Date.now();
+      if (!force && now - lastPaint < 80) return true;
+      lastPaint = now;
+      const tx = document.getElementById('loadingText');
+      if (tx) tx.textContent = _fitLabel + '… ' + Math.max(usedIters, 1) + '/50';
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return fitToken === _fitToken;
+    }
+
+    async function addGroup(destX, destY, idx, a, b) {
+      const ni = idx.length;
+      let sumY = 0;
+      colSum.fill(0);
+      xty.fill(0);
+      xtx.fill(0);
+      for (let t = 0; t < ni; t++) {
+        const row = X[idx[t]];
+        const y = Y[idx[t]];
+        sumY += y;
+        for (let j = 0; j < p; j++) {
+          const xj = row[j];
+          colSum[j] += xj;
+          xty[j] += xj * y;
+          const base = j * p;
+          for (let k = 0; k < p; k++) xtx[base + k] += xj * row[k];
+        }
+        if ((t & 4095) === 4095 && !(await paintFit(false))) return false;
+      }
+      for (let j = 0; j < p; j++) {
+        destY[j] += a * xty[j] - b * colSum[j] * sumY;
+        const bj = b * colSum[j];
+        for (let k = 0; k < p; k++) destX[j][k] += a * xtx[j * p + k] - bj * colSum[k];
+      }
+      return true;
+    }
+
+    async function addAllGroups(destX, destY, s2, s2b) {
+      let sincePaint = 0;
+      for (let g = 0; g < groupList.length; g++) {
+        const idx = groupList[g];
+        const ni = idx.length;
+        const a = 1 / s2;
+        const b = s2b / (s2 * (s2 + ni * s2b));
+        if (!(await addGroup(destX, destY, idx, a, b))) return false;
+        sincePaint += ni;
+        if (sincePaint >= 2500) {
+          sincePaint = 0;
+          if (!(await paintFit(false))) return false;
+        }
+      }
+      return true;
+    }
+
     // OLS starting values
-    const Xt = transpose(X);
-    const XtX = matMul(Xt, X);
-    const XtY = vecMul(Xt, Y);
+    const XtX = Array.from({length:p}, () => new Array(p).fill(0));
+    const XtY = new Array(p).fill(0);
+    const allIdx = new Array(n);
+    for (let i = 0; i < n; i++) allIdx[i] = i;
+    let usedIters = 0;
+    if (!(await addGroup(XtX, XtY, allIdx, 1, 0))) return null;
     const XtXinv = invSymm(XtX);
     let beta = vecMul(XtXinv, XtY);
-    let resid = Y.map((y, i) => y - X[i].reduce((s, v, j) => s + v * beta[j], 0));
-    const SSE = resid.reduce((s, r) => s + r*r, 0);
+    let sse0 = 0;
+    for (let i = 0; i < n; i++) {
+      const row = X[i];
+      let fitted = 0;
+      for (let j = 0; j < p; j++) fitted += row[j] * beta[j];
+      const r = Y[i] - fitted;
+      sse0 += r * r;
+    }
     const dfErr = n - p;
-    let sigma2 = SSE / dfErr;
+    let sigma2 = sse0 / dfErr;
     let sigma2_b = Math.max(0, (sigma2 * 0.1));
 
-    // EM iterations (max 50). Yield each step so the spinner keeps painting.
-    let usedIters = 0;
+    // EM iterations (max 50). Yield often enough for the spinner to keep moving.
     for (let iter = 0; iter < 50; iter++) {
       usedIters = iter + 1;
-      if (fitToken !== _fitToken) return null;
-      const tx = document.getElementById('loadingText');
-      if (tx) tx.textContent = _fitLabel + '… ' + usedIters + '/50';
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (!(await paintFit(true))) return null;
 
-      // Build block-diagonal V inverse
+      // Vi^{-1} = a I - b 11', so X' V^{-1} X = a X'X - b (1'X)'(1'X)
       let XtVinvX = Array.from({length:p}, () => new Array(p).fill(0));
       let XtVinvY = new Array(p).fill(0);
-      let logDetV = 0;
-      let traceVinv = 0;
-      let sumVinvResid2 = 0;
-      let betaOld = beta.slice();
-
-      groups.forEach(g => {
-        const idx = groupMap[g];
-        const ni = idx.length;
-        const Xi = idx.map(i => X[i]);
-        const Yi = idx.map(i => Y[i]);
-
-        // Vi = sigma2_b * 1*1' + sigma2 * I  → inv via Woodbury
-        // Vi^{-1} = a*I - b*11', so Xt V^{-1} X = a XtX - b (1'X)'(1'X)
-        const a = 1 / sigma2;
-        const b = sigma2_b / (sigma2 * (sigma2 + ni * sigma2_b));
-        const XtX_i = matMul(transpose(Xi), Xi);
-        const ones_Xi = Xi.reduce((sum, row) => row.map((v,j) => (sum[j]||0)+v), new Array(p).fill(0));
-        // XtVinvX_i = a*XtX_i - b * ones_Xi * ones_Xi'
-        for (let r2 = 0; r2 < p; r2++)
-          for (let c2 = 0; c2 < p; c2++)
-            XtVinvX[r2][c2] += a * XtX_i[r2][c2] - b * ones_Xi[r2] * ones_Xi[c2];
-
-        // XtVinvY_i
-        const sumYi = Yi.reduce((s,v)=>s+v, 0);
-        for (let r2 = 0; r2 < p; r2++) {
-          const sumXiR = Xi.reduce((s, row) => s + row[r2], 0);
-          XtVinvY[r2] += a * Xi.reduce((s, row, ri) => s + row[r2]*Yi[ri], 0) - b * sumXiR * sumYi;
-        }
-
-        // log|Vi| = (ni-1)*log(sigma2) + log(sigma2 + ni*sigma2_b)
-        logDetV += (ni-1)*Math.log(sigma2) + Math.log(sigma2 + ni*sigma2_b);
-
-        // For sigma2 update: compute Yi - Xi*beta residuals
-        const ri_vec = Yi.map((y2, ii) => y2 - Xi[ii].reduce((s,v,j)=>s+v*beta[j],0));
-        const sumR = ri_vec.reduce((s,v)=>s+v,0);
-        // r' Vi^{-1} r
-        sumVinvResid2 += a * ri_vec.reduce((s,v)=>s+v*v,0) - b * sumR * sumR;
-
-        // tr(Vi^{-1}) for sigma2 update
-        traceVinv += a * ni - b * ni * ni;
-      });
+      if (!(await addAllGroups(XtVinvX, XtVinvY, sigma2, sigma2_b))) return null;
 
       // GLS beta
       try {
@@ -6903,21 +6930,38 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
       } catch(e) { break; }
 
       // Update variance components (REML-like moment estimators)
-      const rNew = Y.map((y2, i) => y2 - X[i].reduce((s,v,j)=>s+v*beta[j],0));
-      const newSSE = rNew.reduce((s,r2)=>s+r2*r2,0);
+      const rNew = new Array(n);
+      let newSSE = 0;
+      for (let i = 0; i < n; i++) {
+        const row = X[i];
+        let fitted = 0;
+        for (let j = 0; j < p; j++) fitted += row[j] * beta[j];
+        const r = Y[i] - fitted;
+        rNew[i] = r;
+        newSSE += r * r;
+      }
       const dfREML = method === 'REML' ? n - p : n;
       const newSigma2 = Math.max(1e-6, newSSE / dfREML);
 
       // Between-group variance: moment estimator
-      const groupMeans = groups.map(g => {
-        const idx = groupMap[g];
-        const yBar = idx.reduce((s,i)=>s+rNew[i],0)/idx.length;
-        return yBar;
-      });
-      const grandMean = groupMeans.reduce((s,v)=>s+v,0)/nGroups;
-      const MSB = groupMeans.reduce((s,v)=>s+(v-grandMean)**2,0)/(nGroups-1);
-      const n0  = (n - groups.reduce((s,g)=>s+groupMap[g].length**2/n,0))/(nGroups-1);
-      const newSigma2_b = Math.max(0, (MSB - newSigma2) / n0);
+      let grandSum = 0;
+      const groupMeans = new Array(groupList.length);
+      for (let g = 0; g < groupList.length; g++) {
+        const idx = groupList[g];
+        let s = 0;
+        for (let t = 0; t < idx.length; t++) s += rNew[idx[t]];
+        const yBar = s / idx.length;
+        groupMeans[g] = yBar;
+        grandSum += yBar;
+      }
+      const grandMean = grandSum / nGroups;
+      let msbNum = 0;
+      for (let g = 0; g < groupList.length; g++) {
+        const d = groupMeans[g] - grandMean;
+        msbNum += d * d;
+      }
+      const MSB = nGroups > 1 ? msbNum / (nGroups - 1) : 0;
+      const newSigma2_b = Math.max(0, n0 ? (MSB - newSigma2) / n0 : 0);
 
       const delta = Math.abs(newSigma2 - sigma2) + Math.abs(newSigma2_b - sigma2_b);
       sigma2 = newSigma2;
@@ -6926,26 +6970,9 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     }
 
     // ── Final GLS fit ──────────────────────────────────────────────
-    const a_f = 1/sigma2, b_f = sigma2_b/(sigma2*(sigma2+0));
     let XtVinvX_f = Array.from({length:p},()=>new Array(p).fill(0));
     let XtVinvY_f = new Array(p).fill(0);
-    groups.forEach(g => {
-      const idx = groupMap[g];
-      const ni  = idx.length;
-      const Xi  = idx.map(i=>X[i]);
-      const Yi  = idx.map(i=>Y[i]);
-      const a   = 1/sigma2, b = sigma2_b/(sigma2*(sigma2+ni*sigma2_b));
-      const XtX_i = matMul(transpose(Xi),Xi);
-      const ones_Xi = Xi.reduce((sum,row)=>row.map((v,j)=>(sum[j]||0)+v), new Array(p).fill(0));
-      for (let r2=0;r2<p;r2++)
-        for (let c2=0;c2<p;c2++)
-          XtVinvX_f[r2][c2] += a*XtX_i[r2][c2] - b*ones_Xi[r2]*ones_Xi[c2];
-      const sumYi = Yi.reduce((s,v)=>s+v,0);
-      for (let r2=0;r2<p;r2++) {
-        const sumXiR = Xi.reduce((s,row)=>s+row[r2],0);
-        XtVinvY_f[r2] += a*Xi.reduce((s,row,ri)=>s+row[r2]*Yi[ri],0) - b*sumXiR*sumYi;
-      }
-    });
+    if (!(await addAllGroups(XtVinvX_f, XtVinvY_f, sigma2, sigma2_b))) return null;
     const XtVinvXinv_f = invSymm(XtVinvX_f);
     beta = vecMul(XtVinvXinv_f, XtVinvY_f);
 

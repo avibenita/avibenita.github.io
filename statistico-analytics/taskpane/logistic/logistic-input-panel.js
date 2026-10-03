@@ -557,16 +557,67 @@ function buildCoefficientRows(fit, predictorNames, includeIntercept, referenceMa
   return rows;
 }
 
-function computeDiagnostics(y, p, X, covariance) {
-  const n = y.length;
-  const k = X[0].length;
-  const dev = [];
-  const pear = [];
-  const leverages = [];
-  const cooks = [];
-  let maxDfbeta = 0;
+function residualBin(value) {
+  if (value <= -3) return 0;
+  if (value <= -2) return 1;
+  if (value <= -1) return 2;
+  if (value <= 0) return 3;
+  if (value <= 1) return 4;
+  if (value <= 2) return 5;
+  if (value <= 3) return 6;
+  return 7;
+}
 
-  for (let i = 0; i < n; i++) {
+function runningSd(sum, sumSq, count) {
+  if (count < 2) return 0;
+  const m = sum / count;
+  const v = (sumSq - count * m * m) / (count - 1);
+  return Math.sqrt(Math.max(0, v));
+}
+
+function keepTopInfluence(top, item, limit) {
+  if (top.length < limit) {
+    top.push(item);
+    return;
+  }
+  let minIdx = 0;
+  for (let t = 1; t < top.length; t++) {
+    if (top[t].cooksD < top[minIdx].cooksD) minIdx = t;
+  }
+  if (item.cooksD > top[minIdx].cooksD) top[minIdx] = item;
+}
+
+function computeDiagnostics(y, p, X, covariance) {
+  const nObs = y.length;
+  const k = (X && X[0] && X[0].length) || 1;
+  const labels = ["≤ -3", "-3 to -2", "-2 to -1", "-1 to 0", "0 to 1", "1 to 2", "2 to 3", "≥ 3"];
+  const devBins = [0, 0, 0, 0, 0, 0, 0, 0];
+  let devSum = 0;
+  let devSumSq = 0;
+  let pearSum = 0;
+  let pearSumSq = 0;
+  let devMin = Infinity;
+  let devMax = -Infinity;
+  let pearMin = Infinity;
+  let pearMax = -Infinity;
+  let devBeyond2 = 0;
+  let devBeyond3 = 0;
+  let pearBeyond2 = 0;
+  let pearBeyond3 = 0;
+  let levSum = 0;
+  let levMax = 0;
+  let cookMax = 0;
+  let maxDfbeta = 0;
+  let levHigh = 0;
+  let levStrict = 0;
+  let cookHigh = 0;
+  let cookExtreme = 0;
+  const levCut = (2 * k) / Math.max(1, nObs);
+  const levCutStrict = (3 * k) / Math.max(1, nObs);
+  const cookCut = 4 / Math.max(1, nObs);
+  const top = [];
+
+  for (let i = 0; i < nObs; i++) {
     const pi = clamp(p[i], 1e-9, 1 - 1e-9);
     const wi = Math.max(1e-8, pi * (1 - pi));
     const yi = y[i];
@@ -576,40 +627,96 @@ function computeDiagnostics(y, p, X, covariance) {
     );
     const dr = (yi - pi >= 0 ? 1 : -1) * Math.sqrt(Math.max(0, devTerm));
     const pr = (yi - pi) / Math.sqrt(wi);
-    dev.push(dr);
-    pear.push(pr);
+    devSum += dr;
+    devSumSq += dr * dr;
+    pearSum += pr;
+    pearSumSq += pr * pr;
+    if (dr < devMin) devMin = dr;
+    if (dr > devMax) devMax = dr;
+    if (pr < pearMin) pearMin = pr;
+    if (pr > pearMax) pearMax = pr;
+    if (Math.abs(dr) > 2) devBeyond2++;
+    if (Math.abs(dr) > 3) devBeyond3++;
+    if (Math.abs(pr) > 2) pearBeyond2++;
+    if (Math.abs(pr) > 3) pearBeyond3++;
+    devBins[residualBin(dr)]++;
 
     let h = 0;
-    if (covariance) {
-      const v = multiplyMatrixVector(covariance, X[i]);
-      h = wi * dot(X[i], v);
+    const rowX = (X && X[i]) || [];
+    if (covariance && rowX.length) {
+      const v = multiplyMatrixVector(covariance, rowX);
+      h = wi * dot(rowX, v);
     }
     h = clamp(h, 0, 0.9999);
-    leverages.push(h);
+    levSum += h;
+    if (h > levMax) levMax = h;
+    if (h > levCut) levHigh++;
+    if (h > levCutStrict) levStrict++;
 
     const cook = (pr * pr * h) / (Math.max(1, k) * Math.pow(1 - h, 2));
-    cooks.push(cook);
+    if (cook > cookMax) cookMax = cook;
+    if (cook > cookCut) cookHigh++;
+    if (cook > 1) cookExtreme++;
+    keepTopInfluence(top, { row: i + 1, cooksD: cook, leverage: h, deviance: dr }, 10);
 
-    if (covariance) {
+    if (covariance && rowX.length) {
       const scoreScale = (yi - pi) / Math.max(1e-8, (1 - h));
       for (let j = 0; j < covariance.length; j++) {
-        const dfb = Math.abs(covariance[j].reduce((s, cij, idx) => s + cij * X[i][idx], 0) * scoreScale);
+        const dfb = Math.abs(covariance[j].reduce((s, cij, idx) => s + cij * rowX[idx], 0) * scoreScale);
         if (dfb > maxDfbeta) maxDfbeta = dfb;
       }
     }
   }
 
-  const outlierCount = dev.filter(v => Math.abs(v) > 2).length;
+  top.sort((a, b) => b.cooksD - a.cooksD);
+  const devMean = nObs ? devSum / nObs : NaN;
+  const pearMean = nObs ? pearSum / nObs : NaN;
+  const devSd = runningSd(devSum, devSumSq, nObs);
+  const pearSd = runningSd(pearSum, pearSumSq, nObs);
 
   return {
-    devianceResidualMean: fmt(mean(dev)),
-    devianceResidualSd: fmt(std(dev)),
-    pearsonResidualMean: fmt(mean(pear)),
-    pearsonResidualSd: fmt(std(pear)),
-    maxLeverage: fmt(max(leverages)),
-    maxCooksDistance: fmt(max(cooks)),
+    n: nObs,
+    parameterCount: k,
+    influenceComputed: !!covariance,
+    devianceResidualMean: fmt(devMean),
+    devianceResidualSd: fmt(devSd),
+    pearsonResidualMean: fmt(pearMean),
+    pearsonResidualSd: fmt(pearSd),
+    maxLeverage: fmt(levMax),
+    maxCooksDistance: fmt(cookMax),
     maxDfbeta: fmt(maxDfbeta),
-    outlierCount: outlierCount
+    outlierCount: devBeyond2,
+    deviance: {
+      mean: devMean,
+      sd: devSd,
+      min: nObs ? devMin : NaN,
+      max: nObs ? devMax : NaN,
+      beyond2: devBeyond2,
+      beyond3: devBeyond3,
+      bins: labels.map((label, idx) => ({ label: label, count: devBins[idx] }))
+    },
+    pearson: {
+      mean: pearMean,
+      sd: pearSd,
+      min: nObs ? pearMin : NaN,
+      max: nObs ? pearMax : NaN,
+      beyond2: pearBeyond2,
+      beyond3: pearBeyond3
+    },
+    influence: {
+      meanLeverage: nObs ? levSum / nObs : NaN,
+      maxLeverage: levMax,
+      leverageCutoff: levCut,
+      leverageHighCount: levHigh,
+      leverageStrictCutoff: levCutStrict,
+      leverageStrictCount: levStrict,
+      maxCooks: cookMax,
+      cookCutoff: cookCut,
+      cookHighCount: cookHigh,
+      cookExtremeCount: cookExtreme,
+      maxDfbeta: maxDfbeta,
+      top: top
+    }
   };
 }
 

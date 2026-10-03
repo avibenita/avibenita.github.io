@@ -128,11 +128,68 @@
       inset: 0;
       pointer-events: none;
       z-index: 0;
-      background: url('assets/hero-analytics.jpg') right center / 36% auto no-repeat;
-      -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 62%, rgba(0, 0, 0, 0.4) 76%, #000 92%);
-      mask-image: linear-gradient(90deg, transparent 0%, transparent 62%, rgba(0, 0, 0, 0.4) 76%, #000 92%);
-      opacity: 0.74;
-      filter: brightness(0.64) saturate(0.78);
+      background: right center / 46% auto no-repeat;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, transparent 54%, rgba(0, 0, 0, 0.55) 70%, #000 88%);
+      mask-image: linear-gradient(90deg, transparent 0%, transparent 54%, rgba(0, 0, 0, 0.55) 70%, #000 88%);
+      opacity: 0;
+      filter: brightness(1.05) saturate(0.95);
+      transition: opacity 1.6s ease;
+    }
+
+    .hero-scene[data-slide="univariate"] { background-image: url('assets/hero-analytics-man-uni.jpg'); }
+    .hero-scene[data-slide="correlation"] { background-image: url('assets/hero-analytics-woman-corr.jpg'); }
+    .hero-scene[data-slide="groups"] { background-image: url('assets/hero-analytics-man-groups.jpg'); }
+    .hero-scene[data-slide="segments"] { background-image: url('assets/hero-analytics-woman-cluster.jpg'); }
+
+    .hero-scene.is-active {
+      opacity: 0.96;
+    }
+
+    .hero-analytics-label {
+      position: absolute;
+      z-index: 1;
+      right: 16px;
+      bottom: 8px;
+      width: min(280px, 34vw);
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: none;
+      color: rgba(255, 226, 186, 0.9);
+      text-align: right;
+      text-shadow: 0 1px 10px rgba(0, 0, 0, 0.9);
+      font-size: 0.72rem;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+      opacity: 0;
+      transition: opacity 1.6s ease;
+    }
+
+    .hero-analytics-label::before {
+      content: "";
+      display: block;
+      width: 42px;
+      height: 1px;
+      margin: 0 0 8px auto;
+      background: linear-gradient(90deg, transparent, rgba(255, 196, 130, 0.95));
+    }
+
+    .hero-analytics-label.is-active { opacity: 1; }
+
+    .hero-analytics-label strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #ffffff;
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0.015em;
+    }
+
+    .hero-analytics-label span { display: block; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-scene,
+      .hero-analytics-label { transition: none; }
     }
 
     .hero.grid::after{
@@ -1292,7 +1349,8 @@
     }
 
     @media (max-width: 1100px) {
-      .hero-scene {
+      .hero-scene,
+      .hero-analytics-label {
         display: none;
       }
     }
@@ -1347,9 +1405,12 @@
     }
 
     :root[data-theme="light"] .hero-scene {
-      opacity: 0.42;
-      filter: brightness(1) saturate(0.9);
-      background: url('assets/hero-analytics.jpg') right center / 36% auto no-repeat;
+      opacity: 0;
+      filter: brightness(1.08) saturate(0.92);
+    }
+
+    :root[data-theme="light"] .hero-scene.is-active {
+      opacity: 0.82;
     }
 
     :root[data-theme="light"] .hero {
@@ -2426,7 +2487,10 @@
 
   <!-- Hero -->
   <section class="hero grid product-hero" id="home" style="--grid-size:24px; --grid-major:120px;">
-    <div class="hero-scene" aria-hidden="true"></div>
+    <div class="hero-scene is-active" data-slide="univariate" aria-hidden="true"></div>
+    <div class="hero-scene" data-slide="correlation" aria-hidden="true"></div>
+    <div class="hero-scene" data-slide="groups" aria-hidden="true"></div>
+    <div class="hero-scene" data-slide="segments" aria-hidden="true"></div>
     <div class="hero-content">
       <div class="hero-kicker-row">
         <div class="hero-kicker"><i class="fas fa-compass-drafting"></i> Analytics Hub</div>
@@ -2443,6 +2507,10 @@
         <a class="btn-secondary" href="/Statistico-Website/explore.html">Find the right analysis</a>
       </div>
     </div>
+    <p class="hero-analytics-label is-active" data-slide="univariate"><strong>Univariate Analysis</strong><span>A distribution and its shape</span></p>
+    <p class="hero-analytics-label" data-slide="correlation"><strong>Correlation Analysis</strong><span>Scatter, fit, and association</span></p>
+    <p class="hero-analytics-label" data-slide="groups"><strong>Group Comparisons</strong><span>Means side by side</span></p>
+    <p class="hero-analytics-label" data-slide="segments"><strong>Segmentation</strong><span>Clusters in the data</span></p>
   </section>
 
   <!-- Hub -->
@@ -4038,6 +4106,26 @@
     const deepLinkModule = new URLSearchParams(window.location.search).get('module');
     const bootModule = (deepLinkModule && MODS[deepLinkModule]) ? deepLinkModule : 'univariate';
     window.showCapModule(bootModule, { skipScroll: bootModule === 'univariate', skipRedraw: true });
+
+    var heroSlides = Array.prototype.slice.call(document.querySelectorAll('.hero-scene[data-slide]'));
+    var heroLabels = Array.prototype.slice.call(document.querySelectorAll('.hero-analytics-label[data-slide]'));
+    var heroIndex = 0;
+    var heroTimer = 0;
+    function showHeroSlide(next) {
+      heroIndex = next;
+      heroSlides.forEach(function (el, i) { el.classList.toggle('is-active', i === heroIndex); });
+      heroLabels.forEach(function (el, i) { el.classList.toggle('is-active', i === heroIndex); });
+    }
+    function queueHeroSlide() {
+      window.clearTimeout(heroTimer);
+      heroTimer = window.setTimeout(function () {
+        showHeroSlide((heroIndex + 1) % heroSlides.length);
+        queueHeroSlide();
+      }, 4000);
+    }
+    if (heroSlides.length > 1 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      queueHeroSlide();
+    }
   })();
   </script>
 </body>

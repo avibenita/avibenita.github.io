@@ -621,14 +621,24 @@
     }
 
     // Send data + model spec to mixed-results.html
+    function rowsForMixedResults(rows, modelSpec) {
+      const sample = modelSpec && modelSpec.sample;
+      if (!sample || sample.mode !== 'sample' || !(sample.n > 0) || !rows || rows.length <= sample.n) return rows || [];
+      if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.drawSampleRows === 'function') {
+        return StatisticoGlobalRange.drawSampleRows(rows, sample.n, sample.seed);
+      }
+      return rows;
+    }
+
     function sendMixedResults() {
       if (!activeDialog || !rangeData) return;
       const modelSpec = JSON.parse(sessionStorage.getItem('mixedModelSpec') || '{}');
+      const rows = rowsForMixedResults(rangeData.slice(1), modelSpec);
       activeDialog.messageChild(JSON.stringify({
         type: 'MIXED_RESULTS',
         payload: {
           headers: rangeData[0] || [],
-          rows: rangeData.slice(1),
+          rows: rows,
           address: rangeAddress,
           modelSpec
         }

@@ -22,11 +22,17 @@
 
       function sendMixedResults() {
         if (!dlg) return;
+        var rows = gr.values.slice(1);
+        var sample = modelSpec && modelSpec.sample;
+        if (sample && sample.mode === 'sample' && sample.n > 0 && rows.length > sample.n &&
+            global.StatisticoGlobalRange && typeof global.StatisticoGlobalRange.drawSampleRows === 'function') {
+          rows = global.StatisticoGlobalRange.drawSampleRows(rows, sample.n, sample.seed);
+        }
         dlg.messageChild(JSON.stringify({
           type: 'MIXED_RESULTS',
           payload: {
             headers: gr.values[0] || [],
-            rows: gr.values.slice(1),
+            rows: rows,
             address: gr.address || '',
             modelSpec: modelSpec
           }

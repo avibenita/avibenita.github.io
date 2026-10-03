@@ -447,6 +447,7 @@
     }
     .conclusion-body { padding:12px 18px 10px; }
     .conclusion-verdict { font-size:1.05rem; font-weight:700; color:var(--text-primary); margin:0 0 8px; }
+    .conclusion-verdict .fa-spinner { margin-right: 8px; color: var(--accent-3, #a78bfa); }
     .conclusion-bullets {
       list-style:none; margin:0 0 10px; padding:0;
       display:flex; flex-direction:column; gap:5px;
@@ -1096,9 +1097,9 @@
       <div id="header-container"></div>
 
       <!-- Loading overlay -->
-      <div class="loading-overlay hidden" id="loadingOverlay">
+      <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite">
         <div class="loading-spinner"></div>
-        <div class="loading-text" id="loadingText">Fitting mixed model...</div>
+        <div class="loading-text" id="loadingText">Fitting mixed model…</div>
       </div>
 
       <div class="wrap">
@@ -1137,7 +1138,7 @@
                   <div class="conclusion-card" id="conclusionCard">
                     <div class="conclusion-header"><i class="fa-solid fa-lightbulb"></i> Model Conclusion</div>
                     <div class="conclusion-body">
-                      <p class="conclusion-verdict" id="conclusionVerdict">Awaiting results…</p>
+                      <p class="conclusion-verdict" id="conclusionVerdict"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>Awaiting results…</p>
                       <ul class="conclusion-bullets" id="conclusionBullets"></ul>
                       <div class="conclusion-microtags" id="conclusionTags"></div>
                     </div>
@@ -1197,7 +1198,7 @@
                         <span><i class="fa-solid fa-circle-question"></i> Questions Tested</span>
                       </div>
                       <div class="mm-section-body padded" id="testedHypothesisBody">
-                        <p style="color:var(--text-muted);font-style:italic;">Awaiting results…</p>
+                        <p style="color:var(--text-muted);font-style:italic;"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Awaiting results…</p>
                       </div>
                     </div>
                   </div>
@@ -1673,7 +1674,7 @@
                       </span>
                     </div>
                     <div class="mm-section-body padded" id="fixedContribBody">
-                      <div class="awaiting-state" style="padding:20px;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
+                      <div class="awaiting-state" style="padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i><p>Awaiting results…</p></div>
                     </div>
                   </div>
 
@@ -1704,11 +1705,11 @@
                       </div>
                       <div class="mm-section-header" style="margin-bottom:8px;border-radius:4px;"><span><i class="fa-solid fa-border-all"></i> Estimated Residual Covariance Matrix (Σ) <span class="metric-help"><i class="fa-regular fa-circle-question" aria-hidden="true"></i><span class="metric-tip">The R-matrix (Σ). Describes the covariance structure of residuals within groups. For VC (default) this is σ²·I (diagonal). For AR(1) or CS it captures within-subject correlations across time points.</span></span></span></div>
                       <div class="mm-table-wrap" id="covMatrixWrap">
-                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
+                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i><p>Awaiting results…</p></div>
                       </div>
                       <div class="mm-section-header" style="margin-top:12px;margin-bottom:8px;border-radius:4px;"><span><i class="fa-solid fa-border-all"></i> G-Matrix — Random Effects Covariance <span class="metric-help"><i class="fa-regular fa-circle-question" aria-hidden="true"></i><span class="metric-tip">The G-matrix contains the variances and covariances of the random effects. The diagonal elements are random-effect variances; off-diagonal elements are covariances between random slopes/intercepts.</span></span></span></div>
                       <div class="mm-table-wrap" id="gMatrixWrap">
-                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-hourglass-half"></i><p>Awaiting results…</p></div>
+                        <div class="awaiting-state" style="padding:30px;text-align:center;"><i class="fa-solid fa-spinner fa-spin"></i><p>Awaiting results…</p></div>
                       </div>
                     </div>
                   </div>
@@ -6562,7 +6563,92 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
      Receives {headers, rows, modelSpec} from the taskpane and computes
      a real mixed model (random-intercept REML via iterative GLS).
   ═══════════════════════════════════════════════════════════════════ */
-  function computeMixedModel(headers, rows, modelSpec) {
+  let _fitLabel = 'Fitting mixed model';
+  let _fitToken = 0;
+
+  function _mmDrawSample(rows, n, seed) {
+    const body = Array.isArray(rows) ? rows : [];
+    const take = Math.min(Math.max(0, n | 0), body.length);
+    if (!take || take >= body.length) return body.slice();
+    let state = (seed || 20260927) >>> 0;
+    function rand() {
+      state = (state + 0x6D2B79F5) | 0;
+      let t = Math.imul(state ^ (state >>> 15), 1 | state);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    const order = new Array(body.length);
+    for (let i = 0; i < body.length; i++) order[i] = i;
+    for (let k = 0; k < take; k++) {
+      const j = k + Math.floor(rand() * (body.length - k));
+      const swap = order[k];
+      order[k] = order[j];
+      order[j] = swap;
+    }
+    const picked = order.slice(0, take).sort((a, b) => a - b);
+    const out = new Array(picked.length);
+    for (let i = 0; i < picked.length; i++) out[i] = body[picked[i]];
+    return out;
+  }
+
+  function scopeMixedRows(rows, spec) {
+    const sample = spec && spec.sample;
+    const sourceRows = (sample && sample.sourceRows) || (rows ? rows.length : 0);
+    if (!sample || sample.mode !== 'sample' || !(sample.n > 0) || !rows || rows.length <= sample.n) {
+      const sampled = !!(sample && sample.mode === 'sample' && sourceRows > (rows ? rows.length : 0));
+      return { rows: rows || [], sampled: sampled, sourceRows: sourceRows };
+    }
+    return {
+      rows: _mmDrawSample(rows, sample.n, sample.seed),
+      sampled: true,
+      sourceRows: sourceRows
+    };
+  }
+
+  function fitStatusText(scoped) {
+    const n = (scoped.rows || []).length;
+    if (scoped.sampled) {
+      const source = Number(scoped.sourceRows) || n;
+      return 'Fitting mixed model on a sample of ' + n.toLocaleString() + ' of ' + source.toLocaleString() + ' rows';
+    }
+    return 'Fitting mixed model on ' + n.toLocaleString() + ' rows';
+  }
+
+  async function runMixedFit(headers, rows, spec) {
+    const token = ++_fitToken;
+    const scoped = scopeMixedRows(rows, spec);
+    _fitLabel = fitStatusText(scoped);
+    showLoading(_fitLabel + '…');
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    if (token !== _fitToken) return;
+    try {
+      const results = await computeMixedModel(headers, scoped.rows, spec);
+      if (!results || token !== _fitToken) return;
+      if (scoped.sampled) {
+        results.sample = Object.assign({}, spec.sample || {}, {
+          mode: 'sample',
+          sampledRows: scoped.rows.length,
+          sourceRows: scoped.sourceRows
+        });
+      }
+      receiveMixedModelResults(results);
+      setTimeout(() => wirePostResultsData(results), 400);
+    } catch (e) {
+      if (token !== _fitToken) return;
+      console.error('Mixed model computation error:', e);
+      const ov = document.getElementById('loadingOverlay');
+      if (ov) {
+        ov.classList.remove('hidden');
+        ov.innerHTML =
+          '<div style="color:#f87171;text-align:center;padding:40px">' +
+          '<i class="fa-solid fa-circle-xmark" style="font-size:32px;margin-bottom:12px;display:block"></i>' +
+          '<strong>Computation Error</strong><br><small>' + (e && e.message ? e.message : e) + '</small></div>';
+      }
+    }
+  }
+
+  async function computeMixedModel(headers, rows, modelSpec) {
+    const fitToken = _fitToken;
     const dep    = modelSpec.dep;
     const fixVars= (modelSpec.fix  || []).concat(modelSpec.cov || []);
     const rndVar = modelSpec.rnd;
@@ -6756,8 +6842,15 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
     let sigma2 = SSE / dfErr;
     let sigma2_b = Math.max(0, (sigma2 * 0.1));
 
-    // EM iterations (max 50)
+    // EM iterations (max 50). Yield each step so the spinner keeps painting.
+    let usedIters = 0;
     for (let iter = 0; iter < 50; iter++) {
+      usedIters = iter + 1;
+      if (fitToken !== _fitToken) return null;
+      const tx = document.getElementById('loadingText');
+      if (tx) tx.textContent = _fitLabel + '… ' + usedIters + '/50';
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
       // Build block-diagonal V inverse
       let XtVinvX = Array.from({length:p}, () => new Array(p).fill(0));
       let XtVinvY = new Array(p).fill(0);
@@ -6773,33 +6866,9 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
         const Yi = idx.map(i => Y[i]);
 
         // Vi = sigma2_b * 1*1' + sigma2 * I  → inv via Woodbury
+        // Vi^{-1} = a*I - b*11', so Xt V^{-1} X = a XtX - b (1'X)'(1'X)
         const a = 1 / sigma2;
         const b = sigma2_b / (sigma2 * (sigma2 + ni * sigma2_b));
-        // Vi^{-1} = a*I - b*11'
-        const Xinv_i = Xi.map((row, ri) =>
-          row.map((v, ci) => {
-            const aXic = a * v;
-            const bSum = b * Xi.reduce((s, r2) => s + r2[ci], 0);
-            return aXic - b * Xi[ri].reduce((s, v2, ci2) => s + v2, 0) * Xi.reduce((s2, r3) => s2 + r3[ci], 0);
-          })
-        );
-        // Correct simpler calculation:
-        // (Vi^{-1})_{jk} = a*I_{jk} - b*1_{jk}
-        function Vi_inv_x(x) {
-          const sumX = x.reduce((s,v)=>s+v,0);
-          return x.map(v => a*v - b*sumX);
-        }
-        function Vi_inv_mat(M) { // M is ni×p
-          return M.map(row => Vi_inv_x(row));
-        }
-
-        const XitVinvXi = matMul(transpose(Xi), Vi_inv_mat(Xi).map((row,ri) =>
-          row.map((v,ci) => {
-            const s = Xi.reduce((acc, r2) => acc + r2[ci], 0);
-            return a * Xi[ri][ci] - b * s * Xi[ri].reduce((acc,v2)=>acc+v2,0);
-          })
-        ));
-        // Simpler correct form: XtVinvX += Xt*(a*I - b*11')*X
         const XtX_i = matMul(transpose(Xi), Xi);
         const ones_Xi = Xi.reduce((sum, row) => row.map((v,j) => (sum[j]||0)+v), new Array(p).fill(0));
         // XtVinvX_i = a*XtX_i - b * ones_Xi * ones_Xi'
@@ -6982,7 +7051,7 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
       n, N: n, nGroups, avgObsPerGroup,
       fixedPredictors: p - 1,
       randomEffects: 2,
-      method, iterations: 50, converged: true,
+      method, iterations: usedIters, converged: true,
       covStructure: covG, dfMethod: dfMeth,
       neg2LL, deviance: neg2LL,
       AIC, AICc, BIC, CAIC, HQIC: neg2LL + 2*nParams*Math.log(Math.log(n)),
@@ -7220,19 +7289,7 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
                 });
               }
 
-              try {
-                const results = computeMixedModel(headers, filteredRows, spec);
-                receiveMixedModelResults(results);
-                setTimeout(() => wirePostResultsData(results), 400);
-              } catch(e) {
-                console.error('Mixed model computation error:', e);
-                // Show error in the UI
-                const ov = document.getElementById('loadingOverlay');
-                if (ov) { ov.classList.remove('hidden'); ov.innerHTML =
-                  '<div style="color:#f87171;text-align:center;padding:40px">' +
-                  '<i class="fa-solid fa-circle-xmark" style="font-size:32px;margin-bottom:12px;display:block"></i>' +
-                  '<strong>Computation Error</strong><br><small>' + e.message + '</small></div>'; }
-              }
+              runMixedFit(headers, filteredRows, spec);
             }
           } catch(e) { console.error('mixed-results parse error:', e); }
         },
@@ -7614,9 +7671,7 @@ ${typeof StatisticoHeader._overallAiReplyFormat === 'function' ? StatisticoHeade
             _modelSpec = spec;
             _sourceHeaders = headers.slice();
             _sourceRows = rows.slice();
-            var results = computeMixedModel(headers, rows, spec);
-            receiveMixedModelResults(results);
-            if (typeof wirePostResultsData === 'function') setTimeout(function () { wirePostResultsData(results); }, 400);
+            runMixedFit(headers, rows, spec);
           } catch (e) {
             console.error('Mixed case study compute failed:', e);
           }

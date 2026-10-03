@@ -11,8 +11,8 @@
   <!-- Shared Config -->
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1" />
   <script src="../shared-config.js?v=20260928range2"></script>
-  <script src="../../shared/large-range-scope.js?v=20260928range2"></script>
-  <script src="../../shared/column-type.js?v=20260910num1"></script>
+  <script src="../../shared/large-range-scope.js?v=20261003log1"></script>
+  <script src="../../shared/column-type.js?v=20261003log1"></script>
   <script src="../ds-guide.js?v=20260330g"></script>
 
   <style>
@@ -973,24 +973,29 @@
     };
 
     function applyRegressionPayload(data) {
-      if (!data || !data.headers || !data.rows) { showToast('Invalid data format', 'error'); return; }
+      if (!data || !data.headers || (!data.rows && !data.columnStats)) { showToast('Invalid data format', 'error'); return; }
       var headers = data.headers;
-      var rows = data.rows;
-      if (window.StatisticoLargeRange) StatisticoLargeRange.sync(rows, headers);
+      var rows = data.rows || [];
+      var rowCount = data.rowCount != null ? data.rowCount : rows.length;
       var address = data.address || '';
       var savedModelSpec = data.savedModelSpec || null;
       var shouldRestoreSavedModel = data.restoreSavedModel === true;
 
-      if (qs('tbRange')) qs('tbRange').textContent = (address ? address + ' · ' : '') + rows.length + ' rows · ' + headers.length + ' variables';
+      if (qs('tbRange')) qs('tbRange').textContent = (address ? address + ' · ' : '') + rowCount + ' rows · ' + headers.length + ' variables';
       var badge = qs('metaBadge');
-      if (badge) badge.textContent = rows.length + ' rows · ' + headers.length + ' vars';
+      if (badge) badge.textContent = rowCount + ' rows · ' + headers.length + ' vars';
 
       var sp = qs('loadingSpinner');
       var mc = qs('mainContent');
       if (sp) sp.style.display = 'none';
       if (mc) mc.style.display = 'flex';
 
-      var stats = buildVariableStats(headers, rows, address);
+      var stats = data.columnStats
+        ? materializeColumnStats(data.columnStats, headers, address)
+        : buildVariableStats(headers, rows, address);
+      if (window.StatisticoLargeRange) {
+        StatisticoLargeRange.sync(rows, headers, { rowCount: rowCount, estimatedChars: data.estimatedChars });
+      }
       STATE.variableStats = stats;
       STATE.variables = [];
       STATE.data = {};
@@ -1022,27 +1027,40 @@
       if (typeof DsGuide !== 'undefined') DsGuide.render('logistic', 'dsGuideContainer', { collapsed: false });
     }
 
-    function buildVariableStats(headers, rows, address) {
-      var stats = {};
+    function rangeAddressForColumn(parsed, colIdx) {
+      if (!parsed) return '';
+      return parsed.sheet + parsed.col(colIdx) + parsed.startRow + ':' + parsed.sheet + parsed.col(colIdx) + parsed.endRow;
+    }
+
+    function materializeColumnStats(columnStats, headers, address) {
       var parsed = parseRangeAddress(address);
+      var stats = {};
       for (var colIdx = 0; colIdx < headers.length; colIdx++) {
         var name = headers[colIdx];
-        var numericCnt = 0, stringCnt = 0, missingCnt = 0, categories = {};
-        for (var rowIdx = 0; rowIdx < rows.length; rowIdx++) {
-          var value = rows[rowIdx][colIdx];
-          if (value === null || value === undefined || value === '') { missingCnt++; continue; }
-          if (StatisticoColumnType.isNumericCell(value)) { numericCnt++; } else { stringCnt++; }
-          var key = String(value);
-          categories[key] = (categories[key] || 0) + 1;
-        }
-        var catList = [];
-        for (var key in categories) { if (categories.hasOwnProperty(key)) catList.push({ value: key, freq: categories[key] }); }
+        var src = (columnStats && columnStats[name]) || {};
         stats[name] = {
-          numeric: numericCnt, string: stringCnt, missing: missingCnt, categories: catList,
-          rangeAddress: parsed ? parsed.sheet + parsed.col(colIdx) + parsed.startRow + ':' + parsed.sheet + parsed.col(colIdx) + parsed.endRow : ''
+          numeric: src.numeric || 0,
+          string: src.string || 0,
+          missing: src.missing || 0,
+          categories: (src.categories || []).slice(),
+          uniqueCount: src.uniqueCount,
+          categoriesCapped: !!src.categoriesCapped,
+          rangeAddress: rangeAddressForColumn(parsed, colIdx)
         };
       }
       return stats;
+    }
+
+    function buildVariableStats(headers, rows, address) {
+      var profiled = (window.StatisticoColumnType && typeof StatisticoColumnType.profileColumns === 'function')
+        ? StatisticoColumnType.profileColumns(headers, rows)
+        : {};
+      return materializeColumnStats(profiled, headers, address);
+    }
+
+    function cappedLevelPhrase(stats) {
+      var least = Math.max(1, ((stats && stats.uniqueCount) || 22) - 1);
+      return 'more than ' + least;
     }
 
     function parseRangeAddress(address) {
@@ -1061,7 +1079,8 @@
 
     function getTwoLevelValues(varName) {
       var stats = STATE.variableStats && STATE.variableStats[varName];
-      if (!stats) return null;
+      if (!stats || stats.categoriesCapped) return null;
+      if (stats.uniqueCount != null && stats.uniqueCount !== 2) return null;
       var categories = stats.categories || [];
       var uniqueValues = [];
       for (var i = 0; i < categories.length; i++) {
@@ -1090,6 +1109,13 @@
       var stats = STATE.variableStats && STATE.variableStats[varName];
       if (!stats) {
         return { valid: false, message: 'Unable to validate "' + varName + '" as binary response.' };
+      }
+
+      if (stats.categoriesCapped) {
+        return {
+          valid: false,
+          message: 'Response "' + varName + '" must have exactly 2 values (0/1 or recodable). Found ' + cappedLevelPhrase(stats) + '.'
+        };
       }
 
       if (isRecodedOutcomeValid(varName)) {
@@ -1139,6 +1165,7 @@
     function getOutcomeStatus(varName) {
       var stats = STATE.variableStats && STATE.variableStats[varName];
       if (!stats) return { status: 'invalid', detail: '' };
+      if (stats.categoriesCapped) return { status: 'invalid', detail: cappedLevelPhrase(stats) + ' levels' };
 
       var uniqueValues = getTwoLevelValues(varName);
       if (uniqueValues) {
@@ -1863,6 +1890,10 @@
     var pendingCategoryAssignment = null;
 
     function showCategoryModal(varName, stats) {
+      if (stats && stats.categoriesCapped) {
+        showToast('"' + varName + '" has ' + cappedLevelPhrase(stats) + ' levels (max 20).', 'error', 6000);
+        return;
+      }
       var categoryData = calculateCategoryFrequencies(varName);
       if (categoryData.categories && categoryData.categories.length > 20) {
         showToast('"' + varName + '" has ' + categoryData.categories.length + ' levels (max 20).', 'error', 6000);

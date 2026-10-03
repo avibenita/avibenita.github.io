@@ -220,15 +220,15 @@
     document.body.appendChild(panel);
   }
 
-  function render(headers, rows) {
+  function render(headers, rows, meta) {
     if (moduleId === "correlations") return;
     var copy = COPY[moduleId] || {
       exact: "the results stay exact",
       later: "later views use those same rows",
       sampled: "every reported statistic then uses the sample"
     };
-    var count = rows.length;
-    var estimated = estimateChars(headers, rows);
+    var count = meta && meta.rowCount != null ? meta.rowCount : rows.length;
+    var estimated = meta && meta.estimatedChars != null ? meta.estimatedChars : estimateChars(headers, rows);
     var proposed = proposeSampleSize(count, estimated);
     var large = count >= 8000 || estimated > CHAR_LIMIT;
     var offer = copy.offerSample !== false && large && proposed < count;
@@ -331,11 +331,11 @@
     return out;
   }
 
-  function sync(rows, headers) {
+  function sync(rows, headers, meta) {
     moduleId = detectModule();
     if (moduleId === "correlations") return;
     hookParent();
-    render(headers || [], Array.isArray(rows) ? rows : []);
+    render(headers || [], Array.isArray(rows) ? rows : [], meta || null);
   }
 
   function rowsForRun(rows) {

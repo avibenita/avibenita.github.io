@@ -116,20 +116,24 @@ function openLogisticModelBuilder() {
 
 function sendDialogData() {
   if (!logisticDialog) return;
-  const headers = (logisticRangeData && logisticRangeData.length) ? (logisticRangeData[0] || []) : [];
-  const rows = (logisticRangeData && logisticRangeData.length > 1) ? logisticRangeData.slice(1) : [];
+  const values = logisticRangeData || [];
+  const payload = (window.StatisticoColumnType && typeof StatisticoColumnType.logisticDialogPayload === "function")
+    ? StatisticoColumnType.logisticDialogPayload(values, logisticRangeAddress, {
+        analysisMode: "logistic",
+        savedModelSpec: null,
+        restoreSavedModel: false
+      })
+    : {
+        headers: values[0] || [],
+        rows: values.length > 1 ? values.slice(1) : [],
+        address: logisticRangeAddress,
+        analysisMode: "logistic",
+        savedModelSpec: null
+      };
 
   logisticDialog.messageChild(JSON.stringify({
     type: "LOGISTIC_DATA",
-    payload: {
-      headers,
-      rows,
-      address: logisticRangeAddress,
-      analysisMode: "logistic",
-      // Always open the builder with a fresh assignment state.
-      // Persisted model spec is still used for direct results opens.
-      savedModelSpec: null
-    }
+    payload
   }));
 }
 

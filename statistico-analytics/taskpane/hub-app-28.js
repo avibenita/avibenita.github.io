@@ -2471,21 +2471,32 @@ function openFactorConfigFromHub() {
 
 function openLogisticConfigFromHub() {
   try { sessionStorage.removeItem("logisticModelSpec"); } catch (e) {}
+  var cachedValues = null;
+  var cachedPayload = null;
   return openBuilderDialogFromHub({
     moduleId: "logistic",
     dialogPath: "logistic/logistic-input.html?dialog=1",
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "LOGISTIC_DATA",
     payloadBuilder: function (gr) {
-      return {
-        headers: gr.values[0] || [],
-        rows: gr.values.slice(1),
-        address: gr.address || "",
-        analysisMode: "logistic",
-        // Always open logistic builder fresh from Hub.
-        savedModelSpec: null,
-        restoreSavedModel: false
-      };
+      var values = (gr && gr.values) || [];
+      if (cachedPayload && cachedValues === values) return cachedPayload;
+      cachedValues = values;
+      cachedPayload = (window.StatisticoColumnType && typeof StatisticoColumnType.logisticDialogPayload === "function")
+        ? StatisticoColumnType.logisticDialogPayload(values, (gr && gr.address) || "", {
+            analysisMode: "logistic",
+            savedModelSpec: null,
+            restoreSavedModel: false
+          })
+        : {
+            headers: values[0] || [],
+            rows: values.slice(1),
+            address: (gr && gr.address) || "",
+            analysisMode: "logistic",
+            savedModelSpec: null,
+            restoreSavedModel: false
+          };
+      return cachedPayload;
     },
     modelActions: ["logisticModel", "regressionModel"],
     onModel: function (msg) {

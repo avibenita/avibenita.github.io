@@ -520,7 +520,7 @@
   };
 
   var state = {
-    tab: "build",
+    tab: "preview",
     tableType: "table1",
     groupVar: "treatment",
     stratVar: "",
@@ -1008,15 +1008,15 @@
   function renderBlockTable(block, sp, rowPad, fontSize, headerBorderBottom, headerBg) {
     var showTest = state.showPValue && block.rows.some(function (r) { return r.test; });
     var showSmdCol = state.showSMD && block.rows.some(function (r) { return r.smd != null && isFinite(r.smd); });
-    var html = '<table style="width:100%;border-collapse:collapse;font-size:' + fontSize + ';border-top:2px solid #111;border-bottom:2px solid #111;">';
+    var html = '<table class="' + (sp.headerStyle === "shade" ? "pt2-head-shade" : "") + '" style="width:100%;border-collapse:collapse;font-size:' + fontSize + ';color:#111;border-top:2px solid #111;border-bottom:2px solid #111;">';
     html += "<thead><tr>";
-    html += '<th style="text-align:left;padding:' + rowPad + ";" + headerBorderBottom + headerBg + '">Characteristic</th>';
+    html += '<th style="text-align:left;padding:' + rowPad + ";color:#111;background:#fff;" + headerBorderBottom + headerBg + '">Characteristic</th>';
     block.columns.forEach(function (col) {
-      html += '<th style="text-align:center;padding:' + rowPad + ";" + headerBorderBottom + headerBg + '">' + esc(col.label) +
-        '<br><span style="font-weight:400;font-size:.82em;">(N=' + block.columnN[col.key] + ")</span></th>";
+      html += '<th style="text-align:center;padding:' + rowPad + ";color:#111;background:#fff;" + headerBorderBottom + headerBg + '">' + esc(col.label) +
+        '<br><span style="font-weight:400;font-size:.82em;color:#111;">(N=' + block.columnN[col.key] + ")</span></th>";
     });
-    if (showTest) html += '<th style="text-align:center;padding:' + rowPad + ";" + headerBorderBottom + headerBg + '">P value</th>';
-    if (showSmdCol) html += '<th style="text-align:center;padding:' + rowPad + ";" + headerBorderBottom + headerBg + '">SMD</th>';
+    if (showTest) html += '<th style="text-align:center;padding:' + rowPad + ";color:#111;background:#fff;" + headerBorderBottom + headerBg + '">P value</th>';
+    if (showSmdCol) html += '<th style="text-align:center;padding:' + rowPad + ";color:#111;background:#fff;" + headerBorderBottom + headerBg + '">SMD</th>';
     html += "</tr></thead><tbody>";
 
     block.rows.forEach(function (row) {
@@ -1912,6 +1912,36 @@
         el.scrollLeft = 0;
       });
     }
+  }
+
+  function wireSpecCollapse() {
+    document.querySelectorAll(".pt2-specs .cfg-panel").forEach(function (panel) {
+      var head = panel.querySelector(".cfg-panel-head");
+      if (!head || head.querySelector(".pt2-collapse-chev")) return;
+      var chev = document.createElement("i");
+      chev.className = "fa-solid fa-chevron-down pt2-collapse-chev";
+      chev.setAttribute("aria-hidden", "true");
+      head.appendChild(chev);
+      head.setAttribute("role", "button");
+      head.setAttribute("tabindex", "0");
+      head.setAttribute("aria-expanded", "true");
+      function toggle() {
+        var collapsed = panel.classList.toggle("is-collapsed");
+        head.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        chev.classList.toggle("fa-chevron-down", !collapsed);
+        chev.classList.toggle("fa-chevron-right", collapsed);
+      }
+      head.addEventListener("click", function (e) {
+        if (e.target.closest && e.target.closest(".pt2-help-btn")) return;
+        toggle();
+      });
+      head.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        if (e.target.closest && e.target.closest(".pt2-help-btn")) return;
+        e.preventDefault();
+        toggle();
+      });
+    });
   }
 
   function wireTabs() {
@@ -3166,9 +3196,10 @@
     wireCategoryEditor();
     wireAiAssistant();
     syncControlsFromState();
+    wireSpecCollapse();
     renderAll();
+    showTab("preview");
     if (window.__PT2_WEB_DEMO__) {
-      showTab("preview");
       try {
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;

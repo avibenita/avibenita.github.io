@@ -2514,29 +2514,59 @@ function openBuilderDialogFromHub(options) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLICATION TABLES — flow
-   The builder is a single self-contained dialog (Build / Preview / Details
-   tabs, own demo dataset + stats engine). On open we push it the currently
-   selected Active Range (if any) so it can build the table from real data
-   instead of the built-in demo set; the builder falls back to the demo
-   dataset on its own if no usable range is selected.
+   The builder is a single dialog (Build / Preview / Details modes).
+   On open we send the current Excel selection (header row plus data).
+   If that selection is too small, the stored hub range is used instead.
+   The Excel window does not fall back to the built-in demo dataset.
    ═══════════════════════════════════════════════════════════════════════════ */
 function finishHubPublicationTablesFlow() {
   hubPublicationTablesFlowActive = false;
   if (!hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
 }
 
-function sendPublicationTablesDataFromHub() {
-  if (!hubPublicationTablesResultsDialog) return;
-  var gr = getGlobalRangePayload();
-  if (!gr) return;
+function pushPublicationTablesPayload(payload) {
+  if (!hubPublicationTablesResultsDialog || !payload) return;
+  if (!payload.headers || !payload.headers.length || !payload.rows || !payload.rows.length) return;
   hubPublicationTablesResultsDialog.messageChild(JSON.stringify({
     type: "PUBTABLES_DATA",
-    payload: {
+    payload: payload
+  }));
+}
+
+function sendPublicationTablesDataFromHub() {
+  if (!hubPublicationTablesResultsDialog) return;
+  function sendStored() {
+    var gr = getGlobalRangePayload();
+    if (!gr) return;
+    pushPublicationTablesPayload({
       headers: gr.values[0] || [],
       rows: gr.values.slice(1),
       address: gr.address || ""
-    }
-  }));
+    });
+  }
+  if (typeof Excel === "undefined" || !Excel.run) {
+    sendStored();
+    return;
+  }
+  Excel.run(function (ctx) {
+    var rng = ctx.workbook.getSelectedRange();
+    rng.load(["values", "address", "rowCount"]);
+    return ctx.sync().then(function () {
+      var values = rng.values;
+      if (rng.rowCount >= 2 && values && values.length >= 2 && values[0] && values[0].length) {
+        if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.save === "function") {
+          StatisticoGlobalRange.save(values, rng.address, "selection");
+        }
+        pushPublicationTablesPayload({
+          headers: values[0] || [],
+          rows: values.slice(1),
+          address: rng.address || ""
+        });
+        return;
+      }
+      sendStored();
+    });
+  }).catch(function () { sendStored(); });
 }
 
 function openPublicationTablesConfigFromHub() {

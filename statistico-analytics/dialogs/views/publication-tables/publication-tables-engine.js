@@ -554,10 +554,27 @@
   var lastAppliedDefaultTitle = state.report.title;
   var lastAppliedDefaultAbbrev = "";
 
-  /* Populate varOrder/varCfg/VAR_DEFS_BY_KEY for the initial demo dataset;
-     wireHostMessaging() may swap this out for the currently selected Excel
-     range shortly after init(). */
-  setDataset("demo", DEMO_DATA, DEMO_VAR_DEFS, DEMO_GROUP_VAR_DEFS, DEMO_STRAT_VAR_DEFS, DEMO_WEIGHT_VAR_DEFS);
+  /* Website Launch Demo keeps the built-in example. Inside Excel the table
+     stays empty until the hub sends the selected range. */
+  function usePendingDataset() {
+    ACTIVE_DATA = [];
+    VAR_DEFS = [];
+    GROUP_VAR_DEFS = [];
+    STRAT_VAR_DEFS = [];
+    WEIGHT_VAR_DEFS = [];
+    VAR_DEFS_BY_KEY = {};
+    state.varOrder = [];
+    state.varCfg = {};
+    state.groupVar = "";
+    state.stratVar = "";
+    state.weightVar = "";
+    state.dataSource = "pending";
+  }
+  if (window.__PT2_WEB_DEMO__) {
+    setDataset("demo", DEMO_DATA, DEMO_VAR_DEFS, DEMO_GROUP_VAR_DEFS, DEMO_STRAT_VAR_DEFS, DEMO_WEIGHT_VAR_DEFS);
+  } else {
+    usePendingDataset();
+  }
 
   function pickFallbackGroupVar(preferredKey) {
     if (state.groupVar && GROUP_VAR_DEFS.some(function (g) { return g.key === state.groupVar; })) return state.groupVar;
@@ -1486,9 +1503,32 @@
 
   function sourceLabel() {
     if (state.dataSource === "excel" && state.excelDataset) {
-      return "Your Excel data" + (state.excelDataset.address ? " (" + state.excelDataset.address + ")" : "");
+      return state.excelDataset.address ? state.excelDataset.address : "Selected range";
     }
-    return "Demo dataset";
+    if (state.dataSource === "demo") return "Demo dataset";
+    return "No range selected";
+  }
+
+  var MODE_COPY = {
+    build: { title: "Build", caption: "Variables, include, order, and summary format" },
+    preview: { title: "Preview", caption: "Manuscript page" },
+    details: { title: "Details", caption: "Methods text, test audit, and data dictionary" }
+  };
+
+  function refreshHeaderChrome() {
+    var copy = MODE_COPY[state.tab] || MODE_COPY.build;
+    var title = $("pt2ViewTitle");
+    if (title) title.textContent = copy.title;
+    var helpBtn = $("pt2HeaderHelp");
+    if (helpBtn) helpBtn.setAttribute("data-help", "explain-" + (state.tab || "build"));
+    var badge = $("pt2SourceBadge");
+    if (badge) {
+      var dataBit = sourceLabel();
+      if (state.dataSource === "excel" || state.dataSource === "demo") dataBit += " \u00B7 N=" + ACTIVE_DATA.length;
+      badge.textContent = copy.caption + " \u00B7 " + dataBit;
+    }
+    var wait = $("pt2RangeWait");
+    if (wait) wait.hidden = state.dataSource !== "pending";
   }
 
   function refreshDefaultAbbreviations() {
@@ -1509,8 +1549,7 @@
     renderVarGrid();
     renderPreview();
     if (state.tab === "details") renderDetails();
-    var badge = $("pt2SourceBadge");
-    if (badge) badge.textContent = sourceLabel() + " \u00B7 N=" + ACTIVE_DATA.length;
+    refreshHeaderChrome();
   }
 
   function syncStructureHints() {
@@ -1615,16 +1654,65 @@
       title: "Publication Tables",
       icon: "fa-circle-question",
       html:
-        helpItem("What this tool does",
-          "Builds a journal-ready table from the current dataset — baseline characteristics (Table 1), a descriptive summary, a frequency distribution, or a group comparison — then copies or exports it for Word.") +
-        helpItem("Build",
-          "Choose the table type, optional group, stratification, and weight variables, which rows to include, and the caption, notes, and style. Each panel\u2019s <strong>?</strong> button explains that section.") +
-        helpItem("Preview",
-          "Shows the manuscript page. Use 75%, 100%, 125%, or Fit width when a grouped table is wide. <strong>Copy Formatted Table</strong> is the usual way to paste into Word.") +
-        helpItem("Details",
-          "Methods text you can paste into a paper, a per-variable test audit (statistic, degrees of freedom, P value, SMD), and a data dictionary of the columns in this dataset.") +
+        helpItem("What you are looking at",
+          "Publication Tables turns the range selected in Excel into a journal-style table: a descriptive summary, a frequency distribution, a baseline Table 1, or a group comparison. The left column holds every specification. The three modes across the top change only the working area.") +
+        helpItem("Where the numbers come from",
+          "The first row of the selection is the header. Every row under it is one record. N is the number of those records (or the common analysis sample, if you turn that on). Blank cells are missing. The built-in example dataset is used only on the website demo, not when this window is opened from Excel.") +
+        helpItem("The three modes",
+          "<ul><li><strong>Build</strong> — which variables appear, in what order, and with what summary.</li><li><strong>Preview</strong> — the manuscript page. Caption, style, and export stay on the left.</li><li><strong>Details</strong> — the methods sentence, the test behind each P value, and a data dictionary.</li></ul>") +
+        helpItem("A row, read left to right",
+          "The stub is the variable (and, for categories, each level). The Overall column uses every record that has a value for that variable. Each group column uses only records in that level. n (%) is the count and the percent of the column N. Mean \u00B1 SD is the arithmetic mean and the standard deviation. The P column is the between-group test. SMD is the standardized mean difference and is shown only for a two-group comparison.")
+    },
+    "explain-build": {
+      title: "Build — variables and summaries",
+      icon: "fa-sliders",
+      html:
+        helpItem("Selected range",
+          "Select the block in Excel before you open this view: one header row, then the data, with each column a variable and each row a record. Addresses such as Sheet1!A1:H240 are shown under the mode name. If the window says no range is selected, select the block on the sheet and open Publication Tables again. A single cell, or a header with no data rows, is not enough.") +
+        helpItem("Table type",
+          "<ul><li><strong>Descriptive Summary</strong> — one column of summaries, no groups and no P values. Continuous rows use Mean \u00B1 SD unless you change the format. Categorical rows use n (%).</li><li><strong>Frequency Distribution</strong> — counts and percentages only. Continuous columns are left out until you set their type to categorical, ordinal, or binary in Configure.</li><li><strong>Baseline Characteristics — Table 1</strong> — Overall, plus one column per level of the group variable, plus P and (for two groups) SMD. This is the usual clinical Table 1.</li><li><strong>Group Comparison</strong> — the same layout, but Overall starts off so the table is about differences rather than the whole sample.</li></ul>Changing the table type resets the group, Overall, P, and SMD switches. Labels, formats, decimals, and which rows are included are kept.") +
+        helpItem("Group, stratification, and weight",
+          "<ul><li><strong>Group variable</strong> — a categorical column with 2 to 12 levels. Each included level becomes a column. The variable is removed from the body so it is not summarized as a row and also used as the columns. Uncheck a level in Edit categories to drop that column. Re-check Include on the group variable if you also want it as a body row.</li><li><strong>Stratification</strong> — a second categorical split. The table is repeated inside each stratum (for example Region: North, then Region: South), each with its own set of columns.</li><li><strong>Weight</strong> — a numeric column. Means, medians, and percentages use the weights. Column headings still show the unweighted N, so the reader can see how many records contributed.</li></ul>") +
+        helpItem("Overall, P, and SMD",
+          "<ul><li><strong>Overall</strong> — every record with a value for that row, including records whose group is missing when \u201CInclude in Overall only\u201D is selected.</li><li><strong>P value</strong> — needs at least two group columns. Continuous rows use Welch\u2019s t-test for two groups and one-way ANOVA for three or more. Categorical rows use the chi-square test. The footnote names the test. P is shown to 3 decimals; values smaller than 0.001 print as &lt;.001 (or &lt;0.001 if you turn on a leading zero).</li><li><strong>SMD</strong> — standardized mean difference, only when there are exactly two groups. It describes how far apart the groups are, not whether the difference is \u201Csignificant.\u201D Rough guides often used in baseline tables: under 0.10 is small, around 0.20 is noticeable, 0.50 and above is large. SMD is blank for categorical rows that have no defined two-group difference, and it is turned off automatically when there are not two groups.</li></ul>") +
+        helpItem("Missing data",
+          "<ul><li><strong>Common analysis sample</strong> — off by default. When on, any record missing at least one displayed variable is dropped from the whole table, so every row shares one N. When off, each row uses the records that have a value for that variable, which is the usual Table 1 rule. Ns can then differ by row.</li><li><strong>Missing as its own category</strong> — for categorical variables, a blank becomes a row labeled Missing (or whatever you type). Configure on a single variable can override this: inherit, show, or exclude.</li><li><strong>Records missing the group</strong> — Include in Overall only (default) keeps them in Overall and out of the group columns. Exclude drops them everywhere. Add a Missing group column gives them their own column. The preview note states how many records were affected.</li></ul>") +
+        helpItem("The variable list",
+          "The number is the order in the published table. Drag the grip to reorder. Include controls whether the variable is a row. The label is what readers see; Excel names such as Analytical_Thinking are cleaned to Analytical thinking, and the original name is on the field\u2019s tooltip. Summary shows the detected type, the format, and the decimals. Configure opens the type override (continuous, categorical, ordinal, binary), the summary format, decimals, the missing rule, and, for categories, Edit categories: Include, the original value, the display label, and the order. When that variable is also the group variable, Include there controls which group columns are printed.") +
+        helpItem("What Build does not change",
+          "Nothing is written back to the worksheet. Include, labels, and category edits affect only this table. The AI Assistant can propose a setup or cleaner labels, but those proposals stay in the dialog until you accept them.")
+    },
+    "explain-preview": {
+      title: "Preview — the manuscript page",
+      icon: "fa-file-lines",
+      html:
+        helpItem("What the page is",
+          "Preview is the table as it will look in a manuscript: table number, title, optional subtitle, the grid, then notes and abbreviations. The chip above the page names the range, N, how many variables are summarized, and the group or stratum if you set one. Specifications on the left apply immediately — you do not have a separate Apply step.") +
+        helpItem("Caption and notes",
+          "<ul><li><strong>Table number</strong> prints as \u201CTable N.\u201D Use the same numbering as the paper.</li><li><strong>Title</strong> is the caption. Switching table type may replace a title you have not edited. Once you type your own title, it is kept.</li><li><strong>Subtitle</strong> is an optional second line (population, time point, source).</li><li><strong>Notes</strong> — leave this blank to print the auto-generated methods note (formats, tests, missing-group handling, N). Anything you type replaces that note entirely.</li><li><strong>Abbreviations</strong> — a second footnote. With Excel data it is built from terms that actually appear (SD, SMD, and similar). Edit it for the journal. The clinical glossary from the website demo is not carried into an Excel table.</li></ul>") +
+        helpItem("Style presets",
+          "<ul><li><strong>Clinical Table 1</strong> — Times, bold caption, horizontal rules.</li><li><strong>APA descriptive</strong> — italic title.</li><li><strong>Journal minimal</strong> — shaded header and a leading zero in P values (0.05 rather than .05).</li><li><strong>Compact report</strong> — denser Arial layout.</li><li><strong>Custom</strong> — italic title, bold caption label, leading zero, serif or sans, row density, and a ruled or shaded header.</li></ul>Default decimals apply to continuous summaries. Default % decimals apply to percentages. <strong>Apply to all variables</strong> writes those into every variable. After that, Configure on one variable can still differ.") +
+        helpItem("Zoom",
+          "75%, 100%, and 125% scale the page. Fit width is for a grouped table that is wider than the pane: the page grows to the table and the pane scrolls, instead of clipping the left side.") +
+        helpItem("Copy and export",
+          "<ul><li><strong>Copy as Text</strong> — tab-delimited plain text. Use it for Excel or a text editor. Formatting is lost.</li><li><strong>Copy Formatted Table</strong> — HTML on the clipboard. This is the paste to use in Word, Outlook, or Google Docs. Paste with the application\u2019s \u201CKeep source formatting\u201D if the font looks wrong.</li><li><strong>Copy as HTML</strong> — the markup as plain text, for a web page or for inspection.</li><li><strong>View as HTML table</strong> — a viewer with Manuscript, Journal, Compact, Striped, or Slate. From there you can copy, download HTML, print, or save a Word-compatible file.</li><li><strong>Export Word Document</strong> — a .doc file that Word can open. Many journals still prefer Copy Formatted Table into a native Word table, because a wrapped HTML file is harder to edit.</li></ul>") +
+        helpItem("What to check before you paste",
+          "Confirm the group columns are the arms you intend, that empty levels you do not want are unchecked, that N in the column headings matches the analysis sample, and that the footnote names the tests you actually want cited. Details is the place to verify each P value\u2019s statistic and degrees of freedom.")
+    },
+    "explain-details": {
+      title: "Details — methods, tests, and the dictionary",
+      icon: "fa-magnifying-glass-chart",
+      html:
+        helpItem("Methods paragraph",
+          "This is prose built from the current specifications, not a stored sentence. It states how continuous variables are shown (mean \u00B1 SD, median and IQR, or median and range), that categorical variables are n (%) unless a row uses another format, which test is used for group comparisons, whether a weight is applied, how missing values and a missing group are handled, and N. Copy it into the paper\u2019s Methods or leave Preview notes blank so a shorter version prints under the table. If you change a format or a test-related switch, come back here — the paragraph updates.") +
+        helpItem("Which test is chosen",
+          "<ul><li>Two groups, continuous row — Welch\u2019s t-test (unequal variances). The statistic is t. df is Welch\u2019s approximation, shown to 2 decimals.</li><li>Three or more groups, continuous row — one-way ANOVA. df is printed as between, within.</li><li>Categorical row — chi-square test of independence. The statistic is \u03C7\u00B2. df is (rows \u2212 1) \u00D7 (group columns \u2212 1), using the levels that are included.</li></ul>There is no P value when the group variable is None, or when a group has fewer than two columns. Frequency and descriptive tables do not run these tests.") +
+        helpItem("How to read the audit",
+          "One line per summarized row. <strong>Type used</strong> is the type after any Configure override, which is what the test saw. <strong>Statistic</strong> is t, F, or \u03C7\u00B2. <strong>df</strong> is as above. <strong>P value</strong> matches the preview, including the &lt;.001 display. <strong>SMD</strong> is the absolute standardized difference for a two-group continuous comparison; it is blank when SMD is off, when there are not two groups, or when it is not defined for that row. Use the audit to confirm automatic test selection matches the analysis plan before you cite the P column.") +
+        helpItem("Data dictionary",
+          "Every column in the selected range is listed, not only the rows in the table. <strong>Summarized</strong> means Include is checked and the variable is in the body. <strong>Available (not summarized)</strong> means it is in the range but unchecked. Group, stratification, and weight roles are labeled separately, including which one is active. Categories are the levels detected in the data. A continuous column shows a numeric range instead of levels. If a column was inferred as the wrong type (an ID code treated as continuous, or a 1/2 code treated as binary), set the override in Build \u2192 Configure and check this list again.") +
         helpItem("AI Assistant",
-          "Suggests a setup, cleaner labels, a QC review, or a title, notes, and short Results draft. Nothing in the table changes until you accept a suggestion.")
+          "Set up my table, Improve labels, Review this table, and Draft title, notes, and Results are proposals. Review lists what would change and why. Accept selected applies only the rows you leave checked. Discard leaves the table as it was. The assistant does not decide scientific exclusions, merged categories, or which test is appropriate without that confirmation.")
     },
     "table-type": {
       title: "Table Type",
@@ -1774,9 +1862,11 @@
       titleEl.textContent = help.title;
       bodyEl.innerHTML = help.html;
       if (iconEl) iconEl.className = "fa-solid " + (help.icon || "fa-circle-info");
+      var box = overlay.querySelector(".pt2-modal-box");
+      if (box) box.classList.toggle("pt2-help-wide", topic === "overview" || topic.indexOf("explain-") === 0);
       overlay.classList.add("open");
     }
-    document.querySelectorAll(".pt2-help-btn[data-help], .pt2-st-help[data-help]").forEach(function (btn) {
+    document.querySelectorAll(".pt2-help-btn[data-help], .pt2-explain[data-help]").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -1802,8 +1892,11 @@
 
   function showTab(tab) {
     state.tab = tab;
+    refreshHeaderChrome();
     document.querySelectorAll(".pt2-tab-btn").forEach(function (b) {
-      b.classList.toggle("active", b.getAttribute("data-tab") === tab);
+      var on = b.getAttribute("data-tab") === tab;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
     });
     ["build", "preview", "details"].forEach(function (t) {
       var el = $("pt2View" + t.charAt(0).toUpperCase() + t.slice(1));

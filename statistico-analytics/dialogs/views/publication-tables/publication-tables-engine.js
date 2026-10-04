@@ -1611,6 +1611,21 @@
   }
 
   var PANEL_HELP = {
+    overview: {
+      title: "Publication Tables",
+      icon: "fa-circle-question",
+      html:
+        helpItem("What this tool does",
+          "Builds a journal-ready table from the current dataset — baseline characteristics (Table 1), a descriptive summary, a frequency distribution, or a group comparison — then copies or exports it for Word.") +
+        helpItem("Build",
+          "Choose the table type, optional group, stratification, and weight variables, which rows to include, and the caption, notes, and style. Each panel\u2019s <strong>?</strong> button explains that section.") +
+        helpItem("Preview",
+          "Shows the manuscript page. Use 75%, 100%, 125%, or Fit width when a grouped table is wide. <strong>Copy Formatted Table</strong> is the usual way to paste into Word.") +
+        helpItem("Details",
+          "Methods text you can paste into a paper, a per-variable test audit (statistic, degrees of freedom, P value, SMD), and a data dictionary of the columns in this dataset.") +
+        helpItem("AI Assistant",
+          "Suggests a setup, cleaner labels, a QC review, or a title, notes, and short Results draft. Nothing in the table changes until you accept a suggestion.")
+    },
     "table-type": {
       title: "Table Type",
       icon: "fa-shapes",
@@ -1761,7 +1776,7 @@
       if (iconEl) iconEl.className = "fa-solid " + (help.icon || "fa-circle-info");
       overlay.classList.add("open");
     }
-    document.querySelectorAll(".pt2-help-btn[data-help]").forEach(function (btn) {
+    document.querySelectorAll(".pt2-help-btn[data-help], .pt2-st-help[data-help]").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.preventDefault();
         e.stopPropagation();

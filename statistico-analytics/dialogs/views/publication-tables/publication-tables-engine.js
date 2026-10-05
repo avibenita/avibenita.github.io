@@ -351,7 +351,10 @@
     });
     var distinctVals = Object.keys(distinctSet);
     var numericRatio = n ? numericCount / n : 0;
-    var isContinuous = n > 0 && numericRatio >= 0.85 && distinctVals.length > 8;
+    var distinctRatio = n ? distinctVals.length / n : 0;
+    /* Few repeated levels stay categorical (sex, Likert). A short sheet of
+       almost-all-different numbers (means, SDs, years) is continuous. */
+    var isContinuous = n > 0 && numericRatio >= 0.85 && (distinctVals.length > 8 || (distinctVals.length > 4 && distinctRatio > 0.5));
     if (isContinuous) return { type: "continuous", missing: values.length - n };
     var allNum = distinctVals.length > 0 && distinctVals.every(function (s) { return isFinite(Number(s)); });
     distinctVals.sort(function (a, b) { return allNum ? Number(a) - Number(b) : a.localeCompare(b); });
@@ -387,9 +390,15 @@
 
   /* Group/stratification candidates: any categorical-ish column with a
      manageable number of levels. Weight candidates: any continuous column. */
-  function computeAuxVarDefs(varDefs) {
+  function computeAuxVarDefs(varDefs, nRows) {
+    var n = nRows || 0;
     var groupish = varDefs.filter(function (v) {
-      return v.type !== "continuous" && v.categories && v.categories.length >= 2 && v.categories.length <= 12;
+      if (v.type === "continuous" || !v.categories || v.categories.length < 2 || v.categories.length > 12) return false;
+      var name = String(v.label || v.key || "");
+      if (/(^id$|_id$|uuid|subject|participant.?id|record.?id)/i.test(name)) return false;
+      /* A grouping factor needs repeated levels. One row per level is an id. */
+      if (n && n / v.categories.length < 2) return false;
+      return true;
     }).map(function (v) { return { key: v.key, label: humanizeLabel(v.label), categories: v.categories }; });
     var weightish = varDefs.filter(function (v) { return v.type === "continuous"; })
       .map(function (v) { return { key: v.key, label: humanizeLabel(v.label) }; });
@@ -399,6 +408,12 @@
   /* Per-dataset memory of variable config, so a re-selection of the same
      range (or a bounce back to the demo set) doesn't discard prior edits. */
   var savedDatasetConfigs = { demo: null, excel: null };
+
+  function isIdentifierColumn(v, n) {
+    var name = String((v && (v.label || v.key)) || "");
+    if (/(^id$|_id$|uuid|subject|participant.?id|record.?id)/i.test(name)) return true;
+    return !!(v && v.categories && n && v.categories.length >= n && v.categories.length > 4);
+  }
 
   function setDataset(kind, rows, varDefs, groupDefs, stratDefs, weightDefs) {
     if (state.dataSource && state.varCfg) {
@@ -423,7 +438,7 @@
     });
     VAR_DEFS.forEach(function (v, idx) {
       if (!newCfg[v.key]) {
-        var includeDefault = kind === "demo" ? (DEMO_DEFAULT_SELECTED.indexOf(v.key) >= 0) : (idx < 15);
+        var includeDefault = kind === "demo" ? (DEMO_DEFAULT_SELECTED.indexOf(v.key) >= 0) : (idx < 15 && !isIdentifierColumn(v, rows.length));
         newCfg[v.key] = makeDefaultVarCfg(v, includeDefault);
         newOrder.push(v.key);
       }
@@ -2030,7 +2045,7 @@
     if (already && already.address === address && already.n === rowArrays.length) return;
 
     var built = buildExcelDataset(headers, rowArrays);
-    var aux = computeAuxVarDefs(built.varDefs);
+    var aux = computeAuxVarDefs(built.varDefs, built.rows.length);
     state.excelDataset = {
       rows: built.rows, varDefs: built.varDefs,
       groupDefs: aux.groupDefs, stratDefs: aux.stratDefs, weightDefs: aux.weightDefs,
@@ -3214,13 +3229,21 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 
-  /* Office.context isn't guaranteed to exist until Office.onReady() resolves,
-     so the host-messaging handshake (which needs Office.context.ui) waits
-     for that instead of running unconditionally inside init(). Everything
-     else in init() runs immediately so the demo table shows up without
-     delay if no range is selected (or this opens outside Excel). */
-  /* Skip Office host handshake on website demos — office.js is not loaded. */
-  if (!window.__PT2_WEB_DEMO__ && typeof Office !== "undefined" && Office.onReady) {
-    Office.onReady().then(wireHostMessaging).catch(function () {});
+  /* office.js is inserted asynchronously and often finishes after this
+     file. Poll until Office exists, then wait for onReady before the
+     parent-message handler is registered. Website demos never load it. */
+  function startHostMessaging() {
+    if (window.__PT2_WEB_DEMO__) return;
+    var tries = 0;
+    function kick() {
+      if (typeof Office !== "undefined" && Office.onReady) {
+        Office.onReady().then(wireHostMessaging).catch(function () {});
+        return;
+      }
+      tries += 1;
+      if (tries < 80) setTimeout(kick, 100);
+    }
+    kick();
   }
+  startHostMessaging();
 })();

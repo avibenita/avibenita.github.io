@@ -2361,60 +2361,74 @@ function openBuilderDialogFromHub(options) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PUBLICATION TABLES — flow
-   The builder is a single self-contained dialog (Build / Preview / Details
-   tabs, own demo dataset + stats engine). On open we push it the currently
-   selected Active Range (if any) so it can build the table from real data
-   instead of the built-in demo set; the builder falls back to the demo
-   dataset on its own if no usable range is selected.
+   The builder is a single dialog (Build / Preview / Details). On open we
+   send the worksheet range already shown in the task pane. A click on an
+   empty cell does not replace that range. The live selection is read only
+   when the task pane has no range yet.
    ═══════════════════════════════════════════════════════════════════════════ */
 function finishHubPublicationTablesFlow() {
   hubPublicationTablesFlowActive = false;
   if (!hubPublicationTablesResultsDialog) setSelectedModuleCard("publication-tables", false);
 }
 
+function cellHasValue(value) {
+  return value != null && String(value).trim() !== "";
+}
+
+function publicationTablesTablePayload(values, address) {
+  if (!values || values.length < 2) return null;
+  var headers = values[0] || [];
+  var rows = values.slice(1);
+  var headerFilled = false;
+  var r, c;
+  for (c = 0; c < headers.length; c++) {
+    if (cellHasValue(headers[c])) { headerFilled = true; break; }
+  }
+  if (!headerFilled || !rows.length) return null;
+  var dataFilled = false;
+  for (r = 0; r < rows.length && !dataFilled; r++) {
+    var row = rows[r] || [];
+    for (c = 0; c < row.length; c++) {
+      if (cellHasValue(row[c])) { dataFilled = true; break; }
+    }
+  }
+  if (!dataFilled) return null;
+  return { headers: headers, rows: rows, address: address || "" };
+}
+
 function pushPublicationTablesPayload(payload) {
   if (!hubPublicationTablesResultsDialog || !payload) return;
   if (!payload.headers || !payload.headers.length || !payload.rows || !payload.rows.length) return;
-  hubPublicationTablesResultsDialog.messageChild(JSON.stringify({
-    type: "PUBTABLES_DATA",
-    payload: payload
-  }));
+  try {
+    hubPublicationTablesResultsDialog.messageChild(JSON.stringify({
+      type: "PUBTABLES_DATA",
+      payload: payload
+    }));
+  } catch (e) {}
 }
 
 function sendPublicationTablesDataFromHub() {
   if (!hubPublicationTablesResultsDialog) return;
-  function sendStored() {
-    var gr = getGlobalRangePayload();
-    if (!gr) return;
-    pushPublicationTablesPayload({
-      headers: gr.values[0] || [],
-      rows: gr.values.slice(1),
-      address: gr.address || ""
-    });
-  }
-  if (typeof Excel === "undefined" || !Excel.run) {
-    sendStored();
+  var gr = getGlobalRangePayload();
+  var stored = gr ? publicationTablesTablePayload(gr.values, gr.address || "") : null;
+  if (stored) {
+    pushPublicationTablesPayload(stored);
     return;
   }
+  if (typeof Excel === "undefined" || !Excel.run) return;
   Excel.run(function (ctx) {
     var rng = ctx.workbook.getSelectedRange();
     rng.load(["values", "address", "rowCount"]);
     return ctx.sync().then(function () {
-      var values = rng.values;
-      if (rng.rowCount >= 2 && values && values.length >= 2 && values[0] && values[0].length) {
-        if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.save === "function") {
-          StatisticoGlobalRange.save(values, rng.address, "selection");
-        }
-        pushPublicationTablesPayload({
-          headers: values[0] || [],
-          rows: values.slice(1),
-          address: rng.address || ""
-        });
-        return;
+      if (!rng.rowCount || rng.rowCount < 2) return;
+      var built = publicationTablesTablePayload(rng.values, rng.address || "");
+      if (!built) return;
+      if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.save === "function") {
+        StatisticoGlobalRange.save(rng.values, rng.address, "selection");
       }
-      sendStored();
+      pushPublicationTablesPayload(built);
     });
-  }).catch(function () { sendStored(); });
+  }).catch(function () {});
 }
 
 function openPublicationTablesConfigFromHub() {

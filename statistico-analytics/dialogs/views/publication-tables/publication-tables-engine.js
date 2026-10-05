@@ -419,7 +419,8 @@
     if (state.dataSource && state.varCfg) {
       savedDatasetConfigs[state.dataSource] = {
         order: state.varOrder, cfg: state.varCfg,
-        groupVar: state.groupVar, stratVar: state.stratVar, weightVar: state.weightVar
+        groupVar: state.groupVar, stratVar: state.stratVar, weightVar: state.weightVar,
+        studyVar: state.studyVar
       };
     }
 
@@ -447,6 +448,11 @@
     state.varCfg = newCfg;
     state.stratVar = (saved && saved.stratVar && STRAT_VAR_DEFS.some(function (s) { return s.key === saved.stratVar; })) ? saved.stratVar : "";
     state.weightVar = (saved && saved.weightVar && WEIGHT_VAR_DEFS.some(function (w) { return w.key === saved.weightVar; })) ? saved.weightVar : "";
+    if (saved && Object.prototype.hasOwnProperty.call(saved, "studyVar")) {
+      state.studyVar = saved.studyVar && VAR_DEFS_BY_KEY[saved.studyVar] ? saved.studyVar : "";
+    } else {
+      state.studyVar = autoStudyKey(kind);
+    }
     state.dataSource = kind;
 
     // Make sure a group var is picked if the current table type needs one
@@ -538,6 +544,7 @@
     tab: "preview",
     tableType: "table1",
     groupVar: "treatment",
+    studyVar: "",
     stratVar: "",
     weightVar: "",
     showOverall: true,
@@ -696,6 +703,7 @@
     // Group / strat / weight columns belong in the table structure, not as body rows
     // (unless the user explicitly re-includes the group variable as a row).
     if (v.key === state.groupVar && !cfg.forceIncludeGroupRow) return false;
+    if (v.key === state.studyVar) return false;
     if (v.key === state.stratVar || v.key === state.weightVar) return false;
     if (state.tableType === "frequency" && effectiveType(v, cfg) === "continuous") return false;
     return true;
@@ -941,6 +949,52 @@
     return { type: "categorical", varKey: v.key, label: cfg.label + ", " + (FORMAT_SUFFIX[cfg.format] || "n (%)"), categoryRows: categoryRows, test: test, smd: smd };
   }
 
+  function autoStudyKey(kind) {
+    if (kind === "demo") return "";
+    var hit = VAR_DEFS.filter(function (v) {
+      var name = String(v.label || "").trim();
+      return /^study$/i.test(name) || /^study[ _-]?name$/i.test(name);
+    })[0];
+    return hit ? hit.key : "";
+  }
+
+  function formatListedValue(v, cfg, raw) {
+    if (isMissing(raw)) return "\u2014";
+    if (effectiveType(v, cfg) === "continuous" && isFinite(Number(raw))) {
+      var n = Number(raw);
+      var decimals = n === Math.round(n) ? 0 : (cfg.decimals || 0);
+      return fmtNum(n, decimals);
+    }
+    return String(raw);
+  }
+
+  /* One row per record, named by the Study column. Checked variables are columns. */
+  function buildStudyListing(baseRows) {
+    var studyKey = state.studyVar;
+    var studyCfg = state.varCfg[studyKey];
+    var vars = eligibleVarDefs();
+    var columns = vars.map(function (v) {
+      var cfg = state.varCfg[v.key];
+      return { key: v.key, label: (cfg && cfg.label) || v.label };
+    });
+    var rows = baseRows.map(function (rec) {
+      var rawLabel = rec[studyKey];
+      return {
+        type: "study",
+        label: isMissing(rawLabel) ? "\u2014" : String(rawLabel),
+        cells: vars.map(function (v) { return formatListedValue(v, state.varCfg[v.key], rec[v.key]); })
+      };
+    });
+    return {
+      listing: true,
+      stubLabel: (studyCfg && studyCfg.label) || "Study",
+      columns: columns,
+      rows: rows,
+      n: baseRows.length,
+      columnN: {}
+    };
+  }
+
   function buildTableBlock(baseRows) {
     var columns = getColumns();
     var vars = eligibleVarDefs();
@@ -955,6 +1009,9 @@
 
   function buildModel() {
     var baseRows = getWorkingRows();
+    if (state.studyVar && VAR_DEFS_BY_KEY[state.studyVar]) {
+      return { strata: [{ label: null, block: buildStudyListing(baseRows) }] };
+    }
     if (!state.stratVar) return { strata: [{ label: null, block: buildTableBlock(baseRows) }] };
     var sdef = STRAT_VAR_DEFS.filter(function (s) { return s.key === state.stratVar; })[0];
     var strata = sdef.categories.map(function (level) {
@@ -969,6 +1026,9 @@
   /* ═══════════════════════════ 7. HTML / TEXT RENDERING ═══════════════════════════ */
 
   function autoNoteText() {
+    if (state.studyVar && state.varCfg[state.studyVar]) {
+      return "Each row is one record, labeled by " + state.varCfg[state.studyVar].label + ". Other columns show the recorded value. N = " + getWorkingRows().length + ".";
+    }
     var contFormats = {}, catFormats = {};
     var hasContinuous = false, hasCategorical = false;
     eligibleVarDefs().forEach(function (v) {
@@ -1021,6 +1081,22 @@
   }
 
   function renderBlockTable(block, sp, rowPad, fontSize, headerBorderBottom, headerBg) {
+    if (block.listing) {
+      var listHtml = '<table class="' + (sp.headerStyle === "shade" ? "pt2-head-shade" : "") + '" style="width:100%;border-collapse:collapse;font-size:' + fontSize + ';color:#111;border-top:2px solid #111;border-bottom:2px solid #111;">';
+      listHtml += "<thead><tr>";
+      listHtml += '<th style="text-align:left;padding:' + rowPad + ";color:#111;background:#fff;" + headerBorderBottom + headerBg + '">' + esc(block.stubLabel) + "</th>";
+      block.columns.forEach(function (col) {
+        listHtml += '<th style="text-align:center;padding:' + rowPad + ";color:#111;background:#fff;" + headerBorderBottom + headerBg + '">' + esc(col.label) + "</th>";
+      });
+      listHtml += "</tr></thead><tbody>";
+      block.rows.forEach(function (row) {
+        listHtml += '<tr><td style="padding:' + rowPad + ';text-align:left;">' + esc(row.label) + "</td>";
+        row.cells.forEach(function (c) { listHtml += '<td style="padding:' + rowPad + ';text-align:center;">' + esc(c) + "</td>"; });
+        listHtml += "</tr>";
+      });
+      listHtml += "</tbody></table>";
+      return listHtml;
+    }
     var showTest = state.showPValue && block.rows.some(function (r) { return r.test; });
     var showSmdCol = state.showSMD && block.rows.some(function (r) { return r.smd != null && isFinite(r.smd); });
     var html = '<table class="' + (sp.headerStyle === "shade" ? "pt2-head-shade" : "") + '" style="width:100%;border-collapse:collapse;font-size:' + fontSize + ';color:#111;border-top:2px solid #111;border-bottom:2px solid #111;">';
@@ -1093,6 +1169,12 @@
     model.strata.forEach(function (stratum) {
       if (stratum.label) lines.push(stratum.label);
       var block = stratum.block;
+      if (block.listing) {
+        lines.push([block.stubLabel].concat(block.columns.map(function (c) { return c.label; })).join("\t"));
+        block.rows.forEach(function (row) { lines.push([row.label].concat(row.cells).join("\t")); });
+        lines.push("");
+        return;
+      }
       var showTest = state.showPValue && block.rows.some(function (r) { return r.test; });
       var showSmdCol = state.showSMD && block.rows.some(function (r) { return r.smd != null && isFinite(r.smd); });
       var header = ["Characteristic"].concat(block.columns.map(function (c) { return c.label + " (N=" + block.columnN[c.key] + ")"; }));
@@ -1275,6 +1357,7 @@
       var willAppearInTable = isVariableEligible(v, cfg);
       if (willAppearInTable) tableRowCounter += 1;
       var isGroupRow = v.key === state.groupVar;
+      var isStudyRow = v.key === state.studyVar;
 
       var tr = document.createElement("tr");
       tr.dataset.varKey = v.key;
@@ -1299,8 +1382,11 @@
       var tdInclude = document.createElement("td");
       var chk = document.createElement("input");
       chk.type = "checkbox";
-      chk.checked = isGroupRow ? !!cfg.forceIncludeGroupRow : !!cfg.include;
-      chk.title = isGroupRow
+      chk.checked = isStudyRow ? false : (isGroupRow ? !!cfg.forceIncludeGroupRow : !!cfg.include);
+      chk.disabled = isStudyRow;
+      chk.title = isStudyRow
+        ? "This column names each row. Change it under Configuration → Study (row label)."
+        : isGroupRow
         ? "Group variable is omitted from the table body by default. Check to include it as a row anyway."
         : "Include in the published table";
       chk.addEventListener("change", function () {
@@ -1323,10 +1409,10 @@
       labelInput.title = cfg.sourceName && cfg.sourceName !== cfg.label ? ("Original: " + cfg.sourceName) : "";
       labelInput.addEventListener("input", function () { cfg.label = labelInput.value; renderPreview(); });
       tdVar.appendChild(labelInput);
-      if (isGroupRow) {
+      if (isStudyRow || isGroupRow) {
         var tag = document.createElement("span");
         tag.className = "pt2-role-tag";
-        tag.textContent = "group";
+        tag.textContent = isStudyRow ? "row label" : "group";
         tdVar.appendChild(tag);
       }
       tr.appendChild(tdVar);
@@ -1455,14 +1541,16 @@
     var chip = $("pt2SourceChip");
     var gDef = state.groupVar ? GROUP_VAR_DEFS.filter(function (g) { return g.key === state.groupVar; })[0] : null;
     var sDef = state.stratVar ? STRAT_VAR_DEFS.filter(function (s) { return s.key === state.stratVar; })[0] : null;
-    chip.textContent = sourceLabel() + " · N=" + ACTIVE_DATA.length + " · " + eligibleVarDefs().length + " variable(s) summarized" +
-      (gDef ? " · grouped by " + gDef.label : "") +
-      (sDef ? " · stratified by " + sDef.label : "");
+    var studyCfg = state.studyVar && state.varCfg[state.studyVar];
+    chip.textContent = sourceLabel() + " · N=" + ACTIVE_DATA.length + " · " + eligibleVarDefs().length + " variable(s)" +
+      (studyCfg ? " · each row labeled by " + studyCfg.label : " summarized") +
+      (!studyCfg && gDef ? " · grouped by " + gDef.label : "") +
+      (!studyCfg && sDef ? " · stratified by " + sDef.label : "");
 
     var existingPaper = wrap.querySelector(".pt2-paper");
     if (!existingPaper) { existingPaper = document.createElement("div"); existingPaper.className = "pt2-paper"; wrap.appendChild(existingPaper); }
 
-    if (!eligibleVarDefs().length) {
+    if (!state.studyVar && !eligibleVarDefs().length) {
       existingPaper.innerHTML = '<div class="pt2-error">No variables are currently included in this table. Go to the Build tab and include at least one variable.</div>';
       applyPreviewZoom();
       return;
@@ -1478,6 +1566,12 @@
     var auditBody = $("pt2AuditBody");
     auditBody.innerHTML = "";
     model.strata.forEach(function (stratum) {
+      if (stratum.block.listing) {
+        var note = document.createElement("tr");
+        note.innerHTML = "<td>" + esc(stratum.block.stubLabel) + "</td><td>listing</td><td>\u2014</td><td>\u2014</td><td>\u2014</td><td>\u2014</td><td>\u2014</td>";
+        auditBody.appendChild(note);
+        return;
+      }
       stratum.block.rows.forEach(function (row) {
         var tr = document.createElement("tr");
         var label = (stratum.label ? stratum.label + " \u2013 " : "") + row.label;
@@ -1569,6 +1663,14 @@
 
   function syncStructureHints() {
     var levels = countGroupLevels();
+    var studyHint = $("pt2StudyHint");
+    if (studyHint) {
+      var studyLabel = state.studyVar && state.varCfg[state.studyVar] ? state.varCfg[state.studyVar].label : "";
+      studyHint.textContent = studyLabel
+        ? "Each report row is one record, named by " + studyLabel + ". Checked variables are the other columns. Group, P, and SMD apply only when this is None."
+        : "Choose the column that names each row, such as Study. None summarizes the checked variables instead (one row per variable).";
+    }
+
     var smdEl = $("pt2ShowSMD");
     var smdHint = $("pt2SmdHint");
     var smdAllowed = !!state.groupVar && levels === 2;
@@ -1635,6 +1737,10 @@
     $("pt2ShowOverall").checked = state.showOverall;
     $("pt2ShowPValue").checked = state.showPValue;
     $("pt2ShowSMD").checked = state.showSMD;
+    populateSelect($("pt2StudyVar"), VAR_DEFS.map(function (v) {
+      var cfg = state.varCfg[v.key];
+      return { key: v.key, label: (cfg && cfg.label) || v.label };
+    }), state.studyVar, "None — summarize variables");
     populateSelect($("pt2GroupVar"), GROUP_VAR_DEFS, state.groupVar, "None");
     populateSelect($("pt2StratVar"), STRAT_VAR_DEFS, state.stratVar, "None");
     populateSelect($("pt2WeightVar"), WEIGHT_VAR_DEFS, state.weightVar, "None (unweighted)");
@@ -1748,6 +1854,8 @@
       title: "Structure",
       icon: "fa-diagram-project",
       html:
+        helpItem("Study (row label)",
+          "The column that names each row of the report, such as Study. Checked variables become the other columns, and each Excel row is printed as recorded. None leaves the summary layout: one row per variable, with Overall (and group columns, when you set a group). A column named Study is selected automatically when the range is loaded from Excel.") +
         helpItem("Group variable",
           "Splits the table into columns — one for each included level of this categorical variable (e.g. treatment arm, sex). Use <strong>Edit categories</strong> on that variable to hide a level (uncheck Include) or rename column headers. The group variable is automatically removed from the table body; you can override that in the Variables list.") +
         helpItem("Stratification variable",
@@ -1976,6 +2084,11 @@
         syncControlsFromState();
         renderAll();
       });
+    });
+    $("pt2StudyVar").addEventListener("change", function (e) {
+      state.studyVar = e.target.value || "";
+      syncControlsFromState();
+      renderAll();
     });
     $("pt2GroupVar").addEventListener("change", function (e) {
       applyGroupVarSelection(e.target.value);
@@ -2235,6 +2348,18 @@
     m.strata.forEach(function (stratum, sIdx) {
       if (stratum.label) body += '<div style="font-weight:700;font-size:12.5px;margin:' + (sIdx ? "16px" : "0") + ' 0 6px;">' + esc(stratum.label) + "</div>";
       var block = stratum.block;
+      if (block.listing) {
+        body += "<table><thead><tr><th>" + esc(block.stubLabel) + "</th>";
+        block.columns.forEach(function (col) { body += "<th>" + esc(col.label) + "</th>"; });
+        body += "</tr></thead><tbody>";
+        block.rows.forEach(function (row) {
+          body += "<tr><td>" + esc(row.label) + "</td>";
+          row.cells.forEach(function (c) { body += "<td>" + esc(c) + "</td>"; });
+          body += "</tr>";
+        });
+        body += "</tbody></table>";
+        return;
+      }
       var hasTest = showTest && block.rows.some(function (r) { return r.test; });
       var hasSmd = showSmdCol && block.rows.some(function (r) { return r.smd != null && isFinite(r.smd); });
       body += "<table><thead><tr><th>Characteristic</th>";

@@ -1525,7 +1525,7 @@
   }
 
   var MODE_COPY = {
-    build: { title: "Build", caption: "Variables, include, order, and summary format" },
+    build: { title: "Build", caption: "Configuration" },
     preview: { title: "Preview", caption: "Manuscript page" },
     details: { title: "Details", caption: "Methods text, test audit, and data dictionary" }
   };
@@ -1674,12 +1674,12 @@
         helpItem("Where the numbers come from",
           "The first row of the selection is the header. Every row under it is one record. N is the number of those records (or the common analysis sample, if you turn that on). Blank cells are missing. The built-in example dataset is used only on the website demo, not when this window is opened from Excel.") +
         helpItem("The three modes",
-          "<ul><li><strong>Build</strong> — which variables appear, in what order, and with what summary.</li><li><strong>Preview</strong> — the manuscript page. Caption, style, and export stay on the left.</li><li><strong>Details</strong> — the methods sentence, the test behind each P value, and a data dictionary.</li></ul>") +
+          "<ul><li><strong>Build</strong> — the configuration input panel. Variables to include are on the left. Table type, structure, missing data, caption, style, and export are on the right.</li><li><strong>Preview</strong> — the manuscript page.</li><li><strong>Details</strong> — the methods sentence, the test behind each P value, and a data dictionary.</li></ul>") +
         helpItem("A row, read left to right",
           "The stub is the variable (and, for categories, each level). The Overall column uses every record that has a value for that variable. Each group column uses only records in that level. n (%) is the count and the percent of the column N. Mean \u00B1 SD is the arithmetic mean and the standard deviation. The P column is the between-group test. SMD is the standardized mean difference and is shown only for a two-group comparison.")
     },
     "explain-build": {
-      title: "Build — variables and summaries",
+      title: "Build — configuration",
       icon: "fa-sliders",
       html:
         helpItem("Selected range",
@@ -1702,7 +1702,7 @@
       icon: "fa-file-lines",
       html:
         helpItem("What the page is",
-          "Preview is the table as it will look in a manuscript: table number, title, optional subtitle, the grid, then notes and abbreviations. The chip above the page names the range, N, how many variables are summarized, and the group or stratum if you set one. Specifications on the left apply immediately — you do not have a separate Apply step.") +
+          "Preview is the table as it will look in a manuscript: table number, title, optional subtitle, the grid, then notes and abbreviations. The chip above the page names the range, N, how many variables are summarized, and the group or stratum if you set one. Change the setup on Build. Those settings apply immediately — there is no separate Apply step.") +
         helpItem("Caption and notes",
           "<ul><li><strong>Table number</strong> prints as \u201CTable N.\u201D Use the same numbering as the paper.</li><li><strong>Title</strong> is the caption. Switching table type may replace a title you have not edited. Once you type your own title, it is kept.</li><li><strong>Subtitle</strong> is an optional second line (population, time point, source).</li><li><strong>Notes</strong> — leave this blank to print the auto-generated methods note (formats, tests, missing-group handling, N). Anything you type replaces that note entirely.</li><li><strong>Abbreviations</strong> — a second footnote. With Excel data it is built from terms that actually appear (SD, SMD, and similar). Edit it for the journal. The clinical glossary from the website demo is not carried into an Excel table.</li></ul>") +
         helpItem("Style presets",

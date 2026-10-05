@@ -2630,7 +2630,10 @@ const StatisticoHeader = {
     for (let i = scripts.length - 1; i >= 0; i--) {
       const src = scripts[i].src || '';
       if (src.indexOf('shared-brand-logo.js') !== -1 || src.indexOf('shared-header.js') !== -1) {
-        return src.replace(/\/[^/]+$/, '/statistico-logo-hub.png?v=20260808blue');
+        var logoFile = document.documentElement.getAttribute('data-theme') === 'light'
+          ? 'statistico-logo-light.png?v=20261005light1'
+          : 'statistico-logo-hub.png?v=20261005light1';
+        return src.replace(/\/[^/]+$/, '/' + logoFile);
       }
     }
     return '';

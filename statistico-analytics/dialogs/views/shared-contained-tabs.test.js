@@ -27,7 +27,7 @@ describe('shared contained tabs', () => {
     expect(css).toMatch(/#header-container[\s\S]*background:\s*transparent !important;/);
     expect(headerCss).toMatch(/#header-container[\s\S]*background:\s*transparent !important;/);
     expect(css).toMatch(/display:\s*none !important;/);
-    expect(css).toMatch(/--st-header-pre-tabs:\s*80px/);
+    expect(css).toMatch(/--st-header-pre-tabs:\s*120px/);
     expect(css).toMatch(/\.sb-logo[\s\S]*border-bottom:\s*1px solid var\(--st-contained-divider\)/);
     expect(css).toMatch(/\.sb-body[\s\S]*padding-top:\s*calc\(var\(--st-contained-h, 48px\) \+ 0\.5cm\)/);
     expect(css).toMatch(/#results-container \{[\s\S]*padding-top:\s*0\.5cm !important;/);

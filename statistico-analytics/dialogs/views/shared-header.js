@@ -35,6 +35,18 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
     document.documentElement.setAttribute('data-tabs', 'contained');
   })();
 
+  /* Every page load starts in dark. Light remains available from the switcher. */
+  (function applyDarkOnLoad() {
+    try {
+      var root = document.documentElement;
+      root.setAttribute('data-theme', 'dark');
+      root.setAttribute('data-theme-pref', 'dark');
+      root.classList.add('highcharts-dark');
+      root.classList.remove('highcharts-light');
+      localStorage.setItem('statistico-theme', 'dark');
+    } catch (e) {}
+  })();
+
   // Hub / marketing embeds (?embed=1): mark the document and keep the 300px
   // sidebar from swallowing narrow modal iframes before page-specific CSS runs.
   // Demos always stay dark so they don't inherit the marketing site's light theme.
@@ -2469,7 +2481,7 @@ const StatisticoHeader = {
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
   },
 
-  _TAB_ASSET_VER: '20260922closeread',
+  _TAB_ASSET_VER: '20261005dark1',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

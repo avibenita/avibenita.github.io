@@ -2510,7 +2510,7 @@
 
   var AI_PROXY_URL = "https://statistico-ai.statistico.workers.dev/";
   var GROQ_MODELS = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"];
-  var AI_HARD_TIMEOUT_MS = 10000;
+  var AI_HARD_TIMEOUT_MS = 20000;
   var aiSession = {
     action: null, payload: null, busy: false,
     abort: null, statusTimer: null, timeoutHandle: null, requestId: 0
@@ -2576,8 +2576,11 @@
             },
             { role: "user", content: prompt }
           ],
-          max_tokens: maxTokens || 500,
-          temperature: 0.2
+          max_tokens: Math.max(maxTokens || 0, 1200),
+          temperature: 0.2,
+          /* gpt-oss spends a small token budget on hidden reasoning and then
+             returns an empty message. Low effort keeps the JSON in content. */
+          reasoning_effort: "low"
         }),
         signal: controller ? controller.signal : undefined
       }).then(function (r) {
@@ -2587,9 +2590,19 @@
           });
         }
         return r.json().then(function (d) {
-          var text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+          var choice = d && d.choices && d.choices[0];
+          var message = choice && choice.message;
+          var text = message && message.content;
           text = text && String(text).trim();
-          if (!text) throw new Error("Empty AI response");
+          if (!text && message) {
+            var reasoning = String(message.reasoning || message.reasoning_content || "").trim();
+            if (reasoning.indexOf("{") >= 0) text = reasoning;
+          }
+          if (!text) {
+            throw new Error(choice && choice.finish_reason === "length"
+              ? "AI reply was cut off before the answer"
+              : "Empty AI response");
+          }
           return text;
         });
       });
@@ -2782,7 +2795,7 @@
 
   function renderAiProposalList(items) {
     if (!items || !items.length) {
-      $("pt2AiResult").innerHTML = '<p class="cfg-hint">No changes suggested.</p>';
+      $("pt2AiResult").innerHTML = '<p class="cfg-hint">Nothing stands out to change. Include, labels, and the group or study setting already look consistent. Edit them on Build if you want a different layout.</p>';
       $("pt2AiFooter").style.display = "none";
       return;
     }

@@ -1013,8 +1013,6 @@ function renderCategoryTiles(query) {
   });
   var html = "";
   var sectionOrder = getClusterSectionOrder(ACTIVE_CLUSTER);
-  var searching = !!q;
-  var openSet = getHubOpenSectionSet();
   sectionOrder.forEach(function (sectionId) {
     var familyTiles = list.filter(function (c) {
       return getClusterTileSectionId(ACTIVE_CLUSTER, c, allSource) === sectionId;
@@ -1033,11 +1031,7 @@ function renderCategoryTiles(query) {
         return renderCategoryModuleBtn(m, tabStyle, scopePrefix, mods.length === 1);
       }).join("");
     }).join("") + "</div>";
-    if (ACTIVE_CLUSTER === "calculators") {
-      html += '<div class="calc-group">' + renderCalcSectionHeader(sectionId, false) + tilesHtml + "</div>";
-    } else {
-      html += renderHubAccordionPanel(sectionId, tilesHtml, searching || !!openSet[sectionId], familyTiles);
-    }
+    html += '<div class="calc-group">' + renderClusterSectionHeader(sectionId) + tilesHtml + "</div>";
   });
   if (ACTIVE_CLUSTER === "tools") {
     var standaloneTiles = list.filter(function (c) { return !!c.standalone; });
@@ -1225,7 +1219,7 @@ function syncHubExpandAllButton() {
   var btn = document.getElementById("hubExpandAllBtn");
   var label = document.getElementById("hubExpandAllBtnLabel");
   var icon = btn && btn.querySelector("i");
-  if (btn && ACTIVE_CLUSTER === "calculators") {
+  if (btn) {
     btn.hidden = true;
     return;
   }
@@ -1297,6 +1291,16 @@ function syncAnalyticsAllBar(query) {
     if (typeof query === "string") input.value = query;
   }
   syncHubExpandAllButton();
+}
+
+function renderClusterSectionHeader(sectionId) {
+  var meta = getClusterSectionMeta(ACTIVE_CLUSTER)[sectionId];
+  if (!meta) return "";
+  return (
+    '<div class="category-section-header" style="--section-color:' + escapeHtml(meta.color) + ';margin:0 0 6px;">' +
+    '<div class="category-section-title">' + escapeHtml(meta.label) + "</div>" +
+    "</div>"
+  );
 }
 
 function renderCalcSectionHeader(sectionId, withDivider) {

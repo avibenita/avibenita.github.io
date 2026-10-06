@@ -555,6 +555,11 @@
     );
   }
 
+  function moduleIsLocked(moduleId) {
+    var api = global.StatisticoHubEntitlement;
+    return !!(api && typeof api.isModuleLocked === "function" && api.isModuleLocked(moduleId));
+  }
+
   function renderAlternatives(alts) {
     if (!alts.length) return "";
     var html =
@@ -562,9 +567,11 @@
       '<div class="proc-advisor-alts-title">You may also consider</div>' +
       '<div class="proc-advisor-alt-list">';
     alts.forEach(function (alt) {
+      var locked = moduleIsLocked(alt.moduleId);
       html +=
         '<button type="button" class="proc-advisor-alt" data-module-id="' + escapeHtml(alt.moduleId) + '">' +
         escapeHtml(alt.titleFull) +
+        (locked ? " · Professional" : "") +
         "</button>";
     });
     html += "</div></div>";
@@ -573,6 +580,11 @@
 
   function renderResult(bundle) {
     var rec = bundle.rec;
+    var locked = moduleIsLocked(rec.moduleId);
+    var openLabel = locked ? "Activate Early Access" : "Open Analysis";
+    var planBadge = locked
+      ? '<span class="proc-advisor-badge">Professional</span>'
+      : "";
     return (
       '<div class="proc-advisor-step-label">Your recommendation</div>' +
       '<div class="proc-advisor-progress">' +
@@ -589,6 +601,7 @@
       '<div class="proc-advisor-badges">' +
       '<span class="proc-advisor-badge ' + difficultyClass(rec.difficulty) + '">' + escapeHtml(rec.difficulty) + "</span>" +
       '<span class="proc-advisor-badge proc-advisor-badge--time">' + escapeHtml(rec.duration) + "</span>" +
+      planBadge +
       "</div>" +
       "</div>" +
       '<p class="proc-advisor-rec-why"><strong>Why:</strong> ' + escapeHtml(rec.reason) + "</p>" +
@@ -600,12 +613,18 @@
       '<button type="button" class="proc-advisor-btn proc-advisor-btn--ghost" id="procAdvisorLearnBtn">' +
       (state.learnOpen ? "Hide details" : "Learn why") +
       "</button>" +
-      '<button type="button" class="proc-advisor-btn proc-advisor-btn--primary" id="procAdvisorOpen" data-module-id="' + escapeHtml(rec.moduleId) + '">Open Analysis</button>' +
+      '<button type="button" class="proc-advisor-btn proc-advisor-btn--primary" id="procAdvisorOpen" data-module-id="' + escapeHtml(rec.moduleId) + '">' + openLabel + "</button>" +
       "</div>"
     );
   }
 
   function launchModule(moduleId) {
+    if (moduleIsLocked(moduleId)) {
+      close();
+      var license = global.StatisticoHubEntitlement;
+      if (license && typeof license.openEarlyAccess === "function") license.openEarlyAccess();
+      return;
+    }
     close();
     if (typeof global.navigateToModule === "function") {
       global.navigateToModule(moduleId);

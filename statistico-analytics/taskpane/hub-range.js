@@ -8,7 +8,7 @@
   var lastPromptBindingId = null;
 
   var KIND_LABELS = {
-    used: "Using data from the current worksheet",
+    used: "Using data from the worksheet",
     prompt: "Using a selected range",
     selection: "Using the current selection",
     named: "Using a named range"

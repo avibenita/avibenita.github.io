@@ -1,0 +1,101 @@
+The current architecture is actually quite good:
+AppSource manifest
+→ hub.html?scope=appsource-v1
+→ redirects to the real production hub (hub-prep28.html)
+→ appsource-v1.json currently decides which modules may be used.
+So there is already one Statistico application, not separate light/full codebases. The light version is simply an entitlement restriction layered over the full product.
+I would now tell Cursor to preserve scope=appsource-v1 as a distribution-channel marker, but replace the hard-coded three-module allow-list as the ultimate authority with the new entitlement system.
+The target architecture should become:
+AppSource
+   ↓
+hub.html?scope=appsource-v1
+   ↓
+Production Statistico hub
+   ↓
+Determine entitlement
+   ├── FREE
+   ├── EARLY_ACCESS
+   └── PROFESSIONAL
+   ↓
+Central access policy
+   ↓
+Menu visibility + module launch authorization
+
+The existing protections are valuable and should remain:
+- hiding families that have no accessible modules;
+- blocking unauthorized navigateToModule() calls;
+- preventing direct module launches from bypassing licensing;
+- hiding the procedure advisor when it could recommend inaccessible modules.
+One thing I would change
+Currently:
+If the entitlement file fails to load, the hub shows no modules.
+
+For the commercial architecture that should become fail-safe to FREE, not fail to nothing.
+So:
+Licensing API succeeds
+    → use returned entitlement
+
+Licensing API temporarily fails
+    → use recently cached entitlement
+
+No usable cached entitlement
+    → FREE
+
+A licensing outage should never make Statistico appear broken.
+What to do with appsource-v1.json
+I would stop thinking of it as the permanent “light package.”
+It can become the AppSource channel configuration, for example:
+{
+  "scope": "appsource-v1",
+  "channel": "appsource",
+  "defaultPlan": "FREE",
+  "procedureAdvisor": true
+}
+
+Then the actual module access belongs in a central licensing policy rather than this scope file.
+For example:
+FREE_MODULE_IDS = [
+  "univariate",
+  "univariate-workspace",
+  "calc-distribution-hub",
+  ...
+]
+
+while:
+EARLY_ACCESS → all modules
+PROFESSIONAL → all modules
+
+That means later you can change the Free offering without changing the manifest or maintaining a separate AppSource application.
+Important: Early Access should show the full product
+Once Stage 1 is implemented:
+New AppSource user
+→ initially FREE
+→ sees invitation to activate Early Access
+→ enters email
+→ receives EARLY_ACCESS
+→ all Analytics, Calculators and Applications appear.
+When Early Access expires:
+→ entitlement becomes effectively FREE
+→ full catalogue can remain visible, but Professional modules are marked/handled as locked.
+This is preferable to physically removing most of the product from navigation after the licensing architecture exists. During the current three-module certification build, hiding everything made sense. For a commercial product, showing the breadth of Statistico helps conversion.
+The Procedure Advisor can then return
+The current decision to hide it is correct because it could recommend inaccessible modules.
+With entitlement awareness, change its behavior to:
+- EARLY_ACCESS / PROFESSIONAL → recommend anything;
+- FREE → it may still recommend a Professional procedure, but clearly identify it as Professional and offer the Early Access/upgrade path.
+That actually makes the advisor useful for product discovery.
+One verification still required
+Cursor only tested this in the browser. Before touching the published behavior, test:
+hub.html?scope=appsource-v1
+inside Excel using the same AppSource manifest ID and configuration.
+Specifically verify:
+- Excel range detection;
+- module launches;
+- dialog/page communication;
+- Office.context behavior;
+- session/local storage;
+- direct-navigation blocking;
+- no unexpected behavior caused by the redirect.
+If that works, I would consider the architectural question settled.
+So the next instruction to Cursor should be the Stage 1 licensing specification, with one modification: preserve the existing scope/route-guard mechanism and make it consume the centralized entitlement policy instead of replacing it.
+And importantly: do not change the AppSource manifest at this stage. The published manifest can remain the stable entry point while Statistico evolves behind it.

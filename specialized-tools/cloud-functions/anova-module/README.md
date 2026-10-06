@@ -9,7 +9,7 @@ Use the [Functions Framework](https://github.com/GoogleCloudPlatform/functions-f
 1. **Create a virtualenv** (PyCharm: *Add Interpreter → Virtualenv*), then install deps:
 
    ```bash
-   cd cloud-functions/anova-module
+   cd specialized-tools/cloud-functions/anova-module
    pip install -r requirements.txt
    ```
 
@@ -19,7 +19,7 @@ Use the [Functions Framework](https://github.com/GoogleCloudPlatform/functions-f
    functions-framework --target=anova_module --port=8080 --debug
    ```
 
-   **PyCharm:** *Run → Edit Configurations → + Python*, then set **Module name** to `functions_framework`, **Parameters** to `--target=anova_module --port=8080 --debug`, and **Working directory** to `cloud-functions/anova-module`.
+   **PyCharm:** *Run → Edit Configurations → + Python*, then set **Module name** to `functions_framework`, **Parameters** to `--target=anova_module --port=8080 --debug`, and **Working directory** to `specialized-tools/cloud-functions/anova-module`.
 
 3. **Point the calculator at localhost.** Serve the repo over HTTP (e.g. `python -m http.server 8000` from the repo root) and open:
 
@@ -40,7 +40,7 @@ Use the [Functions Framework](https://github.com/GoogleCloudPlatform/functions-f
 ### Using gcloud CLI:
 
 ```bash
-cd cloud-functions/anova-module
+cd specialized-tools/cloud-functions/anova-module
 gcloud functions deploy anova-module \
   --gen2 \
   --runtime=python311 \

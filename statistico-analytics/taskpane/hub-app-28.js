@@ -609,6 +609,18 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
+/* null = full product. An object (even empty) is a closed allow-list. */
+let HUB_ENTITLED_MODULE_IDS = null;
+let HUB_ENTITLEMENT_LOAD_ERROR = "";
+var ENTITLED_MODULE_EXTRAS = {
+  "explore-univariate": [
+    {
+      id: "univariate-workspace",
+      label: "Univariate Workspace",
+      tip: "Focused live-data histogram workspace with only the Distribution view enabled."
+    }
+  ]
+};
 /* Active Range is shown on Specialized Tools for Data Preparation and purpose-built tools.
    Calculators and standalone EzPaste pick their own inputs. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];
@@ -814,8 +826,11 @@ function renderCategoryTiles(query) {
     }
   }
   HUB_ACTIONS = {};
-  var allSource = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
+  var catalog = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
     return !c.hidden;
+  });
+  var allSource = catalog.filter(function (c) {
+    return getCategoryModules(c).length > 0;
   });
   var source = allSource;
   var clusterMeta = HUB_CLUSTER_META[ACTIVE_CLUSTER] || HUB_CLUSTER_META.analytics;
@@ -828,9 +843,9 @@ function renderCategoryTiles(query) {
     if (c.title.toLowerCase().indexOf(q) >= 0) return true;
     if ((c.subtitle || "").toLowerCase().indexOf(q) >= 0) return true;
     if ((c.section || "").toLowerCase().indexOf(q) >= 0) return true;
-    var familyMeta = ANALYTICS_SECTION_META[getAnalyticsTileSectionId(c, allSource)];
+    var familyMeta = ANALYTICS_SECTION_META[getAnalyticsTileSectionId(c, catalog)];
     if (familyMeta && familyMeta.label.toLowerCase().indexOf(q) >= 0) return true;
-    var toolsMeta = TOOLS_SECTION_META[getToolsTileSectionId(c, allSource)];
+    var toolsMeta = TOOLS_SECTION_META[getToolsTileSectionId(c, catalog)];
     if (toolsMeta && toolsMeta.label.toLowerCase().indexOf(q) >= 0) return true;
     return mods.some(function (m) { return m.label.toLowerCase().indexOf(q) >= 0; });
   });
@@ -840,8 +855,8 @@ function renderCategoryTiles(query) {
   var openSet = getHubOpenSectionSet();
   sectionOrder.forEach(function (sectionId) {
     var familyTiles = list.filter(function (c) {
-      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, allSource) === sectionId;
-      return getAnalyticsTileSectionId(c, allSource) === sectionId;
+      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, catalog) === sectionId;
+      return getAnalyticsTileSectionId(c, catalog) === sectionId;
     });
     if (!familyTiles.length) return;
     var tilesHtml = '<div class="category-modules">' + familyTiles.map(function (c) {
@@ -915,14 +930,28 @@ function persistAnalyticsSection(sectionId) {
 }
 
 function getAvailableAnalyticsSections() {
-  var tiles = (HUB_CLUSTER_TILES.analytics || HUB_CATEGORY_TILES || []).filter(function (c) {
+  var catalog = (HUB_CLUSTER_TILES.analytics || HUB_CATEGORY_TILES || []).filter(function (c) {
     return !c.hidden;
   });
   var present = {};
-  tiles.forEach(function (tile) {
-    present[getAnalyticsTileSectionId(tile, tiles)] = true;
+  catalog.forEach(function (tile) {
+    if (!getCategoryModules(tile).length) return;
+    present[getAnalyticsTileSectionId(tile, catalog)] = true;
   });
   return ANALYTICS_FAMILY_ORDER.filter(function (id) { return present[id]; });
+}
+
+function getAvailableToolsSections() {
+  var catalog = (HUB_CLUSTER_TILES.tools || []).filter(function (c) {
+    return !c.hidden;
+  });
+  var present = {};
+  catalog.forEach(function (tile) {
+    if (!getCategoryModules(tile).length) return;
+    if (tile.standalone) return;
+    present[getToolsTileSectionId(tile, catalog)] = true;
+  });
+  return TOOLS_SECTION_ORDER.filter(function (id) { return present[id]; });
 }
 
 function isAnalyticsAllView() {
@@ -1008,14 +1037,15 @@ function toggleHubAccordion(sectionId) {
 }
 
 function getHubVisibleSectionIds() {
-  var allSource = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
+  var catalog = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
     return !c.hidden;
   });
   var sectionOrder = ACTIVE_CLUSTER === "tools" ? TOOLS_SECTION_ORDER : ANALYTICS_FAMILY_ORDER;
   return sectionOrder.filter(function (sectionId) {
-    return allSource.some(function (c) {
-      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, allSource) === sectionId;
-      return getAnalyticsTileSectionId(c, allSource) === sectionId;
+    return catalog.some(function (c) {
+      if (!getCategoryModules(c).length) return false;
+      if (ACTIVE_CLUSTER === "tools") return getToolsTileSectionId(c, catalog) === sectionId;
+      return getAnalyticsTileSectionId(c, catalog) === sectionId;
     });
   });
 }
@@ -1162,13 +1192,22 @@ function bindCategoryInfoButtons(list) {
 }
 
 function getCategoryModules(category) {
-  if (Array.isArray(category.modules)) return category.modules;
-  if (Array.isArray(category.subgroups)) {
-    return category.subgroups.reduce(function (all, g) {
-      return all.concat(Array.isArray(g.modules) ? g.modules : []);
-    }, []);
+  if (!category) return [];
+  if (!HUB_ENTITLED_MODULE_IDS) {
+    if (Array.isArray(category.modules)) return category.modules;
+    if (Array.isArray(category.subgroups)) {
+      return category.subgroups.reduce(function (all, g) {
+        return all.concat(Array.isArray(g.modules) ? g.modules : []);
+      }, []);
+    }
+    return [];
   }
-  return [];
+  var api = window.StatisticoHubEntitlement;
+  if (!api || typeof api.visibleModules !== "function") return [];
+  var extras = (ENTITLED_MODULE_EXTRAS[category.id] || []).map(function (module) {
+    return { tileId: category.id, module: module };
+  });
+  return api.visibleModules(category, HUB_ENTITLED_MODULE_IDS, extras);
 }
 
 function renderCategoryGroups(category, scopePrefix) {
@@ -1341,35 +1380,41 @@ function getHubScopeName() {
   }
 }
 
-function applyHubScopeConfig(scopeCfg) {
-  if (!scopeCfg || typeof scopeCfg !== "object") return;
-  if (scopeCfg.clusterTiles && typeof scopeCfg.clusterTiles === "object") {
-    HUB_CLUSTER_TILES = scopeCfg.clusterTiles;
-  }
-  if (scopeCfg.clusterMeta && typeof scopeCfg.clusterMeta === "object") {
-    HUB_CLUSTER_META = scopeCfg.clusterMeta;
-  }
-  if (Array.isArray(scopeCfg.visibleClusters) && scopeCfg.visibleClusters.length) {
-    HUB_VISIBLE_CLUSTERS = scopeCfg.visibleClusters.slice();
-  } else {
-    HUB_VISIBLE_CLUSTERS = Object.keys(HUB_CLUSTER_TILES);
-  }
-  if (Array.isArray(scopeCfg.rangeVisibleClusters)) {
-    HUB_RANGE_VISIBLE_CLUSTERS = scopeCfg.rangeVisibleClusters.slice();
-  }
+function clusterHasEntitledModules(clusterId) {
+  var catalog = (HUB_CLUSTER_TILES[clusterId] || []).filter(function (tile) { return !tile.hidden; });
+  return catalog.some(function (tile) { return getCategoryModules(tile).length > 0; });
+}
+
+function syncEntitledClusterVisibility() {
+  if (!HUB_ENTITLED_MODULE_IDS) return;
+  var visibleIds = [];
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
     var clusterId = btn.getAttribute("data-cluster");
-    var visible = HUB_VISIBLE_CLUSTERS.indexOf(clusterId) >= 0;
+    var visible = clusterHasEntitledModules(clusterId);
+    if (visible) visibleIds.push(clusterId);
     var wrap = btn.closest ? btn.closest(".hub-nav-tools-wrap") : null;
     if (wrap) wrap.style.display = visible ? "" : "none";
     else btn.style.display = visible ? "" : "none";
   });
-  if (HUB_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) < 0) {
-    ACTIVE_CLUSTER = HUB_VISIBLE_CLUSTERS[0] || "analytics";
+  HUB_VISIBLE_CLUSTERS = visibleIds.length ? visibleIds : HUB_VISIBLE_CLUSTERS;
+  if (visibleIds.length && visibleIds.indexOf(ACTIVE_CLUSTER) < 0) {
+    ACTIVE_CLUSTER = visibleIds[0];
   }
+}
+
+function applyHubScopeConfig(scopeCfg) {
+  var api = window.StatisticoHubEntitlement;
+  var ids = api && typeof api.collectModuleIds === "function" ? api.collectModuleIds(scopeCfg || {}) : null;
+  HUB_ENTITLED_MODULE_IDS = ids || {};
+  HUB_ENTITLEMENT_LOAD_ERROR = "";
+  syncEntitledClusterVisibility();
   var available = getAvailableAnalyticsSections();
   if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
-    ACTIVE_ANALYTICS_SECTION = available[0] || "all";
+    ACTIVE_ANALYTICS_SECTION = "all";
+  }
+  var toolSections = getAvailableToolsSections();
+  if (ACTIVE_TOOLS_SECTION !== "all" && toolSections.indexOf(ACTIVE_TOOLS_SECTION) < 0) {
+    ACTIVE_TOOLS_SECTION = "all";
   }
 }
 
@@ -1388,6 +1433,9 @@ function loadHubScopeConfigIfAny() {
     })
     .catch(function (err) {
       console.warn("Hub scope load failed:", err);
+      HUB_ENTITLED_MODULE_IDS = {};
+      HUB_ENTITLEMENT_LOAD_ERROR = "This Statistico package could not load its module entitlements. Refresh and try again.";
+      syncEntitledClusterVisibility();
     });
 }
 
@@ -1411,7 +1459,7 @@ function syncClusterHeader() {
   if (ACTIVE_CLUSTER === "tools") {
     showRange = ACTIVE_TOOLS_SECTION === "all" || TOOLS_RANGE_SECTIONS.indexOf(ACTIVE_TOOLS_SECTION) >= 0;
   }
-  var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
+  var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0 && !HUB_ENTITLED_MODULE_IDS;
   if (range) range.style.display = showRange ? "" : "none";
   if (advisor) advisor.style.display = showAdvisor ? "" : "none";
   syncHubToolsMenuSelection();
@@ -1454,11 +1502,16 @@ function closeHubToolsMenu() {
 function syncHubToolsMenuSelection() {
   var menu = document.getElementById("hubToolsMenu");
   if (!menu) return;
+  var restrict = !!HUB_ENTITLED_MODULE_IDS;
+  var available = restrict ? getAvailableToolsSections() : null;
   menu.querySelectorAll("[data-tools-section]").forEach(function (item) {
-    var on = item.getAttribute("data-tools-section") === ACTIVE_TOOLS_SECTION;
+    var id = item.getAttribute("data-tools-section");
+    var on = id === ACTIVE_TOOLS_SECTION;
     item.classList.toggle("active", on);
     if (on) item.setAttribute("aria-current", "true");
     else item.removeAttribute("aria-current");
+    if (!restrict) return;
+    item.style.display = id === "all" || available.indexOf(id) >= 0 ? "" : "none";
   });
 }
 
@@ -1605,10 +1658,21 @@ function openInUserBrowser(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+function denyUnentitledModule(moduleId) {
+  if (!HUB_ENTITLED_MODULE_IDS) return false;
+  var api = window.StatisticoHubEntitlement;
+  if (api && typeof api.isAllowed === "function" && api.isAllowed(HUB_ENTITLED_MODULE_IDS, moduleId)) return false;
+  try {
+    window.alert("This module is not included in the current Statistico package.");
+  } catch (_e) {}
+  return true;
+}
+
 function runHubModuleAction(actionKey) {
   dismissHubButtonTooltips();
   var module = HUB_ACTIONS[actionKey];
   if (!module) return;
+  if (denyUnentitledModule(module.id)) return;
   if (module.comingSoon) {
     window.alert((module.label || "This module") + " is coming soon.");
     return;
@@ -2814,8 +2878,8 @@ function navigateToModuleCore(id) {
   if (id === "prepare-data" || id === "prepare-quality" || id === "prepare-dataset") {
     if (openPrepareDataFromHub(id)) return;
   }
-  if (id === "univariate") {
-    if (openUnivariateConfigFromHub("univariate", null)) return;
+  if (id === "univariate" || id === "univariate-workspace") {
+    if (openUnivariateConfigFromHub(id, null)) return;
   }
   if (id === "regression") {
     if (openRegressionConfigFromHub()) return;
@@ -2884,6 +2948,7 @@ function navigateToModuleCore(id) {
 }
 
 function navigateToModule(id) {
+  if (denyUnentitledModule(id)) return;
   var hadOpenDialog = dismissAllHubDialogs();
   var proceed = function () {
     if (hadOpenDialog) setTimeout(function () { navigateToModuleCore(id); }, 150);
@@ -2965,6 +3030,7 @@ Office.onReady(function(info) {
     }
     syncClusterHeader();
     renderCategoryTiles("");
+    if (HUB_ENTITLEMENT_LOAD_ERROR) showError(HUB_ENTITLEMENT_LOAD_ERROR);
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.init === "function") {
       window.StatisticoTooltip.init();
       window.StatisticoTooltip.refresh();

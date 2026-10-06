@@ -1215,23 +1215,7 @@ function areAllVisibleHubSectionsOpen() {
   return ids.every(function (id) { return !!openSet[id]; });
 }
 
-function syncHubExpandAllButton() {
-  var btn = document.getElementById("hubExpandAllBtn");
-  var label = document.getElementById("hubExpandAllBtnLabel");
-  var icon = btn && btn.querySelector("i");
-  if (btn) {
-    btn.hidden = true;
-    return;
-  }
-  if (btn) btn.hidden = false;
-  var allOpen = areAllVisibleHubSectionsOpen();
-  if (label) label.textContent = allOpen ? "Collapse All" : "Expand All";
-  if (icon) icon.className = allOpen ? "fa-solid fa-angles-up" : "fa-solid fa-angles-down";
-  if (btn) {
-    btn.setAttribute("aria-label", allOpen ? "Collapse all sections" : "Expand all sections");
-    btn.setAttribute("data-st-tip", allOpen ? "Collapse all sections" : "Expand all sections");
-  }
-}
+function syncHubExpandAllButton() {}
 
 function toggleHubExpandAll() {
   var expand = !areAllVisibleHubSectionsOpen();

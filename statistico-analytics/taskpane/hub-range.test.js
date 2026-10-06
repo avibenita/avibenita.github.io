@@ -162,7 +162,8 @@ describe("Data Preparation stays one module with two entry points", () => {
     expect(html).toContain('id="hubPrepareDataBtn"');
     expect(html).toContain("Prepare data");
     expect(html).not.toContain('id="hubDataReviewBtn"');
-    expect(html).toContain("review records with missing values");
+    expect(html).toContain("Check &amp; Prepare Data");
+    expect(html).toContain("recode");
     expect(html).toContain('data-st-tip="Check, clean, recode, or create a prepared worksheet."');
     expect(html).toContain("hubOpenPrepareData(event)");
     expect(app).toContain('openPrepareDataFromHub("prepare-data")');

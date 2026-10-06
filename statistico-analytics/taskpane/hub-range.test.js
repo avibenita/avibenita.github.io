@@ -131,9 +131,8 @@ describe("prepare shortcut on the data card", () => {
     expect(document.getElementById("hubDataReviewBtn").getAttribute("aria-label")).toBe(
       "60 records with missing values · Review data"
     );
-    expect(document.getElementById("hubDataSummaryText").textContent).toBe("Worksheet data · A1:J151");
+    expect(document.getElementById("hubDataSummaryText").textContent).toBe("Prepared_Data · A1:J151");
     expect(document.getElementById("hubDataWarn").hidden).toBe(false);
-    expect(document.getElementById("hubDataWarnCount").textContent).toBe("Change");
   });
 
   test("labels a missing range as Select data", () => {
@@ -150,7 +149,7 @@ describe("prepare shortcut on the data card", () => {
     expect(bar.classList.contains("has-data-issues")).toBe(false);
     expect(document.getElementById("hubDataIssueText").textContent).toBe("");
     expect(document.getElementById("hubDataWarn").hidden).toBe(true);
-    expect(document.getElementById("hubDataSummaryText").textContent).toBe("Worksheet data · A1:J5");
+    expect(document.getElementById("hubDataSummaryText").textContent).toBe("Sheet1 · A1:J5");
   });
 });
 

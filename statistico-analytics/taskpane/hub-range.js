@@ -394,18 +394,11 @@
     return formatCount(n) + " " + (n === 1 ? singular : plural);
   }
 
-  function addressOnly(headline) {
-    var text = headline || "";
-    var sep = text.lastIndexOf(" · ");
-    return sep >= 0 ? text.slice(sep + 3) : text;
-  }
-
   function syncCompactSummary() {
     var bar = document.getElementById("hubWdataBar");
     var summary = document.getElementById("hubDataSummaryText");
     var summaryBtn = document.getElementById("hubDataSummaryBtn");
     var warn = document.getElementById("hubDataWarn");
-    var warnCount = document.getElementById("hubDataWarnCount");
     if (!bar || !summary) return;
     var addr = (document.getElementById("hubRangeBadgeText") || {}).textContent || "";
     var issue = (document.getElementById("hubDataIssueText") || {}).textContent || "";
@@ -413,12 +406,14 @@
     var digits = String(issue).replace(/,/g, "").match(/^(\d+)/);
     var count = digits ? Number(digits[1]) : 0;
     var label;
-    if (ready) label = "Worksheet data · " + addressOnly(addr);
+    if (ready) label = addr || "Worksheet data";
     else if (bar.classList.contains("is-error") || /select a range/i.test(addr)) label = "Select data";
     else label = "Detecting…";
     summary.textContent = label;
-    if (warn) warn.hidden = !(ready && count > 0);
-    if (warnCount) warnCount.textContent = count > 0 ? "Change" : "";
+    if (warn) {
+      warn.hidden = !(ready && count > 0);
+      warn.title = count > 0 ? issue : "";
+    }
     if (summaryBtn) {
       summaryBtn.setAttribute("aria-label", issue ? label + ", " + issue : label);
     }
@@ -610,13 +605,7 @@
     if (bar) {
       bar.classList.toggle("is-error", !!isError);
       bar.classList.toggle("is-ready", !isError && !pending);
-      if (isError || pending) {
-        bar.classList.toggle("is-open", false);
-        var details = document.getElementById("hubDataDetails");
-        if (details) details.hidden = true;
-        var summaryBtn = document.getElementById("hubDataSummaryBtn");
-        if (summaryBtn) summaryBtn.setAttribute("aria-expanded", "false");
-      }
+      if (isError || pending) closeRangePicker();
     }
     if (isError || pending) {
       setRangeSize("");
@@ -666,7 +655,6 @@
 
   function toggleRangeInfo(event) {
     if (event) event.stopPropagation();
-    closeRangePicker();
     var box = document.getElementById("hubRangeInfo");
     if (box) box.classList.toggle("open");
   }
@@ -729,8 +717,6 @@
     }
     if (bar && bar.classList.contains("is-open") && details && !details.contains(ev.target) && !(summaryBtn && summaryBtn.contains(ev.target)) && !(pop && pop.contains(ev.target))) {
       bar.classList.remove("is-open");
-      details.hidden = true;
-      if (summaryBtn) summaryBtn.setAttribute("aria-expanded", "false");
     }
     if (infoBox && infoBtn && !infoBox.contains(ev.target) && !infoBtn.contains(ev.target)) {
       closeRangeInfo();

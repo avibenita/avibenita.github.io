@@ -418,7 +418,7 @@
     else label = "Detecting…";
     summary.textContent = label;
     if (warn) warn.hidden = !(ready && count > 0);
-    if (warnCount) warnCount.textContent = count > 0 ? formatCount(count) : "";
+    if (warnCount) warnCount.textContent = count > 0 ? "Change" : "";
     if (summaryBtn) {
       summaryBtn.setAttribute("aria-label", issue ? label + ", " + issue : label);
     }

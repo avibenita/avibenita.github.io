@@ -133,7 +133,7 @@ describe("prepare shortcut on the data card", () => {
     );
     expect(document.getElementById("hubDataSummaryText").textContent).toBe("Worksheet data · A1:J151");
     expect(document.getElementById("hubDataWarn").hidden).toBe(false);
-    expect(document.getElementById("hubDataWarnCount").textContent).toBe("60");
+    expect(document.getElementById("hubDataWarnCount").textContent).toBe("Change");
   });
 
   test("labels a missing range as Select data", () => {

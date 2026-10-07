@@ -52,7 +52,7 @@ describe("central access policy", () => {
     expect(channel.defaultPlan).toBe("FREE");
     expect(channel.procedureAdvisor).toBe(true);
     expect(channel.scope).toBe("appsource-v1");
-    expect(channel.licenseApi).toBe("https://statistico-license.statistico.workers.dev/");
+    expect(channel.licenseApi).toBe("https://statistico-license.statistico-interactive.workers.dev/");
     expect(entitlement.planAllows(channel.defaultPlan, "regression")).toBe(false);
     expect(entitlement.FREE_MODULE_IDS).toEqual(["univariate", "univariate-workspace", "calc-distribution-hub"]);
     expect(scope.entitledModules).toContain("univariate");

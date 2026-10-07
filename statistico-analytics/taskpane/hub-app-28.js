@@ -627,15 +627,7 @@ let HUB_CLUSTER_META = {
 let HUB_VISIBLE_CLUSTERS = ["analytics", "tools"];
 /* null = full product, no license gate. An object is the resolved AppSource plan. */
 let HUB_LICENSE = null;
-var ENTITLED_MODULE_EXTRAS = {
-  "explore-univariate": [
-    {
-      id: "univariate-workspace",
-      label: "Univariate Workspace",
-      tip: "Focused live-data histogram workspace with only the Distribution view enabled."
-    }
-  ]
-};
+var ENTITLED_MODULE_EXTRAS = {};
 /* Active Range is shown on Specialized Tools for Data Preparation and purpose-built tools.
    Calculators and standalone EzPaste pick their own inputs. */
 let HUB_RANGE_VISIBLE_CLUSTERS = ["analytics", "tools"];

@@ -180,6 +180,7 @@ describe("AppSource entry still uses the production hub", () => {
     expect(app).toContain("resolveEntitlement");
     expect(app).toContain("presentModules");
     expect(app).toContain("showHubEarlyAccess");
+    expect(app).not.toContain("Univariate Workspace");
     expect(app).not.toContain("HUB_CLUSTER_TILES = scopeCfg.clusterTiles");
     expect(app).not.toContain("could not load its module entitlements");
   });

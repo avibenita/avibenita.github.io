@@ -25,6 +25,10 @@ describe("central access policy", () => {
     expect(entitlement.planAllows("FREE", "pareto2080")).toBe(false);
   });
 
+  test("email addresses are normalized before activation", () => {
+    expect(entitlement.normalizeEmail("  MetricsInstitute@Gmail.com ")).toBe("metricsinstitute@gmail.com");
+  });
+
   test("Early Access and Professional open every module", () => {
     expect(entitlement.planAllows("EARLY_ACCESS", "regression")).toBe(true);
     expect(entitlement.planAllows("PROFESSIONAL", "kmeans")).toBe(true);
@@ -48,7 +52,9 @@ describe("central access policy", () => {
     expect(channel.defaultPlan).toBe("FREE");
     expect(channel.procedureAdvisor).toBe(true);
     expect(channel.scope).toBe("appsource-v1");
+    expect(channel.licenseApi).toBe("https://statistico-license.statistico.workers.dev/");
     expect(entitlement.planAllows(channel.defaultPlan, "regression")).toBe(false);
+    expect(entitlement.FREE_MODULE_IDS).toEqual(["univariate", "univariate-workspace", "calc-distribution-hub"]);
     expect(scope.entitledModules).toContain("univariate");
   });
 });
@@ -180,6 +186,10 @@ describe("AppSource entry still uses the production hub", () => {
     expect(app).toContain("resolveEntitlement");
     expect(app).toContain("presentModules");
     expect(app).toContain("showHubEarlyAccess");
+    expect(app).toContain("No credit card required.");
+    expect(app).toContain("You now have full access to Statistico.");
+    expect(app).toContain("Early Access could not be activated right now. Please try again later. Your Free modules remain available.");
+    expect(app).not.toContain("Early Access activation is not available yet");
     expect(app).not.toContain("Univariate Workspace");
     expect(app).not.toContain("HUB_CLUSTER_TILES = scopeCfg.clusterTiles");
     expect(app).not.toContain("could not load its module entitlements");

@@ -30,6 +30,10 @@
     return null;
   }
 
+  function normalizeEmail(email) {
+    return String(email || "").trim().toLowerCase();
+  }
+
   function planAllows(plan, moduleId) {
     var normalized = normalizePlan(plan) || "FREE";
     if (normalized === "EARLY_ACCESS" || normalized === "PROFESSIONAL") return true;
@@ -187,6 +191,7 @@
     FREE_MODULE_IDS: FREE_MODULE_IDS.slice(),
     CACHE_TTL_MS: CACHE_TTL_MS,
     normalizePlan: normalizePlan,
+    normalizeEmail: normalizeEmail,
     planAllows: planAllows,
     effectivePlan: effectivePlan,
     cacheIsUsable: cacheIsUsable,

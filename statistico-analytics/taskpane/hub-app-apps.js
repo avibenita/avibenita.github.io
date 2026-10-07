@@ -1585,21 +1585,10 @@ function applyHubScopeConfig(scopeCfg) {
 }
 
 function loadHubScopeConfigIfAny() {
-  var scopeName = getHubScopeName();
-  if (!scopeName) return Promise.resolve();
-  var scopeUrl = new URL("hub-scopes/" + encodeURIComponent(scopeName) + ".json", window.location.href);
-  scopeUrl.searchParams.set("v", String(Date.now()));
-  return fetch(scopeUrl.toString(), { cache: "no-store" })
-    .then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
-    })
-    .then(function (cfg) {
-      applyHubScopeConfig(cfg || {});
-    })
-    .catch(function (err) {
-      console.warn("Hub scope load failed:", err);
-    });
+  /* AppSource stays on this three-cluster hub. The scope query is only a
+     channel marker and must not replace Statistical Methods, Interactive
+     Calculators, or Specialized Tools. */
+  return Promise.resolve();
 }
 
 function syncClusterHeader() {

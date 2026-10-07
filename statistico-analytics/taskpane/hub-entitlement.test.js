@@ -173,11 +173,10 @@ describe("AppSource entry still uses the production hub", () => {
   const prepHtml = fs.readFileSync(path.join(root, "hub-prep28.html"), "utf8");
   const app = fs.readFileSync(path.join(root, "hub-app-28.js"), "utf8");
 
-  test("hub.html?scope=appsource-v1 redirects into the production task pane", () => {
-    expect(hubHtml).toContain('params.get("scope")');
-    expect(hubHtml).toContain("appsource-v1");
-    expect(hubHtml).toContain("hub-prep28.html");
-    expect(hubHtml.indexOf("hub-prep28.html")).toBeLessThan(hubHtml.indexOf("office.js"));
+  test("hub.html?scope=appsource-v1 stays on the three-cluster hub", () => {
+    expect(hubHtml).toContain("hub-app-apps.js");
+    expect(hubHtml).toContain("Interactive Calculators");
+    expect(hubHtml.indexOf("hub-prep28.html")).toBe(-1);
   });
 
   test("the production hub asks the entitlement policy instead of replacing its catalog", () => {

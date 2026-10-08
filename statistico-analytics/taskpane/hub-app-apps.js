@@ -3808,40 +3808,7 @@ function submitHubEarlyAccess(event) {
     .catch(function () { return {}; })
     .then(function (body) {
       if (body && body.ok === true) {
-        try { localStorage.removeItem("statistico.feedbackConfirm"); } catch (e) {}
         markSent();
-        return null;
-      }
-      var pending = false;
-      try { pending = localStorage.getItem("statistico.feedbackConfirm") === "1"; } catch (e) { pending = false; }
-      if (pending) {
-        showFeedbackStatus("Open the newest FormSubmit email and click Activate Form. Another send would cancel that link.");
-        return null;
-      }
-      return fetch("https://formsubmit.co/ajax/avi@metrics-institute.net", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({
-          name: "Statistico Early Access",
-          message: message + (email ? "\n\nFrom: " + email : "\n\nFrom: (no email given)"),
-          _subject: "Statistico Early Access feedback",
-          _captcha: "false",
-          _template: "table",
-          _replyto: email || undefined
-        })
-      }).then(function (res) { return res.json(); });
-    })
-    .then(function (body) {
-      if (!body) return;
-      if (String(body.success) === "true") {
-        try { localStorage.removeItem("statistico.feedbackConfirm"); } catch (e) {}
-        markSent();
-        return;
-      }
-      var notice = String(body.message || "");
-      if (/activ/i.test(notice)) {
-        try { localStorage.setItem("statistico.feedbackConfirm", "1"); } catch (e) {}
-        showFeedbackStatus("Open the newest FormSubmit email and click Activate Form. Do not send again before that, or the link is replaced.");
         return;
       }
       showFeedbackStatus("Feedback could not be sent. Please try again.");

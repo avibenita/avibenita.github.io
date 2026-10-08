@@ -90,7 +90,7 @@ async function sendViaCloudflare(env, text) {
 
 async function sendFeedback(env, payload) {
   var message = String(payload && payload.message || "").trim();
-  if (!message || message.length > 5000) return json({ error: true }, 400);
+  if (!message || message.length > 20000) return json({ error: true }, 400);
   var reply = String(payload && payload.email || "").trim();
   if (reply && !policy.isLicenseEmail(policy.normalizeLicenseEmail(reply))) {
     return json({ error: true }, 400);

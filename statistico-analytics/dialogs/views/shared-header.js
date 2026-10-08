@@ -7897,57 +7897,13 @@ REPORT: [one polished paragraph suitable for a report]`;
       }
       if (status) status.textContent = notice || 'Feedback could not be sent. Please try again.';
     };
-    const postForm = () => {
-      let pending = false;
-      try { pending = localStorage.getItem('statistico.feedbackConfirm') === '1'; } catch (e) { pending = false; }
-      if (pending) return Promise.resolve({ skipped: true });
-      const body = new FormData();
-      body.append('name', 'Statistico');
-      body.append('message', text);
-      body.append('_subject', 'Statistico feedback: ' + kind + ' — ' + moduleName + ' / ' + view);
-      body.append('_captcha', 'false');
-      body.append('_template', 'table');
-      if (email) body.append('_replyto', email);
-      if (file) body.append('attachment', file, file.name);
-      return fetch('https://formsubmit.co/ajax/avi@metrics-institute.net', {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-        body: body
-      }).then((res) => res.json()).catch(() => ({}));
-    };
     fetch('https://statistico-license.statistico-interactive.workers.dev/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ action: 'feedback', message: text, email: email })
     })
       .then((res) => res.json())
-      .catch(() => ({}))
-      .then((workerBody) => {
-        if (workerBody && workerBody.ok === true) {
-          try { localStorage.removeItem('statistico.feedbackConfirm'); } catch (e) {}
-          finish(true);
-          return null;
-        }
-        return postForm();
-      })
-      .then((formBody) => {
-        if (!formBody) return;
-        if (formBody.skipped) {
-          finish(false, 'Open the newest FormSubmit email and click Activate Form. Another send would cancel that link.');
-          return;
-        }
-        if (String(formBody.success) === 'true') {
-          try { localStorage.removeItem('statistico.feedbackConfirm'); } catch (e) {}
-          finish(true);
-          return;
-        }
-        if (/activ/i.test(String(formBody.message || ''))) {
-          try { localStorage.setItem('statistico.feedbackConfirm', '1'); } catch (e) {}
-          finish(false, 'Open the newest FormSubmit email and click Activate Form. Do not send again before that, or the link is replaced.');
-          return;
-        }
-        finish(false);
-      })
+      .then((workerBody) => finish(!!(workerBody && workerBody.ok === true)))
       .catch(() => finish(false));
   },
 

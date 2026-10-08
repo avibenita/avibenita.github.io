@@ -1618,53 +1618,27 @@ function installResolvedLicense(resolved, channel) {
 }
 
 function applyHubScopeConfig(scopeCfg) {
-  /* The scope marks the AppSource channel. It does not replace the
-     three-cluster catalog. Plans decide which modules open. */
+  /* AppSource is the Early Access campaign. The scope unlocks the full
+     product. It does not ask for an email or replace the catalog. */
   var api = window.StatisticoHubEntitlement;
   var channel = api && typeof api.readChannel === "function" ? api.readChannel(scopeCfg || {}) : null;
   if (!channel) {
     channel = {
       scope: getHubScopeName() || "appsource-v1",
       channel: "appsource",
-      defaultPlan: "FREE",
+      defaultPlan: "EARLY_ACCESS",
       procedureAdvisor: true,
       licenseApi: ""
     };
   }
-  var cache = api && typeof api.readStoredEntitlement === "function" ? api.readStoredEntitlement() : null;
-  function finish(apiResult, attempted) {
-    var resolved = api.resolveEntitlement({
-      defaultPlan: channel.defaultPlan,
-      apiResult: apiResult,
-      apiAttempted: attempted,
-      cache: cache,
-      now: Date.now()
-    });
-    if (resolved.cacheRecord && typeof api.writeStoredEntitlement === "function") {
-      api.writeStoredEntitlement(resolved.cacheRecord);
-    }
-    return installResolvedLicense(resolved, channel);
-  }
-  if (!api || typeof api.resolveEntitlement !== "function") {
-    return Promise.resolve(installResolvedLicense({
-      plan: "FREE",
-      source: "default",
-      email: "",
-      expiresAt: null,
-      expiredFrom: null
-    }, channel));
-  }
-  if (!channel.licenseApi) return Promise.resolve(finish(null, false));
-  var lookupEmail = cache && cache.email && api.normalizeEmail ? api.normalizeEmail(cache.email) : "";
-  if (!lookupEmail) return Promise.resolve(finish(null, false));
-  var lookupUrl = channel.licenseApi + (channel.licenseApi.indexOf("?") >= 0 ? "&" : "?") + "email=" + encodeURIComponent(lookupEmail);
-  return fetch(lookupUrl, { cache: "no-store", headers: { "Accept": "application/json" } })
-    .then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
-    })
-    .then(function (body) { return finish(body || { error: true }, true); })
-    .catch(function () { return finish({ error: true }, true); });
+  channel.defaultPlan = "EARLY_ACCESS";
+  return Promise.resolve(installResolvedLicense({
+    plan: "EARLY_ACCESS",
+    source: "campaign",
+    email: "",
+    expiresAt: null,
+    expiredFrom: null
+  }, channel));
 }
 
 function loadHubScopeConfigIfAny() {
@@ -3668,11 +3642,8 @@ document.addEventListener("keydown", function (e) {
 });
 
 function licenseBannerText() {
-  if (!HUB_LICENSE || HUB_LICENSE.plan !== "FREE") return "";
-  if (HUB_LICENSE.expiredFrom === "EARLY_ACCESS") {
-    return "Early Access has ended. You are on the Free plan. The full catalogue stays visible, and Professional modules can be unlocked again.";
-  }
-  return "You are on the Free plan. Univariate and the Distribution Calculators are included. Activate Early Access to open the rest of Statistico.";
+  if (!HUB_LICENSE || HUB_LICENSE.plan !== "EARLY_ACCESS" || HUB_LICENSE.source !== "campaign") return "";
+  return "Full Statistico functionality is currently available during our Early Access period. We welcome your feedback.";
 }
 
 function syncHubLicenseBanner() {
@@ -3687,7 +3658,7 @@ function syncHubLicenseBanner() {
     banner = document.createElement("div");
     banner.id = "hubLicenseBanner";
     banner.className = "hub-license-banner";
-    banner.innerHTML = '<div id="hubLicenseBannerText"></div><button type="button" id="hubLicenseBannerBtn">Activate Early Access</button>';
+    banner.innerHTML = '<strong>Early Access</strong><div id="hubLicenseBannerText"></div><button type="button" id="hubLicenseBannerBtn">Send feedback</button>';
     host.insertBefore(banner, host.firstChild);
     banner.querySelector("#hubLicenseBannerBtn").addEventListener("click", function () {
       showHubEarlyAccess();
@@ -3708,13 +3679,14 @@ function ensureHubEarlyAccessPanel() {
   overlay.innerHTML =
     '<div class="hub-early-card" role="dialog" aria-labelledby="hubEarlyTitle">' +
     '<div id="hubEarlyRequest">' +
-    '<h2 id="hubEarlyTitle">Activate Early Access</h2>' +
-    '<p>Enter your email to activate full Statistico Early Access. You’ll get access to every analysis, calculator, and application during the Early Access period. No credit card required.</p>' +
+    '<h2 id="hubEarlyTitle">Send feedback</h2>' +
+    '<p>Tell us what is working and what is not. Your email is optional.</p>' +
     '<form id="hubEarlyForm">' +
-    '<input id="hubEarlyEmail" type="email" autocomplete="email" placeholder="you@example.com" required />' +
+    '<textarea id="hubEarlyMessage" rows="4" placeholder="Your feedback" required></textarea>' +
+    '<input id="hubEarlyEmail" type="email" autocomplete="email" placeholder="Email (optional)" />' +
     '<div class="hub-early-actions">' +
     '<button type="button" class="hub-early-cancel" id="hubEarlyCancel">Not now</button>' +
-    '<button type="submit" class="hub-early-submit" id="hubEarlySubmit">Activate Early Access</button>' +
+    '<button type="submit" class="hub-early-submit" id="hubEarlySubmit">Send feedback</button>' +
     "</div>" +
     '<p class="hub-early-status" id="hubEarlyStatus" role="status"></p>' +
     "</form></div>" +
@@ -3801,48 +3773,31 @@ function submitHubEarlyAccess(event) {
   var emailInput = document.getElementById("hubEarlyEmail");
   var submit = document.getElementById("hubEarlySubmit");
   var api = window.StatisticoHubEntitlement;
+  var messageInput = document.getElementById("hubEarlyMessage");
+  var message = String(messageInput && messageInput.value || "").trim();
   var email = api && typeof api.normalizeEmail === "function"
     ? api.normalizeEmail(emailInput ? emailInput.value : "")
     : String(emailInput && emailInput.value || "").trim().toLowerCase();
-  if (emailInput) emailInput.value = email;
-  var failure = "Early Access could not be activated right now. Please try again later. Your Free modules remain available.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    if (status) status.textContent = "Enter a valid email address.";
+  if (!message) {
+    if (status) status.textContent = "Enter your feedback.";
     return;
   }
-  var apiUrl = HUB_LICENSE && HUB_LICENSE.licenseApi;
-  if (!apiUrl) {
-    if (status) status.textContent = failure;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (status) status.textContent = "That email does not look valid. You can leave it blank.";
     return;
   }
-  if (status) status.textContent = "Activating Early Access…";
-  if (submit) submit.disabled = true;
-  fetch(apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify({
-      action: "early-access",
-      email: email,
-      channel: HUB_LICENSE.channel,
-      scope: HUB_LICENSE.scope
-    })
-  })
-    .then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
-    })
-    .then(function (body) {
-      var granted = api && typeof api.normalizePlan === "function" ? api.normalizePlan(body && body.plan) : "";
-      if (granted !== "EARLY_ACCESS") throw new Error("not granted");
-      var resolved = applyEarlyAccessResponse(body);
-      if (!resolved || resolved.plan !== "EARLY_ACCESS") throw new Error("not granted");
-      if (status) status.textContent = "";
-      showHubEarlySuccess();
-    })
-    .catch(function () {
-      if (status) status.textContent = failure;
-      if (submit) submit.disabled = false;
-    });
+  var body = message + (email ? "\n\nFrom: " + email : "");
+  var href = "mailto:avi@metrics-institute.net?subject=" + encodeURIComponent("Statistico Early Access feedback") + "&body=" + encodeURIComponent(body);
+  var link = document.createElement("a");
+  link.href = href;
+  link.target = "_blank";
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  if (status) status.textContent = "";
+  if (submit) submit.disabled = false;
+  closeHubEarlyAccess();
 }
 
 if (window.StatisticoHubEntitlement) {

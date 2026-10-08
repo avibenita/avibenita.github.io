@@ -3808,7 +3808,14 @@ function submitHubEarlyAccess(event) {
     .catch(function () { return {}; })
     .then(function (body) {
       if (body && body.ok === true) {
+        try { localStorage.removeItem("statistico.feedbackConfirm"); } catch (e) {}
         markSent();
+        return null;
+      }
+      var pending = false;
+      try { pending = localStorage.getItem("statistico.feedbackConfirm") === "1"; } catch (e) { pending = false; }
+      if (pending) {
+        showFeedbackStatus("Open the newest FormSubmit email and click Activate Form. Another send would cancel that link.");
         return null;
       }
       return fetch("https://formsubmit.co/ajax/avi@metrics-institute.net", {
@@ -3827,12 +3834,14 @@ function submitHubEarlyAccess(event) {
     .then(function (body) {
       if (!body) return;
       if (String(body.success) === "true") {
+        try { localStorage.removeItem("statistico.feedbackConfirm"); } catch (e) {}
         markSent();
         return;
       }
       var notice = String(body.message || "");
       if (/activ/i.test(notice)) {
-        showFeedbackStatus("Click Activate Form in the email sent to avi@metrics-institute.net. Then send this again.");
+        try { localStorage.setItem("statistico.feedbackConfirm", "1"); } catch (e) {}
+        showFeedbackStatus("Open the newest FormSubmit email and click Activate Form. Do not send again before that, or the link is replaced.");
         return;
       }
       showFeedbackStatus("Feedback could not be sent. Please try again.");

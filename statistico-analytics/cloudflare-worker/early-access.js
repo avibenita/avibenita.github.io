@@ -8,6 +8,7 @@
  * Optional KV binding ENTITLEMENT_KV (or LICENSE_KV) stores one grant per email.
  * Without it, activation still succeeds and the hub persists the grant locally.
  */
+import { EmailMessage } from "cloudflare:email";
 import policy from "./early-access-policy.cjs";
 
 const CORS = {
@@ -49,6 +50,38 @@ async function writeGrant(store, email, grant) {
   await store.put(storageKey(email), JSON.stringify(grant));
 }
 
+var FEEDBACK_TO = "avi@metrics-institute.net";
+var FEEDBACK_FROM = "feedback@statistico.live";
+
+async function sendFeedback(env, payload) {
+  var message = String(payload && payload.message || "").trim();
+  if (!message || message.length > 5000) return json({ error: true }, 400);
+  var reply = String(payload && payload.email || "").trim();
+  if (reply && !policy.isLicenseEmail(policy.normalizeLicenseEmail(reply))) {
+    return json({ error: true }, 400);
+  }
+  if (!env || !env.SEND_EMAIL || typeof env.SEND_EMAIL.send !== "function") {
+    return json({ error: true }, 503);
+  }
+  var text = message + (reply ? "\n\nFrom: " + reply : "\n\nFrom: (no email given)");
+  var raw = [
+    "From: Statistico <" + FEEDBACK_FROM + ">",
+    "To: " + FEEDBACK_TO,
+    "Subject: Statistico Early Access feedback",
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    text
+  ].join("\r\n");
+  try {
+    await env.SEND_EMAIL.send(new EmailMessage(FEEDBACK_FROM, FEEDBACK_TO, raw));
+  } catch (e) {
+    return json({ error: true }, 502);
+  }
+  return json({ ok: true });
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -77,7 +110,10 @@ export default {
     } catch (e) {
       return json({ error: true }, 400);
     }
-    if (!body || body.action !== "early-access") return json({ error: true }, 400);
+    if (!body || (body.action !== "early-access" && body.action !== "feedback")) {
+      return json({ error: true }, 400);
+    }
+    if (body.action === "feedback") return sendFeedback(env, body);
 
     var email = policy.normalizeLicenseEmail(body.email);
     if (!policy.isLicenseEmail(email)) return json({ error: true }, 400);

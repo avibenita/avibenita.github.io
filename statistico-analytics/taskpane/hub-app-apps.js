@@ -713,6 +713,7 @@ let HUB_CLUSTER_META = {
   }
 };
 let HUB_VISIBLE_CLUSTERS = ["analytics", "calculators", "tools"];
+let HUB_LICENSE = null;
 /* The worksheet-data card is shown for Statistical Methods and the
    data-dependent Specialized Tools. Calculators take entered parameters
    and never read the worksheet, so the card is hidden there. */
@@ -1371,21 +1372,35 @@ function bindCategoryInfoButtons(list) {
   });
 }
 
+function withLicenseState(modules) {
+  var list = modules || [];
+  if (!HUB_LICENSE || !window.StatisticoHubEntitlement || typeof window.StatisticoHubEntitlement.planAllows !== "function") {
+    return list;
+  }
+  return list.map(function (mod) {
+    var copy = {};
+    Object.keys(mod || {}).forEach(function (key) { copy[key] = mod[key]; });
+    copy.locked = !window.StatisticoHubEntitlement.planAllows(HUB_LICENSE.plan, mod && mod.id);
+    return copy;
+  });
+}
+
 function getCategoryModules(category) {
-  if (Array.isArray(category.modules)) return category.modules;
-  if (Array.isArray(category.subgroups)) {
-    return category.subgroups.reduce(function (all, g) {
+  var raw = [];
+  if (category && Array.isArray(category.modules)) raw = category.modules;
+  else if (category && Array.isArray(category.subgroups)) {
+    raw = category.subgroups.reduce(function (all, g) {
       return all.concat(Array.isArray(g.modules) ? g.modules : []);
     }, []);
   }
-  return [];
+  return withLicenseState(raw);
 }
 
 function renderCategoryGroups(category, scopePrefix) {
   var tabStyle = category.tabStyle === "soft" ? "soft" : "pill";
   if (Array.isArray(category.subgroups) && category.subgroups.length) {
     return category.subgroups.map(function (g, idx) {
-      var mods = g.modules || [];
+      var mods = withLicenseState(g.modules || []);
       return (
         '<div class="category-subgroup' + (idx > 0 ? " with-divider" : "") + '">' +
         '<div class="category-subgroup-label">' + escapeHtml(g.label || "") + "</div>" +
@@ -1403,12 +1418,15 @@ function renderCategoryModuleBtn(m, tabStyle, scopePrefix, fullWidth) {
   var tip = m.tip || m.label;
   var styleClass = tabStyle === "soft" ? " category-module-btn--soft" : "";
   if (m.comingSoon) styleClass += " category-module-btn--soon";
+  if (m.locked) styleClass += " category-module-btn--locked";
   if (fullWidth) styleClass += " category-module-btn--full";
   var actionKey = (String(scopePrefix || "scope") + ":" + String(m.id || "item")).replace(/[^a-zA-Z0-9:_-]/g, "-");
   HUB_ACTIONS[actionKey] = m;
   var soonMark = m.comingSoon ? ' <span class="soon-badge">Soon</span>' : "";
+  var lockMark = m.locked ? ' <span class="plan-badge">Professional</span>' : "";
+  var chevron = m.locked ? "fa-lock" : "fa-chevron-right";
   var labelHtml = escapeHtml(m.label).replace(/EzPaste\u2122/g, 'EzPaste<sup class="hub-tm">™</sup>');
-  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')"><span class="category-module-label">' + labelHtml + soonMark + '</span><i class="fa-solid fa-chevron-right category-module-chevron" aria-hidden="true"></i></button>';
+  return '<button class="category-module-btn' + styleClass + '" data-module-id="' + escapeHtml(m.id) + '" data-st-tip="' + escapeHtml(tip) + '" onclick="runHubModuleAction(\'' + escapeHtml(actionKey) + '\')"><span class="category-module-label">' + labelHtml + soonMark + lockMark + '</span><i class="fa-solid ' + chevron + ' category-module-chevron" aria-hidden="true"></i></button>';
 }
 
 var GROUP_COLORS = {
@@ -1552,43 +1570,125 @@ function getHubScopeName() {
   }
 }
 
-function applyHubScopeConfig(scopeCfg) {
-  if (!scopeCfg || typeof scopeCfg !== "object") return;
-  if (scopeCfg.clusterTiles && typeof scopeCfg.clusterTiles === "object") {
-    HUB_CLUSTER_TILES = scopeCfg.clusterTiles;
-  }
-  if (scopeCfg.clusterMeta && typeof scopeCfg.clusterMeta === "object") {
-    HUB_CLUSTER_META = scopeCfg.clusterMeta;
-  }
-  if (Array.isArray(scopeCfg.visibleClusters) && scopeCfg.visibleClusters.length) {
-    HUB_VISIBLE_CLUSTERS = scopeCfg.visibleClusters.slice();
-  } else {
-    HUB_VISIBLE_CLUSTERS = Object.keys(HUB_CLUSTER_TILES);
-  }
-  if (Array.isArray(scopeCfg.rangeVisibleClusters)) {
-    HUB_RANGE_VISIBLE_CLUSTERS = scopeCfg.rangeVisibleClusters.slice();
-  }
+function clusterHasEntitledModules(clusterId) {
+  var catalog = (HUB_CLUSTER_TILES[clusterId] || []).filter(function (tile) { return !tile.hidden; });
+  return catalog.some(function (tile) { return getCategoryModules(tile).length > 0; });
+}
+
+function syncEntitledClusterVisibility() {
+  if (!HUB_LICENSE) return;
+  var visibleIds = [];
   document.querySelectorAll(".hub-nav-tab[data-cluster]").forEach(function (btn) {
     var clusterId = btn.getAttribute("data-cluster");
-    var visible = HUB_VISIBLE_CLUSTERS.indexOf(clusterId) >= 0;
+    var visible = clusterHasEntitledModules(clusterId);
+    if (visible) visibleIds.push(clusterId);
     var wrap = btn.closest ? btn.closest(".hub-nav-tools-wrap") : null;
     if (wrap) wrap.style.display = visible ? "" : "none";
     else btn.style.display = visible ? "" : "none";
   });
-  if (HUB_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) < 0) {
-    ACTIVE_CLUSTER = HUB_VISIBLE_CLUSTERS[0] || "analytics";
-  }
-  var available = getAvailableAnalyticsSections();
-  if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
-    ACTIVE_ANALYTICS_SECTION = available[0] || "all";
+  if (visibleIds.length) HUB_VISIBLE_CLUSTERS = visibleIds;
+  if (visibleIds.length && visibleIds.indexOf(ACTIVE_CLUSTER) < 0) {
+    ACTIVE_CLUSTER = visibleIds[0];
   }
 }
 
+function installResolvedLicense(resolved, channel) {
+  HUB_LICENSE = {
+    plan: resolved.plan,
+    source: resolved.source,
+    email: resolved.email || "",
+    expiresAt: resolved.expiresAt || null,
+    expiredFrom: resolved.expiredFrom || null,
+    channel: channel.channel,
+    scope: channel.scope,
+    procedureAdvisor: channel.procedureAdvisor !== false,
+    licenseApi: channel.licenseApi || "",
+    defaultPlan: channel.defaultPlan || "FREE"
+  };
+  if (window.StatisticoHubEntitlement && typeof window.StatisticoHubEntitlement.setCurrent === "function") {
+    window.StatisticoHubEntitlement.setCurrent(HUB_LICENSE);
+  }
+  syncEntitledClusterVisibility();
+  var available = getAvailableAnalyticsSections();
+  if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
+    ACTIVE_ANALYTICS_SECTION = "all";
+  }
+  syncHubLicenseBanner();
+  return HUB_LICENSE;
+}
+
+function applyHubScopeConfig(scopeCfg) {
+  /* The scope marks the AppSource channel. It does not replace the
+     three-cluster catalog. Plans decide which modules open. */
+  var api = window.StatisticoHubEntitlement;
+  var channel = api && typeof api.readChannel === "function" ? api.readChannel(scopeCfg || {}) : null;
+  if (!channel) {
+    channel = {
+      scope: getHubScopeName() || "appsource-v1",
+      channel: "appsource",
+      defaultPlan: "FREE",
+      procedureAdvisor: true,
+      licenseApi: ""
+    };
+  }
+  var cache = api && typeof api.readStoredEntitlement === "function" ? api.readStoredEntitlement() : null;
+  function finish(apiResult, attempted) {
+    var resolved = api.resolveEntitlement({
+      defaultPlan: channel.defaultPlan,
+      apiResult: apiResult,
+      apiAttempted: attempted,
+      cache: cache,
+      now: Date.now()
+    });
+    if (resolved.cacheRecord && typeof api.writeStoredEntitlement === "function") {
+      api.writeStoredEntitlement(resolved.cacheRecord);
+    }
+    return installResolvedLicense(resolved, channel);
+  }
+  if (!api || typeof api.resolveEntitlement !== "function") {
+    return Promise.resolve(installResolvedLicense({
+      plan: "FREE",
+      source: "default",
+      email: "",
+      expiresAt: null,
+      expiredFrom: null
+    }, channel));
+  }
+  if (!channel.licenseApi) return Promise.resolve(finish(null, false));
+  var lookupEmail = cache && cache.email && api.normalizeEmail ? api.normalizeEmail(cache.email) : "";
+  if (!lookupEmail) return Promise.resolve(finish(null, false));
+  var lookupUrl = channel.licenseApi + (channel.licenseApi.indexOf("?") >= 0 ? "&" : "?") + "email=" + encodeURIComponent(lookupEmail);
+  return fetch(lookupUrl, { cache: "no-store", headers: { "Accept": "application/json" } })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(function (body) { return finish(body || { error: true }, true); })
+    .catch(function () { return finish({ error: true }, true); });
+}
+
 function loadHubScopeConfigIfAny() {
-  /* AppSource stays on this three-cluster hub. The scope query is only a
-     channel marker and must not replace Statistical Methods, Interactive
-     Calculators, or Specialized Tools. */
-  return Promise.resolve();
+  var scopeName = getHubScopeName();
+  if (!scopeName) return Promise.resolve();
+  var scopeUrl = new URL("hub-scopes/" + encodeURIComponent(scopeName) + ".json", window.location.href);
+  scopeUrl.searchParams.set("v", String(Date.now()));
+  return fetch(scopeUrl.toString(), { cache: "no-store" })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(function (cfg) {
+      return applyHubScopeConfig(cfg || {});
+    })
+    .catch(function (err) {
+      console.warn("Hub scope load failed:", err);
+      return applyHubScopeConfig({
+        scope: scopeName,
+        channel: "appsource",
+        defaultPlan: "FREE",
+        procedureAdvisor: true
+      });
+    });
 }
 
 function syncClusterHeader() {
@@ -1621,6 +1721,7 @@ function syncClusterHeader() {
     showRange = ACTIVE_TOOLS_SECTION === "all" || TOOLS_RANGE_SECTIONS.indexOf(ACTIVE_TOOLS_SECTION) >= 0;
   }
   var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
+  if (HUB_LICENSE && HUB_LICENSE.procedureAdvisor === false) showAdvisor = false;
   if (range) range.style.display = showRange ? "" : "none";
   if (advisor) advisor.style.display = showAdvisor ? "" : "none";
   syncHubToolsMenuSelection();
@@ -1814,10 +1915,19 @@ function openInUserBrowser(url) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+function denyUnentitledModule(moduleId) {
+  if (!HUB_LICENSE) return false;
+  var api = window.StatisticoHubEntitlement;
+  if (api && typeof api.planAllows === "function" && api.planAllows(HUB_LICENSE.plan, moduleId)) return false;
+  showHubEarlyAccess();
+  return true;
+}
+
 function runHubModuleAction(actionKey) {
   dismissHubButtonTooltips();
   var module = HUB_ACTIONS[actionKey];
   if (!module) return;
+  if (denyUnentitledModule(module.id)) return;
   if (module.comingSoon) {
     window.alert((module.label || "This module") + " is coming soon.");
     return;
@@ -3553,8 +3663,191 @@ document.addEventListener("keydown", function (e) {
     closePopup();
     closeHubToolsMenu();
     closeHubAnalyticsMenu();
+    closeHubEarlyAccess();
   }
 });
+
+function licenseBannerText() {
+  if (!HUB_LICENSE || HUB_LICENSE.plan !== "FREE") return "";
+  if (HUB_LICENSE.expiredFrom === "EARLY_ACCESS") {
+    return "Early Access has ended. You are on the Free plan. The full catalogue stays visible, and Professional modules can be unlocked again.";
+  }
+  return "You are on the Free plan. Univariate and the Distribution Calculators are included. Activate Early Access to open the rest of Statistico.";
+}
+
+function syncHubLicenseBanner() {
+  var host = document.getElementById("hubStickyChrome") || document.querySelector(".hub-content-panel");
+  var banner = document.getElementById("hubLicenseBanner");
+  var text = licenseBannerText();
+  if (!text || !host) {
+    if (banner) banner.hidden = true;
+    return;
+  }
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "hubLicenseBanner";
+    banner.className = "hub-license-banner";
+    banner.innerHTML = '<div id="hubLicenseBannerText"></div><button type="button" id="hubLicenseBannerBtn">Activate Early Access</button>';
+    host.insertBefore(banner, host.firstChild);
+    banner.querySelector("#hubLicenseBannerBtn").addEventListener("click", function () {
+      showHubEarlyAccess();
+    });
+  }
+  banner.hidden = false;
+  var copy = document.getElementById("hubLicenseBannerText");
+  if (copy) copy.textContent = text;
+}
+
+function ensureHubEarlyAccessPanel() {
+  var overlay = document.getElementById("hubEarlyOverlay");
+  if (overlay) return overlay;
+  overlay = document.createElement("div");
+  overlay.id = "hubEarlyOverlay";
+  overlay.className = "hub-early-overlay";
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML =
+    '<div class="hub-early-card" role="dialog" aria-labelledby="hubEarlyTitle">' +
+    '<div id="hubEarlyRequest">' +
+    '<h2 id="hubEarlyTitle">Activate Early Access</h2>' +
+    '<p>Enter your email to activate full Statistico Early Access. You’ll get access to every analysis, calculator, and application during the Early Access period. No credit card required.</p>' +
+    '<form id="hubEarlyForm">' +
+    '<input id="hubEarlyEmail" type="email" autocomplete="email" placeholder="you@example.com" required />' +
+    '<div class="hub-early-actions">' +
+    '<button type="button" class="hub-early-cancel" id="hubEarlyCancel">Not now</button>' +
+    '<button type="submit" class="hub-early-submit" id="hubEarlySubmit">Activate Early Access</button>' +
+    "</div>" +
+    '<p class="hub-early-status" id="hubEarlyStatus" role="status"></p>' +
+    "</form></div>" +
+    '<div id="hubEarlySuccess" hidden>' +
+    '<h2>Early Access activated</h2>' +
+    '<p>You now have full access to Statistico.</p>' +
+    '<div class="hub-early-actions">' +
+    '<button type="button" class="hub-early-submit" id="hubEarlyDone">Continue</button>' +
+    "</div></div></div>";
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", function (e) {
+    if (e.target === overlay) closeHubEarlyAccess();
+  });
+  document.getElementById("hubEarlyCancel").addEventListener("click", closeHubEarlyAccess);
+  document.getElementById("hubEarlyDone").addEventListener("click", closeHubEarlyAccess);
+  document.getElementById("hubEarlyForm").addEventListener("submit", submitHubEarlyAccess);
+  return overlay;
+}
+
+function showHubEarlyRequest() {
+  var request = document.getElementById("hubEarlyRequest");
+  var success = document.getElementById("hubEarlySuccess");
+  var submit = document.getElementById("hubEarlySubmit");
+  if (request) request.hidden = false;
+  if (success) success.hidden = true;
+  if (submit) submit.disabled = false;
+}
+
+function showHubEarlySuccess() {
+  var request = document.getElementById("hubEarlyRequest");
+  var success = document.getElementById("hubEarlySuccess");
+  if (request) request.hidden = true;
+  if (success) success.hidden = false;
+}
+
+function showHubEarlyAccess() {
+  if (!HUB_LICENSE) return;
+  var overlay = ensureHubEarlyAccessPanel();
+  var status = document.getElementById("hubEarlyStatus");
+  var email = document.getElementById("hubEarlyEmail");
+  showHubEarlyRequest();
+  if (status) status.textContent = "";
+  if (email && HUB_LICENSE.email && !email.value) email.value = HUB_LICENSE.email;
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  if (email) email.focus();
+}
+
+function closeHubEarlyAccess() {
+  var overlay = document.getElementById("hubEarlyOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+function applyEarlyAccessResponse(body) {
+  var api = window.StatisticoHubEntitlement;
+  var channel = {
+    channel: HUB_LICENSE.channel || "appsource",
+    scope: HUB_LICENSE.scope || "",
+    defaultPlan: HUB_LICENSE.defaultPlan || "FREE",
+    procedureAdvisor: HUB_LICENSE.procedureAdvisor !== false,
+    licenseApi: HUB_LICENSE.licenseApi || ""
+  };
+  var resolved = api.resolveEntitlement({
+    defaultPlan: channel.defaultPlan,
+    apiResult: body,
+    apiAttempted: true,
+    cache: null,
+    now: Date.now()
+  });
+  if (resolved.cacheRecord) api.writeStoredEntitlement(resolved.cacheRecord);
+  installResolvedLicense(resolved, channel);
+  syncClusterHeader();
+  var input = document.getElementById("hubSearch");
+  renderCategoryTiles(input ? input.value : "");
+  syncHubLicenseBanner();
+  return resolved;
+}
+
+function submitHubEarlyAccess(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  var status = document.getElementById("hubEarlyStatus");
+  var emailInput = document.getElementById("hubEarlyEmail");
+  var submit = document.getElementById("hubEarlySubmit");
+  var api = window.StatisticoHubEntitlement;
+  var email = api && typeof api.normalizeEmail === "function"
+    ? api.normalizeEmail(emailInput ? emailInput.value : "")
+    : String(emailInput && emailInput.value || "").trim().toLowerCase();
+  if (emailInput) emailInput.value = email;
+  var failure = "Early Access could not be activated right now. Please try again later. Your Free modules remain available.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (status) status.textContent = "Enter a valid email address.";
+    return;
+  }
+  var apiUrl = HUB_LICENSE && HUB_LICENSE.licenseApi;
+  if (!apiUrl) {
+    if (status) status.textContent = failure;
+    return;
+  }
+  if (status) status.textContent = "Activating Early Access…";
+  if (submit) submit.disabled = true;
+  fetch(apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify({
+      action: "early-access",
+      email: email,
+      channel: HUB_LICENSE.channel,
+      scope: HUB_LICENSE.scope
+    })
+  })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(function (body) {
+      var granted = api && typeof api.normalizePlan === "function" ? api.normalizePlan(body && body.plan) : "";
+      if (granted !== "EARLY_ACCESS") throw new Error("not granted");
+      var resolved = applyEarlyAccessResponse(body);
+      if (!resolved || resolved.plan !== "EARLY_ACCESS") throw new Error("not granted");
+      if (status) status.textContent = "";
+      showHubEarlySuccess();
+    })
+    .catch(function () {
+      if (status) status.textContent = failure;
+      if (submit) submit.disabled = false;
+    });
+}
+
+if (window.StatisticoHubEntitlement) {
+  window.StatisticoHubEntitlement.openEarlyAccess = showHubEarlyAccess;
+}
 
 Office.onReady(function(info) {
   if (info.host !== Office.HostType.Excel) {
@@ -3569,6 +3862,7 @@ Office.onReady(function(info) {
     }
     syncClusterHeader();
     renderCategoryTiles("");
+    syncHubLicenseBanner();
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.init === "function") {
       window.StatisticoTooltip.init();
       window.StatisticoTooltip.refresh();

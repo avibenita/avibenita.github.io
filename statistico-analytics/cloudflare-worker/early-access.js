@@ -53,17 +53,23 @@ async function writeGrant(store, email, grant) {
 var FEEDBACK_TO = "avi@metrics-institute.net";
 var FEEDBACK_FROM = "feedback@statistico.live";
 
-async function sendFeedback(env, payload) {
-  var message = String(payload && payload.message || "").trim();
-  if (!message || message.length > 5000) return json({ error: true }, 400);
-  var reply = String(payload && payload.email || "").trim();
-  if (reply && !policy.isLicenseEmail(policy.normalizeLicenseEmail(reply))) {
-    return json({ error: true }, 400);
-  }
-  if (!env || !env.SEND_EMAIL || typeof env.SEND_EMAIL.send !== "function") {
-    return json({ error: true }, 503);
-  }
-  var text = message + (reply ? "\n\nFrom: " + reply : "\n\nFrom: (no email given)");
+function feedbackText(message, reply) {
+  return message + (reply ? "\n\nFrom: " + reply : "\n\nFrom: (no email given)");
+}
+
+async function storeFeedback(env, message, reply) {
+  var store = storeOf(env);
+  if (!store) return;
+  var id = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+  await store.put("feedback:" + id, JSON.stringify({
+    at: new Date().toISOString(),
+    email: reply || "",
+    message: message
+  }), { expirationTtl: 60 * 60 * 24 * 30 });
+}
+
+async function sendViaCloudflare(env, text) {
+  if (!env || !env.SEND_EMAIL || typeof env.SEND_EMAIL.send !== "function") return false;
   var raw = [
     "From: Statistico <" + FEEDBACK_FROM + ">",
     "To: " + FEEDBACK_TO,
@@ -76,10 +82,55 @@ async function sendFeedback(env, payload) {
   ].join("\r\n");
   try {
     await env.SEND_EMAIL.send(new EmailMessage(FEEDBACK_FROM, FEEDBACK_TO, raw));
+    return true;
   } catch (e) {
-    return json({ error: true }, 502);
+    return false;
   }
-  return json({ ok: true });
+}
+
+async function sendViaFormSubmit(text, reply) {
+  var res = await fetch("https://formsubmit.co/ajax/" + FEEDBACK_TO, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Origin": "https://statistico.live",
+      "Referer": "https://statistico.live/statistico-analytics/taskpane/hub.html"
+    },
+    body: JSON.stringify({
+      name: "Statistico Early Access",
+      message: text,
+      _subject: "Statistico Early Access feedback",
+      _captcha: "false",
+      _template: "table",
+      _replyto: reply || undefined
+    })
+  });
+  var body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  if (body && String(body.success) === "true") return "sent";
+  var notice = String(body && body.message || "");
+  if (/activ/i.test(notice)) return "held";
+  if (/rate limit/i.test(notice)) return "retry";
+  return "failed";
+}
+
+async function sendFeedback(env, payload) {
+  var message = String(payload && payload.message || "").trim();
+  if (!message || message.length > 5000) return json({ error: true }, 400);
+  var reply = String(payload && payload.email || "").trim();
+  if (reply && !policy.isLicenseEmail(policy.normalizeLicenseEmail(reply))) {
+    return json({ error: true }, 400);
+  }
+  var text = feedbackText(message, reply);
+  try { await storeFeedback(env, message, reply); } catch (e) { /* keep trying to deliver */ }
+  if (await sendViaCloudflare(env, text)) return json({ ok: true });
+  var form = "failed";
+  try { form = await sendViaFormSubmit(text, reply); } catch (e) { form = "failed"; }
+  if (form === "sent") return json({ ok: true });
+  if (form === "held") return json({ ok: false, held: true });
+  if (form === "retry") return json({ ok: false, retry: true }, 429);
+  return json({ error: true }, 502);
 }
 
 export default {

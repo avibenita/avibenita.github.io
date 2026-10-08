@@ -3788,30 +3788,36 @@ function submitHubEarlyAccess(event) {
   }
   if (status) status.textContent = "Sending…";
   if (submit) submit.disabled = true;
-  fetch("https://formsubmit.co/ajax/avi@metrics-institute.net", {
+  var endpoint = (HUB_LICENSE && HUB_LICENSE.licenseApi) || "https://statistico-license.statistico-interactive.workers.dev/";
+  fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify({
-      name: "Statistico Early Access",
-      message: message + (email ? "\n\nFrom: " + email : "\n\nFrom: (no email given)"),
-      _subject: "Statistico Early Access feedback",
-      _captcha: "false",
-      _template: "table",
-      _replyto: email || undefined
-    })
+    body: JSON.stringify({ action: "feedback", message: message, email: email })
   })
     .then(function (res) {
       return res.json().then(function (body) {
-        if (!res.ok || !body || String(body.success) !== "true") {
-          throw new Error((body && body.message) || "not sent");
-        }
+        return { res: res, body: body || {} };
       });
     })
-    .then(function () {
-      if (messageInput) messageInput.value = "";
-      if (emailInput) emailInput.value = "";
-      if (status) status.textContent = "Sent.";
-      if (submit) submit.disabled = false;
+    .then(function (result) {
+      if (result.body && result.body.ok === true) {
+        if (messageInput) messageInput.value = "";
+        if (emailInput) emailInput.value = "";
+        if (status) status.textContent = "Sent.";
+        if (submit) submit.disabled = false;
+        return;
+      }
+      if (result.body && result.body.held) {
+        if (status) status.textContent = "Saved. Open the FormSubmit message in avi@metrics-institute.net and click Activate Form once. This note will then arrive.";
+        if (submit) submit.disabled = false;
+        return;
+      }
+      if (result.body && result.body.retry) {
+        if (status) status.textContent = "The mailer is busy. Wait a minute and send again.";
+        if (submit) submit.disabled = false;
+        return;
+      }
+      throw new Error("not sent");
     })
     .catch(function () {
       if (status) status.textContent = "Feedback could not be sent. Please try again.";

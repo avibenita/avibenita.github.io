@@ -30,6 +30,7 @@ function makeEl() {
   "hubDataReviewBtn",
   "hubDataSummaryText",
   "hubDataSummaryBtn",
+  "hubDataRoleLabel",
   "hubDataWarn",
   "hubDataWarnCount",
   "hubDataDetails"
@@ -132,6 +133,7 @@ describe("prepare shortcut on the data card", () => {
       "60 records with missing values · Review data"
     );
     expect(document.getElementById("hubDataSummaryText").textContent).toBe("Prepared_Data · A1:J151");
+    expect(document.getElementById("hubDataRoleLabel").hidden).toBe(false);
     expect(document.getElementById("hubDataWarn").hidden).toBe(false);
   });
 

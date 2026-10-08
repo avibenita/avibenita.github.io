@@ -398,6 +398,7 @@
     var bar = document.getElementById("hubWdataBar");
     var summary = document.getElementById("hubDataSummaryText");
     var summaryBtn = document.getElementById("hubDataSummaryBtn");
+    var role = document.getElementById("hubDataRoleLabel");
     var warn = document.getElementById("hubDataWarn");
     if (!bar || !summary) return;
     var addr = (document.getElementById("hubRangeBadgeText") || {}).textContent || "";
@@ -410,12 +411,13 @@
     else if (bar.classList.contains("is-error") || /select a range/i.test(addr)) label = "Select data";
     else label = "Detecting…";
     summary.textContent = label;
+    if (role) role.hidden = !ready;
     if (warn) {
       warn.hidden = !(ready && count > 0);
       warn.title = count > 0 ? issue : "";
     }
     if (summaryBtn) {
-      summaryBtn.setAttribute("aria-label", issue ? label + ", " + issue : label);
+      summaryBtn.setAttribute("aria-label", (ready ? "Working range, " : "") + (issue ? label + ", " + issue : label));
     }
   }
 

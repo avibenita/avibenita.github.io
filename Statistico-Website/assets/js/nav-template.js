@@ -1858,6 +1858,26 @@ footer#contact .footer-bottom {
   border-top: 1px solid var(--border, rgba(255,255,255,.11));
 }
 
+a.linkedin-profile-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 165, 120, 0.4);
+  background: linear-gradient(135deg, rgba(255, 165, 120, 0.16), rgba(120, 200, 255, 0.08));
+  color: var(--site-text-primary, #f4f8ff);
+  font-weight: 700;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+footer#contact .footer-section a.linkedin-profile-btn {
+  display: inline-flex;
+}
+
 @media (max-width: 1600px) {
   .nav-container {
     padding-left: 12px;
@@ -2238,9 +2258,7 @@ const FOOTER_TEMPLATE = `
       </div>
       <div class="footer-section footer-section--linkedin">
         <h4>Connect</h4>
-        <div class="linkedin-badge-wrap">
-          <div class="badge-base LI-profile-badge" data-locale="en_US" data-size="medium" data-theme="dark" data-type="VERTICAL" data-vanity="metricsinstitute" data-version="v1"></div>
-        </div>
+        <a class="linkedin-profile-btn" href="https://www.linkedin.com/in/metricsinstitute" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-linkedin"></i> View LinkedIn profile</a>
       </div>
     </div>
     <div class="footer-bottom">© 2026 Statistico™ Platform. Revolutionizing statistical computing, one analysis at a time.</div>
@@ -2281,24 +2299,6 @@ const FOOTER_TEMPLATE = `
     return 'dark';
   }
 
-  function syncLinkedInBadges(theme) {
-    const badgeTheme = theme === 'light' ? 'light' : 'dark';
-    document.querySelectorAll('.LI-profile-badge').forEach(function(badge) {
-      badge.setAttribute('data-theme', badgeTheme);
-    });
-  }
-
-  function loadLinkedInBadgeScript() {
-    if (window.__statisticoLinkedInBadgeLoaded) return;
-    const script = document.createElement('script');
-    script.src = 'https://platform.linkedin.com/badges/js/profile.js';
-    script.async = true;
-    script.defer = true;
-    script.type = 'text/javascript';
-    document.body.appendChild(script);
-    window.__statisticoLinkedInBadgeLoaded = true;
-  }
-
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     try {
@@ -2306,7 +2306,6 @@ const FOOTER_TEMPLATE = `
     } catch (error) {
       // Ignore storage errors.
     }
-    syncLinkedInBadges(theme);
     const themeToggle = document.getElementById('themeToggle');
     if (themeToggle) {
       const isLight = theme === 'light';
@@ -2392,9 +2391,6 @@ const FOOTER_TEMPLATE = `
     if (footerTermsLink) footerTermsLink.href = links.terms;
     if (footerAddinsLink) footerAddinsLink.href = links.addins;
   }
-
-  syncLinkedInBadges(document.documentElement.getAttribute('data-theme') || getStoredTheme());
-  loadLinkedInBadgeScript();
 
   // Initialize navigation functionality
   function initializeNavigation() {

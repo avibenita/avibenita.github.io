@@ -8,7 +8,6 @@
  * Optional KV binding ENTITLEMENT_KV (or LICENSE_KV) stores one grant per email.
  * Without it, activation still succeeds and the hub persists the grant locally.
  */
-import { EmailMessage } from "cloudflare:email";
 import policy from "./early-access-policy.cjs";
 
 const CORS = {
@@ -68,20 +67,20 @@ async function storeFeedback(env, message, reply) {
   }), { expirationTtl: 60 * 60 * 24 * 30 });
 }
 
-async function sendViaCloudflare(env, text) {
+function feedbackSubject(source) {
+  return source === "website-contact" ? "Statistico website contact" : "Statistico Early Access feedback";
+}
+
+async function sendViaCloudflare(env, text, source, reply) {
   if (!env || !env.SEND_EMAIL || typeof env.SEND_EMAIL.send !== "function") return false;
-  var raw = [
-    "From: Statistico <" + FEEDBACK_FROM + ">",
-    "To: " + FEEDBACK_TO,
-    "Subject: Statistico Early Access feedback",
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: 8bit",
-    "",
-    text
-  ].join("\r\n");
   try {
-    await env.SEND_EMAIL.send(new EmailMessage(FEEDBACK_FROM, FEEDBACK_TO, raw));
+    await env.SEND_EMAIL.send({
+      to: FEEDBACK_TO,
+      from: { email: FEEDBACK_FROM, name: "Statistico" },
+      replyTo: reply || undefined,
+      subject: feedbackSubject(source),
+      text: text
+    });
     return true;
   } catch (e) {
     return false;
@@ -95,9 +94,15 @@ async function sendFeedback(env, payload) {
   if (reply && !policy.isLicenseEmail(policy.normalizeLicenseEmail(reply))) {
     return json({ error: true }, 400);
   }
-  var text = feedbackText(message, reply);
-  try { await storeFeedback(env, message, reply); } catch (e) { /* keep trying to deliver */ }
-  if (await sendViaCloudflare(env, text)) return json({ ok: true });
+  var source = String(payload && payload.source || "").trim();
+  var name = String(payload && payload.name || "").replace(/[\r\n]+/g, " ").trim().slice(0, 200);
+  var bodyText = message;
+  if (source === "website-contact" && name && bodyText.indexOf("Website contact\n") !== 0) {
+    bodyText = "Website contact\nName: " + name + "\n\n" + bodyText;
+  }
+  var text = feedbackText(bodyText, reply);
+  try { await storeFeedback(env, bodyText, reply); } catch (e) { /* keep trying to deliver */ }
+  if (await sendViaCloudflare(env, text, source, reply)) return json({ ok: true });
   return json({ ok: false });
 }
 

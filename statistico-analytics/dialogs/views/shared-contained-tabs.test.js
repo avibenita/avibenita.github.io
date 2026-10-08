@@ -30,7 +30,8 @@ describe('shared contained tabs', () => {
     expect(css).toMatch(/--st-header-pre-tabs:\s*120px/);
     expect(css).toMatch(/\.sb-logo[\s\S]*border-bottom:\s*1px solid var\(--st-contained-divider\)/);
     expect(css).toMatch(/\.sb-body[\s\S]*padding-top:\s*calc\(var\(--st-contained-h, 48px\) \+ 0\.5cm\)/);
-    expect(css).toMatch(/#results-container \{[\s\S]*padding-top:\s*0\.5cm !important;/);
+    expect(css).toMatch(/#results-container \{[\s\S]*padding-top:\s*0 !important;/);
+    expect(css).toMatch(/\.ws-mode-tab\.active::before[\s\S]*bottom:\s*-2px/);
     expect(headerCss).toMatch(/\.header-module-frame \{[\s\S]*border:\s*0;/);
     expect(css).toMatch(/border-top:\s*3px solid transparent/);
     expect(header).toMatch(/setAttribute\('data-tabs', next\)/);

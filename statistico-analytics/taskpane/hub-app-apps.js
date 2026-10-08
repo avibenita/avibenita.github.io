@@ -3786,30 +3786,28 @@ function submitHubEarlyAccess(event) {
     if (status) status.textContent = "That email does not look valid. You can leave it blank.";
     return;
   }
-  var apiUrl = HUB_LICENSE && HUB_LICENSE.licenseApi;
-  if (!apiUrl) {
-    if (status) status.textContent = "Feedback could not be sent. Please try again.";
-    return;
-  }
   if (status) status.textContent = "Sending…";
   if (submit) submit.disabled = true;
-  fetch(apiUrl, {
+  fetch("https://formsubmit.co/ajax/avi@metrics-institute.net", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
     body: JSON.stringify({
-      action: "feedback",
-      message: message,
-      email: email,
-      channel: HUB_LICENSE.channel || "appsource",
-      scope: HUB_LICENSE.scope || ""
+      name: "Statistico Early Access",
+      message: message + (email ? "\n\nFrom: " + email : "\n\nFrom: (no email given)"),
+      _subject: "Statistico Early Access feedback",
+      _captcha: "false",
+      _template: "table",
+      _replyto: email || undefined
     })
   })
     .then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.json();
+      return res.json().then(function (body) {
+        if (!res.ok || !body || String(body.success) !== "true") {
+          throw new Error((body && body.message) || "not sent");
+        }
+      });
     })
-    .then(function (body) {
-      if (!body || body.error || body.ok !== true) throw new Error("not sent");
+    .then(function () {
       if (messageInput) messageInput.value = "";
       if (emailInput) emailInput.value = "";
       if (status) status.textContent = "Sent.";

@@ -3789,39 +3789,56 @@ function submitHubEarlyAccess(event) {
   if (status) status.textContent = "Sending…";
   if (submit) submit.disabled = true;
   var endpoint = (HUB_LICENSE && HUB_LICENSE.licenseApi) || "https://statistico-license.statistico-interactive.workers.dev/";
+  function markSent() {
+    if (messageInput) messageInput.value = "";
+    if (emailInput) emailInput.value = "";
+    if (status) status.textContent = "Sent.";
+    if (submit) submit.disabled = false;
+  }
+  function showFeedbackStatus(text) {
+    if (status) status.textContent = text;
+    if (submit) submit.disabled = false;
+  }
   fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
     body: JSON.stringify({ action: "feedback", message: message, email: email })
   })
-    .then(function (res) {
-      return res.json().then(function (body) {
-        return { res: res, body: body || {} };
-      });
+    .then(function (res) { return res.json(); })
+    .catch(function () { return {}; })
+    .then(function (body) {
+      if (body && body.ok === true) {
+        markSent();
+        return null;
+      }
+      return fetch("https://formsubmit.co/ajax/avi@metrics-institute.net", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          name: "Statistico Early Access",
+          message: message + (email ? "\n\nFrom: " + email : "\n\nFrom: (no email given)"),
+          _subject: "Statistico Early Access feedback",
+          _captcha: "false",
+          _template: "table",
+          _replyto: email || undefined
+        })
+      }).then(function (res) { return res.json(); });
     })
-    .then(function (result) {
-      if (result.body && result.body.ok === true) {
-        if (messageInput) messageInput.value = "";
-        if (emailInput) emailInput.value = "";
-        if (status) status.textContent = "Sent.";
-        if (submit) submit.disabled = false;
+    .then(function (body) {
+      if (!body) return;
+      if (String(body.success) === "true") {
+        markSent();
         return;
       }
-      if (result.body && result.body.held) {
-        if (status) status.textContent = "Saved. Open the FormSubmit message in avi@metrics-institute.net and click Activate Form once. This note will then arrive.";
-        if (submit) submit.disabled = false;
+      var notice = String(body.message || "");
+      if (/activ/i.test(notice)) {
+        showFeedbackStatus("Click Activate Form in the email sent to avi@metrics-institute.net. Then send this again.");
         return;
       }
-      if (result.body && result.body.retry) {
-        if (status) status.textContent = "The mailer is busy. Wait a minute and send again.";
-        if (submit) submit.disabled = false;
-        return;
-      }
-      throw new Error("not sent");
+      showFeedbackStatus("Feedback could not be sent. Please try again.");
     })
     .catch(function () {
-      if (status) status.textContent = "Feedback could not be sent. Please try again.";
-      if (submit) submit.disabled = false;
+      showFeedbackStatus("Feedback could not be sent. Please try again.");
     });
 }
 

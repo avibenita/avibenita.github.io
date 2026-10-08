@@ -88,33 +88,6 @@ async function sendViaCloudflare(env, text) {
   }
 }
 
-async function sendViaFormSubmit(text, reply) {
-  var res = await fetch("https://formsubmit.co/ajax/" + FEEDBACK_TO, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "Origin": "https://statistico.live",
-      "Referer": "https://statistico.live/statistico-analytics/taskpane/hub.html"
-    },
-    body: JSON.stringify({
-      name: "Statistico Early Access",
-      message: text,
-      _subject: "Statistico Early Access feedback",
-      _captcha: "false",
-      _template: "table",
-      _replyto: reply || undefined
-    })
-  });
-  var body = null;
-  try { body = await res.json(); } catch (e) { body = null; }
-  if (body && String(body.success) === "true") return "sent";
-  var notice = String(body && body.message || "");
-  if (/activ/i.test(notice)) return "held";
-  if (/rate limit/i.test(notice)) return "retry";
-  return "failed";
-}
-
 async function sendFeedback(env, payload) {
   var message = String(payload && payload.message || "").trim();
   if (!message || message.length > 5000) return json({ error: true }, 400);
@@ -125,12 +98,7 @@ async function sendFeedback(env, payload) {
   var text = feedbackText(message, reply);
   try { await storeFeedback(env, message, reply); } catch (e) { /* keep trying to deliver */ }
   if (await sendViaCloudflare(env, text)) return json({ ok: true });
-  var form = "failed";
-  try { form = await sendViaFormSubmit(text, reply); } catch (e) { form = "failed"; }
-  if (form === "sent") return json({ ok: true });
-  if (form === "held") return json({ ok: false, held: true });
-  if (form === "retry") return json({ ok: false, retry: true }, 429);
-  return json({ error: true }, 502);
+  return json({ ok: false });
 }
 
 export default {

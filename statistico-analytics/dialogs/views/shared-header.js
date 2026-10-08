@@ -7714,6 +7714,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       </div>
     `;
     footer.appendChild(utilities);
+    footer.appendChild(this._sidebarFeedbackLink());
     nav.appendChild(footer);
 
     const toolsToggle = document.getElementById('sbOutputToolsToggle');
@@ -7734,6 +7735,220 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
       window.StatisticoTooltip.refresh();
     }
+  },
+
+  feedbackAppVersion: '1.0.1.36',
+
+  _sidebarFeedbackLink() {
+    const wrap = document.createElement('div');
+    wrap.className = 'sb-feedback';
+    wrap.innerHTML =
+      '<button type="button" class="sb-feedback-link" id="sbFeedbackLink">' +
+      '<i class="fa-solid fa-comment" aria-hidden="true"></i>' +
+      '<span>Send feedback</span></button>';
+    const btn = wrap.querySelector('#sbFeedbackLink');
+    if (btn) btn.addEventListener('click', () => this.openModuleFeedback());
+    return wrap;
+  },
+
+  _ensureModuleFeedback() {
+    let overlay = document.getElementById('sbFeedbackOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'sbFeedbackOverlay';
+    overlay.className = 'sb-feedback-overlay';
+    overlay.hidden = true;
+    overlay.innerHTML =
+      '<div class="sb-feedback-card" role="dialog" aria-modal="true" aria-labelledby="sbFeedbackTitle">' +
+      '<h2 id="sbFeedbackTitle">Send feedback</h2>' +
+      '<p class="sb-feedback-context" id="sbFeedbackContext"></p>' +
+      '<form id="sbFeedbackForm">' +
+      '<div class="sb-feedback-types" role="radiogroup" aria-label="Feedback type">' +
+      '<label><input type="radio" name="sbFeedbackType" value="Report a problem" checked> Report a problem</label>' +
+      '<label><input type="radio" name="sbFeedbackType" value="Suggest an improvement"> Suggest an improvement</label>' +
+      '</div>' +
+      '<textarea id="sbFeedbackMessage" required placeholder="What happened, or what would help?"></textarea>' +
+      '<label class="sb-feedback-file">Screenshot <span>optional</span>' +
+      '<input id="sbFeedbackFile" type="file" accept="image/*"></label>' +
+      '<label class="sb-feedback-check"><input id="sbFeedbackData" type="checkbox"> Include the current analysis data</label>' +
+      '<p class="sb-feedback-note">Worksheet values are included only if you check this.</p>' +
+      '<input id="sbFeedbackEmail" type="email" autocomplete="email" placeholder="If you’d like a reply">' +
+      '<div class="sb-feedback-actions">' +
+      '<button type="button" id="sbFeedbackCancel">Not now</button>' +
+      '<button type="submit" id="sbFeedbackSend">Send feedback</button>' +
+      '</div>' +
+      '<p class="sb-feedback-status" id="sbFeedbackStatus" role="status"></p>' +
+      '</form>' +
+      '<div id="sbFeedbackThanks" class="sb-feedback-thanks" hidden>' +
+      '<p>Thank you—your feedback was sent.</p>' +
+      '<div class="sb-feedback-actions"><button type="button" id="sbFeedbackClose">Close</button></div>' +
+      '</div></div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) this.closeModuleFeedback();
+    });
+    document.getElementById('sbFeedbackCancel').addEventListener('click', () => this.closeModuleFeedback());
+    document.getElementById('sbFeedbackClose').addEventListener('click', () => this.closeModuleFeedback());
+    document.getElementById('sbFeedbackForm').addEventListener('submit', (event) => this.submitModuleFeedback(event));
+    if (!this._feedbackEscapeBound) {
+      this._feedbackEscapeBound = true;
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') this.closeModuleFeedback();
+      });
+    }
+    return overlay;
+  },
+
+  openModuleFeedback() {
+    const overlay = this._ensureModuleFeedback();
+    const form = document.getElementById('sbFeedbackForm');
+    const thanks = document.getElementById('sbFeedbackThanks');
+    const status = document.getElementById('sbFeedbackStatus');
+    const context = document.getElementById('sbFeedbackContext');
+    if (form) form.hidden = false;
+    if (thanks) thanks.hidden = true;
+    if (status) status.textContent = '';
+    const view = typeof this._aiViewLabel === 'function'
+      ? this._aiViewLabel(this.currentView)
+      : String(this.currentView || 'Current view');
+    if (context) {
+      context.textContent = this._getModuleDisplayName() + ' · ' + view + ' · version ' + this.feedbackAppVersion;
+    }
+    overlay.hidden = false;
+    const message = document.getElementById('sbFeedbackMessage');
+    if (message) message.focus();
+  },
+
+  closeModuleFeedback() {
+    const overlay = document.getElementById('sbFeedbackOverlay');
+    if (overlay) overlay.hidden = true;
+  },
+
+  _feedbackAnalysisData() {
+    const actions = this._pendingActions || {};
+    if (typeof actions.getData !== 'function') return 'Analysis data: requested, but this view has no data export.';
+    try {
+      let text = '';
+      try { text = JSON.stringify(actions.getData()); } catch (e) { text = String(actions.getData()); }
+      if (!text) return 'Analysis data: requested, but none was available.';
+      if (text.length > 12000) text = text.slice(0, 12000) + '\n[truncated]';
+      return 'Analysis data:\n' + text;
+    } catch (e) {
+      return 'Analysis data: requested, but it could not be read.';
+    }
+  },
+
+  submitModuleFeedback(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    const status = document.getElementById('sbFeedbackStatus');
+    const send = document.getElementById('sbFeedbackSend');
+    const messageEl = document.getElementById('sbFeedbackMessage');
+    const emailEl = document.getElementById('sbFeedbackEmail');
+    const fileEl = document.getElementById('sbFeedbackFile');
+    const dataEl = document.getElementById('sbFeedbackData');
+    const typeEl = document.querySelector('input[name="sbFeedbackType"]:checked');
+    const message = String(messageEl && messageEl.value || '').trim();
+    const email = String(emailEl && emailEl.value || '').trim();
+    const kind = String(typeEl && typeEl.value || 'Report a problem');
+    const file = fileEl && fileEl.files && fileEl.files[0];
+    if (!message) {
+      if (status) status.textContent = 'Enter your feedback.';
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (status) status.textContent = 'That email does not look valid. You can leave it blank.';
+      return;
+    }
+    if (file && file.size > 4 * 1024 * 1024) {
+      if (status) status.textContent = 'Choose a screenshot smaller than 4 MB.';
+      return;
+    }
+    const view = typeof this._aiViewLabel === 'function'
+      ? this._aiViewLabel(this.currentView)
+      : String(this.currentView || 'Current view');
+    const moduleName = this._getModuleDisplayName();
+    const text = [
+      'Type: ' + kind,
+      'Module: ' + moduleName,
+      'View: ' + view,
+      'Version: ' + this.feedbackAppVersion,
+      '',
+      message,
+      '',
+      email ? 'From: ' + email : 'From: (no email given)',
+      '',
+      dataEl && dataEl.checked ? this._feedbackAnalysisData() : 'Analysis data: not included',
+      file ? 'Screenshot: ' + file.name : 'Screenshot: none'
+    ].join('\n');
+    if (status) status.textContent = 'Sending…';
+    if (send) send.disabled = true;
+    const finish = (ok, notice) => {
+      if (send) send.disabled = false;
+      if (ok) {
+        const form = document.getElementById('sbFeedbackForm');
+        const thanks = document.getElementById('sbFeedbackThanks');
+        if (form) form.hidden = true;
+        if (thanks) thanks.hidden = false;
+        if (messageEl) messageEl.value = '';
+        if (emailEl) emailEl.value = '';
+        if (fileEl) fileEl.value = '';
+        if (dataEl) dataEl.checked = false;
+        return;
+      }
+      if (status) status.textContent = notice || 'Feedback could not be sent. Please try again.';
+    };
+    const postForm = () => {
+      let pending = false;
+      try { pending = localStorage.getItem('statistico.feedbackConfirm') === '1'; } catch (e) { pending = false; }
+      if (pending) return Promise.resolve({ skipped: true });
+      const body = new FormData();
+      body.append('name', 'Statistico');
+      body.append('message', text);
+      body.append('_subject', 'Statistico feedback: ' + kind + ' — ' + moduleName + ' / ' + view);
+      body.append('_captcha', 'false');
+      body.append('_template', 'table');
+      if (email) body.append('_replyto', email);
+      if (file) body.append('attachment', file, file.name);
+      return fetch('https://formsubmit.co/ajax/avi@metrics-institute.net', {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: body
+      }).then((res) => res.json()).catch(() => ({}));
+    };
+    fetch('https://statistico-license.statistico-interactive.workers.dev/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ action: 'feedback', message: text, email: email })
+    })
+      .then((res) => res.json())
+      .catch(() => ({}))
+      .then((workerBody) => {
+        if (workerBody && workerBody.ok === true) {
+          try { localStorage.removeItem('statistico.feedbackConfirm'); } catch (e) {}
+          finish(true);
+          return null;
+        }
+        return postForm();
+      })
+      .then((formBody) => {
+        if (!formBody) return;
+        if (formBody.skipped) {
+          finish(false, 'Open the newest FormSubmit email and click Activate Form. Another send would cancel that link.');
+          return;
+        }
+        if (String(formBody.success) === 'true') {
+          try { localStorage.removeItem('statistico.feedbackConfirm'); } catch (e) {}
+          finish(true);
+          return;
+        }
+        if (/activ/i.test(String(formBody.message || ''))) {
+          try { localStorage.setItem('statistico.feedbackConfirm', '1'); } catch (e) {}
+          finish(false, 'Open the newest FormSubmit email and click Activate Form. Do not send again before that, or the link is replaced.');
+          return;
+        }
+        finish(false);
+      })
+      .catch(() => finish(false));
   },
 
   PREVIEW_TEMPLATES: {

@@ -67,21 +67,32 @@ async function storeFeedback(env, message, reply) {
   }), { expirationTtl: 60 * 60 * 24 * 30 });
 }
 
-function feedbackSubject(source) {
-  return source === "website-contact" ? "Statistico website contact" : "Statistico Early Access feedback";
+function feedbackSubject(source, message) {
+  if (source === "website-contact") return "Statistico website contact";
+  if (String(message || "").indexOf("Type:") === 0) return "Statistico module feedback";
+  return "Statistico Early Access feedback";
 }
 
-async function sendViaCloudflare(env, text, source, reply) {
-  if (!env || !env.SEND_EMAIL || typeof env.SEND_EMAIL.send !== "function") return false;
+async function sendViaResend(env, text, source, reply) {
+  var key = env && env.RESEND_API_KEY;
+  if (!key) return false;
   try {
-    await env.SEND_EMAIL.send({
-      to: FEEDBACK_TO,
-      from: { email: FEEDBACK_FROM, name: "Statistico" },
-      replyTo: reply || undefined,
-      subject: feedbackSubject(source),
+    var payload = {
+      from: "Statistico <" + FEEDBACK_FROM + ">",
+      to: [FEEDBACK_TO],
+      subject: feedbackSubject(source, text),
       text: text
+    };
+    if (reply) payload.reply_to = reply;
+    var res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + key,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
     });
-    return true;
+    return res.ok;
   } catch (e) {
     return false;
   }
@@ -102,7 +113,7 @@ async function sendFeedback(env, payload) {
   }
   var text = feedbackText(bodyText, reply);
   try { await storeFeedback(env, bodyText, reply); } catch (e) { /* keep trying to deliver */ }
-  if (await sendViaCloudflare(env, text, source, reply)) return json({ ok: true });
+  if (await sendViaResend(env, text, source, reply)) return json({ ok: true });
   return json({ ok: false });
 }
 

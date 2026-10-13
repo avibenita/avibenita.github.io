@@ -696,7 +696,7 @@
                   <span class="section-note" style="margin:0;flex:1;" id="hiCutReadout">Drag the dashed cut line to explore other cluster counts.</span>
                   <button type="button" class="cut-apply-btn" id="hiCutApply" onclick="applyDendroCut()" disabled>Apply cut</button>
                 </div>
-                <div class="section-note" style="margin-top:8px;margin-bottom:0;">Merge height (y-axis) shows the distance at which clusters combine. A horizontal cut at height <em>h</em> gives the number of clusters at that level; applying a cut re-runs the analysis at the new <em>k</em> and refreshes every page.</div>
+                <div class="section-note" id="hiDendroFoot" style="margin-top:8px;margin-bottom:0;">Merge height (y-axis) shows the distance at which clusters combine. A horizontal cut at height <em>h</em> gives the number of clusters at that level; applying a cut re-runs the analysis at the new <em>k</em> and refreshes every page. <span id="hiDendroLargeNote"></span></div>
               </div>
             </section>
 
@@ -1874,53 +1874,79 @@
         el.innerHTML = '<div class="hint-empty">No dendrogram data. Re-run hierarchical clustering.</div>';
         return;
       }
-      var xPos = [];
-      var yPos = [];
+      // A full drawing is one stroke per case. At a few thousand cases that SVG
+      // is wide enough to blank the dialog while it paints, and a chain-like
+      // tree (single linkage) recurses deep enough to crash the page. Collapse
+      // everything below the top of the tree and walk it with an explicit stack.
+      var maxLeaves = 250;
+      var floor = n > maxLeaves ? n - maxLeaves : 0;
+      var stopBelow = n + floor;
+      var rootId = n + merges.length - 1;
+      function sizeOf(id) {
+        return id < n ? 1 : merges[id - n].nMerged;
+      }
+      var leafOrder = [];
+      var walk = [rootId];
+      while (walk.length) {
+        var id = walk.pop();
+        if (id < stopBelow) { leafOrder.push(id); continue; }
+        var node = merges[id - n];
+        if (!node) continue;
+        walk.push(node.right);
+        walk.push(node.left);
+      }
+
+      var nodeCount = n + merges.length;
+      var xPos = new Array(nodeCount);
+      var yPos = new Array(nodeCount);
       var i;
-      function getLeafOrder() {
-        var order = [];
-        function visit(nodeId) {
-          if (nodeId < n) { order.push(nodeId); return; }
-          var idx = nodeId - n;
-          if (idx < 0 || idx >= merges.length) return;
-          var m = merges[idx];
-          visit(m.left);
-          visit(m.right);
-        }
-        visit(n + merges.length - 1);
-        return order;
-      }
-      var leafOrder = getLeafOrder();
-      for (i = 0; i < n; i++) xPos[i] = leafOrder.indexOf(i);
       for (i = 0; i < n; i++) yPos[i] = 0;
+      var maxH = 0;
       for (i = 0; i < merges.length; i++) {
-        var m = merges[i];
-        var lid = m.left, rid = m.right;
-        xPos[n + i] = (xPos[lid] + xPos[rid]) / 2;
-        yPos[n + i] = m.height;
+        var mh = Number(merges[i].height);
+        if (!isFinite(mh)) mh = 0;
+        yPos[n + i] = mh;
+        if (mh > maxH) maxH = mh;
       }
-      var w = Math.max(400, n * 2);
-      var h = 260;
-      var pad = { top: 8, right: 12, bottom: 24, left: 40 };
-      var maxH = merges.length ? Math.max.apply(null, merges.map(function(m) { return m.height; })) : 0;
-      var scaleX = function(x) { return pad.left + (x / Math.max(1, n - 1)) * (w - pad.left - pad.right); };
-      var scaleY = function(y) { return pad.top + h - pad.top - pad.bottom - (y / Math.max(1e-9, maxH)) * (h - pad.top - pad.bottom); };
-      var strokes = [];
-      for (i = 0; i < merges.length; i++) {
+      var cursor = 0;
+      for (i = 0; i < leafOrder.length; i++) {
+        var leaf = leafOrder[i];
+        var sz = sizeOf(leaf) || 1;
+        xPos[leaf] = cursor + sz / 2;
+        cursor += sz;
+      }
+      var span = cursor || n;
+      for (i = floor; i < merges.length; i++) {
         var m = merges[i];
-        var l = m.left, r = m.right;
+        var sl = sizeOf(m.left) || 1;
+        var sr = sizeOf(m.right) || 1;
+        xPos[n + i] = (xPos[m.left] * sl + xPos[m.right] * sr) / (sl + sr);
+      }
+
+      var leavesDrawn = leafOrder.length;
+      var w = Math.max(640, leavesDrawn * (floor > 0 ? 6 : 2));
+      var h = 260;
+      var pad = { top: 8, right: 12, bottom: 24, left: 48 };
+      var plotH = h - pad.top - pad.bottom;
+      var scaleX = function(x) { return pad.left + (x / span) * (w - pad.left - pad.right); };
+      var scaleY = function(y) { return pad.top + plotH * (1 - (y / Math.max(1e-9, maxH))); };
+      var strokes = [];
+      for (i = floor; i < merges.length; i++) {
+        var m2 = merges[i];
+        var l = m2.left, r = m2.right;
         var xL = scaleX(xPos[l]), xR = scaleX(xPos[r]);
-        var yBot = l < n ? scaleY(0) : scaleY(yPos[l]);
-        var yTop = scaleY(m.height);
-        strokes.push("M" + xL.toFixed(2) + "," + yBot + "V" + yTop);
-        strokes.push("M" + xR.toFixed(2) + "," + (r < n ? scaleY(0) : scaleY(yPos[r])) + "V" + yTop);
-        strokes.push("M" + xL.toFixed(2) + "," + yTop + "H" + xR.toFixed(2));
+        var yL = scaleY(yPos[l] || 0);
+        var yR = scaleY(yPos[r] || 0);
+        var yTop = scaleY(m2.height);
+        strokes.push("M" + xL.toFixed(1) + "," + yL.toFixed(1) + "V" + yTop.toFixed(1));
+        strokes.push("M" + xR.toFixed(1) + "," + yR.toFixed(1) + "V" + yTop.toFixed(1));
+        strokes.push("M" + xL.toFixed(1) + "," + yTop.toFixed(1) + "H" + xR.toFixed(1));
       }
       var yAxisTicks = maxH > 0 ? [0, maxH * 0.25, maxH * 0.5, maxH * 0.75, maxH] : [0];
       var yAxisHtml = yAxisTicks.map(function(v) {
         var yy = scaleY(v);
-        return "<line x1='" + pad.left + "' y1='" + yy + "' x2='" + (w - pad.right) + "' y2='" + yy + "' stroke='rgba(255,255,255,.15)' stroke-width='1' stroke-dasharray='2,2'/>" +
-          "<text x='" + (pad.left - 6) + "' y='" + (yy + 4) + "' fill='rgba(255,255,255,.6)' font-size='10' text-anchor='end'>" + formatNumber(v) + "</text>";
+        return "<line x1='" + pad.left + "' y1='" + yy.toFixed(1) + "' x2='" + (w - pad.right) + "' y2='" + yy.toFixed(1) + "' stroke='rgba(255,255,255,.15)' stroke-width='1' stroke-dasharray='2,2'/>" +
+          "<text x='" + (pad.left - 6) + "' y='" + (yy + 4).toFixed(1) + "' fill='rgba(255,255,255,.6)' font-size='10' text-anchor='end'>" + formatNumber(v) + "</text>";
       }).join("");
       var svg = "<svg width=\"100%\" height=\"100%\" viewBox=\"0 0 " + w + " " + h + "\" preserveAspectRatio=\"xMidYMid meet\" style=\"overflow:visible;\">" +
         "<rect width=\"100%\" height=\"100%\" fill=\"transparent\"/>" +
@@ -1933,6 +1959,12 @@
         "</g>" +
         "</svg>";
       el.innerHTML = svg;
+      var largeNote = document.getElementById("hiDendroLargeNote");
+      if (largeNote) {
+        largeNote.textContent = floor > 0
+          ? " This sample is large, so the drawing shows the top of the tree and collapses the lower branches."
+          : "";
+      }
       setupDendrogramCut(el, merges, n, kCurrent, scaleY, h, pad, maxH);
     }
 
@@ -2364,6 +2396,24 @@
             var message = JSON.parse(arg.message || "{}");
             if (!message || !message.type) return;
             switch (message.type) {
+              case "CLUSTER_STATUS":
+                var st = (message.payload && message.payload.message) || "Running the analysis…";
+                var vSt = document.getElementById("cluVerdict");
+                if (vSt) vSt.textContent = st;
+                var qSt = document.getElementById("cluQualityBody");
+                if (qSt) {
+                  qSt.textContent = "";
+                  var qNote = document.createElement("div");
+                  qNote.className = "hint-empty";
+                  qNote.textContent = st;
+                  qSt.appendChild(qNote);
+                }
+                var sbSt = document.getElementById("cluSummaryBody");
+                if (sbSt) {
+                  sbSt.innerHTML = "<tr><td class=\"hint-empty\"></td></tr>";
+                  sbSt.querySelector(".hint-empty").textContent = st;
+                }
+                break;
               case "CLUSTER_BUNDLE": populateClusterBundle(message.payload || {}); break;
               case "CLUSTER_RAW_DATA": populateClusterRawData(message.payload || {}); break;
               case "RESET_RESULTS": window.resetResultsPanel(); break;

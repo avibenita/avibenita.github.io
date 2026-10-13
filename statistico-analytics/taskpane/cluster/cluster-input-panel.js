@@ -300,59 +300,225 @@ function distMatrix(X, metric) {
   return d;
 }
 
-function linkDist(membersA, membersB, dist, mode) {
-  let sum = 0;
-  let cnt = 0;
-  let mn = Infinity;
-  let mx = -Infinity;
-  for (const i of membersA) {
-    for (const j of membersB) {
-      const dij = dist[i][j];
-      if (mode === "single") mn = Math.min(mn, dij);
-      else if (mode === "complete") mx = Math.max(mx, dij);
-      else {
-        sum += dij;
-        cnt++;
-      }
-    }
-  }
-  if (mode === "single") return mn;
-  if (mode === "complete") return mx;
-  return cnt ? sum / cnt : 0;
+// Full pairwise matrix is n*(n-1)/2 doubles. Above this the allocation itself
+// is large enough to blank the results window, so hierarchical stops and the
+// verdict points at K-means.
+const MAX_HIERARCHICAL_CASES = 8000;
+
+function hierarchicalLimitMessage(n) {
+  return "This run has " + n.toLocaleString() + " cases. Hierarchical clustering builds a full distance matrix and stops at " +
+    MAX_HIERARCHICAL_CASES.toLocaleString() + " cases so the results window stays responsive. K-means can take the larger table.";
 }
 
-function hierarchicalCluster(X, linkageMode, kTarget, metric) {
+/**
+ * Agglomerative clustering (single, complete, average / UPGMA).
+ *
+ * The previous version recomputed every cluster-to-cluster distance from the
+ * member rows at every step, which is cubic (worse when clusters are large).
+ * At a few thousand cases that blocked the task pane long enough for the
+ * results window to sit on an empty screen and then repaint. This is the
+ * nearest-neighbour chain algorithm: one condensed distance matrix, then
+ * Lance-Williams updates. It yields about every 30ms so the host can paint.
+ */
+async function hierarchicalCluster(X, linkageMode, kTarget, metric) {
   const n = X.length;
-  const dist = distMatrix(X, metric);
-  let clusters = Array.from({ length: n }, (_, i) => ({ members: [i], id: i }));
-  const merges = [];
-  const kEff = Math.min(Math.max(2, kTarget), n);
-  let nextId = n;
+  const kEff = n < 2 ? (n === 1 ? 1 : 0) : Math.min(Math.max(2, kTarget), n);
+  if (n > MAX_HIERARCHICAL_CASES) {
+    return {
+      tooLarge: true,
+      message: hierarchicalLimitMessage(n),
+      merges: [],
+      labels: [],
+      kUsed: kEff,
+      cophenetic: null
+    };
+  }
+  if (n < 2) {
+    return { merges: [], labels: n ? [0] : [], kUsed: kEff, cophenetic: null };
+  }
 
-  // Cophenetic correlation: each pair (a, b) crosses a merge exactly once, at
-  // the height where their clusters first join. Accumulate Pearson sums on the
-  // fly instead of materialising an n×n cophenetic matrix.
+  const mode = linkageMode === "single" || linkageMode === "complete" ? linkageMode : "average";
+  const manhattan = metric === "manhattan";
+  const p = X[0].length;
+  const nPairs = (n * (n - 1)) / 2;
+  let D;
+  try {
+    D = new Float64Array(nPairs);
+  } catch (e) {
+    return {
+      tooLarge: true,
+      message: hierarchicalLimitMessage(n),
+      merges: [],
+      labels: [],
+      kUsed: kEff,
+      cophenetic: null
+    };
+  }
+
+  function at(i, j) {
+    if (i > j) {
+      const t = i;
+      i = j;
+      j = t;
+    }
+    return (i * (2 * n - i - 1)) / 2 + (j - i - 1);
+  }
+
+  function pointDist(i, j) {
+    const a = X[i];
+    const b = X[j];
+    if (manhattan) {
+      let v = 0;
+      for (let f = 0; f < p; f++) v += Math.abs(a[f] - b[f]);
+      return v;
+    }
+    let s = 0;
+    for (let f = 0; f < p; f++) {
+      const t = a[f] - b[f];
+      s += t * t;
+    }
+    return Math.sqrt(s);
+  }
+
+  let lastYield = Date.now();
+  async function yieldUi() {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    lastYield = Date.now();
+  }
+
+  for (let i = 0; i < n; i++) {
+    const base = (i * (2 * n - i - 1)) / 2 - i - 1;
+    const Xi = X[i];
+    for (let j = i + 1; j < n; j++) {
+      const Xj = X[j];
+      let v = 0;
+      if (manhattan) {
+        for (let f = 0; f < p; f++) v += Math.abs(Xi[f] - Xj[f]);
+      } else {
+        let s = 0;
+        for (let f = 0; f < p; f++) {
+          const t = Xi[f] - Xj[f];
+          s += t * t;
+        }
+        v = Math.sqrt(s);
+      }
+      D[base + j] = v;
+    }
+    if ((i & 15) === 15 && Date.now() - lastYield > 30) await yieldUi();
+  }
+
+  const activeList = new Int32Array(n);
+  const posInList = new Int32Array(n);
+  for (let i = 0; i < n; i++) {
+    activeList[i] = i;
+    posInList[i] = i;
+  }
+  let activeCount = n;
+  const size = new Uint32Array(n);
+  size.fill(1);
+  const pointSlot = new Int32Array(n);
+  const nodeId = new Int32Array(n);
+  for (let i = 0; i < n; i++) {
+    pointSlot[i] = i;
+    nodeId[i] = i;
+  }
+
+  function deactivate(slot) {
+    const idx = posInList[slot];
+    const last = activeList[activeCount - 1];
+    activeList[idx] = last;
+    posInList[last] = idx;
+    posInList[slot] = -1;
+    activeCount--;
+  }
+
+  const merges = [];
+  let nextId = n;
+  // Same ceiling as before: cophenetic walks every pair once, which is fine
+  // up to a couple of thousand cases and not worth the extra pass above that.
   const doCoph = n >= 3 && n <= 2000;
   let cN = 0, cSx = 0, cSy = 0, cSxx = 0, cSyy = 0, cSxy = 0;
 
-  function labelFromClusters(clist) {
-    const lab = Array(n).fill(0);
-    clist.forEach((c, idx) => {
-      c.members.forEach((m) => { lab[m] = idx; });
+  function mergeSlots(keep, drop) {
+    const height = D[at(keep, drop)];
+    const sk = size[keep];
+    const sd = size[drop];
+    merges.push({
+      step: merges.length + 1,
+      n1: sk,
+      n2: sd,
+      nMerged: sk + sd,
+      height,
+      left: nodeId[keep],
+      right: nodeId[drop]
     });
-    return lab;
+    if (doCoph) {
+      const A = [];
+      const B = [];
+      for (let t = 0; t < n; t++) {
+        if (pointSlot[t] === keep) A.push(t);
+        else if (pointSlot[t] === drop) B.push(t);
+      }
+      for (let a = 0; a < A.length; a++) {
+        const ia = A[a];
+        for (let b = 0; b < B.length; b++) {
+          const d0 = pointDist(ia, B[b]);
+          cN++;
+          cSx += d0;
+          cSy += height;
+          cSxx += d0 * d0;
+          cSyy += height * height;
+          cSxy += d0 * height;
+        }
+      }
+    }
+    for (let t = 0; t < activeCount; t++) {
+      const k = activeList[t];
+      if (k === keep || k === drop) continue;
+      const dik = D[at(keep, k)];
+      const djk = D[at(drop, k)];
+      let nd;
+      if (mode === "single") nd = dik < djk ? dik : djk;
+      else if (mode === "complete") nd = dik > djk ? dik : djk;
+      else nd = (sk * dik + sd * djk) / (sk + sd);
+      D[at(keep, k)] = nd;
+    }
+    size[keep] = sk + sd;
+    nodeId[keep] = nextId++;
+    if (doCoph) {
+      for (let t = 0; t < n; t++) if (pointSlot[t] === drop) pointSlot[t] = keep;
+    }
+    deactivate(drop);
   }
 
-  let labelsAtK = null;
-  if (clusters.length === kEff) labelsAtK = labelFromClusters(clusters);
+  function nearest(slot, prefer) {
+    let bestJ = -1;
+    let bestD = Infinity;
+    for (let t = 0; t < activeCount; t++) {
+      const j = activeList[t];
+      if (j === slot) continue;
+      const d = D[at(slot, j)];
+      if (d < bestD) {
+        bestD = d;
+        bestJ = j;
+      }
+    }
+    if (prefer >= 0 && prefer !== slot && posInList[prefer] >= 0) {
+      const pd = D[at(slot, prefer)];
+      if (pd <= bestD) return prefer;
+    }
+    return bestJ;
+  }
 
-  while (clusters.length > 1) {
+  function closestPair() {
+    let bi = -1;
+    let bj = -1;
     let best = Infinity;
-    let bi = 0;
-    let bj = 1;
-    for (let i = 0; i < clusters.length; i++) {
-      for (let j = i + 1; j < clusters.length; j++) {
-        const d = linkDist(clusters[i].members, clusters[j].members, dist, linkageMode);
+    for (let a = 0; a < activeCount; a++) {
+      const i = activeList[a];
+      for (let b = a + 1; b < activeCount; b++) {
+        const j = activeList[b];
+        const d = D[at(i, j)];
         if (d < best) {
           best = d;
           bi = i;
@@ -360,34 +526,57 @@ function hierarchicalCluster(X, linkageMode, kTarget, metric) {
         }
       }
     }
-    const A = clusters[bi];
-    const B = clusters[bj];
-    if (doCoph) {
-      for (let a = 0; a < A.members.length; a++) {
-        for (let b = 0; b < B.members.length; b++) {
-          const d0 = dist[A.members[a]][B.members[b]];
-          cN++;
-          cSx += d0; cSy += best;
-          cSxx += d0 * d0; cSyy += best * best; cSxy += d0 * best;
-        }
-      }
-    }
-    const merged = { members: A.members.concat(B.members), id: nextId++ };
-    merges.push({
-      step: merges.length + 1,
-      n1: A.members.length,
-      n2: B.members.length,
-      nMerged: merged.members.length,
-      height: best,
-      left: A.id,
-      right: B.id
-    });
-    clusters = clusters.filter((_, idx) => idx !== bi && idx !== bj);
-    clusters.push(merged);
-    if (clusters.length === kEff) labelsAtK = labelFromClusters(clusters);
+    return { i: bi, j: bj };
   }
 
-  if (!labelsAtK) labelsAtK = labelFromClusters(clusters);
+  const chain = [];
+  const inChain = new Uint8Array(n);
+  function pushChain(s) {
+    chain.push(s);
+    inChain[s] = 1;
+  }
+  function popChain() {
+    const s = chain.pop();
+    inChain[s] = 0;
+    return s;
+  }
+  function clearChain() {
+    while (chain.length) popChain();
+  }
+
+  let guard = 0;
+  while (activeCount > 1 && guard < n * n) {
+    guard++;
+    if (!chain.length) pushChain(activeList[0]);
+    const a = chain[chain.length - 1];
+    if (posInList[a] < 0) {
+      popChain();
+      continue;
+    }
+    const prefer = chain.length >= 2 ? chain[chain.length - 2] : -1;
+    const b = nearest(a, prefer);
+    if (b < 0) break;
+    if (prefer >= 0 && b === prefer) {
+      popChain();
+      popChain();
+      mergeSlots(prefer, a);
+    } else if (inChain[b] || chain.length > activeCount) {
+      clearChain();
+      const pair = closestPair();
+      if (pair.i < 0) break;
+      mergeSlots(pair.i, pair.j);
+    } else {
+      pushChain(b);
+    }
+    if ((guard & 63) === 0 && Date.now() - lastYield > 30) await yieldUi();
+  }
+
+  // The chain merges reciprocal neighbours as it finds them, so disjoint
+  // branches are not recorded in global height order. The results view treats
+  // merges[i] as the step that leaves n-i-1 clusters, so replay the tree in
+  // that order and cut it there for the labels.
+  const ordered = orderMergesForCut(merges, n);
+  const labelsAtK = labelsFromTree(ordered, n, kEff);
 
   let cophenetic = null;
   if (doCoph && cN > 1) {
@@ -397,7 +586,110 @@ function hierarchicalCluster(X, linkageMode, kTarget, metric) {
     if (varX > 1e-12 && varY > 1e-12) cophenetic = covXY / Math.sqrt(varX * varY);
   }
 
-  return { merges, labels: labelsAtK, kUsed: kEff, cophenetic };
+  return { merges: ordered, labels: labelsAtK, kUsed: kEff, cophenetic };
+}
+
+/** Replay a merge tree so each step is the lowest join whose children exist. */
+function orderMergesForCut(merges, n) {
+  const mCount = merges.length;
+  if (mCount < 2) return merges;
+  const pending = new Uint16Array(mCount);
+  const deps = Array.from({ length: mCount }, () => []);
+  for (let i = 0; i < mCount; i++) {
+    const m = merges[i];
+    if (m.left >= n) {
+      pending[i]++;
+      deps[m.left - n].push(i);
+    }
+    if (m.right >= n) {
+      pending[i]++;
+      deps[m.right - n].push(i);
+    }
+  }
+  const ready = [];
+  for (let i = 0; i < mCount; i++) if (pending[i] === 0) ready.push(i);
+  const order = [];
+  while (ready.length) {
+    let best = 0;
+    let bestH = merges[ready[0]].height;
+    for (let t = 1; t < ready.length; t++) {
+      const h = merges[ready[t]].height;
+      if (h < bestH || (h === bestH && ready[t] < ready[best])) {
+        best = t;
+        bestH = h;
+      }
+    }
+    const i = ready[best];
+    ready.splice(best, 1);
+    order.push(i);
+    const dlist = deps[i];
+    for (let t = 0; t < dlist.length; t++) {
+      const d = dlist[t];
+      pending[d]--;
+      if (pending[d] === 0) ready.push(d);
+    }
+  }
+  if (order.length !== mCount) return merges;
+  const idMap = new Int32Array(n + mCount);
+  for (let i = 0; i < n; i++) idMap[i] = i;
+  const out = new Array(mCount);
+  for (let newIndex = 0; newIndex < mCount; newIndex++) {
+    const oldIndex = order[newIndex];
+    const m = merges[oldIndex];
+    out[newIndex] = {
+      step: newIndex + 1,
+      n1: m.n1,
+      n2: m.n2,
+      nMerged: m.nMerged,
+      height: m.height,
+      left: idMap[m.left],
+      right: idMap[m.right]
+    };
+    idMap[n + oldIndex] = n + newIndex;
+  }
+  return out;
+}
+
+/** Clusters at k by undoing the highest joins from the root. */
+function labelsFromTree(merges, n, k) {
+  if (!n) return [];
+  if (k >= n || !merges.length) return Array.from({ length: n }, (_, i) => i);
+  if (k <= 1) return Array(n).fill(0);
+  const root = n + merges.length - 1;
+  const group = [root];
+  const expand = Math.min(k - 1, merges.length);
+  for (let s = 0; s < expand; s++) {
+    let best = -1;
+    let bestH = -Infinity;
+    for (let i = 0; i < group.length; i++) {
+      const id = group[i];
+      if (id < n) continue;
+      const h = merges[id - n].height;
+      if (h > bestH) {
+        bestH = h;
+        best = i;
+      }
+    }
+    if (best < 0) break;
+    const m = merges[group[best] - n];
+    group.splice(best, 1, m.left, m.right);
+  }
+  const labels = new Array(n);
+  for (let g = 0; g < group.length; g++) {
+    const stack = [group[g]];
+    while (stack.length) {
+      const id = stack.pop();
+      if (id < n) labels[id] = g;
+      else {
+        const m = merges[id - n];
+        if (!m) continue;
+        stack.push(m.left);
+        stack.push(m.right);
+      }
+    }
+  }
+  for (let i = 0; i < n; i++) if (labels[i] == null) labels[i] = 0;
+  return labels;
 }
 
 function kmeans(Z, k, maxIter, metric) {
@@ -761,7 +1053,7 @@ function extractNumericMatrix(headers, rows, spec) {
   return { names, X, missingRows, p: names.length };
 }
 
-function buildClusterBundle(headers, rows, spec) {
+async function buildClusterBundle(headers, rows, spec) {
   const kReq = spec && isFinite(spec.k) ? Number(spec.k) : 3;
   const standardize = !(spec && spec.standardize === false);
   const linkage = (spec && spec.linkage) || "average";
@@ -807,7 +1099,9 @@ function buildClusterBundle(headers, rows, spec) {
   const runKm = !lockedMethod || lockedMethod === "kmeans";
   const runHi = !lockedMethod || lockedMethod === "hierarchical";
   const km = runKm ? kmeans(workX, kReq, maxKmIter, metric) : null;
-  const hi = runHi ? hierarchicalCluster(workX, linkage, kReq, metric) : null;
+  const hiRaw = runHi ? await hierarchicalCluster(workX, linkage, kReq, metric) : null;
+  const hiNote = hiRaw && hiRaw.tooLarge ? hiRaw.message : null;
+  const hi = hiRaw && !hiRaw.tooLarge ? hiRaw : null;
 
   const maxShow = Math.min(maxAssign, n);
   const kmRows = [];
@@ -926,7 +1220,7 @@ function buildClusterBundle(headers, rows, spec) {
 
   return {
     summary: {
-      engineBuild: "20260716a",
+      engineBuild: "20261013a",
       variableCount: p,
       caseCount: n,
       missingRows,
@@ -937,7 +1231,7 @@ function buildClusterBundle(headers, rows, spec) {
       lockedMethod,
       distanceMeasure: metric,
       variableLabels: names,
-      verdict: n >= kReq ? "Clustering run complete" : "Very small sample — interpret with caution",
+      verdict: hiNote || (n >= kReq ? "Clustering run complete" : "Very small sample — interpret with caution"),
       correlationMatrix: R
     },
     scatter,
@@ -1059,8 +1353,17 @@ function openClusterResultsDialog() {
   openClusterResultsDialogOnly();
 }
 
+let clusterRunId = 0;
+let clusterRunning = false;
+
 function sendClusterBundle() {
   if (!clusterDialog || !clusterRangeData) return;
+  const runId = ++clusterRunId;
+  // A cut-line re-run can arrive while the first tree is still building.
+  // Finish the in-flight pass, then start one fresh run with the latest spec
+  // instead of allocating two distance matrices at once.
+  if (clusterRunning) return;
+  clusterRunning = true;
   const headers = clusterRangeData[0] || [];
   const rows = clusterRangeData.slice(1);
   let spec = {};
@@ -1071,16 +1374,66 @@ function sendClusterBundle() {
     spec = {};
   }
   spec = normalizeClusterSpec(spec, headers);
-  const bundle = buildClusterBundle(headers, rows, spec);
-  const rawData = bundle.rawData;
-  const main = Object.assign({}, bundle);
-  delete main.rawData;
-  clusterDialog.messageChild(JSON.stringify({ type: "CLUSTER_BUNDLE", payload: main }));
-  if (rawData) {
-    setTimeout(function() {
-      clusterDialog.messageChild(JSON.stringify({ type: "CLUSTER_RAW_DATA", payload: rawData }));
-    }, 300);
-  }
+  const method = clusterLockedMethod() || spec.clusterMethod;
+  const countLabel = rows.length.toLocaleString();
+  const status = method === "hierarchical"
+    ? "Building the merge tree for " + countLabel + " cases…"
+    : "Clustering " + countLabel + " cases…";
+  try {
+    clusterDialog.messageChild(JSON.stringify({ type: "CLUSTER_STATUS", payload: { message: status } }));
+  } catch (e) { /* dialog may not be listening yet */ }
+
+  setTimeout(function() {
+    if (!clusterDialog || !clusterRangeData) {
+      clusterRunning = false;
+      return;
+    }
+    if (runId !== clusterRunId) {
+      clusterRunning = false;
+      sendClusterBundle();
+      return;
+    }
+    buildClusterBundle(headers, rows, spec).then(function(bundle) {
+      clusterRunning = false;
+      if (runId !== clusterRunId) {
+        if (clusterDialog && clusterRangeData) sendClusterBundle();
+        return;
+      }
+      if (!clusterDialog) return;
+      const rawData = bundle.rawData;
+      const main = Object.assign({}, bundle);
+      delete main.rawData;
+      try {
+        clusterDialog.messageChild(JSON.stringify({ type: "CLUSTER_BUNDLE", payload: main }));
+      } catch (e) {
+        console.error("Cluster bundle message:", e);
+        return;
+      }
+      if (rawData) {
+        setTimeout(function() {
+          if (runId !== clusterRunId || !clusterDialog) return;
+          try {
+            clusterDialog.messageChild(JSON.stringify({ type: "CLUSTER_RAW_DATA", payload: rawData }));
+          } catch (e2) { console.error(e2); }
+        }, 300);
+      }
+    }).catch(function(err) {
+      clusterRunning = false;
+      console.error("Cluster analysis failed:", err);
+      if (runId !== clusterRunId && clusterDialog && clusterRangeData) {
+        sendClusterBundle();
+        return;
+      }
+      try {
+        if (clusterDialog) {
+          clusterDialog.messageChild(JSON.stringify({
+            type: "CLUSTER_STATUS",
+            payload: { message: "The analysis failed. Close the dialog and run it again." }
+          }));
+        }
+      } catch (e3) { /* ignore */ }
+    });
+  }, 40);
 }
 
 window.onRangeDataLoaded = onRangeDataLoaded;

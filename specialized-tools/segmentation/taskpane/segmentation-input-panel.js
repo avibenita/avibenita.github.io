@@ -1,4 +1,4 @@
-/* global Office, DIALOG_SIZES, HubResultsBridge, StatisticoDialogHost, StatisticoGlobalRange, StatisticoSegmentation, StatisticoSegmentationSample */
+/* global Office, DIALOG_SIZES, HubResultsBridge, StatisticoDialogHost, StatisticoGlobalRange, StatisticoSegmentation */
 
 function getSegmentationRangeValues() {
   if (window.StatisticoGlobalRange) {
@@ -6,9 +6,6 @@ function getSegmentationRangeValues() {
     if (gr && gr.values && gr.values.length >= 2) {
       return { values: gr.values, address: gr.address || '' };
     }
-  }
-  if (window.dataInputPanelInstance && window.dataInputPanelInstance.values && window.dataInputPanelInstance.values.length >= 2) {
-    return { values: window.dataInputPanelInstance.values, address: window.dataInputPanelInstance.address || '' };
   }
   return null;
 }
@@ -20,104 +17,35 @@ function getSegmentationDialogsBaseUrl() {
   return window.location.origin + '/dialogs/views/';
 }
 
-function unwrapSegmentationSpec(msg) {
-  if (!msg) return {};
-  var data = msg.payload || msg.data || msg;
-  if (data && data.spec) return data.spec;
-  return data || {};
-}
-
-function loadSegScript(file, flag, cb) {
-  if (window[flag]) { cb(); return; }
+function ensureSegmentationEngine(cb) {
+  if (window.StatisticoSegmentation) { cb(); return; }
   var s = document.createElement('script');
-  s.src = getSegmentationDialogsBaseUrl() + 'segmentation/' + file + '?v=' + Date.now();
+  s.src = getSegmentationDialogsBaseUrl() + 'segmentation/segmentation-engine.js?v=' + Date.now();
   s.onload = function () { cb(); };
-  s.onerror = function () { alert('Could not load ' + file + '.'); };
+  s.onerror = function () { alert('Could not load the segmentation engine.'); };
   document.head.appendChild(s);
 }
 
-function ensureSegmentationEngine(cb) {
-  loadSegScript('segmentation-engine.js', 'StatisticoSegmentation', function () {
-    loadSegScript('segmentation-split-index.js', 'StatisticoSegmentationSplitIndex', function () {
-      loadSegScript('segmentation-sample-data.js', 'StatisticoSegmentationSample', cb);
-    });
-  });
+function readSegmentationSpec() {
+  if (window.__hubSegmentationSpec) return window.__hubSegmentationSpec;
+  try { return JSON.parse(sessionStorage.getItem('segmentationModelSpec') || '{}'); } catch (_e) { return {}; }
 }
 
-function buildSegmentationBundle(headers, rows, spec) {
-  if (!window.StatisticoSegmentation) return { error: 'Segmentation engine is not loaded.', analyzable: false };
-  return StatisticoSegmentation.analyze(headers, rows, spec || {});
-}
-
-var segmentationDialog = null;
 var segmentationResultsDialog = null;
+var segmentationLive = null;
 
-function openSegmentationBuilder() {
-  var url = getSegmentationDialogsBaseUrl() + 'segmentation/segmentation-input.html?v=' + Date.now();
-  Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.REGRESSION_BUILDER, function (result) {
-    if (result.status === Office.AsyncResultStatus.Failed) {
-      console.error('Failed to open segmentation builder:', result.error && result.error.message);
-      return;
+function openSegmentationResultsDialog(payload) {
+  segmentationLive = payload;
+  try {
+    sessionStorage.setItem('segmentationModelSpec', JSON.stringify(payload.spec || {}));
+    if (payload.rows && payload.rows.length <= 20000) {
+      sessionStorage.setItem('segmentationSource', JSON.stringify({
+        headers: payload.headers,
+        rows: payload.rows,
+        address: payload.address || ''
+      }));
     }
-    segmentationDialog = result.value;
-    segmentationDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
-      var msg = JSON.parse(arg.message || '{}');
-      if (msg.action === 'requestData' || msg.action === 'ready') {
-        sendSegmentationDialogData();
-      } else if (msg.action === 'segmentationModel') {
-        handleSegmentationModel(unwrapSegmentationSpec(msg));
-        try { segmentationDialog.close(); } catch (_e) {}
-        segmentationDialog = null;
-      } else if (msg.action === 'close' || msg.action === 'cancel') {
-        try { segmentationDialog.close(); } catch (_e2) {}
-        segmentationDialog = null;
-      }
-    });
-    segmentationDialog.addEventHandler(Office.EventType.DialogEventReceived, function (arg) {
-      if (arg.error === 12006) segmentationDialog = null;
-      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
-    });
-  });
-}
-
-function sendSegmentationDialogData() {
-  if (!segmentationDialog) return;
-  var range = getSegmentationRangeValues();
-  if (!range) return;
-  segmentationDialog.messageChild(JSON.stringify({
-    type: 'SEGMENTATION_DATA',
-    payload: {
-      headers: range.values[0],
-      rows: range.values.slice(1),
-      address: range.address,
-      savedSpec: null
-    }
-  }));
-}
-
-function handleSegmentationModel(spec) {
-  sessionStorage.setItem('segmentationModelSpec', JSON.stringify(spec || {}));
-  var range = getSegmentationRangeValues();
-  if (!range) return;
-  var headers = range.values[0];
-  var rows = range.values.slice(1);
-  try { sessionStorage.setItem('segmentationSource', JSON.stringify({ headers: headers, rows: rows })); } catch (_e) {}
-  ensureSegmentationEngine(function () {
-    var bundle = buildSegmentationBundle(headers, rows, spec);
-    bundle.source = { headers: headers, rows: rows };
-    openSegmentationResultsDialog(bundle);
-  });
-}
-
-function slimSegmentationBundle(bundle) {
-  if (!bundle || typeof bundle !== 'object') return bundle;
-  var slim = Object.assign({}, bundle);
-  delete slim.respondents;
-  return slim;
-}
-
-function openSegmentationResultsDialog(bundle) {
-  sessionStorage.setItem('segmentationBundle', JSON.stringify(slimSegmentationBundle(bundle)));
+  } catch (_e) {}
   var url = getSegmentationDialogsBaseUrl() + 'segmentation/segmentation-results.html?v=' + Date.now();
   Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.RESULTS, function (result) {
     if (result.status === Office.AsyncResultStatus.Failed) {
@@ -127,11 +55,11 @@ function openSegmentationResultsDialog(bundle) {
     segmentationResultsDialog = result.value;
     if (window.HubResultsBridge) HubResultsBridge.registerDialog(segmentationResultsDialog);
     segmentationResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
-      var msg = JSON.parse(arg.message || '{}');
-      if (msg.action === 'ready' || msg.action === 'requestData') {
-        sendSegmentationBundle();
-      } else if (msg.action === 'close' || msg.action === 'closeDialog') {
-        try { segmentationResultsDialog.close(); } catch (_e) {}
+      var msg = {};
+      try { msg = JSON.parse(arg.message || '{}'); } catch (_e) {}
+      if (msg.action === 'ready' || msg.action === 'requestData') sendSegmentationSource();
+      else if (msg.action === 'close' || msg.action === 'closeDialog') {
+        try { segmentationResultsDialog.close(); } catch (_e2) {}
         segmentationResultsDialog = null;
         if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
       }
@@ -143,18 +71,22 @@ function openSegmentationResultsDialog(bundle) {
   });
 }
 
-function sendSegmentationBundle() {
-  if (!segmentationResultsDialog) return;
-  var bundleStr = sessionStorage.getItem('segmentationBundle');
-  if (!bundleStr) return;
-  var payload = null;
-  try { payload = JSON.parse(bundleStr); } catch (_e) { return; }
+function sendSegmentationSource() {
+  if (!segmentationResultsDialog || !segmentationLive) return;
   try {
     segmentationResultsDialog.messageChild(JSON.stringify({
-      type: 'SEGMENTATION_BUNDLE',
-      payload: payload
+      type: 'SEGMENTATION_SOURCE',
+      payload: segmentationLive
     }));
-  } catch (_e2) {}
+  } catch (_e) {
+    try {
+      ensureSegmentationEngine(function () {
+        var bundle = StatisticoSegmentation.analyze(segmentationLive.headers, segmentationLive.rows, segmentationLive.spec);
+        delete bundle.respondents;
+        segmentationResultsDialog.messageChild(JSON.stringify({ type: 'SEGMENTATION_RESULT', payload: bundle }));
+      });
+    } catch (_e2) {}
+  }
 }
 
 (function (hubKey, fn) {
@@ -165,18 +97,12 @@ function sendSegmentationBundle() {
     return fn(gr);
   };
 })('segmentation', function (gr) {
-  var spec = {};
-  try { spec = JSON.parse(sessionStorage.getItem('segmentationModelSpec') || '{}'); } catch (_e) {}
+  var spec = readSegmentationSpec();
+  window.__hubSegmentationSpec = spec;
   var headers = gr.values[0];
   var rows = gr.values.slice(1);
-  try { sessionStorage.setItem('segmentationSource', JSON.stringify({ headers: headers, rows: rows })); } catch (_e2) {}
   ensureSegmentationEngine(function () {
-    var bundle = buildSegmentationBundle(headers, rows, spec);
-    bundle.source = { headers: headers, rows: rows };
-    openSegmentationResultsDialog(bundle);
+    openSegmentationResultsDialog({ headers: headers, rows: rows, spec: spec, address: gr.address || '' });
   });
   return true;
 });
-
-window.StatisticoHubResults = window.StatisticoHubResults || {};
-window.StatisticoHubResults['survey-segmentation'] = window.StatisticoHubResults.segmentation;

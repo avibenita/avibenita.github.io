@@ -222,7 +222,7 @@
     segmentation: {
       badge: 'Wide format  one row per respondent',
       rule:  'Each row is a respondent. Numeric item columns form the two dimensions; optional group, wave, ID, and weight columns sit beside them.',
-      note:  'Multiple items on a dimension are averaged. Missing items are not treated as zero. A wave column enables current vs previous comparison. Optional numeric factor columns power the Drivers / Split Index tab.',
+      note:  'Multiple items on a dimension are averaged. Missing items are not treated as zero. A wave column enables current versus previous comparison.',
       cols: [
         { label: 'Sat_1', role: 'meas', roleLabel: 'X item' },
         { label: 'Sat_2', role: 'meas', roleLabel: 'X item' },

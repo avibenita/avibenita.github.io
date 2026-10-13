@@ -1946,6 +1946,24 @@ const StatisticoHeader = {
       };
     }
 
+    if (this.module === 'segmentation') {
+      const changeOn = !!(globalThis.__segmentationChangeEnabled);
+      const activeTab = globalThis.__segmentationActiveTab || 'overview';
+      return {
+        logoIcon: 'fa-border-all',
+        logoSub: 'Survey',
+        menuTitle: 'Menu',
+        groups: [{
+          title: 'Results',
+          items: [
+            { type: 'tab', tab: 'overview', icon: 'fa-border-all', label: 'Overview', description: 'Four-quadrant segment matrix.', active: activeTab === 'overview' },
+            { type: 'tab', tab: 'groups', icon: 'fa-chart-column', label: 'Group Comparison', description: '100% stacked segment mix by group.', active: activeTab === 'groups' },
+            { type: 'tab', tab: 'change', icon: 'fa-arrow-right-arrow-left', label: 'Change', description: changeOn ? 'Current versus previous survey wave.' : 'Available when a previous wave is selected.', active: activeTab === 'change' }
+          ]
+        }]
+      };
+    }
+
     if (this.module === 'contingency') {
       const onByGroup = this.currentView === 'contingency-by-group';
       const activeTab = globalThis.__contingencyActiveTab || 'overview';

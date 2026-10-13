@@ -1,184 +1,160 @@
 /**
- * Built-in employee-loyalty sample for Survey Segmentation Matrix.
+ * Employee-loyalty sample: one row per respondent.
+ * Satisfaction items Sat_1–Sat_3 and stay items Stay_1–Stay_2 are 1–5 scores.
+ * Division, Wave, Level, and Tenure are categorical. Weight is optional.
  */
-(function (root) {
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  root.StatisticoSegmentationSamples = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var HEADERS = [
-    'RespondentID', 'Sat_Overall', 'Sat_Work', 'Sat_Manager',
-    'Stay_Intent', 'Stay_Recommend',
-    'Career development', 'Compensation', 'Workload', 'Manager support',
-    'Recognition', 'Work–life balance', 'Tools and resources',
-    'Division', 'Tenure', 'Level', 'Wave', 'Weight'
-  ];
+  var HEADERS = ['Respondent ID', 'Sat_1', 'Sat_2', 'Sat_3', 'Stay_1', 'Stay_2', 'Division', 'Wave', 'Level', 'Tenure', 'Weight'];
 
-  function mulberry32(a) {
-    return function () {
-      a |= 0; a = a + 0x6D2B79F5 | 0;
-      var t = Math.imul(a ^ a >>> 15, 1 | a);
-      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
+  var ITEMS = {
+    highXHighY: { sat: [5, 5, 4], stay: [5, 4] },
+    highXLowY: { sat: [5, 4, 5], stay: [2, 3] },
+    lowXHighY: { sat: [2, 3, 2], stay: [5, 4] },
+    lowXLowY: { sat: [2, 2, 1], stay: [2, 1] }
+  };
 
-  function clamp(n, lo, hi) {
-    return Math.max(lo, Math.min(hi, n));
-  }
-
-  function likert(rng, mean) {
-    var v = mean + (rng() - 0.5) * 2.2;
-    if (rng() < 0.03) return '';
-    return clamp(Math.round(v), 1, 5);
-  }
-
-  function pick(rng, items, weights) {
-    var t = 0;
-    for (var i = 0; i < weights.length; i++) t += weights[i];
-    var r = rng() * t;
-    var acc = 0;
-    for (var j = 0; j < items.length; j++) {
-      acc += weights[j];
-      if (r <= acc) return items[j];
+  function pushBlock(rows, state, spec) {
+    var item = ITEMS[spec.segment];
+    for (var i = 0; i < spec.n; i++) {
+      state.n += 1;
+      var id = spec.duplicateId || ('R' + String(1000 + state.n));
+      var sat = item.sat.slice();
+      var stay = item.stay.slice();
+      if (spec.dropSat && i === 0) sat[2] = '';
+      if (spec.blankStay) {
+        stay[0] = '';
+        stay[1] = '';
+      }
+      var weight = spec.weight == null ? 1 : spec.weight;
+      rows.push([
+        id,
+        sat[0], sat[1], sat[2],
+        stay[0], stay[1],
+        spec.group,
+        spec.wave,
+        spec.level || (i % 3 === 0 ? 'Managers' : 'Staff'),
+        spec.tenure || (i % 2 === 0 ? '1–5 years' : '6+ years'),
+        weight
+      ]);
     }
-    return items[items.length - 1];
   }
 
   function buildRows() {
-    var rng = mulberry32(20260815);
-    var divisions = ['Corporate', 'Operations', 'Sales', 'R&D', 'Support'];
-    var divW = [0.18, 0.28, 0.22, 0.16, 0.16];
-    var tenure = ['0–1 years', '1–5 years', '6–10 years', '11+ years'];
-    var tenW = [0.16, 0.38, 0.26, 0.20];
-    var levels = ['Individual contributor', 'Manager', 'Director'];
-    var levW = [0.72, 0.22, 0.06];
     var rows = [];
-    var id = 1000;
-    var waves = [
-      { label: '2025', n: 410, satShift: -0.08, stayShift: -0.05 },
-      { label: '2026', n: 426, satShift: 0, stayShift: 0 }
-    ];
-    waves.forEach(function (wave) {
-      for (var i = 0; i < wave.n; i++) {
-        var div = pick(rng, divisions, divW);
-        if (wave.label === '2026' && rng() < 0.06) div = 'Field';
-        if (wave.label === '2025' && rng() < 0.04) div = 'Legacy Unit';
-        var ten = pick(rng, tenure, tenW);
-        var lev = pick(rng, levels, levW);
-        var baseSat = 4.15 + wave.satShift;
-        var baseStay = 4.05 + wave.stayShift;
-        if (div === 'Corporate') { baseSat -= 0.35; baseStay -= 0.25; }
-        if (div === 'Sales') { baseSat -= 0.15; baseStay -= 0.45; }
-        if (div === 'Support') { baseSat -= 0.45; baseStay -= 0.20; }
-        if (div === 'R&D') { baseSat += 0.10; baseStay += 0.15; }
-        if (div === 'Field') { baseSat -= 0.20; baseStay -= 0.10; }
-        if (div === 'Legacy Unit') { baseSat -= 0.55; baseStay -= 0.35; }
-        if (lev === 'Director') { baseSat += 0.25; baseStay += 0.30; }
-        if (ten === '0–1 years') baseStay -= 0.25;
-        if (ten === '11+ years') { baseStay += 0.20; baseSat -= 0.10; }
-        var rid = 'E' + id;
-        if (wave.label === '2026' && i === 12) rid = 'E1005';
-        rows.push([
-          rid,
-          likert(rng, baseSat),
-          likert(rng, baseSat - 0.05),
-          likert(rng, baseSat - 0.10),
-          likert(rng, baseStay),
-          likert(rng, baseStay - 0.08),
-          likert(rng, baseStay + 0.35),
-          likert(rng, baseStay - 0.05),
-          likert(rng, 3.2),
-          likert(rng, baseStay + 0.15),
-          likert(rng, baseStay + 0.05),
-          likert(rng, 3.4),
-          likert(rng, baseSat - 0.20),
-          div,
-          ten,
-          lev,
-          wave.label,
-          rng() < 0.12 ? Number((0.7 + rng() * 0.8).toFixed(2)) : 1
-        ]);
-        id += 1;
-      }
-    });
+    var state = { n: 0 };
+    function add(spec) { pushBlock(rows, state, spec); }
+
+    add({ segment: 'highXHighY', n: 70, group: 'Corporate', wave: '2026', level: 'Managers', tenure: '6+ years' });
+    add({ segment: 'highXLowY', n: 8, group: 'Corporate', wave: '2026', level: 'Managers' });
+    add({ segment: 'lowXHighY', n: 6, group: 'Corporate', wave: '2026' });
+    add({ segment: 'lowXLowY', n: 4, group: 'Corporate', wave: '2026', level: 'Staff' });
+
+    add({ segment: 'highXHighY', n: 28, group: 'Sales', wave: '2026', level: 'Staff', tenure: '1–5 years' });
+    add({ segment: 'highXLowY', n: 16, group: 'Sales', wave: '2026', level: 'Staff' });
+    add({ segment: 'lowXHighY', n: 8, group: 'Sales', wave: '2026' });
+    add({ segment: 'lowXLowY', n: 12, group: 'Sales', wave: '2026', level: 'Staff', tenure: '1–5 years' });
+
+    add({ segment: 'highXHighY', n: 12, group: 'Operations', wave: '2026' });
+    add({ segment: 'highXLowY', n: 6, group: 'Operations', wave: '2026' });
+    add({ segment: 'lowXHighY', n: 16, group: 'Operations', wave: '2026', level: 'Staff' });
+    add({ segment: 'lowXLowY', n: 14, group: 'Operations', wave: '2026', level: 'Staff' });
+
+    add({ segment: 'highXHighY', n: 4, group: 'Support', wave: '2026', dropSat: true });
+    add({ segment: 'highXLowY', n: 2, group: 'Support', wave: '2026' });
+    add({ segment: 'lowXHighY', n: 3, group: 'Support', wave: '2026' });
+    add({ segment: 'lowXLowY', n: 5, group: 'Support', wave: '2026' });
+
+    add({ segment: 'highXHighY', n: 10, group: 'Field', wave: '2026', level: 'Staff', tenure: '1–5 years' });
+    add({ segment: 'highXLowY', n: 4, group: 'Field', wave: '2026' });
+    add({ segment: 'lowXHighY', n: 3, group: 'Field', wave: '2026' });
+    add({ segment: 'lowXLowY', n: 6, group: 'Field', wave: '2026' });
+
+    add({ segment: 'highXHighY', n: 58, group: 'Corporate', wave: '2025', level: 'Managers' });
+    add({ segment: 'highXLowY', n: 10, group: 'Corporate', wave: '2025' });
+    add({ segment: 'lowXHighY', n: 8, group: 'Corporate', wave: '2025' });
+    add({ segment: 'lowXLowY', n: 8, group: 'Corporate', wave: '2025' });
+
+    add({ segment: 'highXHighY', n: 22, group: 'Sales', wave: '2025' });
+    add({ segment: 'highXLowY', n: 14, group: 'Sales', wave: '2025' });
+    add({ segment: 'lowXHighY', n: 10, group: 'Sales', wave: '2025' });
+    add({ segment: 'lowXLowY', n: 14, group: 'Sales', wave: '2025' });
+
+    add({ segment: 'highXHighY', n: 10, group: 'Operations', wave: '2025' });
+    add({ segment: 'highXLowY', n: 6, group: 'Operations', wave: '2025' });
+    add({ segment: 'lowXHighY', n: 18, group: 'Operations', wave: '2025' });
+    add({ segment: 'lowXLowY', n: 16, group: 'Operations', wave: '2025' });
+
+    add({ segment: 'highXHighY', n: 3, group: 'Support', wave: '2025' });
+    add({ segment: 'highXLowY', n: 2, group: 'Support', wave: '2025' });
+    add({ segment: 'lowXHighY', n: 4, group: 'Support', wave: '2025' });
+    add({ segment: 'lowXLowY', n: 5, group: 'Support', wave: '2025' });
+
+    add({ segment: 'highXHighY', n: 4, group: 'Archive', wave: '2025' });
+    add({ segment: 'highXLowY', n: 3, group: 'Archive', wave: '2025' });
+    add({ segment: 'lowXHighY', n: 5, group: 'Archive', wave: '2025' });
+    add({ segment: 'lowXLowY', n: 8, group: 'Archive', wave: '2025' });
+
+    add({ segment: 'lowXLowY', n: 4, group: 'Corporate', wave: '2026', blankStay: true, level: 'Staff' });
+    add({ segment: 'highXHighY', n: 1, group: 'Sales', wave: '2026', duplicateId: 'R1001', weight: 1 });
+
     return rows;
   }
 
-  var ROWS = buildRows();
-
-  var DEFAULT_SPEC = {
-    template: 'employeeLoyalty',
-    xDimension: {
-      label: 'Satisfaction',
-      columns: ['Sat_Overall', 'Sat_Work', 'Sat_Manager'],
-      thresholdMethod: 'custom',
-      threshold: 4,
-      highLabel: 'Satisfied',
-      lowLabel: 'Not satisfied'
-    },
-    yDimension: {
-      label: 'Intention to stay',
-      columns: ['Stay_Intent', 'Stay_Recommend'],
-      thresholdMethod: 'custom',
-      threshold: 4,
-      highLabel: 'Tending to stay',
-      lowLabel: 'Not tending to stay'
-    },
-    groupColumn: 'Division',
-    waveColumn: 'Wave',
-    currentWave: '2026',
-    previousWave: '2025',
-    respondentIdColumn: 'RespondentID',
-    weightColumn: null,
-    minimumValidItems: 0.5,
-    smallBaseThreshold: 30,
-    factorColumns: [
-      'Career development', 'Compensation', 'Workload', 'Manager support',
-      'Recognition', 'Work–life balance', 'Tools and resources'
-    ]
-  };
-
-  function getTable() {
+  function defaultSpec() {
     return {
-      headers: HEADERS.slice(),
-      rows: ROWS.map(function (r) { return r.slice(); }),
-      values: [HEADERS.slice()].concat(ROWS.map(function (r) { return r.slice(); }))
+      template: 'employeeLoyalty',
+      xDimension: {
+        label: 'Satisfaction',
+        columns: ['Sat_1', 'Sat_2', 'Sat_3'],
+        thresholdMethod: 'custom',
+        threshold: 4,
+        highLabel: 'Satisfied',
+        lowLabel: 'Not satisfied'
+      },
+      yDimension: {
+        label: 'Intention to stay',
+        columns: ['Stay_1', 'Stay_2'],
+        thresholdMethod: 'custom',
+        threshold: 4,
+        highLabel: 'Tending to stay',
+        lowLabel: 'Not tending to stay'
+      },
+      segments: {
+        highXHighY: { label: 'Truly Loyal', color: '#2f9e62' },
+        highXLowY: { label: 'Accessible', color: '#c4922a' },
+        lowXHighY: { label: 'Trapped', color: '#6b7280' },
+        lowXLowY: { label: 'High Risk', color: '#c4725a' }
+      },
+      groupColumn: 'Division',
+      waveColumn: 'Wave',
+      currentWave: '2026',
+      previousWave: '2025',
+      respondentIdColumn: 'Respondent ID',
+      weightColumn: null,
+      minimumValidItems: 0.5,
+      smallBaseThreshold: 30,
+      filters: {}
     };
   }
 
   function defaultPayload() {
-    var t = getTable();
     return {
-      headers: t.headers,
-      rows: t.rows,
-      spec: Object.assign({}, DEFAULT_SPEC)
+      headers: HEADERS.slice(),
+      rows: buildRows(),
+      address: 'Employee loyalty sample',
+      spec: defaultSpec()
     };
   }
 
-  function insertSheet() {
-    if (typeof Excel === 'undefined' || !Excel.run) {
-      return Promise.resolve({ ok: false, error: 'Excel is not available' });
-    }
-    var t = getTable();
-    return Excel.run(function (ctx) {
-      var sheet = ctx.workbook.worksheets.add('Loyalty Sample');
-      var range = sheet.getRangeByIndexes(0, 0, t.values.length, t.headers.length);
-      range.values = t.values;
-      range.format.autofitColumns();
-      sheet.activate();
-      return ctx.sync().then(function () {
-        return { ok: true, values: t.values, address: sheet.name + '!A1' };
-      });
-    }).catch(function (err) {
-      return { ok: false, error: (err && err.message) || String(err) };
-    });
-  }
-
-  root.StatisticoSegmentationSample = {
+  return {
     HEADERS: HEADERS,
-    DEFAULT_SPEC: DEFAULT_SPEC,
-    getTable: getTable,
-    defaultPayload: defaultPayload,
-    insertSheet: insertSheet
+    defaultSpec: defaultSpec,
+    defaultPayload: defaultPayload
   };
-  if (typeof module === 'object' && module.exports) module.exports = root.StatisticoSegmentationSample;
-})(typeof globalThis !== 'undefined' ? globalThis : this);
+});

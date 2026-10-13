@@ -376,7 +376,6 @@ const TOOLS_CATEGORY_TILES = [
   },
   {
     id: "survey-tools",
-    hidden: true, // temporarily hidden from the hub
     section: "Survey Tools",
     sectionId: "survey",
     title: "Survey Segmentation Matrix",

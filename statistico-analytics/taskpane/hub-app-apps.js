@@ -3658,15 +3658,19 @@ function syncHubLicenseBanner() {
     banner = document.createElement("div");
     banner.id = "hubLicenseBanner";
     banner.className = "hub-license-banner";
-    banner.innerHTML = '<strong>Early Access</strong><div id="hubLicenseBannerText"></div><button type="button" id="hubLicenseBannerBtn">Send feedback</button>';
     host.insertBefore(banner, host.firstChild);
-    banner.querySelector("#hubLicenseBannerBtn").addEventListener("click", function () {
-      showHubEarlyAccess();
-    });
+  }
+  if (!banner.querySelector(".hub-license-info")) {
+    banner.innerHTML =
+      '<span class="hub-license-badge">Early Access</span>' +
+      '<button type="button" class="hub-license-info" aria-label="About Early Access">i</button>';
+  }
+  var info = banner.querySelector(".hub-license-info");
+  if (info) info.setAttribute("data-st-tip", text);
+  if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === "function") {
+    window.StatisticoTooltip.refresh(banner);
   }
   banner.hidden = false;
-  var copy = document.getElementById("hubLicenseBannerText");
-  if (copy) copy.textContent = text;
 }
 
 function ensureHubEarlyAccessPanel() {

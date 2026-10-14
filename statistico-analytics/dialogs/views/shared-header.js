@@ -10629,10 +10629,15 @@ ${this._overallAiReplyFormat()}`;
     };
     if (!controls.length) {
       result.deltaR = 0;
+      result.change = this._describePartialChange(result);
       return result;
     }
     const k = names.length;
-    if (n <= k) return result;
+    if (n <= k) {
+      result.deltaR = 0;
+      result.change = this._describePartialChange(result);
+      return result;
+    }
     const R = names.map((_, i) => names.map((__, j) => {
       if (i === j) return 1;
       const pr = this._pearsonFromPairs(cols[i], cols[j]);
@@ -10644,13 +10649,54 @@ ${this._overallAiReplyFormat()}`;
       const denom = Math.sqrt(P[0][0] * P[1][1]);
       partialR = denom ? (-P[0][1] / denom) : NaN;
     } catch (_e) {
+      result.deltaR = 0;
+      result.change = this._describePartialChange(result);
       return result;
     }
-    if (!Number.isFinite(partialR)) return result;
+    if (!Number.isFinite(partialR)) {
+      result.deltaR = 0;
+      result.change = this._describePartialChange(result);
+      return result;
+    }
     const partialDf = n - k;
     result.partial = { r: partialR, p: this._corrPValue(partialR, partialDf), df: partialDf, n };
     result.deltaR = partialR - unadj.r;
+    result.change = this._describePartialChange(result);
     return result;
+  },
+
+  _describePartialChange(cmp) {
+    const r0 = cmp?.unadjusted?.r;
+    const r1 = cmp?.partial?.r;
+    const p0 = cmp?.unadjusted?.p;
+    const p1 = cmp?.partial?.p;
+    if (!cmp?.controls?.length) {
+      return { code: 'unadjusted', label: 'No controls applied; both values are the unadjusted correlation' };
+    }
+    if (!Number.isFinite(r0) || !Number.isFinite(r1)) {
+      return { code: 'unknown', label: 'Change could not be classified' };
+    }
+    const abs0 = Math.abs(r0);
+    const abs1 = Math.abs(r1);
+    const small = 0.10;
+    const sig0 = Number.isFinite(p0) && p0 < 0.05;
+    const sig1 = Number.isFinite(p1) && p1 < 0.05;
+    if (r0 * r1 < 0 && abs0 >= 0.05 && abs1 >= 0.05) {
+      return { code: 'sign-reversal', label: 'Sign reversal after adjustment' };
+    }
+    if (abs0 < small && !sig0 && (abs1 >= small || sig1)) {
+      return { code: 'emerges', label: 'Association emerges after adjustment' };
+    }
+    if ((abs0 >= small || sig0) && abs1 < small && !sig1) {
+      return { code: 'disappears', label: 'Association attenuates to near zero after adjustment' };
+    }
+    if (abs1 > abs0 + 0.05) {
+      return { code: 'strengthens', label: 'Association strengthens after adjustment' };
+    }
+    if (abs1 < abs0 - 0.05) {
+      return { code: 'weakens', label: 'Association weakens after adjustment' };
+    }
+    return { code: 'persists', label: 'Association is similar after adjustment' };
   },
 
   _computePartialInsightData(dataset, controls, excluded, selectedPair) {
@@ -10829,11 +10875,12 @@ ${this._overallAiReplyFormat()}`;
         lines.push(`    Before adjustment: r=${fc(s.unadjusted.r)}, p=${this._fmtCorrP(s.unadjusted.p)}, df=${s.unadjusted.df}`);
         lines.push(`    After controlling for ${s.controls.length ? s.controls.join(', ') : 'no covariates'}: r=${fc(s.partial.r)}, p=${this._fmtCorrP(s.partial.p)}, df=${s.partial.df}`);
         lines.push(`    Change in r=${fc(s.deltaR)}`);
+        if (s.change?.label) lines.push(`    Change pattern=${s.change.code}: ${s.change.label}`);
+        lines.push('    Sample note: Both r values use the same complete-case observations. Only the partial r is adjusted.');
         if (p.headerRows && s.n !== p.headerRows) {
-          lines.push(`    Note: Use Analysis N=${s.n}, not the header row count ${p.headerRows}. Both r values use these ${s.n} observations, so the change is an adjustment effect, not a missing-data change.`);
-        } else {
-          lines.push(`    Note: Both r values use the same ${s.n} observations.`);
+          lines.push(`    Use Analysis N=${s.n}, not the header row count ${p.headerRows}. The difference between the two r values is an adjustment effect, not a missing-data change.`);
         }
+        lines.push('    A larger |partial r| is not automatically the preferable result. Interpretation depends on whether the selected controls are appropriate for the research question.');
       }
       if (p.others?.length) {
         lines.push('  Other adjusted pairs (same-N):');
@@ -11120,7 +11167,7 @@ ${this._localAiReplyFormat()}`;
     return {
       'correlation-matrix': 'Matrix view shows all pairwise correlations. Sort or scan for strongest positive and negative relationships, then use Network/Partial/Reliability for follow-up.',
       'correlation-network': 'Network view highlights relationships above the threshold, can show only connected variables, and uses chart scale to inspect dense graphs.',
-      'partial-correlations': 'Partial correlation removes the part of each variable that can be predicted linearly from the listed controls, then correlates what remains. Compare the unadjusted r and the partial r on the SAME complete-case observations. The main finding is whether the association persists, weakens, or disappears after that adjustment — not a tutorial about the workspace.',
+      'partial-correlations': 'Partial correlation removes the part of each variable that can be predicted linearly from the listed controls, then correlates what remains. Compare the unadjusted r and the partial r on the SAME complete-case observations. Follow the actual change: the association may weaken, disappear, strengthen, emerge, or reverse sign. Only the partial r is adjusted.',
       reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
@@ -11139,15 +11186,18 @@ ${this._localAiReplyFormat()}`;
 
     const partialRules = view === 'partial-correlations' ? `
 PARTIAL VIEW RULES — the finding is the change in r, not the fact that controls were applied:
-- Prioritize the PRIORITY PAIR. BOTTOMLINE must state its unadjusted r and p, its partial r and p, the analysis N, and whether the association weakened, persisted, or strengthened.
-- EVIDENCE must include those four numbers, the analysis N, and the control-variable labels.
-- MEANING must explain the result AND the mechanism: partial correlation residualizes each variable against the controls (removes the part that can be predicted linearly from them) and then correlates what remains. Remaining parts can have a much weaker relationship.
+- Prioritize the PRIORITY PAIR. BOTTOMLINE must state its unadjusted r and p, its partial r and p, the analysis N, and the actual Change pattern (weakens, disappears, strengthens, emerges, sign-reversal, or persists).
+- If Change pattern=emerges, describe an association that appears after adjustment. Do not force a "drop in r" story when r increased or reversed sign.
+- EVIDENCE must include those four numbers, the analysis N, the control-variable labels, and the Change pattern.
+- MEANING must explain the result AND the mechanism: partial correlation residualizes each variable against the controls (removes the part that can be predicted linearly from them) and then correlates what remains. The remaining parts can show a weaker, stronger, newly visible, or reversed linear association.
+- Do not claim that adjustment reveals a causal relationship.
+- A larger |partial r| is not automatically the preferable result. Note that meaning depends on whether the selected controls are appropriate for the question being studied; name the controls when making that caution.
 - In CHECKS, distinguish three levels of conclusion:
-  Supported: whether the association weakens, persists, or strengthens after adjustment.
-  Requires additional calculations: which particular control contributes most to that change.
-  Not established: that the controls cause the association, or that no relationship exists.
+  Supported: the descriptive change after adjustment (emerges / weakens / strengthens / reverses / persists).
+  Requires additional calculations: which particular control contributes most to that change, and whether each control belongs in the adjustment set.
+  Not established: that the controls cause the association, that adjustment uncovered the "true" effect, or that no relationship exists.
 - Use the Analysis N from the same-observation comparison. Do not quote the header / filtered row count as the sample size if it differs.
-- Do not treat a missing-data n change as an adjustment effect; both r values already use the same observations.
+- Both r values use the same complete cases; only the partial r is adjusted. Do not treat a missing-data n change as an adjustment effect.
 ` : '';
 
     if (mode === 'full') {
@@ -11159,7 +11209,7 @@ ${dataBlock}
 RULES:
 - Treat the data above as authoritative.
 - Synthesize Matrix, Network, Descriptives, Partial controls, and PCA/Taylor dimensionality cues when present.
-- When a PRIORITY PAIR is present under Partial Correlations, report its same-N unadjusted vs partial r, p-values, analysis N, and control labels. Do not quote the header row count as the analysis N.
+- When a PRIORITY PAIR is present under Partial Correlations, report its same-N unadjusted vs partial r, p-values, analysis N, control labels, and the actual Change pattern (increase, decrease, emergence, or sign reversal). Do not quote the header row count as the analysis N. Do not claim causality, and do not treat a larger partial r as automatically preferable.
 - Cite exact values where useful.
 - Do not overclaim causality; these are associations.
 - Mention disconnected variables if present.

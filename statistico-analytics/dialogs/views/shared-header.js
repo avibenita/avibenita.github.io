@@ -1958,7 +1958,8 @@ const StatisticoHeader = {
           items: [
             { type: 'tab', tab: 'overview', icon: 'fa-border-all', label: 'Overview', description: 'Four-quadrant segment matrix.', active: activeTab === 'overview' },
             { type: 'tab', tab: 'groups', icon: 'fa-chart-column', label: 'Group Comparison', description: '100% stacked segment mix by group.', active: activeTab === 'groups' },
-            { type: 'tab', tab: 'change', icon: 'fa-arrow-right-arrow-left', label: 'Change', description: changeOn ? 'Current versus previous survey wave.' : 'Available when a previous wave is selected.', active: activeTab === 'change' }
+            { type: 'tab', tab: 'change', icon: 'fa-arrow-right-arrow-left', label: 'Change', description: changeOn ? 'Current versus previous survey wave.' : 'Available when a previous wave is selected.', active: activeTab === 'change' },
+            { type: 'tab', tab: 'drivers', icon: 'fa-chart-simple', label: 'Drivers', description: 'Split Index — factors that differentiate two respondent groups.', active: activeTab === 'drivers' }
           ]
         }]
       };
@@ -10518,6 +10519,171 @@ ${this._overallAiReplyFormat()}`;
     return { r: num / den, n };
   },
 
+  _toFiniteNumber(value) {
+    if (value == null || value === '') return null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    const n = parseFloat(String(value).replace(/,/g, '').replace(/^\uFEFF/, '').trim());
+    return Number.isFinite(n) ? n : null;
+  },
+
+  _rowField(row, header) {
+    if (!row || header == null) return undefined;
+    if (Object.prototype.hasOwnProperty.call(row, header)) return row[header];
+    const wanted = String(header).replace(/^\uFEFF/, '').trim();
+    for (const key of Object.keys(row)) {
+      if (String(key).replace(/^\uFEFF/, '').trim() === wanted) return row[key];
+    }
+    return row[header];
+  },
+
+  _fmtCorrP(p) {
+    if (!Number.isFinite(p)) return 'N/A';
+    if (p < 0.001) return '<.001';
+    return p.toFixed(3);
+  },
+
+  _corrPValue(r, df) {
+    if (!Number.isFinite(r) || !Number.isFinite(df) || df <= 0) return null;
+    if (Math.abs(r) >= 0.999999) return 0;
+    const t = r * Math.sqrt(df / (1 - r * r));
+    if (!Number.isFinite(t)) return null;
+    if (typeof jStat !== 'undefined' && jStat.studentt && typeof jStat.studentt.cdf === 'function') {
+      return 2 * (1 - jStat.studentt.cdf(Math.abs(t), df));
+    }
+    const z = Math.abs(t);
+    const tt = 1 / (1 + 0.2316419 * z);
+    const d = 0.3989423 * Math.exp(-z * z / 2);
+    const tail = d * tt * (0.3193815 + tt * (-0.3565638 + tt * (1.781478 + tt * (-1.821256 + tt * 1.330274))));
+    return Math.min(1, Math.max(0, 2 * tail));
+  },
+
+  _invertSquareMatrix(matrix) {
+    const n = matrix.length;
+    const tryInvert = (src) => {
+      const aug = src.map((row, i) => row.concat(Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))));
+      for (let i = 0; i < n; i++) {
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) maxRow = k;
+        }
+        [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+        if (Math.abs(aug[i][i]) < 1e-12) throw new Error('singular');
+        const pivot = aug[i][i];
+        for (let j = 0; j < 2 * n; j++) aug[i][j] /= pivot;
+        for (let k = 0; k < n; k++) {
+          if (k === i) continue;
+          const factor = aug[k][i];
+          for (let j = 0; j < 2 * n; j++) aug[k][j] -= factor * aug[i][j];
+        }
+      }
+      return aug.map((row) => row.slice(n));
+    };
+    const regularize = (eps) => matrix.map((row, i) => row.map((v, j) => v + (i === j ? eps : 0)));
+    try { return tryInvert(regularize(1e-6)); } catch (_e) {
+      return tryInvert(regularize(1e-4));
+    }
+  },
+
+  _getPartialSelectedPair() {
+    if (window.partialSelectedPair?.x && window.partialSelectedPair?.y) return window.partialSelectedPair;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('partialSelectedPair') || 'null');
+      if (saved?.x && saved?.y) return saved;
+    } catch (_e) {}
+    return null;
+  },
+
+  _setPartialSelectedPair(x, y) {
+    if (!x || !y || x === y) return;
+    const pair = { x, y };
+    window.partialSelectedPair = pair;
+    try { sessionStorage.setItem('partialSelectedPair', JSON.stringify(pair)); } catch (_e) {}
+  },
+
+  _partialComparisonOnCompleteCases(source, xName, yName, controlNames) {
+    const controls = (controlNames || []).filter((name) => name && name !== xName && name !== yName);
+    const dataRows = source?.raw?.data || source?.data;
+    if (!dataRows || !xName || !yName) return null;
+    const names = [xName, yName, ...controls];
+    const complete = [];
+    dataRows.forEach((row) => {
+      const values = names.map((name) => this._toFiniteNumber(this._rowField(row, name)));
+      if (values.every((v) => v != null)) complete.push(values);
+    });
+    const n = complete.length;
+    if (n < 3) return null;
+    const cols = names.map((_, idx) => complete.map((row) => row[idx]));
+    const unadj = this._pearsonFromPairs(cols[0], cols[1]);
+    if (!unadj) return null;
+    const unadjDf = n - 2;
+    const result = {
+      x: xName,
+      y: yName,
+      controls,
+      n,
+      headerRows: Array.isArray(dataRows) ? dataRows.length : n,
+      unadjusted: { r: unadj.r, p: this._corrPValue(unadj.r, unadjDf), df: unadjDf, n },
+      partial: { r: unadj.r, p: this._corrPValue(unadj.r, unadjDf), df: unadjDf, n }
+    };
+    if (!controls.length) {
+      result.deltaR = 0;
+      return result;
+    }
+    const k = names.length;
+    if (n <= k) return result;
+    const R = names.map((_, i) => names.map((__, j) => {
+      if (i === j) return 1;
+      const pr = this._pearsonFromPairs(cols[i], cols[j]);
+      return pr ? pr.r : 0;
+    }));
+    let partialR = NaN;
+    try {
+      const P = this._invertSquareMatrix(R);
+      const denom = Math.sqrt(P[0][0] * P[1][1]);
+      partialR = denom ? (-P[0][1] / denom) : NaN;
+    } catch (_e) {
+      return result;
+    }
+    if (!Number.isFinite(partialR)) return result;
+    const partialDf = n - k;
+    result.partial = { r: partialR, p: this._corrPValue(partialR, partialDf), df: partialDf, n };
+    result.deltaR = partialR - unadj.r;
+    return result;
+  },
+
+  _computePartialInsightData(dataset, controls, excluded, selectedPair) {
+    if (!dataset) return { controls: controls || [], excluded: excluded || [], selected: null, others: [] };
+    const analysisVars = dataset.headers.filter((name) => !(controls || []).includes(name) && !(excluded || []).includes(name));
+    const pairKey = (a, b) => [a, b].sort().join('\u0001');
+    const comparisons = [];
+    for (let i = 0; i < analysisVars.length; i++) {
+      for (let j = i + 1; j < analysisVars.length; j++) {
+        const cmp = this._partialComparisonOnCompleteCases(dataset, analysisVars[i], analysisVars[j], controls);
+        if (cmp) comparisons.push(cmp);
+      }
+    }
+    const score = (cmp) => {
+      if ((controls || []).length) return Math.abs(cmp.deltaR || 0);
+      return Math.abs(cmp.unadjusted?.r || 0);
+    };
+    comparisons.sort((a, b) => score(b) - score(a));
+    let selected = null;
+    if (selectedPair?.x && selectedPair?.y) {
+      selected = comparisons.find((cmp) => pairKey(cmp.x, cmp.y) === pairKey(selectedPair.x, selectedPair.y))
+        || this._partialComparisonOnCompleteCases(dataset, selectedPair.x, selectedPair.y, controls);
+    }
+    if (!selected) selected = comparisons[0] || null;
+    const others = comparisons.filter((cmp) => !selected || pairKey(cmp.x, cmp.y) !== pairKey(selected.x, selected.y)).slice(0, 4);
+    return {
+      controls: controls || [],
+      excluded: excluded || [],
+      selected,
+      selectedByUser: !!(selectedPair?.x && selectedPair?.y && selected && pairKey(selected.x, selected.y) === pairKey(selectedPair.x, selectedPair.y)),
+      others,
+      headerRows: dataset.raw?.data?.length || dataset.rows?.length || null
+    };
+  },
+
   _computeCorrelationMatrixData(dataset) {
     if (!dataset) return null;
     const cols = dataset.headers.map((_, idx) => dataset.rows.map((row) => row[idx]));
@@ -10605,6 +10771,7 @@ ${this._overallAiReplyFormat()}`;
       firstComponentVariance: window.pcaData.firstComponentVariance,
       eigenvalues: window.pcaData.eigenvalues
     } : null;
+    const selectedPair = this._getPartialSelectedPair();
     return {
       data: { variables: dataset.headers, rows: dataset.rows.length },
       matrix,
@@ -10614,7 +10781,7 @@ ${this._overallAiReplyFormat()}`;
         disconnected: dataset.headers.filter((name) => !connectedNames.has(name))
       },
       descriptives,
-      partial: { controls, excluded },
+      partial: this._computePartialInsightData(dataset, controls, excluded, selectedPair),
       reliability,
       pca
     };
@@ -10644,13 +10811,34 @@ ${this._overallAiReplyFormat()}`;
       lines.push('[ PCA / Taylor dimensionality cue ]');
       lines.push(`  First component variance=${f(allData.pca.firstComponentVariance, 1)}%; Eigenvalues=${(allData.pca.eigenvalues || []).slice(0, 6).map((v) => f(v, 2)).join(', ')}`);
     }
-    if (allData.partial?.controls?.length) {
+    if (allData.partial && (allData.partial.controls?.length || allData.partial.excluded?.length || allData.partial.selected)) {
+      const p = allData.partial;
+      const fc = (value) => Number.isFinite(Number(value)) ? Number(value).toFixed(3) : 'N/A';
       lines.push('[ Partial Correlations ]');
-      lines.push(`  Current control variables=${allData.partial.controls.join(', ')}`);
-      if (allData.partial.excluded?.length) lines.push(`  Excluded variables=${allData.partial.excluded.join(', ')}`);
-    } else if (allData.partial?.excluded?.length) {
-      lines.push('[ Partial Correlations ]');
-      lines.push(`  Excluded variables=${allData.partial.excluded.join(', ')}`);
+      lines.push(`  Header / filtered rows=${p.headerRows ?? allData.data.rows}`);
+      lines.push(`  Control variables (${p.controls?.length || 0})=${p.controls?.length ? p.controls.join(', ') : 'none'}`);
+      if (p.excluded?.length) lines.push(`  Excluded variables=${p.excluded.join(', ')}`);
+      if (p.selected) {
+        const s = p.selected;
+        const source = p.selectedByUser ? 'selected by user' : 'largest change after adjustment';
+        lines.push(`  PRIORITY PAIR (${source}): ${s.x} vs ${s.y}`);
+        lines.push('  Same-observation comparison (complete cases on the pair AND all controls):');
+        lines.push(`    Analysis N=${s.n}`);
+        lines.push(`    Before adjustment: r=${fc(s.unadjusted.r)}, p=${this._fmtCorrP(s.unadjusted.p)}, df=${s.unadjusted.df}`);
+        lines.push(`    After controlling for ${s.controls.length ? s.controls.join(', ') : 'no covariates'}: r=${fc(s.partial.r)}, p=${this._fmtCorrP(s.partial.p)}, df=${s.partial.df}`);
+        lines.push(`    Change in r=${fc(s.deltaR)}`);
+        if (p.headerRows && s.n !== p.headerRows) {
+          lines.push(`    Note: Use Analysis N=${s.n}, not the header row count ${p.headerRows}. Both r values use these ${s.n} observations, so the change is an adjustment effect, not a missing-data change.`);
+        } else {
+          lines.push(`    Note: Both r values use the same ${s.n} observations.`);
+        }
+      }
+      if (p.others?.length) {
+        lines.push('  Other adjusted pairs (same-N):');
+        p.others.forEach((cmp) => {
+          lines.push(`    ${cmp.x} vs ${cmp.y}: unadj r=${fc(cmp.unadjusted.r)} p=${this._fmtCorrP(cmp.unadjusted.p)} → partial r=${fc(cmp.partial.r)} p=${this._fmtCorrP(cmp.partial.p)} n=${cmp.n}`);
+        });
+      }
     }
     if (allData.descriptives?.length) {
       lines.push('[ Descriptives ]');
@@ -10930,7 +11118,7 @@ ${this._localAiReplyFormat()}`;
     return {
       'correlation-matrix': 'Matrix view shows all pairwise correlations. Sort or scan for strongest positive and negative relationships, then use Network/Partial/Reliability for follow-up.',
       'correlation-network': 'Network view highlights relationships above the threshold, can show only connected variables, and uses chart scale to inspect dense graphs.',
-      'partial-correlations': 'Partial view recalculates pairwise correlations while controlling selected variables and omitting excluded variables. Use it to check whether a relationship persists after confounders are held constant.',
+      'partial-correlations': 'Partial correlation removes the part of each variable that can be predicted linearly from the listed controls, then correlates what remains. Compare the unadjusted r and the partial r on the SAME complete-case observations. The main finding is whether the association persists, weakens, or disappears after that adjustment — not a tutorial about the workspace.',
       reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
       'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
@@ -10947,6 +11135,19 @@ ${this._localAiReplyFormat()}`;
     const viewLabel = labels[view] || labels.correlations;
     const controls = this._correlationControlsDoc();
 
+    const partialRules = view === 'partial-correlations' ? `
+PARTIAL VIEW RULES — the finding is the change in r, not the fact that controls were applied:
+- Prioritize the PRIORITY PAIR. BOTTOMLINE must state its unadjusted r and p, its partial r and p, the analysis N, and whether the association weakened, persisted, or strengthened.
+- EVIDENCE must include those four numbers, the analysis N, and the control-variable labels.
+- MEANING must explain the result AND the mechanism: partial correlation residualizes each variable against the controls (removes the part that can be predicted linearly from them) and then correlates what remains. Remaining parts can have a much weaker relationship.
+- In CHECKS, distinguish three levels of conclusion:
+  Supported: whether the association weakens, persists, or strengthens after adjustment.
+  Requires additional calculations: which particular control contributes most to that change.
+  Not established: that the controls cause the association, or that no relationship exists.
+- Use the Analysis N from the same-observation comparison. Do not quote the header / filtered row count as the sample size if it differs.
+- Do not treat a missing-data n change as an adjustment effect; both r values already use the same observations.
+` : '';
+
     if (mode === 'full') {
       return `You are a senior statistician writing a full correlation-analysis report that synthesises ALL available correlation views.
 
@@ -10956,6 +11157,7 @@ ${dataBlock}
 RULES:
 - Treat the data above as authoritative.
 - Synthesize Matrix, Network, Descriptives, Partial controls, and PCA/Taylor dimensionality cues when present.
+- When a PRIORITY PAIR is present under Partial Correlations, report its same-N unadjusted vs partial r, p-values, analysis N, and control labels. Do not quote the header row count as the analysis N.
 - Cite exact values where useful.
 - Do not overclaim causality; these are associations.
 - Mention disconnected variables if present.
@@ -10981,7 +11183,7 @@ RULES:
 - Be practical and concise.
 - Do not overclaim causality.
 - Mention exact values when they clarify the reading.
-- Do not mention Cronbach alpha unless this is the Reliability view.${view === 'correlation-by-group-similarity' ? `
+- Do not mention Cronbach alpha unless this is the Reliability view.${partialRules}${view === 'correlation-by-group-similarity' ? `
 - Focus BOTTOMLINE and EVIDENCE on practical similarity, not significance. Cite Pattern / Strength / Sign when a pair is mixed.
 - Do not call this a published coefficient — it is Statistico's Similarity Profile™.
 - Use Very similar / Mostly similar / Mixed similarity / Substantially different.` : ''}
@@ -11303,6 +11505,11 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
 
   _aiFingerprint() {
     const bits = [this.module, this.currentView, this.variableName, this.sampleSize, this._aiRunNonce || 0];
+    if (this.module === 'correlations') {
+      const pair = this._getPartialSelectedPair();
+      bits.push(pair ? `${pair.x}|${pair.y}` : '');
+      bits.push((window.partialControlVariables || []).join(','));
+    }
     try {
       const stored = localStorage.getItem('univariateResults')
         || sessionStorage.getItem('univariateResults')

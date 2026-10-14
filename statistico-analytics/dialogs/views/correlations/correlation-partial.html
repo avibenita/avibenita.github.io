@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20261009tabglow">  <script src="../shared-brand-logo.js?v=20261005light1"></script>
 
-  <script src="../shared-header.js?v=20261009tabglow"></script>
+  <script src="../shared-header.js?v=20261014partialai"></script>
   <!-- Preload filter assets so the page's installer finds them on first call (no flicker). -->
   <script src="../shared/uni-row-filter.js?v=20260524i" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524i" data-filter-api="1"></script>
@@ -788,7 +788,7 @@
 
     .correlation-stats{
       display:grid;
-      grid-template-columns:1fr 1fr 1fr;
+      grid-template-columns:1fr 1fr;
       gap:15px;
       text-align:center;
     }
@@ -1065,6 +1065,10 @@
             <div class="stat-value" id="regularP">-</div>
           </div>
           <div class="stat-item">
+            <div class="stat-label">N</div>
+            <div class="stat-value" id="regularN">-</div>
+          </div>
+          <div class="stat-item">
             <div class="stat-label">DF</div>
             <div class="stat-value" id="regularDF">-</div>
           </div>
@@ -1083,11 +1087,16 @@
             <div class="stat-value" id="partialP">-</div>
           </div>
           <div class="stat-item">
+            <div class="stat-label">N</div>
+            <div class="stat-value" id="partialN">-</div>
+          </div>
+          <div class="stat-item">
             <div class="stat-label">DF</div>
             <div class="stat-value" id="partialDF">-</div>
           </div>
         </div>
       </div>
+      <p id="sameNNote" class="corr-info" style="margin:12px 4px 0;text-align:left;"></p>
     </div>
   </div>
 
@@ -1727,6 +1736,8 @@
           } else {
             const result = calculatePartialCorrelation(varIdx, var2Idx, controlIndices);
             if (result.correlation !== null) td.dataset.corr = String(result.correlation);
+            td.dataset.varX = variableNames[varIdx];
+            td.dataset.varY = variableNames[var2Idx];
             
             const corrSpan = document.createElement('span');
             corrSpan.className = 'clickable-correlation';
@@ -1776,6 +1787,7 @@
       loading.style.display = 'none';
       setPartialMatrixView(partialMatrixView);
       applyPartialThreshold();
+      restoreSelectedPairHighlight();
     }
 
     function buildPartialHeatmap(nonControlIndices, controlIndices) {
@@ -1807,6 +1819,8 @@
             td.appendChild(document.createTextNode(fmtCorr(corr)));
             if (corr !== null) {
               td.dataset.corr = String(corr);
+              td.dataset.varX = variableNames[rowIdx];
+              td.dataset.varY = variableNames[colIdx];
               const intensity = Math.min(1, Math.abs(corr));
               const alpha = 0.18 + intensity * 0.62;
               td.style.background = corr >= 0
@@ -1824,34 +1838,87 @@
       });
     }
 
+    function persistSelectedPair(var1Name, var2Name) {
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._setPartialSelectedPair === 'function') {
+        StatisticoHeader._setPartialSelectedPair(var1Name, var2Name);
+      } else {
+        window.partialSelectedPair = { x: var1Name, y: var2Name };
+        try { sessionStorage.setItem('partialSelectedPair', JSON.stringify(window.partialSelectedPair)); } catch (e) {}
+      }
+    }
+
+    function formatPartialP(p) {
+      if (p == null || !Number.isFinite(p)) return '-';
+      return p < 0.001 ? '<.001' : p.toFixed(3);
+    }
+
+    function restoreSelectedPairHighlight() {
+      const pair = (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._getPartialSelectedPair === 'function')
+        ? StatisticoHeader._getPartialSelectedPair()
+        : window.partialSelectedPair;
+      document.querySelectorAll('#correlationTable td.highlighted, #partialHeatmapTable td.highlighted').forEach((el) => {
+        el.classList.remove('highlighted');
+      });
+      if (!pair) return;
+      document.querySelectorAll('#correlationTable td[data-var-x], #partialHeatmapTable td[data-var-x]').forEach((td) => {
+        const match = (td.dataset.varX === pair.x && td.dataset.varY === pair.y)
+          || (td.dataset.varX === pair.y && td.dataset.varY === pair.x);
+        td.classList.toggle('highlighted', match);
+      });
+    }
+
     /**
      * Show correlation comparison modal
      */
     function showCorrelationModal(var1Idx, var2Idx, var1Name, var2Name, clickedCell) {
+      persistSelectedPair(var1Name, var2Name);
       const controlIndices = getControlIndices();
-      
-      // Regular correlation (no controls)
-      const regularCorr = calculatePartialCorrelation(var1Idx, var2Idx, []);
-      
-      // Partial correlation (with controls)
-      const partialCorr = calculatePartialCorrelation(var1Idx, var2Idx, controlIndices);
-      
-      // Update modal
-      document.getElementById('modalTitle').textContent = `${var1Name} vs ${var2Name}`;
-      document.getElementById('regularR').textContent = fmtCorr(regularCorr.correlation);
-      document.getElementById('regularP').textContent = regularCorr.pValue !== null ? (regularCorr.pValue < 0.001 ? '<.001' : regularCorr.pValue.toFixed(3)) : '-';
-      document.getElementById('regularDF').textContent = regularCorr.df || '-';
-      document.getElementById('partialR').textContent = fmtCorr(partialCorr.correlation);
-      document.getElementById('partialP').textContent = partialCorr.pValue !== null ? (partialCorr.pValue < 0.001 ? '<.001' : partialCorr.pValue.toFixed(3)) : '-';
-      document.getElementById('partialDF').textContent = partialCorr.df || '-';
-      
-      // Highlight cell
-      document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
-      if (clickedCell) {
-        clickedCell.classList.add('highlighted');
+      const controlNames = controlIndices.map((idx) => variableNames[idx]);
+      let cmp = null;
+      if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._partialComparisonOnCompleteCases === 'function') {
+        cmp = StatisticoHeader._partialComparisonOnCompleteCases(
+          { headers: variableNames, raw: correlationData },
+          var1Name,
+          var2Name,
+          controlNames
+        );
       }
-      
-      // Show modal
+
+      document.getElementById('modalTitle').textContent = `${var1Name} vs ${var2Name}`;
+      if (cmp) {
+        document.getElementById('regularR').textContent = fmtCorr(cmp.unadjusted.r);
+        document.getElementById('regularP').textContent = formatPartialP(cmp.unadjusted.p);
+        document.getElementById('regularDF').textContent = cmp.unadjusted.df || '-';
+        document.getElementById('partialR').textContent = fmtCorr(cmp.partial.r);
+        document.getElementById('partialP').textContent = formatPartialP(cmp.partial.p);
+        document.getElementById('partialDF').textContent = cmp.partial.df || '-';
+        const nEl = document.getElementById('regularN');
+        const pnEl = document.getElementById('partialN');
+        if (nEl) nEl.textContent = cmp.n;
+        if (pnEl) pnEl.textContent = cmp.n;
+        const note = document.getElementById('sameNNote');
+        if (note) {
+          const controlText = controlNames.length ? ` after controlling for ${controlNames.join(', ')}` : '';
+          note.textContent = `Both correlations use the same ${cmp.n} complete-case observations${controlText}.`;
+        }
+      } else {
+        const regularCorr = calculatePartialCorrelation(var1Idx, var2Idx, []);
+        const partialCorr = calculatePartialCorrelation(var1Idx, var2Idx, controlIndices);
+        document.getElementById('regularR').textContent = fmtCorr(regularCorr.correlation);
+        document.getElementById('regularP').textContent = formatPartialP(regularCorr.pValue);
+        document.getElementById('regularDF').textContent = regularCorr.df || '-';
+        document.getElementById('partialR').textContent = fmtCorr(partialCorr.correlation);
+        document.getElementById('partialP').textContent = formatPartialP(partialCorr.pValue);
+        document.getElementById('partialDF').textContent = partialCorr.df || '-';
+        const nEl = document.getElementById('regularN');
+        const pnEl = document.getElementById('partialN');
+        if (nEl) nEl.textContent = regularCorr.n || '-';
+        if (pnEl) pnEl.textContent = partialCorr.n || '-';
+      }
+
+      restoreSelectedPairHighlight();
+      if (clickedCell) clickedCell.classList.add('highlighted');
+
       document.getElementById('correlationModal').style.display = 'block';
       setTimeout(centerModal, 10);
     }
@@ -1861,7 +1928,7 @@
      */
     function hideCorrelationModal() {
       document.getElementById('correlationModal').style.display = 'none';
-      document.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
+      restoreSelectedPairHighlight();
     }
 
     /**

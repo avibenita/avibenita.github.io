@@ -10,7 +10,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var HEADERS = ['Respondent ID', 'Sat_1', 'Sat_2', 'Sat_3', 'Stay_1', 'Stay_2', 'Division', 'Wave', 'Level', 'Tenure', 'Weight'];
+  var HEADERS = ['Respondent ID', 'Sat_1', 'Sat_2', 'Sat_3', 'Stay_1', 'Stay_2', 'Career', 'Manager', 'Pay', 'Division', 'Wave', 'Level', 'Tenure', 'Weight'];
 
   var ITEMS = {
     highXHighY: { sat: [5, 5, 4], stay: [5, 4] },
@@ -32,10 +32,15 @@
         stay[1] = '';
       }
       var weight = spec.weight == null ? 1 : spec.weight;
+      var staying = spec.segment === 'highXHighY' || spec.segment === 'lowXHighY';
+      var career = spec.blankStay ? '' : (staying ? (i % 3 === 0 ? 5 : 4) : (i % 3 === 0 ? 3 : 2));
+      var manager = i % 4 === 0 ? 3 : 4;
+      var pay = i % 2 === 0 ? 3 : 4;
       rows.push([
         id,
         sat[0], sat[1], sat[2],
         stay[0], stay[1],
+        career, manager, pay,
         spec.group,
         spec.wave,
         spec.level || (i % 3 === 0 ? 'Managers' : 'Staff'),
@@ -137,6 +142,7 @@
       previousWave: '2025',
       respondentIdColumn: 'Respondent ID',
       weightColumn: null,
+      factorColumns: ['Career', 'Manager', 'Pay'],
       minimumValidItems: 0.5,
       smallBaseThreshold: 30,
       filters: {}

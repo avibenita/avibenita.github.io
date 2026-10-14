@@ -21,10 +21,11 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261009tabglow" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261009tabglow" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261013seg1"></script>
+  <script src="../shared-header.js?v=20261014si1"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
-  <script src="segmentation-engine.js?v=20261013seg1"></script>
-  <script src="segmentation-sample-data.js?v=20261013seg1"></script>
+  <script src="segmentation-engine.js?v=20261014si1"></script>
+  <script src="segmentation-split-index.js?v=20261014si1"></script>
+  <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
     :root {
       --surface-0:#0E141B; --surface-1:#1c2633; --surface-2:#243140; --border:rgba(255,255,255,.14);
@@ -130,6 +131,11 @@
     .change-card .pp { font-size:13px; font-weight:700; }
     .bench { font-size:12.5px; font-weight:700; color:var(--accent); }
     .export-bar { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+    #driverControls { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; align-items:start; margin-bottom:8px; }
+    .driver-index { border:1px solid var(--border); border-radius:8px; margin:0; padding:8px; min-width:0; }
+    .driver-index .driver-legend { font-size:11px; font-weight:700; color:var(--muted); margin-bottom:4px; }
+    #driverIntro .info { display:inline-flex; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; background:#0d9488; color:#fff; font-size:11px; font-weight:700; cursor:help; }
+    #driverPatterns .change-card { flex:1 1 180px; }
     .status-list { margin:8px 0 0; padding-left:18px; font-size:12.5px; }
     @media (max-width: 900px) {
       .cards, .grid-2 { grid-template-columns:1fr 1fr; }
@@ -221,6 +227,7 @@
               <button type="button" class="seg-tab" role="tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
               <button type="button" class="seg-tab" role="tab" id="tab-groups" data-tab="groups" aria-controls="panel-groups" aria-selected="false">Group Comparison</button>
               <button type="button" class="seg-tab" role="tab" id="tab-change" data-tab="change" aria-controls="panel-change" aria-selected="false">Change</button>
+              <button type="button" class="seg-tab" role="tab" id="tab-drivers" data-tab="drivers" aria-controls="panel-drivers" aria-selected="false">Drivers</button>
             </div>
             <section class="seg-panel active" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
               <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
@@ -266,6 +273,92 @@
               <ul class="status-list" id="waveStatus"></ul>
               <div id="changeChart" class="chart"></div>
             </section>
+            <section class="seg-panel" id="panel-drivers" role="tabpanel" aria-labelledby="tab-drivers">
+              <p class="note" id="driverIntro"></p>
+              <div id="driverEmpty">
+                <p id="driverEmptyText">Select survey factors to calculate the Split Index.</p>
+                <button type="button" class="btn" id="selectFactors">Select factors</button>
+              </div>
+              <div id="factorPicker" class="filters"></div>
+              <div id="driverBody" style="display:none;">
+                <div id="driverControls">
+                  <label>Compare groups
+                    <select id="driverMode">
+                      <option value="stay">Tending to stay vs Not tending to stay</option>
+                      <option value="satisfaction">Satisfied vs Not satisfied</option>
+                      <option value="segments">Two segments</option>
+                      <option value="segmentVsRest">Selected segment vs all others</option>
+                    </select>
+                  </label>
+                  <label id="driverGroup1Wrap">Group 1
+                    <select id="driverGroup1"></select>
+                  </label>
+                  <label id="driverGroup2Wrap">Group 2
+                    <select id="driverGroup2"></select>
+                  </label>
+                  <label id="driverSegmentWrap">Segment
+                    <select id="driverSegment"></select>
+                  </label>
+                  <div class="driver-index">
+                    <div class="driver-legend">Split Index</div>
+                    <label class="check"><input type="radio" name="driverIndex" value="raw" checked /> Raw mean difference</label>
+                    <label class="check"><input type="radio" name="driverIndex" value="standardized" /> Standardized mean difference</label>
+                  </div>
+                  <label>Factor order
+                    <select id="driverSort">
+                      <option value="splitDesc">Split Index — descending</option>
+                      <option value="splitAsc">Split Index — ascending</option>
+                      <option value="order">Questionnaire order</option>
+                      <option value="mean1">Group 1 mean</option>
+                      <option value="mean2">Group 2 mean</option>
+                      <option value="name">Factor name</option>
+                    </select>
+                  </label>
+                  <label>Show top factors only
+                    <select id="driverTop">
+                      <option value="0">All</option>
+                      <option value="5">Top 5</option>
+                      <option value="10">Top 10</option>
+                      <option value="15">Top 15</option>
+                    </select>
+                  </label>
+                  <label class="check"><input type="checkbox" id="driverEvidence" /> Show statistical evidence</label>
+                  <div class="driver-index">
+                    <div class="driver-legend">Missing-data handling</div>
+                    <label class="check"><input type="radio" name="driverMissing" value="available" checked /> Available cases by factor</label>
+                    <label class="check"><input type="radio" name="driverMissing" value="complete" /> Complete cases across selected factors</label>
+                  </div>
+                  <label id="driverWaveWrap">Analyze wave
+                    <select id="driverWave">
+                      <option value="current">Current</option>
+                      <option value="previous">Previous</option>
+                    </select>
+                  </label>
+                </div>
+                <p id="driverIndexHelp" class="note"></p>
+                <p id="driverGroups" class="note"></p>
+                <p id="driverScaleNote" class="note"></p>
+                <p id="driverSameNote" class="note"></p>
+                <div id="driverChart" class="chart"></div>
+                <div id="driverPatterns" class="cards"></div>
+                <details class="fold" id="driverStats">
+                  <summary>Statistical details</summary>
+                  <div class="fold-body">
+                    <p class="note" id="driverStatsNote"></p>
+                    <label>Multiple-comparison adjustment
+                      <select id="driverAdjust">
+                        <option value="none">None</option>
+                        <option value="bh" selected>Benjamini–Hochberg FDR</option>
+                        <option value="holm">Holm</option>
+                        <option value="bonferroni">Bonferroni</option>
+                      </select>
+                    </label>
+                    <div style="overflow:auto;"><table id="driverStatsTable"></table></div>
+                    <p class="note" id="driverWeightNote"></p>
+                  </div>
+                </details>
+              </div>
+            </section>
           </div>
         </section>
       </div>
@@ -286,6 +379,10 @@
     var _headerFilterText = '';
     var _groupChart = null;
     var _changeChart = null;
+    var _driverChart = null;
+    var SI = window.StatisticoSplitIndex;
+    var _driver = { mode: 'stay', group1: 'highXHighY', group2: 'lowXLowY', segment: 'highXHighY', index: 'raw', sort: 'splitDesc', topN: 0, evidence: false, missing: 'available', wave: 'current', adjustment: 'bh' };
+    var _splitResult = null;
     var _painting = false;
 
     function segEsc(s) {
@@ -346,6 +443,11 @@
         _bundle.rules.yRule,
         'Valid respondents: ' + _bundle.validN + ' of ' + _bundle.scopedRows
       ];
+      if (_tab === 'drivers' && _splitResult && _splitResult.ok) {
+        parts.unshift(_splitResult.group1.label + ' (n = ' + _splitResult.group1.validN + ') vs ' + _splitResult.group2.label + ' (n = ' + _splitResult.group2.validN + ')');
+        parts.push(_splitResult.indexLabel);
+        if (_splitResult.waveLabel) parts.push('Analyze wave: ' + _splitResult.waveLabel);
+      }
       if (_bundle.scopeLabel && _bundle.scopeLabel !== 'All respondents') parts.push('Current wave: ' + _bundle.scopeLabel);
       if (_spec.previousWave && _bundle.change) parts.push('Previous wave: ' + _spec.previousWave);
       var filters = filterText();
@@ -516,6 +618,7 @@
       paintMatrix();
       if (_tab === 'groups') paintGroups();
       if (_tab === 'change') paintChange();
+      if (_tab === 'drivers') paintDrivers();
     }
 
     function paintSummary() {
@@ -958,6 +1061,159 @@
       });
     }
 
+    function numericFactorChoices() {
+      var blocked = {};
+      if (!_spec) return [];
+      (_spec.xDimension.columns || []).concat(_spec.yDimension.columns || []).forEach(function (name) { blocked[name] = true; });
+      [_spec.groupColumn, _spec.waveColumn, _spec.respondentIdColumn, _spec.weightColumn].forEach(function (name) { if (name) blocked[name] = true; });
+      return SS.profileColumns(_headers, _viewRows).filter(function (col) {
+        return col.numeric && !blocked[col.name];
+      });
+    }
+    function paintFactorPicker() {
+      var host = document.getElementById('factorPicker');
+      if (!host) return;
+      var selected = {};
+      (_spec.factorColumns || []).forEach(function (name) { selected[name] = true; });
+      host.innerHTML = '';
+      var title = document.createElement('strong');
+      title.textContent = 'Factors to compare';
+      host.appendChild(title);
+      numericFactorChoices().forEach(function (col) {
+        var label = document.createElement('label');
+        label.className = 'check';
+        var box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = !!selected[col.name];
+        box.addEventListener('change', function () {
+          var names = (_spec.factorColumns || []).slice();
+          if (box.checked) { if (names.indexOf(col.name) < 0) names.push(col.name); }
+          else names = names.filter(function (name) { return name !== col.name; });
+          _spec.factorColumns = names;
+          _spec.factors = [];
+          recompute();
+        });
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(' ' + col.name));
+        host.appendChild(label);
+      });
+    }
+    function fillDriverSegments() {
+      ['driverGroup1', 'driverGroup2', 'driverSegment'].forEach(function (id) {
+        var sel = document.getElementById(id);
+        var prev = sel.value;
+        sel.innerHTML = '';
+        SS.QUADRANT_KEYS.forEach(function (key) {
+          var opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = _spec.segments[key].label;
+          sel.appendChild(opt);
+        });
+        if (prev) sel.value = prev;
+      });
+      document.getElementById('driverGroup1').value = _driver.group1;
+      document.getElementById('driverGroup2').value = _driver.group2;
+      document.getElementById('driverSegment').value = _driver.segment;
+    }
+    function paintDrivers() {
+      if (!_bundle || !_bundle.ok || !SI) return;
+      var intro = document.getElementById('driverIntro');
+      intro.textContent = SI.COPY.description + ' ';
+      var info = document.createElement('span');
+      info.className = 'info';
+      info.title = SI.COPY.tooltip;
+      info.textContent = 'i';
+      intro.appendChild(info);
+      paintFactorPicker();
+      var hasFactors = SS.factorDefinitions(_spec).length > 0;
+      document.getElementById('driverEmpty').style.display = hasFactors ? 'none' : 'block';
+      document.getElementById('driverBody').style.display = hasFactors ? 'block' : 'none';
+      document.getElementById('driverMode').value = _driver.mode;
+      document.getElementById('driverSort').value = _driver.sort;
+      document.getElementById('driverTop').value = String(_driver.topN);
+      document.getElementById('driverEvidence').checked = _driver.evidence;
+      document.getElementById('driverAdjust').value = _driver.adjustment;
+      document.getElementById('driverWave').value = _driver.wave;
+      document.querySelectorAll('input[name="driverIndex"]').forEach(function (el) { el.checked = el.value === _driver.index; });
+      document.querySelectorAll('input[name="driverMissing"]').forEach(function (el) { el.checked = el.value === _driver.missing; });
+      var stayOpt = document.querySelector('#driverMode option[value="stay"]');
+      var satOpt = document.querySelector('#driverMode option[value="satisfaction"]');
+      if (stayOpt) stayOpt.textContent = _spec.yDimension.highLabel + ' vs ' + _spec.yDimension.lowLabel;
+      if (satOpt) satOpt.textContent = _spec.xDimension.highLabel + ' vs ' + _spec.xDimension.lowLabel;
+      fillDriverSegments();
+      document.getElementById('driverGroup1Wrap').style.display = _driver.mode === 'segments' ? '' : 'none';
+      document.getElementById('driverGroup2Wrap').style.display = _driver.mode === 'segments' ? '' : 'none';
+      document.getElementById('driverSegmentWrap').style.display = _driver.mode === 'segmentVsRest' ? '' : 'none';
+      document.getElementById('driverWaveWrap').style.display = _spec.previousWave ? '' : 'none';
+      document.getElementById('driverIndexHelp').textContent = _driver.index === 'standardized' ? SI.COPY.standardizedHelp : SI.COPY.rawHelp;
+      if (!hasFactors) {
+        _splitResult = null;
+        return;
+      }
+      _splitResult = SI.calculateSplitIndex(_bundle.scoredRespondents || [], _bundle.config, _driver);
+      var same = document.getElementById('driverSameNote');
+      same.textContent = _splitResult.ok ? '' : (_splitResult.error || '');
+      if (!_splitResult.ok) {
+        if (_driverChart) { _driverChart.destroy(); _driverChart = null; }
+        document.getElementById('driverGroups').textContent = '';
+        document.getElementById('driverPatterns').innerHTML = '';
+        document.getElementById('driverStatsTable').innerHTML = '';
+        return;
+      }
+      document.getElementById('driverGroups').textContent = _splitResult.group1.label + ' (n = ' + _splitResult.group1.validN + ') · ' + _splitResult.group2.label + ' (n = ' + _splitResult.group2.validN + ')';
+      document.getElementById('driverScaleNote').textContent = _splitResult.scalesDiffer && _driver.index === 'raw' ? SI.COPY.scaleWarning : '';
+      document.getElementById('driverStatsNote').textContent = SI.COPY.significanceNote;
+      document.getElementById('driverWeightNote').textContent = _splitResult.weightUsed ? 'Weights were applied to means and standard deviations. Sample sizes shown as n are unweighted bases.' : '';
+      var patterns = document.getElementById('driverPatterns');
+      patterns.innerHTML = '';
+      _splitResult.displayed.forEach(function (factor) {
+        var card = document.createElement('article');
+        card.className = 'change-card';
+        var title = document.createElement('h3');
+        title.textContent = factor.factorLabel;
+        var kind = document.createElement('div');
+        kind.className = 'path';
+        kind.textContent = factor.pattern ? factor.pattern.label : '';
+        var body = document.createElement('p');
+        body.textContent = factor.pattern ? factor.pattern.description : '';
+        card.appendChild(title);
+        card.appendChild(kind);
+        card.appendChild(body);
+        patterns.appendChild(card);
+      });
+      var table = document.getElementById('driverStatsTable');
+      var exported = SI.resultsTable(_splitResult);
+      table.innerHTML = '';
+      if (exported.length) {
+        var head = document.createElement('tr');
+        Object.keys(exported[0]).forEach(function (key) {
+          var th = document.createElement('th');
+          th.textContent = key;
+          head.appendChild(th);
+        });
+        table.appendChild(head);
+        exported.forEach(function (record) {
+          var tr = document.createElement('tr');
+          Object.keys(exported[0]).forEach(function (key) {
+            var td = document.createElement('td');
+            td.textContent = record[key];
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+      }
+      var options = SI.buildSplitIndexChartOptions(_splitResult);
+      options.tooltip.useHTML = false;
+      options.tooltip.formatter = function () {
+        var factor = _splitResult.displayed[this.point.index];
+        if (!factor) return '';
+        return SI.buildFactorTooltip(factor, { showEvidence: _driver.evidence }).split('\n').join('<br>');
+      };
+      options.tooltip.useHTML = true;
+      if (_driverChart) { _driverChart.destroy(); _driverChart = null; }
+      _driverChart = Highcharts.chart('driverChart', options);
+    }
+
     function switchTab(name) {
       if (name === 'change' && !(_bundle && _bundle.change)) return;
       _tab = name;
@@ -975,12 +1231,12 @@
       });
       if (window.StatisticoHeader) {
         StatisticoHeader.currentView = 'segmentation-' + name;
-        var titles = { overview: 'Overview', groups: 'Group Comparison', change: 'Change' };
+        var titles = { overview: 'Overview', groups: 'Group Comparison', change: 'Change', drivers: 'Drivers' };
         try { StatisticoHeader.updateTitle(titles[name] || name); } catch (_e) {}
       }
       paint();
       setTimeout(function () {
-        [_groupChart, _changeChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
+        [_groupChart, _changeChart, _driverChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
       }, 40);
     }
     window.switchTab = switchTab;
@@ -1104,6 +1360,7 @@
       });
     }
     function currentChart() {
+      if (_tab === 'drivers') return _driverChart;
       if (_tab === 'change') return _changeChart;
       if (_tab === 'groups') return _groupChart;
       return null;
@@ -1113,7 +1370,7 @@
       var h = Math.max(420, chart.chartHeight || 520);
       var svg = chart.getSVG({
         chart: { width: w, height: h, backgroundColor: '#ffffff' },
-        title: { text: 'Survey Segmentation Matrix', style: { color: '#111827', fontSize: '18px' } },
+        title: { text: _tab === 'drivers' && _splitResult && _splitResult.title ? _splitResult.title : 'Survey Segmentation Matrix', style: { color: '#111827', fontSize: '18px' } },
         subtitle: { text: exportSubtitle(), style: { color: '#334155', fontSize: '12px' } },
         legend: { enabled: _tab !== 'change', itemStyle: { color: '#111827' } },
         xAxis: { labels: { style: { color: '#111827' } } },
@@ -1141,7 +1398,7 @@
       }, 'image/png');
     }
     function exportRows() {
-      var rows = SS.resultsTable(_bundle, sortedGroups());
+      var rows = _tab === 'drivers' && _splitResult && _splitResult.ok ? SI.resultsTable(_splitResult) : SS.resultsTable(_bundle, sortedGroups());
       if (!rows.length) return;
       var cols = Object.keys(rows[0]);
       var lines = [cols.join('\t')];
@@ -1151,7 +1408,7 @@
       var blob = new Blob([lines.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'survey-segmentation-matrix.tsv';
+      a.download = _tab === 'drivers' ? 'split-index.tsv' : 'survey-segmentation-matrix.tsv';
       a.click();
     }
 
@@ -1239,13 +1496,34 @@
     document.getElementById('downloadPng').addEventListener('click', function () {
       canvasForExport().then(function (canvas) { downloadCanvas(canvas, 'survey-segmentation-matrix.png'); }).catch(function () {});
     });
+    document.getElementById('selectFactors').addEventListener('click', function () {
+      var picker = document.getElementById('factorPicker');
+      if (picker) picker.scrollIntoView({ block: 'nearest' });
+      var first = picker && picker.querySelector('input');
+      if (first) first.focus();
+    });
+    document.getElementById('driverMode').addEventListener('change', function () { _driver.mode = this.value; paintDrivers(); });
+    document.getElementById('driverGroup1').addEventListener('change', function () { _driver.group1 = this.value; paintDrivers(); });
+    document.getElementById('driverGroup2').addEventListener('change', function () { _driver.group2 = this.value; paintDrivers(); });
+    document.getElementById('driverSegment').addEventListener('change', function () { _driver.segment = this.value; paintDrivers(); });
+    document.getElementById('driverSort').addEventListener('change', function () { _driver.sort = this.value; paintDrivers(); });
+    document.getElementById('driverTop').addEventListener('change', function () { _driver.topN = Number(this.value); paintDrivers(); });
+    document.getElementById('driverEvidence').addEventListener('change', function () { _driver.evidence = this.checked; paintDrivers(); });
+    document.getElementById('driverAdjust').addEventListener('change', function () { _driver.adjustment = this.value; paintDrivers(); });
+    document.getElementById('driverWave').addEventListener('change', function () { _driver.wave = this.value; paintDrivers(); });
+    document.querySelectorAll('input[name="driverIndex"]').forEach(function (el) {
+      el.addEventListener('change', function () { if (el.checked) { _driver.index = el.value; paintDrivers(); } });
+    });
+    document.querySelectorAll('input[name="driverMissing"]').forEach(function (el) {
+      el.addEventListener('change', function () { if (el.checked) { _driver.missing = el.value; paintDrivers(); } });
+    });
     document.getElementById('exportTable').addEventListener('click', exportRows);
     document.getElementById('copySummary').addEventListener('click', function () {
       var text = SS.interpretationSummary(_bundle);
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
     });
     window.addEventListener('resize', function () {
-      [_groupChart, _changeChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
+      [_groupChart, _changeChart, _driverChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
     });
 
     document.addEventListener('DOMContentLoaded', function () {

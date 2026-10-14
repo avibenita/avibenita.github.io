@@ -99,6 +99,8 @@
       previousWave: null,
       respondentIdColumn: null,
       weightColumn: null,
+      factorColumns: [],
+      factors: [],
       minimumValidItems: 0.5,
       smallBaseThreshold: 30,
       filters: {}
@@ -134,6 +136,15 @@
     out.previousWave = c.previousWave == null || c.previousWave === '' ? null : String(c.previousWave);
     out.respondentIdColumn = c.respondentIdColumn || null;
     out.weightColumn = c.weightColumn || null;
+    out.factorColumns = Array.isArray(c.factorColumns) ? c.factorColumns.filter(Boolean).map(function (name) { return String(name); }) : [];
+    out.factors = Array.isArray(c.factors) ? c.factors.map(function (factor, index) {
+      var columns = factor && Array.isArray(factor.columns) ? factor.columns.filter(Boolean).map(function (name) { return String(name); }) : [];
+      return {
+        id: factor && factor.id ? String(factor.id) : (columns.join('+') || ('factor' + (index + 1))),
+        label: factor && factor.label ? String(factor.label) : (columns.join(' + ') || ('Factor ' + (index + 1))),
+        columns: columns
+      };
+    }).filter(function (factor) { return factor.columns.length; }) : [];
     var minItems = Number(c.minimumValidItems);
     out.minimumValidItems = isFinite(minItems) && minItems > 0 ? Math.min(1, minItems) : 0.5;
     var small = Number(c.smallBaseThreshold);
@@ -419,6 +430,23 @@
     return values;
   }
 
+  function factorDefinitions(config) {
+    if (config && Array.isArray(config.factors) && config.factors.length) {
+      return config.factors.map(function (factor, index) {
+        var columns = Array.isArray(factor.columns) ? factor.columns.slice() : [];
+        return {
+          id: factor.id || columns.join('+') || ('factor' + (index + 1)),
+          label: factor.label || columns.join(' + ') || ('Factor ' + (index + 1)),
+          columns: columns,
+          originalOrder: index
+        };
+      });
+    }
+    return ((config && config.factorColumns) || []).map(function (name, index) {
+      return { id: String(name), label: String(name), columns: [String(name)], originalOrder: index };
+    });
+  }
+
   function scoreRespondents(headers, rows, config) {
     var xIdx = config.xDimension.columns.map(function (name) { return headerIndex(headers, name); });
     var yIdx = config.yDimension.columns.map(function (name) { return headerIndex(headers, name); });
@@ -426,6 +454,7 @@
     var wIdx = headerIndex(headers, config.waveColumn);
     var idIdx = headerIndex(headers, config.respondentIdColumn);
     var wtIdx = headerIndex(headers, config.weightColumn);
+    var factorDefs = factorDefinitions(config);
     var respondents = [];
     var excluded = { items: 0, weight: 0, zeroWeight: 0, negativeWeight: 0, nonNumericWeight: 0 };
     var xValues = [];
@@ -468,6 +497,15 @@
       }
       xValues.push(x.score);
       yValues.push(y.score);
+      var factorScores = {};
+      factorDefs.forEach(function (factor) {
+        var parts = factor.columns.map(function (name) {
+          var idx = headerIndex(headers, name);
+          return idx < 0 ? null : row[idx];
+        });
+        var scored = compositeScore(parts, config.minimumValidItems);
+        factorScores[factor.id] = scored.ok ? scored.score : null;
+      });
       respondents.push({
         index: index,
         id: idIdx >= 0 ? cellText(row[idIdx]) : '',
@@ -477,7 +515,8 @@
         yValidCount: y.validCount,
         weight: weight,
         group: gIdx >= 0 ? (cellText(row[gIdx]) || '(Missing)') : null,
-        wave: wIdx >= 0 ? waveLabel(row[wIdx]) : null
+        wave: wIdx >= 0 ? waveLabel(row[wIdx]) : null,
+        factorScores: factorScores
       });
     });
 
@@ -810,17 +849,23 @@
       emptySegments: emptySegments,
       filterDescription: filterDescription(cfg.filters),
       duplicateIdCount: dupes,
-      respondents: scope.map(function (r) {
-        return {
-          id: r.id,
-          segment: r.segment,
-          group: r.group,
-          wave: r.wave,
-          weight: r.weight,
-          xScore: r.xScore,
-          yScore: r.yScore
-        };
-      })
+      factors: factorDefinitions(cfg),
+      respondents: scope.map(slimRespondent),
+      scoredRespondents: scoredAll.respondents.map(slimRespondent)
+    };
+  }
+
+  function slimRespondent(r) {
+    return {
+      index: r.index,
+      id: r.id,
+      segment: r.segment,
+      group: r.group,
+      wave: r.wave,
+      weight: r.weight,
+      xScore: r.xScore,
+      yScore: r.yScore,
+      factorScores: r.factorScores || {}
     };
   }
 
@@ -957,6 +1002,7 @@
     formatPp: formatPp,
     formatNum: formatNum,
     round1: round1,
+    factorDefinitions: factorDefinitions,
     analyze: analyze,
     resultsTable: resultsTable,
     interpretationSummary: interpretationSummary,

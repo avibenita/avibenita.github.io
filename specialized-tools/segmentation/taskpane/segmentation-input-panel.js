@@ -46,7 +46,8 @@ function openSegmentationResultsDialog(payload) {
       }));
     }
   } catch (_e) {}
-  var url = getSegmentationDialogsBaseUrl() + 'segmentation/segmentation-results.html?v=' + Date.now();
+  var product = (payload && payload.spec && payload.spec.product) === 'split' ? 'split' : 'loyalty';
+  var url = getSegmentationDialogsBaseUrl() + 'segmentation/segmentation-results.html?v=' + Date.now() + '&product=' + product;
   Office.context.ui.displayDialogAsync(url, DIALOG_SIZES.RESULTS, function (result) {
     if (result.status === Office.AsyncResultStatus.Failed) {
       console.error('Failed to open segmentation results:', result.error && result.error.message);

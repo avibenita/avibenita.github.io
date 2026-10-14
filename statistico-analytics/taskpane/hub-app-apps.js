@@ -378,25 +378,29 @@ const TOOLS_CATEGORY_TILES = [
     id: "survey-tools",
     section: "Survey Tools",
     sectionId: "survey",
-    title: "Survey Segmentation Matrix",
+    title: "Survey Tools",
     icon: "fa-border-all",
     accent: "#eab308",
     accentDark: "#a16207",
     color: "#0d9488",
     colorDark: "#0f766e",
-    subtitle: "Transform two survey dimensions into actionable respondent segments.",
-    desc: "Classify respondents into four segments from two survey dimensions, then compare the mix across groups and survey waves.",
+    subtitle: "Loyalty segments and the factors that separate them.",
+    desc: "Classify respondents on two survey dimensions, or compare how survey factors differ between two groups.",
     info: [
-      "Employee-loyalty template: Satisfaction × Intention to stay",
-      "Truly Loyal, Accessible, Trapped, and High Risk segments",
-      "Group comparison with 100% stacked composition",
-      "Optional current vs previous wave change"
+      "Split Index™ — factors that differentiate two respondent groups",
+      "Loyalty Matrix — Satisfaction × Intention to stay",
+      "Each module has its own input, including a time field"
     ],
     modules: [
       {
-        id: "segmentation",
-        label: "Survey Segmentation Matrix",
-        tip: "Classify survey respondents into four segments using two dimensions, then compare groups and waves."
+        id: "split-index",
+        label: "Split Index\u2122",
+        tip: "Measure how strongly each survey factor differentiates two respondent groups, including change over time."
+      },
+      {
+        id: "loyalty-matrix",
+        label: "Loyalty Matrix",
+        tip: "Classify respondents into four loyalty segments and compare the mix across groups and time."
       }
     ]
   },
@@ -3284,11 +3288,12 @@ function openMixedConfigFromHub() {
   });
 }
 
-function openSegmentationFromHub() {
+function openSegmentationFromHub(product) {
+  var which = product === "split" ? "split" : "loyalty";
   try { sessionStorage.removeItem("segmentationModelSpec"); } catch (e) {}
   return openBuilderDialogFromHub({
-    moduleId: "segmentation",
-    dialogPath: "segmentation/segmentation-input.html",
+    moduleId: which === "split" ? "split-index" : "loyalty-matrix",
+    dialogPath: "segmentation/segmentation-input.html?product=" + which,
     dialogOptions: DIALOG_SIZES.REGRESSION_BUILDER,
     dataType: "SEGMENTATION_DATA",
     payloadBuilder: function (gr) {
@@ -3552,8 +3557,11 @@ function navigateToModuleCore(id) {
   if (id === "pareto2080") {
     if (openParetoFromHub()) return;
   }
-  if (id === "segmentation" || id === "survey-segmentation") {
-    if (openSegmentationFromHub()) return;
+  if (id === "segmentation" || id === "survey-segmentation" || id === "loyalty-matrix") {
+    if (openSegmentationFromHub("loyalty")) return;
+  }
+  if (id === "split-index") {
+    if (openSegmentationFromHub("split")) return;
   }
   if (id === "multivariable") {
     if (openMultivariableFromHub()) return;

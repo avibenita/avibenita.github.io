@@ -71,6 +71,8 @@
   function defaultConfig() {
     return {
       template: 'employeeLoyalty',
+      product: 'loyalty',
+      title: 'Loyalty Matrix',
       xDimension: {
         label: 'Satisfaction',
         columns: [],
@@ -116,6 +118,8 @@
     var c = config || {};
     var out = clone(base);
     out.template = c.template || base.template;
+    out.product = c.product === 'split' ? 'split' : 'loyalty';
+    out.title = c.title ? String(c.title) : (out.product === 'split' ? 'Split Index™' : 'Loyalty Matrix');
     ['xDimension', 'yDimension'].forEach(function (key) {
       var src = c[key] || {};
       out[key].label = src.label || base[key].label;

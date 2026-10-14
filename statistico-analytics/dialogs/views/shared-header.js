@@ -905,7 +905,7 @@ const StatisticoHeader = {
       'mixed-model': 'Linear Mixed Model',
       'meta-analysis': 'Meta-Analysis',
       'contingency': 'Contingency Tables',
-      'segmentation': 'Survey Segmentation Matrix',
+      'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
       'pareto': 'Pareto Analysis'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
@@ -1031,7 +1031,7 @@ const StatisticoHeader = {
       'mixed-model': 'Linear Mixed Model',
       'meta-analysis': 'Meta-Analysis',
       'contingency': 'Contingency Tables',
-      'segmentation': 'Survey Segmentation Matrix',
+      'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
       'pareto': 'Pareto Analysis'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
@@ -1706,7 +1706,7 @@ const StatisticoHeader = {
   },
 
   _isSharedSidebarModule() {
-    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency'].includes(this.module);
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency', 'segmentation'].includes(this.module);
   },
 
   _sidebarGroupKey(title) {
@@ -1949,19 +1949,21 @@ const StatisticoHeader = {
     if (this.module === 'segmentation') {
       const changeOn = !!(globalThis.__segmentationChangeEnabled);
       const activeTab = globalThis.__segmentationActiveTab || 'overview';
-      return {
-        logoIcon: 'fa-border-all',
-        logoSub: 'Survey',
-        menuTitle: 'Menu',
-        groups: [{
-          title: 'Results',
-          items: [
-            { type: 'tab', tab: 'overview', icon: 'fa-border-all', label: 'Overview', description: 'Four-quadrant segment matrix.', active: activeTab === 'overview' },
-            { type: 'tab', tab: 'groups', icon: 'fa-chart-column', label: 'Group Comparison', description: '100% stacked segment mix by group.', active: activeTab === 'groups' },
-            { type: 'tab', tab: 'change', icon: 'fa-arrow-right-arrow-left', label: 'Change', description: changeOn ? 'Current versus previous survey wave.' : 'Available when a previous wave is selected.', active: activeTab === 'change' },
-            { type: 'tab', tab: 'drivers', icon: 'fa-chart-simple', label: 'Drivers', description: 'Split Index — factors that differentiate two respondent groups.', active: activeTab === 'drivers' }
+      const split = globalThis.__segmentationProduct === 'split';
+      const items = split
+        ? [
+            { type: 'tab', tab: 'drivers', icon: 'fa-chart-simple', label: 'Split Index\u2122', description: 'Factors that differentiate the two selected groups.', active: true }
           ]
-        }]
+        : [
+            { type: 'tab', tab: 'overview', icon: 'fa-border-all', label: 'Overview', description: 'Four-quadrant loyalty matrix.', active: activeTab === 'overview' },
+            { type: 'tab', tab: 'groups', icon: 'fa-chart-column', label: 'Group Comparison', description: '100% stacked segment mix by group.', active: activeTab === 'groups' },
+            { type: 'tab', tab: 'change', icon: 'fa-arrow-right-arrow-left', label: 'Change', description: changeOn ? 'Current versus previous time period.' : 'Available when a previous time period is selected.', active: activeTab === 'change' }
+          ];
+      return {
+        logoIcon: split ? 'fa-chart-simple' : 'fa-border-all',
+        logoSub: split ? 'Split Index' : 'Loyalty',
+        menuTitle: 'Menu',
+        groups: [{ title: 'View', items: items }]
       };
     }
 
@@ -11912,6 +11914,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
   }
 };
 
+window.StatisticoHeader = StatisticoHeader;
 window.openUniSourceFilter = function () { StatisticoHeader.openUniRowFilter(); };
 window.openUniFilterHelp = function () { StatisticoHeader.openUniFilterHelp(); };
 window.updateUniFilterButtonState = function () { StatisticoHeader.updateUniFilterChrome(); };

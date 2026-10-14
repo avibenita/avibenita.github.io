@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261009tabglow" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261009tabglow" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261014si1"></script>
+  <script src="../shared-header.js?v=20261014survey2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261014si1"></script>
   <script src="segmentation-split-index.js?v=20261014si1"></script>
@@ -38,6 +38,11 @@
     html, body { height:100%; margin:0; }
     body { background:var(--surface-0); color:var(--text); font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     .sb-nav { --sb-accent:#0d9488; --sb-accent-soft:rgba(13,148,136,.16); }
+    #sidebarNav .sb-settings { padding:4px 8px 18px; display:flex; flex-direction:column; gap:8px; }
+    #sidebarNav .sb-settings .sb-group-title { padding:8px 2px 0; }
+    #sidebarNav .sb-settings details.fold { margin:0; background:transparent; }
+    #sidebarNav .sb-settings .grid-2 { grid-template-columns:1fr; }
+    #sidebarNav .sb-settings #driverControls { display:flex; flex-direction:column; gap:8px; }
     .sb-layout { display:flex; flex:1; min-height:0; height:100%; }
     .right-col { flex:1; min-width:0; display:flex; flex-direction:column; min-height:0; }
     #header-container { flex:0 0 auto; position:relative; z-index:20; }
@@ -65,6 +70,7 @@
     .filter-pop summary { cursor:pointer; font-size:12px; font-weight:700; }
     .filter-pop label { display:flex; gap:6px; align-items:center; font-size:12px; font-weight:500; margin-top:4px; }
     .seg-tabs { display:flex; gap:4px; margin:8px 0; border-bottom:1px solid var(--border); }
+    .seg-tabs[hidden], .seg-tab[hidden] { display:none !important; }
     .seg-tab {
       appearance:none; border:1px solid transparent; background:transparent; color:var(--muted);
       padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; font-weight:700; font-size:13px;
@@ -165,8 +171,17 @@
             <details class="fold" id="settingsFold">
               <summary>Settings</summary>
               <div class="fold-body">
-                <div class="grid-2">
-                  <label class="field">Satisfaction rule
+              <div class="grid-2">
+                <label class="field">Title
+                  <input id="reportTitle" type="text" />
+                </label>
+                <label class="field">Horizontal title
+                  <input id="xTitle" type="text" />
+                </label>
+                <label class="field">Vertical title
+                  <input id="yTitle" type="text" />
+                </label>
+                <label class="field" id="xMethodField">Satisfaction rule
                     <select id="xMethod">
                       <option value="custom">Custom numeric threshold</option>
                       <option value="midpoint">Scale midpoint</option>
@@ -174,10 +189,10 @@
                       <option value="favorable">Favorable-response threshold</option>
                     </select>
                   </label>
-                  <label class="field">Satisfaction threshold
+                  <label class="field" id="xThresholdField">Satisfaction threshold
                     <input id="xThreshold" type="number" step="0.01" />
                   </label>
-                  <label class="field">Intention to stay rule
+                  <label class="field" id="yMethodField">Intention to stay rule
                     <select id="yMethod">
                       <option value="custom">Custom numeric threshold</option>
                       <option value="midpoint">Scale midpoint</option>
@@ -185,7 +200,7 @@
                       <option value="favorable">Favorable-response threshold</option>
                     </select>
                   </label>
-                  <label class="field">Intention to stay threshold
+                  <label class="field" id="yThresholdField">Intention to stay threshold
                     <input id="yThreshold" type="number" step="0.01" />
                   </label>
                   <label class="field">Minimum valid items
@@ -195,16 +210,16 @@
                       <option value="1">All selected items</option>
                     </select>
                   </label>
-                  <label class="field">Current wave
+                  <label class="field">Current time
                     <select id="currentWave"></select>
                   </label>
-                  <label class="field">Previous wave
+                  <label class="field">Previous time
                     <select id="previousWave"></select>
                   </label>
                 </div>
               </div>
             </details>
-            <details class="fold">
+            <details class="fold" id="labelFold">
               <summary>Segment labels and colors</summary>
               <div class="fold-body" id="labelEditor"></div>
             </details>
@@ -385,6 +400,77 @@
     var _splitResult = null;
     var _painting = false;
 
+    function productId() {
+      if (_spec && _spec.product === 'split') return 'split';
+      if (/product=split/i.test(location.search)) return 'split';
+      return 'loyalty';
+    }
+    function defaultProductTitle() {
+      return productId() === 'split' ? 'Split Index™' : 'Loyalty Matrix';
+    }
+    function productTitle() {
+      return (_spec && _spec.title) || globalThis.__segmentationTitle || defaultProductTitle();
+    }
+    function setFieldCaption(id, text) {
+      var el = document.getElementById(id);
+      if (el && el.firstChild) el.firstChild.nodeValue = text + '\n';
+    }
+    var _sidebarSettings = null;
+    function mountSidebarSettings() {
+      var body = document.querySelector('#sidebarNav .sb-body');
+      if (!body) return;
+      if (!_sidebarSettings) {
+        _sidebarSettings = document.createElement('div');
+        _sidebarSettings.id = 'sbSettings';
+        _sidebarSettings.className = 'sb-settings';
+        var heading = document.createElement('div');
+        heading.className = 'sb-group-title';
+        heading.textContent = 'Settings';
+        _sidebarSettings.appendChild(heading);
+        ['settingsFold', 'labelFold'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) _sidebarSettings.appendChild(el);
+        });
+      }
+      if (body.firstChild) body.insertBefore(_sidebarSettings, body.firstChild);
+      else body.appendChild(_sidebarSettings);
+      var controls = document.getElementById('driverControls');
+      if (controls && productId() === 'split' && controls.parentNode !== _sidebarSettings) {
+        _sidebarSettings.appendChild(controls);
+      }
+      var settings = document.getElementById('settingsFold');
+      var labels = document.getElementById('labelFold');
+      if (settings) settings.open = true;
+      if (labels) {
+        labels.hidden = productId() === 'split';
+        labels.open = productId() !== 'split';
+      }
+    }
+    function applyProductChrome() {
+      var split = productId() === 'split';
+      var title = productTitle();
+      globalThis.__segmentationProduct = split ? 'split' : 'loyalty';
+      globalThis.__segmentationTitle = title;
+      document.title = title;
+      ['overview', 'groups', 'change', 'drivers'].forEach(function (name) {
+        var show = split ? name === 'drivers' : name !== 'drivers';
+        var tab = document.getElementById('tab-' + name);
+        if (tab) tab.hidden = !show;
+      });
+      var tabs = document.querySelector('.seg-tabs');
+      if (tabs) tabs.hidden = split;
+      var nameEl = document.getElementById('headerModuleName');
+      if (nameEl) nameEl.textContent = title;
+      var xOn = !split || !!(_spec && _spec.xDimension && _spec.xDimension.columns && _spec.xDimension.columns.length);
+      ['xMethodField', 'xThresholdField'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.hidden = !xOn;
+      });
+      mountSidebarSettings();
+      if (split && _tab !== 'drivers') switchTab('drivers');
+      else if (!split && _tab === 'drivers') switchTab('overview');
+    }
+
     function segEsc(s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
@@ -476,6 +562,13 @@
         _spec.previousWave = document.getElementById('previousWave').value || null;
       }
       _spec.smallBaseThreshold = Number(document.getElementById('smallBase').value) || 30;
+      var reportTitle = document.getElementById('reportTitle');
+      var xTitle = document.getElementById('xTitle');
+      var yTitle = document.getElementById('yTitle');
+      if (reportTitle && reportTitle.value.trim()) _spec.title = reportTitle.value.trim();
+      if (xTitle && xTitle.value.trim()) _spec.xDimension.label = xTitle.value.trim();
+      if (yTitle && yTitle.value.trim()) _spec.yDimension.label = yTitle.value.trim();
+      globalThis.__segmentationTitle = _spec.title || defaultProductTitle();
       SS.QUADRANT_KEYS.forEach(function (key) {
         var label = document.getElementById('label-' + key);
         var color = document.getElementById('color-' + key);
@@ -491,6 +584,13 @@
       document.getElementById('xThreshold').value = _spec.xDimension.threshold == null ? '' : _spec.xDimension.threshold;
       document.getElementById('yThreshold').value = _spec.yDimension.threshold == null ? '' : _spec.yDimension.threshold;
       document.getElementById('minItems').value = String(_spec.minimumValidItems);
+      document.getElementById('reportTitle').value = _spec.title || defaultProductTitle();
+      document.getElementById('xTitle').value = _spec.xDimension.label || '';
+      document.getElementById('yTitle').value = _spec.yDimension.label || '';
+      setFieldCaption('xMethodField', (_spec.xDimension.label || 'Horizontal') + ' rule');
+      setFieldCaption('xThresholdField', (_spec.xDimension.label || 'Horizontal') + ' threshold');
+      setFieldCaption('yMethodField', (_spec.yDimension.label || 'Vertical') + ' rule');
+      setFieldCaption('yThresholdField', (_spec.yDimension.label || 'Vertical') + ' threshold');
       document.getElementById('smallBase').value = _spec.smallBaseThreshold;
       var waveOn = !!_spec.waveColumn;
       document.getElementById('currentWave').disabled = !waveOn;
@@ -607,6 +707,7 @@
           syncChangeNav();
         }
       }
+      applyProductChrome();
     }
 
     function paint() {
@@ -1231,7 +1332,7 @@
       });
       if (window.StatisticoHeader) {
         StatisticoHeader.currentView = 'segmentation-' + name;
-        var titles = { overview: 'Overview', groups: 'Group Comparison', change: 'Change', drivers: 'Drivers' };
+        var titles = { overview: 'Overview', groups: 'Group Comparison', change: 'Change', drivers: 'Split Index™' };
         try { StatisticoHeader.updateTitle(titles[name] || name); } catch (_e) {}
       }
       paint();
@@ -1418,6 +1519,18 @@
       _allRows = payload.rows || [];
       _viewRows = _allRows.slice();
       _spec = SS.normalizeConfig(payload.spec || (window.StatisticoSegmentationSamples && StatisticoSegmentationSamples.defaultSpec()));
+      var requested = /product=split/i.test(location.search) ? 'split' : (/product=loyalty/i.test(location.search) ? 'loyalty' : '');
+      if (requested) {
+        var stock = { loyalty: 'Loyalty Matrix', split: 'Split Index™' };
+        var previous = _spec.title || '';
+        _spec.product = requested;
+        if (!previous || previous === stock.loyalty || previous === stock.split || previous === 'Survey Segmentation Matrix') {
+          _spec.title = stock[requested];
+        }
+      }
+      if (!_spec.title) _spec.title = _spec.product === 'split' ? 'Split Index™' : 'Loyalty Matrix';
+      globalThis.__segmentationProduct = _spec.product;
+      globalThis.__segmentationTitle = _spec.title;
       _headerFilterText = '';
       ensureLabelEditor();
       recompute();
@@ -1467,7 +1580,7 @@
       _changeKey = this.value;
       paintChange();
     });
-    ['xMethod', 'yMethod', 'xThreshold', 'yThreshold', 'minItems', 'currentWave', 'previousWave'].forEach(function (id) {
+    ['xMethod', 'yMethod', 'xThreshold', 'yThreshold', 'minItems', 'currentWave', 'previousWave', 'reportTitle', 'xTitle', 'yTitle'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {
         if (_painting) return;
         readSettingsFromDom();
@@ -1527,9 +1640,20 @@
     });
 
     document.addEventListener('DOMContentLoaded', function () {
+      globalThis.__segmentationProduct = /product=split/i.test(location.search) ? 'split' : 'loyalty';
+      globalThis.__segmentationTitle = globalThis.__segmentationProduct === 'split' ? 'Split Index™' : 'Loyalty Matrix';
       if (window.StatisticoHeader) {
         try {
-          StatisticoHeader.init('segmentation-overview', 'Survey Segmentation Matrix', 0, 'segmentation');
+          var renderSidebar = StatisticoHeader._renderSharedSidebar;
+          if (renderSidebar && !StatisticoHeader.__segSidebarWrapped) {
+            StatisticoHeader.__segSidebarWrapped = true;
+            StatisticoHeader._renderSharedSidebar = function () {
+              if (_sidebarSettings && _sidebarSettings.parentNode) _sidebarSettings.parentNode.removeChild(_sidebarSettings);
+              renderSidebar.call(StatisticoHeader);
+              mountSidebarSettings();
+            };
+          }
+          StatisticoHeader.init('segmentation-' + (globalThis.__segmentationProduct === 'split' ? 'drivers' : 'overview'), globalThis.__segmentationTitle, 0, 'segmentation');
           StatisticoHeader.registerActions({
             getData: function () {
               return {
@@ -1548,12 +1672,12 @@
               _headerFilterText = headerFilterText(payload);
               recompute();
             },
-            moduleName: 'Survey Segmentation Matrix'
+            moduleName: globalThis.__segmentationTitle
           });
           if (StatisticoHeader.initSidebarPage) StatisticoHeader.initSidebarPage();
-        } catch (_e) {}
+        } catch (err) { console.error('segmentation header init', err); }
       }
-      switchTab('overview');
+      switchTab(globalThis.__segmentationProduct === 'split' ? 'drivers' : 'overview');
       if (window.__SEG_WEB_DEMO__) {
         bootDemo();
         return;

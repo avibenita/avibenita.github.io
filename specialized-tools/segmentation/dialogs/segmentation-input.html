@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Survey Segmentation Matrix</title>
+  <title>Survey Tools</title>
   <script>
     (function () {
       var q = (location.search || '').toLowerCase();
@@ -89,8 +89,8 @@
 <body>
   <div class="cfg-shell">
     <header class="cfg-header">
-      <div class="cfg-header-icon"><i class="fa-solid fa-border-all"></i></div>
-      <span class="cfg-header-title">Survey Segmentation Matrix</span>
+      <div class="cfg-header-icon"><i class="fa-solid fa-border-all" id="cfgHeaderIcon"></i></div>
+      <span class="cfg-header-title" id="cfgHeaderTitle">Loyalty Matrix</span>
       <span class="cfg-meta-badge" id="segBadge">Employee loyalty</span>
       <button class="cfg-theme-toggle" id="cfgThemeToggle" title="Switch theme" type="button"><span class="cfg-toggle-icon">&#x1F319;</span><div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div><span class="cfg-toggle-label">Dark</span></button>
     </header>
@@ -108,6 +108,20 @@
           </div>
           <div class="reg-equation-strip" id="modelSummary">Select the two survey dimensions. Each row is one respondent.</div>
           <div class="zones" id="zoneList"></div>
+          <div class="opt-card wave-box show" id="waveBox">
+            <h4>Time</h4>
+            <p class="zone-help">Assign a time column, then choose the current and previous period. Comparisons over time use these two periods.</p>
+            <div class="opt-grid">
+              <div>
+                <label for="currentWave">Current time</label>
+                <select id="currentWave" disabled><option value="">Assign a time column</option></select>
+              </div>
+              <div>
+                <label for="previousWave">Previous time</label>
+                <select id="previousWave" disabled><option value="">Assign a time column</option></select>
+              </div>
+            </div>
+          </div>
           <div class="opt-grid">
             <div class="opt-card">
               <h4>Minimum valid items</h4>
@@ -152,19 +166,6 @@
               <div class="rule-line" id="yRule">Tending to stay: score ≥ 4.00</div>
             </div>
           </div>
-          <div class="opt-card wave-box" id="waveBox">
-            <h4>Survey waves</h4>
-            <div class="opt-grid">
-              <div>
-                <label for="currentWave">Current wave</label>
-                <select id="currentWave"></select>
-              </div>
-              <div>
-                <label for="previousWave">Previous wave</label>
-                <select id="previousWave"></select>
-              </div>
-            </div>
-          </div>
           <details class="seg-advanced" id="labelEditor">
             <summary>Segment labels and colors</summary>
             <div class="seg-advanced-body" id="labelFields"></div>
@@ -181,6 +182,7 @@
     </div>
   </div>
   <script>
+    var PRODUCT = /product=split/i.test(location.search) ? 'split' : 'loyalty';
     var SS = window.StatisticoSegmentation;
     var _headers = [];
     var _rows = [];
@@ -199,12 +201,18 @@
       weight: null,
       factors: []
     };
-    var ZONES = [
+    var ZONES = PRODUCT === 'split' ? [
+      { id: 'y', title: 'Outcome dimension', help: 'The score that separates the two groups, such as intention to stay.', multi: true, required: true, numeric: true },
+      { id: 'factors', title: 'Factors to compare', help: 'Survey factors or items compared across the two groups.', multi: true, required: true, numeric: true },
+      { id: 'x', title: 'Second dimension', help: 'Optional. Used when comparing loyalty segments rather than stay versus leave.', multi: true, required: false, numeric: true },
+      { id: 'wave', title: 'Time', help: 'Column that identifies each time period, so results can be compared over time.', multi: false },
+      { id: 'group', title: 'Compare by group', help: 'Optional. Examples: division, department, or location.', multi: false },
+      { id: 'weight', title: 'Weight', help: 'Optional numeric survey weight. If unset, every valid respondent has weight 1.', multi: false, numeric: true }
+    ] : [
       { id: 'x', title: 'Satisfaction dimension', help: 'Select one survey item or several items to combine into a score.', multi: true, required: true, numeric: true },
       { id: 'y', title: 'Intention to stay', help: 'Select one survey item or several items to combine into a score.', multi: true, required: true, numeric: true },
-      { id: 'factors', title: 'Factors to compare', help: 'Select survey factors or items to compare across the two outcome groups.', multi: true, required: false, numeric: true },
       { id: 'group', title: 'Compare by group', help: 'Optional. Examples: division, department, location, tenure group, or employee level.', multi: false },
-      { id: 'wave', title: 'Survey wave', help: 'Optional. Identifies the current and previous surveys.', multi: false },
+      { id: 'wave', title: 'Time', help: 'Column that identifies each time period, so the segment mix can be compared over time.', multi: false },
       { id: 'id', title: 'Respondent ID', help: 'Optional. Kept for a future respondent-transition view. Not used in Version 1 calculations.', multi: false },
       { id: 'weight', title: 'Weight', help: 'Optional numeric survey weight. If unset, every valid respondent has weight 1.', multi: false, numeric: true }
     ];
@@ -433,10 +441,16 @@
 
     function fillWaves() {
       var box = qs('waveBox');
+      box.classList.add('show');
       if (!assign.wave) {
-        box.classList.remove('show');
+        qs('currentWave').innerHTML = '<option value="">Assign a time column</option>';
+        qs('previousWave').innerHTML = '<option value="">Assign a time column</option>';
+        qs('currentWave').disabled = true;
+        qs('previousWave').disabled = true;
         return;
       }
+      qs('currentWave').disabled = false;
+      qs('previousWave').disabled = false;
       var p = profileOf(assign.wave);
       var values = [];
       if (p) {
@@ -460,7 +474,7 @@
       fill('previousWave', pair.previous);
       box.classList.add('show');
       if (qs('currentWave').value && qs('currentWave').value === qs('previousWave').value) {
-        showWarn('Current and previous wave are the same value.');
+        showWarn('Current and previous time are the same value.');
       }
     }
 
@@ -480,18 +494,23 @@
       renderZones();
       fillWaves();
       updateRules();
-      var ready = assign.x.length > 0 && assign.y.length > 0;
-      var overlap = assign.x.filter(function (n) { return assign.y.indexOf(n) >= 0; });
-      var hint = 'Select both dimensions';
+      var ready = PRODUCT === 'split'
+        ? (assign.y.length > 0 && assign.factors.length > 0)
+        : (assign.x.length > 0 && assign.y.length > 0);
+      var overlap = assign.x.filter(function (n) { return assign.y.indexOf(n) >= 0 || assign.factors.indexOf(n) >= 0; })
+        .concat(assign.y.filter(function (n) { return assign.factors.indexOf(n) >= 0; }));
+      var hint = PRODUCT === 'split' ? 'Select an outcome and at least one factor' : 'Select both dimensions';
       if (overlap.length) {
         ready = false;
-        hint = 'A column can belong to only one dimension';
+        hint = 'A column can belong to only one role';
         showWarn(hint + '.');
       } else if (assign.wave && qs('currentWave').value && qs('currentWave').value === qs('previousWave').value) {
-        hint = 'Choose two different waves';
-        showWarn('Current and previous wave are the same value.');
+        hint = 'Choose two different time periods';
+        showWarn('Current and previous time are the same value.');
       } else if (ready) {
-        hint = assign.x.length + ' satisfaction item' + (assign.x.length === 1 ? '' : 's') + ' · ' + assign.y.length + ' stay item' + (assign.y.length === 1 ? '' : 's');
+        hint = PRODUCT === 'split'
+          ? (assign.factors.length + ' factor' + (assign.factors.length === 1 ? '' : 's'))
+          : (assign.x.length + ' satisfaction item' + (assign.x.length === 1 ? '' : 's') + ' · ' + assign.y.length + ' stay item' + (assign.y.length === 1 ? '' : 's'));
         showWarn('');
       } else {
         showWarn('');
@@ -501,7 +520,14 @@
       var bits = [];
       if (assign.x.length) bits.push(assign.x.join(' + '));
       if (assign.y.length) bits.push(assign.y.join(' + '));
-      qs('modelSummary').textContent = bits.length ? bits.join('  ×  ') : 'Select the two survey dimensions. Each row is one respondent.';
+      var emptySummary = PRODUCT === 'split'
+        ? 'Select the outcome dimension and the factors to compare. Each row is one respondent.'
+        : 'Select the two survey dimensions. Each row is one respondent.';
+      qs('modelSummary').textContent = bits.length ? bits.join('  ×  ') : emptySummary;
+      var xCard = qs('xThresholdCard');
+      if (xCard) xCard.style.display = (PRODUCT === 'split' && !assign.x.length) ? 'none' : '';
+      var labels = qs('labelEditor');
+      if (labels) labels.style.display = PRODUCT === 'split' ? 'none' : '';
     }
 
     function buildSpec() {
@@ -529,6 +555,8 @@
       base.minimumValidItems = Number(qs('minItems').value);
       base.smallBaseThreshold = Number(qs('smallBase').value);
       base.filters = {};
+      base.product = PRODUCT;
+      base.title = PRODUCT === 'split' ? 'Split Index™' : 'Loyalty Matrix';
       return base;
     }
 
@@ -538,7 +566,7 @@
       try { sessionStorage.setItem('segmentationModelSpec', JSON.stringify(spec)); } catch (_e) {}
       try { sessionStorage.setItem('segmentationSource', JSON.stringify({ headers: _headers, rows: _rows, address: _address })); } catch (_e2) {}
       if (window.__SEG_WEB_DEMO__ && !(typeof Office !== 'undefined' && Office.context && Office.context.ui && Office.context.ui.messageParent)) {
-        location.href = 'segmentation-results.html?demo=1';
+        location.href = 'segmentation-results.html?demo=1&product=' + PRODUCT;
         return;
       }
       send('segmentationModel', spec);
@@ -597,6 +625,16 @@
     qs('currentWave').addEventListener('change', refresh);
     qs('previousWave').addEventListener('change', refresh);
 
+    (function applyInputChrome() {
+      var split = PRODUCT === 'split';
+      document.title = split ? 'Split Index™' : 'Loyalty Matrix';
+      qs('cfgHeaderTitle').textContent = document.title;
+      qs('cfgHeaderIcon').className = split ? 'fa-solid fa-chart-simple' : 'fa-solid fa-border-all';
+      var yHead = qs('yThresholdCard') && qs('yThresholdCard').querySelector('h4');
+      if (yHead && split) yHead.textContent = 'Outcome threshold';
+      var xHead = qs('xThresholdCard') && qs('xThresholdCard').querySelector('h4');
+      if (xHead && split) xHead.textContent = 'Second dimension threshold';
+    })();
     renderLabels();
     if (window.__SEG_WEB_DEMO__) {
       bootDemo();

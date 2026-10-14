@@ -27,8 +27,18 @@ function ensureSegmentationEngine(cb) {
 }
 
 function readSegmentationSpec() {
-  if (window.__hubSegmentationSpec) return window.__hubSegmentationSpec;
-  try { return JSON.parse(sessionStorage.getItem('segmentationModelSpec') || '{}'); } catch (_e) { return {}; }
+  var spec = null;
+  try { spec = JSON.parse(sessionStorage.getItem('segmentationModelSpec') || 'null'); } catch (_e) {}
+  if (!spec || typeof spec !== 'object') spec = window.__hubSegmentationSpec || {};
+  var launched = '';
+  try { launched = sessionStorage.getItem('segmentationProduct') || ''; } catch (_e2) {}
+  if (launched === 'split' || launched === 'loyalty') {
+    spec.product = launched;
+    if (!spec.title || spec.title === 'Loyalty Matrix' || spec.title === 'Split Index™' || spec.title === 'Survey Segmentation Matrix') {
+      spec.title = launched === 'split' ? 'Split Index™' : 'Loyalty Matrix';
+    }
+  }
+  return spec;
 }
 
 var segmentationResultsDialog = null;

@@ -3290,7 +3290,11 @@ function openMixedConfigFromHub() {
 
 function openSegmentationFromHub(product) {
   var which = product === "split" ? "split" : "loyalty";
-  try { sessionStorage.removeItem("segmentationModelSpec"); } catch (e) {}
+  window.__hubSegmentationSpec = null;
+  try {
+    sessionStorage.removeItem("segmentationModelSpec");
+    sessionStorage.setItem("segmentationProduct", which);
+  } catch (e) {}
   return openBuilderDialogFromHub({
     moduleId: which === "split" ? "split-index" : "loyalty-matrix",
     dialogPath: "segmentation/segmentation-input.html?product=" + which,
@@ -3308,7 +3312,12 @@ function openSegmentationFromHub(product) {
     onModel: function (msg) {
       var data = msg.payload || msg.data || {};
       var spec = (data && data.spec) ? data.spec : data;
-      sessionStorage.setItem("segmentationModelSpec", JSON.stringify(spec || {}));
+      spec = spec && typeof spec === "object" ? spec : {};
+      var launched = "";
+      try { launched = sessionStorage.getItem("segmentationProduct") || ""; } catch (e) {}
+      if (launched === "split" || launched === "loyalty") spec.product = launched;
+      window.__hubSegmentationSpec = spec;
+      sessionStorage.setItem("segmentationModelSpec", JSON.stringify(spec));
     },
     hubResultsKey: "segmentation",
     nextDelayMs: 450,

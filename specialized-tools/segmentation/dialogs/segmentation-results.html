@@ -46,9 +46,17 @@
     .sb-layout { display:flex; flex:1; min-height:0; height:100%; }
     .right-col { flex:1; min-width:0; display:flex; flex-direction:column; min-height:0; }
     #header-container { flex:0 0 auto; position:relative; z-index:20; }
-    .wrap { flex:1; min-height:0; overflow:auto; padding:10px 12px 24px; }
-    .card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:12px; }
-    .state-msg { text-align:center; padding:48px 16px; color:var(--muted); }
+    .wrap { flex:1; min-height:0; overflow:auto; padding:10px 12px 24px; display:flex; flex-direction:column; }
+    .card { flex:1; display:flex; flex-direction:column; min-height:320px; background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:12px; }
+    .state-msg { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; padding:28px 20px; color:var(--muted); }
+    .state-panel { width:min(440px, 100%); display:flex; flex-direction:column; align-items:center; gap:18px; }
+    .state-copy { margin:0; max-width:36em; font-size:14px; line-height:1.45; }
+    .state-sketch { width:100%; display:flex; flex-direction:column; gap:10px; padding:16px 18px; border:1px dashed rgba(148,163,184,.45); border-radius:12px; background:rgba(15,23,42,.28); }
+    .state-sketch[hidden] { display:none !important; }
+    .state-row { height:16px; border-radius:999px; background:rgba(148,163,184,.16); overflow:hidden; }
+    .state-row i { display:block; height:100%; width:var(--w); border-radius:inherit; background:linear-gradient(90deg, rgba(94,234,212,.55), rgba(244,200,74,.7)); }
+    .state-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
+    .state-cell { height:72px; border-radius:10px; background:rgba(148,163,184,.14); }
     .summary { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); margin-bottom:10px; }
     .summary strong { font-size:13px; }
     .summary span { font-size:12.5px; color:var(--muted); }
@@ -161,10 +169,36 @@
       <div class="wrap">
         <section class="card">
           <div id="emptyState" class="state-msg">
-            <p>Select two survey dimensions to classify respondents.</p>
+            <div class="state-panel">
+              <p class="state-copy">Select two survey dimensions to classify respondents.</p>
+              <div class="state-sketch" data-sketch="split" hidden>
+                <div class="state-row"><i style="--w:78%"></i></div>
+                <div class="state-row"><i style="--w:52%"></i></div>
+                <div class="state-row"><i style="--w:34%"></i></div>
+              </div>
+              <div class="state-sketch" data-sketch="matrix">
+                <div class="state-grid">
+                  <div class="state-cell"></div><div class="state-cell"></div>
+                  <div class="state-cell"></div><div class="state-cell"></div>
+                </div>
+              </div>
+            </div>
           </div>
           <div id="errorState" class="state-msg" style="display:none;">
-            <p id="errorText"></p>
+            <div class="state-panel">
+              <p id="errorText" class="state-copy"></p>
+              <div class="state-sketch" data-sketch="split" hidden>
+                <div class="state-row"><i style="--w:78%"></i></div>
+                <div class="state-row"><i style="--w:52%"></i></div>
+                <div class="state-row"><i style="--w:34%"></i></div>
+              </div>
+              <div class="state-sketch" data-sketch="matrix">
+                <div class="state-grid">
+                  <div class="state-cell"></div><div class="state-cell"></div>
+                  <div class="state-cell"></div><div class="state-cell"></div>
+                </div>
+              </div>
+            </div>
           </div>
           <div id="results" style="display:none;">
             <div class="summary" id="summary"></div>
@@ -513,10 +547,18 @@
     function meta(key) {
       return (_spec && _spec.segments && _spec.segments[key]) || { label: key, color: '#6b7280' };
     }
+    function syncStateSketch() {
+      var product = (_spec && _spec.product) || (/product=split/i.test(location.search) ? 'split' : 'loyalty');
+      var kind = product === 'split' ? 'split' : 'matrix';
+      document.querySelectorAll('[data-sketch]').forEach(function (el) {
+        el.hidden = el.getAttribute('data-sketch') !== kind;
+      });
+    }
     function showState(which) {
-      document.getElementById('emptyState').style.display = which === 'empty' ? 'block' : 'none';
-      document.getElementById('errorState').style.display = which === 'error' ? 'block' : 'none';
+      document.getElementById('emptyState').style.display = which === 'empty' ? 'flex' : 'none';
+      document.getElementById('errorState').style.display = which === 'error' ? 'flex' : 'none';
       document.getElementById('results').style.display = which === 'results' ? 'block' : 'none';
+      if (which !== 'results') syncStateSketch();
     }
     function filterText() {
       var local = _bundle && _bundle.filterDescription ? _bundle.filterDescription : SS.filterDescription(_spec && _spec.filters);

@@ -334,4 +334,23 @@ describe('Survey segmentation classification', () => {
     expect(med.rules.xThreshold).toBe(3);
     expect(med.rules.xRule).toBe('Satisfied: score ≥ 3.00');
   });
+
+  test('Split Index runs from the outcome and factors when the second dimension is empty', () => {
+    const cfg = SS.defaultConfig();
+    cfg.product = 'split';
+    cfg.yDimension.columns = ['Stay'];
+    cfg.yDimension.thresholdMethod = 'custom';
+    cfg.yDimension.threshold = 4;
+    cfg.factorColumns = ['A', 'B'];
+    const result = SS.analyze(
+      ['Stay', 'A', 'B'],
+      [[5, 5, 2], [5, 4, 2], [2, 1, 4], [1, 2, 5]],
+      cfg
+    );
+    expect(result.ok).toBe(true);
+    expect(result.scoredRespondents).toHaveLength(4);
+    expect(result.scoredRespondents[0].factorScores.A).toBe(5);
+    expect(result.factors.map((factor) => factor.id)).toEqual(['A', 'B']);
+    expect(result.rules.yThreshold).toBe(4);
+  });
 });

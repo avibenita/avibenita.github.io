@@ -464,12 +464,14 @@
     var xValues = [];
     var yValues = [];
 
+    var needX = config.xDimension.columns.length > 0;
+    var needY = config.yDimension.columns.length > 0;
     rows.forEach(function (row, index) {
       var xParts = xIdx.map(function (i) { return i < 0 ? null : row[i]; });
       var yParts = yIdx.map(function (i) { return i < 0 ? null : row[i]; });
       var x = compositeScore(xParts, config.minimumValidItems);
       var y = compositeScore(yParts, config.minimumValidItems);
-      if (!x.ok || !y.ok) {
+      if ((!needX && !needY) || (needX && !x.ok) || (needY && !y.ok)) {
         excluded.items += 1;
         return;
       }
@@ -499,8 +501,8 @@
         }
         weight = parsed;
       }
-      xValues.push(x.score);
-      yValues.push(y.score);
+      if (x.ok) xValues.push(x.score);
+      if (y.ok) yValues.push(y.score);
       var factorScores = {};
       factorDefs.forEach(function (factor) {
         var parts = factor.columns.map(function (name) {
@@ -703,7 +705,12 @@
     if (!sourceHeaders.length || !sourceRows.length) {
       return { ok: false, error: 'No data selected. Choose an Excel range with a header row and respondent rows.', warnings: warnings, config: cfg };
     }
-    if (!cfg.xDimension.columns.length || !cfg.yDimension.columns.length) {
+    var splitWithFactors = cfg.product === 'split' && (cfg.factorColumns.length > 0 || cfg.factors.length > 0);
+    if (splitWithFactors) {
+      if (!cfg.yDimension.columns.length) {
+        return { ok: false, error: 'Select the outcome dimension and at least one factor.', warnings: warnings, config: cfg };
+      }
+    } else if (!cfg.xDimension.columns.length || !cfg.yDimension.columns.length) {
       return { ok: false, error: 'Select at least one numeric column for each dimension.', warnings: warnings, config: cfg };
     }
 
@@ -758,8 +765,8 @@
     cfg.yDimension.thresholdMethod = yResolved.method;
     assignSegments(scoredAll.respondents, xResolved.threshold, yResolved.threshold);
 
-    if (xResolved.outside) warnings.push(cfg.xDimension.label + ' threshold ' + formatNum(xResolved.threshold) + ' is outside the observed scale.');
-    if (yResolved.outside) warnings.push(cfg.yDimension.label + ' threshold ' + formatNum(yResolved.threshold) + ' is outside the observed scale.');
+    if (cfg.xDimension.columns.length && xResolved.outside) warnings.push(cfg.xDimension.label + ' threshold ' + formatNum(xResolved.threshold) + ' is outside the observed scale.');
+    if (cfg.yDimension.columns.length && yResolved.outside) warnings.push(cfg.yDimension.label + ' threshold ' + formatNum(yResolved.threshold) + ' is outside the observed scale.');
     if (scoredAll.excluded.negativeWeight) warnings.push(scoredAll.excluded.negativeWeight + ' respondent' + (scoredAll.excluded.negativeWeight === 1 ? '' : 's') + ' excluded because the weight is negative.');
     if (scoredAll.excluded.nonNumericWeight) warnings.push(scoredAll.excluded.nonNumericWeight + ' respondent' + (scoredAll.excluded.nonNumericWeight === 1 ? '' : 's') + ' excluded because the weight is missing or not numeric.');
     if (scoredAll.excluded.zeroWeight) warnings.push(scoredAll.excluded.zeroWeight + ' respondent' + (scoredAll.excluded.zeroWeight === 1 ? '' : 's') + ' excluded because the weight is zero.');

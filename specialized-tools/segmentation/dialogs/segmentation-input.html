@@ -53,6 +53,17 @@
     .reg-zone-head { display:flex; align-items:center; gap:7px; padding:6px 8px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid var(--cfg-border); background:rgba(13,148,136,.08); color:var(--seg-acc); }
     .zone-req { color:#dc2626; margin-left:2px; }
     .zone-help { margin:0; padding:4px 8px 0; font-size:11px; color:var(--cfg-text3); font-weight:500; text-transform:none; letter-spacing:0; }
+    .reg-zone-head .zone-info {
+      margin-left:auto; border:0; background:transparent; color:inherit; cursor:pointer;
+      width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+      font-size:13px;
+    }
+    .reg-zone-head .zone-info:hover, .reg-zone-head .zone-info[aria-expanded="true"] { background:rgba(13,148,136,.16); }
+    .zone-info-pop {
+      display:none; margin:0; padding:6px 8px 8px; font-size:12px; line-height:1.45;
+      color:var(--cfg-text); font-weight:500; text-transform:none; letter-spacing:0;
+    }
+    .reg-zone-card.show-info .zone-info-pop { display:block; }
     .reg-zone-body { padding:4px 6px; min-height:36px; display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
     .reg-zone-body.drag-over { outline:1px dashed var(--seg-acc); }
     .reg-zone-placeholder { width:100%; text-align:center; font-size:10.5px; font-style:italic; color:var(--cfg-text3); }
@@ -77,8 +88,6 @@
     .cfg-btn.run:not(:disabled) { background:linear-gradient(135deg,#0d9488,#0f766e); border-color:transparent; color:#fff; font-weight:700; }
     .demo-row { display:flex; flex-wrap:wrap; gap:6px; }
     .demo-row button { font-size:10.5px; padding:5px 8px; border-radius:6px; border:1px solid var(--cfg-border); background:var(--cfg-surface); color:var(--cfg-text2); cursor:pointer; }
-    .wave-box { display:none; }
-    .wave-box.show { display:block; }
     @media (max-width: 760px) {
       .reg-layout { flex-direction:column; overflow:auto; }
       .reg-vars-col { flex:0 0 auto; max-height:180px; }
@@ -108,20 +117,6 @@
           </div>
           <div class="reg-equation-strip" id="modelSummary">Select the two survey dimensions. Each row is one respondent.</div>
           <div class="zones" id="zoneList"></div>
-          <div class="opt-card wave-box show" id="waveBox">
-            <h4>Time</h4>
-            <p class="zone-help">Assign a time column, then choose the current and previous period. Comparisons over time use these two periods.</p>
-            <div class="opt-grid">
-              <div>
-                <label for="currentWave">Current time</label>
-                <select id="currentWave" disabled><option value="">Assign a time column</option></select>
-              </div>
-              <div>
-                <label for="previousWave">Previous time</label>
-                <select id="previousWave" disabled><option value="">Assign a time column</option></select>
-              </div>
-            </div>
-          </div>
           <div class="opt-grid">
             <div class="opt-card">
               <h4>Minimum valid items</h4>
@@ -192,6 +187,11 @@
     var dragged = null;
     var xDirty = false;
     var yDirty = false;
+    var PERIOD_INFO = 'Use this column to say when each response was collected. The value should be the survey year, such as 2024 or 2025. A quarter, month, or wave name also works when that is how the surveys are separated. If the file contains more than one survey, every row needs a period value. With two survey years, the column should show which year each response belongs to, so the two surveys can be compared.';
+    var _periodCurrent = null;
+    var _periodPrevious = null;
+    var _savedCurrent = null;
+    var _savedPrevious = null;
     var assign = {
       x: [],
       y: [],
@@ -205,14 +205,14 @@
       { id: 'y', title: 'Outcome dimension', help: 'The score that separates the two groups, such as intention to stay.', multi: true, required: true, numeric: true },
       { id: 'factors', title: 'Factors to compare', help: 'Survey factors or items compared across the two groups.', multi: true, required: true, numeric: true },
       { id: 'x', title: 'Second dimension', help: 'Optional. Used when comparing loyalty segments rather than stay versus leave.', multi: true, required: false, numeric: true },
-      { id: 'wave', title: 'Time', help: 'Column that identifies each time period, so results can be compared over time.', multi: false },
+      { id: 'wave', title: 'Period column', help: '', info: PERIOD_INFO, multi: false },
       { id: 'group', title: 'Compare by group', help: 'Optional. Examples: division, department, or location.', multi: false },
       { id: 'weight', title: 'Weight', help: 'Optional numeric survey weight. If unset, every valid respondent has weight 1.', multi: false, numeric: true }
     ] : [
       { id: 'x', title: 'Satisfaction dimension', help: 'Select one survey item or several items to combine into a score.', multi: true, required: true, numeric: true },
       { id: 'y', title: 'Intention to stay', help: 'Select one survey item or several items to combine into a score.', multi: true, required: true, numeric: true },
       { id: 'group', title: 'Compare by group', help: 'Optional. Examples: division, department, location, tenure group, or employee level.', multi: false },
-      { id: 'wave', title: 'Time', help: 'Column that identifies each time period, so the segment mix can be compared over time.', multi: false },
+      { id: 'wave', title: 'Period column', help: '', info: PERIOD_INFO, multi: false },
       { id: 'id', title: 'Respondent ID', help: 'Optional. Kept for a future respondent-transition view. Not used in Version 1 calculations.', multi: false },
       { id: 'weight', title: 'Weight', help: 'Optional numeric survey weight. If unset, every valid respondent has weight 1.', multi: false, numeric: true }
     ];
@@ -315,7 +315,28 @@
         card.dataset.zone = zone.id;
         var head = document.createElement('div');
         head.className = 'reg-zone-head';
-        head.innerHTML = zone.title + (zone.required ? '<span class="zone-req">*</span>' : '');
+        head.appendChild(document.createTextNode(zone.title));
+        if (zone.required) {
+          var req = document.createElement('span');
+          req.className = 'zone-req';
+          req.textContent = '*';
+          head.appendChild(req);
+        }
+        if (zone.info) {
+          var infoBtn = document.createElement('button');
+          infoBtn.type = 'button';
+          infoBtn.className = 'zone-info';
+          infoBtn.setAttribute('aria-label', 'About the period column');
+          infoBtn.setAttribute('aria-expanded', 'false');
+          infoBtn.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>';
+          infoBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var open = card.classList.toggle('show-info');
+            infoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          });
+          head.appendChild(infoBtn);
+        }
         var help = document.createElement('p');
         help.className = 'zone-help';
         help.textContent = zone.help;
@@ -345,7 +366,13 @@
           if (name) place(zone.id, name);
         });
         card.appendChild(head);
-        card.appendChild(help);
+        if (zone.help) card.appendChild(help);
+        if (zone.info) {
+          var pop = document.createElement('p');
+          pop.className = 'zone-info-pop';
+          pop.textContent = zone.info;
+          card.appendChild(pop);
+        }
         card.appendChild(body);
         host.appendChild(card);
       });
@@ -440,42 +467,16 @@
     }
 
     function fillWaves() {
-      var box = qs('waveBox');
-      box.classList.add('show');
-      if (!assign.wave) {
-        qs('currentWave').innerHTML = '<option value="">Assign a time column</option>';
-        qs('previousWave').innerHTML = '<option value="">Assign a time column</option>';
-        qs('currentWave').disabled = true;
-        qs('previousWave').disabled = true;
-        return;
-      }
-      qs('currentWave').disabled = false;
-      qs('previousWave').disabled = false;
+      _periodCurrent = null;
+      _periodPrevious = null;
+      if (!assign.wave) return;
       var p = profileOf(assign.wave);
       var values = [];
-      if (p) {
-        _rows.forEach(function (row) { values.push(row[p.index]); });
-      }
+      if (p) _rows.forEach(function (row) { values.push(row[p.index]); });
       var pair = SS.inferWavePair(values);
-      function fill(id, selected) {
-        var sel = qs(id);
-        var prev = sel.value || selected;
-        sel.innerHTML = '';
-        pair.values.forEach(function (v) {
-          var opt = document.createElement('option');
-          opt.value = v;
-          opt.textContent = v;
-          sel.appendChild(opt);
-        });
-        if (prev && pair.values.indexOf(prev) >= 0) sel.value = prev;
-        else if (selected) sel.value = selected;
-      }
-      fill('currentWave', pair.current);
-      fill('previousWave', pair.previous);
-      box.classList.add('show');
-      if (qs('currentWave').value && qs('currentWave').value === qs('previousWave').value) {
-        showWarn('Current and previous time are the same value.');
-      }
+      var valuesText = pair.values.map(function (v) { return String(v); });
+      _periodCurrent = (_savedCurrent && valuesText.indexOf(String(_savedCurrent)) >= 0) ? String(_savedCurrent) : pair.current;
+      _periodPrevious = (_savedPrevious && valuesText.indexOf(String(_savedPrevious)) >= 0) ? String(_savedPrevious) : pair.previous;
     }
 
     function showWarn(text) {
@@ -500,20 +501,20 @@
       var overlap = assign.x.filter(function (n) { return assign.y.indexOf(n) >= 0 || assign.factors.indexOf(n) >= 0; })
         .concat(assign.y.filter(function (n) { return assign.factors.indexOf(n) >= 0; }));
       var hint = PRODUCT === 'split' ? 'Select an outcome and at least one factor' : 'Select both dimensions';
+      var periodNote = (assign.wave && _periodCurrent && !_periodPrevious)
+        ? 'This period column has only one period, so there is no earlier survey to compare.'
+        : '';
       if (overlap.length) {
         ready = false;
         hint = 'A column can belong to only one role';
         showWarn(hint + '.');
-      } else if (assign.wave && qs('currentWave').value && qs('currentWave').value === qs('previousWave').value) {
-        hint = 'Choose two different time periods';
-        showWarn('Current and previous time are the same value.');
       } else if (ready) {
         hint = PRODUCT === 'split'
           ? (assign.factors.length + ' factor' + (assign.factors.length === 1 ? '' : 's'))
           : (assign.x.length + ' satisfaction item' + (assign.x.length === 1 ? '' : 's') + ' · ' + assign.y.length + ' stay item' + (assign.y.length === 1 ? '' : 's'));
-        showWarn('');
+        showWarn(periodNote);
       } else {
-        showWarn('');
+        showWarn(periodNote);
       }
       qs('runHint').textContent = hint;
       qs('btnRun').disabled = !ready;
@@ -546,8 +547,8 @@
       base.yDimension.threshold = qs('yThreshold').value === '' ? null : Number(qs('yThreshold').value);
       base.groupColumn = assign.group;
       base.waveColumn = assign.wave;
-      base.currentWave = assign.wave ? qs('currentWave').value : null;
-      base.previousWave = assign.wave ? qs('previousWave').value : null;
+      base.currentWave = assign.wave ? _periodCurrent : null;
+      base.previousWave = assign.wave ? _periodPrevious : null;
       base.respondentIdColumn = assign.id;
       base.weightColumn = assign.weight;
       base.factorColumns = assign.factors.slice();
@@ -588,13 +589,13 @@
         assign.id = saved.respondentIdColumn || null;
         assign.weight = saved.weightColumn || null;
         assign.factors = (saved.factorColumns || []).slice();
+        _savedCurrent = saved.currentWave || null;
+        _savedPrevious = saved.previousWave || null;
       }
       qs('loadingSpinner').style.display = 'none';
       qs('mainContent').style.display = 'flex';
       renderLabels();
       refresh();
-      if (saved && saved.currentWave) qs('currentWave').value = saved.currentWave;
-      if (saved && saved.previousWave) qs('previousWave').value = saved.previousWave;
     }
 
     function loadSample() {
@@ -622,8 +623,6 @@
     qs('minItems').addEventListener('change', refresh);
     qs('btnRun').addEventListener('click', runAnalysis);
     qs('btnCancel').addEventListener('click', function () { send('cancel'); });
-    qs('currentWave').addEventListener('change', refresh);
-    qs('previousWave').addEventListener('change', refresh);
 
     (function applyInputChrome() {
       var split = PRODUCT === 'split';

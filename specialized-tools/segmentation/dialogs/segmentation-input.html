@@ -187,6 +187,7 @@
     var dragged = null;
     var xDirty = false;
     var yDirty = false;
+    var SPLIT_CONSTRUCT_INFO = 'Select one variable, or several variables that are averaged into one score. This is the construct you hypothesise explains why the dimension scores differ, such as engagement. The construct is split into two ranges: high and low. The high range is at or above the cut-off, and the low range is below it. Split Index is the distance between these two groups on each dimension. A larger distance means that dimension does more to separate the high group from the low group.';
     var PERIOD_INFO = 'Use this column to say when each response was collected. The value should be the survey year, such as 2024 or 2025. A quarter, month, or wave name also works when that is how the surveys are separated. If the file contains more than one survey, every row needs a period value. With two survey years, the column should show which year each response belongs to, so the two surveys can be compared.';
     var _periodCurrent = null;
     var _periodPrevious = null;
@@ -202,8 +203,8 @@
       factors: []
     };
     var ZONES = PRODUCT === 'split' ? [
-      { id: 'y', title: 'Outcome dimension', help: 'The score that separates the two groups, such as intention to stay.', multi: true, required: true, numeric: true },
-      { id: 'factors', title: 'Factors to compare', help: 'Survey factors or items compared across the two groups.', multi: true, required: true, numeric: true },
+      { id: 'y', title: 'Splitting Construct', help: 'One or more items, averaged into a score and split into a high range and a low range.', info: SPLIT_CONSTRUCT_INFO, multi: true, required: true, numeric: true },
+      { id: 'factors', title: 'Factors to compare', help: 'Dimensions compared between the high group and the low group. Split Index is the distance between their scores.', multi: true, required: true, numeric: true },
       { id: 'x', title: 'Second dimension', help: 'Optional. Used when comparing loyalty segments rather than stay versus leave.', multi: true, required: false, numeric: true },
       { id: 'wave', title: 'Period column', help: '', info: PERIOD_INFO, multi: false },
       { id: 'group', title: 'Compare by group', help: 'Optional. Examples: division, department, or location.', multi: false },
@@ -326,7 +327,7 @@
           var infoBtn = document.createElement('button');
           infoBtn.type = 'button';
           infoBtn.className = 'zone-info';
-          infoBtn.setAttribute('aria-label', 'About the period column');
+          infoBtn.setAttribute('aria-label', 'About ' + zone.title);
           infoBtn.setAttribute('aria-expanded', 'false');
           infoBtn.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i>';
           infoBtn.addEventListener('click', function (e) {
@@ -426,8 +427,12 @@
         var custom = qs(axis + 'Threshold').value;
         var values = numericValues(assign[axis]);
         var resolved = SS.resolveThreshold(method, custom === '' ? null : Number(custom), values);
-        var label = axis === 'x' ? (qs('xHigh') ? qs('xHigh').value : 'Satisfied') : (qs('yHigh') ? qs('yHigh').value : 'Tending to stay');
-        qs(axis + 'Rule').textContent = label + ': score ≥ ' + SS.formatNum(resolved.threshold);
+        var label = axis === 'x'
+          ? (qs('xHigh') ? qs('xHigh').value : 'Satisfied')
+          : (PRODUCT === 'split' ? 'High range' : (qs('yHigh') ? qs('yHigh').value : 'Tending to stay'));
+        var rule = label + ': score ≥ ' + SS.formatNum(resolved.threshold);
+        if (PRODUCT === 'split' && axis === 'y') rule += '. Below this is the low range.';
+        qs(axis + 'Rule').textContent = rule;
         qs(axis + 'Threshold').disabled = method !== 'custom';
       });
     }
@@ -500,7 +505,7 @@
         : (assign.x.length > 0 && assign.y.length > 0);
       var overlap = assign.x.filter(function (n) { return assign.y.indexOf(n) >= 0 || assign.factors.indexOf(n) >= 0; })
         .concat(assign.y.filter(function (n) { return assign.factors.indexOf(n) >= 0; }));
-      var hint = PRODUCT === 'split' ? 'Select an outcome and at least one factor' : 'Select both dimensions';
+      var hint = PRODUCT === 'split' ? 'Select a splitting construct and at least one factor' : 'Select both dimensions';
       var periodNote = (assign.wave && _periodCurrent && !_periodPrevious)
         ? 'This period column has only one period, so there is no earlier survey to compare.'
         : '';
@@ -522,7 +527,7 @@
       if (assign.x.length) bits.push(assign.x.join(' + '));
       if (assign.y.length) bits.push(assign.y.join(' + '));
       var emptySummary = PRODUCT === 'split'
-        ? 'Select the outcome dimension and the factors to compare. Each row is one respondent.'
+        ? 'Select the splitting construct and the factors to compare. Each row is one respondent.'
         : 'Select the two survey dimensions. Each row is one respondent.';
       qs('modelSummary').textContent = bits.length ? bits.join('  ×  ') : emptySummary;
       var xCard = qs('xThresholdCard');
@@ -630,7 +635,7 @@
       qs('cfgHeaderTitle').textContent = document.title;
       qs('cfgHeaderIcon').className = split ? 'fa-solid fa-chart-simple' : 'fa-solid fa-border-all';
       var yHead = qs('yThresholdCard') && qs('yThresholdCard').querySelector('h4');
-      if (yHead && split) yHead.textContent = 'Outcome threshold';
+      if (yHead && split) yHead.textContent = 'High / low cut-off';
       var xHead = qs('xThresholdCard') && qs('xThresholdCard').querySelector('h4');
       if (xHead && split) xHead.textContent = 'Second dimension threshold';
     })();

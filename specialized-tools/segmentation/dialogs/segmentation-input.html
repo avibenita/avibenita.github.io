@@ -428,7 +428,12 @@
           ? (qs('xHigh') ? qs('xHigh').value : 'Satisfied')
           : (PRODUCT === 'split' ? 'High range' : (qs('yHigh') ? qs('yHigh').value : 'Tending to stay'));
         var rule = label + ': score ≥ ' + SS.formatNum(resolved.threshold);
-        if (PRODUCT === 'split' && axis === 'y') rule += '. Below this is the low range.';
+        if (PRODUCT === 'split' && axis === 'y') {
+          var hasScores = assign.y.length > 0 && numericValues(assign.y).length > 0;
+          rule = hasScores
+            ? 'Split at the median (' + SS.formatNum(resolved.threshold) + '). At or above the median is the high range; below it is the low range. You can change this cut-off in the results.'
+            : 'The construct is split at the median. At or above the median is the high range; below it is the low range. You can change this cut-off in the results.';
+        }
         qs(axis + 'Rule').textContent = rule;
         qs(axis + 'Threshold').disabled = method !== 'custom';
       });
@@ -564,6 +569,7 @@
         base.xDimension.columns = [];
         base.groupColumn = null;
         base.weightColumn = null;
+        base.yDimension.thresholdMethod = 'median';
       }
       return base;
     }
@@ -643,6 +649,14 @@
       qs('cfgHeaderIcon').className = split ? 'fa-solid fa-chart-simple' : 'fa-solid fa-border-all';
       var yHead = qs('yThresholdCard') && qs('yThresholdCard').querySelector('h4');
       if (yHead && split) yHead.textContent = 'High / low cut-off';
+      if (split) {
+        qs('yMethod').value = 'median';
+        ['yMethod', 'yThreshold'].forEach(function (id) {
+          var el = qs(id);
+          el.hidden = true;
+          if (el.previousElementSibling && el.previousElementSibling.tagName === 'LABEL') el.previousElementSibling.hidden = true;
+        });
+      }
       var xHead = qs('xThresholdCard') && qs('xThresholdCard').querySelector('h4');
       if (xHead && split) xHead.textContent = 'Second dimension threshold';
     })();

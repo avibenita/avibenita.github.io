@@ -600,65 +600,98 @@
     };
   }
 
-  function buildSplitIndexChartOptions(result) {
+  function buildSplitIndexChartOptions(result, presentation) {
     var rows = (result && result.displayed) || [];
+    var view = presentation || {};
+    var ink = view.ink || '#f8fafc';
+    var muted = view.muted || '#cbd5e1';
     var longLabel = rows.some(function (row) { return String(row.factorLabel).length > 22; });
-    var indexName = result && result.indexType === 'standardized' ? 'Standardized Split Index' : 'Raw Split Index';
+    var indexName = result && result.indexType === 'standardized' ? 'Standardized Split Index' : 'Split Index';
+    var groupName = function (group, fallback) {
+      if (!group) return fallback;
+      var n = group.validN != null ? ' (n = ' + group.validN + ')' : '';
+      return (group.label || fallback) + n;
+    };
     return {
       chart: {
         type: 'line',
         backgroundColor: 'transparent',
         scrollablePlotArea: rows.length > 8 ? { minWidth: rows.length * 96, scrollPositionX: 0 } : undefined
       },
-      title: { text: null },
+      title: {
+        text: view.title || null,
+        align: 'center',
+        style: { color: ink, fontSize: '22px', fontWeight: '700' }
+      },
+      subtitle: {
+        text: view.subtitle || null,
+        align: 'center',
+        style: { color: muted, fontSize: '14px' }
+      },
       credits: { enabled: false },
-      legend: { enabled: true, reversed: false },
+      legend: { enabled: true, reversed: false, itemStyle: { color: ink } },
       xAxis: {
         categories: rows.map(function (row) { return row.factorLabel; }),
         labels: {
           rotation: longLabel || rows.length > 8 ? -40 : 0,
-          style: { color: '#1c1917', fontSize: '11px' }
-        }
+          style: { color: ink, fontSize: '11px' }
+        },
+        lineColor: muted,
+        tickColor: muted
       },
       yAxis: [
-        { title: { text: 'Factor mean' }, labels: { style: { color: '#1c1917' } } },
-        { title: { text: indexName }, opposite: true, min: 0, labels: { style: { color: '#1c1917' } } }
+        {
+          title: { text: 'Mean score', style: { color: '#3b82f6' } },
+          labels: { style: { color: ink } },
+          gridLineColor: 'rgba(148,163,184,.25)'
+        },
+        {
+          title: { text: indexName, style: { color: '#94a3b8' } },
+          opposite: true,
+          min: 0,
+          alignTicks: false,
+          gridLineWidth: 0,
+          labels: { style: { color: ink } }
+        }
       ],
       tooltip: { shared: false },
       plotOptions: {
         line: {
-          lineWidth: 2,
-          marker: { enabled: true, symbol: 'circle', radius: 5 },
-          dataLabels: { enabled: rows.length <= 12, format: '{y:.2f}', allowOverlap: false, style: { color: '#1c1917', textOutline: 'none', fontSize: '10px' } }
+          lineWidth: 2.5,
+          zIndex: 2,
+          marker: { enabled: true, symbol: 'circle', radius: 4 },
+          dataLabels: { enabled: rows.length <= 12, format: '{y:.2f}', allowOverlap: false, style: { color: ink, textOutline: 'none', fontSize: '10px' } }
         },
         column: {
-          pointPadding: 0.25,
-          groupPadding: 0.15,
-          borderWidth: 0,
-          dataLabels: { enabled: rows.length <= 12, format: '{y:.2f}', allowOverlap: false, style: { color: '#1c1917', textOutline: 'none', fontSize: '10px' } }
+          zIndex: 1,
+          pointPadding: 0.2,
+          groupPadding: 0.18,
+          borderWidth: 1,
+          borderColor: '#eab308',
+          dataLabels: { enabled: false }
         }
       },
       series: [
         {
           type: 'line',
-          name: result && result.group1 ? result.group1.label : 'Group 1',
+          name: groupName(result && result.group1, 'High group'),
           yAxis: 0,
-          color: '#0d9488',
+          color: '#3b82f6',
           data: rows.map(function (row) { return isNum(row.group1.mean) ? Math.round(row.group1.mean * 100) / 100 : null; })
         },
         {
           type: 'line',
-          name: result && result.group2 ? result.group2.label : 'Group 2',
+          name: groupName(result && result.group2, 'Low group'),
           yAxis: 0,
-          color: '#c4725a',
+          color: '#ef4444',
           data: rows.map(function (row) { return isNum(row.group2.mean) ? Math.round(row.group2.mean * 100) / 100 : null; })
         },
         {
           type: 'column',
           name: indexName,
           yAxis: 1,
-          color: '#94a3b8',
-          pointWidth: 10,
+          color: '#d6d3d1',
+          pointWidth: 16,
           data: rows.map(function (row) { return isNum(row.selectedSplitIndex) ? Math.round(row.selectedSplitIndex * 100) / 100 : null; })
         }
       ]

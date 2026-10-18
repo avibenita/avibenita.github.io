@@ -120,6 +120,8 @@
     out.template = c.template || base.template;
     out.product = c.product === 'split' ? 'split' : 'loyalty';
     out.title = c.title ? String(c.title) : (out.product === 'split' ? 'Split Index™' : 'Loyalty Matrix');
+    out.chartTitle = c.chartTitle ? String(c.chartTitle) : '';
+    out.chartSubtitle = c.chartSubtitle ? String(c.chartSubtitle) : '';
     ['xDimension', 'yDimension'].forEach(function (key) {
       var src = c[key] || {};
       out[key].label = src.label || base[key].label;

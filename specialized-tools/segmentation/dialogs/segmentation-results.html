@@ -58,6 +58,7 @@
     .state-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
     .state-cell { height:72px; border-radius:10px; background:rgba(148,163,184,.14); }
     .summary { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; padding:8px 10px; border:1px solid var(--border); border-radius:10px; background:var(--surface-2); margin-bottom:10px; }
+    .summary[hidden] { display:none !important; }
     .summary strong { font-size:13px; }
     .summary span { font-size:12.5px; color:var(--muted); }
     details.fold { border:1px solid var(--border); border-radius:10px; margin-bottom:10px; background:var(--surface-2); }
@@ -71,6 +72,7 @@
     }
     .label-row { display:grid; grid-template-columns:minmax(0,1fr) 46px; gap:6px; align-items:center; }
     .warn-list { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+    .warn-list[hidden] { display:none !important; }
     .warn { border-left:3px solid #d4a017; background:rgba(212,160,23,.12); padding:8px 10px; border-radius:8px; font-size:12.5px; }
     .filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
     .filter-chip { font-size:12.5px; }
@@ -214,6 +216,12 @@
                 </label>
                 <label class="field">Vertical title
                   <input id="yTitle" type="text" />
+                </label>
+                <label class="field" id="chartTitleField">Chart title
+                  <input id="chartTitle" type="text" />
+                </label>
+                <label class="field" id="chartSubtitleField">Chart subtitle
+                  <input id="chartSubtitle" type="text" />
                 </label>
                 <label class="field" id="xMethodField">Satisfaction rule
                     <select id="xMethod">
@@ -499,6 +507,14 @@
         var el = document.getElementById(id);
         if (el) el.hidden = !xOn;
       });
+      ['chartTitleField', 'chartSubtitleField'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.hidden = !split;
+      });
+      var summary = document.getElementById('summary');
+      var warnings = document.getElementById('warnings');
+      if (summary) summary.hidden = split;
+      if (warnings) warnings.hidden = split;
       mountSidebarSettings();
       if (split && _tab !== 'drivers') switchTab('drivers');
       else if (!split && _tab === 'drivers') switchTab('overview');
@@ -508,6 +524,19 @@
       return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
       });
+    }
+    function defaultSplitChartTitle() {
+      var label = (_spec && _spec.yDimension && _spec.yDimension.label) || 'Intention to stay';
+      return 'Factors split by ' + label;
+    }
+    function splitChartPresentation() {
+      var light = document.documentElement.getAttribute('data-theme') === 'light';
+      return {
+        title: (_spec && _spec.chartTitle) || defaultSplitChartTitle(),
+        subtitle: (_spec && _spec.chartSubtitle) || 'Split-Index™ Approach',
+        ink: light ? '#1c1917' : '#f8fafc',
+        muted: light ? '#3f3f46' : '#cbd5e1'
+      };
     }
     function ink() {
       return document.documentElement.getAttribute('data-theme') === 'light' ? '#1c1917' : '#f8fafc';
@@ -607,8 +636,15 @@
       var xTitle = document.getElementById('xTitle');
       var yTitle = document.getElementById('yTitle');
       if (reportTitle && reportTitle.value.trim()) _spec.title = reportTitle.value.trim();
+      var previousAuto = defaultSplitChartTitle();
       if (xTitle && xTitle.value.trim()) _spec.xDimension.label = xTitle.value.trim();
       if (yTitle && yTitle.value.trim()) _spec.yDimension.label = yTitle.value.trim();
+      var chartTitle = document.getElementById('chartTitle');
+      var chartSubtitle = document.getElementById('chartSubtitle');
+      var typedTitle = chartTitle && chartTitle.value.trim();
+      _spec.chartTitle = typedTitle && typedTitle !== previousAuto && typedTitle !== defaultSplitChartTitle() ? typedTitle : '';
+      var typedSubtitle = chartSubtitle && chartSubtitle.value.trim();
+      _spec.chartSubtitle = typedSubtitle && typedSubtitle !== 'Split-Index™ Approach' ? typedSubtitle : '';
       globalThis.__segmentationTitle = _spec.title || defaultProductTitle();
       SS.QUADRANT_KEYS.forEach(function (key) {
         var label = document.getElementById('label-' + key);
@@ -628,6 +664,10 @@
       document.getElementById('reportTitle').value = _spec.title || defaultProductTitle();
       document.getElementById('xTitle').value = _spec.xDimension.label || '';
       document.getElementById('yTitle').value = _spec.yDimension.label || '';
+      var chartTitleInput = document.getElementById('chartTitle');
+      var chartSubtitleInput = document.getElementById('chartSubtitle');
+      if (chartTitleInput) chartTitleInput.value = _spec.chartTitle || defaultSplitChartTitle();
+      if (chartSubtitleInput) chartSubtitleInput.value = _spec.chartSubtitle || 'Split-Index™ Approach';
       setFieldCaption('xMethodField', (_spec.xDimension.label || 'Horizontal') + ' rule');
       setFieldCaption('xThresholdField', (_spec.xDimension.label || 'Horizontal') + ' threshold');
       setFieldCaption('yMethodField', (_spec.yDimension.label || 'Vertical') + ' rule');
@@ -1330,7 +1370,7 @@
           table.appendChild(tr);
         });
       }
-      var options = SI.buildSplitIndexChartOptions(_splitResult);
+      var options = SI.buildSplitIndexChartOptions(_splitResult, splitChartPresentation());
       options.tooltip.useHTML = false;
       options.tooltip.formatter = function () {
         var factor = _splitResult.displayed[this.point.index];
@@ -1607,7 +1647,7 @@
       _changeKey = this.value;
       paintChange();
     });
-    ['xMethod', 'yMethod', 'xThreshold', 'yThreshold', 'minItems', 'currentWave', 'previousWave', 'reportTitle', 'xTitle', 'yTitle'].forEach(function (id) {
+    ['xMethod', 'yMethod', 'xThreshold', 'yThreshold', 'minItems', 'currentWave', 'previousWave', 'reportTitle', 'xTitle', 'yTitle', 'chartTitle', 'chartSubtitle'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {
         if (_painting) return;
         readSettingsFromDom();

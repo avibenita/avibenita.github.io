@@ -258,7 +258,6 @@
               <div class="fold-body" id="labelEditor"></div>
             </details>
             <div class="warn-list" id="warnings"></div>
-            <div class="filters" id="filterBar"></div>
             <div class="detail" id="detail">
               <div>
                 <strong id="detailTitle"></strong>
@@ -732,6 +731,7 @@
         showState('error');
         document.getElementById('errorText').textContent = _bundle.error;
         syncChangeNav();
+        activateHeaderFilter();
         return;
       }
       _spec.xDimension.threshold = _bundle.rules.xThreshold;
@@ -750,13 +750,13 @@
         }
       }
       applyProductChrome();
+      activateHeaderFilter();
     }
 
     function paint() {
       if (!_bundle || !_bundle.ok) return;
       paintSummary();
       paintWarnings();
-      paintFilters();
       paintDetail();
       paintMatrix();
       if (_tab === 'groups') paintGroups();
@@ -797,51 +797,30 @@
         host.appendChild(empty);
       }
     }
-    function paintFilters() {
-      var bar = document.getElementById('filterBar');
-      bar.innerHTML = '';
-      var active = filterText();
-      if (active) {
-        var chip = document.createElement('div');
-        chip.className = 'filter-chip';
-        chip.textContent = 'Active filters: ' + active;
-        bar.appendChild(chip);
+    var _activatingHeaderFilter = false;
+    function headerFilterReady() {
+      var meta = window.UniRowFilter && typeof UniRowFilter.getSourceMeta === 'function' ? UniRowFilter.getSourceMeta() : null;
+      return !!(meta && Array.isArray(meta.allRows) && meta.allRows.length);
+    }
+    function activateHeaderFilter() {
+      if (_activatingHeaderFilter || !window.StatisticoHeader || !_headers.length || !_allRows.length) return;
+      _activatingHeaderFilter = true;
+      try {
+        if (!headerFilterReady() && window.UniRowFilter && typeof StatisticoHeader._initUniRowFilterFromStorage === 'function') {
+          StatisticoHeader._initUniRowFilterFromStorage();
+        }
+        if (typeof StatisticoHeader.updateUniFilterChrome === 'function') StatisticoHeader.updateUniFilterChrome();
+      } catch (_e) {}
+      _activatingHeaderFilter = false;
+      if (!headerFilterReady()) {
+        setTimeout(function () {
+          if (headerFilterReady() || !window.UniRowFilter || !window.StatisticoHeader) return;
+          try {
+            StatisticoHeader._initUniRowFilterFromStorage();
+            StatisticoHeader.updateUniFilterChrome();
+          } catch (_e2) {}
+        }, 400);
       }
-      var clear = document.createElement('button');
-      clear.type = 'button';
-      clear.className = 'btn';
-      clear.id = 'clearFilters';
-      clear.textContent = 'Clear all filters';
-      clear.addEventListener('click', clearFilters);
-      bar.appendChild(clear);
-      var cols = SS.filterColumns(_headers, _allRows, _spec);
-      cols.forEach(function (col) {
-        var det = document.createElement('details');
-        det.className = 'filter-pop';
-        var sum = document.createElement('summary');
-        sum.textContent = col.name;
-        det.appendChild(sum);
-        var selected = (_spec.filters && _spec.filters[col.name]) || null;
-        col.levels.forEach(function (level) {
-          var label = document.createElement('label');
-          var box = document.createElement('input');
-          box.type = 'checkbox';
-          box.checked = !selected || selected.indexOf(level.value) >= 0;
-          box.addEventListener('change', function () {
-            var picked = Array.prototype.filter.call(det.querySelectorAll('input'), function (el) { return el.checked; })
-              .map(function (el) { return el.value; });
-            if (!_spec.filters) _spec.filters = {};
-            if (picked.length === col.levels.length) delete _spec.filters[col.name];
-            else _spec.filters[col.name] = picked;
-            recompute();
-          });
-          box.value = level.value;
-          label.appendChild(box);
-          label.appendChild(document.createTextNode(level.value + ' (' + level.n + ')'));
-          det.appendChild(label);
-        });
-        bar.appendChild(det);
-      });
     }
     function clearFilters() {
       _spec.filters = {};

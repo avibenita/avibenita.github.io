@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261009tabglow" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261009tabglow" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261014survey2"></script>
+  <script src="../shared-header.js?v=20261019splitai"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261015split1"></script>
   <script src="segmentation-split-index.js?v=20261014si1"></script>
@@ -147,12 +147,10 @@
     .change-card .path { font-size:14px; font-weight:800; }
     .change-card .pp { font-size:13px; font-weight:700; }
     .bench { font-size:12.5px; font-weight:700; color:var(--accent); }
-    .export-bar { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
     #driverControls { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; align-items:start; margin-bottom:8px; }
     .driver-index { border:1px solid var(--border); border-radius:8px; margin:0; padding:8px; min-width:0; }
     .driver-index .driver-legend { font-size:11px; font-weight:700; color:var(--muted); margin-bottom:4px; }
     #driverIntro .info { display:inline-flex; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; background:#0d9488; color:#fff; font-size:11px; font-weight:700; cursor:help; }
-    #driverPatterns .change-card { flex:1 1 180px; }
     .status-list { margin:8px 0 0; padding-left:18px; font-size:12.5px; }
     @media (max-width: 900px) {
       .cards, .grid-2 { grid-template-columns:1fr 1fr; }
@@ -274,12 +272,6 @@
               </div>
               <button type="button" class="btn" id="clearSelection">Clear selection</button>
             </div>
-            <div class="export-bar">
-              <button type="button" class="btn" id="copyChart">Copy chart</button>
-              <button type="button" class="btn" id="downloadPng">Download PNG</button>
-              <button type="button" class="btn" id="exportTable">Export results table</button>
-              <button type="button" class="btn" id="copySummary">Copy interpretation-ready summary</button>
-            </div>
             <div class="seg-tabs" role="tablist" aria-label="Survey segmentation views">
               <button type="button" class="seg-tab" role="tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="true">Overview</button>
               <button type="button" class="seg-tab" role="tab" id="tab-groups" data-tab="groups" aria-controls="panel-groups" aria-selected="false">Group Comparison</button>
@@ -393,7 +385,6 @@
                 <p id="driverScaleNote" class="note"></p>
                 <p id="driverSameNote" class="note"></p>
                 <div id="driverChart" class="chart"></div>
-                <div id="driverPatterns" class="cards"></div>
                 <details class="fold" id="driverStats">
                   <summary>Statistical details</summary>
                   <div class="fold-body">
@@ -607,6 +598,53 @@
       if (filters) parts.push('Active filters: ' + filters);
       return parts.join(' · ');
     }
+    function roundInsight(n) {
+      return typeof n === 'number' && isFinite(n) ? Math.round(n * 100) / 100 : null;
+    }
+    function splitInsight() {
+      if (!_splitResult || !_splitResult.ok) return null;
+      return {
+        chartTitle: (_spec && _spec.chartTitle) || defaultSplitChartTitle(),
+        chartSubtitle: (_spec && _spec.chartSubtitle) || 'Split-Index™ Approach',
+        index: _splitResult.indexLabel || _splitResult.indexType,
+        group1: { label: _splitResult.group1.label, n: _splitResult.group1.validN },
+        group2: { label: _splitResult.group2.label, n: _splitResult.group2.validN },
+        factors: (_splitResult.displayed || []).map(function (factor) {
+          return {
+            factor: factor.factorLabel,
+            highGroupMean: roundInsight(factor.group1 && factor.group1.mean),
+            lowGroupMean: roundInsight(factor.group2 && factor.group2.mean),
+            splitIndex: roundInsight(factor.selectedSplitIndex),
+            pattern: factor.pattern ? factor.pattern.label : '',
+            reading: factor.pattern ? factor.pattern.description : ''
+          };
+        })
+      };
+    }
+    function publishSegmentationInsight() {
+      var split = splitInsight();
+      var interpretation = _bundle && _bundle.ok ? SS.interpretationSummary(_bundle) : '';
+      if (window.__segmentationBundle && typeof window.__segmentationBundle === 'object') {
+        window.__segmentationBundle.interpretation = interpretation;
+        window.__segmentationBundle.context = exportSubtitle();
+        window.__segmentationBundle.splitIndex = split;
+      }
+      window.buildAIPayload = function () {
+        return {
+          module: globalThis.__segmentationProduct === 'split' ? 'Split Index™' : 'Loyalty Matrix',
+          view: _tab,
+          context: exportSubtitle(),
+          interpretation: interpretation,
+          splitIndex: split,
+          loyalty: globalThis.__segmentationProduct === 'split' ? null : {
+            rules: _bundle && _bundle.rules,
+            overall: _bundle && _bundle.overall,
+            validN: _bundle && _bundle.validN,
+            change: _bundle && _bundle.change
+          }
+        };
+      };
+    }
     function sortedGroups() {
       if (!_bundle || !_bundle.groups) return [];
       if (_focus) return SS.sortGroups(_bundle.groups, _focus, _focus);
@@ -765,10 +803,12 @@
       } : { error: _bundle && _bundle.error };
       window.__segmentationChangeEnabled = !!(_bundle && _bundle.change);
       if (!_bundle.ok) {
+        _splitResult = null;
         showState('error');
         document.getElementById('errorText').textContent = _bundle.error;
         syncChangeNav();
         activateHeaderFilter();
+        publishSegmentationInsight();
         return;
       }
       _spec.xDimension.threshold = _bundle.rules.xThreshold;
@@ -788,6 +828,7 @@
       }
       applyProductChrome();
       activateHeaderFilter();
+      publishSegmentationInsight();
     }
 
     function paint() {
@@ -1304,6 +1345,7 @@
       document.getElementById('driverWaveWrap').style.display = _spec.previousWave ? '' : 'none';
       if (!hasFactors) {
         _splitResult = null;
+        publishSegmentationInsight();
         return;
       }
       _splitResult = SI.calculateSplitIndex(_bundle.scoredRespondents || [], _bundle.config, _driver);
@@ -1311,30 +1353,14 @@
       same.textContent = _splitResult.ok ? '' : (_splitResult.error || '');
       if (!_splitResult.ok) {
         if (_driverChart) { _driverChart.destroy(); _driverChart = null; }
-        document.getElementById('driverPatterns').innerHTML = '';
         document.getElementById('driverStatsTable').innerHTML = '';
+        publishSegmentationInsight();
         return;
       }
       document.getElementById('driverScaleNote').textContent = _splitResult.scalesDiffer && _driver.index === 'raw' ? SI.COPY.scaleWarning : '';
       document.getElementById('driverStatsNote').textContent = SI.COPY.significanceNote;
       document.getElementById('driverWeightNote').textContent = _splitResult.weightUsed ? 'Weights were applied to means and standard deviations. Sample sizes shown as n are unweighted bases.' : '';
-      var patterns = document.getElementById('driverPatterns');
-      patterns.innerHTML = '';
-      _splitResult.displayed.forEach(function (factor) {
-        var card = document.createElement('article');
-        card.className = 'change-card';
-        var title = document.createElement('h3');
-        title.textContent = factor.factorLabel;
-        var kind = document.createElement('div');
-        kind.className = 'path';
-        kind.textContent = factor.pattern ? factor.pattern.label : '';
-        var body = document.createElement('p');
-        body.textContent = factor.pattern ? factor.pattern.description : '';
-        card.appendChild(title);
-        card.appendChild(kind);
-        card.appendChild(body);
-        patterns.appendChild(card);
-      });
+      publishSegmentationInsight();
       var table = document.getElementById('driverStatsTable');
       var exported = SI.resultsTable(_splitResult);
       table.innerHTML = '';
@@ -1401,169 +1427,6 @@
         el.title = on ? 'Current versus previous survey wave' : 'Select a current and a previous survey wave to open Change.';
         if (el.classList.contains('sb-item')) el.classList.toggle('is-disabled', !on);
       });
-    }
-
-    function drawMatrixCanvas() {
-      var canvas = document.createElement('canvas');
-      var w = 1400;
-      var h = 980;
-      canvas.width = w;
-      canvas.height = h;
-      var ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#111827';
-      ctx.font = '700 36px Segoe UI, sans-serif';
-      ctx.fillText('Survey Segmentation Matrix', 48, 64);
-      ctx.font = '16px Segoe UI, sans-serif';
-      ctx.fillStyle = '#334155';
-      wrapText(ctx, exportSubtitle(), 48, 100, 1300, 24);
-      var cells = [
-        ['lowXHighY', 0, 0],
-        ['highXHighY', 1, 0],
-        ['lowXLowY', 0, 1],
-        ['highXLowY', 1, 1]
-      ];
-      var left = 180;
-      var top = 220;
-      var cw = 560;
-      var ch = 280;
-      ctx.fillStyle = '#111827';
-      ctx.font = '700 18px Segoe UI, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(_bundle.config.xDimension.label, left + cw, top - 70);
-      ctx.font = '600 16px Segoe UI, sans-serif';
-      ctx.fillText('Low', left + cw / 2, top - 36);
-      ctx.fillText('High', left + cw + cw / 2, top - 36);
-      ctx.save();
-      ctx.translate(70, top + ch);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillText(_bundle.config.yDimension.label, 0, 0);
-      ctx.restore();
-      ctx.textAlign = 'left';
-      cells.forEach(function (item) {
-        var key = item[0];
-        var x = left + item[1] * (cw + 16);
-        var y = top + item[2] * (ch + 16);
-        ctx.fillStyle = mixWhite(meta(key).color, 0.78);
-        roundRect(ctx, x, y, cw, ch, 16);
-        ctx.fill();
-        ctx.fillStyle = '#1c1917';
-        ctx.font = '700 18px Segoe UI, sans-serif';
-        ctx.fillText(meta(key).label.toUpperCase(), x + 24, y + 48);
-        ctx.font = '800 42px Segoe UI, sans-serif';
-        ctx.fillText(SS.formatPct(_bundle.overall[key].pct), x + 24, y + 110);
-        ctx.font = '600 18px Segoe UI, sans-serif';
-        ctx.fillText('n = ' + _bundle.overall[key].n, x + 24, y + 148);
-        var change = _bundle.change && _bundle.change.overall[key];
-        if (change) ctx.fillText(arrow(change.pp) + ' ' + ppDisplay(change.pp) + ' vs previous', x + 24, y + 182);
-      });
-      ctx.textAlign = 'left';
-      ctx.font = '16px Segoe UI, sans-serif';
-      var lx = 48;
-      SS.STACK_ORDER.forEach(function (key, i) {
-        ctx.fillStyle = meta(key).color;
-        ctx.fillRect(lx, 860, 18, 18);
-        ctx.fillStyle = '#111827';
-        ctx.fillText(meta(key).label, lx + 26, 875);
-        lx += 220;
-      });
-      return canvas;
-    }
-    function roundRect(ctx, x, y, w, h, r) {
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.arcTo(x + w, y, x + w, y + h, r);
-      ctx.arcTo(x + w, y + h, x, y + h, r);
-      ctx.arcTo(x, y + h, x, y, r);
-      ctx.arcTo(x, y, x + w, y, r);
-      ctx.closePath();
-    }
-    function wrapText(ctx, text, x, y, max, line) {
-      var words = String(text || '').split(' ');
-      var row = '';
-      words.forEach(function (word) {
-        var next = row ? row + ' ' + word : word;
-        if (ctx.measureText(next).width > max) {
-          ctx.fillText(row, x, y);
-          y += line;
-          row = word;
-        } else row = next;
-      });
-      if (row) ctx.fillText(row, x, y);
-    }
-    function svgToCanvas(svg, w, h) {
-      return new Promise(function (resolve, reject) {
-        if (svg.indexOf('xmlns') < 0) svg = svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-        var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var img = new Image();
-        img.onload = function () {
-          var canvas = document.createElement('canvas');
-          canvas.width = w * 2;
-          canvas.height = h * 2;
-          var ctx = canvas.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          URL.revokeObjectURL(url);
-          resolve(canvas);
-        };
-        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('chart')); };
-        img.src = url;
-      });
-    }
-    function currentChart() {
-      if (_tab === 'drivers') return _driverChart;
-      if (_tab === 'change') return _changeChart;
-      if (_tab === 'groups') return _groupChart;
-      return null;
-    }
-    function chartWithContext(chart) {
-      var w = Math.max(640, chart.chartWidth || 900);
-      var h = Math.max(420, chart.chartHeight || 520);
-      var svg = chart.getSVG({
-        chart: { width: w, height: h, backgroundColor: '#ffffff' },
-        title: { text: _tab === 'drivers' && _splitResult && _splitResult.title ? _splitResult.title : 'Survey Segmentation Matrix', style: { color: '#111827', fontSize: '18px' } },
-        subtitle: { text: exportSubtitle(), style: { color: '#334155', fontSize: '12px' } },
-        legend: { enabled: _tab !== 'change', itemStyle: { color: '#111827' } },
-        xAxis: { labels: { style: { color: '#111827' } } },
-        yAxis: { labels: { style: { color: '#111827' } }, title: { style: { color: '#111827' } } }
-      });
-      return svgToCanvas(svg, w, h);
-    }
-    function canvasForExport() {
-      if (_tab === 'overview' || !currentChart()) return Promise.resolve(drawMatrixCanvas());
-      return chartWithContext(currentChart());
-    }
-    function downloadCanvas(canvas, name) {
-      var a = document.createElement('a');
-      a.href = canvas.toDataURL('image/png');
-      a.download = name;
-      a.click();
-    }
-    function copyCanvas(canvas) {
-      canvas.toBlob(function (blob) {
-        if (navigator.clipboard && window.ClipboardItem && blob) {
-          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).catch(function () {
-            downloadCanvas(canvas, 'survey-segmentation-matrix.png');
-          });
-        } else downloadCanvas(canvas, 'survey-segmentation-matrix.png');
-      }, 'image/png');
-    }
-    function exportRows() {
-      var rows = _tab === 'drivers' && _splitResult && _splitResult.ok ? SI.resultsTable(_splitResult) : SS.resultsTable(_bundle, sortedGroups());
-      if (!rows.length) return;
-      var cols = Object.keys(rows[0]);
-      var lines = [cols.join('\t')];
-      rows.forEach(function (row) {
-        lines.push(cols.map(function (c) { return row[c]; }).join('\t'));
-      });
-      var blob = new Blob([lines.join('\n')], { type: 'text/tab-separated-values;charset=utf-8' });
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = _tab === 'drivers' ? 'split-index.tsv' : 'survey-segmentation-matrix.tsv';
-      a.click();
     }
 
     function applySource(payload) {
@@ -1656,12 +1519,6 @@
         switchTab(next.getAttribute('data-tab'));
       }
     });
-    document.getElementById('copyChart').addEventListener('click', function () {
-      canvasForExport().then(copyCanvas).catch(function () {});
-    });
-    document.getElementById('downloadPng').addEventListener('click', function () {
-      canvasForExport().then(function (canvas) { downloadCanvas(canvas, 'survey-segmentation-matrix.png'); }).catch(function () {});
-    });
     document.getElementById('selectFactors').addEventListener('click', function () {
       var picker = document.getElementById('factorPicker');
       if (picker) picker.scrollIntoView({ block: 'nearest' });
@@ -1682,11 +1539,6 @@
     });
     document.querySelectorAll('input[name="driverMissing"]').forEach(function (el) {
       el.addEventListener('change', function () { if (el.checked) { _driver.missing = el.value; paintDrivers(); } });
-    });
-    document.getElementById('exportTable').addEventListener('click', exportRows);
-    document.getElementById('copySummary').addEventListener('click', function () {
-      var text = SS.interpretationSummary(_bundle);
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
     });
     window.addEventListener('resize', function () {
       [_groupChart, _changeChart, _driverChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });

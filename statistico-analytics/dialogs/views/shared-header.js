@@ -8883,7 +8883,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'segmentation-overview': 'Overview',
       'segmentation-groups': 'Group Comparison',
       'segmentation-change': 'Change',
-      'segmentation-drivers': 'Drivers',
+      'segmentation-drivers': 'Split Index™',
       'dependent-explore': 'Descriptives',
       'dependent-trajectories': 'Trajectories',
       'dependent-assumptions': 'Assumptions',
@@ -9162,7 +9162,15 @@ REPORT: [one polished paragraph suitable for a report]`;
       'multivariable-bubble':
         'A bubble chart: each case is plotted by two numeric axes, with bubble size encoding a third variable and optional color for groups or a scale. Use it to compare position and magnitude together. Hover for values; click to select; legend click focuses a group, Ctrl+click hides it, double-click isolates it.',
       'multivariable-true3d':
-        'A 3D scatter of X, Y, and Z, with bubble size as a fourth encoding. Drag the plot to rotate so points that overlap in two dimensions can separate along the third. Use the 3D sliders for alpha, beta, and depth, and map Z in Variables.'
+        'A 3D scatter of X, Y, and Z, with bubble size as a fourth encoding. Drag the plot to rotate so points that overlap in two dimensions can separate along the third. Use the 3D sliders for alpha, beta, and depth, and map Z in Variables.',
+      'segmentation-overview':
+        'Loyalty Matrix. Four segments are formed by the two cut-offs. The interpretation-ready summary is in the computed payload under interpretation, with segment percentages under loyalty.overall. These are descriptive shares, not significance tests.',
+      'segmentation-groups':
+        'Group comparison of the loyalty segments. Use the visible bars and the computed payload. Do not treat percentage differences as significance tests.',
+      'segmentation-change':
+        'Change between the current and previous survey period, in percentage points. Use the computed payload. These are descriptive changes, not significance tests.',
+      'segmentation-drivers':
+        'Split Index™. The chart has two vertical axes: mean score on the left (blue = high group, red = low group) and Split Index on the right (gray columns). A larger Split Index means the factor separates the two groups more. Pattern readings are not printed under the chart. They are in the computed payload at splitIndex.factors, each with pattern and reading. The interpretation summary is in interpretation. Use those readings and the means. Do not invent significance tests, and do not tell the user to look for pattern cards or export buttons.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -9280,7 +9288,9 @@ REPORT: [one polished paragraph suitable for a report]`;
         + ' If the analysis is nonparametric (e.g. Friedman), note that power is an approximation obtained by converting the rank effect (Kendall\u2019s W) to a parametric planning effect f.',
       'independent-power': POWER_PLANNING_GUARD,
       'mixed-model-power': POWER_PLANNING_GUARD
-        + ' Emphasise that mixed-model power is planned in SUBJECTS, not total observations: ICC and measurements-per-subject determine the effective sample size, so adding subjects usually helps more than adding repeats.'
+        + ' Emphasise that mixed-model power is planned in SUBJECTS, not total observations: ICC and measurements-per-subject determine the effective sample size, so adding subjects usually helps more than adding repeats.',
+      'segmentation-drivers':
+        'This is a dual-axis Split Index chart. Describe the blue and red mean lines and the gray Split Index columns. Factor pattern readings (Strong differentiator, Shared strength, Shared weakness, Group-specific weakness) are in the computed payload under splitIndex.factors, not printed on the page. Cite those readings, the group means, and the Split Index values. Do not refer to pattern cards, a copy-chart button, or an interpretation-ready summary button.'
     };
     const chartGuard = chartGuards[viewKey];
     const partialPlotGuard = chartGuard

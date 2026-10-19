@@ -615,6 +615,7 @@
     var angled = longLabel || rows.length > 6;
     var light = ink === '#1c1917';
     var indexInk = light ? '#57534e' : '#d6d3d1';
+    var grid = light ? 'rgba(28,25,23,.28)' : 'rgba(226,232,240,.42)';
     return {
       chart: {
         type: 'spline',
@@ -649,6 +650,8 @@
       },
       xAxis: {
         categories: rows.map(function (row) { return row.factorLabel; }),
+        gridLineWidth: 1,
+        gridLineColor: grid,
         lineWidth: 0,
         tickLength: 0,
         labels: {
@@ -661,8 +664,9 @@
         {
           title: { text: 'Dimensions mean score', margin: 16, style: { color: ink, fontWeight: '700', fontSize: '16px' } },
           labels: { style: { color: ink, fontWeight: '700', fontSize: '15px' } },
-          gridLineColor: 'rgba(148,163,184,.22)',
-          gridLineDashStyle: 'Dot'
+          gridLineWidth: 1,
+          gridLineColor: grid,
+          gridLineDashStyle: 'Solid'
         },
         {
           title: { text: indexName, margin: 16, style: { color: indexInk, fontWeight: '700', fontSize: '16px' } },

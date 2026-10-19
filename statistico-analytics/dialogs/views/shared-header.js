@@ -8266,7 +8266,8 @@ REPORT: [one polished paragraph suitable for a report]`;
     const axisPatch = (axis) => {
       const userTitle = (axis && axis.userOptions && axis.userOptions.title && axis.userOptions.title.style) || {};
       const userLabels = (axis && axis.userOptions && axis.userOptions.labels && axis.userOptions.labels.style) || {};
-      return {
+      const userAxis = (axis && axis.userOptions) || {};
+      const patch = {
         title: {
           style: {
             color: userTitle.color || axisColor,
@@ -8282,11 +8283,13 @@ REPORT: [one polished paragraph suitable for a report]`;
             textOutline: 'none'
           }
         },
-        gridLineColor: tpl.grid,
+        gridLineColor: userAxis.gridLineColor || tpl.grid,
         minorGridLineColor: tpl.minorGrid,
         lineColor: tpl.line,
         tickColor: tpl.line
       };
+      if (userAxis.gridLineWidth != null) patch.gridLineWidth = userAxis.gridLineWidth;
+      return patch;
     };
     try {
       chart.update({

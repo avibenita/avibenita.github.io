@@ -8263,13 +8263,30 @@ REPORT: [one polished paragraph suitable for a report]`;
       ? '#242C37'
       : ((tpl && tpl.chartBg) || (isLight ? '#ffffff' : '#242C37'));
     const axisColor = tpl.axis;
-    const axisPatch = {
-      title: { style: { color: axisColor, fontSize: '0.8em' } },
-      labels: { style: { color: axisColor, fontSize: '0.8em', textOutline: 'none' } },
-      gridLineColor: tpl.grid,
-      minorGridLineColor: tpl.minorGrid,
-      lineColor: tpl.line,
-      tickColor: tpl.line
+    const axisPatch = (axis) => {
+      const userTitle = (axis && axis.userOptions && axis.userOptions.title && axis.userOptions.title.style) || {};
+      const userLabels = (axis && axis.userOptions && axis.userOptions.labels && axis.userOptions.labels.style) || {};
+      return {
+        title: {
+          style: {
+            color: userTitle.color || axisColor,
+            fontSize: userTitle.fontSize || '0.8em',
+            fontWeight: userTitle.fontWeight
+          }
+        },
+        labels: {
+          style: {
+            color: userLabels.color || axisColor,
+            fontSize: userLabels.fontSize || '0.8em',
+            fontWeight: userLabels.fontWeight,
+            textOutline: 'none'
+          }
+        },
+        gridLineColor: tpl.grid,
+        minorGridLineColor: tpl.minorGrid,
+        lineColor: tpl.line,
+        tickColor: tpl.line
+      };
     };
     try {
       chart.update({
@@ -8291,8 +8308,8 @@ REPORT: [one polished paragraph suitable for a report]`;
           borderColor: tpl.tooltipBorder,
           style: { color: tpl.tooltipText, fontSize: '0.8em' }
         },
-        xAxis: axisPatch,
-        yAxis: axisPatch
+        xAxis: (chart.xAxis || []).map(axisPatch),
+        yAxis: (chart.yAxis || []).map(axisPatch)
       }, true, false, false);
     } catch (e) {}
   },
@@ -9170,7 +9187,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'segmentation-change':
         'Change between the current and previous survey period, in percentage points. Use the computed payload. These are descriptive changes, not significance tests.',
       'segmentation-drivers':
-        'Split Index™. The chart has two vertical axes: mean score on the left (blue = high group, red = low group) and Split Index on the right (gray columns). A larger Split Index means the factor separates the two groups more. Pattern readings are not printed under the chart. They are in the computed payload at splitIndex.factors, each with pattern and reading. The interpretation summary is in interpretation. Use those readings and the means. Do not invent significance tests, and do not tell the user to look for pattern cards or export buttons.'
+        'Split Index™. The chart has two vertical axes: Dimensions mean score on the left (blue = high group, red = low group) and Split Index on the right (gray columns). A larger Split Index means the factor separates the two groups more. Pattern readings are not printed under the chart. They are in the computed payload at splitIndex.factors, each with pattern and reading. The interpretation summary is in interpretation. Use those readings and the means. Do not invent significance tests, and do not tell the user to look for pattern cards or export buttons.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -9290,7 +9307,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'mixed-model-power': POWER_PLANNING_GUARD
         + ' Emphasise that mixed-model power is planned in SUBJECTS, not total observations: ICC and measurements-per-subject determine the effective sample size, so adding subjects usually helps more than adding repeats.',
       'segmentation-drivers':
-        'This is a dual-axis Split Index chart. Describe the blue and red mean lines and the gray Split Index columns. Factor pattern readings (Strong differentiator, Shared strength, Shared weakness, Group-specific weakness) are in the computed payload under splitIndex.factors, not printed on the page. Cite those readings, the group means, and the Split Index values. Do not refer to pattern cards, a copy-chart button, or an interpretation-ready summary button.'
+        'This is a dual-axis Split Index chart. Describe the blue and red lines on Dimensions mean score and the gray Split Index columns. Factor pattern readings (Strong differentiator, Shared strength, Shared weakness, Group-specific weakness) are in the computed payload under splitIndex.factors, not printed on the page. Cite those readings, the group means, and the Split Index values. Do not refer to pattern cards, a copy-chart button, or an interpretation-ready summary button.'
     };
     const chartGuard = chartGuards[viewKey];
     const partialPlotGuard = chartGuard

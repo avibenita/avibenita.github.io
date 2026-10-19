@@ -614,7 +614,6 @@
     };
     var angled = longLabel || rows.length > 6;
     var light = ink === '#1c1917';
-    var meanInk = light ? '#1d4ed8' : '#93c5fd';
     var indexInk = light ? '#57534e' : '#d6d3d1';
     return {
       chart: {
@@ -660,18 +659,18 @@
       },
       yAxis: [
         {
-          title: { text: 'Mean score', style: { color: meanInk, fontWeight: '600' } },
-          labels: { style: { color: meanInk, fontWeight: '600' } },
+          title: { text: 'Dimensions mean score', margin: 16, style: { color: ink, fontWeight: '700', fontSize: '16px' } },
+          labels: { style: { color: ink, fontWeight: '700', fontSize: '15px' } },
           gridLineColor: 'rgba(148,163,184,.22)',
           gridLineDashStyle: 'Dot'
         },
         {
-          title: { text: indexName, style: { color: indexInk, fontWeight: '600' } },
+          title: { text: indexName, margin: 16, style: { color: indexInk, fontWeight: '700', fontSize: '16px' } },
           opposite: true,
           min: 0,
           alignTicks: false,
           gridLineWidth: 0,
-          labels: { style: { color: indexInk, fontWeight: '600' } }
+          labels: { style: { color: indexInk, fontWeight: '700', fontSize: '15px' } }
         }
       ],
       tooltip: { shared: false, borderRadius: 8 },
@@ -679,11 +678,11 @@
         spline: {
           lineWidth: 2.75,
           zIndex: 3,
-          marker: { enabled: true, symbol: 'circle', radius: 4.5, lineWidth: 0 },
+          marker: { enabled: true, symbol: 'circle', radius: 10, lineWidth: 0 },
           dataLabels: {
             enabled: rows.length <= 14,
             format: '{y:.2f}',
-            y: -6,
+            y: -12,
             allowOverlap: false,
             style: { color: ink, textOutline: 'none', fontSize: '11px', fontWeight: '700' }
           },

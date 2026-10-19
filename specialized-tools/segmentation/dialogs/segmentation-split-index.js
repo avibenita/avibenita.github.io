@@ -612,86 +612,118 @@
       var n = group.validN != null ? ' (n = ' + group.validN + ')' : '';
       return (group.label || fallback) + n;
     };
+    var angled = longLabel || rows.length > 6;
+    var light = ink === '#1c1917';
+    var meanInk = light ? '#1d4ed8' : '#93c5fd';
+    var indexInk = light ? '#57534e' : '#d6d3d1';
     return {
       chart: {
-        type: 'line',
+        type: 'spline',
         backgroundColor: 'transparent',
-        scrollablePlotArea: rows.length > 8 ? { minWidth: rows.length * 96, scrollPositionX: 0 } : undefined
+        spacingTop: 16,
+        spacingRight: 18,
+        spacingBottom: 12,
+        spacingLeft: 12,
+        style: { fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" },
+        scrollablePlotArea: rows.length > 8 ? { minWidth: rows.length * 108, scrollPositionX: 0 } : undefined
       },
       title: {
         text: view.title || null,
         align: 'center',
-        style: { color: ink, fontSize: '22px', fontWeight: '700' }
+        margin: 6,
+        style: { color: ink, fontSize: '26px', fontWeight: '600', letterSpacing: '0.04em' }
       },
       subtitle: {
         text: view.subtitle || null,
         align: 'center',
-        style: { color: muted, fontSize: '14px' }
+        style: { color: muted, fontSize: '13px', fontWeight: '500' }
       },
       credits: { enabled: false },
-      legend: { enabled: true, reversed: false, itemStyle: { color: ink } },
+      legend: {
+        enabled: true,
+        align: 'center',
+        verticalAlign: 'bottom',
+        itemStyle: { color: ink, fontWeight: '600', fontSize: '12px' },
+        itemHoverStyle: { color: ink },
+        symbolRadius: 2,
+        padding: 8
+      },
       xAxis: {
         categories: rows.map(function (row) { return row.factorLabel; }),
+        lineWidth: 0,
+        tickLength: 0,
         labels: {
-          rotation: longLabel || rows.length > 8 ? -40 : 0,
-          style: { color: ink, fontSize: '11px' }
-        },
-        lineColor: muted,
-        tickColor: muted
+          rotation: angled ? -40 : 0,
+          align: angled ? 'right' : 'center',
+          style: { color: muted, fontSize: '12px', fontWeight: '600' }
+        }
       },
       yAxis: [
         {
-          title: { text: 'Mean score', style: { color: '#3b82f6' } },
-          labels: { style: { color: ink } },
-          gridLineColor: 'rgba(148,163,184,.25)'
+          title: { text: 'Mean score', style: { color: meanInk, fontWeight: '600' } },
+          labels: { style: { color: meanInk, fontWeight: '600' } },
+          gridLineColor: 'rgba(148,163,184,.22)',
+          gridLineDashStyle: 'Dot'
         },
         {
-          title: { text: indexName, style: { color: '#94a3b8' } },
+          title: { text: indexName, style: { color: indexInk, fontWeight: '600' } },
           opposite: true,
           min: 0,
           alignTicks: false,
           gridLineWidth: 0,
-          labels: { style: { color: ink } }
+          labels: { style: { color: indexInk, fontWeight: '600' } }
         }
       ],
-      tooltip: { shared: false },
+      tooltip: { shared: false, borderRadius: 8 },
       plotOptions: {
-        line: {
-          lineWidth: 2.5,
-          zIndex: 2,
-          marker: { enabled: true, symbol: 'circle', radius: 4 },
-          dataLabels: { enabled: rows.length <= 12, format: '{y:.2f}', allowOverlap: false, style: { color: ink, textOutline: 'none', fontSize: '10px' } }
+        spline: {
+          lineWidth: 2.75,
+          zIndex: 3,
+          marker: { enabled: true, symbol: 'circle', radius: 4.5, lineWidth: 0 },
+          dataLabels: {
+            enabled: rows.length <= 14,
+            format: '{y:.2f}',
+            y: -6,
+            allowOverlap: false,
+            style: { color: ink, textOutline: 'none', fontSize: '11px', fontWeight: '700' }
+          },
+          states: { hover: { lineWidthPlus: 0, halo: { size: 0 } } }
         },
         column: {
           zIndex: 1,
-          pointPadding: 0.2,
-          groupPadding: 0.18,
+          grouping: false,
+          pointPadding: 0.16,
+          groupPadding: 0.14,
+          maxPointWidth: 34,
           borderWidth: 1,
-          borderColor: '#eab308',
+          borderColor: '#e7c56a',
+          borderRadius: 2,
           dataLabels: { enabled: false }
         }
       },
       series: [
         {
-          type: 'line',
+          type: 'spline',
           name: groupName(result && result.group1, 'High group'),
           yAxis: 0,
           color: '#3b82f6',
+          legendIndex: 2,
           data: rows.map(function (row) { return isNum(row.group1.mean) ? Math.round(row.group1.mean * 100) / 100 : null; })
         },
         {
-          type: 'line',
+          type: 'spline',
           name: groupName(result && result.group2, 'Low group'),
           yAxis: 0,
           color: '#ef4444',
+          legendIndex: 1,
           data: rows.map(function (row) { return isNum(row.group2.mean) ? Math.round(row.group2.mean * 100) / 100 : null; })
         },
         {
           type: 'column',
           name: indexName,
           yAxis: 1,
-          color: '#d6d3d1',
-          pointWidth: 16,
+          color: 'rgba(214,211,209,0.78)',
+          legendIndex: 0,
           data: rows.map(function (row) { return isNum(row.selectedSplitIndex) ? Math.round(row.selectedSplitIndex * 100) / 100 : null; })
         }
       ]

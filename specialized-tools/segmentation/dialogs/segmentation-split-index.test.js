@@ -269,16 +269,16 @@ describe('Split Index calculations', () => {
     expect(text).toMatch(/Valid n:/);
   });
 
-  test('the chart uses straight lines and columns, never a spline', () => {
+  test('the chart uses smooth group lines and Split Index columns on a second axis', () => {
     const result = SI.calculateSplitIndex([
       row(0, 5, 5, 5, 4),
       row(1, 2, 2, 2, 3)
     ], config(), {});
     const options = SI.buildSplitIndexChartOptions(result);
-    expect(options.chart.type).toBe('line');
-    expect(options.series.map((series) => series.type)).toEqual(['line', 'line', 'column']);
-    expect(JSON.stringify(options).indexOf('spline')).toBe(-1);
+    expect(options.chart.type).toBe('spline');
+    expect(options.series.map((series) => series.type)).toEqual(['spline', 'spline', 'column']);
     expect(options.series[0].data).toEqual([5, 4]);
     expect(options.series[2].yAxis).toBe(1);
+    expect(options.yAxis[1].opposite).toBe(true);
   });
 });

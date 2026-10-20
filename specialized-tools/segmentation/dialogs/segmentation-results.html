@@ -183,6 +183,9 @@
     .bench { font-size:12.5px; font-weight:700; color:var(--accent); }
     #driverControls { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; align-items:start; margin-bottom:8px; }
     #driverControls[hidden] { display:none !important; }
+    #splitCutField[hidden] { display:none !important; }
+    .cut-row { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:8px; align-items:center; }
+    .cut-row input[type="range"] { width:100%; margin:0; padding:0; height:22px; accent-color:#5eead4; }
     .driver-index { border:1px solid var(--border); border-radius:8px; margin:0; padding:8px; min-width:0; }
     .driver-index .driver-legend { font-size:11px; font-weight:700; color:var(--muted); margin-bottom:4px; }
     #driverIntro .info { display:inline-flex; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; background:#0d9488; color:#fff; font-size:11px; font-weight:700; cursor:help; }
@@ -263,6 +266,23 @@
                 <label class="field" id="lowLegendField">Lower score
                   <input id="lowLegend" type="text" />
                 </label>
+                <div id="splitCutField">
+                  <label class="field">Cut-off rule
+                    <select id="splitCutMethod">
+                      <option value="median">Median</option>
+                      <option value="midpoint">Scale midpoint</option>
+                      <option value="favorable">Favorable-response threshold</option>
+                      <option value="custom">Custom number</option>
+                    </select>
+                  </label>
+                  <label class="field">Cut-off
+                    <span class="cut-row">
+                      <input id="splitCutSlider" type="range" min="1" max="5" step="0.01" value="4" />
+                      <input id="splitCutValue" type="number" step="0.01" />
+                    </span>
+                  </label>
+                  <p class="note" id="splitCutRule"></p>
+                </div>
                 <label class="field" id="xMethodField">Satisfaction rule
                     <select id="xMethod">
                       <option value="custom">Custom numeric threshold</option>
@@ -471,7 +491,7 @@
       <h3>How the index is calculated</h3>
       <ul>
         <li><strong>Splitting construct.</strong> Intention to stay can be one item or the average of several items. Missing answers stay missing. They are not scored as zero.</li>
-        <li><strong>Cut-off.</strong> The default cut is the median. At or above the median is the high group. Below the median is the low group. You can change the cut-off in Settings.</li>
+        <li><strong>Cut-off.</strong> The default cut is the median. At or above the median is the high group. Below the median is the low group. You can move the cut-off, and the chart updates with it.</li>
         <li><strong>Factor score.</strong> Each dimension you compare is averaged in the same way, for the respondents who answered it.</li>
         <li><strong>Raw distance.</strong> The raw Split Index is the absolute difference of the two group means.</li>
         <li><strong>Standardized distance.</strong> When dimensions do not share a scale, the standardized Split Index divides that difference by the pooled standard deviation. A one-point gap on a 1–5 scale is then not treated as equal to a one-point gap on a 0–100 scale.</li>
@@ -582,6 +602,8 @@
         var el = document.getElementById(id);
         if (el) el.hidden = split;
       });
+      var cutField = document.getElementById('splitCutField');
+      if (cutField) cutField.hidden = !split;
       var driverControls = document.getElementById('driverControls');
       if (driverControls) driverControls.hidden = split;
       var summary = document.getElementById('summary');
@@ -743,9 +765,16 @@
     function readSettingsFromDom() {
       if (!_spec) return;
       _spec.xDimension.thresholdMethod = document.getElementById('xMethod').value;
-      _spec.yDimension.thresholdMethod = document.getElementById('yMethod').value;
       _spec.xDimension.threshold = Number(document.getElementById('xThreshold').value);
-      _spec.yDimension.threshold = Number(document.getElementById('yThreshold').value);
+      if (productId() === 'split') {
+        var cutMethod = document.getElementById('splitCutMethod');
+        var cutValue = document.getElementById('splitCutValue');
+        if (cutMethod) _spec.yDimension.thresholdMethod = cutMethod.value || 'median';
+        if (cutValue && cutValue.value !== '') _spec.yDimension.threshold = Number(cutValue.value);
+      } else {
+        _spec.yDimension.thresholdMethod = document.getElementById('yMethod').value;
+        _spec.yDimension.threshold = Number(document.getElementById('yThreshold').value);
+      }
       _spec.minimumValidItems = Number(document.getElementById('minItems').value);
       if (_spec.waveColumn) {
         _spec.currentWave = document.getElementById('currentWave').value || null;
@@ -780,6 +809,50 @@
         if (color && color.value) _spec.segments[key].color = color.value;
       });
     }
+    function syncSplitCutControls() {
+      if (!_spec || productId() !== 'split') return;
+      var methodEl = document.getElementById('splitCutMethod');
+      var valueEl = document.getElementById('splitCutValue');
+      var slider = document.getElementById('splitCutSlider');
+      var rule = document.getElementById('splitCutRule');
+      if (!methodEl || !valueEl || !slider) return;
+      var method = _spec.yDimension.thresholdMethod || 'median';
+      var value = Number(_spec.yDimension.threshold);
+      methodEl.value = method;
+      var scale = _bundle && _bundle.rules && _bundle.rules.yScale;
+      var min = scale && scale.min != null ? Number(scale.min) : 1;
+      var max = scale && scale.max != null ? Number(scale.max) : 5;
+      if (isFinite(value)) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+        var shown = Math.round(value * 100) / 100;
+        valueEl.value = String(shown);
+        slider.min = String(min);
+        slider.max = String(max);
+        slider.step = '0.01';
+        slider.value = String(shown);
+      }
+      if (rule && isFinite(value)) {
+        var high = _spec.yDimension.highLabel || SS.SPLIT_HIGH_LABEL;
+        var low = _spec.yDimension.lowLabel || SS.SPLIT_LOW_LABEL;
+        rule.textContent = high + ' is at or above ' + SS.formatNum(value) + '. ' + low + ' is below it.';
+      }
+    }
+    function applySplitCut(method, value) {
+      if (!_spec) return;
+      var scores = ((_bundle && _bundle.scoredRespondents) || []).map(function (r) { return r.yScore; }).filter(function (n) { return typeof n === 'number' && isFinite(n); });
+      var resolved = SS.resolveThreshold(method, method === 'custom' ? value : _spec.yDimension.threshold, scores);
+      _spec.yDimension.thresholdMethod = resolved.method;
+      _spec.yDimension.threshold = resolved.threshold;
+      if (_bundle && _bundle.config && _bundle.config.yDimension) {
+        _bundle.config.yDimension.thresholdMethod = resolved.method;
+        _bundle.config.yDimension.threshold = resolved.threshold;
+      }
+      if (_bundle && _bundle.rules) _bundle.rules.yThreshold = resolved.threshold;
+      syncSplitCutControls();
+      if (_bundle && _bundle.ok) paintDrivers();
+      else recompute();
+    }
     function syncSettingsToDom() {
       if (!_spec) return;
       _painting = true;
@@ -810,6 +883,7 @@
       if (waveOn) fillWaveSelects();
       document.getElementById('xThreshold').disabled = document.getElementById('xMethod').value !== 'custom';
       document.getElementById('yThreshold').disabled = document.getElementById('yMethod').value !== 'custom';
+      syncSplitCutControls();
       ensureLabelEditor();
       SS.QUADRANT_KEYS.forEach(function (key) {
         var label = document.getElementById('label-' + key);
@@ -1641,6 +1715,24 @@
     document.getElementById('changeSegment').addEventListener('change', function () {
       _changeKey = this.value;
       paintChange();
+    });
+    document.getElementById('splitCutMethod').addEventListener('change', function () {
+      if (_painting) return;
+      applySplitCut(this.value || 'median', Number(document.getElementById('splitCutValue').value));
+    });
+    document.getElementById('splitCutSlider').addEventListener('input', function () {
+      if (_painting) return;
+      document.getElementById('splitCutMethod').value = 'custom';
+      document.getElementById('splitCutValue').value = this.value;
+      applySplitCut('custom', Number(this.value));
+    });
+    document.getElementById('splitCutValue').addEventListener('input', function () {
+      if (_painting) return;
+      document.getElementById('splitCutMethod').value = 'custom';
+      document.getElementById('splitCutSlider').value = this.value;
+      var n = Number(this.value);
+      if (!isFinite(n)) return;
+      applySplitCut('custom', n);
     });
     ['xMethod', 'yMethod', 'xThreshold', 'yThreshold', 'minItems', 'currentWave', 'previousWave', 'reportTitle', 'xTitle', 'yTitle', 'chartTitle', 'chartSubtitle', 'highLegend', 'lowLegend'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {

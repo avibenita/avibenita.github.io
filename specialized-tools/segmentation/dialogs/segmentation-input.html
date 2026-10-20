@@ -22,8 +22,10 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260928range2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="segmentation-sample-data.js?v=20261013seg1"></script>
   <script src="segmentation-engine.js?v=20261020legend"></script>
+  <script src="segmentation-split-index.js?v=20261020cut"></script>
   <style>
     :root { --seg-acc: #0d9488; }
     [data-theme="light"] { --seg-acc: #0f766e; }
@@ -88,6 +90,10 @@
     .cfg-btn.run:not(:disabled) { background:linear-gradient(135deg,#0d9488,#0f766e); border-color:transparent; color:#fff; font-weight:700; }
     .demo-row { display:flex; flex-wrap:wrap; gap:6px; }
     .demo-row button { font-size:10.5px; padding:5px 8px; border-radius:6px; border:1px solid var(--cfg-border); background:var(--cfg-surface); color:var(--cfg-text2); cursor:pointer; }
+    .cut-row { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:8px; align-items:center; }
+    .cut-row input[type="range"] { width:100%; margin:0; accent-color:var(--seg-acc); }
+    .split-preview { height:340px; margin-top:8px; }
+    .split-preview-note { margin:6px 0 0; font-size:11px; color:var(--cfg-text3); }
     @media (max-width: 760px) {
       .reg-layout { flex-direction:column; overflow:auto; }
       .reg-vars-col { flex:0 0 auto; max-height:180px; }
@@ -160,6 +166,25 @@
               <input id="yThreshold" type="number" step="0.01" value="4" />
               <div class="rule-line" id="yRule">Tending to stay: score ≥ 4.00</div>
             </div>
+          </div>
+          <div class="opt-card" id="splitCutCard" hidden>
+            <h4>Splitting cut-off</h4>
+            <p class="zone-help">The default cut is the median of the splitting construct. At or above the cut is the highest score. Below it is the lower score. Move the cut and the chart updates.</p>
+            <label for="splitCutMethod">Rule</label>
+            <select id="splitCutMethod">
+              <option value="median" selected>Median</option>
+              <option value="midpoint">Scale midpoint</option>
+              <option value="favorable">Favorable-response threshold</option>
+              <option value="custom">Custom number</option>
+            </select>
+            <label for="splitCutValue">Cut-off</label>
+            <div class="cut-row">
+              <input id="splitCutSlider" type="range" min="1" max="5" step="0.01" value="4" />
+              <input id="splitCutValue" type="number" step="0.01" value="4" />
+            </div>
+            <div class="rule-line" id="splitCutRule">At or above the cut is the highest score. Below it is the lower score.</div>
+            <div id="splitPreview" class="split-preview"></div>
+            <p class="split-preview-note" id="splitPreviewNote"></p>
           </div>
           <div class="opt-card" id="splitLegendCard" hidden>
             <h4>Legend labels</h4>
@@ -541,6 +566,9 @@
       qs('modelSummary').textContent = bits.length ? bits.join('  ×  ') : emptySummary;
       var xCard = qs('xThresholdCard');
       if (xCard) xCard.style.display = PRODUCT === 'split' ? 'none' : '';
+      var yCard = qs('yThresholdCard');
+      if (yCard) yCard.style.display = PRODUCT === 'split' ? 'none' : '';
+      scheduleSplitPreview();
       var labels = qs('labelEditor');
       if (labels) labels.style.display = PRODUCT === 'split' ? 'none' : '';
     }
@@ -576,7 +604,9 @@
         base.xDimension.columns = [];
         base.groupColumn = null;
         base.weightColumn = null;
-        base.yDimension.thresholdMethod = 'median';
+        base.yDimension.thresholdMethod = (qs('splitCutMethod') && qs('splitCutMethod').value) || 'median';
+        var cutValue = qs('splitCutValue') ? qs('splitCutValue').value : '';
+        base.yDimension.threshold = cutValue === '' ? null : Number(cutValue);
         var highLegend = qs('splitHighLabel');
         var lowLegend = qs('splitLowLabel');
         base.yDimension.highLabel = (highLegend && highLegend.value.trim()) || SS.SPLIT_HIGH_LABEL;
@@ -627,6 +657,10 @@
         var savedLow = saved && saved.yDimension && saved.yDimension.lowLabel;
         if (highLegend) highLegend.value = (saved && saved.legendLabelsCustom && savedHigh) ? savedHigh : (savedHigh && savedHigh !== 'Tending to stay' ? savedHigh : 'Highest score');
         if (lowLegend) lowLegend.value = (saved && saved.legendLabelsCustom && savedLow) ? savedLow : (savedLow && savedLow !== 'Not tending to stay' ? savedLow : 'Lower score');
+        if (saved && saved.product === 'split' && saved.yDimension) {
+          qs('splitCutMethod').value = saved.yDimension.thresholdMethod || 'median';
+          if (saved.yDimension.threshold != null && saved.yDimension.threshold !== '') qs('splitCutValue').value = saved.yDimension.threshold;
+        }
       }
       qs('loadingSpinner').style.display = 'none';
       qs('mainContent').style.display = 'flex';
@@ -652,10 +686,119 @@
       loadSample();
     }
 
+    var _previewChart = null;
+    var _previewBundle = null;
+    var _previewKey = '';
+    var _cutPainting = false;
+    var _previewTimer = 0;
+
+    function splitCutNumber() {
+      var n = Number(qs('splitCutValue').value);
+      return isFinite(n) ? n : null;
+    }
+
+    function writeSplitCut(threshold, scale) {
+      var shown = Math.round(Number(threshold) * 100) / 100;
+      var slider = qs('splitCutSlider');
+      var min = scale && scale.min != null ? scale.min : 1;
+      var max = scale && scale.max != null ? scale.max : 5;
+      if (isFinite(shown)) {
+        if (shown < min) min = shown;
+        if (shown > max) max = shown;
+      }
+      _cutPainting = true;
+      slider.min = String(min);
+      slider.max = String(max);
+      slider.step = '0.01';
+      if (qs('splitCutMethod').value !== 'custom') {
+        qs('splitCutValue').value = String(shown);
+        slider.value = String(shown);
+      } else if (isFinite(shown)) {
+        slider.value = qs('splitCutValue').value;
+      }
+      var high = (qs('splitHighLabel').value || '').trim() || 'Highest score';
+      var low = (qs('splitLowLabel').value || '').trim() || 'Lower score';
+      var cut = qs('splitCutMethod').value === 'custom' ? splitCutNumber() : shown;
+      qs('splitCutRule').textContent = high + ' is at or above ' + SS.formatNum(cut) + '. ' + low + ' is below it.';
+      _cutPainting = false;
+    }
+
+    function scheduleSplitPreview() {
+      if (PRODUCT !== 'split') return;
+      clearTimeout(_previewTimer);
+      _previewTimer = setTimeout(paintSplitPreview, 40);
+    }
+
+    function paintSplitPreview() {
+      if (PRODUCT !== 'split' || !window.StatisticoSplitIndex || typeof Highcharts === 'undefined') return;
+      var host = qs('splitPreview');
+      var note = qs('splitPreviewNote');
+      if (!assign.y.length || !assign.factors.length) {
+        if (_previewChart) { _previewChart.destroy(); _previewChart = null; }
+        host.innerHTML = '';
+        note.textContent = 'Select a splitting construct and at least one factor to see the chart.';
+        return;
+      }
+      var spec = buildSpec();
+      var key = [assign.y.join('|'), assign.factors.join('|'), spec.minimumValidItems, assign.wave || '', spec.currentWave || '', spec.previousWave || ''].join('~');
+      if (!_previewBundle || _previewKey !== key) {
+        _previewBundle = SS.analyze(_headers, _rows, spec);
+        _previewKey = key;
+      }
+      var bundle = _previewBundle;
+      if (!bundle || !bundle.ok) {
+        if (_previewChart) { _previewChart.destroy(); _previewChart = null; }
+        host.innerHTML = '';
+        note.textContent = (bundle && bundle.error) || 'The chart cannot be drawn for this selection.';
+        return;
+      }
+      var scores = (bundle.scoredRespondents || []).map(function (r) { return r.yScore; }).filter(function (n) { return typeof n === 'number' && isFinite(n); });
+      var resolved = SS.resolveThreshold(spec.yDimension.thresholdMethod, spec.yDimension.threshold, scores);
+      var cfg = JSON.parse(JSON.stringify(bundle.config));
+      cfg.yDimension.threshold = resolved.threshold;
+      cfg.yDimension.thresholdMethod = resolved.method;
+      cfg.yDimension.highLabel = spec.yDimension.highLabel;
+      cfg.yDimension.lowLabel = spec.yDimension.lowLabel;
+      cfg.chartTitle = spec.chartTitle;
+      writeSplitCut(resolved.threshold, bundle.rules && bundle.rules.yScale);
+      var result = window.StatisticoSplitIndex.calculateSplitIndex(bundle.scoredRespondents || [], cfg, { mode: 'stay', index: 'raw' });
+      if (!result.ok) {
+        if (_previewChart) { _previewChart.destroy(); _previewChart = null; }
+        host.innerHTML = '';
+        note.textContent = result.error || 'The chart cannot be drawn for this cut-off.';
+        return;
+      }
+      note.textContent = '';
+      var light = document.documentElement.getAttribute('data-theme') === 'light';
+      var options = window.StatisticoSplitIndex.buildSplitIndexChartOptions(result, {
+        title: 'Factors split by ' + (spec.yDimension.label || 'the splitting construct'),
+        subtitle: 'Split-Index™ Approach',
+        ink: light ? '#1c1917' : '#f8fafc',
+        muted: light ? '#3f3f46' : '#cbd5e1'
+      });
+      options.chart.height = 320;
+      if (_previewChart) { _previewChart.destroy(); _previewChart = null; }
+      _previewChart = Highcharts.chart(host, options);
+    }
+
+    function onSplitCutEdited(makeCustom) {
+      if (_cutPainting) return;
+      if (makeCustom) qs('splitCutMethod').value = 'custom';
+      var slider = qs('splitCutSlider');
+      if (makeCustom === 'slider') qs('splitCutValue').value = slider.value;
+      if (makeCustom === 'number') slider.value = qs('splitCutValue').value;
+      scheduleSplitPreview();
+    }
+
     qs('xMethod').addEventListener('change', refresh);
     qs('yMethod').addEventListener('change', refresh);
     qs('xThreshold').addEventListener('input', function () { xDirty = true; updateRules(); });
     qs('yThreshold').addEventListener('input', function () { yDirty = true; updateRules(); });
+    qs('splitCutMethod').addEventListener('change', function () { onSplitCutEdited(false); });
+    qs('splitCutSlider').addEventListener('input', function () { onSplitCutEdited('slider'); });
+    qs('splitCutValue').addEventListener('input', function () { onSplitCutEdited('number'); });
+    qs('splitHighLabel').addEventListener('input', scheduleSplitPreview);
+    qs('splitLowLabel').addEventListener('input', scheduleSplitPreview);
     qs('minItems').addEventListener('change', refresh);
     qs('btnRun').addEventListener('click', runAnalysis);
     qs('btnCancel').addEventListener('click', function () { send('cancel'); });
@@ -665,10 +808,10 @@
       document.title = split ? 'Split Index™' : 'Loyalty Matrix';
       qs('cfgHeaderTitle').textContent = document.title;
       qs('cfgHeaderIcon').className = split ? 'fa-solid fa-chart-simple' : 'fa-solid fa-border-all';
-      var yHead = qs('yThresholdCard') && qs('yThresholdCard').querySelector('h4');
-      if (yHead && split) yHead.textContent = 'High / low cut-off';
       var legendCard = qs('splitLegendCard');
       if (legendCard) legendCard.hidden = !split;
+      var cutCard = qs('splitCutCard');
+      if (cutCard) cutCard.hidden = !split;
       if (split) {
         qs('yMethod').value = 'median';
         ['yMethod', 'yThreshold'].forEach(function (id) {

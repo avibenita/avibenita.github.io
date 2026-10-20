@@ -24,7 +24,7 @@
   <script src="../shared-header.js?v=20261020checks"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261014si1"></script>
+  <script src="segmentation-split-index.js?v=20261020flag"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
     :root {
@@ -156,6 +156,13 @@
     .help-card .swatch.blue { background:#3b82f6; }
     .help-card .swatch.red { background:#ef4444; }
     .help-card .swatch.col { width:12px; height:16px; background:rgba(214,211,209,.9); border:1px solid #e7c56a; border-radius:2px; }
+    .help-card .swatch.flag { width:12px; height:16px; background:rgba(231,197,106,.95); border:1px solid #f8e7b0; border-radius:2px; }
+    .flag-note { display:flex; gap:10px; align-items:flex-start; margin:10px 0 0; padding:10px 12px; border:1px solid rgba(231,197,106,.5); border-radius:10px; background:rgba(231,197,106,.1); color:var(--text); font-size:13px; line-height:1.45; }
+    .flag-note[hidden] { display:none !important; }
+    .flag-note p { margin:0; }
+    .flag-mark { flex:0 0 12px; width:12px; height:18px; margin-top:2px; border-radius:2px; background:rgba(231,197,106,.95); border:1px solid #f8e7b0; }
+    .stats-scroll tr.flagged-row td:first-child,
+    .stats-scroll td.flag-cell { color:#e7c56a; font-weight:700; }
     .help-close { float:right; }
     .note { font-size:12px; color:var(--muted); margin:6px 0 0; }
     table { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px; }
@@ -454,6 +461,10 @@
                 <p id="driverScaleNote" class="note"></p>
                 <p id="driverSameNote" class="note"></p>
                 <div id="driverChart" class="chart"></div>
+                <div id="splitFlagNote" class="flag-note" hidden>
+                  <i class="flag-mark" aria-hidden="true"></i>
+                  <p id="splitFlagText"></p>
+                </div>
                 <details class="fold" id="driverStats">
                   <summary>Statistical details</summary>
                   <div class="fold-body">
@@ -497,6 +508,7 @@
       <ul>
         <li id="splitHelpConstruct"><strong>Splitting construct.</strong></li>
         <li id="splitHelpCutoff"><strong>Cut-off.</strong></li>
+        <li id="splitHelpFlag"><strong>Above average + 1 SD.</strong></li>
         <li><strong>Factor score.</strong> Each dimension you compare is averaged in the same way, for the respondents who answered it.</li>
         <li><strong>Raw distance.</strong> The raw Split Index is the absolute difference of the two group means.</li>
         <li><strong>Standardized distance.</strong> When dimensions do not share a scale, the standardized Split Index divides that difference by the pooled standard deviation. A one-point gap on a 1–5 scale is then not treated as equal to a one-point gap on a 0–100 scale.</li>
@@ -644,6 +656,7 @@
       document.getElementById('splitHelpColumns').innerHTML = '<span class="swatch col"></span>The Split Index is the distance between the two lines. The gray columns draw that distance. A taller column means the dimension does more to separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + '. A short column means both groups rate the dimension about the same.';
       document.getElementById('splitHelpConstruct').innerHTML = '<strong>Splitting construct.</strong> ' + segEsc(n.construct) + ' can be one item or the average of several items. Missing answers stay missing. They are not scored as zero.';
       document.getElementById('splitHelpCutoff').innerHTML = '<strong>Cut-off.</strong> The default cut is the median. At or above the median is ' + segEsc(n.high) + '. Below the median is ' + segEsc(n.low) + '. You can move the cut-off, and the chart updates with it.';
+      document.getElementById('splitHelpFlag').innerHTML = '<strong>Above average + 1 SD.</strong> A gold column, and its gold label, means that factor’s Split Index is higher than the average Split Index of the factors in the chart plus one standard deviation. The dashed gold line is that cutoff. Those factors separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + ' more than the typical factor here.';
       document.getElementById('splitHelpExampleTitle').textContent = 'Example: ' + n.construct;
       document.getElementById('splitHelpExample').textContent = n.construct + ' is the splitting construct. Its median is the cut-off. Respondents at or above that median are ' + n.high + '. Respondents below it are ' + n.low + '.';
       document.getElementById('splitHelpExampleNumbers').textContent = 'On the direct-manager dimension in the illustration, ' + n.high + ' averages 4.26 and ' + n.low + ' averages 3.53. The raw Split Index is the distance between those means:';
@@ -746,12 +759,18 @@
         index: _splitResult.indexLabel || _splitResult.indexType,
         group1: { label: _splitResult.group1.label, n: _splitResult.group1.validN },
         group2: { label: _splitResult.group2.label, n: _splitResult.group2.validN },
+        spread: _splitResult.spread ? {
+          mean: roundInsight(_splitResult.spread.mean),
+          sd: roundInsight(_splitResult.spread.sd),
+          cutoff: roundInsight(_splitResult.spread.cutoff)
+        } : null,
         factors: (_splitResult.displayed || []).map(function (factor) {
           return {
             factor: factor.factorLabel,
             highGroupMean: roundInsight(factor.group1 && factor.group1.mean),
             lowGroupMean: roundInsight(factor.group2 && factor.group2.mean),
             splitIndex: roundInsight(factor.selectedSplitIndex),
+            aboveAveragePlusOneSd: !!factor.aboveAverageSpread,
             pattern: factor.pattern ? factor.pattern.label : '',
             reading: factor.pattern ? factor.pattern.description : ''
           };
@@ -1590,6 +1609,7 @@
       document.getElementById('driverWaveWrap').style.display = _spec.previousWave ? '' : 'none';
       if (!hasFactors) {
         _splitResult = null;
+        paintSplitFlagNote(null);
         publishSegmentationInsight();
         return;
       }
@@ -1599,6 +1619,7 @@
       if (!_splitResult.ok) {
         if (_driverChart) { _driverChart.destroy(); _driverChart = null; }
         document.getElementById('driverStatsTable').innerHTML = '';
+        paintSplitFlagNote(null);
         publishSegmentationInsight();
         return;
       }
@@ -1622,6 +1643,10 @@
           Object.keys(exported[0]).forEach(function (key) {
             var td = document.createElement('td');
             td.textContent = record[key];
+            if (key === 'Above average + 1 SD' && record[key] === 'Yes') {
+              td.className = 'flag-cell';
+              tr.className = 'flagged-row';
+            }
             tr.appendChild(td);
           });
           table.appendChild(tr);
@@ -1639,6 +1664,33 @@
       options.tooltip.useHTML = true;
       if (_driverChart) { _driverChart.destroy(); _driverChart = null; }
       _driverChart = Highcharts.chart('driverChart', options);
+      paintSplitFlagNote(_splitResult);
+    }
+    function paintSplitFlagNote(result) {
+      var note = document.getElementById('splitFlagNote');
+      var text = document.getElementById('splitFlagText');
+      if (!note || !text) return;
+      var spread = result && result.spread;
+      if (!spread || spread.cutoff == null || !isFinite(spread.cutoff)) {
+        note.hidden = true;
+        text.textContent = '';
+        return;
+      }
+      var cutoff = SS.formatNum(spread.cutoff);
+      var flagged = (result.displayed || []).filter(function (factor) { return factor.aboveAverageSpread; }).map(function (factor) { return factor.factorLabel; });
+      var sentence;
+      if (flagged.length) {
+        sentence = 'Gold columns rise above the dashed line. That line is the average Split Index of these factors plus one standard deviation (' + cutoff + '). ' + joinNames(flagged) + (flagged.length === 1 ? ' separates' : ' separate') + ' the two groups more than the typical factor in this chart.';
+      } else {
+        sentence = 'The dashed line is the average Split Index of these factors plus one standard deviation (' + cutoff + '). No factor is above it.';
+      }
+      text.textContent = sentence;
+      note.hidden = false;
+    }
+    function joinNames(names) {
+      if (names.length === 1) return names[0];
+      if (names.length === 2) return names[0] + ' and ' + names[1];
+      return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
     }
 
     function switchTab(name) {

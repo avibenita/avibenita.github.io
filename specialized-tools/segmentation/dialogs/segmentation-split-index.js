@@ -430,6 +430,9 @@
     });
     var indexName = factor.indexType === 'standardized' ? 'Standardized Split Index' : 'Raw Split Index';
     lines.push(indexName + ': ' + (isNum(factor.selectedSplitIndex) ? formatFixed(factor.selectedSplitIndex, 2) : '—'));
+    if (factor.aboveAverageSpread) {
+      lines.push('Above the average Split Index + 1 SD' + (isNum(factor.spreadCutoff) ? ' (' + formatFixed(factor.spreadCutoff, 2) + ').' : '.'));
+    }
     if (isNum(factor.signedDifference)) lines.push('Signed difference: ' + (factor.signedDifference > 0 ? '+' : '') + formatFixed(factor.signedDifference, 2));
     if (factor.standardizedSplitIndex == null && factor.standardizedUnavailable) lines.push(COPY.zeroVariance);
     if (showStats && factor.confidenceInterval) {
@@ -565,6 +568,11 @@
       factor.rank = index + 1;
       factor.pattern = classifyFactorPattern(factor, factor.rank, factor.cutoff == null ? (cfg.xDimension && cfg.xDimension.threshold) : factor.cutoff, maxIndex);
     });
+    var spread = splitIndexSpread(factors);
+    factors.forEach(function (factor) {
+      factor.spreadCutoff = spread.cutoff;
+      factor.aboveAverageSpread = spread.cutoff != null && isNum(factor.selectedSplitIndex) && factor.selectedSplitIndex > spread.cutoff;
+    });
     var scaleKeys = {};
     factors.forEach(function (factor) {
       if (!factor.scale) return;
@@ -595,9 +603,48 @@
       scalesDiffer: Object.keys(scaleKeys).length > 1,
       group1: { id: spec.group1.id, label: spec.group1.label, validN: group1Rows.length },
       group2: { id: spec.group2.id, label: spec.group2.label, validN: group2Rows.length },
+      spread: spread,
       factors: factors,
       displayed: ordered
     };
+  }
+
+  function splitIndexSpread(factors) {
+    var values = [];
+    (factors || []).forEach(function (factor) {
+      if (isNum(factor.selectedSplitIndex)) values.push(factor.selectedSplitIndex);
+    });
+    var n = values.length;
+    if (n < 2) return { n: n, mean: n ? values[0] : null, sd: null, cutoff: null };
+    var sum = 0;
+    values.forEach(function (value) { sum += value; });
+    var mean = sum / n;
+    var square = 0;
+    values.forEach(function (value) {
+      var diff = value - mean;
+      square += diff * diff;
+    });
+    var sd = Math.sqrt(square / (n - 1));
+    return { n: n, mean: mean, sd: sd, cutoff: mean + sd };
+  }
+
+  function spreadLine(result, light) {
+    var spread = result && result.spread;
+    if (!spread || !isNum(spread.cutoff)) return [];
+    return [{
+      value: spread.cutoff,
+      color: '#e7c56a',
+      dashStyle: 'ShortDash',
+      width: 1.75,
+      zIndex: 5,
+      label: {
+        text: 'Average + 1 SD',
+        align: 'left',
+        x: 8,
+        y: -8,
+        style: { color: light ? '#8a6a1d' : '#e7c56a', fontSize: '12px', fontWeight: '700' }
+      }
+    }];
   }
 
   function buildSplitIndexChartOptions(result, presentation) {
@@ -654,10 +701,23 @@
         gridLineColor: grid,
         lineWidth: 0,
         tickLength: 0,
+        plotBands: rows.map(function (row, index) {
+          if (!row.aboveAverageSpread) return null;
+          return { from: index - 0.5, to: index + 0.5, color: light ? 'rgba(231,197,106,.18)' : 'rgba(231,197,106,.14)', zIndex: 0 };
+        }).filter(Boolean),
         labels: {
           rotation: angled ? -40 : 0,
           align: angled ? 'right' : 'center',
-          style: { color: muted, fontSize: '12px', fontWeight: '600' }
+          useHTML: true,
+          style: { color: muted, fontSize: '12px', fontWeight: '600' },
+          formatter: function () {
+            var safe = String(this.value == null ? '' : this.value).replace(/[&<>]/g, function (ch) {
+              return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch];
+            });
+            var row = rows[this.pos];
+            if (!row || !row.aboveAverageSpread) return safe;
+            return '<span style="color:#e7c56a;font-weight:800">' + safe + '</span>';
+          }
         }
       },
       yAxis: [
@@ -674,7 +734,8 @@
           min: 0,
           alignTicks: false,
           gridLineWidth: 0,
-          labels: { style: { color: indexInk, fontWeight: '700', fontSize: '15px' } }
+          labels: { style: { color: indexInk, fontWeight: '700', fontSize: '15px' } },
+          plotLines: spreadLine(result, light)
         }
       ],
       tooltip: { shared: false, borderRadius: 8 },
@@ -727,7 +788,12 @@
           yAxis: 1,
           color: 'rgba(214,211,209,0.78)',
           legendIndex: 0,
-          data: rows.map(function (row) { return isNum(row.selectedSplitIndex) ? Math.round(row.selectedSplitIndex * 100) / 100 : null; })
+          data: rows.map(function (row) {
+            if (!isNum(row.selectedSplitIndex)) return null;
+            var y = Math.round(row.selectedSplitIndex * 100) / 100;
+            if (!row.aboveAverageSpread) return y;
+            return { y: y, color: 'rgba(231,197,106,0.95)', borderColor: '#f8e7b0' };
+          })
         }
       ]
     };
@@ -750,6 +816,7 @@
         'Signed difference': formatFixed(factor.signedDifference, 2),
         'Raw Split Index': formatFixed(factor.rawSplitIndex, 2),
         'Standardized Split Index': formatFixed(factor.standardizedSplitIndex, 2),
+        'Above average + 1 SD': factor.aboveAverageSpread ? 'Yes' : 'No',
         'Lower confidence limit': factor.confidenceInterval ? formatFixed(factor.confidenceInterval.lower, 2) : '',
         'Upper confidence limit': factor.confidenceInterval ? formatFixed(factor.confidenceInterval.upper, 2) : '',
         'Welch statistic': factor.welchTest ? formatFixed(factor.welchTest.statistic, 3) : '',
@@ -779,6 +846,7 @@
     classifyFactorPattern: classifyFactorPattern,
     sortSplitIndexResults: sortSplitIndexResults,
     calculateSplitIndex: calculateSplitIndex,
+    splitIndexSpread: splitIndexSpread,
     buildFactorTooltip: buildFactorTooltip,
     buildSplitIndexChartOptions: buildSplitIndexChartOptions,
     resultsTable: resultsTable,

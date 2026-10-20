@@ -339,8 +339,8 @@ describe('Survey segmentation classification', () => {
     const legacy = SS.defaultConfig();
     legacy.product = 'split';
     const migrated = SS.normalizeConfig(legacy);
-    expect(migrated.yDimension.highLabel).toBe('Highest score');
-    expect(migrated.yDimension.lowLabel).toBe('Lower score');
+    expect(migrated.yDimension.highLabel).toBe('Highest Intention to stay');
+    expect(migrated.yDimension.lowLabel).toBe('Lower Intention to stay');
     const custom = SS.normalizeConfig({
       product: 'split',
       legendLabelsCustom: true,

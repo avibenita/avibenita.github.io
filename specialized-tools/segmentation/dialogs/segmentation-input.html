@@ -24,7 +24,7 @@
   <script src="../shared-config.js?v=20260928range2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="segmentation-sample-data.js?v=20261013seg1"></script>
-  <script src="segmentation-engine.js?v=20261020legend"></script>
+  <script src="segmentation-engine.js?v=20261020wording"></script>
   <script src="segmentation-split-index.js?v=20261020cut"></script>
   <style>
     :root { --seg-acc: #0d9488; }
@@ -169,7 +169,7 @@
           </div>
           <div class="opt-card" id="splitCutCard" hidden>
             <h4>Splitting cut-off</h4>
-            <p class="zone-help">The default cut is the median of the splitting construct. At or above the cut is the highest score. Below it is the lower score. Move the cut and the chart updates.</p>
+            <p class="zone-help" id="splitCutIntro">The default cut is the median. At or above the cut is the high group. Below it is the low group. Move the cut and the chart updates.</p>
             <label for="splitCutMethod">Rule</label>
             <select id="splitCutMethod">
               <option value="median" selected>Median</option>
@@ -188,10 +188,10 @@
           </div>
           <div class="opt-card" id="splitLegendCard" hidden>
             <h4>Legend labels</h4>
-            <label for="splitHighLabel">Highest score</label>
-            <input id="splitHighLabel" type="text" value="Highest score" />
-            <label for="splitLowLabel">Lower score</label>
-            <input id="splitLowLabel" type="text" value="Lower score" />
+            <label for="splitHighLabel">High group</label>
+            <input id="splitHighLabel" type="text" value="" />
+            <label for="splitLowLabel">Low group</label>
+            <input id="splitLowLabel" type="text" value="" />
           </div>
           <details class="seg-advanced" id="labelEditor">
             <summary>Segment labels and colors</summary>
@@ -530,6 +530,18 @@
     }
 
     function refresh() {
+      if (PRODUCT === 'split') {
+        var names = SS.splitGroupLabels('Intention to stay');
+        var highIn = qs('splitHighLabel');
+        var lowIn = qs('splitLowLabel');
+        if (highIn && !highIn.value.trim()) highIn.value = names.high;
+        if (lowIn && !lowIn.value.trim()) lowIn.value = names.low;
+        var high = (highIn && highIn.value.trim()) || names.high;
+        var low = (lowIn && lowIn.value.trim()) || names.low;
+        ZONES[0].help = 'One or more items, averaged into a score. At or above the cut is ' + high + '. Below it is ' + low + '.';
+        ZONES[0].info = 'Select one variable, or several variables that are averaged into one score. At or above the cut-off is ' + high + '. Below it is ' + low + '. Split Index is the distance between these two groups on each dimension. A larger distance means that dimension does more to separate ' + high + ' from ' + low + '.';
+        ZONES[1].help = 'Dimensions compared between ' + high + ' and ' + low + '. Split Index is the distance between their scores.';
+      }
       renderVariables();
       renderZones();
       fillWaves();
@@ -609,9 +621,10 @@
         base.yDimension.threshold = cutValue === '' ? null : Number(cutValue);
         var highLegend = qs('splitHighLabel');
         var lowLegend = qs('splitLowLabel');
-        base.yDimension.highLabel = (highLegend && highLegend.value.trim()) || SS.SPLIT_HIGH_LABEL;
-        base.yDimension.lowLabel = (lowLegend && lowLegend.value.trim()) || SS.SPLIT_LOW_LABEL;
-        base.legendLabelsCustom = base.yDimension.highLabel !== SS.SPLIT_HIGH_LABEL || base.yDimension.lowLabel !== SS.SPLIT_LOW_LABEL;
+        var generated = SS.splitGroupLabels(base.yDimension.label);
+        base.yDimension.highLabel = (highLegend && highLegend.value.trim()) || generated.high;
+        base.yDimension.lowLabel = (lowLegend && lowLegend.value.trim()) || generated.low;
+        base.legendLabelsCustom = base.yDimension.highLabel !== generated.high || base.yDimension.lowLabel !== generated.low;
       }
       return base;
     }
@@ -653,10 +666,13 @@
         assign.weight = null;
         var highLegend = qs('splitHighLabel');
         var lowLegend = qs('splitLowLabel');
+        var generated = SS.splitGroupLabels(saved && saved.yDimension && saved.yDimension.label);
         var savedHigh = saved && saved.yDimension && saved.yDimension.highLabel;
         var savedLow = saved && saved.yDimension && saved.yDimension.lowLabel;
-        if (highLegend) highLegend.value = (saved && saved.legendLabelsCustom && savedHigh) ? savedHigh : (savedHigh && savedHigh !== 'Tending to stay' ? savedHigh : 'Highest score');
-        if (lowLegend) lowLegend.value = (saved && saved.legendLabelsCustom && savedLow) ? savedLow : (savedLow && savedLow !== 'Not tending to stay' ? savedLow : 'Lower score');
+        var genericHigh = !savedHigh || savedHigh === 'Tending to stay' || savedHigh === 'Highest score';
+        var genericLow = !savedLow || savedLow === 'Not tending to stay' || savedLow === 'Lower score';
+        if (highLegend) highLegend.value = (saved && saved.legendLabelsCustom && savedHigh) ? savedHigh : (genericHigh ? generated.high : savedHigh);
+        if (lowLegend) lowLegend.value = (saved && saved.legendLabelsCustom && savedLow) ? savedLow : (genericLow ? generated.low : savedLow);
         if (saved && saved.product === 'split' && saved.yDimension) {
           qs('splitCutMethod').value = saved.yDimension.thresholdMethod || 'median';
           if (saved.yDimension.threshold != null && saved.yDimension.threshold !== '') qs('splitCutValue').value = saved.yDimension.threshold;
@@ -716,10 +732,14 @@
       } else if (isFinite(shown)) {
         slider.value = qs('splitCutValue').value;
       }
-      var high = (qs('splitHighLabel').value || '').trim() || 'Highest score';
-      var low = (qs('splitLowLabel').value || '').trim() || 'Lower score';
+      var construct = 'Intention to stay';
+      var names = SS.splitGroupLabels(construct);
+      var high = (qs('splitHighLabel').value || '').trim() || names.high;
+      var low = (qs('splitLowLabel').value || '').trim() || names.low;
       var cut = qs('splitCutMethod').value === 'custom' ? splitCutNumber() : shown;
       qs('splitCutRule').textContent = high + ' is at or above ' + SS.formatNum(cut) + '. ' + low + ' is below it.';
+      var intro = qs('splitCutIntro');
+      if (intro) intro.textContent = 'The default cut is the median of ' + construct + '. At or above the cut is ' + high + '. Below it is ' + low + '. Move the cut and the chart updates.';
       _cutPainting = false;
     }
 

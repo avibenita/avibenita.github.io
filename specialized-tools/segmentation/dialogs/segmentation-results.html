@@ -23,7 +23,7 @@
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
   <script src="../shared-header.js?v=20261020checks"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
-  <script src="segmentation-engine.js?v=20261020legend"></script>
+  <script src="segmentation-engine.js?v=20261020wording"></script>
   <script src="segmentation-split-index.js?v=20261014si1"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
@@ -260,10 +260,10 @@
                 <label class="field" id="chartSubtitleField">Chart subtitle
                   <input id="chartSubtitle" type="text" />
                 </label>
-                <label class="field" id="highLegendField">Highest score
+                <label class="field" id="highLegendField">High group
                   <input id="highLegend" type="text" />
                 </label>
-                <label class="field" id="lowLegendField">Lower score
+                <label class="field" id="lowLegendField">Low group
                   <input id="lowLegend" type="text" />
                 </label>
                 <label class="field" id="xMethodField">Satisfaction rule
@@ -486,30 +486,30 @@
       <p class="help-kicker">Split Index™</p>
       <h2 id="splitHelpTitle">How the chart is built</h2>
       <h3>What it answers</h3>
-      <p>The chart finds the survey dimensions most linked to a splitting construct. In the retention example, that construct is intention to stay. Respondents are divided into two groups on that score, and every other dimension is scored inside each group.</p>
+      <p id="splitHelpAnswer"></p>
       <h3>The two lines</h3>
-      <p><span class="swatch blue"></span><strong>Blue — Inclined to stay.</strong> These respondents scored at or above the cut-off on intention to stay.</p>
-      <p><span class="swatch red"></span><strong>Red — Inclined to leave.</strong> These respondents scored below the cut-off.</p>
-      <p>People who intend to stay usually rate the rest of the survey more positively, so the blue line sits above the red line. Each dimension also has its own typical level, so the two lines often follow a similar shape. They are not perfectly parallel. The gaps between them are the result.</p>
+      <p id="splitHelpBlue"><span class="swatch blue"></span></p>
+      <p id="splitHelpRed"><span class="swatch red"></span></p>
+      <p id="splitHelpLines"></p>
       <h3>The columns</h3>
-      <p><span class="swatch col"></span>The Split Index is the distance between the two lines. The gray columns draw that distance. A taller column means the dimension does more to separate people who intend to stay from people who intend to leave. Those are the stronger retention factors. A short column means both groups rate the dimension about the same, so it explains less of the difference.</p>
+      <p id="splitHelpColumns"><span class="swatch col"></span></p>
       <h3>How the index is calculated</h3>
       <ul>
-        <li><strong>Splitting construct.</strong> Intention to stay can be one item or the average of several items. Missing answers stay missing. They are not scored as zero.</li>
-        <li><strong>Cut-off.</strong> The default cut is the median. At or above the median is the high group. Below the median is the low group. You can move the cut-off, and the chart updates with it.</li>
+        <li id="splitHelpConstruct"><strong>Splitting construct.</strong></li>
+        <li id="splitHelpCutoff"><strong>Cut-off.</strong></li>
         <li><strong>Factor score.</strong> Each dimension you compare is averaged in the same way, for the respondents who answered it.</li>
         <li><strong>Raw distance.</strong> The raw Split Index is the absolute difference of the two group means.</li>
         <li><strong>Standardized distance.</strong> When dimensions do not share a scale, the standardized Split Index divides that difference by the pooled standard deviation. A one-point gap on a 1–5 scale is then not treated as equal to a one-point gap on a 0–100 scale.</li>
       </ul>
       <div class="help-example">
-        <h3 style="margin-top:0;">Example: intention to stay</h3>
-        <p>Intention to stay is the splitting construct. Its median is the cut-off. Respondents at or above that median are Inclined to stay. Respondents below it are Inclined to leave.</p>
-        <p>On the direct-manager dimension in the retention illustration, Inclined to stay averages 4.26 and Inclined to leave averages 3.53. The raw Split Index is the distance between those means:</p>
+        <h3 style="margin-top:0;" id="splitHelpExampleTitle">Example</h3>
+        <p id="splitHelpExample"></p>
+        <p id="splitHelpExampleNumbers"></p>
         <p><strong>|4.26 − 3.53| = 0.73</strong></p>
-        <p>That column is taller than a dimension where the two lines nearly meet. Direct manager therefore separates people who intend to stay from people who intend to leave more than a dimension with a short column. Read the chart the same way across the other dimensions: start with the tallest columns.</p>
+        <p id="splitHelpExampleRead"></p>
       </div>
       <h3>What a tall column does not mean</h3>
-      <p>A large Split Index shows that the dimension separates the two groups. It does not, by itself, show that the dimension causes people to stay.</p>
+      <p id="splitHelpCaution"></p>
     </div>
   </div>
   <script>
@@ -623,6 +623,32 @@
       return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
       });
+    }
+    function splitNames() {
+      var construct = (_spec && _spec.yDimension && _spec.yDimension.label) || 'the splitting construct';
+      var generated = SS.splitGroupLabels(construct === 'the splitting construct' ? '' : construct);
+      return {
+        construct: construct,
+        high: (_spec && _spec.yDimension && _spec.yDimension.highLabel) || generated.high,
+        low: (_spec && _spec.yDimension && _spec.yDimension.lowLabel) || generated.low
+      };
+    }
+    function fillSplitHelp() {
+      var n = splitNames();
+      var answer = document.getElementById('splitHelpAnswer');
+      if (!answer) return;
+      answer.textContent = 'The chart finds the survey dimensions most linked to ' + n.construct + '. Respondents are divided into ' + n.high + ' and ' + n.low + ', and every other dimension is scored inside each group.';
+      document.getElementById('splitHelpBlue').innerHTML = '<span class="swatch blue"></span><strong>Blue — ' + segEsc(n.high) + '.</strong> These respondents scored at or above the cut-off on ' + segEsc(n.construct) + '.';
+      document.getElementById('splitHelpRed').innerHTML = '<span class="swatch red"></span><strong>Red — ' + segEsc(n.low) + '.</strong> These respondents scored below the cut-off.';
+      document.getElementById('splitHelpLines').textContent = n.high + ' usually rates the other dimensions more positively, so the blue line sits above the red line. Each dimension also has its own typical level, so the two lines often follow a similar shape. They are not perfectly parallel. The gaps between them are the result.';
+      document.getElementById('splitHelpColumns').innerHTML = '<span class="swatch col"></span>The Split Index is the distance between the two lines. The gray columns draw that distance. A taller column means the dimension does more to separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + '. A short column means both groups rate the dimension about the same.';
+      document.getElementById('splitHelpConstruct').innerHTML = '<strong>Splitting construct.</strong> ' + segEsc(n.construct) + ' can be one item or the average of several items. Missing answers stay missing. They are not scored as zero.';
+      document.getElementById('splitHelpCutoff').innerHTML = '<strong>Cut-off.</strong> The default cut is the median. At or above the median is ' + segEsc(n.high) + '. Below the median is ' + segEsc(n.low) + '. You can move the cut-off, and the chart updates with it.';
+      document.getElementById('splitHelpExampleTitle').textContent = 'Example: ' + n.construct;
+      document.getElementById('splitHelpExample').textContent = n.construct + ' is the splitting construct. Its median is the cut-off. Respondents at or above that median are ' + n.high + '. Respondents below it are ' + n.low + '.';
+      document.getElementById('splitHelpExampleNumbers').textContent = 'On the direct-manager dimension in the illustration, ' + n.high + ' averages 4.26 and ' + n.low + ' averages 3.53. The raw Split Index is the distance between those means:';
+      document.getElementById('splitHelpExampleRead').textContent = 'That column is taller than a dimension where the two lines nearly meet. Direct manager therefore separates ' + n.high + ' from ' + n.low + ' more than a dimension with a short column. Read the chart the same way across the other dimensions: start with the tallest columns.';
+      document.getElementById('splitHelpCaution').textContent = 'A large Split Index shows that the dimension separates ' + n.high + ' from ' + n.low + '. It does not, by itself, show that the dimension causes a respondent to be in ' + n.high + '.';
     }
     function defaultSplitChartTitle() {
       var label = (_spec && _spec.yDimension && _spec.yDimension.label) || 'Intention to stay';
@@ -800,11 +826,12 @@
       _spec.chartSubtitle = typedSubtitle && typedSubtitle !== 'Split-Index™ Approach' ? typedSubtitle : '';
       var highLegend = document.getElementById('highLegend');
       var lowLegend = document.getElementById('lowLegend');
+      var generated = SS.splitGroupLabels(_spec.yDimension.label);
       var highText = highLegend && highLegend.value.trim();
       var lowText = lowLegend && lowLegend.value.trim();
-      _spec.yDimension.highLabel = highText || SS.SPLIT_HIGH_LABEL;
-      _spec.yDimension.lowLabel = lowText || SS.SPLIT_LOW_LABEL;
-      _spec.legendLabelsCustom = _spec.yDimension.highLabel !== SS.SPLIT_HIGH_LABEL || _spec.yDimension.lowLabel !== SS.SPLIT_LOW_LABEL;
+      _spec.yDimension.highLabel = highText || generated.high;
+      _spec.yDimension.lowLabel = lowText || generated.low;
+      _spec.legendLabelsCustom = _spec.yDimension.highLabel !== generated.high || _spec.yDimension.lowLabel !== generated.low;
       globalThis.__segmentationTitle = _spec.title || defaultProductTitle();
       SS.QUADRANT_KEYS.forEach(function (key) {
         var label = document.getElementById('label-' + key);
@@ -837,10 +864,10 @@
         slider.value = String(shown);
       }
       if (rule && isFinite(value)) {
-        var high = _spec.yDimension.highLabel || SS.SPLIT_HIGH_LABEL;
-        var low = _spec.yDimension.lowLabel || SS.SPLIT_LOW_LABEL;
-        rule.textContent = high + ' is at or above ' + SS.formatNum(value) + '. ' + low + ' is below it.';
+        var names = splitNames();
+        rule.textContent = names.high + ' is at or above ' + SS.formatNum(value) + '. ' + names.low + ' is below it.';
       }
+      fillSplitHelp();
     }
     function applySplitCut(method, value) {
       if (!_spec) return;

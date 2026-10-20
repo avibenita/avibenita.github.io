@@ -116,12 +116,20 @@
   var SPLIT_HIGH_LABEL = 'Highest score';
   var SPLIT_LOW_LABEL = 'Lower score';
 
+  function splitGroupLabels(constructLabel) {
+    var name = String(constructLabel || '').trim() || 'score';
+    return { high: 'Highest ' + name, low: 'Lower ' + name };
+  }
+
   function applySplitLegendDefaults(spec) {
     if (!spec || spec.product !== 'split' || !spec.yDimension || spec.legendLabelsCustom) return spec;
+    var labels = splitGroupLabels(spec.yDimension.label);
     var high = spec.yDimension.highLabel;
     var low = spec.yDimension.lowLabel;
-    if (!high || high === 'Tending to stay') spec.yDimension.highLabel = SPLIT_HIGH_LABEL;
-    if (!low || low === 'Not tending to stay') spec.yDimension.lowLabel = SPLIT_LOW_LABEL;
+    var genericHigh = !high || high === 'Tending to stay' || high === 'High range' || high === 'High' || high === SPLIT_HIGH_LABEL;
+    var genericLow = !low || low === 'Not tending to stay' || low === 'Low range' || low === 'Low' || low === SPLIT_LOW_LABEL;
+    if (genericHigh) spec.yDimension.highLabel = labels.high;
+    if (genericLow) spec.yDimension.lowLabel = labels.low;
     return spec;
   }
 
@@ -1013,6 +1021,7 @@
     defaultConfig: defaultConfig,
     normalizeConfig: normalizeConfig,
     applySplitLegendDefaults: applySplitLegendDefaults,
+    splitGroupLabels: splitGroupLabels,
     SPLIT_HIGH_LABEL: SPLIT_HIGH_LABEL,
     SPLIT_LOW_LABEL: SPLIT_LOW_LABEL,
     isMissing: isMissing,

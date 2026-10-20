@@ -285,7 +285,7 @@ describe('Split Index calculations', () => {
       row(0, 5, 5, 5, 4),
       row(1, 2, 2, 2, 3)
     ], named, {}));
-    expect(labeled.series[0].name).toMatch(/^Highest score \(n = /);
-    expect(labeled.series[1].name).toMatch(/^Lower score \(n = /);
+    expect(labeled.series[0].name).toMatch(/^Highest Intention to stay \(n = /);
+    expect(labeled.series[1].name).toMatch(/^Lower Intention to stay \(n = /);
   });
 });

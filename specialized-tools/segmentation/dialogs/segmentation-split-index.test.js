@@ -280,5 +280,12 @@ describe('Split Index calculations', () => {
     expect(options.series[0].data).toEqual([5, 4]);
     expect(options.series[2].yAxis).toBe(1);
     expect(options.yAxis[1].opposite).toBe(true);
+    const named = SS.normalizeConfig(Object.assign(config(), { product: 'split' }));
+    const labeled = SI.buildSplitIndexChartOptions(SI.calculateSplitIndex([
+      row(0, 5, 5, 5, 4),
+      row(1, 2, 2, 2, 3)
+    ], named, {}));
+    expect(labeled.series[0].name).toMatch(/^Highest score \(n = /);
+    expect(labeled.series[1].name).toMatch(/^Lower score \(n = /);
   });
 });

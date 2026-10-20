@@ -335,6 +335,22 @@ describe('Survey segmentation classification', () => {
     expect(med.rules.xRule).toBe('Satisfied: score ≥ 3.00');
   });
 
+  test('Split Index legend defaults to highest and lower score and keeps a custom pair', () => {
+    const legacy = SS.defaultConfig();
+    legacy.product = 'split';
+    const migrated = SS.normalizeConfig(legacy);
+    expect(migrated.yDimension.highLabel).toBe('Highest score');
+    expect(migrated.yDimension.lowLabel).toBe('Lower score');
+    const custom = SS.normalizeConfig({
+      product: 'split',
+      legendLabelsCustom: true,
+      yDimension: { highLabel: 'Tending to stay', lowLabel: 'Leavers' }
+    });
+    expect(custom.yDimension.highLabel).toBe('Tending to stay');
+    expect(custom.yDimension.lowLabel).toBe('Leavers');
+    expect(SS.normalizeConfig(SS.defaultConfig()).yDimension.highLabel).toBe('Tending to stay');
+  });
+
   test('Split Index runs from the outcome and factors when the second dimension is empty', () => {
     const cfg = SS.defaultConfig();
     cfg.product = 'split';

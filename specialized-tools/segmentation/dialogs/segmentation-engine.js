@@ -113,6 +113,18 @@
     return JSON.parse(JSON.stringify(obj));
   }
 
+  var SPLIT_HIGH_LABEL = 'Highest score';
+  var SPLIT_LOW_LABEL = 'Lower score';
+
+  function applySplitLegendDefaults(spec) {
+    if (!spec || spec.product !== 'split' || !spec.yDimension || spec.legendLabelsCustom) return spec;
+    var high = spec.yDimension.highLabel;
+    var low = spec.yDimension.lowLabel;
+    if (!high || high === 'Tending to stay') spec.yDimension.highLabel = SPLIT_HIGH_LABEL;
+    if (!low || low === 'Not tending to stay') spec.yDimension.lowLabel = SPLIT_LOW_LABEL;
+    return spec;
+  }
+
   function normalizeConfig(config) {
     var base = defaultConfig();
     var c = config || {};
@@ -122,6 +134,7 @@
     out.title = c.title ? String(c.title) : (out.product === 'split' ? 'Split Index™' : 'Loyalty Matrix');
     out.chartTitle = c.chartTitle ? String(c.chartTitle) : '';
     out.chartSubtitle = c.chartSubtitle ? String(c.chartSubtitle) : '';
+    out.legendLabelsCustom = !!c.legendLabelsCustom;
     ['xDimension', 'yDimension'].forEach(function (key) {
       var src = c[key] || {};
       out[key].label = src.label || base[key].label;
@@ -131,6 +144,7 @@
       out[key].highLabel = src.highLabel || base[key].highLabel;
       out[key].lowLabel = src.lowLabel || base[key].lowLabel;
     });
+    applySplitLegendDefaults(out);
     QUADRANT_KEYS.forEach(function (key) {
       var src = (c.segments && c.segments[key]) || {};
       if (src.label) out.segments[key].label = String(src.label);
@@ -998,6 +1012,9 @@
     DEFAULT_COLORS: DEFAULT_COLORS,
     defaultConfig: defaultConfig,
     normalizeConfig: normalizeConfig,
+    applySplitLegendDefaults: applySplitLegendDefaults,
+    SPLIT_HIGH_LABEL: SPLIT_HIGH_LABEL,
+    SPLIT_LOW_LABEL: SPLIT_LOW_LABEL,
     isMissing: isMissing,
     toNumber: toNumber,
     compositeScore: compositeScore,

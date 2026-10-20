@@ -23,7 +23,7 @@
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
   <script src="../shared-header.js?v=20261019splitaxis"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
-  <script src="segmentation-engine.js?v=20261015split1"></script>
+  <script src="segmentation-engine.js?v=20261020legend"></script>
   <script src="segmentation-split-index.js?v=20261014si1"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
@@ -239,7 +239,7 @@
           <div id="results" style="display:none;">
             <div class="summary" id="summary"></div>
             <details class="fold" id="settingsFold">
-              <summary>Settings</summary>
+              <summary>Labels</summary>
               <div class="fold-body">
               <div class="grid-2">
                 <label class="field" id="reportTitleField">Title
@@ -256,6 +256,12 @@
                 </label>
                 <label class="field" id="chartSubtitleField">Chart subtitle
                   <input id="chartSubtitle" type="text" />
+                </label>
+                <label class="field" id="highLegendField">Highest score
+                  <input id="highLegend" type="text" />
+                </label>
+                <label class="field" id="lowLegendField">Lower score
+                  <input id="lowLegend" type="text" />
                 </label>
                 <label class="field" id="xMethodField">Satisfaction rule
                     <select id="xMethod">
@@ -527,7 +533,7 @@
         _sidebarSettings.className = 'sb-settings';
         var heading = document.createElement('div');
         heading.className = 'sb-group-title';
-        heading.textContent = 'Settings';
+        heading.textContent = 'Labels';
         _sidebarSettings.appendChild(heading);
         ['settingsFold', 'labelFold'].forEach(function (id) {
           var el = document.getElementById(id);
@@ -568,7 +574,7 @@
         var el = document.getElementById(id);
         if (el) el.hidden = split || !xOn;
       });
-      ['chartTitleField', 'chartSubtitleField'].forEach(function (id) {
+      ['chartTitleField', 'chartSubtitleField', 'highLegendField', 'lowLegendField'].forEach(function (id) {
         var el = document.getElementById(id);
         if (el) el.hidden = !split;
       });
@@ -759,6 +765,13 @@
       _spec.chartTitle = typedTitle && typedTitle !== previousAuto && typedTitle !== defaultSplitChartTitle() ? typedTitle : '';
       var typedSubtitle = chartSubtitle && chartSubtitle.value.trim();
       _spec.chartSubtitle = typedSubtitle && typedSubtitle !== 'Split-Index™ Approach' ? typedSubtitle : '';
+      var highLegend = document.getElementById('highLegend');
+      var lowLegend = document.getElementById('lowLegend');
+      var highText = highLegend && highLegend.value.trim();
+      var lowText = lowLegend && lowLegend.value.trim();
+      _spec.yDimension.highLabel = highText || SS.SPLIT_HIGH_LABEL;
+      _spec.yDimension.lowLabel = lowText || SS.SPLIT_LOW_LABEL;
+      _spec.legendLabelsCustom = _spec.yDimension.highLabel !== SS.SPLIT_HIGH_LABEL || _spec.yDimension.lowLabel !== SS.SPLIT_LOW_LABEL;
       globalThis.__segmentationTitle = _spec.title || defaultProductTitle();
       SS.QUADRANT_KEYS.forEach(function (key) {
         var label = document.getElementById('label-' + key);
@@ -782,6 +795,10 @@
       var chartSubtitleInput = document.getElementById('chartSubtitle');
       if (chartTitleInput) chartTitleInput.value = _spec.chartTitle || defaultSplitChartTitle();
       if (chartSubtitleInput) chartSubtitleInput.value = _spec.chartSubtitle || 'Split-Index™ Approach';
+      var highLegendInput = document.getElementById('highLegend');
+      var lowLegendInput = document.getElementById('lowLegend');
+      if (highLegendInput) highLegendInput.value = (_spec.yDimension && _spec.yDimension.highLabel) || SS.SPLIT_HIGH_LABEL;
+      if (lowLegendInput) lowLegendInput.value = (_spec.yDimension && _spec.yDimension.lowLabel) || SS.SPLIT_LOW_LABEL;
       setFieldCaption('xMethodField', (_spec.xDimension.label || 'Horizontal') + ' rule');
       setFieldCaption('xThresholdField', (_spec.xDimension.label || 'Horizontal') + ' threshold');
       setFieldCaption('yMethodField', (_spec.yDimension.label || 'Vertical') + ' rule');
@@ -1554,22 +1571,26 @@
       });
     }
 
+    function finishSpec(spec) {
+      var requested = /product=split/i.test(location.search) ? 'split' : (/product=loyalty/i.test(location.search) ? 'loyalty' : '');
+      if (requested) {
+        var stock = { loyalty: 'Loyalty Matrix', split: 'Split Index™' };
+        var previous = spec.title || '';
+        spec.product = requested;
+        if (!previous || previous === stock.loyalty || previous === stock.split || previous === 'Survey Segmentation Matrix') {
+          spec.title = stock[requested];
+        }
+      }
+      if (!spec.title) spec.title = spec.product === 'split' ? 'Split Index™' : 'Loyalty Matrix';
+      SS.applySplitLegendDefaults(spec);
+      return spec;
+    }
     function applySource(payload) {
       if (!payload) return;
       _headers = payload.headers || [];
       _allRows = payload.rows || [];
       _viewRows = _allRows.slice();
-      _spec = SS.normalizeConfig(payload.spec || (window.StatisticoSegmentationSamples && StatisticoSegmentationSamples.defaultSpec()));
-      var requested = /product=split/i.test(location.search) ? 'split' : (/product=loyalty/i.test(location.search) ? 'loyalty' : '');
-      if (requested) {
-        var stock = { loyalty: 'Loyalty Matrix', split: 'Split Index™' };
-        var previous = _spec.title || '';
-        _spec.product = requested;
-        if (!previous || previous === stock.loyalty || previous === stock.split || previous === 'Survey Segmentation Matrix') {
-          _spec.title = stock[requested];
-        }
-      }
-      if (!_spec.title) _spec.title = _spec.product === 'split' ? 'Split Index™' : 'Loyalty Matrix';
+      _spec = finishSpec(SS.normalizeConfig(payload.spec || (window.StatisticoSegmentationSamples && StatisticoSegmentationSamples.defaultSpec())));
       globalThis.__segmentationProduct = _spec.product;
       globalThis.__segmentationTitle = _spec.title;
       _headerFilterText = '';
@@ -1621,7 +1642,7 @@
       _changeKey = this.value;
       paintChange();
     });
-    ['xMethod', 'yMethod', 'xThreshold', 'yThreshold', 'minItems', 'currentWave', 'previousWave', 'reportTitle', 'xTitle', 'yTitle', 'chartTitle', 'chartSubtitle'].forEach(function (id) {
+    ['xMethod', 'yMethod', 'xThreshold', 'yThreshold', 'minItems', 'currentWave', 'previousWave', 'reportTitle', 'xTitle', 'yTitle', 'chartTitle', 'chartSubtitle', 'highLegend', 'lowLegend'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {
         if (_painting) return;
         readSettingsFromDom();
@@ -1745,7 +1766,7 @@
                 if (msg.type === 'SEGMENTATION_SOURCE') applySource(msg.payload);
                 if (msg.type === 'SEGMENTATION_RESULT' && msg.payload) {
                   _bundle = msg.payload;
-                  _spec = SS.normalizeConfig(msg.payload.config || {});
+                  _spec = finishSpec(SS.normalizeConfig(msg.payload.config || {}));
                   if (_bundle.ok) { showState('results'); paint(); }
                   else { showState('error'); document.getElementById('errorText').textContent = _bundle.error || 'No results.'; }
                 }

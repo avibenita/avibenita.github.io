@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260928range2"></script>
   <script src="segmentation-sample-data.js?v=20261013seg1"></script>
-  <script src="segmentation-engine.js?v=20261015split1"></script>
+  <script src="segmentation-engine.js?v=20261020legend"></script>
   <style>
     :root { --seg-acc: #0d9488; }
     [data-theme="light"] { --seg-acc: #0f766e; }
@@ -160,6 +160,13 @@
               <input id="yThreshold" type="number" step="0.01" value="4" />
               <div class="rule-line" id="yRule">Tending to stay: score ≥ 4.00</div>
             </div>
+          </div>
+          <div class="opt-card" id="splitLegendCard" hidden>
+            <h4>Legend labels</h4>
+            <label for="splitHighLabel">Highest score</label>
+            <input id="splitHighLabel" type="text" value="Highest score" />
+            <label for="splitLowLabel">Lower score</label>
+            <input id="splitLowLabel" type="text" value="Lower score" />
           </div>
           <details class="seg-advanced" id="labelEditor">
             <summary>Segment labels and colors</summary>
@@ -570,6 +577,11 @@
         base.groupColumn = null;
         base.weightColumn = null;
         base.yDimension.thresholdMethod = 'median';
+        var highLegend = qs('splitHighLabel');
+        var lowLegend = qs('splitLowLabel');
+        base.yDimension.highLabel = (highLegend && highLegend.value.trim()) || SS.SPLIT_HIGH_LABEL;
+        base.yDimension.lowLabel = (lowLegend && lowLegend.value.trim()) || SS.SPLIT_LOW_LABEL;
+        base.legendLabelsCustom = base.yDimension.highLabel !== SS.SPLIT_HIGH_LABEL || base.yDimension.lowLabel !== SS.SPLIT_LOW_LABEL;
       }
       return base;
     }
@@ -609,6 +621,12 @@
         assign.x = [];
         assign.group = null;
         assign.weight = null;
+        var highLegend = qs('splitHighLabel');
+        var lowLegend = qs('splitLowLabel');
+        var savedHigh = saved && saved.yDimension && saved.yDimension.highLabel;
+        var savedLow = saved && saved.yDimension && saved.yDimension.lowLabel;
+        if (highLegend) highLegend.value = (saved && saved.legendLabelsCustom && savedHigh) ? savedHigh : (savedHigh && savedHigh !== 'Tending to stay' ? savedHigh : 'Highest score');
+        if (lowLegend) lowLegend.value = (saved && saved.legendLabelsCustom && savedLow) ? savedLow : (savedLow && savedLow !== 'Not tending to stay' ? savedLow : 'Lower score');
       }
       qs('loadingSpinner').style.display = 'none';
       qs('mainContent').style.display = 'flex';
@@ -649,6 +667,8 @@
       qs('cfgHeaderIcon').className = split ? 'fa-solid fa-chart-simple' : 'fa-solid fa-border-all';
       var yHead = qs('yThresholdCard') && qs('yThresholdCard').querySelector('h4');
       if (yHead && split) yHead.textContent = 'High / low cut-off';
+      var legendCard = qs('splitLegendCard');
+      if (legendCard) legendCard.hidden = !split;
       if (split) {
         qs('yMethod').value = 'median';
         ['yMethod', 'yThreshold'].forEach(function (id) {

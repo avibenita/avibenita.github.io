@@ -3067,6 +3067,91 @@ const StatisticoHeader = {
     });
   },
 
+  _captureLiveReportSnapshot() {
+    const headClone = document.head ? document.head.cloneNode(true) : document.createElement('head');
+    headClone.querySelectorAll('script, noscript').forEach((node) => node.remove());
+    const bodyClone = document.body ? document.body.cloneNode(true) : document.createElement('body');
+    bodyClone.querySelectorAll('script, noscript, #stExportProgressOverlay, #stReportExportOverlay').forEach((node) => node.remove());
+    this._prepareExportSnapshotBody(bodyClone);
+    const primary = bodyClone.querySelector('.right-col') || bodyClone;
+    const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
+    return '<!DOCTYPE html><html><head><meta charset="utf-8">' + headClone.innerHTML + '</head><body>' + payload + '</body></html>';
+  },
+
+  _exportSegmentationReport() {
+    const split = globalThis.__segmentationProduct === 'split';
+    const changeOn = !!globalThis.__segmentationChangeEnabled;
+    const file = 'segmentation/segmentation-results.html';
+    const sections = split
+      ? [{ id: 'drivers', label: 'Split Index™', file: file }]
+      : [
+          { id: 'overview', label: 'Overview', file: file },
+          { id: 'groups', label: 'Group Comparison', file: file }
+        ].concat(changeOn ? [{ id: 'change', label: 'Change', file: file }] : []);
+    const title = globalThis.__segmentationTitle || (split ? 'Split Index™' : 'Loyalty Matrix');
+    this.pickReportSections(sections, (selectedIds, cover) => {
+      const selected = sections.filter((section) => selectedIds.includes(String(section.id)));
+      this._downloadSegmentationReport(selected, cover, title);
+    }, {
+      coverDefaults: {
+        title: title + ' Report',
+        subtitle: 'Statistico Interactive',
+        subject: title,
+        description: 'Survey results from the active workbook range.'
+      }
+    });
+  },
+
+  async _downloadSegmentationReport(selected, cover, title) {
+    const escMap = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' };
+    const esc = (value) => String(value == null ? '' : value).replace(/[<>&"]/g, (ch) => escMap[ch]);
+    const escAttr = (value) => esc(value);
+    const previous = globalThis.__segmentationActiveTab;
+    const progress = document.createElement('div');
+    progress.id = 'stExportProgressOverlay';
+    progress.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2147483400;display:flex;align-items:center;justify-content:center;padding:16px;';
+    progress.innerHTML = '<div style="min-width:280px;max-width:440px;padding:16px 18px;border-radius:12px;background:#111827;color:#e5e7eb;">Preparing export…</div>';
+    document.body.appendChild(progress);
+    try {
+      const snaps = [];
+      for (let i = 0; i < selected.length; i += 1) {
+        if (typeof window.switchTab === 'function' && selected[i].id !== globalThis.__segmentationActiveTab) {
+          window.switchTab(selected[i].id);
+          await new Promise((resolve) => setTimeout(resolve, 400));
+        }
+        snaps.push({ snapshotHtml: this._captureLiveReportSnapshot(), ok: true });
+      }
+      const built = this._buildSuccessfulExportSections(selected, snaps, esc, escAttr, { cover: cover || {} });
+      if (!built.included.length) {
+        alert('No sections could be captured for export.');
+        return;
+      }
+      const logoDataUrl = cover && cover.enabled ? await this._resolveExportLogoDataUrl(cover) : '';
+      const coverHtml = this._buildExportCoverPageHtml(cover, logoDataUrl, esc);
+      const reportCss = 'body{font-family:Segoe UI,Arial,sans-serif;padding:24px;max-width:1120px;margin:auto;color:#0f172a}h1{margin-bottom:4px}h2{margin-top:28px}nav{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:18px 0}section{page-break-inside:avoid;border-top:1px solid #e2e8f0;padding-top:14px}.meta{color:#475569;font-size:13px}.report-frame{width:100%;height:760px;border:1px solid #d1d5db;border-radius:10px;background:#fff}' + this._getExportCoverCss();
+      const intro = cover && cover.enabled
+        ? '<nav><strong>Included sections</strong><ol>' + built.toc + '</ol></nav>'
+        : '<h1>' + esc(title) + ' Report</h1><p class="meta"><strong>Generated:</strong> ' + esc(new Date().toLocaleString()) + '</p><nav><strong>Included sections</strong><ol>' + built.toc + '</ol></nav>';
+      const pageTitle = (cover && cover.enabled && cover.title) ? cover.title : (title + ' Report');
+      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(pageTitle) + '</title><style>' + reportCss + '</style></head><body>' + coverHtml + intro + built.html + '</body></html>';
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, '');
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = title.replace(/[^a-z0-9]+/gi, '_') + '_Report_' + stamp + '.html';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => { URL.revokeObjectURL(url); link.remove(); }, 1000);
+    } finally {
+      if (previous && typeof window.switchTab === 'function' && previous !== globalThis.__segmentationActiveTab) {
+        window.switchTab(previous);
+      }
+      const overlay = document.getElementById('stExportProgressOverlay');
+      if (overlay) overlay.remove();
+    }
+  },
+
   _buildSuccessfulExportSections(selected, snapshotResults, esc, escAttr, exportOptions = {}) {
     const wantDesc = !!(exportOptions.cover && exportOptions.cover.aiDescriptionPerSection);
     const wantInterp = !!(exportOptions.cover && exportOptions.cover.aiInterpretationPerSection);
@@ -7661,8 +7746,10 @@ REPORT: [one polished paragraph suitable for a report]`;
     const hasView = typeof actions.getData === 'function';
     const hasHtml = typeof actions.exportHtml === 'function';
     const hasJson = typeof actions.exportJson === 'function';
+    const surveySidebar = this.module === 'segmentation';
 
     // ── AI pill — above export / tools (every sidebar module) ─────────────
+    if (!surveySidebar) {
     const isDependentKplus = this.module === 'dependent' && this.currentView === 'dependent-results-kplus';
     const supportsFullAiPill = this.module === 'independent' || isDependentKplus;
     const aiSection = document.createElement('div');
@@ -7678,6 +7765,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       </button>
     `;
     footer.appendChild(aiSection);
+    }
 
     const exportWrap = document.createElement('div');
     exportWrap.id = 'sbExportWrap';
@@ -7694,6 +7782,13 @@ REPORT: [one polished paragraph suitable for a report]`;
     footer.appendChild(exportWrap);
 
     let toolsOpen = false;
+    const extraTools = surveySidebar ? '' : (
+      '<div class="sb-theme-switch-wrap">' + this._renderThemeSwitcherHtml('hc-theme-switch--sidebar') + '</div>'
+      + '<button class="sb-bottom-btn sb-bottom-btn--json ' + (hasJson ? '' : 'sb-bottom-btn--disabled') + '" id="sbExportJsonBtn" '
+      + (hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled')
+      + ' title="' + (hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet') + '">'
+      + '<i class="fa-solid fa-download"></i><span class="sb-item-label">Download JSON</span></button>'
+    );
 
     const utilities = document.createElement('div');
     utilities.id = 'sbUtilities';
@@ -7701,7 +7796,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     utilities.innerHTML = `
       <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
               aria-expanded="${toolsOpen ? 'true' : 'false'}"
-              title="View Data, Save PNG, Color theme, Download JSON">
+              title="${surveySidebar ? 'View Data and Save PNG' : 'View Data, Save PNG, Color theme, Download JSON'}">
         <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
         <span class="sb-bottom-label">Output &amp; Tools</span>
         <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>
@@ -7721,16 +7816,7 @@ REPORT: [one polished paragraph suitable for a report]`;
           <i class="fa-solid fa-image"></i>
           <span class="sb-item-label">Save as PNG</span>
         </button>
-        <div class="sb-theme-switch-wrap">
-          ${this._renderThemeSwitcherHtml('hc-theme-switch--sidebar')}
-        </div>
-        <button class="sb-bottom-btn sb-bottom-btn--json ${hasJson ? '' : 'sb-bottom-btn--disabled'}"
-                id="sbExportJsonBtn"
-                ${hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled'}
-                title="${hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet'}">
-          <i class="fa-solid fa-download"></i>
-          <span class="sb-item-label">Download JSON</span>
-        </button>
+        ${extraTools}
       </div>
     `;
     footer.appendChild(utilities);

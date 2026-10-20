@@ -73,7 +73,16 @@
     .reg-chip-x { background:none; border:none; cursor:pointer; color:inherit; font-size:13px; }
     .opt-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .opt-card { border:1px solid var(--cfg-border); border-radius:8px; padding:8px; background:var(--cfg-surface); }
-    .opt-card h4 { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--cfg-text3); margin:0 0 6px; }
+    .opt-card h4 { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--cfg-text3); margin:0 0 6px; display:flex; align-items:center; gap:6px; }
+    .opt-card .zone-info {
+      margin-left:auto; border:0; background:transparent; color:inherit; cursor:pointer;
+      width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+      font-size:13px;
+    }
+    .opt-card .zone-info:hover, .opt-card .zone-info[aria-expanded="true"] { background:rgba(13,148,136,.16); }
+    .opt-card .zone-info-pop { display:none; }
+    .opt-card.show-info .zone-info-pop { display:block; }
+    .opt-tag { font-weight:600; text-transform:none; letter-spacing:0; color:var(--cfg-text3); }
     .opt-card label { display:block; font-size:11px; font-weight:700; margin:6px 0 3px; }
     .opt-card select, .opt-card input[type="number"], .opt-card input[type="text"] {
       width:100%; padding:6px 8px; border-radius:7px; border:1px solid var(--cfg-border);
@@ -168,7 +177,10 @@
             </div>
           </div>
           <div class="opt-card" id="splitCutCard" hidden>
-            <h4>Splitting cut-off</h4>
+            <h4>Splitting factor cut-off
+              <button type="button" class="zone-info" id="splitCutInfo" aria-label="About the splitting factor cut-off" aria-expanded="false"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
+            </h4>
+            <p class="zone-info-pop" id="splitCutInfoPop">This cut-off divides the splitting factor into the high group and the low group. The default cut is the median. At or above the cut is the high group. Below it is the low group. The chart updates as you move the cut.</p>
             <p class="zone-help" id="splitCutIntro">The default cut is the median. At or above the cut is the high group. Below it is the low group. Move the cut and the chart updates.</p>
             <label for="splitCutMethod">Rule</label>
             <select id="splitCutMethod">
@@ -185,6 +197,11 @@
             <div class="rule-line" id="splitCutRule">At or above the cut is the highest score. Below it is the lower score.</div>
             <div id="splitPreview" class="split-preview"></div>
             <p class="split-preview-note" id="splitPreviewNote"></p>
+          </div>
+          <div class="opt-card" id="splitTitleCard" hidden>
+            <h4>Chart title</h4>
+            <label for="splitChartTitle">Title <span class="opt-tag">optional</span></label>
+            <input id="splitChartTitle" type="text" value="" />
           </div>
           <div class="opt-card" id="splitLegendCard" hidden>
             <h4>Legend labels</h4>
@@ -225,6 +242,8 @@
     var _periodPrevious = null;
     var _savedCurrent = null;
     var _savedPrevious = null;
+    var _savedFactorLabel = '';
+    var _savedFactorColumns = '';
     var assign = {
       x: [],
       y: [],
@@ -529,9 +548,19 @@
       el.classList.add('show');
     }
 
+    function splittingFactorName() {
+      return assign.y.length ? assign.y.join(' + ') : '';
+    }
+    function splittingFactorLabel() {
+      if (_savedFactorLabel && assign.y.join('|') === _savedFactorColumns) return _savedFactorLabel;
+      return splittingFactorName();
+    }
+    function defaultSplitChartTitle() {
+      return 'Factors split by ' + (splittingFactorLabel() || 'the splitting factor');
+    }
     function refresh() {
       if (PRODUCT === 'split') {
-        var names = SS.splitGroupLabels('Intention to stay');
+        var names = SS.splitGroupLabels(splittingFactorLabel() || 'Intention to stay');
         var highIn = qs('splitHighLabel');
         var lowIn = qs('splitLowLabel');
         if (highIn && !highIn.value.trim()) highIn.value = names.high;
@@ -541,6 +570,8 @@
         ZONES[0].help = 'One or more items, averaged into a score. At or above the cut is ' + high + '. Below it is ' + low + '.';
         ZONES[0].info = 'Select one variable, or several variables that are averaged into one score. At or above the cut-off is ' + high + '. Below it is ' + low + '. Split Index is the distance between these two groups on each dimension. A larger distance means that dimension does more to separate ' + high + ' from ' + low + '.';
         ZONES[1].help = 'Dimensions compared between ' + high + ' and ' + low + '. Split Index is the distance between their scores.';
+        var titleIn = qs('splitChartTitle');
+        if (titleIn && titleIn.dataset.custom !== '1') titleIn.value = defaultSplitChartTitle();
       }
       renderVariables();
       renderZones();
@@ -619,12 +650,16 @@
         base.yDimension.thresholdMethod = (qs('splitCutMethod') && qs('splitCutMethod').value) || 'median';
         var cutValue = qs('splitCutValue') ? qs('splitCutValue').value : '';
         base.yDimension.threshold = cutValue === '' ? null : Number(cutValue);
+        if (splittingFactorLabel()) base.yDimension.label = splittingFactorLabel();
         var highLegend = qs('splitHighLabel');
         var lowLegend = qs('splitLowLabel');
         var generated = SS.splitGroupLabels(base.yDimension.label);
         base.yDimension.highLabel = (highLegend && highLegend.value.trim()) || generated.high;
         base.yDimension.lowLabel = (lowLegend && lowLegend.value.trim()) || generated.low;
         base.legendLabelsCustom = base.yDimension.highLabel !== generated.high || base.yDimension.lowLabel !== generated.low;
+        var titleIn = qs('splitChartTitle');
+        var typedTitle = titleIn && titleIn.value.trim();
+        base.chartTitle = typedTitle && typedTitle !== defaultSplitChartTitle() ? typedTitle : '';
       }
       return base;
     }
@@ -659,6 +694,8 @@
         assign.factors = (saved.factorColumns || []).slice();
         _savedCurrent = saved.currentWave || null;
         _savedPrevious = saved.previousWave || null;
+        _savedFactorLabel = (saved.yDimension && saved.yDimension.label) || '';
+        _savedFactorColumns = ((saved.yDimension && saved.yDimension.columns) || []).join('|');
       }
       if (PRODUCT === 'split') {
         assign.x = [];
@@ -676,6 +713,11 @@
         if (saved && saved.product === 'split' && saved.yDimension) {
           qs('splitCutMethod').value = saved.yDimension.thresholdMethod || 'median';
           if (saved.yDimension.threshold != null && saved.yDimension.threshold !== '') qs('splitCutValue').value = saved.yDimension.threshold;
+        }
+        var titleIn = qs('splitChartTitle');
+        if (titleIn && saved && saved.chartTitle) {
+          titleIn.value = saved.chartTitle;
+          titleIn.dataset.custom = '1';
         }
       }
       qs('loadingSpinner').style.display = 'none';
@@ -732,7 +774,7 @@
       } else if (isFinite(shown)) {
         slider.value = qs('splitCutValue').value;
       }
-      var construct = 'Intention to stay';
+      var construct = splittingFactorLabel() || 'the splitting factor';
       var names = SS.splitGroupLabels(construct);
       var high = (qs('splitHighLabel').value || '').trim() || names.high;
       var low = (qs('splitLowLabel').value || '').trim() || names.low;
@@ -791,7 +833,7 @@
       note.textContent = '';
       var light = document.documentElement.getAttribute('data-theme') === 'light';
       var options = window.StatisticoSplitIndex.buildSplitIndexChartOptions(result, {
-        title: 'Factors split by ' + (spec.yDimension.label || 'the splitting construct'),
+        title: spec.chartTitle || ('Factors split by ' + (spec.yDimension.label || 'the splitting factor')),
         subtitle: 'Split-Index™ Approach',
         ink: light ? '#1c1917' : '#f8fafc',
         muted: light ? '#3f3f46' : '#cbd5e1'
@@ -818,6 +860,15 @@
     qs('splitCutSlider').addEventListener('input', function () { onSplitCutEdited('slider'); });
     qs('splitCutValue').addEventListener('input', function () { onSplitCutEdited('number'); });
     qs('splitHighLabel').addEventListener('input', scheduleSplitPreview);
+    qs('splitChartTitle').addEventListener('input', function () {
+      this.dataset.custom = this.value.trim() && this.value.trim() !== defaultSplitChartTitle() ? '1' : '';
+      scheduleSplitPreview();
+    });
+    qs('splitCutInfo').addEventListener('click', function () {
+      var card = qs('splitCutCard');
+      var open = card.classList.toggle('show-info');
+      this.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
     qs('splitLowLabel').addEventListener('input', scheduleSplitPreview);
     qs('minItems').addEventListener('change', refresh);
     qs('btnRun').addEventListener('click', runAnalysis);
@@ -830,6 +881,8 @@
       qs('cfgHeaderIcon').className = split ? 'fa-solid fa-chart-simple' : 'fa-solid fa-border-all';
       var legendCard = qs('splitLegendCard');
       if (legendCard) legendCard.hidden = !split;
+      var titleCard = qs('splitTitleCard');
+      if (titleCard) titleCard.hidden = !split;
       var cutCard = qs('splitCutCard');
       if (cutCard) cutCard.hidden = !split;
       if (split) {

@@ -1950,20 +1950,16 @@ const StatisticoHeader = {
       const changeOn = !!(globalThis.__segmentationChangeEnabled);
       const activeTab = globalThis.__segmentationActiveTab || 'overview';
       const split = globalThis.__segmentationProduct === 'split';
-      const items = split
-        ? [
-            { type: 'tab', tab: 'drivers', icon: 'fa-chart-simple', label: 'Split Index\u2122', description: 'Factors that differentiate the two selected groups.', active: true }
-          ]
-        : [
-            { type: 'tab', tab: 'overview', icon: 'fa-border-all', label: 'Overview', description: 'Four-quadrant loyalty matrix.', active: activeTab === 'overview' },
-            { type: 'tab', tab: 'groups', icon: 'fa-chart-column', label: 'Group Comparison', description: '100% stacked segment mix by group.', active: activeTab === 'groups' },
-            { type: 'tab', tab: 'change', icon: 'fa-arrow-right-arrow-left', label: 'Change', description: changeOn ? 'Current versus previous time period.' : 'Available when a previous time period is selected.', active: activeTab === 'change' }
-          ];
+      const items = [
+        { type: 'tab', tab: 'overview', icon: 'fa-border-all', label: 'Overview', description: 'Four-quadrant loyalty matrix.', active: activeTab === 'overview' },
+        { type: 'tab', tab: 'groups', icon: 'fa-chart-column', label: 'Group Comparison', description: '100% stacked segment mix by group.', active: activeTab === 'groups' },
+        { type: 'tab', tab: 'change', icon: 'fa-arrow-right-arrow-left', label: 'Change', description: changeOn ? 'Current versus previous time period.' : 'Available when a previous time period is selected.', active: activeTab === 'change' }
+      ];
       return {
         logoIcon: split ? 'fa-chart-simple' : 'fa-border-all',
         logoSub: split ? 'Split Index' : 'Loyalty',
         menuTitle: 'Menu',
-        groups: [{ title: 'View', items: items }]
+        groups: split ? [] : [{ title: 'View', items: items }]
       };
     }
 

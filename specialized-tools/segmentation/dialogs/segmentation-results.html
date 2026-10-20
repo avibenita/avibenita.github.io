@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261009tabglow" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261009tabglow" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261019splitaxis"></script>
+  <script src="../shared-header.js?v=20261020panels"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020legend"></script>
   <script src="segmentation-split-index.js?v=20261014si1"></script>
@@ -183,7 +183,7 @@
     .bench { font-size:12.5px; font-weight:700; color:var(--accent); }
     #driverControls { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; align-items:start; margin-bottom:8px; }
     #driverControls[hidden] { display:none !important; }
-    #splitCutField[hidden] { display:none !important; }
+    details.fold[hidden] { display:none !important; }
     .cut-row { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:8px; align-items:center; }
     .cut-row input[type="range"] { width:100%; margin:0; padding:0; height:22px; accent-color:#5eead4; }
     .driver-index { border:1px solid var(--border); border-radius:8px; margin:0; padding:8px; min-width:0; }
@@ -266,23 +266,6 @@
                 <label class="field" id="lowLegendField">Lower score
                   <input id="lowLegend" type="text" />
                 </label>
-                <div id="splitCutField">
-                  <label class="field">Cut-off rule
-                    <select id="splitCutMethod">
-                      <option value="median">Median</option>
-                      <option value="midpoint">Scale midpoint</option>
-                      <option value="favorable">Favorable-response threshold</option>
-                      <option value="custom">Custom number</option>
-                    </select>
-                  </label>
-                  <label class="field">Cut-off
-                    <span class="cut-row">
-                      <input id="splitCutSlider" type="range" min="1" max="5" step="0.01" value="4" />
-                      <input id="splitCutValue" type="number" step="0.01" />
-                    </span>
-                  </label>
-                  <p class="note" id="splitCutRule"></p>
-                </div>
                 <label class="field" id="xMethodField">Satisfaction rule
                     <select id="xMethod">
                       <option value="custom">Custom numeric threshold</option>
@@ -318,6 +301,28 @@
                   <label class="field" id="previousWaveField">Previous time
                     <select id="previousWave"></select>
                   </label>
+                </div>
+              </div>
+            </details>
+            <details class="fold" id="cutFold" hidden>
+              <summary>Cut-off</summary>
+              <div class="fold-body">
+                <div id="splitCutField">
+                  <label class="field">Cut-off rule
+                    <select id="splitCutMethod">
+                      <option value="median">Median</option>
+                      <option value="midpoint">Scale midpoint</option>
+                      <option value="favorable">Favorable-response threshold</option>
+                      <option value="custom">Custom number</option>
+                    </select>
+                  </label>
+                  <label class="field">Cut-off
+                    <span class="cut-row">
+                      <input id="splitCutSlider" type="range" min="1" max="5" step="0.01" value="4" />
+                      <input id="splitCutValue" type="number" step="0.01" />
+                    </span>
+                  </label>
+                  <p class="note" id="splitCutRule"></p>
                 </div>
               </div>
             </details>
@@ -551,11 +556,7 @@
         _sidebarSettings = document.createElement('div');
         _sidebarSettings.id = 'sbSettings';
         _sidebarSettings.className = 'sb-settings';
-        var heading = document.createElement('div');
-        heading.className = 'sb-group-title';
-        heading.textContent = 'Labels';
-        _sidebarSettings.appendChild(heading);
-        ['settingsFold', 'labelFold'].forEach(function (id) {
+        ['settingsFold', 'cutFold', 'labelFold'].forEach(function (id) {
           var el = document.getElementById(id);
           if (el) _sidebarSettings.appendChild(el);
         });
@@ -567,8 +568,13 @@
         _sidebarSettings.appendChild(controls);
       }
       var settings = document.getElementById('settingsFold');
+      var cut = document.getElementById('cutFold');
       var labels = document.getElementById('labelFold');
       if (settings) settings.open = true;
+      if (cut) {
+        cut.hidden = productId() !== 'split';
+        cut.open = productId() === 'split';
+      }
       if (labels) {
         labels.hidden = productId() === 'split';
         labels.open = productId() !== 'split';
@@ -602,8 +608,6 @@
         var el = document.getElementById(id);
         if (el) el.hidden = split;
       });
-      var cutField = document.getElementById('splitCutField');
-      if (cutField) cutField.hidden = !split;
       var driverControls = document.getElementById('driverControls');
       if (driverControls) driverControls.hidden = split;
       var summary = document.getElementById('summary');

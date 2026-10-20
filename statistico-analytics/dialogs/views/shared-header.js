@@ -619,6 +619,9 @@ const StatisticoHeader = {
     document.addEventListener('click', (e) => {
       const label = e.target && e.target.closest ? e.target.closest('label') : null;
       if (!label) return;
+      // Column-filter rows toggle themselves and keep the selection mode.
+      // A second flip here makes the box look stuck.
+      if (label.closest('.uni-excel-filter-dropdown')) return;
       if (e.target.closest('a, button, select, textarea, input:not([type="checkbox"])')) return;
       if (label.closest('#stReportExportOverlay')) {
         const exportInput = label.querySelector('input[type="checkbox"]');
@@ -5676,7 +5679,7 @@ const StatisticoHeader = {
   },
 
   _injectUniFilterAssets() {
-    const v = '20260524e';
+    const v = '20261020checks';
     const base = this._uniFilterAssetBase();
     const cssHref = `${base}uni-filter-shared.css?v=${v}`;
     const existingCss = document.querySelector('link[data-uni-filter-shared-css]');

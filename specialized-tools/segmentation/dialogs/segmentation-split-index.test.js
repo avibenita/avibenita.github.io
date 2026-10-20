@@ -303,11 +303,16 @@ describe('Split Index calculations', () => {
     const result = SI.calculateSplitIndex(people, cfg, { index: 'raw' });
     expect(result.spread.cutoff).toBeCloseTo(result.spread.mean + result.spread.sd, 8);
     expect(result.factors.filter((factor) => factor.aboveAverageSpread).map((factor) => factor.factorId)).toEqual(['A']);
-    const options = SI.buildSplitIndexChartOptions(result);
+    const plain = SI.buildSplitIndexChartOptions(result);
+    expect(plain.yAxis[1].plotLines).toEqual([]);
+    expect(plain.xAxis.plotBands).toEqual([]);
+    expect(plain.series[2].data[0]).toEqual(expect.any(Number));
+    const options = SI.buildSplitIndexChartOptions(result, { highlightSpread: true });
     expect(options.yAxis[1].plotLines[0].value).toBeCloseTo(result.spread.cutoff, 8);
+    expect(options.xAxis.plotBands).toHaveLength(1);
     expect(options.series[2].data[0].color).toBe('rgba(231,197,106,0.95)');
     expect(options.series[2].data[1]).toEqual(expect.any(Number));
     expect(SI.resultsTable(result)[0]['Above average + 1 SD']).toBe('Yes');
-    expect(SI.buildFactorTooltip(result.factors.filter((factor) => factor.factorId === 'A')[0], { showEvidence: false })).toMatch(/Above the average Split Index \+ 1 SD/);
+    expect(SI.buildFactorTooltip(result.factors.filter((factor) => factor.factorId === 'A')[0], { showEvidence: false })).toMatch(/and thus may be an explaining factor/);
   });
 });

@@ -21,10 +21,10 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261009tabglow" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261009tabglow" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261020checks"></script>
+  <script src="../shared-header.js?v=20261020flag"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261020flag"></script>
+  <script src="segmentation-split-index.js?v=20261020flag2"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
     :root {
@@ -159,7 +159,8 @@
     .help-card .swatch.flag { width:12px; height:16px; background:rgba(231,197,106,.95); border:1px solid #f8e7b0; border-radius:2px; }
     .flag-note { display:flex; gap:10px; align-items:flex-start; margin:10px 0 0; padding:10px 12px; border:1px solid rgba(231,197,106,.5); border-radius:10px; background:rgba(231,197,106,.1); color:var(--text); font-size:13px; line-height:1.45; }
     .flag-note[hidden] { display:none !important; }
-    .flag-note p { margin:0; }
+    .flag-note p { margin:0; flex:1; }
+    .flag-toggle { flex:0 0 auto; margin-left:8px; padding-bottom:0 !important; white-space:nowrap; font-weight:700; color:#e7c56a !important; }
     .flag-mark { flex:0 0 12px; width:12px; height:18px; margin-top:2px; border-radius:2px; background:rgba(231,197,106,.95); border:1px solid #f8e7b0; }
     .stats-scroll tr.flagged-row td:first-child,
     .stats-scroll td.flag-cell { color:#e7c56a; font-weight:700; }
@@ -464,6 +465,7 @@
                 <div id="splitFlagNote" class="flag-note" hidden>
                   <i class="flag-mark" aria-hidden="true"></i>
                   <p id="splitFlagText"></p>
+                  <label class="check flag-toggle"><input type="checkbox" id="splitFlagToggle" /> Highlight</label>
                 </div>
                 <details class="fold" id="driverStats">
                   <summary>Statistical details</summary>
@@ -541,7 +543,7 @@
     var _changeChart = null;
     var _driverChart = null;
     var SI = window.StatisticoSplitIndex;
-    var _driver = { mode: 'stay', group1: 'highXHighY', group2: 'lowXLowY', segment: 'highXHighY', index: 'raw', sort: 'splitDesc', topN: 0, evidence: false, missing: 'available', wave: 'current', adjustment: 'bh' };
+    var _driver = { mode: 'stay', group1: 'highXHighY', group2: 'lowXLowY', segment: 'highXHighY', index: 'raw', sort: 'splitDesc', topN: 0, evidence: false, missing: 'available', wave: 'current', adjustment: 'bh', highlightSpread: false };
     var _splitResult = null;
     var _painting = false;
 
@@ -656,7 +658,7 @@
       document.getElementById('splitHelpColumns').innerHTML = '<span class="swatch col"></span>The Split Index is the distance between the two lines. The gray columns draw that distance. A taller column means the dimension does more to separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + '. A short column means both groups rate the dimension about the same.';
       document.getElementById('splitHelpConstruct').innerHTML = '<strong>Splitting construct.</strong> ' + segEsc(n.construct) + ' can be one item or the average of several items. Missing answers stay missing. They are not scored as zero.';
       document.getElementById('splitHelpCutoff').innerHTML = '<strong>Cut-off.</strong> The default cut is the median. At or above the median is ' + segEsc(n.high) + '. Below the median is ' + segEsc(n.low) + '. You can move the cut-off, and the chart updates with it.';
-      document.getElementById('splitHelpFlag').innerHTML = '<strong>Above average + 1 SD.</strong> A gold column, and its gold label, means that factor’s Split Index is higher than the average Split Index of the factors in the chart plus one standard deviation. The dashed gold line is that cutoff. Those factors separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + ' more than the typical factor here.';
+      document.getElementById('splitHelpFlag').innerHTML = '<strong>Above average + 1 SD.</strong> Highlight starts off. Turn it on to mark a gold column and the gold area behind it. That mark means the factor’s Split Index is higher than the average Split Index of the factors in the chart plus one standard deviation. The dashed gold line is that cutoff. Those factors separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + ' more than the typical factor, and thus may be an explaining factor.';
       document.getElementById('splitHelpExampleTitle').textContent = 'Example: ' + n.construct;
       document.getElementById('splitHelpExample').textContent = n.construct + ' is the splitting construct. Its median is the cut-off. Respondents at or above that median are ' + n.high + '. Respondents below it are ' + n.low + '.';
       document.getElementById('splitHelpExampleNumbers').textContent = 'On the direct-manager dimension in the illustration, ' + n.high + ' averages 4.26 and ' + n.low + ' averages 3.53. The raw Split Index is the distance between those means:';
@@ -673,7 +675,8 @@
         title: (_spec && _spec.chartTitle) || defaultSplitChartTitle(),
         subtitle: (_spec && _spec.chartSubtitle) || 'Split-Index™ Approach',
         ink: light ? '#1c1917' : '#f8fafc',
-        muted: light ? '#3f3f46' : '#cbd5e1'
+        muted: light ? '#3f3f46' : '#cbd5e1',
+        highlightSpread: !!_driver.highlightSpread
       };
     }
     function ink() {
@@ -764,6 +767,9 @@
           sd: roundInsight(_splitResult.spread.sd),
           cutoff: roundInsight(_splitResult.spread.cutoff)
         } : null,
+        highlightExplainingFactors: !!_driver.highlightSpread,
+        explainingFactors: (_splitResult.displayed || []).filter(function (factor) { return factor.aboveAverageSpread; }).map(function (factor) { return factor.factorLabel; }),
+        explainingFactorNote: explainingFactorNote(_splitResult),
         factors: (_splitResult.displayed || []).map(function (factor) {
           return {
             factor: factor.factorLabel,
@@ -771,6 +777,7 @@
             lowGroupMean: roundInsight(factor.group2 && factor.group2.mean),
             splitIndex: roundInsight(factor.selectedSplitIndex),
             aboveAveragePlusOneSd: !!factor.aboveAverageSpread,
+            mayBeExplainingFactor: !!factor.aboveAverageSpread,
             pattern: factor.pattern ? factor.pattern.label : '',
             reading: factor.pattern ? factor.pattern.description : ''
           };
@@ -1643,7 +1650,7 @@
           Object.keys(exported[0]).forEach(function (key) {
             var td = document.createElement('td');
             td.textContent = record[key];
-            if (key === 'Above average + 1 SD' && record[key] === 'Yes') {
+            if (_driver.highlightSpread && key === 'Above average + 1 SD' && record[key] === 'Yes') {
               td.className = 'flag-cell';
               tr.className = 'flagged-row';
             }
@@ -1676,16 +1683,28 @@
         text.textContent = '';
         return;
       }
+      var toggle = document.getElementById('splitFlagToggle');
+      if (toggle) toggle.checked = !!_driver.highlightSpread;
       var cutoff = SS.formatNum(spread.cutoff);
       var flagged = (result.displayed || []).filter(function (factor) { return factor.aboveAverageSpread; }).map(function (factor) { return factor.factorLabel; });
+      var clause = flagged.length === 1 ? ', and thus may be an explaining factor' : ', and thus may be explaining factors';
       var sentence;
-      if (flagged.length) {
-        sentence = 'Gold columns rise above the dashed line. That line is the average Split Index of these factors plus one standard deviation (' + cutoff + '). ' + joinNames(flagged) + (flagged.length === 1 ? ' separates' : ' separate') + ' the two groups more than the typical factor in this chart.';
-      } else {
+      if (flagged.length && _driver.highlightSpread) {
+        sentence = 'Gold columns rise above the dashed line. That line is the average Split Index of these factors plus one standard deviation (' + cutoff + '). ' + joinNames(flagged) + (flagged.length === 1 ? ' separates' : ' separate') + ' the two groups more than the typical factor in this chart' + clause + '.';
+      } else if (flagged.length) {
+        sentence = joinNames(flagged) + (flagged.length === 1 ? ' is' : ' are') + ' above the average Split Index plus one standard deviation (' + cutoff + ')' + clause + '.';
+      } else if (_driver.highlightSpread) {
         sentence = 'The dashed line is the average Split Index of these factors plus one standard deviation (' + cutoff + '). No factor is above it.';
+      } else {
+        sentence = 'No factor is above the average Split Index plus one standard deviation (' + cutoff + ').';
       }
       text.textContent = sentence;
       note.hidden = false;
+    }
+    function explainingFactorNote(result) {
+      var names = ((result && result.displayed) || []).filter(function (factor) { return factor.aboveAverageSpread; }).map(function (factor) { return factor.factorLabel; });
+      if (!names.length) return 'No factor is above the average Split Index plus one standard deviation.';
+      return joinNames(names) + (names.length === 1 ? ' may be an explaining factor' : ' may be explaining factors') + ' because the Split Index is above the average Split Index plus one standard deviation. This separates the two groups more than the typical factor. It is descriptive, not a causal test.';
     }
     function joinNames(names) {
       if (names.length === 1) return names[0];
@@ -1875,6 +1894,7 @@
     document.getElementById('driverSort').addEventListener('change', function () { _driver.sort = this.value; paintDrivers(); });
     document.getElementById('driverTop').addEventListener('change', function () { _driver.topN = Number(this.value); paintDrivers(); });
     document.getElementById('driverEvidence').addEventListener('change', function () { _driver.evidence = this.checked; paintDrivers(); });
+    document.getElementById('splitFlagToggle').addEventListener('change', function () { _driver.highlightSpread = this.checked; paintDrivers(); });
     document.getElementById('driverAdjust').addEventListener('change', function () { _driver.adjustment = this.value; paintDrivers(); });
     document.getElementById('driverWave').addEventListener('change', function () { _driver.wave = this.value; paintDrivers(); });
     document.querySelectorAll('input[name="driverIndex"]').forEach(function (el) {

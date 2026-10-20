@@ -431,7 +431,7 @@
     var indexName = factor.indexType === 'standardized' ? 'Standardized Split Index' : 'Raw Split Index';
     lines.push(indexName + ': ' + (isNum(factor.selectedSplitIndex) ? formatFixed(factor.selectedSplitIndex, 2) : '—'));
     if (factor.aboveAverageSpread) {
-      lines.push('Above the average Split Index + 1 SD' + (isNum(factor.spreadCutoff) ? ' (' + formatFixed(factor.spreadCutoff, 2) + ').' : '.'));
+      lines.push('Above the average Split Index + 1 SD' + (isNum(factor.spreadCutoff) ? ' (' + formatFixed(factor.spreadCutoff, 2) + ')' : '') + ', and thus may be an explaining factor.');
     }
     if (isNum(factor.signedDifference)) lines.push('Signed difference: ' + (factor.signedDifference > 0 ? '+' : '') + formatFixed(factor.signedDifference, 2));
     if (factor.standardizedSplitIndex == null && factor.standardizedUnavailable) lines.push(COPY.zeroVariance);
@@ -663,6 +663,7 @@
     var light = ink === '#1c1917';
     var indexInk = light ? '#57534e' : '#d6d3d1';
     var grid = light ? 'rgba(28,25,23,.28)' : 'rgba(226,232,240,.42)';
+    var highlight = !!view.highlightSpread;
     return {
       chart: {
         type: 'spline',
@@ -701,10 +702,10 @@
         gridLineColor: grid,
         lineWidth: 0,
         tickLength: 0,
-        plotBands: rows.map(function (row, index) {
+        plotBands: highlight ? rows.map(function (row, index) {
           if (!row.aboveAverageSpread) return null;
           return { from: index - 0.5, to: index + 0.5, color: light ? 'rgba(231,197,106,.18)' : 'rgba(231,197,106,.14)', zIndex: 0 };
-        }).filter(Boolean),
+        }).filter(Boolean) : [],
         labels: {
           rotation: angled ? -40 : 0,
           align: angled ? 'right' : 'center',
@@ -715,7 +716,7 @@
               return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch];
             });
             var row = rows[this.pos];
-            if (!row || !row.aboveAverageSpread) return safe;
+            if (!highlight || !row || !row.aboveAverageSpread) return safe;
             return '<span style="color:#e7c56a;font-weight:800">' + safe + '</span>';
           }
         }
@@ -735,7 +736,7 @@
           alignTicks: false,
           gridLineWidth: 0,
           labels: { style: { color: indexInk, fontWeight: '700', fontSize: '15px' } },
-          plotLines: spreadLine(result, light)
+          plotLines: highlight ? spreadLine(result, light) : []
         }
       ],
       tooltip: { shared: false, borderRadius: 8 },
@@ -791,7 +792,7 @@
           data: rows.map(function (row) {
             if (!isNum(row.selectedSplitIndex)) return null;
             var y = Math.round(row.selectedSplitIndex * 100) / 100;
-            if (!row.aboveAverageSpread) return y;
+            if (!highlight || !row.aboveAverageSpread) return y;
             return { y: y, color: 'rgba(231,197,106,0.95)', borderColor: '#f8e7b0' };
           })
         }

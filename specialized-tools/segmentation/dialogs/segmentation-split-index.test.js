@@ -332,4 +332,21 @@ describe('Split Index calculations', () => {
     expect(one.group1.validN + one.group2.validN).toBe(2);
     expect(one.factors.filter((factor) => factor.factorId === 'Pay')[0].rawSplitIndex).toBeCloseTo(4, 8);
   });
+
+  test('period comparison keeps a Split Index for each period', () => {
+    const cfg = config({ waveColumn: 'Wave', currentWave: '2026', previousWave: '2025' });
+    const people = [
+      Object.assign(row(0, 5, 5, 5, 1), { wave: '2026' }),
+      Object.assign(row(1, 2, 2, 1, 1), { wave: '2026' }),
+      Object.assign(row(2, 5, 5, 1, 5), { wave: '2025' }),
+      Object.assign(row(3, 2, 2, 1, 1), { wave: '2025' })
+    ];
+    const comparison = SI.compareSplitIndexByPeriod(people, cfg, { index: 'raw' }, ['2025', '2026']);
+    const pay = comparison.factors.filter((factor) => factor.factorId === 'Pay')[0];
+    expect(comparison.periods).toEqual(['2025', '2026']);
+    expect(pay.periods.map((cell) => cell.splitIndex)).toEqual([4, 0]);
+    const options = SI.buildPeriodComparisonChartOptions(comparison);
+    expect(options.series.map((series) => series.name)).toEqual(['2025', '2026']);
+    expect(options.series[0].data[options.xAxis.categories.indexOf('Pay')]).toBe(4);
+  });
 });

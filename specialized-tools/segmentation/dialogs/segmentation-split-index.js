@@ -812,6 +812,138 @@
     };
   }
 
+  function compareSplitIndexByPeriod(respondents, config, options, periods) {
+    var list = (periods || []).map(function (period) { return String(period); }).filter(Boolean);
+    var base = options || {};
+    var overall = calculateSplitIndex(respondents, config, Object.assign({}, base, { period: 'all' }));
+    if (!overall.ok) return overall;
+    var byPeriod = {};
+    list.forEach(function (period) {
+      byPeriod[period] = calculateSplitIndex(respondents, config, Object.assign({}, base, { period: period }));
+    });
+    return {
+      ok: true,
+      periods: list,
+      indexType: overall.indexType,
+      indexLabel: overall.indexLabel,
+      factors: (overall.displayed || []).map(function (factor) {
+        return {
+          factorId: factor.factorId,
+          factorLabel: factor.factorLabel,
+          periods: list.map(function (period) {
+            var result = byPeriod[period];
+            var match = result && result.ok ? (result.factors || []).filter(function (item) { return item.factorId === factor.factorId; })[0] : null;
+            return {
+              period: period,
+              splitIndex: match ? match.selectedSplitIndex : null,
+              highGroupMean: match && match.group1 ? match.group1.mean : null,
+              lowGroupMean: match && match.group2 ? match.group2.mean : null,
+              highGroupN: match && match.group1 ? match.group1.validN : null,
+              lowGroupN: match && match.group2 ? match.group2.validN : null
+            };
+          })
+        };
+      })
+    };
+  }
+
+  function buildPeriodComparisonChartOptions(comparison, presentation) {
+    var rows = (comparison && comparison.factors) || [];
+    var periods = (comparison && comparison.periods) || [];
+    var view = presentation || {};
+    var ink = view.ink || '#f8fafc';
+    var muted = view.muted || '#cbd5e1';
+    var light = ink === '#1c1917';
+    var grid = light ? 'rgba(28,25,23,.28)' : 'rgba(226,232,240,.42)';
+    var colors = ['#2dd4bf', '#e7c56a', '#93c5fd', '#f9a8d4', '#fdba74', '#a3e635', '#c4b5fd', '#67e8f9'];
+    var indexName = comparison && comparison.indexType === 'standardized' ? 'Standardized Split Index' : 'Split Index';
+    var angled = rows.length > 6 || rows.some(function (row) { return String(row.factorLabel).length > 22; });
+    return {
+      chart: {
+        type: 'column',
+        backgroundColor: 'transparent',
+        spacingTop: 16,
+        spacingRight: 16,
+        spacingBottom: 12,
+        spacingLeft: 12,
+        style: { fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" },
+        scrollablePlotArea: rows.length > 8 ? { minWidth: rows.length * 120, scrollPositionX: 0 } : undefined
+      },
+      title: {
+        text: view.title || 'Split Index across periods',
+        align: 'center',
+        margin: 6,
+        style: { color: ink, fontSize: '26px', fontWeight: '600' }
+      },
+      subtitle: {
+        text: view.subtitle || 'Each column is that period’s Split Index',
+        align: 'center',
+        style: { color: muted, fontSize: '13px', fontWeight: '500' }
+      },
+      credits: { enabled: false },
+      legend: {
+        enabled: true,
+        align: 'center',
+        verticalAlign: 'bottom',
+        itemStyle: { color: ink, fontWeight: '600', fontSize: '12px' },
+        itemHoverStyle: { color: ink }
+      },
+      xAxis: {
+        categories: rows.map(function (row) { return row.factorLabel; }),
+        gridLineWidth: 1,
+        gridLineColor: grid,
+        lineWidth: 0,
+        tickLength: 0,
+        labels: {
+          rotation: angled ? -40 : 0,
+          align: angled ? 'right' : 'center',
+          style: { color: muted, fontSize: '12px', fontWeight: '600' }
+        }
+      },
+      yAxis: {
+        title: { text: indexName, margin: 16, style: { color: ink, fontWeight: '700', fontSize: '16px' } },
+        min: 0,
+        gridLineWidth: 1,
+        gridLineColor: grid,
+        labels: { style: { color: ink, fontWeight: '700', fontSize: '15px' } }
+      },
+      tooltip: {
+        shared: false,
+        useHTML: true,
+        formatter: function () {
+          var row = rows[this.point.index];
+          var cell = row && row.periods ? row.periods.filter(function (item) { return item.period === this.series.name; }, this)[0] : null;
+          var lines = ['<b>' + this.key + '</b>', this.series.name];
+          lines.push(indexName + ': ' + (isNum(this.y) ? formatFixed(this.y, 2) : '—'));
+          if (cell && isNum(cell.highGroupMean)) lines.push('High group mean: ' + formatFixed(cell.highGroupMean, 2));
+          if (cell && isNum(cell.lowGroupMean)) lines.push('Low group mean: ' + formatFixed(cell.lowGroupMean, 2));
+          return lines.join('<br>');
+        }
+      },
+      plotOptions: {
+        column: {
+          grouping: true,
+          borderWidth: 0,
+          borderRadius: 2,
+          pointPadding: 0.08,
+          groupPadding: 0.14,
+          maxPointWidth: 28
+        }
+      },
+      series: periods.map(function (period, index) {
+        return {
+          type: 'column',
+          name: String(period),
+          color: colors[index % colors.length],
+          data: rows.map(function (row) {
+            var cell = (row.periods || []).filter(function (item) { return item.period === String(period); })[0];
+            return cell && isNum(cell.splitIndex) ? Math.round(cell.splitIndex * 100) / 100 : null;
+          })
+        };
+      })
+    };
+  }
+
   function resultsTable(result) {
     if (!result || !result.ok) return [];
     return (result.factors || []).map(function (factor) {
@@ -862,6 +994,8 @@
     splitIndexSpread: splitIndexSpread,
     buildFactorTooltip: buildFactorTooltip,
     buildSplitIndexChartOptions: buildSplitIndexChartOptions,
+    compareSplitIndexByPeriod: compareSplitIndexByPeriod,
+    buildPeriodComparisonChartOptions: buildPeriodComparisonChartOptions,
     resultsTable: resultsTable,
     formatFixed: formatFixed
   };

@@ -21,10 +21,10 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261009tabglow" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261009tabglow" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261020export"></script>
+  <script src="../shared-header.js?v=20261021periods"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261021period"></script>
+  <script src="segmentation-split-index.js?v=20261021periods"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
     :root {
@@ -144,7 +144,7 @@
     }
     .btn.primary { background:#0f766e; border-color:#0f766e; color:#fff; }
     .chart { width:100%; height:460px; min-height:280px; }
-    #driverChart { height:580px; border:1px solid var(--border); border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.035), transparent 120px); }
+    #driverChart, #periodChart { height:580px; border:1px solid var(--border); border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.035), transparent 120px); }
     .chart-tools { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 0 8px; }
     .period-pick { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--text); }
     .period-pick[hidden] { display:none !important; }
@@ -361,6 +361,7 @@
               <button type="button" class="seg-tab" role="tab" id="tab-groups" data-tab="groups" aria-controls="panel-groups" aria-selected="false">Group Comparison</button>
               <button type="button" class="seg-tab" role="tab" id="tab-change" data-tab="change" aria-controls="panel-change" aria-selected="false">Change</button>
               <button type="button" class="seg-tab" role="tab" id="tab-drivers" data-tab="drivers" aria-controls="panel-drivers" aria-selected="false">Drivers</button>
+              <button type="button" class="seg-tab" role="tab" id="tab-periods" data-tab="periods" aria-controls="panel-periods" aria-selected="false" hidden>Across periods</button>
             </div>
             <section class="seg-panel active" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
               <div class="matrix-wrap"><div class="matrix" id="matrix"></div></div>
@@ -405,6 +406,11 @@
               <h3 id="changeTitle" style="font-size:14px;margin:0 0 6px;"></h3>
               <ul class="status-list" id="waveStatus"></ul>
               <div id="changeChart" class="chart"></div>
+            </section>
+            <section class="seg-panel" id="panel-periods" role="tabpanel" aria-labelledby="tab-periods">
+              <p class="note" id="periodCompareNote"></p>
+              <div id="periodChart" class="chart"></div>
+              <div style="overflow:auto;"><table id="periodTable"></table></div>
             </section>
             <section class="seg-panel" id="panel-drivers" role="tabpanel" aria-labelledby="tab-drivers">
               <div class="chart-tools">
@@ -555,6 +561,7 @@
     var _groupChart = null;
     var _changeChart = null;
     var _driverChart = null;
+    var _periodChart = null;
     var SI = window.StatisticoSplitIndex;
     var _driver = { mode: 'stay', group1: 'highXHighY', group2: 'lowXLowY', segment: 'highXHighY', index: 'raw', sort: 'splitDesc', topN: 0, evidence: false, missing: 'available', wave: 'current', period: 'all', adjustment: 'bh', highlightSpread: false };
     var _splitResult = null;
@@ -613,13 +620,17 @@
       globalThis.__segmentationProduct = split ? 'split' : 'loyalty';
       globalThis.__segmentationTitle = title;
       document.title = title;
-      ['overview', 'groups', 'change', 'drivers'].forEach(function (name) {
-        var show = split ? name === 'drivers' : name !== 'drivers';
+      var periodsOn = split && periodLevelList().length >= 2;
+      globalThis.__segmentationPeriodsOn = periodsOn;
+      ['overview', 'groups', 'change', 'drivers', 'periods'].forEach(function (name) {
+        var show = split ? (name === 'drivers' || (name === 'periods' && periodsOn)) : name !== 'drivers' && name !== 'periods';
         var tab = document.getElementById('tab-' + name);
         if (tab) tab.hidden = !show;
       });
+      var driversTab = document.getElementById('tab-drivers');
+      if (driversTab) driversTab.textContent = split ? 'Split Index' : 'Drivers';
       var tabs = document.querySelector('.seg-tabs');
-      if (tabs) tabs.hidden = split;
+      if (tabs) tabs.hidden = split && !periodsOn;
       var nameEl = document.getElementById('headerModuleName');
       if (nameEl) nameEl.textContent = title;
       var xOn = !!( _spec && _spec.xDimension && _spec.xDimension.columns && _spec.xDimension.columns.length);
@@ -642,8 +653,8 @@
       if (summary) summary.hidden = split;
       if (warnings) warnings.hidden = split;
       mountSidebarSettings();
-      if (split && _tab !== 'drivers') switchTab('drivers');
-      else if (!split && _tab === 'drivers') switchTab('overview');
+      if (split && _tab !== 'drivers' && !(periodsOn && _tab === 'periods')) switchTab('drivers');
+      else if (!split && (_tab === 'drivers' || _tab === 'periods')) switchTab('overview');
     }
 
     function segEsc(s) {
@@ -783,6 +794,7 @@
         highlightExplainingFactors: !!_driver.highlightSpread,
         explainingFactors: (_splitResult.displayed || []).filter(function (factor) { return factor.aboveAverageSpread; }).map(function (factor) { return factor.factorLabel; }),
         explainingFactorNote: explainingFactorNote(_splitResult),
+        periodComparison: periodComparisonPayload(),
         factors: (_splitResult.displayed || []).map(function (factor) {
           return {
             factor: factor.factorLabel,
@@ -920,7 +932,7 @@
       }
       if (_bundle && _bundle.rules) _bundle.rules.yThreshold = resolved.threshold;
       syncSplitCutControls();
-      if (_bundle && _bundle.ok) paintDrivers();
+      if (_bundle && _bundle.ok) paint();
       else recompute();
     }
     function syncSettingsToDom() {
@@ -1080,6 +1092,7 @@
       if (_tab === 'groups') paintGroups();
       if (_tab === 'change') paintChange();
       if (_tab === 'drivers') paintDrivers();
+      if (_tab === 'periods') paintPeriods();
     }
 
     function paintSummary() {
@@ -1687,10 +1700,43 @@
       _driverChart = Highcharts.chart('driverChart', options);
       paintSplitFlagNote(_splitResult);
     }
-    function syncPeriodSelect() {
-      var pick = document.getElementById('periodPick');
-      var sel = document.getElementById('periodSelect');
-      if (!pick || !sel) return;
+    function paintPeriods() {
+      if (!_bundle || !_bundle.ok || !SI) return;
+      var levels = periodLevelList();
+      var names = splitNames();
+      var note = document.getElementById('periodCompareNote');
+      if (note) note.textContent = 'Each column is the Split Index in that period. A taller column means the factor separates ' + names.high + ' from ' + names.low + ' more in that period.';
+      var comparison = SI.compareSplitIndexByPeriod(_bundle.scoredRespondents || [], _bundle.config, _driver, levels);
+      var table = document.getElementById('periodTable');
+      if (table) {
+        table.innerHTML = '';
+        if (comparison && comparison.ok && comparison.factors.length) {
+          var head = document.createElement('tr');
+          ['Factor'].concat(comparison.periods).forEach(function (label) {
+            var th = document.createElement('th');
+            th.textContent = label;
+            head.appendChild(th);
+          });
+          table.appendChild(head);
+          comparison.factors.forEach(function (factor) {
+            var tr = document.createElement('tr');
+            var name = document.createElement('td');
+            name.textContent = factor.factorLabel;
+            tr.appendChild(name);
+            factor.periods.forEach(function (cell) {
+              var td = document.createElement('td');
+              td.textContent = cell.splitIndex == null || !isFinite(cell.splitIndex) ? '—' : SS.formatNum(cell.splitIndex);
+              tr.appendChild(td);
+            });
+            table.appendChild(tr);
+          });
+        }
+      }
+      if (_periodChart) { _periodChart.destroy(); _periodChart = null; }
+      if (!comparison || !comparison.ok) return;
+      _periodChart = Highcharts.chart('periodChart', SI.buildPeriodComparisonChartOptions(comparison, splitChartPresentation()));
+    }
+    function periodLevelList() {
       var seen = {};
       var levels = [];
       ((_bundle && _bundle.scoredRespondents) || []).forEach(function (respondent) {
@@ -1705,6 +1751,27 @@
         if (isFinite(na) && isFinite(nb) && String(na) === a && String(nb) === b) return na - nb;
         return a < b ? -1 : a > b ? 1 : 0;
       });
+      return levels;
+    }
+    function periodComparisonPayload() {
+      var levels = periodLevelList();
+      if (!SI || !_bundle || !_bundle.ok || productId() !== 'split' || levels.length < 2) return null;
+      var comparison = SI.compareSplitIndexByPeriod(_bundle.scoredRespondents || [], _bundle.config, _driver, levels);
+      if (!comparison || !comparison.ok) return null;
+      return {
+        periods: comparison.periods,
+        factors: comparison.factors.map(function (factor) {
+          var byPeriod = {};
+          factor.periods.forEach(function (cell) { byPeriod[cell.period] = roundInsight(cell.splitIndex); });
+          return { factor: factor.factorLabel, splitIndexByPeriod: byPeriod };
+        })
+      };
+    }
+    function syncPeriodSelect() {
+      var pick = document.getElementById('periodPick');
+      var sel = document.getElementById('periodSelect');
+      if (!pick || !sel) return;
+      var levels = periodLevelList();
       var show = productId() === 'split' && !!(_spec && _spec.waveColumn) && levels.length >= 2;
       pick.hidden = !show;
       if (!show) {
@@ -1783,12 +1850,12 @@
       });
       if (window.StatisticoHeader) {
         StatisticoHeader.currentView = 'segmentation-' + name;
-        var titles = { overview: 'Overview', groups: 'Group Comparison', change: 'Change', drivers: 'Split Index™' };
+        var titles = { overview: 'Overview', groups: 'Group Comparison', change: 'Change', drivers: 'Split Index™', periods: 'Across periods' };
         try { StatisticoHeader.updateTitle(titles[name] || name); } catch (_e) {}
       }
       paint();
       setTimeout(function () {
-        [_groupChart, _changeChart, _driverChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
+        [_groupChart, _changeChart, _driverChart, _periodChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
       }, 40);
     }
     window.switchTab = switchTab;
@@ -1915,7 +1982,7 @@
     });
     document.querySelector('.seg-tabs').addEventListener('keydown', function (e) {
       var tabs = Array.prototype.filter.call(document.querySelectorAll('.seg-tab'), function (btn) {
-        return btn.getAttribute('aria-disabled') !== 'true';
+        return !btn.hidden && btn.getAttribute('aria-disabled') !== 'true';
       });
       var index = tabs.indexOf(document.activeElement);
       if (index < 0) return;
@@ -1972,7 +2039,7 @@
       el.addEventListener('change', function () { if (el.checked) { _driver.missing = el.value; paintDrivers(); } });
     });
     window.addEventListener('resize', function () {
-      [_groupChart, _changeChart, _driverChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
+      [_groupChart, _changeChart, _driverChart, _periodChart].forEach(function (c) { if (c) try { c.reflow(); } catch (_e) {} });
     });
 
     document.addEventListener('DOMContentLoaded', function () {

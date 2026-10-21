@@ -455,13 +455,25 @@
     if (spec.sameGroup) {
       return { ok: false, empty: false, error: 'Select two different groups. A group cannot be compared with itself.', spec: spec, factors: [], displayed: [] };
     }
-    var wave = opts.wave === 'previous' ? 'previous' : 'current';
-    var waveValue = wave === 'previous' ? cfg.previousWave : cfg.currentWave;
-    if (wave === 'previous' && !cfg.previousWave) {
-      return { ok: false, empty: false, error: 'A previous wave is not available for this analysis.', spec: spec, factors: [], displayed: [] };
+    var period = opts.period;
+    var wave = opts.wave === 'previous' ? 'previous' : (opts.wave === 'all' ? 'all' : 'current');
+    var waveValue = null;
+    if (period === 'all' || wave === 'all') {
+      wave = 'all';
+      waveValue = null;
+    } else if (period) {
+      wave = 'period';
+      waveValue = String(period);
+    } else if (wave === 'previous') {
+      if (!cfg.previousWave) {
+        return { ok: false, empty: false, error: 'A previous wave is not available for this analysis.', spec: spec, factors: [], displayed: [] };
+      }
+      waveValue = cfg.previousWave;
+    } else if (cfg.waveColumn && cfg.currentWave) {
+      waveValue = cfg.currentWave;
     }
     var pool = (respondents || []).filter(function (respondent) {
-      if (!cfg.waveColumn || waveValue == null || waveValue === '') return true;
+      if (waveValue == null || waveValue === '') return true;
       return String(respondent.wave) === String(waveValue);
     });
     var group1Rows = pool.filter(function (respondent) { return inGroup(respondent, 1, cfg, spec); });
@@ -599,7 +611,7 @@
       adjustment: opts.adjustment || 'bh',
       weightUsed: weightUsed,
       wave: wave,
-      waveLabel: waveValue || '',
+      waveLabel: wave === 'all' ? 'All' : (waveValue || ''),
       scalesDiffer: Object.keys(scaleKeys).length > 1,
       group1: { id: spec.group1.id, label: spec.group1.label, validN: group1Rows.length },
       group2: { id: spec.group2.id, label: spec.group2.label, validN: group2Rows.length },

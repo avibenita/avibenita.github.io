@@ -25,7 +25,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="segmentation-sample-data.js?v=20261013seg1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261020flag2"></script>
+  <script src="segmentation-split-index.js?v=20261021period"></script>
   <style>
     :root { --seg-acc: #0d9488; }
     [data-theme="light"] { --seg-acc: #0f766e; }
@@ -180,13 +180,13 @@
             <h4>Splitting factor cut-off
               <button type="button" class="zone-info" id="splitCutInfo" aria-label="About the splitting factor cut-off" aria-expanded="false"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
             </h4>
-            <p class="zone-info-pop" id="splitCutInfoPop">This cut-off divides the splitting factor into the high group and the low group. The default cut is the median. At or above the cut is the high group. Below it is the low group. The chart updates as you move the cut.</p>
-            <p class="zone-help" id="splitCutIntro">The default cut is the median. At or above the cut is the high group. Below it is the low group. Move the cut and the chart updates.</p>
+            <p class="zone-info-pop" id="splitCutInfoPop">This cut-off divides the splitting factor into the high group and the low group. The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. The chart updates as you move the cut.</p>
+            <p class="zone-help" id="splitCutIntro">The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. Move the cut and the chart updates.</p>
             <label for="splitCutMethod">Rule</label>
             <select id="splitCutMethod">
-              <option value="median" selected>Median</option>
+              <option value="favorable" selected>Favorable-response threshold</option>
+              <option value="median">Median</option>
               <option value="midpoint">Scale midpoint</option>
-              <option value="favorable">Favorable-response threshold</option>
               <option value="custom">Custom number</option>
             </select>
             <label for="splitCutValue">Cut-off</label>
@@ -647,7 +647,7 @@
         base.xDimension.columns = [];
         base.groupColumn = null;
         base.weightColumn = null;
-        base.yDimension.thresholdMethod = (qs('splitCutMethod') && qs('splitCutMethod').value) || 'median';
+        base.yDimension.thresholdMethod = (qs('splitCutMethod') && qs('splitCutMethod').value) || 'favorable';
         var cutValue = qs('splitCutValue') ? qs('splitCutValue').value : '';
         base.yDimension.threshold = cutValue === '' ? null : Number(cutValue);
         if (splittingFactorLabel()) base.yDimension.label = splittingFactorLabel();
@@ -711,7 +711,7 @@
         if (highLegend) highLegend.value = (saved && saved.legendLabelsCustom && savedHigh) ? savedHigh : (genericHigh ? generated.high : savedHigh);
         if (lowLegend) lowLegend.value = (saved && saved.legendLabelsCustom && savedLow) ? savedLow : (genericLow ? generated.low : savedLow);
         if (saved && saved.product === 'split' && saved.yDimension) {
-          qs('splitCutMethod').value = saved.yDimension.thresholdMethod || 'median';
+          qs('splitCutMethod').value = saved.yDimension.thresholdMethod || 'favorable';
           if (saved.yDimension.threshold != null && saved.yDimension.threshold !== '') qs('splitCutValue').value = saved.yDimension.threshold;
         }
         var titleIn = qs('splitChartTitle');
@@ -781,7 +781,7 @@
       var cut = qs('splitCutMethod').value === 'custom' ? splitCutNumber() : shown;
       qs('splitCutRule').textContent = high + ' is at or above ' + SS.formatNum(cut) + '. ' + low + ' is below it.';
       var intro = qs('splitCutIntro');
-      if (intro) intro.textContent = 'The default cut is the median of ' + construct + '. At or above the cut is ' + high + '. Below it is ' + low + '. Move the cut and the chart updates.';
+      if (intro) intro.textContent = 'The default cut is the favorable-response threshold of ' + construct + '. At or above the cut is ' + high + '. Below it is ' + low + '. Move the cut and the chart updates.';
       _cutPainting = false;
     }
 
@@ -886,7 +886,8 @@
       var cutCard = qs('splitCutCard');
       if (cutCard) cutCard.hidden = !split;
       if (split) {
-        qs('yMethod').value = 'median';
+        qs('yMethod').value = 'favorable';
+        if (qs('splitCutMethod')) qs('splitCutMethod').value = 'favorable';
         ['yMethod', 'yThreshold'].forEach(function (id) {
           var el = qs(id);
           el.hidden = true;

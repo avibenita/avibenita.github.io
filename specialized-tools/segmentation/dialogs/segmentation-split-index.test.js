@@ -315,4 +315,21 @@ describe('Split Index calculations', () => {
     expect(SI.resultsTable(result)[0]['Above average + 1 SD']).toBe('Yes');
     expect(SI.buildFactorTooltip(result.factors.filter((factor) => factor.factorId === 'A')[0], { showEvidence: false })).toMatch(/and thus may be an explaining factor/);
   });
+
+  test('a period filter keeps one survey and All keeps every period', () => {
+    const cfg = config({ waveColumn: 'Wave', currentWave: '2026', previousWave: '2025' });
+    const people = [
+      Object.assign(row(0, 5, 5, 5, 1), { wave: '2026' }),
+      Object.assign(row(1, 2, 2, 1, 1), { wave: '2026' }),
+      Object.assign(row(2, 5, 5, 1, 5), { wave: '2025' }),
+      Object.assign(row(3, 2, 2, 1, 1), { wave: '2025' })
+    ];
+    const all = SI.calculateSplitIndex(people, cfg, { period: 'all', index: 'raw' });
+    const one = SI.calculateSplitIndex(people, cfg, { period: '2025', index: 'raw' });
+    expect(all.waveLabel).toBe('All');
+    expect(all.group1.validN + all.group2.validN).toBe(4);
+    expect(one.waveLabel).toBe('2025');
+    expect(one.group1.validN + one.group2.validN).toBe(2);
+    expect(one.factors.filter((factor) => factor.factorId === 'Pay')[0].rawSplitIndex).toBeCloseTo(4, 8);
+  });
 });

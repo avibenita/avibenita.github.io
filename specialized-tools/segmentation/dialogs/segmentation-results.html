@@ -24,7 +24,7 @@
   <script src="../shared-header.js?v=20261020export"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261020flag2"></script>
+  <script src="segmentation-split-index.js?v=20261021period"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
     :root {
@@ -145,7 +145,10 @@
     .btn.primary { background:#0f766e; border-color:#0f766e; color:#fff; }
     .chart { width:100%; height:460px; min-height:280px; }
     #driverChart { height:580px; border:1px solid var(--border); border-radius:14px; background:linear-gradient(180deg, rgba(255,255,255,.035), transparent 120px); }
-    .chart-tools { display:flex; justify-content:flex-end; margin:0 0 8px; }
+    .chart-tools { display:flex; justify-content:space-between; align-items:center; gap:8px; margin:0 0 8px; }
+    .period-pick { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--text); }
+    .period-pick[hidden] { display:none !important; }
+    .period-pick select { min-width:148px; }
     .help-open { display:inline-flex; align-items:center; gap:8px; }
     .help-pop { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(8,12,18,.72); }
     .help-pop[hidden] { display:none !important; }
@@ -319,15 +322,15 @@
             <details class="fold" id="cutFold" hidden>
               <summary>Splitting factor cut-off
                 <button type="button" class="fold-info" id="cutInfoBtn" aria-label="About the splitting factor cut-off" aria-expanded="false"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
-                <span class="fold-info-pop" id="cutInfoPop" hidden>This cut-off divides the splitting factor into the high group and the low group. The default cut is the median. At or above the cut is the high group. Below it is the low group. The chart updates as you move the cut.</span>
+                <span class="fold-info-pop" id="cutInfoPop" hidden>This cut-off divides the splitting factor into the high group and the low group. The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. The chart updates as you move the cut.</span>
               </summary>
               <div class="fold-body">
                 <div id="splitCutField">
                   <label class="field">Cut-off rule
                     <select id="splitCutMethod">
+                      <option value="favorable" selected>Favorable-response threshold</option>
                       <option value="median">Median</option>
                       <option value="midpoint">Scale midpoint</option>
-                      <option value="favorable">Favorable-response threshold</option>
                       <option value="custom">Custom number</option>
                     </select>
                   </label>
@@ -405,6 +408,9 @@
             </section>
             <section class="seg-panel" id="panel-drivers" role="tabpanel" aria-labelledby="tab-drivers">
               <div class="chart-tools">
+                <label class="period-pick" id="periodPick" hidden>Period
+                  <select id="periodSelect" aria-label="Period"></select>
+                </label>
                 <button type="button" class="btn help-open" id="splitHelpOpen"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> How Split Index works</button>
               </div>
               <div id="driverEmpty">
@@ -550,7 +556,7 @@
     var _changeChart = null;
     var _driverChart = null;
     var SI = window.StatisticoSplitIndex;
-    var _driver = { mode: 'stay', group1: 'highXHighY', group2: 'lowXLowY', segment: 'highXHighY', index: 'raw', sort: 'splitDesc', topN: 0, evidence: false, missing: 'available', wave: 'current', adjustment: 'bh', highlightSpread: false };
+    var _driver = { mode: 'stay', group1: 'highXHighY', group2: 'lowXLowY', segment: 'highXHighY', index: 'raw', sort: 'splitDesc', topN: 0, evidence: false, missing: 'available', wave: 'current', period: 'all', adjustment: 'bh', highlightSpread: false };
     var _splitResult = null;
     var _painting = false;
 
@@ -664,7 +670,7 @@
       document.getElementById('splitHelpLines').textContent = n.high + ' usually rates the other dimensions more positively, so the blue line sits above the red line. Each dimension also has its own typical level, so the two lines often follow a similar shape. They are not perfectly parallel. The gaps between them are the result.';
       document.getElementById('splitHelpColumns').innerHTML = '<span class="swatch col"></span>The Split Index is the distance between the two lines. The gray columns draw that distance. A taller column means the dimension does more to separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + '. A short column means both groups rate the dimension about the same.';
       document.getElementById('splitHelpConstruct').innerHTML = '<strong>Splitting construct.</strong> ' + segEsc(n.construct) + ' can be one item or the average of several items. Missing answers stay missing. They are not scored as zero.';
-      document.getElementById('splitHelpCutoff').innerHTML = '<strong>Cut-off.</strong> The default cut is the median. At or above the median is ' + segEsc(n.high) + '. Below the median is ' + segEsc(n.low) + '. You can move the cut-off, and the chart updates with it.';
+      document.getElementById('splitHelpCutoff').innerHTML = '<strong>Cut-off.</strong> The default cut is the favorable-response threshold. At or above that cut is ' + segEsc(n.high) + '. Below it is ' + segEsc(n.low) + '. You can move the cut-off, and the chart updates with it.';
       document.getElementById('splitHelpFlag').innerHTML = '<strong>Above average + 1 SD.</strong> Highlight starts off. Turn it on to mark a gold column and the gold area behind it. That mark means the factor’s Split Index is higher than the average Split Index of the factors in the chart plus one standard deviation. The dashed gold line is that cutoff. Those factors separate ' + segEsc(n.high) + ' from ' + segEsc(n.low) + ' more than the typical factor, and thus may be an explaining factor.';
       document.getElementById('splitHelpExampleTitle').textContent = 'Example: ' + n.construct;
       document.getElementById('splitHelpExample').textContent = n.construct + ' is the splitting construct. Its median is the cut-off. Respondents at or above that median are ' + n.high + '. Respondents below it are ' + n.low + '.';
@@ -750,7 +756,7 @@
       if (_tab === 'drivers' && _splitResult && _splitResult.ok) {
         parts.unshift(_splitResult.group1.label + ' (n = ' + _splitResult.group1.validN + ') vs ' + _splitResult.group2.label + ' (n = ' + _splitResult.group2.validN + ')');
         parts.push(_splitResult.indexLabel);
-        if (_splitResult.waveLabel) parts.push('Analyze wave: ' + _splitResult.waveLabel);
+        if (_splitResult.waveLabel) parts.push('Period: ' + _splitResult.waveLabel);
       }
       if (_bundle.scopeLabel && _bundle.scopeLabel !== 'All respondents') parts.push('Current wave: ' + _bundle.scopeLabel);
       if (_spec.previousWave && _bundle.change) parts.push('Previous wave: ' + _spec.previousWave);
@@ -880,7 +886,7 @@
       var slider = document.getElementById('splitCutSlider');
       var rule = document.getElementById('splitCutRule');
       if (!methodEl || !valueEl || !slider) return;
-      var method = _spec.yDimension.thresholdMethod || 'median';
+      var method = _spec.yDimension.thresholdMethod || 'favorable';
       var value = Number(_spec.yDimension.threshold);
       methodEl.value = method;
       var scale = _bundle && _bundle.rules && _bundle.rules.yScale;
@@ -1627,6 +1633,7 @@
         publishSegmentationInsight();
         return;
       }
+      syncPeriodSelect();
       _splitResult = SI.calculateSplitIndex(_bundle.scoredRespondents || [], _bundle.config, _driver);
       var same = document.getElementById('driverSameNote');
       same.textContent = _splitResult.ok ? '' : (_splitResult.error || '');
@@ -1679,6 +1686,46 @@
       if (_driverChart) { _driverChart.destroy(); _driverChart = null; }
       _driverChart = Highcharts.chart('driverChart', options);
       paintSplitFlagNote(_splitResult);
+    }
+    function syncPeriodSelect() {
+      var pick = document.getElementById('periodPick');
+      var sel = document.getElementById('periodSelect');
+      if (!pick || !sel) return;
+      var seen = {};
+      var levels = [];
+      ((_bundle && _bundle.scoredRespondents) || []).forEach(function (respondent) {
+        var key = respondent && respondent.wave != null ? String(respondent.wave) : '';
+        if (!key || seen[key]) return;
+        seen[key] = true;
+        levels.push(key);
+      });
+      levels.sort(function (a, b) {
+        var na = Number(a);
+        var nb = Number(b);
+        if (isFinite(na) && isFinite(nb) && String(na) === a && String(nb) === b) return na - nb;
+        return a < b ? -1 : a > b ? 1 : 0;
+      });
+      var show = productId() === 'split' && !!(_spec && _spec.waveColumn) && levels.length >= 2;
+      pick.hidden = !show;
+      if (!show) {
+        _driver.period = 'all';
+        return;
+      }
+      var current = _driver.period || 'all';
+      if (current !== 'all' && levels.indexOf(current) < 0) current = 'all';
+      sel.innerHTML = '';
+      var all = document.createElement('option');
+      all.value = 'all';
+      all.textContent = 'All';
+      sel.appendChild(all);
+      levels.forEach(function (level) {
+        var opt = document.createElement('option');
+        opt.value = level;
+        opt.textContent = level;
+        sel.appendChild(opt);
+      });
+      sel.value = current;
+      _driver.period = current;
     }
     function paintSplitFlagNote(result) {
       var note = document.getElementById('splitFlagNote');
@@ -1917,6 +1964,7 @@
     document.getElementById('splitFlagToggle').addEventListener('change', function () { _driver.highlightSpread = this.checked; paintDrivers(); });
     document.getElementById('driverAdjust').addEventListener('change', function () { _driver.adjustment = this.value; paintDrivers(); });
     document.getElementById('driverWave').addEventListener('change', function () { _driver.wave = this.value; paintDrivers(); });
+    document.getElementById('periodSelect').addEventListener('change', function () { _driver.period = this.value || 'all'; paintDrivers(); });
     document.querySelectorAll('input[name="driverIndex"]').forEach(function (el) {
       el.addEventListener('change', function () { if (el.checked) { _driver.index = el.value; paintDrivers(); } });
     });

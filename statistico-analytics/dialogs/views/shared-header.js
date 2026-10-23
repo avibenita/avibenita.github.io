@@ -3083,7 +3083,7 @@ const StatisticoHeader = {
     const changeOn = !!globalThis.__segmentationChangeEnabled;
     const file = 'segmentation/segmentation-results.html';
     const sections = split
-      ? [{ id: 'drivers', label: 'Split Index™', file: file }].concat(globalThis.__segmentationPeriodsOn ? [{ id: 'periods', label: 'Across periods', file: file }] : [])
+      ? [{ id: 'drivers', label: 'Split Index™', file: file }, { id: 'standardized', label: 'Standardized Split Index', file: file }].concat(globalThis.__segmentationPeriodsOn ? [{ id: 'periods', label: 'Across periods', file: file }] : [])
       : [
           { id: 'overview', label: 'Overview', file: file },
           { id: 'groups', label: 'Group Comparison', file: file }
@@ -8990,6 +8990,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'segmentation-change': 'Change',
       'segmentation-drivers': 'Split Index™',
       'segmentation-periods': 'Across periods',
+      'segmentation-standardized': 'Standardized Split Index',
       'dependent-explore': 'Descriptives',
       'dependent-trajectories': 'Trajectories',
       'dependent-assumptions': 'Assumptions',
@@ -9278,7 +9279,9 @@ REPORT: [one polished paragraph suitable for a report]`;
       'segmentation-drivers':
         'Split Index™. The chart has two vertical axes: Dimensions mean score on the left (blue = high group, red = low group) and Split Index on the right (gray columns). A larger Split Index means the factor separates the two groups more. Pattern readings are not printed under the chart. They are in the computed payload at splitIndex.factors, each with pattern and reading. Factors whose Split Index is above the average Split Index plus one standard deviation are listed in splitIndex.explainingFactors, and splitIndex.explainingFactorNote states that each may be an explaining factor. The Highlight control starts off (splitIndex.highlightExplainingFactors is false), so do not describe gold columns as visible unless that flag is true. The interpretation summary is in interpretation. Use those readings and the means. Do not invent significance tests, do not treat an explaining factor as a proven cause, and do not tell the user to look for pattern cards or export buttons.',
       'segmentation-periods':
-        'Across periods. Grouped columns compare the Split Index of each factor in every survey period. Use splitIndex.periodComparison. A taller column means the factor separates the two groups more in that period. These are descriptive comparisons, not significance tests.'
+        'Across periods. Grouped columns compare the Split Index of each factor in every survey period. Use splitIndex.periodComparison. A taller column means the factor separates the two groups more in that period. These are descriptive comparisons, not significance tests.',
+      'segmentation-standardized':
+        'Standardized Split Index. The chart uses the same two groups, and each column is the mean difference divided by the pooled standard deviation. Use splitIndex.standardized.factors. A larger standardized Split Index means the factor separates the two groups more, on a scale that does not depend on the factor’s units. These are descriptive comparisons, not significance tests or causes.'
     };
     return docs[key] || `This ${moduleName} ${label} view summarizes the active analysis section. Use the visible controls, tables, and plots to understand the current model state and diagnostics.`;
   },
@@ -9400,7 +9403,9 @@ REPORT: [one polished paragraph suitable for a report]`;
       'segmentation-drivers':
         'This is a dual-axis Split Index chart. Describe the blue and red lines on Dimensions mean score and the gray Split Index columns. Factor pattern readings (Strong differentiator, Shared strength, Shared weakness, Group-specific weakness) are in the computed payload under splitIndex.factors, not printed on the page. Cite those readings, the group means, and the Split Index values. Also use splitIndex.explainingFactors and splitIndex.explainingFactorNote: a factor above the average Split Index plus one standard deviation may be an explaining factor because it separates the two groups more than the typical factor. Say that only for factors in explainingFactors, and say it is descriptive, not causal. Gold columns and the gold area are hidden until Highlight is on. Mention gold only when splitIndex.highlightExplainingFactors is true. Do not refer to pattern cards, a copy-chart button, or an interpretation-ready summary button.',
       'segmentation-periods':
-        'This compares the Split Index of each factor across survey periods. Each column group is one factor, and each color is one period. A taller column means that factor separates the two groups more in that period. Use splitIndex.periodComparison.factors, where splitIndexByPeriod maps each period to its Split Index. Describe which factors change between periods and which stay steady. Do not treat the comparison as a significance test or a cause.'
+        'This compares the Split Index of each factor across survey periods. Each column group is one factor, and each color is one period. A taller column means that factor separates the two groups more in that period. Use splitIndex.periodComparison.factors, where splitIndexByPeriod maps each period to its Split Index. Describe which factors change between periods and which stay steady. Do not treat the comparison as a significance test or a cause.',
+      'segmentation-standardized':
+        'This is the standardized Split Index. Columns are the difference between the two group means divided by the pooled standard deviation. Use splitIndex.standardized.factors and standardizedSplitIndex. A larger value means the factor separates the two groups more, independent of the factor’s units. Gold columns follow the same Highlight switch as the raw Split Index. Do not treat a large standardized index as a significance test or a cause.'
     };
     const chartGuard = chartGuards[viewKey];
     const partialPlotGuard = chartGuard

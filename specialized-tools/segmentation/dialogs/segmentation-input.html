@@ -195,6 +195,7 @@
               <input id="splitCutValue" type="number" step="0.01" value="4" />
             </div>
             <div class="rule-line" id="splitCutRule">At or above the cut is the highest score. Below it is the lower score.</div>
+            <p class="zone-help" id="splitCutCensus"></p>
             <div id="splitPreview" class="split-preview"></div>
             <p class="split-preview-note" id="splitPreviewNote"></p>
           </div>
@@ -755,7 +756,23 @@
       return isFinite(n) ? n : null;
     }
 
-    function writeSplitCut(threshold, scale) {
+    function cutCensusText(scores, threshold, highLabel, lowLabel) {
+      var nums = (scores || []).filter(function (n) { return typeof n === 'number' && isFinite(n); });
+      if (!nums.length || typeof threshold !== 'number' || !isFinite(threshold)) return '';
+      var min = nums[0];
+      var max = nums[0];
+      var high = 0;
+      var low = 0;
+      nums.forEach(function (n) {
+        if (n < min) min = n;
+        if (n > max) max = n;
+        if (n >= threshold) high += 1;
+        else low += 1;
+      });
+      return 'Min ' + SS.formatNum(min) + ', max ' + SS.formatNum(max) + '. ' + highLabel + ': ' + high + ' case' + (high === 1 ? '' : 's') + '. ' + lowLabel + ': ' + low + ' case' + (low === 1 ? '' : 's') + '.';
+    }
+
+    function writeSplitCut(threshold, scale, scores) {
       var shown = Math.round(Number(threshold) * 100) / 100;
       var slider = qs('splitCutSlider');
       var min = scale && scale.min != null ? scale.min : 1;
@@ -780,6 +797,8 @@
       var low = (qs('splitLowLabel').value || '').trim() || names.low;
       var cut = qs('splitCutMethod').value === 'custom' ? splitCutNumber() : shown;
       qs('splitCutRule').textContent = high + ' is at or above ' + SS.formatNum(cut) + '. ' + low + ' is below it.';
+      var census = qs('splitCutCensus');
+      if (census) census.textContent = cutCensusText(scores, cut, high, low);
       var intro = qs('splitCutIntro');
       if (intro) intro.textContent = 'The default cut is the favorable-response threshold of ' + construct + '. At or above the cut is ' + high + '. Below it is ' + low + '. Move the cut and the chart updates.';
       _cutPainting = false;
@@ -799,6 +818,8 @@
         if (_previewChart) { _previewChart.destroy(); _previewChart = null; }
         host.innerHTML = '';
         note.textContent = 'Select a splitting construct and at least one factor to see the chart.';
+        var waiting = qs('splitCutCensus');
+        if (waiting) waiting.textContent = '';
         return;
       }
       var spec = buildSpec();
@@ -822,7 +843,7 @@
       cfg.yDimension.highLabel = spec.yDimension.highLabel;
       cfg.yDimension.lowLabel = spec.yDimension.lowLabel;
       cfg.chartTitle = spec.chartTitle;
-      writeSplitCut(resolved.threshold, bundle.rules && bundle.rules.yScale);
+      writeSplitCut(resolved.threshold, bundle.rules && bundle.rules.yScale, scores);
       var result = window.StatisticoSplitIndex.calculateSplitIndex(bundle.scoredRespondents || [], cfg, { mode: 'stay', index: 'raw' });
       if (!result.ok) {
         if (_previewChart) { _previewChart.destroy(); _previewChart = null; }

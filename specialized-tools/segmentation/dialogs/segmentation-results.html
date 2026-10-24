@@ -21,10 +21,10 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261023tabedge" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261023tabedge" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261024ai"></script>
+  <script src="../shared-header.js?v=20261024scale"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261024z"></script>
+  <script src="segmentation-split-index.js?v=20261024scale"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
     :root {
@@ -80,7 +80,9 @@
     .label-row { display:grid; grid-template-columns:minmax(0,1fr) 46px; gap:6px; align-items:center; }
     .warn-list { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
     .warn-list[hidden] { display:none !important; }
-    .warn { border-left:3px solid #d4a017; background:rgba(212,160,23,.12); padding:8px 10px; border-radius:8px; font-size:12.5px; }
+    .scale-notice { display:flex; gap:10px; align-items:center; justify-content:space-between; margin:0 0 10px; }
+    .scale-notice[hidden] { display:none !important; }
+    .scale-notice .btn { flex:0 0 auto; }
     .filters { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
     .filters[hidden] { display:none !important; }
     .filter-chip { font-size:12.5px; }
@@ -458,6 +460,10 @@
                 <button type="button" class="btn help-open" id="splitHelpOpen"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> How Split Index works</button>
               </div>
               <p class="note" id="splitGroupNote"></p>
+              <div class="warn scale-notice" id="scaleNotice" hidden>
+                <span id="scaleNoticeText"></span>
+                <button type="button" class="btn" id="scaleNoticeOpen">Open Standardized</button>
+              </div>
               <div id="driverEmpty">
                 <p id="driverEmptyText">Select survey factors to calculate the Split Index.</p>
                 <button type="button" class="btn" id="selectFactors">Select factors</button>
@@ -834,6 +840,8 @@
         highlightExplainingFactors: !!_driver.highlightSpread,
         explainingFactors: (_splitResult.displayed || []).filter(function (factor) { return factor.aboveAverageSpread; }).map(function (factor) { return factor.factorLabel; }),
         explainingFactorNote: explainingFactorNote(_splitResult),
+        scalesDiffer: !!_splitResult.scalesDiffer,
+        scaleNotice: _splitResult.scalesDiffer ? SI.COPY.scaleWarning : '',
         periodComparison: periodComparisonPayload(),
         splittingFactor: splittingFactorInsight(),
         standardized: standardizedInsight(),
@@ -1792,6 +1800,8 @@
       if (!hasFactors) {
         _splitResult = null;
         paintSplitFlagNote(null);
+        var idleNotice = document.getElementById('scaleNotice');
+        if (idleNotice) idleNotice.hidden = true;
         publishSegmentationInsight();
         return;
       }
@@ -1803,10 +1813,19 @@
         if (_driverChart) { _driverChart.destroy(); _driverChart = null; }
         document.getElementById('driverStatsTable').innerHTML = '';
         paintSplitFlagNote(null);
+        var failedNotice = document.getElementById('scaleNotice');
+        if (failedNotice) failedNotice.hidden = true;
         publishSegmentationInsight();
         return;
       }
       document.getElementById('driverScaleNote').textContent = _splitResult.scalesDiffer && _driver.index === 'raw' ? SI.COPY.scaleWarning : '';
+      var scaleNotice = document.getElementById('scaleNotice');
+      var scaleNoticeText = document.getElementById('scaleNoticeText');
+      if (scaleNotice && scaleNoticeText) {
+        var showScale = productId() === 'split' && _splitResult.scalesDiffer && _driver.index !== 'standardized';
+        scaleNotice.hidden = !showScale;
+        scaleNoticeText.textContent = showScale ? SI.COPY.scaleWarning : '';
+      }
       document.getElementById('driverStatsNote').textContent = SI.COPY.significanceNote;
       document.getElementById('driverWeightNote').textContent = _splitResult.weightUsed ? 'Weights were applied to means and standard deviations. Sample sizes shown as n are unweighted bases.' : '';
       publishSegmentationInsight();
@@ -2209,6 +2228,7 @@
     document.getElementById('driverTop').addEventListener('change', function () { _driver.topN = Number(this.value); paintDrivers(); });
     document.getElementById('driverEvidence').addEventListener('change', function () { _driver.evidence = this.checked; paintDrivers(); });
     document.getElementById('splitFlagToggle').addEventListener('change', function () { _driver.highlightSpread = this.checked; paintDrivers(); });
+    document.getElementById('scaleNoticeOpen').addEventListener('click', function () { switchTab('standardized'); });
     document.getElementById('driverAdjust').addEventListener('change', function () { _driver.adjustment = this.value; paintDrivers(); });
     document.getElementById('driverWave').addEventListener('change', function () { _driver.wave = this.value; paintDrivers(); });
     document.getElementById('periodSelect').addEventListener('change', function () { _driver.period = this.value || 'all'; syncSplitCutControls(); paint(); });

@@ -25,7 +25,7 @@
     tooltip: 'A large Split Index indicates an association with group membership. It does not, by itself, establish that the factor causes the outcome.',
     rawHelp: 'Best when all factors use the same response scale.',
     standardizedHelp: 'Accounts for factor variability and supports comparison across different scales.',
-    scaleWarning: 'The selected factors may use different scales. Consider the standardized Split Index.',
+    scaleWarning: 'These factors look like they use different scales, so the smaller ones are compressed on this chart. The Standardized view puts every factor on a common scale.',
     empty: 'Select survey factors to calculate the Split Index.',
     significanceNote: 'Statistical significance depends on both the size of the difference and the available sample. Use the Split Index to assess separation and the confidence interval to assess precision.',
     zeroVariance: 'No within-group variation',
@@ -337,13 +337,13 @@
       if (n > max) max = n;
     });
     function within(a, b) { return min >= a - 1e-9 && max <= b + 1e-9; }
-    if (within(1, 5)) return { min: 1, max: 5 };
-    if (within(1, 7)) return { min: 1, max: 7 };
-    if (within(1, 6)) return { min: 1, max: 6 };
-    if (within(0, 10)) return { min: 0, max: 10 };
-    if (within(1, 10)) return { min: 1, max: 10 };
-    if (within(0, 100)) return { min: 0, max: 100 };
-    return { min: min, max: max };
+    if (within(1, 5)) return { min: 1, max: 5, known: true };
+    if (within(1, 7)) return { min: 1, max: 7, known: true };
+    if (within(1, 6)) return { min: 1, max: 6, known: true };
+    if (within(0, 10)) return { min: 0, max: 10, known: true };
+    if (within(1, 10)) return { min: 1, max: 10, known: true };
+    if (within(0, 100)) return { min: 0, max: 100, known: true };
+    return { min: min, max: max, known: false };
   }
 
   function classifyFactorPattern(factor, rank, cutoff, maxIndex) {
@@ -603,11 +603,7 @@
       factor.spreadCutoff = spread.cutoff;
       factor.aboveAverageSpread = spread.cutoff != null && isNum(factor.selectedSplitIndex) && factor.selectedSplitIndex > spread.cutoff;
     });
-    var scaleKeys = {};
-    factors.forEach(function (factor) {
-      if (!factor.scale) return;
-      scaleKeys[factor.scale.min + ':' + factor.scale.max] = true;
-    });
+    var scaleCheck = scalesLookDifferent(factors);
     var sortMode = opts.sort || 'splitDesc';
     var ordered = sortSplitIndexResults(factors, sortMode);
     var topN = Number(opts.topN);
@@ -630,13 +626,37 @@
       weightUsed: weightUsed,
       wave: wave,
       waveLabel: wave === 'all' ? 'All' : (waveValue || ''),
-      scalesDiffer: Object.keys(scaleKeys).length > 1,
+      scalesDiffer: scaleCheck.differ,
       group1: { id: spec.group1.id, label: spec.group1.label, validN: group1Rows.length },
       group2: { id: spec.group2.id, label: spec.group2.label, validN: group2Rows.length },
       spread: spread,
       factors: factors,
       displayed: ordered
     };
+  }
+
+  function scalesLookDifferent(factors) {
+    var known = {};
+    var levels = [];
+    (factors || []).forEach(function (factor) {
+      if (factor.scale && factor.scale.known) known[factor.scale.min + ':' + factor.scale.max] = true;
+      var level = 0;
+      [factor.commonScale && factor.commonScale.mean, factor.commonScale && factor.commonScale.sd, factor.group1 && factor.group1.mean, factor.group2 && factor.group2.mean].forEach(function (value) {
+        if (isNum(value)) level = Math.max(level, Math.abs(value));
+      });
+      if (level > 1e-8) levels.push(level);
+    });
+    var ratio = 1;
+    if (levels.length > 1) {
+      var low = levels[0];
+      var high = levels[0];
+      levels.forEach(function (value) {
+        if (value < low) low = value;
+        if (value > high) high = value;
+      });
+      ratio = high / low;
+    }
+    return { differ: Object.keys(known).length > 1 || ratio >= 3, ratio: ratio };
   }
 
   function splitIndexSpread(factors) {

@@ -87,6 +87,30 @@ describe('Split Index calculations', () => {
     expect(SI.buildFactorTooltip(career, { showEvidence: false })).toMatch(/Standardized mean: \+/);
   });
 
+  test('factors on different scales are flagged and similar scales are not', () => {
+    const mixed = SI.calculateSplitIndex([
+      row(0, 5, 5, 4, 300),
+      row(1, 5, 5, 5, 340),
+      row(2, 2, 2, 2, 20),
+      row(3, 2, 2, 3, 40)
+    ], config(), { index: 'raw' });
+    expect(mixed.scalesDiffer).toBe(true);
+    const same = SI.calculateSplitIndex([
+      row(0, 5, 5, 4, 3),
+      row(1, 5, 5, 5, 4),
+      row(2, 2, 2, 2, 2),
+      row(3, 2, 2, 3, 3)
+    ], config(), { index: 'raw' });
+    expect(same.scalesDiffer).toBe(false);
+    const known = SI.calculateSplitIndex([
+      row(0, 5, 5, 4, 6),
+      row(1, 5, 5, 5, 7),
+      row(2, 2, 2, 2, 2),
+      row(3, 2, 2, 3, 3)
+    ], config(), { index: 'raw' });
+    expect(known.scalesDiffer).toBe(true);
+  });
+
   test('equal means produce a Split Index of zero', () => {
     const result = SI.calculateSplitIndex([
       row(0, 5, 5, 4, 4),

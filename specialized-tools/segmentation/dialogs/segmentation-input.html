@@ -25,7 +25,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="segmentation-sample-data.js?v=20261013seg1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261024z"></script>
+  <script src="segmentation-split-index.js?v=20261024scale"></script>
   <style>
     :root { --seg-acc: #0d9488; }
     [data-theme="light"] { --seg-acc: #0f766e; }
@@ -121,6 +121,8 @@
     .split-preview { height:320px; margin-top:8px; }
     .split-preview:empty { display:none; height:0; margin:0; }
     .split-preview-note { margin:6px 0 0; font-size:11px; color:var(--cfg-text3); }
+    .scale-notice { margin:8px 0 0; padding:8px 10px; border-left:3px solid #d4a017; background:rgba(212,160,23,.12); border-radius:8px; font-size:12px; color:var(--cfg-text); }
+    .scale-notice[hidden] { display:none !important; }
     @media (max-width: 760px) {
       .reg-layout { flex-direction:column; overflow:auto; }
       .reg-vars-col { flex:0 0 auto; max-height:180px; }
@@ -227,6 +229,7 @@
               </div>
               <div id="splitPreview" class="split-preview"></div>
               <p class="split-preview-note" id="splitPreviewNote"></p>
+              <p class="scale-notice" id="splitScaleNotice" hidden></p>
             </div>
           </div>
           <div class="opt-card" id="splitTitleCard" hidden>
@@ -861,9 +864,11 @@
       var anchor = qs('zoneList');
       var preview = qs('splitPreview');
       var previewNote = qs('splitPreviewNote');
+      var scaleNotice = qs('splitScaleNotice');
       if (anchor && anchor.parentNode && preview) {
         anchor.parentNode.insertBefore(preview, anchor.nextSibling);
         if (previewNote) anchor.parentNode.insertBefore(previewNote, preview.nextSibling);
+        if (scaleNotice) anchor.parentNode.insertBefore(scaleNotice, previewNote ? previewNote.nextSibling : preview.nextSibling);
       }
     }
 
@@ -913,6 +918,8 @@
         host.innerHTML = '';
         if (!assign.y.length) {
           note.textContent = '';
+          var emptyScale = qs('splitScaleNotice');
+          if (emptyScale) emptyScale.hidden = true;
           paintCutCensus([], null, '', '');
           return;
         }
@@ -920,6 +927,8 @@
         var earlyCut = SS.resolveThreshold(qs('splitCutMethod').value, splitCutNumber(), earlyScores);
         writeSplitCut(earlyCut.threshold, SS.inferScale(earlyScores), earlyScores);
         note.textContent = 'Add at least one factor to see the chart.';
+        var waitingScale = qs('splitScaleNotice');
+        if (waitingScale) waitingScale.hidden = true;
         return;
       }
       var spec = buildSpec();
@@ -949,9 +958,16 @@
         if (_previewChart) { _previewChart.destroy(); _previewChart = null; }
         host.innerHTML = '';
         note.textContent = result.error || 'The chart cannot be drawn for this cut-off.';
+        var failedScale = qs('splitScaleNotice');
+        if (failedScale) failedScale.hidden = true;
         return;
       }
       note.textContent = '';
+      var scaleNotice = qs('splitScaleNotice');
+      if (scaleNotice) {
+        scaleNotice.hidden = !result.scalesDiffer;
+        scaleNotice.textContent = result.scalesDiffer ? window.StatisticoSplitIndex.COPY.scaleWarning : '';
+      }
       var light = document.documentElement.getAttribute('data-theme') === 'light';
       var options = window.StatisticoSplitIndex.buildSplitIndexChartOptions(result, {
         title: spec.chartTitle || ('Factors split by ' + (spec.yDimension.label || 'the splitting factor')),

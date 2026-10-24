@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261023tabedge" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261023tabedge" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261024z"></script>
+  <script src="../shared-header.js?v=20261024ai"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
   <script src="segmentation-split-index.js?v=20261024z"></script>
@@ -835,6 +835,7 @@
         explainingFactors: (_splitResult.displayed || []).filter(function (factor) { return factor.aboveAverageSpread; }).map(function (factor) { return factor.factorLabel; }),
         explainingFactorNote: explainingFactorNote(_splitResult),
         periodComparison: periodComparisonPayload(),
+        splittingFactor: splittingFactorInsight(),
         standardized: standardizedInsight(),
         factors: (_splitResult.displayed || []).map(function (factor) {
           return {
@@ -850,6 +851,26 @@
         })
       };
     }
+    function splittingFactorInsight() {
+      if (productId() !== 'split' || !_spec || !_spec.yDimension) return null;
+      var names = splitNames();
+      var threshold = Number(_spec.yDimension.threshold);
+      var stats = censusStats(splitCutScores(), threshold);
+      var cut = isFinite(threshold) ? roundInsight(threshold) : null;
+      if (!stats) {
+        return { factor: names.construct, rule: _spec.yDimension.thresholdMethod || '', cutOff: cut };
+      }
+      return {
+        factor: names.construct,
+        rule: _spec.yDimension.thresholdMethod || '',
+        cutOff: cut,
+        minimum: roundInsight(stats.min),
+        maximum: roundInsight(stats.max),
+        highGroup: { label: names.high, n: stats.high },
+        lowGroup: { label: names.low, n: stats.low },
+        note: names.construct + ' ranges from ' + SS.formatNum(stats.min) + ' to ' + SS.formatNum(stats.max) + '. ' + names.high + ' is at or above ' + SS.formatNum(threshold) + ' (' + stats.high + ' cases). ' + names.low + ' is below it (' + stats.low + ' cases).'
+      };
+    }
     function standardizedInsight() {
       if (!SI || !_bundle || !_bundle.ok || productId() !== 'split') return null;
       var opts = {};
@@ -859,6 +880,8 @@
       if (!result || !result.ok) return null;
       return {
         index: result.indexLabel || 'Standardized Split Index',
+        scale: 'z',
+        scaleNote: 'The lines are z-scores. For each factor, z = (group mean − overall mean) / overall standard deviation. The overall mean and standard deviation use every included case and stay fixed when the cut-off moves. A positive z means that group averages that many standard deviations above the factor’s overall mean. highGroupMean and lowGroupMean are the original units. The columns are the standardized Split Index: the absolute difference of those original means divided by the pooled within-group standard deviation. That column is not the gap between the z-score lines.',
         spread: result.spread ? {
           mean: roundInsight(result.spread.mean),
           sd: roundInsight(result.spread.sd),

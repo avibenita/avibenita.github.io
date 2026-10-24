@@ -65,7 +65,7 @@
       display:none; margin:0; padding:6px 8px 8px; font-size:12px; line-height:1.45;
       color:var(--cfg-text); font-weight:500; text-transform:none; letter-spacing:0;
     }
-    .reg-zone-card.show-info .zone-info-pop { display:block; }
+    .reg-zone-card.show-info > .zone-info-pop { display:block; }
     .reg-zone-body { padding:4px 6px; min-height:36px; display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
     .reg-zone-body.drag-over { outline:1px dashed var(--seg-acc); }
     .reg-zone-placeholder { width:100%; text-align:center; font-size:10.5px; font-style:italic; color:var(--cfg-text3); }
@@ -101,7 +101,25 @@
     .demo-row button { font-size:10.5px; padding:5px 8px; border-radius:6px; border:1px solid var(--cfg-border); background:var(--cfg-surface); color:var(--cfg-text2); cursor:pointer; }
     .cut-row { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:8px; align-items:center; }
     .cut-row input[type="range"] { width:100%; margin:0; accent-color:var(--seg-acc); }
-    .split-preview { height:340px; margin-top:8px; }
+    .reg-zone-card > #splitCutCard { border:0; border-top:1px solid var(--cfg-border); border-radius:0; background:transparent; }
+    #splitCutCard.is-waiting #splitCutControls { display:none; }
+    #splitCutCard:not(.is-waiting) #splitCutWait { display:none; }
+    .cut-census { display:grid; gap:8px; margin-top:8px; }
+    .cut-census[hidden] { display:none !important; }
+    .cut-range { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px; align-items:center; }
+    .cut-end { font-size:11px; color:var(--cfg-text3); white-space:nowrap; }
+    .cut-end strong { color:var(--cfg-text); font-size:12px; }
+    .cut-track { position:relative; height:6px; border-radius:99px; background:linear-gradient(90deg,#ef4444 0%, #e7c56a 50%, #3b82f6 100%); }
+    .cut-track i { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; background:#fff; border:2px solid #0f766e; transform:translate(-50%,-50%); }
+    .cut-sides { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .cut-side { border:1px solid var(--cfg-border); border-radius:8px; padding:6px 8px; }
+    .cut-side.high { border-color:rgba(59,130,246,.5); }
+    .cut-side.low { border-color:rgba(239,68,68,.5); }
+    .cut-side strong { display:block; font-size:16px; line-height:1.1; color:var(--cfg-text); }
+    .cut-side .cut-n { display:block; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--cfg-text3); }
+    .cut-side .cut-name { display:block; font-size:11px; color:var(--cfg-text2, var(--cfg-text)); }
+    .split-preview { height:320px; margin-top:8px; }
+    .split-preview:empty { display:none; height:0; margin:0; }
     .split-preview-note { margin:6px 0 0; font-size:11px; color:var(--cfg-text3); }
     @media (max-width: 760px) {
       .reg-layout { flex-direction:column; overflow:auto; }
@@ -177,27 +195,39 @@
             </div>
           </div>
           <div class="opt-card" id="splitCutCard" hidden>
-            <h4>Splitting factor cut-off
+            <h4>Cut-off
               <button type="button" class="zone-info" id="splitCutInfo" aria-label="About the splitting factor cut-off" aria-expanded="false"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
             </h4>
-            <p class="zone-info-pop" id="splitCutInfoPop">This cut-off divides the splitting factor into the high group and the low group. The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. The chart updates as you move the cut.</p>
-            <p class="zone-help" id="splitCutIntro">The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. Move the cut and the chart updates.</p>
-            <label for="splitCutMethod">Rule</label>
-            <select id="splitCutMethod">
-              <option value="favorable" selected>Favorable-response threshold</option>
-              <option value="median">Median</option>
-              <option value="midpoint">Scale midpoint</option>
-              <option value="custom">Custom number</option>
-            </select>
-            <label for="splitCutValue">Cut-off</label>
-            <div class="cut-row">
-              <input id="splitCutSlider" type="range" min="1" max="5" step="0.01" value="4" />
-              <input id="splitCutValue" type="number" step="0.01" value="4" />
+            <p class="zone-info-pop" id="splitCutInfoPop">This cut-off divides the splitting factor into the high group and the low group. The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. The marker on the range is the cut. The chart updates as you move it.</p>
+            <p class="zone-help" id="splitCutWait">Choose the splitting factor above. Its minimum, maximum, and the number of cases in each group appear here.</p>
+            <div id="splitCutControls">
+              <label for="splitCutMethod">Rule</label>
+              <select id="splitCutMethod">
+                <option value="favorable" selected>Favorable-response threshold</option>
+                <option value="median">Median</option>
+                <option value="midpoint">Scale midpoint</option>
+                <option value="custom">Custom number</option>
+              </select>
+              <label for="splitCutValue">Cut-off</label>
+              <div class="cut-row">
+                <input id="splitCutSlider" type="range" min="1" max="5" step="0.01" value="4" />
+                <input id="splitCutValue" type="number" step="0.01" value="4" />
+              </div>
+              <div class="rule-line" id="splitCutRule">At or above the cut is the highest score. Below it is the lower score.</div>
+              <div class="cut-census" id="splitCutCensus" hidden>
+                <div class="cut-range">
+                  <span class="cut-end">Min <strong id="splitCutMin"></strong></span>
+                  <span class="cut-track" aria-hidden="true"><i id="splitCutMark"></i></span>
+                  <span class="cut-end">Max <strong id="splitCutMax"></strong></span>
+                </div>
+                <div class="cut-sides">
+                  <div class="cut-side high"><strong id="splitCutHighN"></strong><span class="cut-n">cases</span><span class="cut-name" id="splitCutHighName"></span></div>
+                  <div class="cut-side low"><strong id="splitCutLowN"></strong><span class="cut-n">cases</span><span class="cut-name" id="splitCutLowName"></span></div>
+                </div>
+              </div>
+              <div id="splitPreview" class="split-preview"></div>
+              <p class="split-preview-note" id="splitPreviewNote"></p>
             </div>
-            <div class="rule-line" id="splitCutRule">At or above the cut is the highest score. Below it is the lower score.</div>
-            <p class="zone-help" id="splitCutCensus"></p>
-            <div id="splitPreview" class="split-preview"></div>
-            <p class="split-preview-note" id="splitPreviewNote"></p>
           </div>
           <div class="opt-card" id="splitTitleCard" hidden>
             <h4>Chart title</h4>
@@ -358,6 +388,9 @@
 
     function renderZones() {
       var host = qs('zoneList');
+      var cutCard = qs('splitCutCard');
+      var park = qs('mainContent') || document.body;
+      if (cutCard && park) park.appendChild(cutCard);
       host.innerHTML = '';
       ZONES.forEach(function (zone) {
         var card = document.createElement('div');
@@ -403,7 +436,8 @@
           names.forEach(function (name) { body.appendChild(chip(name, zone.id)); });
         }
         if (selectedVar) card.classList.add('await-click');
-        card.addEventListener('click', function () {
+        card.addEventListener('click', function (e) {
+          if (e.target.closest && e.target.closest('#splitCutCard')) return;
           if (selectedVar) place(zone.id, selectedVar);
         });
         card.addEventListener('dragover', function (e) { e.preventDefault(); body.classList.add('drag-over'); });
@@ -576,6 +610,7 @@
       }
       renderVariables();
       renderZones();
+      dockSplitCut();
       fillWaves();
       updateRules();
       var ready = PRODUCT === 'split'
@@ -756,9 +791,26 @@
       return isFinite(n) ? n : null;
     }
 
-    function cutCensusText(scores, threshold, highLabel, lowLabel) {
+    function splittingScores() {
+      if (!assign.y.length || !SS.compositeScore) return [];
+      var indexes = [];
+      assign.y.forEach(function (name) {
+        var profile = profileOf(name);
+        if (profile) indexes.push(profile.index);
+      });
+      if (!indexes.length) return [];
+      var fraction = Number(qs('minItems').value);
+      var scores = [];
+      _rows.forEach(function (row) {
+        var values = indexes.map(function (index) { return row[index]; });
+        var scored = SS.compositeScore(values, fraction);
+        if (scored && scored.ok && typeof scored.score === 'number' && isFinite(scored.score)) scores.push(scored.score);
+      });
+      return scores;
+    }
+    function censusStats(scores, threshold) {
       var nums = (scores || []).filter(function (n) { return typeof n === 'number' && isFinite(n); });
-      if (!nums.length || typeof threshold !== 'number' || !isFinite(threshold)) return '';
+      if (!nums.length || typeof threshold !== 'number' || !isFinite(threshold)) return null;
       var min = nums[0];
       var max = nums[0];
       var high = 0;
@@ -769,12 +821,57 @@
         if (n >= threshold) high += 1;
         else low += 1;
       });
-      return 'Min ' + SS.formatNum(min) + ', max ' + SS.formatNum(max) + '. ' + highLabel + ': ' + high + ' case' + (high === 1 ? '' : 's') + '. ' + lowLabel + ': ' + low + ' case' + (low === 1 ? '' : 's') + '.';
+      return { min: min, max: max, high: high, low: low };
+    }
+    function paintCutCensus(scores, threshold, highLabel, lowLabel) {
+      var box = qs('splitCutCensus');
+      var stats = censusStats(scores, threshold);
+      if (!box) return stats;
+      if (!stats) {
+        box.hidden = true;
+        return null;
+      }
+      var minEl = qs('splitCutMin');
+      var maxEl = qs('splitCutMax');
+      var highEl = qs('splitCutHighN');
+      var lowEl = qs('splitCutLowN');
+      if (!minEl || !maxEl || !highEl || !lowEl) return stats;
+      box.hidden = false;
+      minEl.textContent = SS.formatNum(stats.min);
+      maxEl.textContent = SS.formatNum(stats.max);
+      var span = stats.max - stats.min;
+      var pos = span > 0 ? (Number(threshold) - stats.min) / span : 0.5;
+      pos = Math.max(0, Math.min(1, pos));
+      var mark = qs('splitCutMark');
+      if (mark) mark.style.left = (pos * 100) + '%';
+      qs('splitCutHighN').textContent = String(stats.high);
+      qs('splitCutLowN').textContent = String(stats.low);
+      qs('splitCutHighName').textContent = highLabel;
+      qs('splitCutLowName').textContent = lowLabel;
+      return stats;
+    }
+    function dockSplitCut() {
+      if (PRODUCT !== 'split') return;
+      var card = qs('splitCutCard');
+      var zone = document.querySelector('.reg-zone-card[data-zone="y"]');
+      if (!card || !zone) return;
+      zone.appendChild(card);
+      card.hidden = false;
+      card.classList.toggle('is-waiting', !assign.y.length);
+      var anchor = qs('zoneList');
+      var preview = qs('splitPreview');
+      var previewNote = qs('splitPreviewNote');
+      if (anchor && anchor.parentNode && preview) {
+        anchor.parentNode.insertBefore(preview, anchor.nextSibling);
+        if (previewNote) anchor.parentNode.insertBefore(previewNote, preview.nextSibling);
+      }
     }
 
     function writeSplitCut(threshold, scale, scores) {
-      var shown = Math.round(Number(threshold) * 100) / 100;
       var slider = qs('splitCutSlider');
+      var value = qs('splitCutValue');
+      if (!slider || !value) return;
+      var shown = Math.round(Number(threshold) * 100) / 100;
       var min = scale && scale.min != null ? scale.min : 1;
       var max = scale && scale.max != null ? scale.max : 5;
       if (isFinite(shown)) {
@@ -797,10 +894,7 @@
       var low = (qs('splitLowLabel').value || '').trim() || names.low;
       var cut = qs('splitCutMethod').value === 'custom' ? splitCutNumber() : shown;
       qs('splitCutRule').textContent = high + ' is at or above ' + SS.formatNum(cut) + '. ' + low + ' is below it.';
-      var census = qs('splitCutCensus');
-      if (census) census.textContent = cutCensusText(scores, cut, high, low);
-      var intro = qs('splitCutIntro');
-      if (intro) intro.textContent = 'The default cut is the favorable-response threshold of ' + construct + '. At or above the cut is ' + high + '. Below it is ' + low + '. Move the cut and the chart updates.';
+      paintCutCensus(scores, cut, high, low);
       _cutPainting = false;
     }
 
@@ -817,9 +911,15 @@
       if (!assign.y.length || !assign.factors.length) {
         if (_previewChart) { _previewChart.destroy(); _previewChart = null; }
         host.innerHTML = '';
-        note.textContent = 'Select a splitting construct and at least one factor to see the chart.';
-        var waiting = qs('splitCutCensus');
-        if (waiting) waiting.textContent = '';
+        if (!assign.y.length) {
+          note.textContent = '';
+          paintCutCensus([], null, '', '');
+          return;
+        }
+        var earlyScores = splittingScores();
+        var earlyCut = SS.resolveThreshold(qs('splitCutMethod').value, splitCutNumber(), earlyScores);
+        writeSplitCut(earlyCut.threshold, SS.inferScale(earlyScores), earlyScores);
+        note.textContent = 'Add at least one factor to see the chart.';
         return;
       }
       var spec = buildSpec();

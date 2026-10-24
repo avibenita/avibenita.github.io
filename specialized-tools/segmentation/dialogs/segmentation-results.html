@@ -201,6 +201,22 @@
     details.fold[hidden] { display:none !important; }
     .cut-row { display:grid; grid-template-columns:minmax(0,1fr) 76px; gap:8px; align-items:center; }
     .cut-row input[type="range"] { width:100%; margin:0; padding:0; height:22px; accent-color:#5eead4; }
+    .cut-summary { margin-left:auto; font-size:11px; font-weight:600; color:var(--muted); }
+    #cutInfoBtn { margin-left:8px; }
+    .cut-census { display:grid; gap:8px; }
+    .cut-census[hidden] { display:none !important; }
+    .cut-range { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:8px; align-items:center; }
+    .cut-end { font-size:11px; color:var(--muted); white-space:nowrap; }
+    .cut-end strong { color:var(--text); font-size:12px; }
+    .cut-track { position:relative; height:6px; border-radius:99px; background:linear-gradient(90deg,#ef4444 0%, #e7c56a 50%, #3b82f6 100%); }
+    .cut-track i { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; background:#fff; border:2px solid #0f766e; transform:translate(-50%,-50%); }
+    .cut-sides { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .cut-side { border:1px solid var(--border); border-radius:8px; padding:6px 8px; background:var(--surface-2); }
+    .cut-side.high { border-color:rgba(59,130,246,.55); }
+    .cut-side.low { border-color:rgba(239,68,68,.55); }
+    .cut-side strong { display:block; font-size:16px; line-height:1.1; }
+    .cut-side .cut-n { display:block; font-size:10px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+    .cut-side .cut-name { display:block; font-size:11px; color:var(--text); }
     .driver-index { border:1px solid var(--border); border-radius:8px; margin:0; padding:8px; min-width:0; }
     .driver-index .driver-legend { font-size:11px; font-weight:700; color:var(--muted); margin-bottom:4px; }
     #driverIntro .info { display:inline-flex; width:16px; height:16px; border-radius:50%; align-items:center; justify-content:center; background:#0d9488; color:#fff; font-size:11px; font-weight:700; cursor:help; }
@@ -320,9 +336,10 @@
               </div>
             </details>
             <details class="fold" id="cutFold" hidden>
-              <summary>Splitting factor cut-off
+              <summary><span id="cutFoldTitle">Splitting factor</span>
+                <span class="cut-summary" id="cutFoldMeta"></span>
                 <button type="button" class="fold-info" id="cutInfoBtn" aria-label="About the splitting factor cut-off" aria-expanded="false"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
-                <span class="fold-info-pop" id="cutInfoPop" hidden>This cut-off divides the splitting factor into the high group and the low group. The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. The chart updates as you move the cut.</span>
+                <span class="fold-info-pop" id="cutInfoPop" hidden>This cut-off divides the splitting factor into the high group and the low group. The default cut is the favorable-response threshold. At or above the cut is the high group. Below it is the low group. The marker on the range is the cut. The chart updates as you move it.</span>
               </summary>
               <div class="fold-body">
                 <div id="splitCutField">
@@ -341,7 +358,17 @@
                     </span>
                   </label>
                   <p class="note" id="splitCutRule"></p>
-                  <p class="note" id="splitCutCensus"></p>
+                  <div class="cut-census" id="splitCutCensus" hidden>
+                    <div class="cut-range">
+                      <span class="cut-end">Min <strong id="splitCutMin"></strong></span>
+                      <span class="cut-track" aria-hidden="true"><i id="splitCutMark"></i></span>
+                      <span class="cut-end">Max <strong id="splitCutMax"></strong></span>
+                    </div>
+                    <div class="cut-sides">
+                      <div class="cut-side high"><strong id="splitCutHighN"></strong><span class="cut-n">cases</span><span class="cut-name" id="splitCutHighName"></span></div>
+                      <div class="cut-side low"><strong id="splitCutLowN"></strong><span class="cut-n">cases</span><span class="cut-name" id="splitCutLowName"></span></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </details>
@@ -410,6 +437,7 @@
               <div id="changeChart" class="chart"></div>
             </section>
             <section class="seg-panel" id="panel-standardized" role="tabpanel" aria-labelledby="tab-standardized">
+              <p class="note" id="standardGroupNote"></p>
               <p class="note" id="standardNote"></p>
               <div id="standardChart" class="chart"></div>
               <div id="standardFlagNote" class="flag-note" hidden>
@@ -429,6 +457,7 @@
                 </label>
                 <button type="button" class="btn help-open" id="splitHelpOpen"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> How Split Index works</button>
               </div>
+              <p class="note" id="splitGroupNote"></p>
               <div id="driverEmpty">
                 <p id="driverEmptyText">Select survey factors to calculate the Split Index.</p>
                 <button type="button" class="btn" id="selectFactors">Select factors</button>
@@ -952,8 +981,18 @@
       if (rule && isFinite(value)) {
         var names = splitNames();
         rule.textContent = names.high + ' is at or above ' + SS.formatNum(value) + '. ' + names.low + ' is below it.';
-        var census = document.getElementById('splitCutCensus');
-        if (census) census.textContent = cutCensusText(splitCutScores(), value, names.high, names.low);
+        var stats = paintCutCensus(splitCutScores(), value, names.high, names.low);
+        var title = document.getElementById('cutFoldTitle');
+        if (title) title.textContent = names.construct || 'Splitting factor';
+        var meta = document.getElementById('cutFoldMeta');
+        if (meta) meta.textContent = stats ? ('min ' + SS.formatNum(stats.min) + ' · max ' + SS.formatNum(stats.max)) : '';
+        var line = stats
+          ? (names.construct + ' ranges from ' + SS.formatNum(stats.min) + ' to ' + SS.formatNum(stats.max) + '. ' + names.high + ': ' + stats.high + ' cases. ' + names.low + ': ' + stats.low + ' cases.')
+          : '';
+        ['splitGroupNote', 'standardGroupNote'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.textContent = line;
+        });
       }
       fillSplitHelp();
     }
@@ -964,8 +1003,8 @@
         return typeof r.yScore === 'number' && isFinite(r.yScore);
       }).map(function (r) { return r.yScore; });
     }
-    function cutCensusText(scores, threshold, highLabel, lowLabel) {
-      if (!scores.length || typeof threshold !== 'number' || !isFinite(threshold)) return '';
+    function censusStats(scores, threshold) {
+      if (!scores.length || typeof threshold !== 'number' || !isFinite(threshold)) return null;
       var min = scores[0];
       var max = scores[0];
       var high = 0;
@@ -976,7 +1015,29 @@
         if (n >= threshold) high += 1;
         else low += 1;
       });
-      return 'Min ' + SS.formatNum(min) + ', max ' + SS.formatNum(max) + '. ' + highLabel + ': ' + high + ' case' + (high === 1 ? '' : 's') + '. ' + lowLabel + ': ' + low + ' case' + (low === 1 ? '' : 's') + '.';
+      return { min: min, max: max, high: high, low: low };
+    }
+    function paintCutCensus(scores, threshold, highLabel, lowLabel) {
+      var box = document.getElementById('splitCutCensus');
+      var stats = censusStats(scores, threshold);
+      if (!box) return stats;
+      if (!stats) {
+        box.hidden = true;
+        return null;
+      }
+      box.hidden = false;
+      document.getElementById('splitCutMin').textContent = SS.formatNum(stats.min);
+      document.getElementById('splitCutMax').textContent = SS.formatNum(stats.max);
+      var span = stats.max - stats.min;
+      var pos = span > 0 ? (Number(threshold) - stats.min) / span : 0.5;
+      pos = Math.max(0, Math.min(1, pos));
+      var mark = document.getElementById('splitCutMark');
+      if (mark) mark.style.left = (pos * 100) + '%';
+      document.getElementById('splitCutHighN').textContent = String(stats.high);
+      document.getElementById('splitCutLowN').textContent = String(stats.low);
+      document.getElementById('splitCutHighName').textContent = highLabel;
+      document.getElementById('splitCutLowName').textContent = lowLabel;
+      return stats;
     }
     function applySplitCut(method, value) {
       if (!_spec) return;

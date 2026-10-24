@@ -10,6 +10,8 @@
  * Standardized values are the absolute pooled-SD mean difference,
  * labeled "Standardized mean difference". Raw and standardized
  * indices are never mixed in one ranking.
+ * On that view the group lines are z-scores from each factor's
+ * overall mean and standard deviation, not from the groups alone.
  */
 (function (root, factory) {
   var api = factory();
@@ -424,12 +426,20 @@
     [factor.group1, factor.group2].forEach(function (group) {
       lines.push(group.label);
       lines.push('Mean: ' + (isNum(group.mean) ? formatFixed(group.mean, 2) : '—') + (factor.weightUsed ? ' (weighted)' : ''));
+      if (factor.indexType === 'standardized' && isNum(group.zMean)) {
+        lines.push('Standardized mean: ' + (group.zMean > 0 ? '+' : '') + formatFixed(group.zMean, 2));
+      }
       lines.push('Valid n: ' + group.validN);
       lines.push('SD: ' + (isNum(group.sd) ? formatFixed(group.sd, 2) : '—'));
       lines.push('');
     });
     var indexName = factor.indexType === 'standardized' ? 'Standardized Split Index' : 'Raw Split Index';
     lines.push(indexName + ': ' + (isNum(factor.selectedSplitIndex) ? formatFixed(factor.selectedSplitIndex, 2) : '—'));
+    if (factor.indexType === 'standardized' && factor.commonScale && isNum(factor.commonScale.mean) && factor.commonScale.sd > 0) {
+      lines.push('Common scale: overall mean ' + formatFixed(factor.commonScale.mean, 2) + ', SD ' + formatFixed(factor.commonScale.sd, 2) + '.');
+    } else if (factor.indexType === 'standardized' && factor.commonScale && !(factor.commonScale.sd > 0)) {
+      lines.push('This factor does not vary across the included cases, so it has no common-scale position.');
+    }
     if (factor.aboveAverageSpread) {
       lines.push('Above the average Split Index + 1 SD' + (isNum(factor.spreadCutoff) ? ' (' + formatFixed(factor.spreadCutoff, 2) + ')' : '') + ', and thus may be an explaining factor.');
     }
@@ -515,6 +525,11 @@
         });
         return out;
       }
+      var overall = calculateGroupStatistics(pairs(pool));
+      var zMean = function (mean) {
+        if (!isNum(mean) || !isNum(overall.mean) || !(overall.sd > 0)) return null;
+        return (mean - overall.mean) / overall.sd;
+      };
       var g1 = calculateGroupStatistics(pairs(group1Rows));
       var g2 = calculateGroupStatistics(pairs(group2Rows));
       var signed = isNum(g1.mean) && isNum(g2.mean) ? g1.mean - g2.mean : null;
@@ -534,6 +549,7 @@
         originalOrder: factor.originalOrder,
         scale: scale,
         cutoff: scale ? (scale.min + scale.max) / 2 : null,
+        commonScale: { mean: overall.mean, sd: overall.sd, validN: overall.validN },
         weightUsed: weightUsed,
         indexType: indexType,
         group1: {
@@ -541,6 +557,7 @@
           label: spec.group1.label,
           mean: g1.mean,
           sd: g1.sd,
+          zMean: zMean(g1.mean),
           validN: g1.validN,
           weightedN: g1.weightedN
         },
@@ -549,6 +566,7 @@
           label: spec.group2.label,
           mean: g2.mean,
           sd: g2.sd,
+          zMean: zMean(g2.mean),
           validN: g2.validN,
           weightedN: g2.weightedN
         },
@@ -666,6 +684,12 @@
     var muted = view.muted || '#cbd5e1';
     var longLabel = rows.some(function (row) { return String(row.factorLabel).length > 22; });
     var indexName = result && result.indexType === 'standardized' ? 'Standardized Split Index' : 'Split Index';
+    var commonScale = result && result.indexType === 'standardized';
+    var plotted = function (group) {
+      if (!group) return null;
+      var value = commonScale ? group.zMean : group.mean;
+      return isNum(value) ? Math.round(value * 100) / 100 : null;
+    };
     var groupName = function (group, fallback) {
       if (!group) return fallback;
       var n = group.validN != null ? ' (n = ' + group.validN + ')' : '';
@@ -735,11 +759,20 @@
       },
       yAxis: [
         {
-          title: { text: 'Dimensions mean score', margin: 16, style: { color: ink, fontWeight: '700', fontSize: '16px' } },
+          title: { text: commonScale ? 'Standardized mean (z)' : 'Dimensions mean score', margin: 16, style: { color: ink, fontWeight: '700', fontSize: '16px' } },
           labels: { style: { color: ink, fontWeight: '700', fontSize: '15px' } },
           gridLineWidth: 1,
           gridLineColor: grid,
-          gridLineDashStyle: 'Solid'
+          gridLineDashStyle: 'Solid',
+          softMin: commonScale ? 0 : undefined,
+          softMax: commonScale ? 0 : undefined,
+          plotLines: commonScale ? [{
+            value: 0,
+            color: muted,
+            width: 1,
+            zIndex: 2,
+            label: { text: 'Overall mean', style: { color: muted, fontSize: '11px', fontWeight: '600' } }
+          }] : []
         },
         {
           title: { text: indexName, margin: 16, style: { color: indexInk, fontWeight: '700', fontSize: '16px' } },
@@ -785,7 +818,7 @@
           yAxis: 0,
           color: '#3b82f6',
           legendIndex: 2,
-          data: rows.map(function (row) { return isNum(row.group1.mean) ? Math.round(row.group1.mean * 100) / 100 : null; })
+          data: rows.map(function (row) { return plotted(row.group1); })
         },
         {
           type: 'spline',
@@ -793,7 +826,7 @@
           yAxis: 0,
           color: '#ef4444',
           legendIndex: 1,
-          data: rows.map(function (row) { return isNum(row.group2.mean) ? Math.round(row.group2.mean * 100) / 100 : null; })
+          data: rows.map(function (row) { return plotted(row.group2); })
         },
         {
           type: 'column',

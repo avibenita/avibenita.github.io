@@ -21,10 +21,10 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261023tabedge" />
   <link rel="stylesheet" href="../shared-contained-tabs.css?v=20261023tabedge" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261023census"></script>
+  <script src="../shared-header.js?v=20261024z"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="segmentation-engine.js?v=20261020wording"></script>
-  <script src="segmentation-split-index.js?v=20261021periods"></script>
+  <script src="segmentation-split-index.js?v=20261024z"></script>
   <script src="segmentation-sample-data.js?v=20261014si1"></script>
   <style>
     :root {
@@ -868,6 +868,12 @@
           return {
             factor: factor.factorLabel,
             standardizedSplitIndex: roundInsight(factor.selectedSplitIndex),
+            highGroupMean: roundInsight(factor.group1 && factor.group1.mean),
+            lowGroupMean: roundInsight(factor.group2 && factor.group2.mean),
+            highGroupZ: roundInsight(factor.group1 && factor.group1.zMean),
+            lowGroupZ: roundInsight(factor.group2 && factor.group2.zMean),
+            overallMean: roundInsight(factor.commonScale && factor.commonScale.mean),
+            overallSd: roundInsight(factor.commonScale && factor.commonScale.sd),
             aboveAveragePlusOneSd: !!factor.aboveAverageSpread
           };
         })
@@ -1823,8 +1829,7 @@
     function paintStandardized() {
       if (!_bundle || !_bundle.ok || !SI) return;
       var note = document.getElementById('standardNote');
-      var names = splitNames();
-      if (note) note.textContent = 'The standardized Split Index divides the difference between ' + names.high + ' and ' + names.low + ' by their pooled standard deviation. Factors on different scales can be compared, and a larger value means the factor separates the two groups more.';
+      if (note) note.textContent = 'Each factor is drawn on a common scale. A point is that group’s average in standard-deviation units from the factor’s overall mean, using every included case. Those overall values stay fixed when the cut-off moves. A point at +0.60 means the group averages 0.60 standard deviations above the factor’s overall mean. The columns stay the standardized Split Index: the difference between the original group means divided by their pooled standard deviation. Hover a point to see the original mean.';
       if (!SS.factorDefinitions(_spec).length) {
         if (_standardChart) { _standardChart.destroy(); _standardChart = null; }
         paintSplitFlagNote(null, 'standardFlagNote', 'standardFlagText');
@@ -1841,6 +1846,7 @@
         return;
       }
       var options = SI.buildSplitIndexChartOptions(result, splitChartPresentation());
+      if (options.subtitle) options.subtitle.text = 'Common scale: each factor’s overall mean is 0 and its standard deviation is 1';
       options.tooltip.formatter = function () {
         var factor = result.displayed[this.point.index];
         if (!factor) return '';

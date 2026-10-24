@@ -52,6 +52,41 @@ describe('Split Index calculations', () => {
     expect(SI.calculateStandardizedSplitIndex(g1, g2)).toBeCloseTo(3, 8);
   });
 
+  test('common scale uses each factor overall mean and standard deviation', () => {
+    const people = [
+      row(0, 5, 5, 10, 1),
+      row(1, 5, 4, 10, 1),
+      row(2, 2, 3, 0, 1),
+      row(3, 2, 2, 0, 1)
+    ];
+    const wide = SI.calculateSplitIndex(people, config(), { index: 'standardized' });
+    const moved = config();
+    moved.yDimension.threshold = 3;
+    const narrow = SI.calculateSplitIndex(people, moved, { index: 'standardized' });
+    const career = wide.factors.filter((factor) => factor.factorId === 'Career')[0];
+    const careerMoved = narrow.factors.filter((factor) => factor.factorId === 'Career')[0];
+    const sd = Math.sqrt(100 / 3);
+    expect(career.commonScale.mean).toBeCloseTo(5, 8);
+    expect(career.commonScale.sd).toBeCloseTo(sd, 8);
+    expect(career.group1.mean).toBeCloseTo(10, 8);
+    expect(career.group1.zMean).toBeCloseTo(5 / sd, 8);
+    expect(career.group2.zMean).toBeCloseTo(-5 / sd, 8);
+    expect(careerMoved.commonScale.mean).toBeCloseTo(career.commonScale.mean, 8);
+    expect(careerMoved.commonScale.sd).toBeCloseTo(career.commonScale.sd, 8);
+    expect(careerMoved.group1.mean).not.toBeCloseTo(career.group1.mean, 5);
+    const options = SI.buildSplitIndexChartOptions(wide, {});
+    expect(options.series.map((series) => series.type)).toEqual(['spline', 'spline', 'column']);
+    expect(options.yAxis[0].title.text).toBe('Standardized mean (z)');
+    expect(options.series[0].data[options.xAxis.categories.indexOf('Career')]).toBeCloseTo(Math.round((5 / sd) * 100) / 100, 8);
+    expect(options.series[2].name).toBe('Standardized Split Index');
+    expect(options.yAxis[0].plotLines[0].value).toBe(0);
+    const raw = SI.buildSplitIndexChartOptions(SI.calculateSplitIndex(people, config(), { index: 'raw' }), {});
+    expect(raw.yAxis[0].title.text).toBe('Dimensions mean score');
+    expect(raw.series[0].data[raw.xAxis.categories.indexOf('Career')]).toBe(10);
+    expect(SI.buildFactorTooltip(career, { showEvidence: false })).toMatch(/Mean: 10\.00/);
+    expect(SI.buildFactorTooltip(career, { showEvidence: false })).toMatch(/Standardized mean: \+/);
+  });
+
   test('equal means produce a Split Index of zero', () => {
     const result = SI.calculateSplitIndex([
       row(0, 5, 5, 4, 4),
@@ -76,7 +111,9 @@ describe('Split Index calculations', () => {
     const career = result.factors.filter((f) => f.factorId === 'Career')[0];
     expect(career.standardizedSplitIndex).toBeNull();
     expect(career.selectedSplitIndex).toBeNull();
+    expect(career.group1.zMean).toBeNull();
     expect(SI.buildFactorTooltip(career, { showEvidence: false })).toMatch(/No within-group variation/);
+    expect(SI.buildFactorTooltip(career, { showEvidence: false })).toMatch(/no common-scale position/);
   });
 
   test('missing observations produce factor-specific bases', () => {

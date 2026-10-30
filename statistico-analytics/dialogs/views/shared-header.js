@@ -4339,7 +4339,7 @@ const StatisticoHeader = {
           }
         });
         if (!out.searchParams.has('build')) {
-          out.searchParams.set('build', '20260827ht1');
+          out.searchParams.set('build', '20261030sel1');
         }
         return out.href;
       } catch (e) {

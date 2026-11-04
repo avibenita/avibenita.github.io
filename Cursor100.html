@@ -1,0 +1,224 @@
+# Cursor production brief — Independent Means video, r001
+
+## Goal
+
+Create a standalone narrated walkthrough of Independent Means: compare separate groups, examine distributions and assumptions, interpret uncertainty and effect size, then demonstrate prospective power/sample-size planning. Reuse the established Statistico film identity. Render a complete review; do not stop at a plan.
+
+Target approximately 3:10–3:35 including the silent 44-second ending. Use “Independent Means” as the title. Keep it separate from Paired / Repeated Means.
+
+## Inspect first
+
+Inspect the current input flow, compute engine, independent results page, shared power integration, report generation and existing video harness.
+
+Deployed discovery targets:
+- https://statistico.live/Statistico-Website/analytics/independent-means.html
+- https://statistico.live/statistico-analytics/dialogs/views/independent/independent-results.html
+
+Evidence from the deployed results HTML on 4 November 2026:
+- Menu entries include Test Results, Assumptions, Effect Sizes, Power Analysis and Descriptives.
+- Controls include framework, test method, two-sided/one-sided alternative and significance.
+- Welch, Student and permutation options appear; primary/robustness results, Hedges g, rank measures and a multi-group branch exist.
+- The page loads shared-power-template.js and shared-power-analysis.js and calls a shared active engine.
+
+Verify which controls are actually enabled, how the host recomputes settings and which methods are fully operational. Mark any unavailable option as unavailable in the inventory. Marketing overview labels may differ from the working menu.
+
+## Dataset and numerical contract
+
+Use a clearly labeled “Simulated independent groups: performance score.” These are different people, not before/after measurements. Arbitrary score units; no causal claim.
+
+Generate reproducibly with Python/NumPy, then save the generated rows as fixture data for the JavaScript/Excel input path:
+
+```python
+import numpy as np
+rng = np.random.default_rng(110401)
+def sample(n, mean, sd):
+    z = rng.normal(size=n)
+    return np.round(mean + sd*(z-z.mean())/z.std(ddof=1), 6)
+a = sample(30, 65, 10)
+b = sample(30, 71, 10)
+# Long format: participant_id, group, score; IDs A01–A30 and B01–B30.
+# If the real input uses separate columns, preserve the independent design:
+# being on the same Excel row must not imply a pair.
+```
+
+Reference checks on these saved values:
+- nA = nB = 30; total = 60; means approximately 65 and 71; sample SDs approximately 10.
+- B minus A = +6.00000007 points.
+- Two-sided Welch test: |t| = 2.32379003, df ≈ 58, p = 0.0236622148.
+- 95% CI for B minus A: [0.83158773, 11.16841240].
+- If the UI reports A minus B, use −6, negative t and CI [−11.16841240, −0.83158773]. Match all labels/narration.
+- Pooled-SD Cohen d for B minus A ≈ +0.60000000. Hedges g is bias-corrected d; calculate the engine's actual correction and never label g as d.
+- Default alpha .05, two-sided, 95% CI.
+
+Values are engineered simulated examples, not empirical evidence. Reference with scipy.stats.ttest_ind(equal_var=False) and an independently calculated Welch CI; tolerate rounding at approximately 1e−5.
+
+## Storyboard and narration
+
+A light sweep separates the sections. Inside a section, the picture eases larger on the thing being discussed, then eases back. Chapter times below are the spoken scenes; the assembled film adds the sweeps between them.
+
+### 00:00–00:04 — opening
+
+Statistico logo, “Independent Means.”
+Tagline: “Compare groups. Understand the difference.”
+
+### 00:04–00:34 — objective and module structure
+
+Open the fully populated dataset. Show group labels, then the real left menu and a brief prepared preview of relevant views. Explain internal control groups without inventing tabs. Ease toward the menu, then back to the group labels.
+
+Suggested narration:
+“Independent comparisons ask how separate groups differ on the same outcome. Each participant belongs to one group. Here, we compare simulated performance scores. The menu connects descriptives, assumptions, test results, effect sizes and power analysis. Within each view, controls change the method, display or planning assumptions. We'll inspect the groups first, interpret their difference, and then explore what a future study would need.”
+
+Return to Descriptives. No empty or loading previews.
+
+### 00:34–00:57 — explore the groups
+
+Show both groups' n, mean and spread; then the actual comparison chart/box plot and supported distribution view. Ease in on the two summaries, then on the chart.
+
+Narration:
+“Group B averages six points higher, but the distributions overlap. Looking at spread and unusual values helps us understand what that average difference represents.”
+
+Interact with a verified chart selector or descriptive row; hold the resulting distribution. Avoid assuming a mean-chart error bar is a CI if the legend actually specifies SD/SE.
+
+Takeaway: “Compare spread as well as averages.”
+
+### 00:57–01:15 — assumptions and method
+
+Show actual diagnostics, then the two-sided Welch setting. Ease in on the diagnostic, then on the Welch control. Do not make normality p-values a mechanical test selector.
+
+Narration:
+“Welch's test compares group means without requiring equal variances. The diagnostic views help assess distribution shape and unusual observations. They support statistical judgment rather than automatically choosing the analysis.”
+
+Independence is a study-design assumption, not established by a normality or variance test.
+
+### 01:15–01:44 — result, confidence and effect
+
+Show Welch t, df, p, labeled mean difference, CI and Hedges g. Ease in so the estimate and the confidence interval lead the frame, not only the significance badge.
+
+Narration:
+“The estimated difference is six points in favour of Group B. The confidence interval describes uncertainty around that difference, while the standardised effect expresses its magnitude relative to variation.”
+
+If alpha/confidence updates the result correctly, change significance .05 → .01 (95% → 99% CI), then restore .05. Show that the interval widens, while the estimate and two-sided p-value stay unchanged. The significance decision may change; the data have not.
+
+Narration:
+“Demanding greater confidence widens the interval. It does not change the observed difference.”
+
+If this control requires host recomputation, wait for the real response. Do not edit numbers as overlays.
+
+### 01:44–02:20 — substantial power and sample-size demonstration
+
+Open the working power workflow. Ease in on the planning inputs, then on the solved number per group. Show all of these parameters with their units:
+- Prospective two-sided independent two-sample t planning.
+- Alpha .05, target power .80, allocation 1:1.
+- Planning Cohen d = .60, explicitly a hypothetical planning assumption.
+- Solve for sample size: approximately 45 per group, 90 total, for a conventional equal-variance t planning model.
+- Reduce assumed d to .40 and show the newly computed sample size rising.
+- Restore d .60, switch to power-for-n if supported, and show n = 30 per group gives approximately .6275 under that same planning model.
+
+Narration:
+“Power planning asks what a future study would need. For a hypothetical standardised difference of zero point six, eighty percent power and equal allocation, this model needs about forty-five participants per group. A smaller difference requires a larger study. We can also fix the sample size and explore the power it provides.”
+
+Critical statistical distinctions:
+- This reference is a common-variance noncentral-t planning model. Do not call it exact Welch power. If the actual engine plans Welch with unequal SDs, enter its required parameters and validate that model independently.
+- This is not evidence that the observed result is true and is not a post-hoc power justification.
+- For the same planning model, n = 44 per group gives power .794670016; n = 45 gives .803696923. Round required n upward and recheck achieved power.
+- Do not feed Hedges g into a field labeled Cohen d without a justified conversion.
+- Increasing target power or lowering assumed effect should not reduce required n, all else fixed.
+- If the service fails, capture/report a failure, not a fabricated calculation.
+
+### 02:20–02:35 — robustness or multi-group preview
+
+Prefer one concise, verified framework switch to Mann–Whitney with its actual rank effect, then return to the parametric view. Ease in on that rank result while it is on screen.
+
+Narration:
+“A rank-based comparison provides another perspective when its assumptions match the question. Its result answers a different question from a difference in means.”
+
+Do not describe Mann–Whitney as universally testing medians. Do not compare one-sided p-values to two-sided references.
+
+Alternatively use a short multi-group preview only if the branch works and its method/post-hoc family are validated. If using it, seed a separate clearly labeled fixture and show real adjusted p-values; an omnibus result does not mean every pair differs. No unsupported Tukey/Games–Howell combination.
+
+### Approximately 02:35 onward — silent ending and closing
+
+Card 1 analysis inventory, verified against working UI:
+- Independent group setup: separate columns or score/group roles.
+- Group exploration: descriptives, distributions, means/box plots.
+- Assumptions and diagnostics.
+- Welch/Student tests and rank-based comparison, plus permutation only if implemented.
+- Mean differences, confidence intervals, Hedges g and supported rank effects.
+- Power/sample-size planning and validated multi-group/post-hoc features where available.
+
+Do not claim multi-factor ANOVA, ANCOVA or mixed models as features of this screen simply because they exist elsewhere.
+
+Use the shared Card 2 and closing specification below.
+
+## Boundary and acceptance checks
+
+1. Both groups' reference statistics match the saved fixture; group order and sign remain consistent.
+2. Welch versus Student remain explicitly identified. Equal SDs in this fixture make them numerically close; do not imply they are universally interchangeable.
+3. Changing confidence/alpha preserves n, means, effect estimate and the same-method p-value; intervals/decision respond correctly. Restore defaults.
+4. Missing values are handled independently within each group; do not accidentally use complete-pair deletion. Test an uneven sample-size variant without filming it as the primary fixture.
+5. A group with insufficient observations or zero variance follows truthful validation states; no NaN presented as a result.
+6. Power checks match the chosen model, per-group versus total counts are explicit, required n is rounded up, and stale service output never survives input changes.
+7. For rank tests with ties and multi-group adjusted comparisons, verify the implemented method/correction; never invent exact p-values.
+8. Full playback confirms result holds, readable labels, voice-only stems, silent ending and stable audio.
+
+## Production and delivery contract
+
+Reuse the Contingency review picture treatment, logo, narration style and capabilities-card component. The reference is `Statistico/contingency/produce/` (`open.html`, `bridge.html`, `cards.html`, `thanks.html`, `close.html`, and the focus windows in `assemble.mjs`). Copy that motion. Do not copy Contingency wording, timings, or statistics. Locate the actual repository files first; deployed URLs below are discovery targets, not assertions about local paths. Do not rebuild the application or invent controls to satisfy the storyboard.
+
+Produce the complete review MP4, editable scene definitions, narration script, scene-sized voice-only audio clips, fixture data, capability inventory and QA report. Keep this as a separate film and project from the other Compare Means procedure. Avi will make the final approved CapCut export; do not publish or replace any website asset.
+
+Use the established 1728×1080 canvas, 30 fps, H.264 MP4 with fast-start metadata. Capture real application output at adequate resolution. Keep controls, group/occasion names, axes and results legible at website-player size. No stretching, wandering cursor, blank navigation, stale values or fabricated statistical panels.
+
+For each interaction: show context → highlight control → perform action → await computation/render completion → hold the result 2–3 seconds. Leave sentence captions off; use only brief takeaway text away from results. Highlight rings and takeaway lines are capture overlays, as in the Contingency film.
+
+Picture style, matching Contingency:
+
+- **Section transitions.** Insert the navy light-sweep between every join except card 1 into card 2: dark field, one cyan beam, one thin horizontal rule that scales in and fades. That covers the opening, each spoken chapter, the cards, the thank-you, and the close. Crossfade into the sweep and out of it at about 0.38 seconds. Do not hard-cut those joins. Card 1 into card 2 is the 0.6-second crossfade only. Fade the film out over the last 0.7 seconds.
+- **Focus enlargement.** After the picture is scaled to 1728×1080, ease the frame onto the subject, hold, then ease back. The enlarge and return each take about 0.5 seconds. Zoom stays modest, about 1.14 to 1.42, centered on what the narration is about (the menu, the two group summaries, the chart, the Welch diagnostic, the estimate and interval, the planning inputs and the solved n). A scene may contain more than one enlargement when the subject moves. Keep the number, label, or axis being read inside the frame. This is a post-capture picture move. Do not wander a cursor or zoom the application itself.
+- **Title cards.** Opening, capability cards, thank-you, and close use the same navy and cyan stage: a short rise (about 0.55–0.7 seconds) and, on the opening and the cards, one background glint. Text stays steady. No scrolling, typewriter, or reflection over the words.
+
+Narration should explain purpose and interpretation, not recite clicks. Preserve pauses needed to inspect results; extend scenes rather than speeding speech. Deliver clean voice only, without generated music or background noise. For voice conversion, use spoken scene-sized segments, retain timeline start positions separately, and do not send a long silent capabilities ending through the voice changer. Listen to the entire converted output before accepting it.
+
+Aim for roughly −16 to −17 LUFS for narration, with true peak ≤ −1 dBTP after appropriate peak control. Check quiet and loud phrases; do not simply boost near-full-scale peaks. Keep optional music on its own track. Both capabilities cards are unnarrated.
+
+### Shared ending: two silent cards
+
+Reuse the approved visual family: navy, cyan, clear hierarchy, steady text, one background glint per card. Card 1 lasts 25 seconds; Card 2 lasts 19 seconds; use a gentle approximately 0.6-second crossfade. No scrolling, typewriter effect, spoken bullet list, or a glint passing over the words.
+
+Card 1 title: “A preview of a much broader toolkit”
+Subtitle: “Selected demonstrations from Independent Means”
+Put all verified statistical capabilities here. If separate analysis by a grouping/stratification variable exists, put that here too; comparing the groups already defining a test is not a separate by-group feature.
+
+Card 2 title: “Interpret, prepare & share”
+Use distinct areas for:
+- AI: “Explain this view” and “Analyse all results,” as separate capabilities only if each works in this module.
+- Workflow: supported filters, save/reload configurations, customised HTML/APA reporting, copying and verified exports.
+- Recoding via the companion Data Manipulation module, clearly identified as a companion tool.
+
+Do not copy the Univariate inventory verbatim. Omit unsupported capabilities; report omissions. If there is only one AI action, describe that actual scope without claiming both.
+
+After card 2, hold a short thank-you: “Thank you.” and the module name “Independent Means”, then a logo close with one line and statistico.live. The thank-you and close sit outside the silent 44-second capabilities export. Export that capabilities ending separately as well as within the film.
+
+### Reproducibility and states
+
+Reset fixture, roles, selected method, alpha/confidence, alternative, active view, filters, chart settings and planning parameters at chapter boundaries. Await asynchronous completion, including cloud power responses. Ignore stale requests; never film a result for previous inputs.
+
+Use the supported Excel/input/session contract. Fixture injection can load data, but must use the real statistical engine. Preserve source missing values; document eligibility rules and distinguish loaded rows from analysed participants.
+
+Loading, service failure and invalid input must retain the application's truthful states, with no manufactured output. Never replace an error with cached success. Run the existing relevant tests plus independent numerical checks below. Decorative changes do not require redundant tests.
+
+### Files and completion report
+
+Within the existing media root, use this module's own folders: 01_source, 02_script, 03_audio, 04_review, 05_capcut and 06_approved. Respect an established equivalent convention if already present.
+
+Deliver:
+- independent__film__review-r001.mp4
+- independent__capabilities_two_cards__r001.mp4
+- independent__narration__r001.md
+- independent__storyboard__r001.md
+- independent__capability_inventory__r001.md
+- independent__qa__r001.md
+
+Keep approved CapCut files separate, e.g. independent__capcut__v001-vo.mp4. Never overwrite an approved export. Report changed files, exact render command, runtime/size, numerical checks, actual features versus advertised ones, playback/audio checks, omitted scenes and remaining limitations.
+
+

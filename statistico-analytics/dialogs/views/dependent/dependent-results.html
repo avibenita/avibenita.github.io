@@ -872,17 +872,22 @@
         }
         return;
       }
-      const welchSig = parseMaybeNumber(r.welchP) < alpha;
-      const mwSig = parseMaybeNumber(r.mwP) < alpha;
+      const pairedP = parseMaybeNumber(r.pairedP);
+      const wilcoxP = parseMaybeNumber(r.wilcoxonP);
+      const welchSig = (isFinite(pairedP) ? pairedP : parseMaybeNumber(r.welchP)) < alpha;
+      const mwSig = (isFinite(wilcoxP) ? wilcoxP : parseMaybeNumber(r.mwP)) < alpha;
       const primaryParametric = primaryFramework !== "nonparametric";
 
       // Determine primary p-value and decision
       let primaryP = 0;
       if (primaryParametric) {
-        const chosen = currentPrimaryTest || "welch";
-        primaryP = chosen === "student" ? r.studentP : (chosen === "permutation" ? r.permutationP : r.welchP);
+        const chosen = currentPrimaryTest || "paired";
+        if (chosen === "paired" || isFinite(pairedP)) primaryP = r.pairedP;
+        else if (chosen === "student") primaryP = r.studentP;
+        else if (chosen === "permutation") primaryP = r.permutationP;
+        else primaryP = r.welchP;
       } else {
-        primaryP = r.mwP;
+        primaryP = isFinite(wilcoxP) ? r.wilcoxonP : r.mwP;
       }
       
       // Set decision
@@ -1059,8 +1064,13 @@
       renderPosthoc(r.posthoc || {}, s.compareMode || "two-vars");
       setText("efG", fmt(fx.hedgesG)); setText("efDelta", fmt(fx.cliffsDelta)); setText("efRrb", fmt(fx.rankBiserial)); setText("efPs", fmt(fx.probabilitySuperiority));
       setText("powNote", p.note); setText("powEndpoint", p.suggestedEndpoint); setText("powVal", fmt(p.placeholderPower));
-      setText("repWelch", "Welch: t(" + fmt(r.welchDf) + ")=" + fmt(r.welchT) + ", p " + fmtP(r.welchP) + ", mean diff " + fmt(r.meanDiff) + " [" + fmt(r.ciLow) + ", " + fmt(r.ciHigh) + "].");
-      setText("repMw", "Mann-Whitney: U=" + fmt(r.u) + ", p " + fmtP(r.mwP) + ", rank-biserial " + fmt(fx.rankBiserial) + ".");
+      if (isFinite(parseMaybeNumber(r.pairedT))) {
+        setText("repWelch", "Paired t: t(" + fmt(r.pairedDf) + ")=" + fmt(r.pairedT) + ", p " + fmtP(r.pairedP) + ", mean diff " + fmt(r.meanDiff) + " [" + fmt(r.ciLow) + ", " + fmt(r.ciHigh) + "].");
+        setText("repMw", "Wilcoxon signed-rank: W=" + fmt(r.wilcoxonW) + ", p " + fmtP(r.wilcoxonP) + ".");
+      } else {
+        setText("repWelch", "Welch: t(" + fmt(r.welchDf) + ")=" + fmt(r.welchT) + ", p " + fmtP(r.welchP) + ", mean diff " + fmt(r.meanDiff) + " [" + fmt(r.ciLow) + ", " + fmt(r.ciHigh) + "].");
+        setText("repMw", "Mann-Whitney: U=" + fmt(r.u) + ", p " + fmtP(r.mwP) + ", rank-biserial " + fmt(fx.rankBiserial) + ".");
+      }
       setText("repCons", rep.consistency);
       
       // Update descriptive stats table
@@ -1105,9 +1115,9 @@
         const m3 = vec.reduce((a,b) => a + ((b-mean)/sd)**3, 0) / n;
         const skew = n > 2 ? m3 * Math.sqrt(n*(n-1))/(n-2) : NaN;
         // Excess kurtosis (unbiased)
-        const m4 = vec.reduce((a,b) => a + ((b-mean)/sd)**4, 0) / n;
+        const z4 = vec.reduce((a,b) => a + ((b-mean)/sd)**4, 0);
         const kurt = n > 3
-          ? ((n+1)*n*(n-1)/((n-2)*(n-3))) * m4 - 3*(n-1)**2/((n-2)*(n-3))
+          ? (n * (n + 1) / ((n - 1) * (n - 2) * (n - 3))) * z4 - 3 * (n - 1) * (n - 1) / ((n - 2) * (n - 3))
           : NaN;
         return { n, mean, sd, median, min, max, skew, kurt, vector: vec };
       }
@@ -1183,12 +1193,14 @@
       });
       
       // Update summary info
-      const totalN = (e.n1 || 0) + (e.n2 || 0);
+      const pairN = parseMaybeNumber(e.completePairs);
+      const scoreN = (parseMaybeNumber(e.n1) || 0) + (parseMaybeNumber(e.n2) || 0);
+      const totalN = isFinite(pairN) && pairN > 0 ? pairN : scoreN;
       const mean1 = parseMaybeNumber(e.mean1) || 0;
       const mean2 = parseMaybeNumber(e.mean2) || 0;
       const n1 = parseMaybeNumber(e.n1) || 0;
       const n2 = parseMaybeNumber(e.n2) || 0;
-      const overallMean = totalN > 0 ? (mean1 * n1 + mean2 * n2) / totalN : 0;
+      const overallMean = scoreN > 0 ? (mean1 * n1 + mean2 * n2) / scoreN : 0;
       
       setText('expTotalN', totalN);
       setText('expOverallMean', fmt(overallMean));

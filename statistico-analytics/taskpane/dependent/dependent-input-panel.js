@@ -115,8 +115,79 @@ function median(a) {
   return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2;
 }
 
-function computePairedT(a, b, alt) {
-  // Compute paired t-test
+function logGamma(z) {
+  const g = 7;
+  const c = [
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7
+  ];
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z);
+  z -= 1;
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (z + i);
+  const t = z + g + 0.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+
+function betaContinuedFraction(a, b, x) {
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  let c = 1;
+  let d = 1 - qab * x / qap;
+  if (Math.abs(d) < 1e-30) d = 1e-30;
+  d = 1 / d;
+  let h = d;
+  for (let m = 1; m <= 200; m++) {
+    const m2 = 2 * m;
+    let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = 1 + aa / c;
+    if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d;
+    h *= d * c;
+    aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d;
+    if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = 1 + aa / c;
+    if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 3e-14) break;
+  }
+  return h;
+}
+
+function regularizedBeta(a, b, x) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const lnBt = logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x);
+  const bt = Math.exp(lnBt);
+  if (x < (a + 1) / (a + b + 2)) return bt * betaContinuedFraction(a, b, x) / a;
+  return 1 - bt * betaContinuedFraction(b, a, 1 - x) / b;
+}
+
+function twoSidedStudentP(t, df) {
+  if (!isFinite(t) || !(df > 0)) return NaN;
+  return regularizedBeta(df / 2, 0.5, df / (df + t * t));
+}
+
+function studentTCritical(df, twoSidedAlpha) {
+  let lo = 0;
+  let hi = 80;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (twoSidedStudentP(mid, df) > twoSidedAlpha) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+function computePairedT(a, b, alt, confidence) {
+  // Paired t on complete differences: mean(a - b) against a Student t reference.
   const diffs = [];
   const minLen = Math.min(a.length, b.length);
   for (let i = 0; i < minLen; i++) {
@@ -124,26 +195,27 @@ function computePairedT(a, b, alt) {
     if (isFinite(d)) diffs.push(d);
   }
   const n = diffs.length;
-  if (n < 2) return { t: NaN, df: 0, p: NaN, diff: NaN };
+  if (n < 2) return { t: NaN, df: 0, p: NaN, diff: NaN, ciLow: NaN, ciHigh: NaN };
   const m = mean(diffs);
   const s = sd(diffs);
   const se = s / Math.sqrt(n);
   const t = se > 0 ? m / se : 0;
   const df = n - 1;
-  // Simple z-approximation for p-value
-  const z = Math.abs(t);
-  const erf = (x) => {
-    const sign = x < 0 ? -1 : 1;
-    const ax = Math.abs(x);
-    const t = 1 / (1 + 0.3275911 * ax);
-    const y = 1 - (((((1.061405429 * t + -1.453152027) * t + 1.421413741) * t + -0.284496736) * t + 0.254829592) * t * Math.exp(-ax * ax));
-    return sign * y;
+  const pTwo = se > 0 ? twoSidedStudentP(t, df) : 1;
+  let p = pTwo;
+  if (alt === "greater") p = t >= 0 ? pTwo / 2 : 1 - pTwo / 2;
+  if (alt === "less") p = t <= 0 ? pTwo / 2 : 1 - pTwo / 2;
+  const level = Number(confidence);
+  const conf = isFinite(level) && level > 0 && level < 1 ? level : 0.95;
+  const half = se > 0 ? studentTCritical(df, 1 - conf) * se : 0;
+  return {
+    t: t,
+    df: df,
+    p: Math.max(0, Math.min(1, p)),
+    diff: m,
+    ciLow: m - half,
+    ciHigh: m + half
   };
-  const normalCdf = (z) => 0.5 * (1 + erf(z / Math.sqrt(2)));
-  let p = 2 * (1 - normalCdf(z));
-  if (alt === "greater") p = 1 - normalCdf(t);
-  if (alt === "less") p = normalCdf(t);
-  return { t, df, p: Math.max(0, Math.min(1, p)), diff: m };
 }
 
 function computeWilcoxon(a, b, alt) {
@@ -183,7 +255,9 @@ function computeWilcoxon(a, b, alt) {
   let p = 2 * (1 - normalCdf(Math.abs(z)));
   if (alt === "greater") p = 1 - normalCdf(z);
   if (alt === "less") p = normalCdf(z);
-  return { w: wPlus, p: Math.max(0, Math.min(1, p)) };
+  const rankTotal = n * (n + 1) / 2;
+  const rankBiserial = rankTotal > 0 ? (2 * wPlus / rankTotal) - 1 : NaN;
+  return { w: wPlus, p: Math.max(0, Math.min(1, p)), rankBiserial: rankBiserial };
 }
 
 function computeRepeatedMeasuresANOVA(headers, rows, selectedColumns, primaryFramework, posthocMethod, posthocCorrection) {
@@ -1165,7 +1239,7 @@ function buildDependentBundle(headers, rows, spec) {
   console.log(`Two-timepoint analysis: Total rows: ${totalRows}, Complete pairs: ${completePairs}, Missing: ${missingPairs} (${missingPct.toFixed(1)}%)`);
   
   const alt = spec.hypothesis || "two-sided";
-  const paired = computePairedT(t1, t2, alt);
+  const paired = computePairedT(t1, t2, alt, spec.confidence || 0.95);
   const wilcoxon = computeWilcoxon(t1, t2, alt);
   
   const n1 = t1.length, n2 = t2.length;
@@ -1217,12 +1291,14 @@ function buildDependentBundle(headers, rows, spec) {
       pairedDf: paired.df,
       pairedP: paired.p,
       meanDiff: paired.diff,
+      ciLow: paired.ciLow,
+      ciHigh: paired.ciHigh,
       wilcoxonW: wilcoxon.w,
       wilcoxonP: wilcoxon.p
     },
     effects: {
       hedgesG: g,
-      rankBiserial: wilcoxon.w / Math.max(1, n1)
+      rankBiserial: wilcoxon.rankBiserial
     },
     report: {
       apaPaired: `Paired t-test showed ${paired.p < 0.05 ? "a significant" : "no significant"} change, t(${paired.df})=${paired.t.toFixed(2)}, p=${paired.p.toFixed(4)}.`,

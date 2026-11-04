@@ -2113,8 +2113,8 @@ const StatisticoHeader = {
     if (this.module === 'dependent') {
       const isKplus = this.currentView === 'dependent-results-kplus';
       const analysisItems = [
-        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: isKplus ? 'Overview' : 'Test Results', active: true },
-        { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' }
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: isKplus ? 'Overview' : 'Test Results', description: isKplus ? 'Repeated-measures omnibus result.' : 'Paired t and the signed-rank check.', active: true },
+        { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions', description: isKplus ? 'Sphericity and the repeated-measures checks.' : 'What the change scores need to satisfy.' }
       ];
       if (isKplus) {
         analysisItems.splice(1, 0, { type: 'tab', tab: 'trajectories', icon: 'fa-chart-line', label: 'Trajectories' });
@@ -2122,19 +2122,19 @@ const StatisticoHeader = {
       }
       if (isKplus) {
         analysisItems.push(
-          { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
-          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power & Sample Size' }
+          { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes', description: 'Effect sizes for the repeated-measures result.' },
+          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Sample-size planning for repeated measures.' }
         );
       } else {
         analysisItems.push(
-          { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
-          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' },
-          { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'APA Report' }
+          { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes', description: 'Effect sizes printed beside the paired result.' },
+          { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis', description: 'Not calculated on this two-occasion page.' },
+          { type: 'tab', tab: 'report', icon: 'fa-file-lines', label: 'APA Report', description: 'Written paired result.' }
         );
       }
       return {
         logoIcon: 'fa-clock-rotate-left',
-        logoSub: 'Repeated',
+        logoSub: isKplus ? 'Repeated' : 'Paired',
         menuTitle: 'Menu',
         groups: [
           {
@@ -2144,7 +2144,7 @@ const StatisticoHeader = {
           {
             title: 'Tools',
             items: [
-              { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Descriptives' }
+              { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Descriptives', description: isKplus ? 'Occasion summaries for the repeated design.' : 'Occasion summaries and the complete-pair count.' }
             ]
           }
         ]

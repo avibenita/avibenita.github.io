@@ -14,11 +14,11 @@ node assemble.mjs
 
 ## Outputs
 
-- `04_review/contingency__film__review-r001.mp4` — 20.4 MB, 1728×1080, 30 fps, H.264 High, AAC 48 kHz stereo, 3:55.17, faststart.
+- `04_review/contingency__film__review-r001.mp4` — 32.3 MB, 1728×1080, 30 fps, H.264 High, AAC 48 kHz stereo, 4:05.07, faststart.
 - `04_review/contingency__capabilities_two_cards__r001.mp4` — 4.5 MB, silent, 44.8 s.
 - Narration stem after loudnorm: integrated −16.7 LUFS, true peak −1.5 dBFS.
 
-The review is longer than the 3:15–3:30 aim. Speech was left at Aria −4% and the holds were not cut to force the target. CapCut can shorten the silent holds.
+The review is longer than the 3:15–3:30 aim. Speech was left at Aria −4%. Section changes use a short navy light-sweep, and the picture eases in on the menu, table, measures, residuals, and chart. CapCut can shorten the silent holds.
 
 ## Reference checks
 

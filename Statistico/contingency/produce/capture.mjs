@@ -421,6 +421,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const scenes = [];
   const checks = [];
+  const wanted = new Set(process.argv.slice(2).filter((arg) => arg !== 'probe'));
   try {
     const jobs = [
       ['open', (page, api) => brand(page, 'open.html', 4, api)],
@@ -432,6 +433,15 @@ async function main() {
       ['sparse', sparse],
       ['card1', (page, api) => brand(page, 'cards.html?card=1', 25, api)],
       ['card2', (page, api) => brand(page, 'cards.html?card=2', 19, api)],
+      ['bridge', (page, api) => brand(page, 'bridge.html', 1.2, api)],
+      ['thanks', async (page, api) => {
+        await page.goto(`${BASE}/Statistico/contingency/produce/thanks.html`, { waitUntil: 'load' });
+        await page.evaluate(() => document.body.classList.add('go'));
+        api.mark();
+        await page.waitForTimeout(PROBE ? 120 : 420);
+        await api.say('thanks-1');
+        await page.waitForTimeout(PROBE ? 120 : 750);
+      }],
       ['close', async (page, api) => {
         await page.goto(`${BASE}/Statistico/contingency/produce/close.html`, { waitUntil: 'load' });
         await page.evaluate(() => document.body.classList.add('go'));
@@ -440,22 +450,31 @@ async function main() {
         await api.say('close-1');
         await page.waitForTimeout(PROBE ? 200 : 1100);
       }]
-    ];
+    ].filter(([name]) => !wanted.size || wanted.has(name));
     for (const [name, fn] of jobs) {
       process.stdout.write(`scene ${name}\n`);
       scenes.push(await recordScene(browser, name, fn));
     }
-    const group = await browser.newPage({ viewport: { width: 1728, height: 1080 } });
-    await group.goto(`${BASE}/statistico-analytics/dialogs/views/contingency/by-group.html?demo=1`, { waitUntil: 'domcontentloaded' });
-    await group.waitForTimeout(1800);
-    await group.screenshot({ path: path.join(WORK, 'qa', 'by-group.png') });
-    checks.push({ byGroup: (await group.locator('body').innerText()).slice(0, 400) });
-    await group.close();
+    if (!wanted.size) {
+      const group = await browser.newPage({ viewport: { width: 1728, height: 1080 } });
+      await group.goto(`${BASE}/statistico-analytics/dialogs/views/contingency/by-group.html?demo=1`, { waitUntil: 'domcontentloaded' });
+      await group.waitForTimeout(1800);
+      await group.screenshot({ path: path.join(WORK, 'qa', 'by-group.png') });
+      checks.push({ byGroup: (await group.locator('body').innerText()).slice(0, 400) });
+      await group.close();
+    }
   } finally {
     await browser.close();
     server.close();
   }
-  fs.writeFileSync(path.join(WORK, 'scenes.json'), JSON.stringify(scenes, null, 2));
+  const scenePath = path.join(WORK, 'scenes.json');
+  const order = ['open', 'orient', 'percent', 'twobytwo', 'segments', 'pattern', 'sparse', 'card1', 'card2', 'bridge', 'thanks', 'close'];
+  let previous = [];
+  try { previous = JSON.parse(fs.readFileSync(scenePath, 'utf8')); } catch { previous = []; }
+  const byId = new Map(previous.map((scene) => [scene.id, scene]));
+  for (const scene of scenes) byId.set(scene.id, scene);
+  const merged = order.map((id) => byId.get(id)).filter(Boolean);
+  fs.writeFileSync(scenePath, JSON.stringify(merged, null, 2));
   fs.writeFileSync(path.join(WORK, 'checks.json'), JSON.stringify(checks, null, 2));
   console.log(JSON.stringify(scenes.map((s) => ({ id: s.id, trim: s.trim, cues: s.cues })), null, 2));
 }

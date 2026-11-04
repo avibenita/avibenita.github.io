@@ -17,6 +17,7 @@ Voice: en-US-AriaNeural at −4%. Scene clips are in `03_audio/`. Spoken text is
 | pat-1 | The overall test does not tell us where the pattern lies. Adjusted residuals identify combinations occurring more or less often than independence predicts. Here, low satisfaction is over-represented in Basic, while high satisfaction is over-represented in Premium. |
 | pat-2 | The percentage chart makes that contrast easier to compare. |
 | sparse-1 | With small expected counts, the chi-square approximation needs caution. For a two-by-two table, Fisher's exact test provides an alternative. |
+| thanks-1 | Thank you for watching. |
 | close-1 | Explore categorical relationships. Understand the difference. |
 
 On-screen takeaways, not spoken:

@@ -284,19 +284,25 @@
     }
 
     .network-label{
-      font-size:9px;
+      font-size:11px;
       font-weight:600;
       fill:var(--accent-1);
       text-anchor:middle;
       pointer-events:none;
       user-select:none;
+      paint-order:stroke;
+      stroke:var(--surface-1,#1a2332);
+      stroke-width:3px;
     }
 
     .network-corr-label{
-      font-size:8px;
+      font-size:10px;
       fill:var(--text-secondary);
       pointer-events:none;
       text-anchor:middle;
+      paint-order:stroke;
+      stroke:var(--surface-1,#1a2332);
+      stroke-width:3px;
     }
 
     .network-corr-label.dimmed{
@@ -861,7 +867,7 @@
         .enter().append("text")
         .attr("class", "network-label")
         .text(d => d.id)
-        .attr("dy", NETWORK_LABEL_OFFSET);
+        .attr("dy", "0.35em");
 
       function applyNetworkTick() {
         link
@@ -870,17 +876,31 @@
           .attr("x2", d => d.target.x)
           .attr("y2", d => d.target.y);
 
-        linkLabels
-          .attr("x", d => (d.source.x + d.target.x) / 2)
-          .attr("y", d => (d.source.y + d.target.y) / 2);
+        linkLabels.each(function (d) {
+          const sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y;
+          const mx = (sx + tx) / 2;
+          const my = (sy + ty) / 2;
+          const edx = tx - sx;
+          const edy = ty - sy;
+          const elen = Math.hypot(edx, edy) || 1;
+          d3.select(this)
+            .attr("x", mx + (-edy / elen) * 14)
+            .attr("y", my + (edx / elen) * 14);
+        });
 
         node
           .attr("cx", d => d.x)
           .attr("cy", d => d.y);
 
-        labels
-          .attr("x", d => d.x)
-          .attr("y", d => d.y);
+        labels.each(function (d) {
+          const dx = d.x - width / 2;
+          const dy = d.y - height / 2;
+          const len = Math.hypot(dx, dy) || 1;
+          const gap = NETWORK_NODE_RADIUS + 22;
+          d3.select(this)
+            .attr("x", d.x + (dx / len) * gap)
+            .attr("y", d.y + (dy / len) * gap);
+        });
 
         nodes.forEach(d => networkNodePositions.set(d.id, { x: d.x, y: d.y }));
       }

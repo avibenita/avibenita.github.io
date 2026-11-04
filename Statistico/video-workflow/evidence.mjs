@@ -64,11 +64,18 @@ export function detectSilence(ffmpeg, file) {
 
 export function classifySilence(intervals, scenes, duration) {
   const findings = [];
-  for (const interval of intervals) {
+  for (const interval of intervals || []) {
     const end = interval.end ?? duration;
-    const intentional = (scenes || []).find((scene) => scene.intentionalSilence && overlapRatio(interval.start, end, scene.start, scene.end) >= 0.6);
+    const sceneEnd = (scene) => scene.end ?? duration;
+    const intentional = (scenes || []).find((scene) => scene.intentionalSilence && overlapRatio(interval.start, end, scene.start, sceneEnd(scene)) >= 0.6);
     if (intentional) continue;
-    const speech = (scenes || []).find((scene) => !scene.intentionalSilence && overlapRatio(interval.start, end, scene.start, scene.end) >= 0.5);
+    const speech = (scenes || []).find((scene) => {
+      if (scene.intentionalSilence) return false;
+      const span = Math.max(0.001, sceneEnd(scene) - scene.start);
+      const overlap = Math.max(0, Math.min(end, sceneEnd(scene)) - Math.max(interval.start, scene.start));
+      const eatsOpening = interval.start <= scene.start + span * 0.25;
+      return eatsOpening && overlap / span >= 0.5;
+    });
     if (speech) {
       findings.push({
         id: `silence-${speech.id}`,
@@ -183,22 +190,33 @@ export async function packageEvidence({ ffmpeg, mp4, manifest, moduleConfig, run
   return evidence;
 }
 
-function normalizeScenes(manifest, duration, moduleConfig) {
-  const source = manifest?.scenes || manifest?.starts || [];
-  if (Array.isArray(source) && source.length && source[0].id) {
-    return source.map((scene) => ({
-      id: scene.id,
-      start: Number(scene.start || 0),
-      end: Number(scene.end ?? (Number(scene.start || 0) + Number(scene.duration || 0))),
-      holdSeconds: scene.holdSeconds ?? null,
-      intentionalSilence: Boolean(scene.intentionalSilence || (moduleConfig.intentionalSilenceSceneIds || []).includes(scene.id))
-    }));
+export function normalizeScenes(manifest, duration, moduleConfig) {
+  const listed = Array.isArray(manifest?.scenes) ? manifest.scenes : [];
+  const starts = manifest?.starts && typeof manifest.starts === 'object' && !Array.isArray(manifest.starts) ? manifest.starts : null;
+  if (listed.length && listed[0]?.id) {
+    return listed.filter((scene) => scene.id !== 'bridge').map((scene) => {
+      const mapped = starts && starts[scene.id] != null ? Number(starts[scene.id]) : null;
+      const start = scene.start != null ? Number(scene.start) : (mapped ?? 0);
+      const end = scene.end != null
+        ? Number(scene.end)
+        : start + Number(scene.duration || 0);
+      return {
+        id: scene.id,
+        start,
+        end: end || duration || start,
+        holdSeconds: scene.holdSeconds ?? null,
+        intentionalSilence: Boolean(
+          scene.intentionalSilence
+          || (moduleConfig.intentionalSilenceSceneIds || []).includes(scene.id)
+          || (Array.isArray(scene.cues) && scene.cues.length === 0)
+        )
+      };
+    });
   }
-  const starts = manifest?.starts || {};
-  return Object.keys(starts).map((id) => ({
+  return Object.keys(starts || {}).map((id) => ({
     id,
     start: Number(starts[id]),
-    end: null,
+    end: duration || null,
     holdSeconds: null,
     intentionalSilence: (moduleConfig.intentionalSilenceSceneIds || []).includes(id)
   }));

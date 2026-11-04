@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { packageEvidence, DETECTION_LIMITS, makeClip } from './evidence.mjs';
+import { packageEvidence, classifySilence, normalizeScenes, DETECTION_LIMITS, makeClip } from './evidence.mjs';
 import { finish } from './report.mjs';
 import { dryRunLines, produceCandidate } from './producer.mjs';
 import { estimateReviewUsd, requiredIssues, reviewWithOpenAI, transcribeMp4, validateReview } from './reviewer.mjs';
@@ -109,9 +109,11 @@ export async function runAuto(options) {
     while (reviewRound < limits.maxCandidateReviews) {
       const candidate = state.candidates[state.candidates.length - 1];
       if (reviewRound > 0) say(log, 'Checking revised film');
+      const evidencePath = path.join(runDir, 'evidence', `v${candidate.round}`, 'evidence.json');
       const evidence = state.completed[`evidence-${candidate.round}`]
-        ? readJson(path.join(runDir, 'evidence', `v${candidate.round}`, 'evidence.json'))
+        ? readJson(evidencePath)
         : await buildEvidence({ root, config, limits, runDir, candidate, state, adapters, options });
+      if (repairCollapsedTimeline(evidence, candidate.manifest, config)) writeJson(evidencePath, evidence);
       state.completed[`evidence-${candidate.round}`] = true;
       candidate.technicalOk = !evidence.technicalIssues?.length && !evidence.silenceFindings?.length;
       save();
@@ -127,6 +129,7 @@ export async function runAuto(options) {
       if (!state.openIssues.length && !evidence.technicalIssues?.length && !evidence.silenceFindings?.length) {
         state.status = 'READY_FOR_HUMAN_REVIEW';
         state.recommended = candidate.mp4;
+        state.stoppedReason = undefined;
         say(log, 'Ready for your review');
         break;
       }
@@ -156,7 +159,13 @@ export async function runAuto(options) {
       say(log, `Applying revision ${revisionIndex} of ${limits.maxRevisionRounds}`);
       const applied = await applyRevision({ root, config, limits, runDir, issues: state.openIssues, adapters, options });
       state.revisions.push({ round: revisionIndex, ...applied });
-      if (!applied.accepted) throw stop(applied.summary, 'blocked');
+      if (!applied.accepted) {
+        if (applied.unattendedBlocked) {
+          state.recommended = candidate.mp4;
+          throw stop(`${applied.summary} The reviewed candidate was kept and was not re-recorded.`, 'NEEDS_HUMAN_REVIEW');
+        }
+        throw stop(applied.summary, 'blocked');
+      }
       const next = await renderRound({ root, config, runDir, round: candidate.round + 1, log, adapters, state, options });
       state.candidates.push(next);
       save();
@@ -188,6 +197,18 @@ function stop(reason, statusCode) {
   error.reason = reason;
   error.statusCode = statusCode;
   return error;
+}
+
+function repairCollapsedTimeline(evidence, manifest, moduleConfig) {
+  const starts = manifest?.starts;
+  if (!starts || Array.isArray(starts) || !evidence?.scenes?.length) return false;
+  const collapsed = evidence.scenes.some((scene) => scene.id !== 'open' && scene.id !== 'bridge' && Number(scene.start) === 0 && Number(starts[scene.id]) > 0.05);
+  if (!collapsed) return false;
+  const scenes = normalizeScenes(manifest, evidence.probe?.duration || 0, moduleConfig);
+  if (!scenes.length) return false;
+  evidence.scenes = scenes;
+  evidence.silenceFindings = classifySilence(evidence.silence || [], scenes, evidence.probe?.duration || 0);
+  return true;
 }
 
 function earlierCandidate(state) {
@@ -254,9 +275,10 @@ async function obtainReview({ evidence, config, limits, root, runDir, round, pre
           apiKey: process.env.OPENAI_API_KEY
         });
       } catch (error) {
-        if (error.code === 'AUTH' || error.status === 401) throw error;
+        if (error.code === 'AUTH' || error.code === 'QUOTA' || error.status === 401) throw error;
         evidence.transcript = { status: 'failed', reason: error.message };
       }
+      if (evidence.frameDir) writeJson(path.join(evidence.frameDir, 'evidence.json'), evidence);
     }
     result = await reviewWithOpenAI({
       evidence,
@@ -306,7 +328,7 @@ async function applyRevision({ root, config, limits, runDir, issues, adapters })
     writeRevisionInstructions(runDir, request, proposal.proposal || proposal.reason);
     summary = proposal.reason || ISOLATION_NOTE;
     restoreBytes(root, before, watched);
-    return { round: issues.length, accepted: false, summary, changes: [] };
+    return { round: issues.length, accepted: false, unattendedBlocked: !proposal.available, summary, changes: [] };
   }
   const changes = diffBytes(root, before, watched);
   const gate = acceptChanges(changes, config.permittedPrefixes || [], config.protectedPrefixes || []);

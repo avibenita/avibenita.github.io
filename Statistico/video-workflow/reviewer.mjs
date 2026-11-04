@@ -1,5 +1,15 @@
 import fs from 'fs';
 import path from 'path';
+import tls from 'node:tls';
+
+function trustSystemCertificates() {
+  if (typeof tls.getCACertificates !== 'function' || typeof tls.setDefaultCACertificates !== 'function') return;
+  const system = tls.getCACertificates('system');
+  if (!system?.length) return;
+  tls.setDefaultCACertificates([...tls.getCACertificates('default'), ...system]);
+}
+
+trustSystemCertificates();
 
 export const REVIEW_SCHEMA = {
   type: 'object',
@@ -92,20 +102,26 @@ export function estimateReviewUsd(limits, imageCount, audioSeconds) {
 export async function transcribeMp4({ ffmpeg, ffmpegText, mp4, runDir, limits, apiKey }) {
   const wav = path.join(runDir, 'speech-for-transcript.wav');
   ffmpegText(ffmpeg, ['-y', '-i', mp4, '-vn', '-ac', '1', '-ar', '16000', wav]);
-  const form = new FormData();
   const bytes = fs.readFileSync(wav);
-  form.append('file', new Blob([bytes], { type: 'audio/wav' }), 'speech.wav');
-  form.append('model', limits.transcriptionModel || 'whisper-1');
-  form.append('response_format', 'verbose_json');
-  form.append('timestamp_granularities[]', 'segment');
-  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-    signal: AbortSignal.timeout(limits.requestTimeoutMs || 120000)
+  const text = await withRetry(limits, async () => {
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: 'audio/wav' }), 'speech.wav');
+    form.append('model', limits.transcriptionModel || 'whisper-1');
+    form.append('response_format', 'verbose_json');
+    form.append('timestamp_granularities[]', 'segment');
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${bearer(apiKey)}` },
+      body: form,
+      signal: AbortSignal.timeout(Math.max(limits.requestTimeoutMs || 120000, 180000))
+    });
+    const bodyText = await response.text();
+    if (!response.ok) {
+      const error = httpError('transcription', response.status, bodyText);
+      throw error;
+    }
+    return bodyText;
   });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`transcription failed (${response.status}): ${redact(text)}`);
   const body = JSON.parse(text);
   return {
     status: 'measured',
@@ -177,10 +193,11 @@ function batchPrompt(evidence, standards, previousIssues, round, batch) {
   return [
     `Candidate round ${round}. MP4 hash ${evidence.sha256}. Duration ${evidence.probe?.duration}s. ${evidence.probe?.width}x${evidence.probe?.height} at ${evidence.probe?.fps} fps.`,
     `Scenes: ${JSON.stringify(evidence.scenes)}`,
-    `Measured loudness: ${JSON.stringify(evidence.loudness)}`,
+    `Measured loudness: ${JSON.stringify({ integratedLufs: evidence.loudness?.integratedLufs, peakDbfs: evidence.loudness?.peakDbfs })}`,
     `Silence findings: ${JSON.stringify(evidence.silenceFindings)}`,
     `Technical issues: ${JSON.stringify(evidence.technicalIssues)}`,
     `Numerical check: ${JSON.stringify(evidence.numerical)}`,
+    `Transcript: ${transcriptNote(evidence.transcript)}`,
     `Unsampled intervals: ${JSON.stringify(evidence.unsampled)}`,
     `Previous required issue ids: ${(previousIssues || []).map((issue) => issue.id).join(', ') || 'none'}`,
     `Frame files in this batch, in order: ${batch.map((file) => path.basename(file)).join(', ')}`,
@@ -188,28 +205,94 @@ function batchPrompt(evidence, standards, previousIssues, round, batch) {
   ].join('\n');
 }
 
-async function completeReview(apiKey, limits, messages) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: limits.reviewModel,
-      messages,
-      response_format: { type: 'json_schema', json_schema: { name: 'video_review', strict: true, schema: REVIEW_SCHEMA } },
-      max_completion_tokens: 4000
-    }),
-    signal: AbortSignal.timeout(limits.requestTimeoutMs || 120000)
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    const error = new Error(`review request failed (${response.status}): ${redact(text).slice(0, 800)}`);
-    error.status = response.status;
-    if (response.status === 401 || response.status === 403 || response.status === 402) error.code = 'AUTH';
+function transcriptNote(transcript) {
+  if (!transcript?.segments?.length) return transcript?.status === 'failed' ? `not measured (${transcript.reason || 'transcription failed'})` : 'not measured';
+  const lines = transcript.segments.map((segment) => `${segment.start}-${segment.end}s ${segment.text}`).join('\n');
+  return `${transcript.status}. Segment times are measured from the rendered audio, not from the script.\n${lines}`.slice(0, 12000);
+}
+
+function bearer(apiKey) {
+  let key = String(apiKey || '').trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) key = key.slice(1, -1).trim();
+  if (!key) {
+    const error = new Error('OPENAI_API_KEY is not set');
+    error.code = 'AUTH';
     throw error;
   }
+  return key;
+}
+
+function publicCause(error) {
+  const cause = error?.cause;
+  const codes = [];
+  if (cause?.code) codes.push(String(cause.code));
+  if (Array.isArray(cause?.errors)) {
+    for (const item of cause.errors) if (item?.code) codes.push(String(item.code));
+  }
+  const detail = cause?.message ? redact(cause.message).slice(0, 180) : '';
+  return [redact(error?.message || 'request failed'), codes.join(', '), detail].filter(Boolean).join(' | ');
+}
+
+function httpError(kind, status, bodyText) {
+  const redacted = redact(bodyText);
+  const quota = status === 429 && /insufficient_quota|credit_balance_exhausted|no credits remaining/i.test(redacted);
+  const error = new Error(quota
+    ? 'OpenAI credits are exhausted, so this review cannot run. Add credits, then resume the same run. Recording was not repeated.'
+    : `${kind} request failed (${status}): ${redacted.slice(0, 500)}`);
+  error.status = status;
+  if (status === 401 || status === 403 || status === 402) error.code = 'AUTH';
+  if (quota) error.code = 'QUOTA';
+  return error;
+}
+
+function retryable(error) {
+  if (error?.code === 'AUTH' || error?.code === 'QUOTA') return false;
+  const status = error?.status;
+  if (status === 400 || status === 401 || status === 402 || status === 403) return false;
+  if (status === 408 || status === 409 || status === 429 || status >= 500) return true;
+  return !status && /fetch failed|network|timeout|aborted|ECONNRESET|ETIMEDOUT|UND_ERR|EAI_AGAIN/i.test(publicCause(error));
+}
+
+async function withRetry(limits, fn) {
+  const attempts = 1 + (Number(limits.transientRetries) || 0);
+  let last;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      last = error;
+      if (!retryable(error) || attempt === attempts - 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+    }
+  }
+  if (last && !last.status) {
+    const wrapped = new Error(publicCause(last));
+    wrapped.code = last.code;
+    throw wrapped;
+  }
+  throw last;
+}
+
+async function completeReview(apiKey, limits, messages) {
+  const text = await withRetry(limits, async () => {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${bearer(apiKey)}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: limits.reviewModel,
+        messages,
+        response_format: { type: 'json_schema', json_schema: { name: 'video_review', strict: true, schema: REVIEW_SCHEMA } },
+        max_completion_tokens: 4000
+      }),
+      signal: AbortSignal.timeout(limits.requestTimeoutMs || 120000)
+    });
+    const bodyText = await response.text();
+    if (!response.ok) throw httpError('review', response.status, bodyText);
+    return bodyText;
+  });
   const body = JSON.parse(text);
   const content = body.choices?.[0]?.message?.content;
   if (!content) throw new Error('empty review response');
@@ -217,5 +300,5 @@ async function completeReview(apiKey, limits, messages) {
 }
 
 function redact(text) {
-  return String(text).replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]');
+  return String(text).replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]').replace(/Bearer\s+\S+/gi, 'Bearer [redacted]');
 }

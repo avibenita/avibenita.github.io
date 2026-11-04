@@ -285,6 +285,10 @@ test('intentional silence is not failed speech, and a speech gap is', () => {
   const gap = classifySilence([{ start: 1, end: 8 }], scenes, 54);
   assert.equal(gap.length, 1);
   assert.equal(gap[0].scene, 'groups');
+  const paced = classifySilence([{ start: 24.3, end: 29.6 }], [{ id: 'orient', start: 5.24, end: 41.47, intentionalSilence: false }], 237);
+  assert.equal(paced.length, 0);
+  const tail = classifySilence([{ start: 227.29, end: 231.11 }], [{ id: 'thanks', start: 225.55, end: 229.75, intentionalSilence: false }], 237);
+  assert.equal(tail.length, 0);
   assert.ok(DETECTION_LIMITS.some((item) => /cropped labels/.test(item)));
 });
 

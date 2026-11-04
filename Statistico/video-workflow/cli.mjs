@@ -2,7 +2,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { runAuto, runDemo } from './controller.mjs';
 import { doctorLines } from './producer.mjs';
-import { REPO_ROOT, SETUP_TEXT, loadModule } from './util.mjs';
+import { REPO_ROOT, loadModule } from './util.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -60,10 +60,7 @@ if (command === 'auto') {
     log: (line) => console.log(line)
   });
   if (result.report) console.log(result.report);
-  if (result.code) {
-    if (!String(result.stoppedReason || '').includes('OPENAI_API_KEY')) console.log(SETUP_TEXT);
-    process.exit(result.code);
-  }
+  if (result.code) process.exit(result.code);
   process.exit(0);
 }
 

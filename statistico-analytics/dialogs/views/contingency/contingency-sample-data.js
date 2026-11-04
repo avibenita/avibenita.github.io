@@ -79,6 +79,55 @@
         ['Placebo', 'Improved', 20],
         ['Placebo', 'No change', 40]
       ]
+    },
+    programme: {
+      id: 'programme',
+      title: 'Simulated programme completion',
+      description: '120 participants. Programme × Completion. Programme A 42/60 completed, Programme B 30/60.',
+      headers: ['Programme', 'Completion'],
+      rows: (function () {
+        var r = [], i;
+        for (i = 0; i < 42; i++) r.push(['Programme A', 'Completed']);
+        for (i = 0; i < 18; i++) r.push(['Programme A', 'Did not complete']);
+        for (i = 0; i < 30; i++) r.push(['Programme B', 'Completed']);
+        for (i = 0; i < 30; i++) r.push(['Programme B', 'Did not complete']);
+        return r;
+      })()
+    },
+    satisfaction: {
+      id: 'satisfaction',
+      title: 'Simulated segment × satisfaction',
+      description: '180 participants. Segment × Satisfaction. Every independence expected count is 20.',
+      headers: ['Segment', 'Satisfaction'],
+      rows: (function () {
+        var r = [], i;
+        var cells = [
+          ['Basic', 'Low', 30], ['Basic', 'Medium', 18], ['Basic', 'High', 12],
+          ['Standard', 'Low', 18], ['Standard', 'Medium', 24], ['Standard', 'High', 18],
+          ['Premium', 'Low', 12], ['Premium', 'Medium', 18], ['Premium', 'High', 30]
+        ];
+        cells.forEach(function (c) {
+          for (i = 0; i < c[2]; i++) r.push([c[0], c[1]]);
+        });
+        return r;
+      })()
+    },
+    sparse2x2: {
+      id: 'sparse2x2',
+      title: 'Simulated sparse 2×2',
+      description: '10 participants. All expected counts are 2.5. For the Fisher exact demonstration.',
+      headers: ['Group', 'Result'],
+      rows: (function () {
+        var r = [], i;
+        var cells = [
+          ['Group A', 'Positive', 4], ['Group A', 'Negative', 1],
+          ['Group B', 'Positive', 1], ['Group B', 'Negative', 4]
+        ];
+        cells.forEach(function (c) {
+          for (i = 0; i < c[2]; i++) r.push([c[0], c[1]]);
+        });
+        return r;
+      })()
     }
   };
 

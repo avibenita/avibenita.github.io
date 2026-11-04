@@ -75,7 +75,6 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
       function injectSiteReturnLink() {
         if (window.self !== window.top) return;
-        if (document.getElementById('st-site-return')) return;
         if (!document.getElementById('st-site-return-style')) {
           const style = document.createElement('style');
           style.id = 'st-site-return-style';
@@ -84,23 +83,34 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
             'padding:5px 11px;border-radius:999px;text-decoration:none;font-size:11px;font-weight:700;' +
             'color:#e8f6ff;border:1px solid rgba(120,200,255,.45);background:rgba(120,200,255,.16);white-space:nowrap}' +
             '.sb-nav-footer>.st-site-return{align-self:stretch;justify-content:center;margin:0 12px 10px;box-sizing:border-box}' +
+            '.laptop-frame>.st-site-return{flex:0 0 auto !important;width:auto !important;height:auto !important}' +
             '.st-site-return:hover{filter:brightness(1.12);color:#fff}';
           document.head.appendChild(style);
         }
-        const a = document.createElement('a');
-        a.id = 'st-site-return';
-        a.className = 'st-site-return';
-        const path = (window.location.pathname || '').toLowerCase();
-        const specialized = /\/(publication-tables|multivariable|prepare)\//.test(path);
-        a.href = specialized
-          ? 'https://statistico.live/Statistico-Website/index-Addins.html'
-          : 'https://statistico.live/Statistico-Website/index-Analytics.html';
-        a.innerHTML = specialized ? '← Back to Specialized Tools' : '← Back to Analytics';
-        const bar = document.querySelector('.mv-topbar') || document.querySelector('.cfg-header');
-        const sidebarFooter = document.querySelector('.sb-nav-footer');
-        if (bar) bar.insertBefore(a, bar.firstChild);
-        else if (sidebarFooter) sidebarFooter.insertBefore(a, sidebarFooter.firstChild);
-        else document.body.insertBefore(a, document.body.firstChild);
+        const place = () => {
+          if (document.getElementById('st-site-return')) return true;
+          const bar = document.querySelector('.mv-topbar') || document.querySelector('.cfg-header');
+          const sidebarFooter = document.querySelector('.sb-nav-footer');
+          if (!bar && !sidebarFooter) return false;
+          const a = document.createElement('a');
+          a.id = 'st-site-return';
+          a.className = 'st-site-return';
+          const path = (window.location.pathname || '').toLowerCase();
+          const specialized = /\/(publication-tables|multivariable|prepare)\//.test(path);
+          a.href = specialized
+            ? 'https://statistico.live/Statistico-Website/index-Addins.html'
+            : 'https://statistico.live/Statistico-Website/index-Analytics.html';
+          a.innerHTML = specialized ? '← Back to Specialized Tools' : '← Back to Analytics';
+          if (bar) bar.insertBefore(a, bar.firstChild);
+          else sidebarFooter.insertBefore(a, sidebarFooter.firstChild);
+          return true;
+        };
+        if (place()) return;
+        let tries = 0;
+        const timer = setInterval(() => {
+          tries += 1;
+          if (place() || tries > 40) clearInterval(timer);
+        }, 50);
       }
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', injectSiteReturnLink, { once: true });

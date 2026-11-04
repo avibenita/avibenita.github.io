@@ -426,6 +426,66 @@ describe('Larger contingency tables', () => {
     expect(colSums).toEqual(colTotals);
   });
 
+  test('film fixtures match the programme, satisfaction, and sparse reference values', () => {
+    const Samples = require('./contingency-sample-data.js');
+    function run(id) {
+      const ex = Samples.EXAMPLES[id];
+      return CT.analyze(ex.headers, ex.rows, { rowVar: ex.headers[0], colVar: ex.headers[1], confidence: 0.95 });
+    }
+    const z = CT.zCrit(0.95);
+    const prog = run('programme');
+    expect(prog.representedN).toBe(120);
+    expect(prog.inputRowCount).toBe(120);
+    expect(prog.frequencyWeightingApplied).toBe(false);
+    expect(prog.observed).toEqual([[42, 18], [30, 30]]);
+    expect(prog.expected[0][0]).toBeCloseTo(36, 8);
+    expect(prog.expected[0][1]).toBeCloseTo(24, 8);
+    expect(prog.rowPct[0][0]).toBeCloseTo(70, 8);
+    expect(prog.rowPct[1][0]).toBeCloseTo(50, 8);
+    expect(prog.tests.pearson.stat).toBeCloseTo(5, 8);
+    expect(prog.tests.pearson.df).toBe(1);
+    expect(prog.tests.pearson.p).toBeCloseTo(0.0253473187, 6);
+    expect(prog.measures2x2.riskRatio.value).toBeCloseTo(1.4, 8);
+    expect(prog.measures2x2.oddsRatio.value).toBeCloseTo(2.333333333, 6);
+    expect(prog.measures2x2.oddsRatio.continuityCorrection).toBe(false);
+    expect(prog.measures2x2.riskDifference.value).toBeCloseTo(0.2, 8);
+    const or = prog.measures2x2.oddsRatio;
+    const rr = prog.measures2x2.riskRatio;
+    const rd = prog.measures2x2.riskDifference;
+    expect(or.ciLower).toBeCloseTo(Math.exp(or.logValue - z * or.seLog), 8);
+    expect(rr.ciLower).toBeCloseTo(Math.exp(rr.logValue - z * rr.seLog), 8);
+    expect(rd.ciLower).toBeCloseTo(rd.value - z * rd.se, 8);
+    const flipped = CT.remap2x2(prog, 'Programme B', 'Completed');
+    expect(flipped.measures2x2.riskRatio.value).toBeCloseTo(0.714285714, 6);
+    expect(flipped.measures2x2.oddsRatio.value).toBeCloseTo(0.428571429, 6);
+    expect(flipped.measures2x2.riskDifference.value).toBeCloseTo(-0.2, 8);
+    expect(flipped.measures2x2).toBeTruthy();
+
+    const sat = run('satisfaction');
+    expect(sat.N).toBe(180);
+    expect(sat.nRows).toBe(3);
+    expect(sat.nCols).toBe(3);
+    expect(sat.measures2x2).toBeNull();
+    sat.expected.forEach((row) => row.forEach((cell) => expect(cell).toBeCloseTo(20, 8)));
+    expect(sat.tests.pearson.stat).toBeCloseTo(18, 8);
+    expect(sat.tests.pearson.df).toBe(4);
+    expect(sat.tests.pearson.p).toBeCloseTo(0.00123409804, 6);
+    expect(sat.tests.cramersV).toBeCloseTo(0.223606798, 6);
+    expect(sat.stdResiduals[0][0]).toBeCloseTo(3.354101966, 6);
+    expect(sat.pearsonResiduals[0][0]).toBeCloseTo(2.236067978, 6);
+    expect(sat.stdResiduals[0][2]).toBeCloseTo(-2.683281573, 6);
+    expect(sat.rowPct[0][2]).toBeCloseTo(20, 8);
+    expect(sat.rowPct[1][2]).toBeCloseTo(30, 8);
+    expect(sat.rowPct[2][2]).toBeCloseTo(50, 8);
+
+    const sparse = run('sparse2x2');
+    expect(sparse.N).toBe(10);
+    expect(sparse.expected[0][0]).toBeCloseTo(2.5, 8);
+    expect(sparse.diagnostics.assumptionWarning).toMatch(/chi-square approximation/i);
+    expect(sparse.tests.fisher.available).toBe(true);
+    expect(sparse.tests.fisher.p).toBeCloseTo(0.2063492063, 6);
+  });
+
   test('Monte Carlo p-value is small for a strongly associated table and stable for a seed', () => {
     const observed = [[20, 1, 1], [1, 18, 1], [1, 1, 16]];
     const once = CT.monteCarloIndependence(observed, { nSims: 499, seed: 11 });

@@ -42,11 +42,11 @@ Hedges g puts the same difference on the scale of the variation. Here it is a me
 
 ## power-1
 
-Power planning asks what a future study would need. This planner uses a noncentral F model for two groups. For a hypothetical eta-squared of zero point zero eight three, about a standardised difference of zero point six, and eighty percent power, it calls for eighty-nine participants in total.
+Power planning asks what a future study would need. This planner uses a noncentral F model for two groups. It is not exact Welch power. For a hypothetical eta-squared of zero point zero eight three, about a standardised difference of zero point six, and eighty percent power, it calls for ninety participants, forty-five in each group.
 
 ## power-2
 
-A smaller difference, eta-squared zero point zero three eight, needs a larger study: two hundred and one participants.
+A smaller difference, eta-squared zero point zero three eight, needs a larger study: two hundred and two participants, one hundred and one in each group.
 
 ## power-3
 

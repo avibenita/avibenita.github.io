@@ -289,21 +289,11 @@ function detectTwoVarsDesign(rows, aIdx, bIdx, n1, n2) {
   };
 }
 
-function computeWelch(x, y, alt) {
-  const n1 = x.length, n2 = y.length;
-  const m1 = mean(x), m2 = mean(y);
-  const v1 = variance(x), v2 = variance(y);
-  const se = Math.sqrt((v1 / n1) + (v2 / n2));
-  const t = se > 0 ? (m1 - m2) / se : 0;
-  const num = Math.pow((v1 / n1) + (v2 / n2), 2);
-  const den = (Math.pow(v1 / n1, 2) / Math.max(1, n1 - 1)) + (Math.pow(v2 / n2, 2) / Math.max(1, n2 - 1));
-  const df = den > 0 ? num / den : Math.max(1, n1 + n2 - 2);
-  const z = Math.abs(t);
-  let p = 2 * (1 - normalCdf(z));
-  if (alt === "greater") p = 1 - normalCdf(t);
-  if (alt === "less") p = normalCdf(t);
-  const zcrit = 1.959964;
-  return { t, df, p: Math.max(0, Math.min(1, p)), diff: m1 - m2, ciLow: (m1 - m2) - zcrit * se, ciHigh: (m1 - m2) + zcrit * se };
+function computeWelch(x, y, alt, alpha) {
+  if (!globalThis.StatisticoIndependentContract) {
+    throw new Error("Load independent-contract.js before independent-input-panel.js");
+  }
+  return globalThis.StatisticoIndependentContract.computeWelch(x, y, alt, alpha);
 }
 
 function computeStudent(x, y, alt) {
@@ -356,28 +346,10 @@ function computePermutationT(x, y, alt, iterations) {
 }
 
 function computeMannWhitney(x, y, alt) {
-  const all = [];
-  x.forEach(v => all.push({ v, g: 1 }));
-  y.forEach(v => all.push({ v, g: 2 }));
-  all.sort((a, b) => a.v - b.v);
-  let i = 0;
-  while (i < all.length) {
-    let j = i + 1;
-    while (j < all.length && all[j].v === all[i].v) j++;
-    const r = (i + 1 + j) / 2;
-    for (let k = i; k < j; k++) all[k].rank = r;
-    i = j;
+  if (!globalThis.StatisticoIndependentContract) {
+    throw new Error("Load independent-contract.js before independent-input-panel.js");
   }
-  const r1 = all.filter(d => d.g === 1).reduce((s, d) => s + d.rank, 0);
-  const n1 = x.length, n2 = y.length;
-  const u1 = r1 - (n1 * (n1 + 1)) / 2;
-  const mu = n1 * n2 / 2;
-  const sigma = Math.sqrt(n1 * n2 * (n1 + n2 + 1) / 12);
-  const z = sigma > 0 ? (u1 - mu) / sigma : 0;
-  let p = 2 * (1 - normalCdf(Math.abs(z)));
-  if (alt === "greater") p = 1 - normalCdf(z);
-  if (alt === "less") p = normalCdf(z);
-  return { u: u1, z, p: Math.max(0, Math.min(1, p)) };
+  return globalThis.StatisticoIndependentContract.computeMannWhitney(x, y, alt);
 }
 
 function cliffsDelta(x, y) {
@@ -628,7 +600,8 @@ function buildIndependentBundle(headers, rows, spec) {
     }
   }
   const alt = spec.hypothesis || "two-sided";
-  const welch = computeWelch(g1, g2, alt);
+  const alpha = 1 - Number(spec.confidence || 0.95);
+  const welch = computeWelch(g1, g2, alt, alpha);
   const student = computeStudent(g1, g2, alt);
   const permutation = computePermutationT(g1, g2, alt, spec.permutationIterations || 1200);
   const mw = computeMannWhitney(g1, g2, alt);
@@ -773,7 +746,7 @@ function buildIndependentBundle(headers, rows, spec) {
     },
     results: {
       primary: "Welch t-test",
-      welchT: welch.t, welchDf: welch.df, welchP: welch.p,
+      welchT: welch.t, welchDf: welch.df, welchP: welch.p, welchSe: welch.se,
       studentT: student.t, studentDf: student.df, studentP: student.p,
       permutationP: permutation.p, permutationIterations: permutation.iterations,
       meanDiff: welch.diff, ciLow: welch.ciLow, ciHigh: welch.ciHigh,
@@ -782,7 +755,9 @@ function buildIndependentBundle(headers, rows, spec) {
       posthoc
     },
     effects: {
-      hedgesG: g, cliffsDelta: delta, rankBiserial: rrb, probabilitySuperiority: ps
+      hedgesG: g, cliffsDelta: delta, rankBiserial: rrb, probabilitySuperiority: ps,
+      etaSquared: globalThis.StatisticoIndependentContract.etaSquared(g1, g2),
+      eta2: globalThis.StatisticoIndependentContract.etaSquared(g1, g2)
     },
     power: {
       note: "Python-backed power endpoint can be attached to this panel.",

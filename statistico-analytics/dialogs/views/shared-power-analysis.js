@@ -91,6 +91,14 @@
     return Math.max(0, Math.min(1, 1 - noncentralFCdf(fcrit, df1, df2, ncp)));
   }
 
+  function balanceGroupTotal(n, k) {
+    n = Number(n);
+    k = Number(k);
+    if (!isFinite(n) || n <= 0 || !isFinite(k) || k < 2) return n;
+    var rem = n % k;
+    return rem === 0 ? n : n + (k - rem);
+  }
+
   function estimateRequiredN(f2, df1, minN, df2AtN, targetPower, alpha) {
     if (!f2 || f2 <= 0 || !df1 || df1 < 1) return 0;
     var nMin = Math.max(minN, df2AtN(minN) >= 1 ? minN : minN + 1);
@@ -184,7 +192,9 @@
     }
 
     function computeRequiredN(ctx, targetPower) {
-      return estimateRequiredN(ctx.f2, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, targetPower, ctx.alpha);
+      var n = estimateRequiredN(ctx.f2, ctx.df1, minN(ctx), function (nn) { return df2AtN(ctx, nn); }, targetPower, ctx.alpha);
+      if (cfg.balanceGroups) n = balanceGroupTotal(n, ctx.k);
+      return n;
     }
 
     function detectableEffect(ctx, targetPower) {
@@ -1075,12 +1085,14 @@
     var target = global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.getSelectedTargetPower
       ? global.StatisticoPowerTemplate.getSelectedTargetPower()
       : { pct: '85%', power: 0.85 };
-    var reqN = estimateRequiredN(ctx.f2, ctx.df1, Math.max(ctx.k + 1, 8), function (n) { return n - ctx.k; }, target.power, ctx.alpha);
+    var reqN = balanceGroupTotal(estimateRequiredN(ctx.f2, ctx.df1, Math.max(ctx.k + 1, 8), function (n) { return n - ctx.k; }, target.power, ctx.alpha), ctx.k);
     if (!reqN) return 'Select a target power to see required sample size.';
+    var perGroup = ctx.k > 1 && reqN % ctx.k === 0 ? reqN / ctx.k : null;
+    var alloc = perGroup ? (reqN + ' total (' + perGroup + ' per group)') : String(reqN);
     var effectName = ctx.isNonparametric ? 'ε²' : 'η²';
-    return 'Required N at ' + target.pct + ' power is ' + reqN
+    return 'Required N at ' + target.pct + ' power is ' + alloc
       + ' (' + (ctx.testLabel || 'omnibus test') + ', ' + effectName + ' = ' + ctx.effect.toFixed(3)
-      + ', current total N = ' + ctx.n + ' across ' + ctx.k + ' groups).';
+      + ', current total N = ' + ctx.n + ' across ' + ctx.k + ' groups). This is a balanced noncentral-F allocation, not exact Welch power.';
   }
 
   function independentEngineNote(ctx) {
@@ -1382,6 +1394,7 @@
         formatPlanningSummary: independentPlanningSummary,
         formatCurveNote: independentCurveNote,
         getContext: function (source) { return independentMeansContext(source); },
+        balanceGroups: true,
         minN: function (ctx) { return Math.max(ctx.k + 1, 8); },
         df2AtN: function (ctx, n) { return n - ctx.k; },
         onCalculate: function (ctx) {

@@ -29,6 +29,7 @@
   <script src="../shared/filter.js?v=20260524e" data-filter-api="1"></script>
 
   <script src="../../../src/shared/js/ai-config.js?v=20260429a"></script>
+  <script src="../../../taskpane/independent/independent-contract.js?v=20261104a"></script>
   <style>
     :root{--surface-0:#0E141B;--surface-1:#242C37;--surface-2:#242C37;--border:#6b7280;--accent-1:rgb(255,165,120);--accent-2:rgb(120,200,255);--text-primary:#fff;--text-secondary:rgba(255,255,255,.82);--text-muted:rgba(255,255,255,.62);--panel-radius:10px;--panel-shadow:0px 4px 20px rgba(0,0,0,.4);--indep-panel-width:70%;--indep-panel-max:920px;--indep-panel-min:520px;}
     /* ── Light Theme ── */
@@ -770,6 +771,11 @@
       });
       syncFrameworkSelectUI(primaryFramework);
     }
+    function refreshDisplayedInterval() {
+      if (!(lastBundle && lastBundle.results)) return;
+      var alphaNow = Number((document.getElementById("setAlpha") || { value: "0.05" }).value || 0.05);
+      updateResultsPanels(lastBundle.results, lastBundle.effects || {}, lastBundle.setup || {}, alphaNow);
+    }
     function recalculateIndependentPower() {
       window._independentPrimaryFramework = primaryFramework;
       if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
@@ -984,7 +990,7 @@
       }
 
       if (primaryParametric) {
-        if (estLbl) estLbl.textContent = "Mean Diff + 95% CI";
+        if (estLbl) estLbl.textContent = "Mean Diff + " + (Math.round((1 - alpha) * 1000) / 10).toString().replace(/\.0$/, "") + "% CI";
         if (effLbl) effLbl.textContent = "Effect Size (Hedges g)";
         if (secEffLbl) secEffLbl.textContent = "Rank-biserial r";
         const chosen = currentPrimaryTest || "welch";
@@ -1012,7 +1018,10 @@
           setText("resPrimaryTest", "Welch t-test");
           setText("resPrimaryStat", "t(" + fmt(r.welchDf) + ") = " + fmt(r.welchT));
           setText("resPrimaryP", fmtP(r.welchP));
-          setText("resPrimaryEstimate", fmt(r.meanDiff) + " [" + fmt(r.ciLow) + ", " + fmt(r.ciHigh) + "]");
+          var span = (typeof StatisticoIndependentContract !== "undefined" && isFinite(parseMaybeNumber(r.welchSe)))
+            ? StatisticoIndependentContract.interval(parseMaybeNumber(r.meanDiff), parseMaybeNumber(r.welchSe), parseMaybeNumber(r.welchDf), alpha)
+            : { lo: r.ciLow, hi: r.ciHigh };
+          setText("resPrimaryEstimate", fmt(r.meanDiff) + " [" + fmt(span.lo) + ", " + fmt(span.hi) + "]");
         }
         
         setText("resEffectSize", fmt(fx.hedgesG) + hedgesMagnitudeLabel(fx.hedgesG));
@@ -1816,6 +1825,7 @@
             var alphaVal = document.getElementById("alphaVal");
             if (alphaVal) alphaVal.textContent = Number(el.value || 0.05).toFixed(3);
             recalculateIndependentPower();
+            refreshDisplayedInterval();
           }
           notifySettingsChanged();
         });
@@ -1824,6 +1834,7 @@
             var alphaVal = document.getElementById("alphaVal");
             if (alphaVal) alphaVal.textContent = Number(el.value || 0.05).toFixed(3);
             recalculateIndependentPower();
+            refreshDisplayedInterval();
           });
         }
       });

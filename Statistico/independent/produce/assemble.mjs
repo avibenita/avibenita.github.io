@@ -4,7 +4,7 @@ import { spawnSync } from 'child_process';
 
 const ROOT = 'e:/OneDrive/GitHub/Statistico/independent';
 const WORK = path.join(ROOT, '04_review/work');
-const AUDIO = path.join(ROOT, '03_audio');
+const AUDIO = process.env.AUDIO_DIR || path.join(ROOT, '03_audio');
 const OUT = path.join(ROOT, '04_review');
 const FFMPEG = process.env.FFMPEG || 'C:/Users/Avi Benita/AppData/Local/Programs/Python/Python314/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v9.0.2.exe';
 const BRIDGE_FADE = 0.38;
@@ -113,7 +113,7 @@ run([
   cardsFile
 ]);
 const cardsDuration = durationOf(cardsFile);
-const cardsOnly = path.join(OUT, 'independent__capabilities_two_cards__r001.mp4');
+const cardsOnly = process.env.CARDS_OUT || path.join(OUT, 'independent__capabilities_two_cards__r001.mp4');
 run([
   '-y', '-i', cardsFile,
   '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p',
@@ -209,7 +209,7 @@ const report = `${check.stderr || ''}`;
 const iMatch = report.match(/I:\s+(-?\d+(?:\.\d+)?)\s+LUFS/g);
 const peakMatch = report.match(/Peak:\s+(-?\d+(?:\.\d+)?)\s+dBFS/g);
 
-const film = path.join(OUT, 'independent__film__review-r001.mp4');
+const film = process.env.FILM_OUT || path.join(OUT, 'independent__film__review-r001.mp4');
 run([
   '-y', '-i', picture, '-i', speechNorm,
   '-map', '0:v:0', '-map', '1:a:0',

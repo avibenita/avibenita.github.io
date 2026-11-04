@@ -132,6 +132,7 @@ async function loadFilm(page) {
     timeout: 45000
   });
   await page.waitForFunction(() => typeof window.populateBundle === 'function' && !!document.querySelector('#sidebarNav'), null, { timeout: 25000 });
+  await page.addScriptTag({ url: `${BASE}/statistico-analytics/taskpane/independent/independent-contract.js` });
   await page.addScriptTag({ url: `${BASE}/statistico-analytics/taskpane/independent/independent-input-panel.js` });
   const shown = await page.evaluate((fixture) => {
     const bundle = buildIndependentBundle(fixture.headers, fixture.rows, fixture.spec);
@@ -170,9 +171,11 @@ async function loadFilm(page) {
         lo: bundle.results.ciLow,
         hi: bundle.results.ciHigh,
         g: bundle.effects.hedgesG,
+        eta: bundle.effects.etaSquared,
         u: bundle.results.u,
         mwP: bundle.results.mwP,
         rrb: bundle.effects.rankBiserial,
+        se: bundle.results.welchSe,
         design: bundle.setup.designValidation && bundle.setup.designValidation.status
       }
     };
@@ -181,8 +184,14 @@ async function loadFilm(page) {
   if (shown.engine.design !== 'independent') throw new Error(`design ${shown.engine.design}: ${shown.design}`);
   near(shown.engine.diff, -6, 1e-4, 'A minus B');
   near(shown.engine.t, -2.32379, 1e-4, 'Welch t');
-  near(shown.engine.p, 0.02013675, 1e-5, 'normal p');
+  near(shown.engine.df, 58, 1e-4, 'Welch df');
+  near(shown.engine.p, 0.02366221481, 1e-6, 'Welch t p');
+  near(shown.engine.lo, -11.16841240, 1e-4, 'Welch CI low');
+  near(shown.engine.hi, -0.8315877291, 1e-4, 'Welch CI high');
   near(shown.engine.g, -0.5922078, 1e-4, 'Hedges g');
+  near(shown.engine.eta, 0.0851735016, 1e-6, 'observed eta-squared');
+  near(shown.engine.u, 309, 1e-6, 'Mann-Whitney U');
+  near(shown.engine.mwP, 0.03710526255, 2e-5, 'Mann-Whitney p');
   return shown;
 }
 
@@ -411,6 +420,31 @@ async function dumpNumbers(browser) {
   await setEta(page, '0.083');
   const back = await readPower(page);
   await clickTab(page, 'results');
+  await page.evaluate(() => {
+    const el = document.getElementById('setAlpha');
+    el.value = '0.01';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForTimeout(300);
+  const alpha01 = await page.evaluate(() => ({
+    p: document.getElementById('resPrimaryP').textContent,
+    est: document.getElementById('resPrimaryEstimate').textContent,
+    label: document.getElementById('resPrimaryEstimateLabel').textContent
+  }));
+  if (!/0\.0237/.test(alpha01.p)) throw new Error(`alpha .01 changed the Welch p: ${alpha01.p}`);
+  const upper = Number((alpha01.est.match(/,\s*([+-]?\d+(?:\.\d+)?)\]/) || [])[1]);
+  if (!(upper > -0.2)) throw new Error(`alpha .01 did not widen the interval: ${alpha01.est}`);
+  if (!/99%/.test(alpha01.label)) throw new Error(`interval label stayed at the old confidence: ${alpha01.label}`);
+  if (String(d60.req) !== '90') throw new Error(`eta .083 required N ${d60.req}, expected balanced 90`);
+  if (String(d40.req) !== '202') throw new Error(`eta .038 required N ${d40.req}, expected balanced 202`);
+  await page.evaluate(() => {
+    const el = document.getElementById('setAlpha');
+    el.value = '0.05';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.waitForTimeout(200);
   await page.click('#fwFrameworkBtn');
   await page.click('#fwFrameworkMenu .fw-select-option[data-value="nonparametric"]');
   await page.waitForTimeout(300);
@@ -431,7 +465,7 @@ async function dumpNumbers(browser) {
     testOptions: [...document.querySelectorAll('#setPrimaryTest option')].map((o) => o.textContent)
   }));
   await shot(page, 'numbers-mw');
-  const report = { shown, observed, d60, d40, back, mw, tools };
+  const report = { shown, observed, d60, d40, back, mw, alpha01, tools };
   fs.writeFileSync(path.join(WORK, 'numbers.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
   await page.close();

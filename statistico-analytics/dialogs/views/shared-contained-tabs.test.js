@@ -39,6 +39,8 @@ describe('shared contained tabs', () => {
     expect(css).toMatch(/border-top:\s*0 !important;/);
     expect(css).toMatch(/\.statistico-shell,\s*\nhtml\[data-tabs="contained"\] \.statistico-shell\.statistico-shell--with-views \{\s*\n\s*margin-bottom:\s*0 !important;/);
     expect(css).toMatch(/border-bottom:\s*2px solid var\(--st-contained-indicator\) !important;/);
+    expect(css).toMatch(/\.ws-chrome--attached:has\(\.view-switcher\)[\s\S]*padding:\s*0 !important;/);
+    expect(css).toMatch(/\.view-container:has\(\.ws-mode-bar\)::before[\s\S]*display:\s*none !important;/);
     expect(header).toMatch(/setAttribute\('data-tabs', next\)/);
     expect(header).toMatch(/shared-contained-tabs\.css/);
     expect(tabsJs).toMatch(/ws-tab-scroll-wrap/);

@@ -98,6 +98,7 @@
 
   var _customTimer = null;
   var _assumeTimer = null;
+  var _sliderFrame = 0;
 
   var CHIPS = [
     { pct: '80',     key: 'req80',     fallback: 'powReq80'      },
@@ -267,7 +268,6 @@
     var subtitle = o.subtitle || (variant === 'mixed'
       ? 'Required subjects, achieved power, and detectable effect'
       : 'Required N, achieved power, and detectable effect');
-    var customHandler = esc(o.customHandler || 'window.StatisticoPowerTemplate.runCustomCompute()');
     var assumeEffectName = variant === 'mixed' ? 'partial η²' : (variant === 'anova' ? 'η²' : 'R²');
     var assumePLabel = variant === 'mixed' ? 'df₁' : (variant === 'anova' ? 'Groups' : 'Predictors');
     var assumeNLabel = variant === 'mixed' ? 'Subjects' : 'N';
@@ -302,13 +302,12 @@
       + '  <div class="pwstd-chip-check"><i class="fa-solid fa-check"></i></div>'
       + '  <div class="pwstd-chip-label">Custom power</div>'
       + '  <div class="pwstd-chip-custom-ctrl" onclick="event.stopPropagation()">'
-      + '    <input class="pwstd-select pwstd-chip-input" type="number" id="' + id(ids,'customInput','customPowerInput') + '"'
-      + ' min="50" max="99" step="1" value="85"'
-      + ' oninput="window.StatisticoPowerTemplate._onCustomInput()" onclick="event.stopPropagation()">'
-      + '    <span class="pwstd-chip-pct">%</span>'
-      + '    <button type="button" class="pwstd-chip-btn" onclick="event.stopPropagation();' + customHandler + '" title="Recalculate">'
-      + '      <i class="fa-solid fa-sync" id="' + id(ids,'customIcon','customPowerIcon') + '"></i>'
-      + '    </button>'
+      + '    <input class="pwstd-power-slider" type="range" id="customPowerSlider"'
+      + ' min="50" max="99" step="1" value="85" style="--pw:71.4%"'
+      + ' aria-label="Custom power" aria-valuemin="50" aria-valuemax="99" aria-valuenow="85"'
+      + ' oninput="window.StatisticoPowerTemplate._onCustomSlider(this.value)">'
+      + '    <span class="pwstd-chip-pct pwstd-chip-pct--live" id="customPowerReadout">85%</span>'
+      + '    <input type="hidden" id="' + id(ids,'customInput','customPowerInput') + '" value="85">'
       + '  </div>'
       + '  <div class="pwstd-chip-metric">' + reqMetricLabel + '</div>'
       + '  <div class="pwstd-chip-value" id="' + customValueId + '">--</div>'
@@ -746,6 +745,34 @@
     }
   }
 
+  function _syncCustomSlider(pct) {
+    pct = Math.max(50, Math.min(99, Math.round(Number(pct))));
+    if (!isFinite(pct)) pct = 85;
+    var inp = document.getElementById('customPowerInput');
+    var readout = document.getElementById('customPowerReadout');
+    var slider = document.getElementById('customPowerSlider');
+    if (inp) inp.value = String(pct);
+    if (readout) readout.textContent = pct + '%';
+    if (slider) {
+      slider.value = String(pct);
+      slider.setAttribute('aria-valuenow', String(pct));
+      slider.style.setProperty('--pw', (((pct - 50) / 49) * 100).toFixed(1) + '%');
+    }
+    return pct;
+  }
+
+  function _selectCustomChip() {
+    var chip = document.querySelector('.pwstd-chip--custom');
+    if (!chip) return;
+    if (!chip.classList.contains('pwstd-chip--selected')) {
+      document.querySelectorAll('.pwstd-chip--selectable').forEach(function (c) {
+        c.classList.remove('pwstd-chip--selected');
+      });
+      chip.classList.add('pwstd-chip--selected');
+    }
+    _updateHeroTargetLabels();
+  }
+
   function _onCustomInput() {
     var customChip = document.querySelector('.pwstd-chip--selected[data-pct="Custom"]');
     if (!customChip) return;
@@ -753,6 +780,22 @@
     var n = valEl ? valEl.textContent : '--';
     _updatePlanningCard('Custom', n);
     _scheduleCustomCompute();
+  }
+
+  function _onCustomSlider(raw) {
+    var pct = _syncCustomSlider(raw);
+    _selectCustomChip();
+    var valEl = document.getElementById('customRequiredN');
+    _updatePlanningCard('Custom', valEl ? valEl.textContent : '…');
+    if (_sliderFrame) return;
+    _sliderFrame = requestAnimationFrame(function () {
+      _sliderFrame = 0;
+      var tpl = window.StatisticoPowerTemplate;
+      if (!tpl || typeof tpl._customComputeFn !== 'function') return;
+      try { tpl._customComputeFn(); }
+      catch (err) { console.error('[StatisticoPowerTemplate] custom slider compute failed:', err); }
+    });
+    return pct;
   }
 
   function _onCustomComplete(n) {
@@ -880,6 +923,7 @@
     },
     _onChipClick:     _onChipClick,
     _onCustomInput:   _onCustomInput,
+    _onCustomSlider:  _onCustomSlider,
     _toggleTechDetails: _toggleTechPanel,
     _onPowerMethodChange: _onPowerMethodChange,
     _toggleTechPanel:   _toggleTechPanel,

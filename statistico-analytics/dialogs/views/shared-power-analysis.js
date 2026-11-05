@@ -94,7 +94,7 @@
   function estimateRequiredN(f2, df1, minN, df2AtN, targetPower, alpha) {
     if (!f2 || f2 <= 0 || !df1 || df1 < 1) return 0;
     var nMin = Math.max(minN, df2AtN(minN) >= 1 ? minN : minN + 1);
-    var nMax = 5000;
+    var nMax = 200000;
     var best = 0;
     for (var iter = 0; iter < 60 && nMin <= nMax; iter++) {
       var n = Math.floor((nMin + nMax) / 2);
@@ -183,12 +183,34 @@
       return powerAtF2(ctx.n, ctx.df1, ctx.df2, ctx.f2, ctx.alpha);
     }
 
+    var reqMemo = Object.create(null);
+    var detMemo = Object.create(null);
+
+    function planKey(ctx, targetPower, extra) {
+      return [
+        Number(targetPower).toFixed(4),
+        extra || '',
+        ctx.f2, ctx.df1, ctx.alpha, ctx.n,
+        ctx.p || '', ctx.k || '', ctx.withIntercept ? 1 : 0,
+        ctx.df2Base || '', ctx.df2Subjects || '',
+        cfg.balanceGroups ? 1 : 0, cfg.variant || ''
+      ].join('|');
+    }
+
     function computeRequiredN(ctx, targetPower) {
-      return estimateRequiredN(ctx.f2, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, targetPower, ctx.alpha);
+      var key = planKey(ctx, targetPower, 'n');
+      if (reqMemo[key] != null) return reqMemo[key];
+      var n = estimateRequiredN(ctx.f2, ctx.df1, minN(ctx), function (nn) { return df2AtN(ctx, nn); }, targetPower, ctx.alpha);
+      reqMemo[key] = n;
+      return n;
     }
 
     function detectableEffect(ctx, targetPower) {
-      return effectFromF2(estimateDetectableF2(ctx.n, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, targetPower, ctx.alpha));
+      var key = planKey(ctx, targetPower, 'd');
+      if (detMemo[key] != null) return detMemo[key];
+      var effect = effectFromF2(estimateDetectableF2(ctx.n, ctx.df1, minN(ctx), function (n) { return df2AtN(ctx, n); }, targetPower, ctx.alpha));
+      detMemo[key] = effect;
+      return effect;
     }
 
     function resolveLabelsForCtx(ctx) {
@@ -512,21 +534,39 @@
       var lo = minN(ctx);
       var req95 = computeRequiredN(ctx, 0.95) || selectedReqN || lo;
       var zoomCurrent = svg.dataset.zoomMode === 'current';
+      var customActive = !!document.querySelector('.pwstd-chip--selected[data-pct="Custom"]');
       var focusN = selectedReqN || req95 || lo;
-      var maxN = zoomCurrent
-        ? Math.max(Math.ceil(ctx.n * 4), ctx.n + 50, lo + 24, 40)
-        : Math.max(Math.ceil(focusN * 2), lo + 24, 40);
+      var maxN;
+      if (zoomCurrent) {
+        maxN = Math.max(Math.ceil(ctx.n * 4), ctx.n + 50, lo + 24, 40);
+      } else if (customActive) {
+        var reqTop = computeRequiredN(ctx, 0.99) || focusN;
+        maxN = Math.max(Math.ceil(reqTop * 1.12), Math.ceil((ctx.n || lo) * 1.25), lo + 24, 40);
+      } else {
+        maxN = Math.max(Math.ceil(focusN * 2), lo + 24, 40);
+      }
       var currentOnScale = ctx.n >= lo && ctx.n <= maxN;
       var step = Math.max(1, Math.floor((maxN - lo) / 80));
-      var points = [];
-      for (var n = lo; n <= maxN; n += step) {
-        var df2 = df2AtN(ctx, n);
-        if (df2 < 1) continue;
-        points.push({ n: n, power: powerAtF2(n, ctx.df1, df2, ctx.f2, ctx.alpha) });
-      }
-      if (!points.length || points[points.length - 1].n !== maxN) {
-        var df2Last = df2AtN(ctx, maxN);
-        if (df2Last >= 1) points.push({ n: maxN, power: powerAtF2(maxN, ctx.df1, df2Last, ctx.f2, ctx.alpha) });
+      var pointKey = [
+        lo, maxN, step, ctx.df1, ctx.f2, ctx.alpha,
+        ctx.p || '', ctx.k || '', ctx.withIntercept ? 1 : 0,
+        ctx.df2Base || '', ctx.df2Subjects || '', cfg.variant || ''
+      ].join('|');
+      var points;
+      if (svg._pwPointCache && svg._pwPointCache.key === pointKey) {
+        points = svg._pwPointCache.points;
+      } else {
+        points = [];
+        for (var n = lo; n <= maxN; n += step) {
+          var df2 = df2AtN(ctx, n);
+          if (df2 < 1) continue;
+          points.push({ n: n, power: powerAtF2(n, ctx.df1, df2, ctx.f2, ctx.alpha) });
+        }
+        if (!points.length || points[points.length - 1].n !== maxN) {
+          var df2Last = df2AtN(ctx, maxN);
+          if (df2Last >= 1) points.push({ n: maxN, power: powerAtF2(maxN, ctx.df1, df2Last, ctx.f2, ctx.alpha) });
+        }
+        svg._pwPointCache = { key: pointKey, points: points };
       }
 
       var W = 640, H = 300, pad = { l: 52, r: 56, t: 24, b: 40 };
@@ -584,8 +624,13 @@
         parts.push('<text x="' + curX.toFixed(1) + '" y="' + (pad.t - 6) + '" text-anchor="middle" fill="' + skin.current + '" font-size="10" font-weight="700">Current ' + (cfg.curveCurrentLabel || 'N') + '=' + ctx.n + ' (' + formatPowerPct(curPower) + ')</text>');
       }
       if (reqX && selectedReqN >= lo && selectedReqN <= maxN) {
+        if (customActive) {
+          parts.push('<line x1="' + reqX.toFixed(1) + '" y1="' + pad.t + '" x2="' + reqX.toFixed(1) + '" y2="' + (pad.t + plotH) + '" stroke="' + skin.target + '" stroke-dasharray="3 3" stroke-width="1.25"/>');
+        }
+        var reqLabelY = tgtY - 8;
+        if (reqLabelY < pad.t + 12) reqLabelY = tgtY + 16;
         parts.push('<circle cx="' + reqX.toFixed(1) + '" cy="' + tgtY.toFixed(1) + '" r="5" fill="' + skin.target + '" stroke="#fff" stroke-width="1.5"/>');
-        parts.push('<text x="' + reqX.toFixed(1) + '" y="' + (tgtY - 8).toFixed(1) + '" text-anchor="middle" fill="' + skin.target + '" font-size="10" font-weight="700">Required ' + (cfg.curveCurrentLabel || 'N') + '=' + selectedReqN + '</text>');
+        parts.push('<text x="' + reqX.toFixed(1) + '" y="' + reqLabelY.toFixed(1) + '" text-anchor="middle" fill="' + skin.target + '" font-size="10" font-weight="700">Required ' + (cfg.curveCurrentLabel || 'N') + '=' + selectedReqN + '</text>');
       }
       parts.push('<text class="pwstd-axis-tick" x="' + (pad.l + plotW / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" fill="' + skin.axis + '" font-size="12" font-weight="700">' + (cfg.curveXAxisLabel || 'Sample size (N)') + '</text>');
       svg.innerHTML = parts.join('');
@@ -723,18 +768,27 @@
       }
       if (customRequiredN) {
         customRequiredN.textContent = req;
-        customRequiredN.style.color = '#7fdb9f';
+        customRequiredN.style.color = '';
       }
       if (cfg.variant === 'mixed') {
         updateMixedChipSubs(ctx, null);
       }
+      var customActive = !!document.querySelector('.pwstd-chip--selected[data-pct="Custom"]');
+      var targetSel = {
+        pct: Math.round(targetPower * 100) + '%',
+        power: targetPower
+      };
+      if (customActive) {
+        powSetText('powRequired', req);
+        updateHeroLabels(ctx, targetSel);
+        updatePlanningSummary(ctx);
+        updateExecutiveSummary(ctx, observedPower(ctx), req, targetSel);
+        updateEffectCompare(ctx, detectableEffect(ctx, targetPower), targetPower);
+      }
       if (global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.onCustomComplete) {
         global.StatisticoPowerTemplate.onCustomComplete(req);
       }
-      var targetSel = global.StatisticoPowerTemplate && global.StatisticoPowerTemplate.getSelectedTargetPower
-        ? global.StatisticoPowerTemplate.getSelectedTargetPower()
-        : { pct: Math.round(targetPower * 100) + '%', power: targetPower };
-      if (targetSel.power === targetPower) {
+      if (customActive) {
         try {
           renderCurve(ctx, targetPower, req);
         } catch (curveErr) {
@@ -1130,8 +1184,8 @@
   }
 
   function updateMixedChipSubs(ctx, reqMap) {
-    if (!ctx || !reqMap) return;
-    ['80', '85', '90', '95'].forEach(function (p) {
+    if (!ctx) return;
+    if (reqMap) ['80', '85', '90', '95'].forEach(function (p) {
       var req = reqMap[p];
       var sub = document.getElementById('powReq' + p + 'Sub');
       if (!sub) return;

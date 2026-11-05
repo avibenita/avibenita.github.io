@@ -3674,6 +3674,58 @@
       text-transform: uppercase;
       vertical-align: middle;
     }
+    .full-model-ref {
+      font-weight: 600;
+      font-size: 0.78em;
+      color: var(--text-muted, #94a3b8);
+      white-space: nowrap;
+    }
+    .kpi-value .full-model-ref,
+    .sp-stat-value .full-model-ref {
+      font-size: 0.55em;
+      font-weight: 650;
+      margin-left: 0.35em;
+      letter-spacing: 0;
+    }
+    .reg-scope-banner {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px 10px;
+      margin: 0 0 12px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: rgba(15, 23, 42, 0.92);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+    :root[data-theme="light"] .reg-scope-banner {
+      background: rgba(240, 249, 255, 0.96);
+    }
+    .reg-scope-k {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #38bdf8;
+    }
+    .reg-scope-group {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 8px;
+      max-width: 100%;
+    }
+    .reg-scope-k--out { color: #fbbf24; }
+    .reg-scope-note {
+      flex-basis: 100%;
+      color: var(--text-muted);
+      font-size: 0.74rem;
+    }
     .reg-overview-block.coef-recalc-flash {
       animation: coefRecalcFlash 0.8s ease;
     }
@@ -6178,12 +6230,13 @@
       const r2    = results.R2;
       const n     = results.n;
       const droppedCount = window._regExcluded ? window._regExcluded.size : 0;
-      const droppedNote = droppedCount
-        ? ` <strong>${droppedCount}</strong> term${droppedCount === 1 ? '' : 's'} dropped — these results are the reduced model.`
-        : '';
+      const droppedNote = reducedModelNote();
+      const fullFit = fullModel();
 
       if (!regressionFTestReady(results)) {
-        verdict.innerHTML = 'No predictors are in the model, so there is no overall F-test.';
+        const fullP = fullFit && Number.isFinite(fullFit.F_pvalue) ? formatFPValue(fullFit.F_pvalue) : '';
+        verdict.innerHTML = 'No predictors are in the model, so there is no overall F-test.'
+          + (fullP ? ` (full model p = ${withFull(fullP, '')})` : '');
         detail.innerHTML = `The fitted value is the mean of the outcome, based on <strong>${n}</strong> observations.${droppedNote}`;
         microtags.innerHTML = '<span class="microtag microtag-weak"><i class="fa-solid fa-filter" aria-hidden="true"></i>Reduced model</span>';
         return;
@@ -6191,22 +6244,28 @@
 
       // ── Significance ──────────────────────────────────────────
       const isSig = sig < 0.05;
-      const sigText = sig < 0.0001 ? '< 0.0001' : sig.toFixed(3);
+      const sigText = sig < 0.0001 ? '< 0.0001' : sig.toFixed(4);
+      const fullSig = fullFit && Number.isFinite(fullFit.F_pvalue) ? formatFPValue(fullFit.F_pvalue) : '';
+      const sigShown = withFull(sigText, fullSig);
       const sigBadge = isSig
         ? `<span class="conclusion-badge badge-sig">Significant ✓</span>`
         : `<span class="conclusion-badge badge-ns">Not Significant ✗</span>`;
 
-      verdict.innerHTML = isSig
-        ? `The model is statistically significant (p = ${sigText}) ${sigBadge}`
-        : `The model is not statistically significant (p = ${sigText}) ${sigBadge}`;
+      const lead = isSig
+        ? 'The model is statistically significant'
+        : 'The model is not statistically significant';
+      const pClause = modelIsReduced() ? `, p = ${sigShown}` : ` (p = ${sigShown})`;
+      verdict.innerHTML = `${lead}${pClause} ${sigBadge}`;
 
       // ── R² strength (clean sentence, no badge inline) ─────────
       let r2Strength = 'weak';
       if (r2 >= 0.6)      r2Strength = 'strong';
       else if (r2 >= 0.3) r2Strength = 'moderate';
 
+      const r2Now = `${(r2 * 100).toFixed(2)}%`;
+      const r2Full = fullFit && Number.isFinite(fullFit.R2) ? `${(fullFit.R2 * 100).toFixed(2)}%` : '';
       detail.innerHTML =
-        `Explains <strong>${(r2 * 100).toFixed(1)}%</strong> of the variance — ` +
+        `Explains <strong>${withFull(r2Now, r2Full)}</strong> of the variance — ` +
         `<strong>${r2Strength}</strong> explanatory power. ` +
         `Based on <strong>${n}</strong> observations.${droppedNote}`;
 
@@ -6433,6 +6492,8 @@
           }
         }, 50);
       }
+      syncModelScopeBanners();
+      if (tabName === 'power') annotatePowerFullModel();
     }
 
     // Global decimal precision setting
@@ -6602,9 +6663,19 @@
       const container = document.getElementById('singlePageView');
       const results = window.regressionResults;
       const { y, xn = [], xc = [] } = receivedModelSpec;
+      const full = fullModel();
+      const spNum = (value) => Number.isFinite(Number(value)) ? Number(value) : null;
+      const r2val = spNum(results.R2 != null ? results.R2 : results.rSquared);
+      const adjVal = spNum(results.R2_adj != null ? results.R2_adj : results.rSquaredAdj);
+      const fVal = spNum(results.F_stat != null ? results.F_stat : results.fStatistic);
+      const pVal = spNum(results.F_pvalue != null ? results.F_pvalue : results.fPValue);
+      const rmseVal = spNum(results.RMSE != null ? results.RMSE : results.rmse);
+      const aicVal = spNum(results.AIC != null ? results.AIC : results.aic);
+      const pText = (p) => (p == null ? 'N/A' : (p < 0.0001 ? '< 0.0001' : p.toFixed(4)));
       
       // Build the single-page layout HTML
       let html = `
+        ${modelScopeBannerHtml()}
         <!-- Model Summary Section -->
         <div class="sp-section">
           <div class="sp-section-header">
@@ -6614,35 +6685,35 @@
             <div class="sp-stats-grid">
               <div class="sp-stat-box">
                 <div class="sp-stat-label">R-Squared (R²)</div>
-                <div class="sp-stat-value">${results.rSquared ? results.rSquared.toFixed(4) : 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(r2val == null ? 'N/A' : r2val.toFixed(4), full && Number.isFinite(full.R2) ? full.R2.toFixed(4) : '')}</div>
               </div>
               <div class="sp-stat-box">
                 <div class="sp-stat-label">Adjusted R²</div>
-                <div class="sp-stat-value">${results.rSquaredAdj ? results.rSquaredAdj.toFixed(4) : 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(adjVal == null ? 'N/A' : adjVal.toFixed(4), full && Number.isFinite(full.R2_adj) ? full.R2_adj.toFixed(4) : '')}</div>
               </div>
               <div class="sp-stat-box">
                 <div class="sp-stat-label">F-Statistic</div>
-                <div class="sp-stat-value">${results.fStatistic ? formatNumber(results.fStatistic) : 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(fVal == null ? 'N/A' : formatNumber(fVal), full && Number.isFinite(full.F_stat) ? formatNumber(full.F_stat) : '')}</div>
               </div>
               <div class="sp-stat-box">
                 <div class="sp-stat-label">P-Value (F-test)</div>
-                <div class="sp-stat-value">${results.fPValue ? (results.fPValue < 0.0001 ? '< 0.0001' : results.fPValue.toFixed(4)) : 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(pText(pVal), full && Number.isFinite(full.F_pvalue) ? pText(full.F_pvalue) : '')}</div>
               </div>
               <div class="sp-stat-box">
                 <div class="sp-stat-label">RMSE</div>
-                <div class="sp-stat-value">${results.rmse ? formatNumber(results.rmse) : 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(rmseVal == null ? 'N/A' : formatNumber(rmseVal), full && Number.isFinite(full.RMSE) ? formatNumber(full.RMSE) : '')}</div>
               </div>
               <div class="sp-stat-box">
                 <div class="sp-stat-label">Observations</div>
-                <div class="sp-stat-value">${results.n || 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(results.n || 'N/A', full && full.n != null ? full.n : '')}</div>
               </div>
               <div class="sp-stat-box">
                 <div class="sp-stat-label">Degrees of Freedom</div>
-                <div class="sp-stat-value">${results.df || 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(results.df || 'N/A', full && full.df != null ? full.df : '')}</div>
               </div>
               <div class="sp-stat-box">
                 <div class="sp-stat-label">AIC</div>
-                <div class="sp-stat-value">${results.aic ? formatNumber(results.aic) : 'N/A'}</div>
+                <div class="sp-stat-value">${withFull(aicVal == null ? 'N/A' : formatNumber(aicVal), full && Number.isFinite(full.AIC) ? formatNumber(full.AIC) : '')}</div>
               </div>
             </div>
           </div>
@@ -8033,6 +8104,7 @@ ${sectionsHtml}
           interactionInfo,
           modelSpec: receivedModelSpec
         } : null;
+        window._regFullResults = null;
         window._regExcluded = new Set();
         window._regActiveColumns = _specReady ? _columnSpecs.slice() : null;
 
@@ -8192,6 +8264,153 @@ ${sectionsHtml}
       return `${safe.slice(0, -1).join(', ')}, and ${safe[safe.length - 1]}`;
     }
 
+    function modelIsReduced() {
+      return !!(window._regExcluded && window._regExcluded.size && window._regFullResults);
+    }
+
+    function fullModel() {
+      return modelIsReduced() ? window._regFullResults : null;
+    }
+
+    function snapshotFullRegression(results, allVars, xnVars, xcVars) {
+      if (!results || !Array.isArray(results.coefficients)) return;
+      const byName = {};
+      results.coefficients.forEach((coef, i) => {
+        const name = (allVars && allVars[i]) || `X${i}`;
+        const vifIndex = i - (results.includeIntercept ? 1 : 0);
+        byName[name] = {
+          coef,
+          se: results.std_errors ? results.std_errors[i] : null,
+          t: results.t_values ? results.t_values[i] : null,
+          p: results.p_values ? results.p_values[i] : null,
+          ciL: results.CI_lower ? results.CI_lower[i] : null,
+          ciU: results.CI_upper ? results.CI_upper[i] : null,
+          vif: results.VIF ? results.VIF[vifIndex] : null
+        };
+      });
+      let mae = null;
+      if (Array.isArray(results.residuals) && results.residuals.length) {
+        mae = results.residuals.reduce((sum, r) => sum + Math.abs(Number(r) || 0), 0) / results.residuals.length;
+      }
+      window._regFullResults = {
+        R2: results.R2,
+        R2_adj: results.R2_adj,
+        RMSE: results.RMSE,
+        AIC: results.AIC,
+        BIC: results.BIC,
+        F_stat: results.F_stat,
+        F_pvalue: results.F_pvalue,
+        SSE: results.SSE,
+        SSR: results.SSR,
+        TSS: results.TSS,
+        n: results.n,
+        k: results.k,
+        df: results.df,
+        mae,
+        xnCount: (xnVars || []).length,
+        xcCount: (xcVars || []).length,
+        byName
+      };
+    }
+
+    function withFull(current, full) {
+      const cur = current == null || current === '' ? '—' : String(current);
+      if (!modelIsReduced() || full == null || full === '' || full === '—' || full === 'N/A') {
+        return escapeHtmlText(cur);
+      }
+      const fullText = String(full);
+      if (cur === fullText) return escapeHtmlText(cur);
+      return `${escapeHtmlText(cur)}<span class="full-model-ref" title="Full model"> (${escapeHtmlText(fullText)})</span>`;
+    }
+
+    function setHtml(id, current, full) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = withFull(current, full);
+      return el;
+    }
+
+    function fullTerm(name) {
+      const snap = window._regFullResults;
+      if (!modelIsReduced() || !snap || !snap.byName) return null;
+      return snap.byName[name] || null;
+    }
+
+    function sigStars(p) {
+      if (!Number.isFinite(p)) return '';
+      if (p < 0.001) return ' ***';
+      if (p < 0.01) return ' **';
+      if (p < 0.05) return ' *';
+      return '';
+    }
+
+    function keptAndRemovedLabels() {
+      const design = window._regFullDesign;
+      const excluded = window._regExcluded || new Set();
+      const kept = [];
+      const removed = [];
+      if (!design) {
+        excluded.forEach(key => removed.push(key));
+        return { kept, removed };
+      }
+      if (design.includeIntercept) {
+        (excluded.has('Intercept') ? removed : kept).push('Intercept');
+      }
+      (design.columns || []).forEach(col => {
+        (excluded.has(col.key) ? removed : kept).push(col.name);
+      });
+      return { kept, removed };
+    }
+
+    function reducedModelNote() {
+      if (!modelIsReduced()) return '';
+      const { kept, removed } = keptAndRemovedLabels();
+      return ` Kept: <strong>${formatDroppedNames(kept)}</strong>. Removed: <strong>${formatDroppedNames(removed)}</strong>. Values in parentheses are the full model.`;
+    }
+
+    function modelScopeBannerHtml() {
+      if (!modelIsReduced()) return '';
+      const { kept, removed } = keptAndRemovedLabels();
+      return `<div class="reg-scope-banner" role="status">
+        <span class="reg-scope-group"><span class="reg-scope-k">Kept</span> <span>${formatDroppedNames(kept) || 'none'}</span></span>
+        <span class="reg-scope-group"><span class="reg-scope-k reg-scope-k--out">Removed</span> <span>${formatDroppedNames(removed) || 'none'}</span></span>
+        <span class="reg-scope-note">Values in parentheses are the full model.</span>
+      </div>`;
+    }
+
+    function syncModelScopeBanners() {
+      document.querySelectorAll('.reg-scope-banner').forEach(el => el.remove());
+      const html = modelScopeBannerHtml();
+      if (!html) return;
+      document.querySelectorAll('.tab-content').forEach(host => {
+        host.insertAdjacentHTML('afterbegin', html);
+      });
+    }
+
+    function annotatePowerFullModel() {
+      const full = fullModel();
+      if (!full || !Number.isFinite(full.R2)) return;
+      const fullText = full.R2.toFixed(3);
+      ['pwstd-metric-r2', 'pwstd-r2-observed', 'pwstd-assume-obs'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const current = (el.textContent || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+        if (!current || current === '—') return;
+        el.innerHTML = withFull(current, fullText);
+      });
+    }
+
+    function hookPowerFullModelAnnotation() {
+      const engine = window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine;
+      if (!engine || engine._fullModelHooked || typeof engine.calculate !== 'function') return;
+      const original = engine.calculate.bind(engine);
+      engine.calculate = function (results) {
+        const out = original(results);
+        annotatePowerFullModel();
+        return out;
+      };
+      engine._fullModelHooked = true;
+    }
+
     function setCoefIncludeStatus(html, isWarning) {
       const el = document.getElementById('coefIncludeStatus');
       if (!el) return;
@@ -8210,13 +8429,15 @@ ${sectionsHtml}
       const excluded = window._regExcluded;
       if (!excluded || excluded.size === 0) {
         setCoefIncludeStatus('');
+        syncModelScopeBanners();
         return;
       }
-      const list = formatDroppedNames([...excluded]);
+      const { kept, removed } = keptAndRemovedLabels();
       setCoefIncludeStatus(
-        `<i class="fa-solid fa-rotate" aria-hidden="true"></i><span>Recalculated without <strong>${list}</strong>. This overview and every analysis now use the reduced model. Check a dimmed row to put a term back.</span>`,
+        `<i class="fa-solid fa-rotate" aria-hidden="true"></i><span>Kept <strong>${formatDroppedNames(kept)}</strong>. Removed <strong>${formatDroppedNames(removed)}</strong>. Values in parentheses are the full model. Check a dimmed row to put a term back.</span>`,
         false
       );
+      syncModelScopeBanners();
     }
 
     function activeCoefficientIndex(term, results, design, excluded) {
@@ -8309,20 +8530,26 @@ ${sectionsHtml}
           else if (p < 0.05) sig = ' *';
         }
         const pClass = !hasStat ? '' : (p < 0.05 ? 'pvalue-good' : (p < 0.1 ? 'pvalue-warning' : 'pvalue-bad'));
-        const pText = !hasStat ? '—' : (p < 0.0001 ? '&lt; 0.0001' : p.toFixed(4));
+        const pText = !hasStat ? '—' : (p < 0.0001 ? '< 0.0001' : p.toFixed(4));
         const vifIndex = statIndex - (results.includeIntercept ? 1 : 0);
         const vifText = !hasStat || term.kind === 'intercept'
           ? '—'
           : ((results.VIF && results.VIF[vifIndex] != null) ? Number(results.VIF[vifIndex]).toFixed(2) : '—');
+        const prior = fullTerm(term.name);
+        const priorNum = (value, fmt) => (prior && value != null && Number.isFinite(Number(value)) ? fmt(Number(value)) : '');
+        const priorP = prior && Number.isFinite(prior.p) ? (prior.p < 0.0001 ? '< 0.0001' : prior.p.toFixed(4)) : '';
+        const priorVif = prior && term.kind !== 'intercept' && prior.vif != null && Number.isFinite(Number(prior.vif))
+          ? Number(prior.vif).toFixed(2)
+          : '';
 
         const cells = [
-          { html: hasStat ? `${formatNumber(results.coefficients[statIndex])}${sig}` : '—', cls: 'coef-cell' },
-          { html: hasStat ? formatNumber(results.std_errors[statIndex]) : '—', depth: 'analyst' },
-          { html: hasStat && Number.isFinite(results.t_values[statIndex]) ? results.t_values[statIndex].toFixed(2) : '—', depth: 'analyst' },
-          { html: pText, cls: pClass },
-          { html: hasStat ? formatNumber(results.CI_lower[statIndex]) : '—', cls: 'ci-cell' },
-          { html: hasStat ? formatNumber(results.CI_upper[statIndex]) : '—', cls: 'ci-cell' },
-          { html: vifText, depth: 'analyst' }
+          { html: withFull(hasStat ? `${formatNumber(results.coefficients[statIndex])}${sig}` : '—', priorNum(prior && prior.coef, v => `${formatNumber(v)}${sigStars(prior.p)}`)), cls: 'coef-cell' },
+          { html: withFull(hasStat ? formatNumber(results.std_errors[statIndex]) : '—', priorNum(prior && prior.se, formatNumber)), depth: 'analyst' },
+          { html: withFull(hasStat && Number.isFinite(results.t_values[statIndex]) ? results.t_values[statIndex].toFixed(2) : '—', priorNum(prior && prior.t, v => v.toFixed(2))), depth: 'analyst' },
+          { html: withFull(pText, priorP), cls: pClass },
+          { html: withFull(hasStat ? formatNumber(results.CI_lower[statIndex]) : '—', priorNum(prior && prior.ciL, formatNumber)), cls: 'ci-cell' },
+          { html: withFull(hasStat ? formatNumber(results.CI_upper[statIndex]) : '—', priorNum(prior && prior.ciU, formatNumber)), cls: 'ci-cell' },
+          { html: withFull(vifText, priorVif), depth: 'analyst' }
         ];
         cells.forEach(cell => {
           const td = document.createElement('td');
@@ -8572,9 +8799,13 @@ ${sectionsHtml}
       
       // Build complete variable list with proper names (for use throughout)
       const allVars = results.includeIntercept ? ['Intercept', ...varNames] : varNames;
+      if (!window._regExcluded || window._regExcluded.size === 0) {
+        snapshotFullRegression(results, allVars, xnVars, xcVars);
+      }
+      const full = fullModel();
       
       // Populate Sample Info panel
-      document.getElementById('validObs').textContent = results.n;
+      setHtml('validObs', results.n, full && full.n != null ? full.n : '');
       document.getElementById('includeIntercept').textContent = results.includeIntercept ? 'Yes' : 'No';
       
       // Update shared header sample size now that n is known
@@ -8591,9 +8822,9 @@ ${sectionsHtml}
         // Re-register actions so View Data now has real data available
         registerHeaderActions();
       }
-      document.getElementById('numNumericVars').textContent = xnVars.length;
-      document.getElementById('numCategoricalVars').textContent = xcVars.length;
-      document.getElementById('degreesOfFreedom').textContent = results.df; // Residual degrees of freedom (n - k)
+      setHtml('numNumericVars', xnVars.length, full ? full.xnCount : '');
+      setHtml('numCategoricalVars', xcVars.length, full ? full.xcCount : '');
+      setHtml('degreesOfFreedom', results.df, full && full.df != null ? full.df : '');
       
       // Show/hide ANCOVA group based on model structure
       const ancovaGroupNav = document.getElementById('ancovaGroupNav');
@@ -8621,21 +8852,23 @@ ${sectionsHtml}
       }
       requestAnimationFrame(updateRegSidebarScrollHint);
       
-      // Populate Model Fit panel
-      document.getElementById('rSquared').textContent = results.R2.toFixed(4); // Always 4 decimals for R²
-      document.getElementById('adjRSquared').textContent = results.R2_adj.toFixed(4); // Always 4 decimals for R²
-      document.getElementById('rootMSE').textContent = formatNumber(results.RMSE);
-      document.getElementById('aic').textContent = formatNumber(results.AIC);
-      document.getElementById('bic').textContent = formatNumber(results.BIC);
+      // Populate Model Fit panel. Parentheses are the full model when a term was dropped.
+      const numOrEmpty = (value) => Number.isFinite(value) ? formatNumber(value) : '';
+      setHtml('rSquared', results.R2.toFixed(4), full && Number.isFinite(full.R2) ? full.R2.toFixed(4) : '');
+      setHtml('adjRSquared', results.R2_adj.toFixed(4), full && Number.isFinite(full.R2_adj) ? full.R2_adj.toFixed(4) : '');
+      setHtml('rootMSE', formatNumber(results.RMSE), numOrEmpty(full && full.RMSE));
+      setHtml('aic', formatNumber(results.AIC), numOrEmpty(full && full.AIC));
+      setHtml('bic', formatNumber(results.BIC), numOrEmpty(full && full.BIC));
       
       // Populate F-test panel
       const fReady = regressionFTestReady(results);
       const fStatText = fReady ? formatNumber(results.F_stat) : '—';
       const fPText = fReady ? formatFPValue(results.F_pvalue) : '—';
-      document.getElementById('fStatistic').textContent = fStatText;
-      document.getElementById('fPValue').textContent = fPText;
-      document.getElementById('ssModel').textContent = formatNumber(results.SSE);
-      document.getElementById('ssResidual').textContent = formatNumber(results.SSR);
+      const fullFReady = !!(full && full.k > 1 && Number.isFinite(full.F_stat) && Number.isFinite(full.F_pvalue));
+      setHtml('fStatistic', fStatText, fullFReady ? formatNumber(full.F_stat) : '');
+      setHtml('fPValue', fPText, fullFReady ? formatFPValue(full.F_pvalue) : '');
+      setHtml('ssModel', formatNumber(results.SSE), numOrEmpty(full && full.SSE));
+      setHtml('ssResidual', formatNumber(results.SSR), numOrEmpty(full && full.SSR));
 
       applyMetricClass(document.getElementById('rSquared'), rSquaredClass(results.R2));
       applyMetricClass(document.getElementById('adjRSquared'), rSquaredClass(results.R2_adj));
@@ -8667,28 +8900,32 @@ ${sectionsHtml}
         const ms_residual = df_residual > 0 ? results.SSR / df_residual : null;
         const msModelText = ms_model == null || !Number.isFinite(ms_model) ? '—' : formatNumber(ms_model);
         const msResidText = ms_residual == null || !Number.isFinite(ms_residual) ? '—' : formatNumber(ms_residual);
+        const fullDfModel = full && Number.isFinite(full.k) ? Math.max(0, full.k - 1) : null;
+        const fullDfResid = full && Number.isFinite(full.df) ? full.df : null;
+        const fullMsModel = fullDfModel > 0 && Number.isFinite(full.SSE) ? formatNumber(full.SSE / fullDfModel) : '';
+        const fullMsResid = fullDfResid > 0 && Number.isFinite(full.SSR) ? formatNumber(full.SSR / fullDfResid) : '';
         
         anovaBody.innerHTML = `
           <tr style="background: rgba(74, 85, 104, 0.3);">
             <td><strong>Model</strong></td>
-            <td>${df_model}</td>
-            <td>${formatNumber(results.SSE)}</td>
-            <td>${msModelText}</td>
-            <td>${fReady ? formatNumber(results.F_stat) : '—'}</td>
-            <td>${fReady ? formatFPValue(results.F_pvalue) : '—'}</td>
+            <td>${withFull(df_model, fullDfModel == null ? '' : fullDfModel)}</td>
+            <td>${withFull(formatNumber(results.SSE), full && Number.isFinite(full.SSE) ? formatNumber(full.SSE) : '')}</td>
+            <td>${withFull(msModelText, fullMsModel)}</td>
+            <td>${withFull(fReady ? formatNumber(results.F_stat) : '—', fullFReady ? formatNumber(full.F_stat) : '')}</td>
+            <td>${withFull(fReady ? formatFPValue(results.F_pvalue) : '—', fullFReady ? formatFPValue(full.F_pvalue) : '')}</td>
           </tr>
           <tr>
             <td><strong>Residual</strong></td>
-            <td>${df_residual}</td>
-            <td>${formatNumber(results.SSR)}</td>
-            <td>${msResidText}</td>
+            <td>${withFull(df_residual, fullDfResid == null ? '' : fullDfResid)}</td>
+            <td>${withFull(formatNumber(results.SSR), full && Number.isFinite(full.SSR) ? formatNumber(full.SSR) : '')}</td>
+            <td>${withFull(msResidText, fullMsResid)}</td>
             <td>—</td>
             <td>—</td>
           </tr>
           <tr style="background: rgba(255, 165, 120, 0.2); font-weight: 600;">
             <td><strong>Total</strong></td>
             <td>${df_total}</td>
-            <td>${formatNumber(results.TSS)}</td>
+            <td>${withFull(formatNumber(results.TSS), full && Number.isFinite(full.TSS) ? formatNumber(full.TSS) : '')}</td>
             <td>—</td>
             <td>—</td>
             <td>—</td>
@@ -8714,6 +8951,8 @@ ${sectionsHtml}
       buildConclusionCard(results);
       applyDepth(window._analysisDepth || 'insight');
       if (typeof calculateRegressionPower === 'function') calculateRegressionPower(results);
+      syncModelScopeBanners();
+      annotatePowerFullModel();
     }
 
     // Function to trigger VB6 regression
@@ -9536,16 +9775,22 @@ ${sectionsHtml}
         fpText = String(stats.fPValue || stats.pValue);
       }
       const nText = Number.isNaN(nRaw) ? (stats.observations || stats.validObs || stats.n || 'N/A') : String(Math.round(nRaw));
+      const full = fullModel();
+      const fullR2Text = full && Number.isFinite(full.R2) ? `${(full.R2 * 100).toFixed(2)}%` : '';
+      const fullAdjText = full && Number.isFinite(full.R2_adj) ? `${(full.R2_adj * 100).toFixed(2)}%` : '';
+      const fullRmseText = full && Number.isFinite(full.RMSE) ? full.RMSE.toFixed(2) : '';
+      const fullFpText = full && Number.isFinite(full.F_pvalue) ? formatFPValue(full.F_pvalue) : (full ? '—' : '');
+      const fullNText = full && full.n != null ? String(full.n) : '';
       const r2Elem = document.getElementById('kpiRSquared');
       const adjElem = document.getElementById('kpiAdjRSquared');
       const rmseElem = document.getElementById('kpiRMSE');
       const fpElem = document.getElementById('kpiFPValue');
       const nElem = document.getElementById('kpiN');
-      if (r2Elem) r2Elem.innerText = r2Text;
-      if (adjElem) adjElem.innerText = adjR2Text;
-      if (rmseElem) rmseElem.innerText = rmseText;
-      if (fpElem) fpElem.innerText = fpText;
-      if (nElem) nElem.innerText = nText;
+      if (r2Elem) r2Elem.innerHTML = withFull(r2Text, fullR2Text);
+      if (adjElem) adjElem.innerHTML = withFull(adjR2Text, fullAdjText);
+      if (rmseElem) rmseElem.innerHTML = withFull(rmseText, fullRmseText);
+      if (fpElem) fpElem.innerHTML = withFull(fpText, fullFpText);
+      if (nElem) nElem.innerHTML = withFull(nText, fullNText);
       applyMetricClass(r2Elem, rSquaredClass(r2Raw));
       applyMetricClass(adjElem, rSquaredClass(adjR2Raw));
       applyMetricClass(fpElem, pValueClass(fpRaw));
@@ -9558,11 +9803,15 @@ ${sectionsHtml}
       const rmse = stats.rootMSE || stats.rmse || stats.RMSE || 'N/A';
       const fP = parsePValue(stats.fPValue || stats.pValue || stats.F_pvalue);
       const n = stats.observations || stats.validObs || stats.n || 'N/A';
+      const full = fullModel();
+      const r2Shown = Number.isNaN(r2)
+        ? ''
+        : withFull(`${(r2 * 100).toFixed(2)}%`, full && Number.isFinite(full.R2) ? `${(full.R2 * 100).toFixed(2)}%` : '');
       let fitStatement = 'Model fit could not be evaluated from current outputs.';
       if (!Number.isNaN(r2)) {
-        if (r2 < 0.3) fitStatement = `The model explains ${(r2 * 100).toFixed(1)}% of variance, indicating weak explanatory power.`;
-        else if (r2 < 0.6) fitStatement = `The model explains ${(r2 * 100).toFixed(1)}% of variance, showing moderate explanatory power.`;
-        else fitStatement = `The model explains ${(r2 * 100).toFixed(1)}% of variance, indicating strong explanatory power.`;
+        if (r2 < 0.3) fitStatement = `The model explains ${r2Shown} of variance, indicating weak explanatory power.`;
+        else if (r2 < 0.6) fitStatement = `The model explains ${r2Shown} of variance, showing moderate explanatory power.`;
+        else fitStatement = `The model explains ${r2Shown} of variance, indicating strong explanatory power.`;
       }
       let sigStatement = 'Overall significance is not available.';
       if (!Number.isNaN(fP)) {
@@ -9570,7 +9819,11 @@ ${sectionsHtml}
           ? 'The F-test is statistically significant, so at least one predictor contributes to the model.'
           : 'The F-test is not statistically significant, so predictor effects should be interpreted cautiously.';
       }
-      el.innerText = `${fitStatement} RMSE = ${rmse}. Sample size n = ${n}. ${sigStatement}`;
+      const rmseShown = withFull(
+        Number.isFinite(Number(rmse)) ? formatNumber(Number(rmse)) : rmse,
+        full && Number.isFinite(full.RMSE) ? formatNumber(full.RMSE) : ''
+      );
+      el.innerHTML = `${fitStatement} RMSE = ${rmseShown}. Sample size n = ${escapeHtmlText(n)}. ${sigStatement}${reducedModelNote()}`;
     }
 
     // Function to populate the panels dynamically
@@ -10148,12 +10401,16 @@ ${sectionsHtml}
       const r2 = res.R2 ?? res.rSquared ?? res.R_squared ?? 0;
       const mae = observed.reduce((s, y, i) => s + Math.abs(y - fitted[i]), 0) / n;
 
-      const setKpi = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatNumber(val); };
-      setKpi('predOverviewKpiRMSE', rmse);
-      setKpi('predOverviewKpiR2', r2);
-      setKpi('predOverviewKpiMAE', mae);
+      const full = fullModel();
+      const setKpi = (id, val, fullVal) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = withFull(formatNumber(val), Number.isFinite(fullVal) ? formatNumber(fullVal) : '');
+      };
+      setKpi('predOverviewKpiRMSE', rmse, full && full.RMSE);
+      setKpi('predOverviewKpiR2', r2, full && full.R2);
+      setKpi('predOverviewKpiMAE', mae, full && full.mae);
       const nEl = document.getElementById('predOverviewKpiN');
-      if (nEl) nEl.textContent = String(n);
+      if (nEl) nEl.innerHTML = withFull(String(n), full && full.n != null ? String(full.n) : '');
 
       if (typeof Highcharts === 'undefined') return;
       const th = _resChartTheme();
@@ -12352,13 +12609,17 @@ ${sectionsHtml}
         const rmse   = results.RMSE    || 0;
         const n      = results.n       || 0;
         const pFmt   = p => p < 0.001 ? '< .001' : p.toFixed(3);
-        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-        set('ancovaKpiR2',    R2.toFixed(d));
-        set('ancovaKpiR2Adj', R2adj.toFixed(d));
-        set('ancovaKpiF',     F.toFixed(d));
-        set('ancovaKpiFp',    pFmt(pF));
-        set('ancovaKpiRmse',  rmse.toFixed(d));
-        set('ancovaKpiN',     String(n));
+        const full = fullModel();
+        const set = (id, val, fullVal) => {
+          const el = document.getElementById(id);
+          if (el) el.innerHTML = withFull(val, fullVal);
+        };
+        set('ancovaKpiR2',    R2.toFixed(d), full && Number.isFinite(full.R2) ? full.R2.toFixed(d) : '');
+        set('ancovaKpiR2Adj', R2adj.toFixed(d), full && Number.isFinite(full.R2_adj) ? full.R2_adj.toFixed(d) : '');
+        set('ancovaKpiF',     F.toFixed(d), full && Number.isFinite(full.F_stat) ? full.F_stat.toFixed(d) : '');
+        set('ancovaKpiFp',    pFmt(pF), full && Number.isFinite(full.F_pvalue) ? pFmt(full.F_pvalue) : '');
+        set('ancovaKpiRmse',  rmse.toFixed(d), full && Number.isFinite(full.RMSE) ? full.RMSE.toFixed(d) : '');
+        set('ancovaKpiN',     String(n), full && full.n != null ? String(full.n) : '');
       }
 
       // Legacy fit table (kept for back-compat if some build still has it)
@@ -12373,13 +12634,15 @@ ${sectionsHtml}
         const k      = results.k       || (xn.length + xc.length);
         const pFmt   = p => p < 0.001 ? '< .001' : p.toFixed(4);
         const r2Interp = R2adj >= 0.7 ? 'Strong' : R2adj >= 0.4 ? 'Moderate' : 'Weak';
+        const full = fullModel();
+        const fullK = full && Number.isFinite(full.k) ? full.k : '';
         tbody.innerHTML = `
-          <tr><td>R²</td><td>${R2.toFixed(d)}</td><td>Variance explained by the model</td></tr>
-          <tr><td>Adjusted R²</td><td>${R2adj.toFixed(d)}</td><td>${r2Interp} overall fit</td></tr>
-          <tr><td>F statistic</td><td>${F.toFixed(d)}</td><td>Overall model test (p ${pFmt(pF)})</td></tr>
-          <tr><td>RMSE</td><td>${rmse.toFixed(d)}</td><td>Root mean squared error (residual SD)</td></tr>
-          <tr><td>N</td><td>${n}</td><td>Observations used</td></tr>
-          <tr><td>Predictors</td><td>${k}</td><td>${xc.length} factor(s), ${xn.length} covariate(s)</td></tr>
+          <tr><td>R²</td><td>${withFull(R2.toFixed(d), full && Number.isFinite(full.R2) ? full.R2.toFixed(d) : '')}</td><td>Variance explained by the model</td></tr>
+          <tr><td>Adjusted R²</td><td>${withFull(R2adj.toFixed(d), full && Number.isFinite(full.R2_adj) ? full.R2_adj.toFixed(d) : '')}</td><td>${r2Interp} overall fit</td></tr>
+          <tr><td>F statistic</td><td>${withFull(F.toFixed(d), full && Number.isFinite(full.F_stat) ? full.F_stat.toFixed(d) : '')}</td><td>Overall model test (p ${withFull(pFmt(pF), full && Number.isFinite(full.F_pvalue) ? pFmt(full.F_pvalue) : '')})</td></tr>
+          <tr><td>RMSE</td><td>${withFull(rmse.toFixed(d), full && Number.isFinite(full.RMSE) ? full.RMSE.toFixed(d) : '')}</td><td>Root mean squared error (residual SD)</td></tr>
+          <tr><td>N</td><td>${withFull(n, full && full.n != null ? full.n : '')}</td><td>Observations used</td></tr>
+          <tr><td>Predictors</td><td>${withFull(k, fullK)}</td><td>${xc.length} factor(s), ${xn.length} covariate(s)</td></tr>
         `;
       }
     }
@@ -12559,9 +12822,11 @@ ${sectionsHtml}
     // ===== REGRESSION POWER & SAMPLE SIZE =====
 
     function calculateRegressionPower(results) {
+      hookPowerFullModelAnnotation();
       if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
         window.StatisticoPowerAnalysis._activeEngine.calculate(results);
       }
+      annotatePowerFullModel();
     }
 
     function refreshRegressionPowerAnalysis() {

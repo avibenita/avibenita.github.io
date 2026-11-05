@@ -98,10 +98,16 @@ export function doctorLines(root, config, limits) {
       ? `Narration stems stale: ${stale.map((item) => item.id).join(', ')}. The next production regenerates only those lines.`
       : 'Narration stems: match the current spoken text');
   }
-  const offline = runProcess('node', [path.join(root, 'Statistico', 'video-workflow', 'validate-independent.mjs'), '--offline'], { cwd: root, timeoutMs: 60000 });
-  lines.push(offline.status === 0 ? 'Numerical contract: passed offline' : `Numerical contract: failed\n${(offline.stderr || offline.stdout).slice(-800)}`);
+  const numericalArgs = [...(config.numericalCommand || []).slice(1)];
+  if (numericalArgs.some((arg) => String(arg).includes('validate-independent.mjs')) && !numericalArgs.includes('--offline')) {
+    numericalArgs.push('--offline');
+  }
+  const numerical = config.numericalCommand?.length
+    ? runProcess(config.numericalCommand[0], numericalArgs, { cwd: root, timeoutMs: 180000 })
+    : { status: 1, stdout: '', stderr: 'No numerical command' };
+  lines.push(numerical.status === 0 ? 'Numerical contract: passed' : `Numerical contract: failed\n${(numerical.stderr || numerical.stdout).slice(-800)}`);
   lines.push('Approved folder is not written by doctor.');
-  const failed = !ffmpeg || missing.length > 0 || offline.status !== 0 || !Number.isFinite(limits.maxEstimatedUsd);
+  const failed = !ffmpeg || missing.length > 0 || numerical.status !== 0 || !Number.isFinite(limits.maxEstimatedUsd);
   return { lines, failed };
 }
 

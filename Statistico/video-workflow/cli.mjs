@@ -27,7 +27,7 @@ const args = parseArgs(process.argv.slice(2));
 const command = args._[0] || 'auto';
 
 if (command === 'doctor') {
-  const { config, limits } = loadModule('independent-means');
+  const { config, limits } = loadModule(args.flags.module || 'independent-means');
   const report = doctorLines(REPO_ROOT, config, limits);
   for (const line of report.lines) console.log(line);
   if (report.failed) {

@@ -4,6 +4,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+import { clearFilmHighlight, readHighlightLog, showFilmHighlight } from '../../video-workflow/overlay/highlight.mjs';
 
 const require = createRequire('e:/OneDrive/GitHub/statistico-analytics/package.json');
 const { chromium } = require('playwright');
@@ -109,26 +110,26 @@ async function openApp(page, example, tab) {
 }
 
 async function hot(page, selector) {
-  await page.evaluate((sel) => {
-    document.querySelectorAll('.film-hot').forEach((el) => el.classList.remove('film-hot'));
-    const el = sel ? document.querySelector(sel) : null;
-    if (el) el.classList.add('film-hot');
-  }, selector);
+  if (!selector) {
+    await clearFilmHighlight(page);
+    return;
+  }
+  await showFilmHighlight(page, selector);
 }
 
 async function hotCell(page, row, col) {
-  const ok = await page.evaluate(({ row, col }) => {
-    document.querySelectorAll('.film-hot').forEach((el) => el.classList.remove('film-hot'));
+  const sel = await page.evaluate(({ row, col }) => {
     const label = (el) => (el && el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
     const heads = [...document.querySelectorAll('#tableWrap thead th')].map(label);
     const ci = heads.findIndex((h) => h === col.toLowerCase() || h.startsWith(col.toLowerCase()));
     const tr = [...document.querySelectorAll('#tableWrap tbody tr')].find((rowEl) => label(rowEl.querySelector('th')) === row.toLowerCase());
     const td = tr && ci > 0 ? tr.querySelectorAll('td')[ci - 1] : null;
-    if (!td) return false;
-    td.classList.add('film-hot');
-    return true;
+    if (!td) return '';
+    td.id = 'filmHotCell';
+    return '#filmHotCell';
   }, { row, col });
-  if (!ok) throw new Error(`Cell not found: ${row} × ${col}`);
+  if (!sel) throw new Error(`Cell not found: ${row} × ${col}`);
+  await showFilmHighlight(page, sel);
 }
 
 async function park(page) {
@@ -167,10 +168,9 @@ async function clickTab(page, tab) {
 }
 
 const FILM_CSS = `
-  .film-hot { outline: 3px solid #7dd3fc !important; outline-offset: 3px; border-radius: 10px; }
   #filmTakeaway {
     position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
-    z-index: 99999; max-width: 980px;
+    z-index: 100002; max-width: 980px;
     background: rgba(7,17,28,.92);
     border: 1px solid rgba(120,200,255,.55);
     color: #fff; font: 700 26px/1.25 "Segoe UI", sans-serif;
@@ -215,8 +215,10 @@ async function recordScene(browser, name, run) {
     note(id);
     await page.waitForTimeout(dur(id) * 1000);
   };
+  let highlights = [];
   try {
     await run(page, { mark, note, say });
+    highlights = await readHighlightLog(page, useful).catch(() => []);
     await shot(page, name);
   } catch (err) {
     await shot(page, `${name}-error`).catch(() => {});
@@ -229,7 +231,7 @@ async function recordScene(browser, name, run) {
   const dest = path.join(WORK, `${name}.webm`);
   fs.copyFileSync(src, dest);
   fs.unlinkSync(src);
-  return { id: name, src: dest, trim: Math.max(0, (useful - t0) / 1000), cues };
+  return { id: name, src: dest, trim: Math.max(0, (useful - t0) / 1000), cues, highlights };
 }
 
 async function orient(page, { mark, say }) {

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import tls from 'node:tls';
+import { highlightIssuesFromManifest } from './overlay/highlight.mjs';
 
 function trustSystemCertificates() {
   if (typeof tls.getCACertificates !== 'function' || typeof tls.setDefaultCACertificates !== 'function') return;
@@ -185,8 +186,20 @@ function reviewerSystem() {
     'A transcript does not prove voice naturalness, pronunciation, absence of music or noise, or pleasant transitions.',
     'Sampling is not a complete motion review. Advisory style preferences are informational.',
     'Do not request a change to statistical engines, fixture data, reference tests, or acceptance thresholds.',
-    'The final human viewing and CapCut approval remain required.'
+    'The final human viewing and CapCut approval remain required.',
+    'Warm-gold highlight checks: the frame is #FFD18A, a thin 2px outline with stronger corner brackets, sitting about 8–12px outside the target so content stays visible, with a restrained glow and a gentle dim outside the frame.',
+    'The frame fades in, pulses the glow once, then holds steady, and fades out. It must stay on the same target during camera movement and zoom.',
+    'Do not ask for the analytical interface colors or behavior to change so they match the overlay. The overlay is a video layer.',
+    'Exact 250ms, 1.2s, and 200ms timings are overlay constants. Sampled frames alone cannot prove them. Say so under unassessed checks unless the highlight log is present and disagrees.',
+    'A documented module limitation in the numerical check is context. Do not request a fabricated number, a fake test result, or an edit to the statistical engine to hide it.'
   ].join(' ');
+}
+
+export function measuredHighlightIssues(evidence, moduleConfig) {
+  return highlightIssuesFromManifest({
+    highlight: evidence?.highlight,
+    highlights: evidence?.highlight?.events
+  }, moduleConfig || {});
 }
 
 function batchPrompt(evidence, standards, previousIssues, round, batch) {
@@ -196,6 +209,7 @@ function batchPrompt(evidence, standards, previousIssues, round, batch) {
     `Measured loudness: ${JSON.stringify({ integratedLufs: evidence.loudness?.integratedLufs, peakDbfs: evidence.loudness?.peakDbfs })}`,
     `Silence findings: ${JSON.stringify(evidence.silenceFindings)}`,
     `Technical issues: ${JSON.stringify(evidence.technicalIssues)}`,
+    `Highlight log: ${JSON.stringify(evidence.highlight || null)}`,
     `Numerical check: ${JSON.stringify(evidence.numerical)}`,
     `Transcript: ${transcriptNote(evidence.transcript)}`,
     `Unsampled intervals: ${JSON.stringify(evidence.unsampled)}`,

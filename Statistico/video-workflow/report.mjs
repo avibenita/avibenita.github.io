@@ -37,9 +37,10 @@ export function writeReport(runDir, state) {
   }
   lines.push('');
   lines.push('## What to view and listen to');
-  lines.push(state.recommended
+  const viewing = state.moduleId === 'independent-means'
     ? `Open ${state.recommended}. Check the picture, the narration, the silent capability cards, and the closing. Confirm the on-screen Welch result, interval, and planning totals against the numerical report.`
-    : 'There is no candidate to approve.');
+    : `Open ${state.recommended}. Check the picture, the narration, and the closing. Confirm the on-screen results against the numerical validation in this report.`;
+  lines.push(state.recommended ? viewing : 'There is no candidate to approve.');
   if (state.stoppedReason) {
     lines.push('');
     lines.push(`Stopped: ${state.stoppedReason}`);

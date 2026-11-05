@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
+import { highlightReport } from '../../video-workflow/overlay/highlight.mjs';
 
 const ROOT = 'e:/OneDrive/GitHub/Statistico/contingency';
 const WORK = path.join(ROOT, '04_review/work');
@@ -228,7 +229,8 @@ const summary = {
   cardsBytes: fs.statSync(cardsOnly).size,
   placed,
   loudness: { integrated: iMatch && iMatch.slice(-1)[0], peak: peakMatch && peakMatch.slice(-1)[0] },
-  scenes: normalized.map((s) => ({ id: s.id, duration: s.duration, cues: s.cues }))
+  scenes: normalized.map((s) => ({ id: s.id, duration: s.duration, cues: s.cues })),
+  highlight: highlightReport(normalized, starts)
 };
 fs.writeFileSync(path.join(WORK, 'assemble.json'), JSON.stringify(summary, null, 2));
 console.log(JSON.stringify(summary, null, 2));

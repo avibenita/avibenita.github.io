@@ -5,6 +5,7 @@ import path from 'path';
 import test from 'node:test';
 import { spawn } from 'child_process';
 import { classifySilence, DETECTION_LIMITS } from '../evidence.mjs';
+import { FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC, highlightCssIssues, highlightEventIssues, highlightStandardIssues } from '../overlay/highlight.mjs';
 import { demoAdapters, demoConfig, runAuto } from '../controller.mjs';
 import { doctorLines, dryRunLines } from '../producer.mjs';
 import { REPO_ROOT, loadModule, readJson, writeJson } from '../util.mjs';
@@ -290,6 +291,31 @@ test('intentional silence is not failed speech, and a speech gap is', () => {
   const tail = classifySilence([{ start: 227.29, end: 231.11 }], [{ id: 'thanks', start: 225.55, end: 229.75, intentionalSilence: false }], 237);
   assert.equal(tail.length, 0);
   assert.ok(DETECTION_LIMITS.some((item) => /cropped labels/.test(item)));
+});
+
+test('the warm-gold highlight spec matches the shared overlay', () => {
+  assert.deepEqual(highlightStandardIssues(), []);
+  assert.deepEqual(highlightCssIssues(FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC), []);
+  const aligned = highlightEventIssues([{
+    action: 'show',
+    selector: '#kpiStrip',
+    color: '#FFD18A',
+    outlinePx: 2,
+    cornerPx: 4,
+    target: { x: 100, y: 80, w: 240, h: 60 },
+    frame: { x: 90, y: 70, w: 260, h: 80 }
+  }]);
+  assert.deepEqual(aligned, []);
+  const covering = highlightEventIssues([{
+    action: 'show',
+    selector: '#kpiStrip',
+    color: '#7dd3fc',
+    outlinePx: 3,
+    cornerPx: 3,
+    target: { x: 100, y: 80, w: 40, h: 20 },
+    frame: { x: 100, y: 80, w: 40, h: 20 }
+  }]);
+  assert.ok(covering.length >= 2);
 });
 
 test('the pre-existing assemble command still targets the r001 review file by default', () => {

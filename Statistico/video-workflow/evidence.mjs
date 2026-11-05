@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ffmpegText, sha256File, writeJson } from './util.mjs';
+import { highlightIssuesFromManifest } from './overlay/highlight.mjs';
 
 function hasFaststart(file) {
   const buf = fs.readFileSync(file);
@@ -117,6 +118,10 @@ export function technicalIssues(probe, loudness, moduleConfig) {
   return issues;
 }
 
+export function highlightTechnicalIssues(manifest, moduleConfig) {
+  return highlightIssuesFromManifest(manifest, moduleConfig);
+}
+
 export function samplePlan(duration, scenes, caps) {
   const overviewCap = caps.overviewFrameCap || 160;
   const detailCap = caps.detailFrameCap || 80;
@@ -146,7 +151,8 @@ export async function packageEvidence({ ffmpeg, mp4, manifest, moduleConfig, run
   const silence = detectSilence(ffmpeg, mp4);
   const scenes = normalizeScenes(manifest, probe.duration, moduleConfig);
   const silenceFindings = classifySilence(silence, scenes, probe.duration);
-  const tech = technicalIssues(probe, loudness, moduleConfig);
+  const highlight = manifest?.highlight || null;
+  const tech = technicalIssues(probe, loudness, moduleConfig).concat(highlightTechnicalIssues(manifest, moduleConfig));
   const plan = samplePlan(probe.duration, scenes, limits || {});
   const frameDir = path.join(runDir, 'evidence', `v${round}`);
   fs.mkdirSync(frameDir, { recursive: true });
@@ -182,6 +188,7 @@ export async function packageEvidence({ ffmpeg, mp4, manifest, moduleConfig, run
     frameDir,
     unsampled: plan.unsampled,
     numerical: numerical || null,
+    highlight,
     transcript: { status: 'not_run', reason: 'Transcription runs only during a paid review of this exact MP4.' },
     detectionLimits: DETECTION_LIMITS,
     samplingNote: 'Sampling is not a complete motion review.'

@@ -2234,6 +2234,40 @@
       min-height: 320px;
       height: 100%;
     }
+    #tab-pred-overview .pred-axes-toggle {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.38);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1.3;
+      cursor: pointer;
+    }
+    #tab-pred-overview .pred-axes-toggle:hover {
+      background: rgba(255,255,255,.18);
+      border-color: rgba(255,255,255,.6);
+    }
+    #tab-pred-overview .pred-axes-toggle.is-on {
+      background: rgba(52,211,153,.24);
+      border-color: rgba(110,231,183,.75);
+      color: #6ee7b7;
+    }
+    #tab-pred-overview .pred-axes-toggle:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+    html[data-theme="light"] #tab-pred-overview .chart-panel-h .pred-axes-toggle.is-on,
+    html[data-theme="light"] #tab-pred-overview .chart-panel-h .pred-axes-toggle.is-on i {
+      color: #6ee7b7 !important;
+    }
     .ix-overview-panel.chart-panel {
       padding: 0;
       overflow: hidden;
@@ -5384,7 +5418,12 @@
                   <div class="kpi-card" style="border-top:3px solid var(--text-muted);"><div class="kpi-label">n</div><div id="predOverviewKpiN" class="kpi-value">—</div></div>
                 </div>
                 <div class="chart-panel chart-panel--fill chart-panel--solo">
-                  <div class="chart-panel-h"><i class="fa-solid fa-chart-scatter"></i> Observed vs Predicted</div>
+                  <div class="chart-panel-h">
+                    <i class="fa-solid fa-chart-scatter"></i> Observed vs Predicted
+                    <button type="button" class="pred-axes-toggle" id="predAxesReverseBtn" aria-pressed="false" onclick="togglePredAxes()" title="Swap the observed and predicted axes">
+                      <i class="fa-solid fa-right-left" aria-hidden="true"></i> Reverse axes
+                    </button>
+                  </div>
                   <div class="chart-panel-b">
                     <div id="predObsPredChart"></div>
                   </div>
@@ -10722,6 +10761,21 @@ ${sectionsHtml}
     /**
      * Predictions workspace — Overview tab (fit quality + observed vs predicted)
      */
+    let predOverviewAxesReversed = false;
+
+    function syncPredAxesToggle() {
+      const btn = document.getElementById('predAxesReverseBtn');
+      if (!btn) return;
+      btn.setAttribute('aria-pressed', predOverviewAxesReversed ? 'true' : 'false');
+      btn.classList.toggle('is-on', predOverviewAxesReversed);
+    }
+
+    function togglePredAxes() {
+      predOverviewAxesReversed = !predOverviewAxesReversed;
+      syncPredAxesToggle();
+      loadPredOverviewTab();
+    }
+
     function loadPredOverviewTab() {
       const res = window.regressionResults || window.globalRegressionResults;
       const dat = window.regressionData;
@@ -10750,26 +10804,41 @@ ${sectionsHtml}
 
       if (typeof Highcharts === 'undefined') return;
       const th = _resChartTheme();
-      const scatter = observed.map((y, i) => [fitted[i], y]);
+      const reversed = predOverviewAxesReversed;
+      const scatter = observed.map((y, i) => (reversed ? [y, fitted[i]] : [fitted[i], y]));
       const lo = Math.min(...fitted, ...observed);
       const hi = Math.max(...fitted, ...observed);
+      const xTitle = (reversed ? 'Observed ' : 'Predicted ') + yVar;
+      const yTitle = (reversed ? 'Predicted ' : 'Observed ') + yVar;
+      const tipName = escapeHtmlText(yVar);
       Highcharts.chart('predObsPredChart', {
         chart: { type: 'scatter', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
         title: { text: null },
-        xAxis: { title: { text: 'Predicted ' + yVar, style: { color: th.textColor } }, gridLineColor: th.gridLine, labels: { style: { color: th.axisText } } },
-        yAxis: { title: { text: 'Observed ' + yVar, style: { color: th.textColor } }, gridLineColor: th.gridLine, labels: { style: { color: th.axisText } } },
+        xAxis: { title: { text: xTitle, style: { color: th.textColor } }, gridLineColor: th.gridLine, labels: { style: { color: th.axisText } } },
+        yAxis: { title: { text: yTitle, style: { color: th.textColor } }, gridLineColor: th.gridLine, labels: { style: { color: th.axisText } } },
         legend: {
           enabled: true,
           itemStyle: { color: th.textColor, fontSize: '11px', fontWeight: '600' },
           itemHoverStyle: { color: th.textColor }
         },
-        tooltip: { backgroundColor: th.bgTooltip, borderColor: th.borderTooltip, style: { color: th.textColor } },
+        tooltip: {
+          backgroundColor: th.bgTooltip,
+          borderColor: th.borderTooltip,
+          style: { color: th.textColor },
+          formatter: function () {
+            const pred = reversed ? this.y : this.x;
+            const obs = reversed ? this.x : this.y;
+            return '<b>Predicted ' + tipName + '</b>: ' + formatNumber(pred) +
+              '<br><b>Observed ' + tipName + '</b>: ' + formatNumber(obs);
+          }
+        },
         series: [
           { name: 'Observed vs predicted', type: 'scatter', color: 'rgba(120,200,255,0.65)', data: scatter },
           { name: '45° identity line', type: 'line', color: 'rgba(255,165,120,0.75)', dashStyle: 'Dash', marker: { enabled: false }, enableMouseTracking: false, data: [[lo, lo], [hi, hi]] }
         ],
         credits: { enabled: false }
       });
+      syncPredAxesToggle();
       setTimeout(function () {
         const el = document.getElementById('predObsPredChart');
         if (!el || typeof Highcharts === 'undefined') return;

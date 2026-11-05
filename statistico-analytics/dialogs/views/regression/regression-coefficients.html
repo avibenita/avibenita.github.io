@@ -3595,6 +3595,94 @@
     :root[data-theme="light"] .regression-table td.pvalue-warning { color: #b45309; }
     :root[data-theme="light"] .regression-table td.pvalue-bad     { color: #64748b; }
 
+    /* Coefficient inclusion: uncheck a term to drop it and refit every analysis */
+    .coef-include-note,
+    .coef-include-status {
+      margin: 0;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: var(--text-secondary);
+    }
+    .coef-include-note {
+      border-bottom: 1px solid var(--border);
+      background: rgba(56, 189, 248, 0.06);
+    }
+    .coef-include-note i { color: #38bdf8; margin-right: 6px; }
+    .coef-include-status {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      color: var(--text-primary);
+      background: rgba(56, 189, 248, 0.1);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.28);
+    }
+    .coef-include-status[hidden] { display: none !important; }
+    .coef-include-status.is-warning {
+      background: rgba(251, 191, 36, 0.1);
+      border-bottom-color: rgba(251, 191, 36, 0.35);
+    }
+    .coef-include-status i { margin-top: 2px; color: #38bdf8; }
+    .coef-include-status.is-warning i { color: #fbbf24; }
+    .regression-table th.coef-include-col,
+    .regression-table td.coef-include-cell {
+      width: 76px;
+      min-width: 76px !important;
+      max-width: 84px;
+      text-align: center !important;
+      white-space: nowrap;
+      line-height: 1.15;
+      font-size: 0.68rem;
+      letter-spacing: 0.03em;
+      position: static;
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+    #coefficientsTable { table-layout: auto; }
+    .regression-table th.coef-var-col,
+    .regression-table td.coef-var-cell {
+      text-align: left !important;
+      width: auto;
+      min-width: 128px;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .coef-include-check {
+      width: 15px;
+      height: 15px;
+      margin: 0;
+      accent-color: #38bdf8;
+      cursor: pointer;
+      vertical-align: middle;
+    }
+    .coef-include-check:disabled { cursor: default; }
+    .regression-table tbody tr.coef-row-excluded td:not(.coef-include-cell) {
+      opacity: 0.38;
+    }
+    .coef-dropped-tag {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      vertical-align: middle;
+    }
+    .reg-overview-block.coef-recalc-flash {
+      animation: coefRecalcFlash 0.8s ease;
+    }
+    @keyframes coefRecalcFlash {
+      0% { box-shadow: inset 0 0 0 0 rgba(56, 189, 248, 0); }
+      35% { box-shadow: inset 0 0 0 2px rgba(56, 189, 248, 0.7); }
+      100% { box-shadow: inset 0 0 0 0 rgba(56, 189, 248, 0); }
+    }
+
     /* ── Visualization: inviting X-axis picker ── */
     .mv-axis-picker {
       flex-shrink: 0;
@@ -4901,11 +4989,17 @@
             <button class="collapse-toggle" id="toggleCoefficientsBtn" onclick="toggleSection('coefficientsBody','toggleCoefficientsBtn')"><i class="fa-solid fa-chevron-up"></i> Collapse</button>
           </div>
           <div class="stat-panel-body collapsible-content" id="coefficientsBody" style="padding: 0;">
+            <p class="coef-include-note" id="coefIncludeNote">
+              <i class="fa-solid fa-square-check" aria-hidden="true"></i>
+              Every term starts checked, so it is in the model. Uncheck a row to drop that term: this overview, the equation, and every analysis recalculate together, and the row dims. Check it again to put the term back.
+            </p>
+            <p class="coef-include-status" id="coefIncludeStatus" hidden aria-live="polite"></p>
             <div class="table-container" style="margin: 0; border: none; border-radius: 0;">
               <table class="regression-table" id="coefficientsTable">
                 <thead>
                   <tr>
-                    <th><i class="fa-solid fa-tag"></i> Variable</th>
+                    <th class="coef-include-col" title="Uncheck a term to drop it from the model. The overview and every analysis recalculate, and the row dims.">In model</th>
+                    <th class="coef-var-col"><i class="fa-solid fa-tag"></i> Variable</th>
                     <th>Coefficient</th>
                     <th data-col-depth="analyst">Std. Error</th>
                     <th data-col-depth="analyst">t-value</th>
@@ -4917,7 +5011,7 @@
                 </thead>
                 <tbody id="dataTableBody">
                   <tr>
-                    <td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;">
+                    <td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;">
                       <i class="fa-solid fa-hourglass-half"></i> Awaiting regression results...
                     </td>
                   </tr>
@@ -6083,7 +6177,17 @@
       const sig   = results.F_pvalue;
       const r2    = results.R2;
       const n     = results.n;
-      const fStat = results.F_stat;
+      const droppedCount = window._regExcluded ? window._regExcluded.size : 0;
+      const droppedNote = droppedCount
+        ? ` <strong>${droppedCount}</strong> term${droppedCount === 1 ? '' : 's'} dropped — these results are the reduced model.`
+        : '';
+
+      if (!regressionFTestReady(results)) {
+        verdict.innerHTML = 'No predictors are in the model, so there is no overall F-test.';
+        detail.innerHTML = `The fitted value is the mean of the outcome, based on <strong>${n}</strong> observations.${droppedNote}`;
+        microtags.innerHTML = '<span class="microtag microtag-weak"><i class="fa-solid fa-filter" aria-hidden="true"></i>Reduced model</span>';
+        return;
+      }
 
       // ── Significance ──────────────────────────────────────────
       const isSig = sig < 0.05;
@@ -6104,7 +6208,7 @@
       detail.innerHTML =
         `Explains <strong>${(r2 * 100).toFixed(1)}%</strong> of the variance — ` +
         `<strong>${r2Strength}</strong> explanatory power. ` +
-        `Based on <strong>${n}</strong> observations.`;
+        `Based on <strong>${n}</strong> observations.${droppedNote}`;
 
       // ── Micro-tags ────────────────────────────────────────────
       const tags = [];
@@ -6123,6 +6227,10 @@
       if (n < 30)       tags.push({ cls: 'microtag-small',  icon: 'fa-triangle-exclamation', label: 'Small Sample' });
       else if (n < 100) tags.push({ cls: 'microtag-medium', icon: 'fa-users', label: 'Medium Sample' });
       else              tags.push({ cls: 'microtag-large',  icon: 'fa-users', label: 'Large Sample' });
+
+      if (droppedCount) {
+        tags.push({ cls: 'microtag-mod', icon: 'fa-filter', label: droppedCount === 1 ? '1 term dropped' : `${droppedCount} terms dropped` });
+      }
 
       microtags.innerHTML = tags
         .map(t => `<span class="microtag ${t.cls}"><i class="fa-solid ${t.icon}" aria-hidden="true"></i>${t.label}</span>`)
@@ -6357,10 +6465,15 @@
       }
       console.log('🔢 Decimal precision changed to:', globalDecimalPrecision);
       
-      // Re-render results if they exist
-      if (window.regressionResults && receivedModelSpec) {
-        const { y, xn = [], xc = [], interactions = [] } = receivedModelSpec;
-        displayRegressionResults(window.regressionResults, y, xn, xc, interactions, window.globalInteractionColumnNames || [], window.globalInteractionInfo || []);
+      // Re-render results if they exist. Keep a reduced model if terms were unchecked.
+      if (window.regressionResults) {
+        const view = currentIncludedView();
+        if (view) {
+          displayRegressionResults(window.regressionResults, view.y, view.xn, view.xc, view.interactions, view.interactionColumnNames, view.interactionInfo);
+        } else if (receivedModelSpec) {
+          const { y, xn = [], xc = [], interactions = [] } = receivedModelSpec;
+          displayRegressionResults(window.regressionResults, y, xn, xc, interactions, window.globalInteractionColumnNames || [], window.globalInteractionInfo || []);
+        }
       }
     }
     
@@ -7779,7 +7892,7 @@ ${sectionsHtml}
         console.error('❌ No valid data after filtering');
         const tbody = document.getElementById('dataTableBody');
         if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="8" style="color: #ff6b6b; text-align: center; padding: 20px;">
+          tbody.innerHTML = `<tr><td colspan="9" style="color: #ff6b6b; text-align: center; padding: 20px;">
             <i class="fa-solid fa-exclamation-triangle"></i> No valid observations after removing missing values
           </td></tr>`;
         }
@@ -7901,7 +8014,28 @@ ${sectionsHtml}
           ssModel: results.SSE,      ssResidual: results.SSR
         };
         storeRegressionResultsForAI(_statsForAI, _coeffRowsForAI);
-        
+
+        const _columnSpecs = buildRegColumnSpecs(xnSorted, categoricalInfo, interactionInfo);
+        const _matrixCols = xMatrix[0] ? xMatrix[0].length : 0;
+        const _specReady = _columnSpecs.length === _matrixCols;
+        if (!_specReady) {
+          console.warn('Coefficient inclusion disabled: column map does not match the design matrix.', _columnSpecs.length, _matrixCols);
+        }
+        window._regFullDesign = _specReady ? {
+          xMatrix,
+          yVector,
+          includeIntercept,
+          columns: _columnSpecs,
+          y,
+          xn: xnSorted,
+          xc: xcSorted,
+          interactions,
+          interactionInfo,
+          modelSpec: receivedModelSpec
+        } : null;
+        window._regExcluded = new Set();
+        window._regActiveColumns = _specReady ? _columnSpecs.slice() : null;
+
         // Display results in the UI
         displayRegressionResults(results, y, xn, xc, interactions, interactionColumnNames, interactionInfo);
         
@@ -7913,7 +8047,7 @@ ${sectionsHtml}
         // Show error in UI instead of alert
         const tbody = document.getElementById('dataTableBody');
         if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="8" style="color: #ff6b6b; text-align: center; padding: 20px;">
+          tbody.innerHTML = `<tr><td colspan="9" style="color: #ff6b6b; text-align: center; padding: 20px;">
             <i class="fa-solid fa-exclamation-triangle"></i> Error: ${error.message}
           </td></tr>`;
         }
@@ -7922,6 +8056,513 @@ ${sectionsHtml}
       }
     }
     
+    function escapeHtmlText(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function regressionFTestReady(results) {
+      return !!(results && results.k > 1 && Number.isFinite(results.F_stat) && Number.isFinite(results.F_pvalue));
+    }
+
+    function formatFPValue(p) {
+      if (!Number.isFinite(p)) return '—';
+      return p < 0.0001 ? '< 0.0001' : p.toFixed(4);
+    }
+
+    function buildRegColumnSpecs(xnSorted, categoricalInfo, interactionInfo) {
+      const columns = [];
+      const push = (spec) => {
+        spec.sourceIndex = columns.length;
+        columns.push(spec);
+      };
+      (xnSorted || []).forEach(name => push({ key: name, name, kind: 'numeric' }));
+      (categoricalInfo || []).forEach(catInfo => {
+        (catInfo.dummyNames || []).forEach((dummyName, di) => {
+          push({
+            key: dummyName,
+            name: dummyName,
+            kind: 'dummy',
+            factor: catInfo.name,
+            level: String(catInfo.categories[di + 1])
+          });
+        });
+      });
+      (interactionInfo || []).forEach(ixi => {
+        const ixKey = `${ixi.v1} × ${ixi.v2}`;
+        if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+          push({
+            key: ixKey, name: ixKey, kind: 'interaction', ixKey,
+            factors: [{ kind: 'numeric', name: ixi.v1 }, { kind: 'numeric', name: ixi.v2 }]
+          });
+        } else if (ixi.v1IsNumeric && ixi.v2Cat) {
+          ixi.v2Cat.dummyNames.forEach((d, i) => {
+            push({
+              key: `${ixi.v1} × ${d}`,
+              name: `${ixi.v1} × ${d}`,
+              kind: 'interaction',
+              ixKey,
+              factors: [
+                { kind: 'numeric', name: ixi.v1 },
+                { kind: 'dummy', factor: ixi.v2Cat.name, level: String(ixi.v2Cat.categories[i + 1]) }
+              ]
+            });
+          });
+        } else if (ixi.v1Cat && ixi.v2IsNumeric) {
+          ixi.v1Cat.dummyNames.forEach((d, i) => {
+            push({
+              key: `${d} × ${ixi.v2}`,
+              name: `${d} × ${ixi.v2}`,
+              kind: 'interaction',
+              ixKey,
+              factors: [
+                { kind: 'dummy', factor: ixi.v1Cat.name, level: String(ixi.v1Cat.categories[i + 1]) },
+                { kind: 'numeric', name: ixi.v2 }
+              ]
+            });
+          });
+        } else if (ixi.v1Cat && ixi.v2Cat) {
+          ixi.v1Cat.dummyNames.forEach((d1, i) => {
+            ixi.v2Cat.dummyNames.forEach((d2, j) => {
+              push({
+                key: `${d1} × ${d2}`,
+                name: `${d1} × ${d2}`,
+                kind: 'interaction',
+                ixKey,
+                factors: [
+                  { kind: 'dummy', factor: ixi.v1Cat.name, level: String(ixi.v1Cat.categories[i + 1]) },
+                  { kind: 'dummy', factor: ixi.v2Cat.name, level: String(ixi.v2Cat.categories[j + 1]) }
+                ]
+              });
+            });
+          });
+        }
+      });
+      return columns;
+    }
+
+    function currentIncludedView() {
+      const design = window._regFullDesign;
+      if (!design || !Array.isArray(design.columns)) return null;
+      const excluded = window._regExcluded || new Set();
+      const columns = design.columns.filter(c => !excluded.has(c.key));
+      const xn = columns.filter(c => c.kind === 'numeric').map(c => c.name);
+      const xc = [];
+      columns.forEach(c => {
+        if (c.kind === 'dummy' && c.factor && xc.indexOf(c.factor) === -1) xc.push(c.factor);
+      });
+      const interactionColumnNames = columns.filter(c => c.kind === 'interaction').map(c => c.name);
+      const interactions = (design.interactions || []).filter(ix =>
+        columns.some(c => c.ixKey === `${ix.var1} × ${ix.var2}`)
+      );
+      return {
+        y: design.y,
+        xn,
+        xc,
+        interactions,
+        interactionColumnNames,
+        interactionInfo: design.interactionInfo || [],
+        columns,
+        includeIntercept: !!(design.includeIntercept && !excluded.has('Intercept'))
+      };
+    }
+
+    function includedAnalysisVariables() {
+      const view = currentIncludedView();
+      if (!view) return null;
+      return { y: view.y, xn: view.xn, xc: view.xc };
+    }
+
+    function includedTermCount() {
+      const design = window._regFullDesign;
+      if (!design) return 0;
+      const excluded = window._regExcluded || new Set();
+      let count = design.includeIntercept && !excluded.has('Intercept') ? 1 : 0;
+      design.columns.forEach(c => { if (!excluded.has(c.key)) count += 1; });
+      return count;
+    }
+
+    function formatDroppedNames(names) {
+      const safe = names.map(escapeHtmlText);
+      if (safe.length <= 1) return safe[0] || '';
+      if (safe.length === 2) return `${safe[0]} and ${safe[1]}`;
+      return `${safe.slice(0, -1).join(', ')}, and ${safe[safe.length - 1]}`;
+    }
+
+    function setCoefIncludeStatus(html, isWarning) {
+      const el = document.getElementById('coefIncludeStatus');
+      if (!el) return;
+      if (!html) {
+        el.hidden = true;
+        el.innerHTML = '';
+        el.classList.remove('is-warning');
+        return;
+      }
+      el.hidden = false;
+      el.classList.toggle('is-warning', !!isWarning);
+      el.innerHTML = html;
+    }
+
+    function updateCoefIncludeStatus() {
+      const excluded = window._regExcluded;
+      if (!excluded || excluded.size === 0) {
+        setCoefIncludeStatus('');
+        return;
+      }
+      const list = formatDroppedNames([...excluded]);
+      setCoefIncludeStatus(
+        `<i class="fa-solid fa-rotate" aria-hidden="true"></i><span>Recalculated without <strong>${list}</strong>. This overview and every analysis now use the reduced model. Check a dimmed row to put a term back.</span>`,
+        false
+      );
+    }
+
+    function activeCoefficientIndex(term, results, design, excluded) {
+      if (!design || excluded.has(term.key)) return -1;
+      let idx = results.includeIntercept ? 1 : 0;
+      if (term.kind === 'intercept') return results.includeIntercept ? 0 : -1;
+      for (let i = 0; i < design.columns.length; i++) {
+        const col = design.columns[i];
+        if (excluded.has(col.key)) continue;
+        if (col.key === term.key) return idx;
+        idx += 1;
+      }
+      return -1;
+    }
+
+    function coefficientTermsForTable(allVars) {
+      const design = window._regFullDesign;
+      const matrixCols = design && design.xMatrix && design.xMatrix[0] ? design.xMatrix[0].length : 0;
+      if (design && Array.isArray(design.columns) && design.columns.length === matrixCols) {
+        const terms = [];
+        if (design.includeIntercept) terms.push({ key: 'Intercept', name: 'Intercept', kind: 'intercept' });
+        design.columns.forEach(c => terms.push(c));
+        return { terms, interactive: true };
+      }
+      return {
+        terms: (allVars || []).map(name => ({
+          key: name,
+          name,
+          kind: name === 'Intercept' ? 'intercept' : 'numeric'
+        })),
+        interactive: false
+      };
+    }
+
+    function renderCoefficientIncludeTable(results, allVars) {
+      const tbody = document.getElementById('dataTableBody');
+      if (!tbody || !results) return;
+      const { terms, interactive } = coefficientTermsForTable(allVars);
+      const excluded = window._regExcluded || new Set();
+      const design = window._regFullDesign;
+      tbody.innerHTML = '';
+
+      terms.forEach((term, termIndex) => {
+        const dropped = interactive && excluded.has(term.key);
+        const statIndex = dropped
+          ? -1
+          : (interactive ? activeCoefficientIndex(term, results, design, excluded) : termIndex);
+        const row = document.createElement('tr');
+        if (dropped) row.className = 'coef-row-excluded';
+
+        let varClass = 'var-numeric';
+        if (term.kind === 'intercept') varClass = 'var-intercept';
+        else if (term.kind === 'dummy') varClass = 'var-categorical';
+        else if (String(term.name).indexOf('_') !== -1 && term.kind !== 'interaction') varClass = 'var-categorical';
+
+        if (!dropped) {
+          if (term.kind === 'intercept') row.style.background = 'rgba(251, 191, 36, 0.08)';
+          else if (varClass === 'var-categorical') row.style.background = 'rgba(244, 114, 182, 0.08)';
+          else row.style.background = 'rgba(59, 130, 246, 0.05)';
+        }
+
+        const includeTd = document.createElement('td');
+        includeTd.className = 'coef-include-cell';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.className = 'coef-include-check';
+        box.checked = !dropped;
+        box.disabled = !interactive;
+        box.setAttribute('data-term-key', term.key);
+        const action = dropped
+          ? `Put ${term.name} back in the model and recalculate every analysis.`
+          : `Drop ${term.name} from the model and recalculate every analysis. The row will dim.`;
+        box.setAttribute('aria-label', action);
+        box.title = action;
+        includeTd.appendChild(box);
+        row.appendChild(includeTd);
+
+        const nameTd = document.createElement('td');
+        nameTd.className = 'coef-var-cell';
+        const droppedTag = dropped ? '<span class="coef-dropped-tag">Dropped</span>' : '';
+        nameTd.innerHTML = `<strong class="${varClass}">${escapeHtmlText(term.name)}</strong>${droppedTag}`;
+        row.appendChild(nameTd);
+
+        const hasStat = statIndex >= 0 && Number.isFinite(results.coefficients[statIndex]);
+        const p = hasStat ? results.p_values[statIndex] : NaN;
+        let sig = '';
+        if (hasStat) {
+          if (p < 0.001) sig = ' ***';
+          else if (p < 0.01) sig = ' **';
+          else if (p < 0.05) sig = ' *';
+        }
+        const pClass = !hasStat ? '' : (p < 0.05 ? 'pvalue-good' : (p < 0.1 ? 'pvalue-warning' : 'pvalue-bad'));
+        const pText = !hasStat ? '—' : (p < 0.0001 ? '&lt; 0.0001' : p.toFixed(4));
+        const vifIndex = statIndex - (results.includeIntercept ? 1 : 0);
+        const vifText = !hasStat || term.kind === 'intercept'
+          ? '—'
+          : ((results.VIF && results.VIF[vifIndex] != null) ? Number(results.VIF[vifIndex]).toFixed(2) : '—');
+
+        const cells = [
+          { html: hasStat ? `${formatNumber(results.coefficients[statIndex])}${sig}` : '—', cls: 'coef-cell' },
+          { html: hasStat ? formatNumber(results.std_errors[statIndex]) : '—', depth: 'analyst' },
+          { html: hasStat && Number.isFinite(results.t_values[statIndex]) ? results.t_values[statIndex].toFixed(2) : '—', depth: 'analyst' },
+          { html: pText, cls: pClass },
+          { html: hasStat ? formatNumber(results.CI_lower[statIndex]) : '—', cls: 'ci-cell' },
+          { html: hasStat ? formatNumber(results.CI_upper[statIndex]) : '—', cls: 'ci-cell' },
+          { html: vifText, depth: 'analyst' }
+        ];
+        cells.forEach(cell => {
+          const td = document.createElement('td');
+          if (cell.cls) td.className = cell.cls;
+          if (cell.depth) td.setAttribute('data-col-depth', cell.depth);
+          td.innerHTML = cell.html;
+          row.appendChild(td);
+        });
+        tbody.appendChild(row);
+      });
+    }
+
+    function captureAnalysisFlags() {
+      return {
+        residuals: !!window.residualsLoaded,
+        plots: !!window.resPlotsLoaded,
+        influence: !!window.resInfluentialLoaded,
+        predOv: !!window.predOverviewLoaded,
+        pred: !!window.predictionsLoaded,
+        viz: !!window.modelVizLoaded,
+        partial: !!window.partialGridLoaded,
+        ancova: !!window.ancovaLoaded,
+        corr: !!window.correlationsLoaded,
+        desc: !!window.descriptiveLoaded
+      };
+    }
+
+    function resetAnalysisFlags() {
+      _resData = null;
+      window._resDiagResults = null;
+      window.residualsLoaded = false;
+      window.resPlotsLoaded = false;
+      window.resInfluentialLoaded = false;
+      window.resAiLoaded = false;
+      window.predOverviewLoaded = false;
+      window.predictionsLoaded = false;
+      window.modelVizLoaded = false;
+      window.partialGridLoaded = false;
+      window.ancovaLoaded = false;
+      window.correlationsLoaded = false;
+      window.descriptiveLoaded = false;
+    }
+
+    function refreshLoadedAnalyses(was) {
+      const run = (fn) => { try { fn(); } catch (err) { console.error('Analysis sync failed:', err); } };
+      if (was.residuals || was.plots || was.influence) run(() => loadResidualsTab());
+      if (was.plots) run(() => loadResPlots());
+      if (was.influence) run(() => loadResInfluential());
+      if (was.predOv) run(() => loadPredOverviewTab());
+      if (was.pred) run(() => { initializePredictions(); window.predictionsLoaded = true; });
+      if (was.viz) run(() => {
+        if (!(window.globalXnVars || []).length) {
+          const loading = document.getElementById('modelVizLoading');
+          const content = document.getElementById('modelVizContent');
+          if (content) content.style.display = 'none';
+          if (loading) loading.style.display = '';
+        }
+        loadModelVizTab();
+        window.modelVizLoaded = true;
+      });
+      if (was.partial) run(() => {
+        if (!(window.globalXnVars || []).length) {
+          const loading = document.getElementById('pgLoading');
+          const content = document.getElementById('pgContent');
+          if (content) content.style.display = 'none';
+          if (loading) loading.style.display = '';
+        }
+        loadPartialGridTab();
+        window.partialGridLoaded = true;
+      });
+      if (was.ancova && (window.globalXnVars || []).length && (window.globalXcVars || []).length) {
+        run(() => { initializeANCOVA(); window.ancovaLoaded = true; });
+      }
+      if (was.corr) run(() => loadCorrelationsTab());
+      if (was.desc) run(() => loadDescriptiveTab());
+    }
+
+    function flashRecalculatedOverview() {
+      const el = document.querySelector('.reg-overview-block');
+      if (!el) return;
+      el.classList.remove('coef-recalc-flash');
+      void el.offsetWidth;
+      el.classList.add('coef-recalc-flash');
+    }
+
+    function publishIncludedModel() {
+      const design = window._regFullDesign;
+      const excluded = window._regExcluded || new Set();
+      if (!design) return false;
+      if (includedTermCount() < 1) return false;
+
+      const view = currentIncludedView();
+      const columns = view.columns;
+      const includeIntercept = view.includeIntercept;
+      let results;
+      try {
+        if (!columns.length) {
+          results = computeOLS(design.yVector.map(() => [1]), design.yVector, false, 0.05);
+          results.includeIntercept = true;
+        } else {
+          const reducedX = design.xMatrix.map(row => columns.map(c => row[c.sourceIndex]));
+          results = computeOLS(reducedX, design.yVector, includeIntercept, 0.05);
+        }
+      } catch (err) {
+        console.warn('Reduced model could not be fit:', err);
+        return false;
+      }
+      if (!results || !Array.isArray(results.coefficients) || results.coefficients.some(c => !Number.isFinite(c))) {
+        return false;
+      }
+      if (!(results.k > 1) || !Number.isFinite(results.F_stat)) {
+        results.F_stat = NaN;
+        results.F_pvalue = NaN;
+      }
+      results.fitted = Array.isArray(results.Y_fit) ? results.Y_fit.slice() : [];
+
+      const reducedX = columns.length
+        ? design.xMatrix.map(row => columns.map(c => row[c.sourceIndex]))
+        : design.yVector.map(() => []);
+      const activeNames = columns.map(c => c.name);
+
+      window.regressionResults = results;
+      window.globalRegressionResults = results;
+      window.regressionData = {
+        yVector: design.yVector.slice(),
+        xMatrix: reducedX,
+        intercept: includeIntercept
+      };
+      window.regressionVariableNames = activeNames.slice();
+      window.globalXnVars = view.xn.slice();
+      window.globalXcVars = view.xc.slice();
+      window.globalIncludeIntercept = includeIntercept;
+      window.globalInteractions = view.interactions.slice();
+      window.globalInteractionColumnNames = view.interactionColumnNames.slice();
+      window.globalInteractionInfo = view.interactionInfo;
+      window._regActiveColumns = columns.slice();
+
+      const was = captureAnalysisFlags();
+      resetAnalysisFlags();
+      displayRegressionResults(
+        results,
+        view.y,
+        view.xn,
+        view.xc,
+        view.interactions,
+        view.interactionColumnNames,
+        view.interactionInfo
+      );
+      refreshLoadedAnalyses(was);
+
+      try {
+        const names = includeIntercept ? ['Intercept', ...activeNames] : activeNames.slice();
+        const coeffRows = results.coefficients.map((coef, i) => ({
+          Variable: names[i] || `Var${i}`,
+          Coefficient: coef,
+          'Std. Error': results.std_errors[i],
+          't-value': results.t_values[i],
+          'P-value': results.p_values[i],
+          '95% CI Lower': results.CI_lower[i],
+          '95% CI Upper': results.CI_upper[i],
+          VIF: null
+        }));
+        storeRegressionResultsForAI({
+          observations: results.n,
+          validObs: results.n,
+          numNumericVars: view.xn.length,
+          numCategoricalVars: view.xc.length,
+          rSquared: results.R2,
+          adjRSquared: results.R2_adj,
+          rootMSE: results.RMSE,
+          aic: results.AIC,
+          bic: results.BIC,
+          fStatistic: results.F_stat,
+          fPValue: results.F_pvalue,
+          ssModel: results.SSE,
+          ssResidual: results.SSR
+        }, coeffRows);
+      } catch (err) {
+        console.warn('Could not refresh stored regression results:', err);
+      }
+
+      if (window.regressionNavData && design.modelSpec) {
+        window.regressionNavData.results = results;
+        window.regressionNavData.modelSpec = Object.assign({}, design.modelSpec, {
+          y: design.y,
+          xn: view.xn.slice(),
+          xc: view.xc.slice(),
+          interactions: view.interactions.slice(),
+          intercept: includeIntercept ? 1 : 0,
+          excludedTerms: [...excluded]
+        });
+        persistSessionJson('regressionNavData', window.regressionNavData);
+      }
+      updateCoefIncludeStatus();
+      return true;
+    }
+
+    function onCoefIncludeToggle(key, wantIncluded) {
+      const design = window._regFullDesign;
+      if (!design || !key) return;
+      const excluded = window._regExcluded || (window._regExcluded = new Set());
+      const wasExcluded = excluded.has(key);
+      if (wantIncluded) excluded.delete(key);
+      else excluded.add(key);
+
+      const box = document.querySelector(`.coef-include-check[data-term-key="${CSS.escape(key)}"]`);
+      if (includedTermCount() < 1) {
+        if (wasExcluded) excluded.add(key);
+        else excluded.delete(key);
+        if (box) box.checked = true;
+        setCoefIncludeStatus(
+          '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>At least one term has to stay in the model.</span>',
+          true
+        );
+        return;
+      }
+
+      if (!publishIncludedModel()) {
+        if (wasExcluded) excluded.add(key);
+        else excluded.delete(key);
+        if (box) box.checked = !excluded.has(key);
+        setCoefIncludeStatus(
+          `<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Could not refit without <strong>${escapeHtmlText(key)}</strong>. That term stays in the model.</span>`,
+          true
+        );
+        return;
+      }
+      flashRecalculatedOverview();
+    }
+
+    if (!window._coefIncludeBound) {
+      window._coefIncludeBound = true;
+      document.addEventListener('change', function (event) {
+        const box = event.target;
+        if (!box || !box.classList || !box.classList.contains('coef-include-check')) return;
+        if (box.disabled) return;
+        onCoefIncludeToggle(box.getAttribute('data-term-key'), box.checked);
+      });
+    }
+
     // Display regression results in the UI
     function displayRegressionResults(results, yVarName, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo) {
       console.log('📊 Displaying regression results...');
@@ -7988,19 +8629,22 @@ ${sectionsHtml}
       document.getElementById('bic').textContent = formatNumber(results.BIC);
       
       // Populate F-test panel
-      document.getElementById('fStatistic').textContent = formatNumber(results.F_stat);
-      document.getElementById('fPValue').textContent = results.F_pvalue < 0.0001 ? '< 0.0001' : results.F_pvalue.toFixed(4); // Always 4 decimals for p-value
+      const fReady = regressionFTestReady(results);
+      const fStatText = fReady ? formatNumber(results.F_stat) : '—';
+      const fPText = fReady ? formatFPValue(results.F_pvalue) : '—';
+      document.getElementById('fStatistic').textContent = fStatText;
+      document.getElementById('fPValue').textContent = fPText;
       document.getElementById('ssModel').textContent = formatNumber(results.SSE);
       document.getElementById('ssResidual').textContent = formatNumber(results.SSR);
 
       applyMetricClass(document.getElementById('rSquared'), rSquaredClass(results.R2));
       applyMetricClass(document.getElementById('adjRSquared'), rSquaredClass(results.R2_adj));
-      applyMetricClass(document.getElementById('fPValue'), pValueClass(results.F_pvalue));
+      applyMetricClass(document.getElementById('fPValue'), fReady ? pValueClass(results.F_pvalue) : '');
       updateExecutiveKpis({
         R2: results.R2,
         adjR2: results.R2_adj,
         rmse: results.RMSE,
-        pValue: results.F_pvalue < 0.0001 ? '< 0.0001' : results.F_pvalue.toFixed(4),
+        pValue: fPText,
         n: results.n
       });
       updateInterpretationPanel({
@@ -8014,28 +8658,30 @@ ${sectionsHtml}
       const anovaBody = document.getElementById('anovaTableBody');
       if (anovaBody) {
         // Calculate degrees of freedom
-        const df_model = results.k - 1; // k - 1 for model (k includes intercept)
+        const df_model = Math.max(0, results.k - 1); // k - 1 for model (k includes intercept)
         const df_residual = results.df; // n - k
         const df_total = results.n - 1;
         
         // Calculate mean squares
-        const ms_model = results.SSE / df_model;
-        const ms_residual = results.SSR / df_residual;
+        const ms_model = df_model > 0 ? results.SSE / df_model : null;
+        const ms_residual = df_residual > 0 ? results.SSR / df_residual : null;
+        const msModelText = ms_model == null || !Number.isFinite(ms_model) ? '—' : formatNumber(ms_model);
+        const msResidText = ms_residual == null || !Number.isFinite(ms_residual) ? '—' : formatNumber(ms_residual);
         
         anovaBody.innerHTML = `
           <tr style="background: rgba(74, 85, 104, 0.3);">
             <td><strong>Model</strong></td>
             <td>${df_model}</td>
             <td>${formatNumber(results.SSE)}</td>
-            <td>${formatNumber(ms_model)}</td>
-            <td>${formatNumber(results.F_stat)}</td>
-            <td>${results.F_pvalue < 0.0001 ? '< 0.0001' : results.F_pvalue.toFixed(4)}</td>
+            <td>${msModelText}</td>
+            <td>${fReady ? formatNumber(results.F_stat) : '—'}</td>
+            <td>${fReady ? formatFPValue(results.F_pvalue) : '—'}</td>
           </tr>
           <tr>
             <td><strong>Residual</strong></td>
             <td>${df_residual}</td>
             <td>${formatNumber(results.SSR)}</td>
-            <td>${formatNumber(ms_residual)}</td>
+            <td>${msResidText}</td>
             <td>—</td>
             <td>—</td>
           </tr>
@@ -8050,62 +8696,8 @@ ${sectionsHtml}
         `;
       }
       
-      // Populate coefficients table
-      const tbody = document.getElementById('dataTableBody');
-      if (tbody) {
-        tbody.innerHTML = '';
-        
-        results.coefficients.forEach((coef, i) => {
-          const row = document.createElement('tr');
-          const varName = allVars[i] || `X${i}`;
-          
-          // Determine variable type for color coding
-          let varClass = '';
-          let rowStyle = '';
-          if (i === 0 && results.includeIntercept) {
-            varClass = 'var-intercept';
-            rowStyle = 'background: rgba(251, 191, 36, 0.08) !important;';
-          } else {
-            // Check if it's a categorical variable (contains underscore for dummy coding)
-            if (varName.includes('_')) {
-              varClass = 'var-categorical';
-              rowStyle = 'background: rgba(244, 114, 182, 0.08) !important;';
-            } else {
-              varClass = 'var-numeric';
-              rowStyle = 'background: rgba(59, 130, 246, 0.05) !important;';
-            }
-          }
-          
-          // Check significance
-          const significant = results.p_values[i] < 0.05;
-          const highlySignificant = results.p_values[i] < 0.01;
-          const veryHighlySignificant = results.p_values[i] < 0.001;
-          
-          let sigIndicator = '';
-          if (veryHighlySignificant) sigIndicator = ' ***';
-          else if (highlySignificant) sigIndicator = ' **';
-          else if (significant) sigIndicator = ' *';
-          
-          row.style.cssText = rowStyle;
-          
-          // Use global formatNumber function for all values
-          const formatCoef = (val) => formatNumber(val);
-          const formatSE = (val) => formatNumber(val);
-          
-          row.innerHTML = `
-            <td><strong class="${varClass}">${varName}</strong></td>
-            <td class="coef-cell">${formatCoef(coef)}${sigIndicator}</td>
-            <td data-col-depth="analyst">${formatSE(results.std_errors[i])}</td>
-            <td data-col-depth="analyst">${results.t_values[i].toFixed(2)}</td>
-            <td class="${results.p_values[i] < 0.05 ? 'pvalue-good' : (results.p_values[i] < 0.1 ? 'pvalue-warning' : 'pvalue-bad')}">${results.p_values[i] < 0.0001 ? '< 0.0001' : results.p_values[i].toFixed(4)}</td>
-            <td class="ci-cell">${formatCoef(results.CI_lower[i])}</td>
-            <td class="ci-cell">${formatCoef(results.CI_upper[i])}</td>
-            <td data-col-depth="analyst">${i === 0 && results.includeIntercept ? '—' : (results.VIF[i - (results.includeIntercept ? 1 : 0)]?.toFixed(2) || '—')}</td>
-          `;
-          
-          tbody.appendChild(row);
-        });
-      }
+      // Populate coefficients table, including terms the user has dropped
+      renderCoefficientIncludeTable(results, allVars);
       
       // Generate and display regression equation inline
       const equationTerms = results.coefficients.map((coef, i) => ({
@@ -8664,9 +9256,12 @@ ${sectionsHtml}
       const embedQs = 'embed=1&parent=regression';
       const iframeUrl = `${baseUrl}/correlations/correlation-matrix-v2.html?${embedQs}&cb=${Date.now()}`;
 
-      // Prepare column info
+      // Prepare column info from the terms still in the model
       const { headers, rows, address } = receivedRegressionData;
-      const { y, xn = [], xc = [] } = receivedModelSpec;
+      const includedVars = includedAnalysisVariables();
+      const y = includedVars ? includedVars.y : receivedModelSpec.y;
+      const xn = includedVars ? includedVars.xn : (receivedModelSpec.xn || []);
+      const xc = includedVars ? includedVars.xc : (receivedModelSpec.xc || []);
       const modelVars = [y, ...xn, ...xc];
       const indices = modelVars.map(v => headers.indexOf(v)).filter(i => i !== -1);
       const filteredHeaders = indices.map(i => headers[i]);
@@ -8730,9 +9325,12 @@ ${sectionsHtml}
       const embedQs = 'embed=1&parent=regression';
       const iframeUrl = `${baseUrl}/correlations/descriptive-stats.html?${embedQs}&cb=${Date.now()}`;
 
-      // Prepare column info
+      // Prepare column info from the terms still in the model
       const { headers, rows, address } = receivedRegressionData;
-      const { y, xn = [], xc = [] } = receivedModelSpec;
+      const includedVars = includedAnalysisVariables();
+      const y = includedVars ? includedVars.y : receivedModelSpec.y;
+      const xn = includedVars ? includedVars.xn : (receivedModelSpec.xn || []);
+      const xc = includedVars ? includedVars.xc : (receivedModelSpec.xc || []);
       const modelVars = [y, ...xn, ...xc];
       const indices = modelVars.map(v => headers.indexOf(v)).filter(i => i !== -1);
       const filteredHeaders = indices.map(i => headers[i]);
@@ -9087,7 +9685,7 @@ ${sectionsHtml}
         const tr = document.createElement('tr');
         tr.className = 'section-header section-header-row';
         const td = document.createElement('td');
-        td.colSpan = 8;
+        td.colSpan = 9;
         td.textContent = title;
         tr.appendChild(td);
         return tr;
@@ -9112,6 +9710,20 @@ ${sectionsHtml}
       // Helper function to create a data row
       function createDataRow(row) {
         const tr = document.createElement('tr');
+        const includeTd = document.createElement('td');
+        includeTd.className = 'coef-include-cell';
+        const includeBox = document.createElement('input');
+        includeBox.type = 'checkbox';
+        includeBox.className = 'coef-include-check';
+        includeBox.checked = true;
+        includeBox.disabled = !window._regFullDesign;
+        const varLabel = row.Variable || row.variable || '';
+        if (varLabel) includeBox.setAttribute('data-term-key', varLabel);
+        includeBox.title = includeBox.disabled
+          ? 'Term inclusion is available after the model is computed in this view.'
+          : 'Uncheck to drop this term and recalculate every analysis. The row will dim.';
+        includeTd.appendChild(includeBox);
+        tr.appendChild(includeTd);
         const columns = [
           { keys: ['Variable', 'variable'], type: 'var' },
           { keys: ['Coefficient', 'coef', 'Estimate', 'estimate'], type: 'coef' },
@@ -9127,6 +9739,7 @@ ${sectionsHtml}
           const value = valueByKeys(row, col.keys);
           const td = document.createElement('td');
           td.textContent = value;
+          if (col.type === 'var') td.classList.add('coef-var-cell');
           if (col.type === 'coef') td.classList.add('coef-cell');
           if (col.type === 'ci') td.classList.add('ci-cell');
           if (col.type === 'p') classifyPValueCell(td, value);
@@ -9214,7 +9827,7 @@ ${sectionsHtml}
         if (tableBody) {
           tableBody.innerHTML = `
             <tr>
-              <td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;">
+              <td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;">
                 <i class="fa-solid fa-hourglass-half"></i> Awaiting regression results...
               </td>
             </tr>
@@ -9274,7 +9887,7 @@ ${sectionsHtml}
       if (tableBody && !tableBody.querySelector('tr')) {
         tableBody.innerHTML = `
           <tr>
-            <td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;">
+            <td colspan="9" style="text-align:center; padding:20px; color:var(--text-muted); font-style:italic;">
               <i class="fa-solid fa-hourglass-half"></i> Awaiting regression results...
             </td>
           </tr>
@@ -9664,9 +10277,18 @@ ${sectionsHtml}
       predictionData.coefficients = results.coefficients || [];
       predictionData.stats = results;
 
-      // Get variable info from global data
+      // Get variable info from global data. Active columns keep scenario inputs
+      // aligned when a main effect was dropped but an interaction still needs it.
       const yVar = window.globalYVar || 'Y';
-      const xnVars = window.globalXnVars || [];
+      const xnVars = (window.globalXnVars || []).slice();
+      (window._regActiveColumns || []).forEach(col => {
+        const bits = [];
+        if (col.kind === 'numeric') bits.push(col);
+        (col.factors || []).forEach(f => bits.push(f));
+        bits.forEach(f => {
+          if (f.kind === 'numeric' && f.name && xnVars.indexOf(f.name) === -1) xnVars.push(f.name);
+        });
+      });
       const xcVars = window.globalXcVars || [];
       const rawHeaders = window.globalRawHeaders || [];
       const rawRows = window.globalRawRows || [];
@@ -9913,29 +10535,44 @@ ${sectionsHtml}
       const results = window.globalRegressionResults;
       const includeIntercept = window.globalIncludeIntercept;
       
-      // Build X vector for prediction
+      // Build X vector for prediction. A reduced model walks the active columns
+      // so dropped terms stay out of the scenario, diagnostics, and fit.
       const xVector = [];
-      
-      // Add intercept if needed
-      if (includeIntercept) {
-        xVector.push(1);
+      const useReduced = window._regExcluded && window._regExcluded.size > 0 && Array.isArray(window._regActiveColumns);
+      if (useReduced) {
+        if (includeIntercept) xVector.push(1);
+        window._regActiveColumns.forEach(col => {
+          if (col.kind === 'numeric') {
+            const v = Number(inputs[col.name]);
+            xVector.push(Number.isFinite(v) ? v : 0);
+          } else if (col.kind === 'dummy') {
+            xVector.push(String(inputs[col.factor]) === String(col.level) ? 1 : 0);
+          } else if (col.kind === 'interaction') {
+            let prod = 1;
+            (col.factors || []).forEach(f => {
+              if (f.kind === 'numeric') {
+                const v = Number(inputs[f.name]);
+                prod *= Number.isFinite(v) ? v : 0;
+              } else if (f.kind === 'dummy') {
+                prod *= String(inputs[f.factor]) === String(f.level) ? 1 : 0;
+              }
+            });
+            xVector.push(prod);
+          }
+        });
+      } else {
+        if (includeIntercept) xVector.push(1);
+        predictionData.numericVars.forEach(varName => {
+          xVector.push(inputs[varName] || 0);
+        });
+        predictionData.categoricalVars.forEach(varName => {
+          const levels = predictionData.categoricalLevels[varName];
+          const selectedLevel = inputs[varName];
+          for (let i = 1; i < levels.length; i++) {
+            xVector.push(selectedLevel === levels[i] ? 1 : 0);
+          }
+        });
       }
-
-      // Add numeric variables
-      predictionData.numericVars.forEach(varName => {
-        xVector.push(inputs[varName] || 0);
-      });
-
-      // Add categorical variables (dummy coded)
-      predictionData.categoricalVars.forEach(varName => {
-        const levels = predictionData.categoricalLevels[varName];
-        const selectedLevel = inputs[varName];
-        
-        // One-hot encoding (drop first level as reference)
-        for (let i = 1; i < levels.length; i++) {
-          xVector.push(selectedLevel === levels[i] ? 1 : 0);
-        }
-      });
 
       // Calculate point prediction: y_hat = X * beta
       let prediction = 0;

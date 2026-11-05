@@ -1143,7 +1143,7 @@
       if (!spec || !rows || !rows.length) return null;
       const { y, xn = [], xc = [], intercept } = spec;
       const interactions = normalizeInteractionTerms(spec.interactions);
-      const includeIntercept = intercept === 1 || intercept === true;
+      let includeIntercept = intercept === 1 || intercept === true;
       const yIndex = headers.indexOf(y);
       if (yIndex === -1) return null;
 
@@ -1152,7 +1152,7 @@
       const xnIndices = xnSorted.map((varName) => headers.indexOf(varName));
       const categoricalInfo = categoricalInfoOverride || buildCategoricalInfo(rows, headers, xcSorted);
 
-      const variableNames = [...xnSorted];
+      let variableNames = [...xnSorted];
       categoricalInfo.forEach((catInfo) => variableNames.push(...catInfo.dummyNames));
 
       const interactionInfo = interactions.map((ix) => {
@@ -1232,6 +1232,28 @@
       }
 
       if (!xMatrix.length || xMatrix.length !== yVector.length) return null;
+
+      const excludedTerms = new Set(Array.isArray(spec.excludedTerms) ? spec.excludedTerms : []);
+      if (excludedTerms.has('Intercept')) includeIntercept = false;
+      if (excludedTerms.size && xMatrix[0]) {
+        const keep = [];
+        variableNames.forEach((name, i) => {
+          if (!excludedTerms.has(name)) keep.push(i);
+        });
+        if (keep.length !== variableNames.length) {
+          const keepSet = new Set(keep);
+          variableNames = variableNames.filter((name) => !excludedTerms.has(name));
+          for (let r = 0; r < xMatrix.length; r++) {
+            xMatrix[r] = xMatrix[r].filter((_, i) => keepSet.has(i));
+          }
+        }
+      }
+      if (xMatrix[0] && xMatrix[0].length === 0) {
+        if (!includeIntercept) return null;
+        for (let r = 0; r < xMatrix.length; r++) xMatrix[r] = [1];
+        variableNames = ['Intercept'];
+        includeIntercept = false;
+      }
 
       const displayNames = includeIntercept ? ['Intercept', ...variableNames] : variableNames.slice();
       const paramCount = xMatrix[0].length + (includeIntercept ? 1 : 0);

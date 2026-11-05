@@ -1,14 +1,15 @@
 # Regression brief r001
 
-One seeded sales model, brought in with `demo=1`. The film does not tour static tables.
+The film follows the shared module-story structure.
 
-The opening is narrated, then a short card separates that introduction from the module. The live demonstration is four responses:
+The overview maps four areas the current module actually offers: estimates and their uncertainty, predictor-effect plots, scenario prediction, and diagnostics with an influence comparison. The spoken overview is the verified sentence in `cues.json`.
 
-1. Move Ad Spend. Predicted sales and the profile title change.
-2. Switch the profile to Store Size, then move that slider. The chart axis and the prediction change.
-3. The screen's flagged rows are the selection. Refit Excluding Flagged shows the original fit beside the refit.
-4. Restore Original removes that comparison.
+Three demonstrations follow, each a different question:
 
-Each step shows the control first, performs the action, and holds the result. Narration explains the consequence and does not read the figures. The refit is a sensitivity comparison.
+1. Choose Store Size on the predictor-effect plot and watch that plot respond.
+2. Move Ad Spend and watch the scenario prediction and profile respond.
+3. Exclude the rows the screen flags, compare the fit, and restore the original. The refit is a sensitivity check.
 
-The production check confirms the seeded page, the predictor response, and the refit panel. It does not sign off the module as independently validated. Calculation findings that the film avoids are in `Statistico/validation/regression/FINDINGS.md`.
+The feature catalogue then uses the Univariate card grid. Page one is the verified inventory. Page two separates sharing tools from results this build does not treat as reliable. Narration does not read the bullets or the on-screen figures.
+
+The production check confirms the seeded page and the featured actions. It is not a validation sign-off. Deferred calculations stay in `Statistico/validation/regression/FINDINGS.md`.

@@ -151,9 +151,10 @@ try {
     if (pageData.kpiFp !== '< 0.0001') {
       limits.push(`Overview F-test chip shows "${pageData.kpiFp}" while the conclusion text is below 0.0001. Deferred to the validation project. Not featured.`);
     }
-    const ad = pageData.table.find((row) => row[0] === 'Ad Spend');
+    const ad = pageData.table.find((row) => row.includes('Ad Spend'));
     if (!ad) failures.push('Ad Spend row is missing');
     else {
+      const nameAt = ad.indexOf('Ad Spend');
       const expected = [
         'Ad Spend',
         formatLikePage(ref.coefficients[1]),
@@ -165,9 +166,11 @@ try {
       ];
       expected.forEach((text, index) => {
         if (index === 0) return;
-        if (!String(ad[index] || '').includes(text)) failures.push(`Ad Spend column ${index} shows "${ad[index]}", expected to include ${text}`);
+        const shown = ad[nameAt + index];
+        if (!String(shown || '').includes(text)) failures.push(`Ad Spend column ${index} shows "${shown}", expected to include ${text}`);
       });
-      if (ad[7] !== '—') limits.push(`VIF cell shows "${ad[7]}" because computeOLS is called without the VIF flag. Deferred. Not featured.`);
+      const vif = ad[nameAt + 7];
+      if (vif !== '—') limits.push(`VIF cell shows "${vif}" because computeOLS is called without the VIF flag. Deferred. Not featured.`);
     }
     await page.evaluate(() => switchTab('results-detail'));
     const fPanel = await page.textContent('#fPValue');
@@ -188,7 +191,7 @@ try {
     await page.waitForTimeout(200);
     const endPred = await page.evaluate(() => ({
       value: document.getElementById('predictedValue').textContent,
-      ad: document.getElementById('value-Ad Spend').textContent
+      ad: document.getElementById('input-Ad Spend').value
     }));
     const deltaShown = Number(endPred.value) - Number(startPred.value);
     const deltaSlope = ref.coefficients[1] * (Number(endPred.ad) - Number(startPred.ad));

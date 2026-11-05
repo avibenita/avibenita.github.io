@@ -88,13 +88,55 @@ async function loadFilm(page) {
   await page.waitForTimeout(PROBE ? 80 : 350);
 }
 
-async function opening(page, { mark, say }) {
-  await page.goto(`${BASE}/Statistico/regression/produce/open.html`, { waitUntil: 'load' });
+async function overview(page, { mark, say }) {
+  await page.goto(`${BASE}/Statistico/regression/produce/overview.html`, { waitUntil: 'load' });
   await page.evaluate(() => document.body.classList.add('go'));
   mark();
-  await page.waitForTimeout(PROBE ? 40 : 160);
-  await say('open-1');
+  await page.waitForTimeout(PROBE ? 40 : 280);
+  await say('overview-1');
+  await page.waitForTimeout(PROBE ? 40 : 2200);
+}
+
+async function effects(page, { mark, note }) {
+  await loadFilm(page);
+  mark();
+  await page.evaluate(() => switchTab('viz-partial'));
+  await page.waitForFunction(() => {
+    const row = document.getElementById('modelVizCbRow');
+    const chart = document.querySelector('#modelVizChart .highcharts-container, #modelVizChart svg');
+    return row && row.textContent && /Store Size/.test(row.textContent) && chart;
+  }, null, { timeout: 12000 });
+  await page.waitForTimeout(PROBE ? 40 : 400);
+  const before = await page.locator('#modelVizFitRow').innerText();
+  await page.evaluate(() => {
+    const scroller = document.querySelector('#tab-model-viz .ws-body');
+    const pill = document.getElementById('modelVizCbRow');
+    if (!scroller || !pill) return;
+    const top = pill.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = Math.max(0, top - 8);
+  });
+  const store = page.locator('#modelVizCbRow button', { hasText: 'Store Size' });
+  await page.evaluate(() => {
+    const button = [...document.querySelectorAll('#modelVizCbRow button')].find((el) => /Store Size/.test(el.textContent || ''));
+    if (button) button.id = 'filmStorePill';
+  });
+  await hot(page, '#filmStorePill', 1);
+  note('effects-1');
+  const total = dur('effects-1');
+  await page.waitForTimeout(total * 0.58 * 1000);
+  await store.click();
+  await page.waitForFunction(() => /Store Size/.test(document.getElementById('modelVizFitRow')?.innerText || ''), null, { timeout: 8000 });
   await page.waitForTimeout(PROBE ? 40 : 500);
+  const after = await page.locator('#modelVizFitRow').innerText();
+  if (before === after) throw new Error('Choosing Store Size did not change the effect plot');
+  await clearFilmHighlight(page);
+  await page.evaluate(() => {
+    document.getElementById('modelVizChart')?.scrollIntoView({ block: 'center', inline: 'nearest' });
+  });
+  await hot(page, '#modelVizChart', 1);
+  await page.waitForTimeout(Math.max(0, total * 0.42) * 1000);
+  await page.waitForTimeout(PROBE ? 40 : 3000);
+  await clearFilmHighlight(page);
 }
 
 async function scenario(page, { mark, note, say }) {
@@ -127,32 +169,6 @@ async function scenario(page, { mark, note, say }) {
   await clearFilmHighlight(page);
   await hot(page, '#predictedValue', 1);
   await page.waitForTimeout(Math.max(0, first * 0.58) * 1000);
-  await page.waitForTimeout(PROBE ? 40 : 2800);
-  await clearFilmHighlight(page);
-  const mid = await page.locator('#predictedValue').innerText();
-  await page.locator('[data-pred-axis="Store%20Size"]').scrollIntoViewIfNeeded();
-  note('scenario-2');
-  const second = dur('scenario-2');
-  await hot(page, '[data-pred-axis="Store%20Size"]', 1);
-  await page.waitForTimeout(Math.min(second * 0.28, 1.1) * 1000);
-  await page.click('[data-pred-axis="Store%20Size"]');
-  await page.waitForTimeout(PROBE ? 40 : 450);
-  const axis = await page.evaluate(() => window._predProfileChart?.xAxis?.[0]?.options?.title?.text || '');
-  if (!/Store Size/i.test(axis)) throw new Error(`Profile axis did not switch to Store Size: ${axis}`);
-  await clearFilmHighlight(page);
-  await hot(page, '[id="input-Store Size"]', 1);
-  await page.waitForTimeout(Math.max(0, second * 0.22) * 1000);
-  await page.evaluate(() => {
-    const slider = document.getElementById('input-Store Size');
-    slider.value = slider.min;
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  await page.waitForTimeout(PROBE ? 40 : 450);
-  const end = await page.locator('#predictedValue').innerText();
-  if (mid === end) throw new Error('Moving store size did not change the prediction');
-  await clearFilmHighlight(page);
-  await hot(page, '#predProfileChart', 1);
-  await page.waitForTimeout(Math.max(0, second * 0.5) * 1000);
   await page.waitForTimeout(PROBE ? 40 : 3000);
   await clearFilmHighlight(page);
 }
@@ -283,11 +299,20 @@ async function main() {
   const scenes = [];
   try {
     const jobs = [
-      ['open', opening],
-      ['enter', (page, api) => brand(page, 'enter.html', 2.8, api)],
+      ['overview', overview],
+      ['enter', (page, api) => brand(page, 'enter.html', 2.4, api)],
+      ['effects', effects],
       ['scenario', scenario],
-      ['chapter', (page, api) => brand(page, 'chapter.html', 2.6, api)],
       ['influence', influence],
+      ['catalogue', async (page, api) => {
+        await page.goto(`${BASE}/Statistico/regression/produce/catalogue.html?page=1`, { waitUntil: 'load' });
+        await page.evaluate(() => document.body.classList.add('go'));
+        api.mark();
+        await page.waitForTimeout(PROBE ? 40 : 350);
+        await api.say('catalogue-1');
+        await page.waitForTimeout(PROBE ? 40 : 12000);
+      }],
+      ['catalogue2', (page, api) => brand(page, 'catalogue.html?page=2', 15, api)],
       ['bridge', (page, api) => brand(page, 'bridge.html', 1.2, api)],
       ['thanks', async (page, api) => {
         await page.goto(`${BASE}/Statistico/regression/produce/thanks.html`, { waitUntil: 'load' });

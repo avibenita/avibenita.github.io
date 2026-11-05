@@ -1,13 +1,12 @@
 # Regression QA r001
 
-Watch the recommended candidate before any publication or approved-folder copy.
+Watch the recommended candidate before publication or an approved-folder copy.
 
 Confirm:
 
-- The opening sentence starts while the opening page is on screen, and the enter card is a distinct pause before the module.
-- Ad Spend changes the prediction and the profile. Store Size does the same after the profile switches.
-- The flagged rows, the refit comparison, and Restore Original are each visible long enough to follow.
-- Narration does not read the on-screen figures, and it calls the refit a sensitivity check.
-- The warm-gold frame draws in, the glow breathes, and only one frame is active.
+- The overview explains the four areas and runs about 15–20 seconds.
+- The effect plot, the scenario slider, and the refit each show a starting state, an action, a response, and a short hold.
+- The catalogue is a separate ending, with readable cards and a distinct “Not in this build” group.
+- Narration does not read the on-screen figures.
 
-The production check is not a validation sign-off. Unfeatured calculation defects stay in `Statistico/validation/regression/FINDINGS.md`.
+The production check is not a validation sign-off.

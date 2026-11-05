@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import test from 'node:test';
 import { spawn } from 'child_process';
-import { classifySilence, DETECTION_LIMITS, recitedNarrationIssues } from '../evidence.mjs';
+import { classifySilence, DETECTION_LIMITS, moduleStoryIssues, recitedNarrationIssues } from '../evidence.mjs';
 import { FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC, glowDeltaIssue, highlightCssIssues, highlightEventIssues, highlightStandardIssues } from '../overlay/highlight.mjs';
 import { demoAdapters, demoConfig, runAuto } from '../controller.mjs';
 import { doctorLines, dryRunLines } from '../producer.mjs';
@@ -320,7 +320,22 @@ test('the warm-gold highlight spec matches the shared overlay', () => {
   assert.equal(glowDeltaIssue(Buffer.from([0, 0, 0]), Buffer.from([20, 0, 0])), '');
   const cues = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'Statistico', 'regression', 'produce', 'cues.json'), 'utf8'));
   assert.equal(recitedNarrationIssues(cues).length, 0);
-  assert.match(cues.find((cue) => cue.id === 'open-1').spoken, /^Put your regression model in motion\./);
+  assert.match(cues.find((cue) => cue.id === 'overview-1').spoken, /one interactive workspace/);
+  assert.match(cues.find((cue) => cue.id === 'catalogue-1').spoken, /broader regression toolkit/);
+  const story = moduleStoryIssues([
+    { id: 'overview', start: 0, end: 12 },
+    { id: 'effects', start: 12, end: 30 },
+    { id: 'scenario', start: 30, end: 50 }
+  ], {
+    filmStructure: {
+      id: 'module-story',
+      overviewSceneId: 'overview',
+      demonstrationSceneIds: ['effects', 'scenario', 'influence'],
+      catalogueSceneIds: ['catalogue', 'catalogue2']
+    }
+  });
+  assert.ok(story.some((line) => /overview/.test(line)));
+  assert.ok(story.some((line) => /catalogue/.test(line)));
   assert.equal(HIGHLIGHT_SPEC.breatheMs, 2400);
   assert.equal(HIGHLIGHT_SPEC.fadeInMs, 300);
 });

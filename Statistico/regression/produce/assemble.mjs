@@ -83,15 +83,17 @@ const bridge = byId.bridge;
 if (!bridge) throw new Error('bridge scene is missing');
 if (!byId.thanks) throw new Error('thanks scene is missing');
 
-const sequence = ['open', 'enter', 'scenario', 'chapter', 'influence', 'thanks', 'close'];
+const sequence = ['overview', 'enter', 'effects', 'scenario', 'influence', 'catalogue', 'catalogue2', 'thanks', 'close'];
 const filters = [`[${sequence.length}:v]split=${sequence.length - 1}`];
 const splitLabels = [];
 for (let i = 0; i < sequence.length - 1; i += 1) splitLabels.push(`[b${i}]`);
 filters[0] += splitLabels.join('');
-let accDur = byId.open.duration;
+const firstId = sequence[0];
+if (!byId[firstId]) throw new Error(`${firstId} scene is missing`);
+let accDur = byId[firstId].duration;
 let prev = '[0:v]';
 let bridgeSlot = 0;
-const starts = { open: 0 };
+const starts = { [firstId]: 0 };
 for (let i = 1; i < sequence.length; i += 1) {
   const id = sequence[i];
   const input = `[${sequence.indexOf(id)}:v]`;

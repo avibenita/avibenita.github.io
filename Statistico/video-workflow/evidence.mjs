@@ -123,7 +123,31 @@ export function highlightTechnicalIssues(manifest, moduleConfig) {
   return highlightIssuesFromManifest(manifest, moduleConfig);
 }
 
-const RECITED_VALUE = /\d|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|hundred|thousand|percent|percentage)\b|\br-squared\b|\bp-?value\b/i;
+const RECITED_VALUE = /\d|\b(?:zero|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|hundred|thousand|percent|percentage)\b|\bone\s+(?:point|hundred)\b|\br-squared\b|\bp-?value\b/i;
+
+export function moduleStoryIssues(scenes, moduleConfig) {
+  const spec = moduleConfig?.filmStructure;
+  if (!spec || spec.id !== 'module-story') return [];
+  const issues = [];
+  const listed = scenes || [];
+  const byId = Object.fromEntries(listed.map((scene) => [scene.id, scene]));
+  const overview = byId[spec.overviewSceneId || 'overview'];
+  if (!overview) issues.push('A substantive module overview is missing.');
+  else {
+    const span = Number(overview.end || 0) - Number(overview.start || 0);
+    const min = spec.overviewMinSeconds ?? 14;
+    const max = spec.overviewMaxSeconds ?? 23;
+    if (span < min || span > max) issues.push(`Module overview is ${span.toFixed(1)}s. It needs about 15–20 seconds and must explain the workspace, not only a logo.`);
+  }
+  const demos = spec.demonstrationSceneIds || [];
+  if (demos.length < 3 || demos.length > 4) issues.push('Name three or four demonstrations in the module profile.');
+  const present = demos.filter((id) => byId[id]);
+  if (present.length < 3) issues.push(`Distinct demonstrations present: ${present.join(', ') || 'none'}. Three or four are required, each with a visible action and response.`);
+  for (const id of spec.catalogueSceneIds || []) {
+    if (!byId[id]) issues.push(`Feature catalogue scene ${id} is missing.`);
+  }
+  return issues;
+}
 
 export function recitedNarrationIssues(lines) {
   const issues = [];
@@ -220,6 +244,7 @@ export async function packageEvidence({ ffmpeg, mp4, manifest, moduleConfig, run
   const spoken = narrationLines(moduleConfig);
   const tech = technicalIssues(probe, loudness, moduleConfig)
     .concat(highlightTechnicalIssues(manifest, moduleConfig))
+    .concat(moduleStoryIssues(scenes, moduleConfig))
     .concat(spoken == null ? ['Narration file is missing.'] : recitedNarrationIssues(spoken));
   if (moduleConfig?.highlightRequired && glowMotion.issue) tech.push(glowMotion.issue);
   if (moduleConfig?.highlightRequired && glowMotion.checked === false && glowMotion.note) tech.push(glowMotion.note);

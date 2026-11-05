@@ -954,6 +954,9 @@
       opacity: 0;
       pointer-events: none;
     }
+    .loading-overlay.is-holding {
+      transition: none;
+    }
     
     .loading-spinner {
       width: 60px;
@@ -5305,7 +5308,7 @@
               <div class="mv-axis-picker">
                 <div class="mv-axis-picker-head">
                   <p class="mv-axis-picker-title"><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i> Choose the X-axis predictor</p>
-                  <p class="mv-axis-picker-hint">Click a variable — the chart updates instantly</p>
+                  <p class="mv-axis-picker-hint">Click a variable to update the chart</p>
                 </div>
                 <div id="modelVizCbRow" class="mv-axis-options" role="group" aria-label="X-axis predictor"></div>
               </div>
@@ -5847,11 +5850,11 @@
                     </p>
                     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;" id="ancovaPlotControls">
                       <label style="font-size:13px;color:var(--text-secondary);">Covariate (X axis):</label>
-                      <select id="ancovaPlotCovariate" style="font-size:13px;padding:4px 8px;" onchange="refreshANCOVAPlot()">
+                      <select id="ancovaPlotCovariate" style="font-size:13px;padding:4px 8px;" onchange="scheduleResultRefresh(refreshANCOVAPlot)">
                         <option value="">-- select --</option>
                       </select>
                       <label style="font-size:13px;color:var(--text-secondary);margin-left:10px;">Factor (grouping):</label>
-                      <select id="ancovaPlotFactor" style="font-size:13px;padding:4px 8px;" onchange="refreshANCOVAPlot()">
+                      <select id="ancovaPlotFactor" style="font-size:13px;padding:4px 8px;" onchange="scheduleResultRefresh(refreshANCOVAPlot)">
                         <option value="">-- select --</option>
                       </select>
                     </div>
@@ -7617,10 +7620,38 @@ ${sectionsHtml}
       if (!overlay) return;
       const elapsed = analysisLoadingShownAt ? (Date.now() - analysisLoadingShownAt) : 0;
       const wait = Math.max(0, MIN_ANALYSIS_LOADING_MS - elapsed);
+      const token = overlay.dataset.loadingToken || '';
       setTimeout(() => {
+        if ((overlay.dataset.loadingToken || '') !== token) return;
+        overlay.classList.remove('is-holding');
         overlay.classList.add('hidden');
         analysisLoadingShownAt = 0;
       }, wait);
+    }
+
+    var resultRefreshToken = 0;
+    var MIN_RESULT_REFRESH_MS = 500;
+
+    function scheduleResultRefresh(work, message) {
+      const overlay = document.getElementById('loadingOverlay');
+      const token = ++resultRefreshToken;
+      if (overlay) overlay.dataset.loadingToken = String(token);
+      showAnalysisLoading(message || 'Updating the results…');
+      if (overlay) overlay.classList.add('is-holding');
+      setTimeout(() => {
+        if (token !== resultRefreshToken) return;
+        try {
+          work();
+        } catch (err) {
+          console.error('Result refresh failed:', err);
+        }
+        if (token !== resultRefreshToken) return;
+        if (overlay) {
+          overlay.classList.remove('is-holding');
+          overlay.classList.add('hidden');
+        }
+        analysisLoadingShownAt = 0;
+      }, MIN_RESULT_REFRESH_MS);
     }
 
     // Initialize Office.js
@@ -8767,17 +8798,19 @@ ${sectionsHtml}
         return;
       }
 
-      if (!publishIncludedModel()) {
-        if (wasExcluded) excluded.add(key);
-        else excluded.delete(key);
-        if (box) box.checked = !excluded.has(key);
-        setCoefIncludeStatus(
-          `<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Could not refit without <strong>${escapeHtmlText(key)}</strong>. That term stays in the model.</span>`,
-          true
-        );
-        return;
-      }
-      flashRecalculatedOverview();
+      scheduleResultRefresh(() => {
+        if (!publishIncludedModel()) {
+          if (wasExcluded) excluded.add(key);
+          else excluded.delete(key);
+          if (box) box.checked = !excluded.has(key);
+          setCoefIncludeStatus(
+            `<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Could not refit without <strong>${escapeHtmlText(key)}</strong>. That term stays in the model.</span>`,
+            true
+          );
+          return;
+        }
+        flashRecalculatedOverview();
+      });
     }
 
     if (!window._coefIncludeBound) {
@@ -10702,11 +10735,13 @@ ${sectionsHtml}
         if (!select) return;
         select.addEventListener('change', function () {
           syncPredSelectLabel(varName);
-          try {
-            updatePrediction();
-          } catch (err) {
-            console.error('updatePrediction failed:', err);
-          }
+          scheduleResultRefresh(() => {
+            try {
+              updatePrediction();
+            } catch (err) {
+              console.error('updatePrediction failed:', err);
+            }
+          });
         });
         bindPredSelect(varName);
       });
@@ -11641,7 +11676,7 @@ ${sectionsHtml}
       const v = fromSelect?.value ?? document.getElementById('ixGlobalTermSelect')?.value
         ?? document.querySelector('.ix-term-select')?.value;
       syncIxTermSelects(v);
-      refreshIxWorkspaceViews();
+      scheduleResultRefresh(() => refreshIxWorkspaceViews());
     }
 
     function onIxPlotSelectChange() {
@@ -13542,6 +13577,7 @@ ${sectionsHtml}
     }
 
     function onModelVizSelect(idx) {
+      if (idx === _mvSelectedIdx) return;
       const xnVars = window.globalXnVars || [];
       _mvSelectedIdx = idx;
       xnVars.forEach((_, i) => {
@@ -13553,7 +13589,7 @@ ${sectionsHtml}
         const icon = btn.querySelector('i');
         if (icon) icon.className = 'fa-solid ' + (active ? 'fa-check' : 'fa-chart-line');
       });
-      _mvRefresh();
+      scheduleResultRefresh(() => _mvRefresh());
     }
 
     function _mvRefresh() {

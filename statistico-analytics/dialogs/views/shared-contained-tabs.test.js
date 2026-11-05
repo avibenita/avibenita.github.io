@@ -34,13 +34,11 @@ describe('shared contained tabs', () => {
     expect(css).toMatch(/linear-gradient\(#000 0, #000 10px, transparent 10px\)/);
     expect(css).toMatch(/padding-left:\s*0 !important;/);
     expect(css).toMatch(/\.ws-mode-tab\.active::before[\s\S]*display:\s*none !important/);
-    expect(css).toMatch(/@keyframes st-contained-tab-accent/);
-    expect(css).toMatch(/animation:\s*st-contained-tab-accent 3\.2s linear infinite/);
+    expect(css).toMatch(/\.ws-mode-tab\.active::after[\s\S]*display:\s*none !important/);
     expect(headerCss).toMatch(/\.header-module-frame \{[\s\S]*border:\s*0;/);
     expect(css).toMatch(/border-top:\s*0 !important;/);
     expect(css).toMatch(/\.statistico-shell,\s*\nhtml\[data-tabs="contained"\] \.statistico-shell\.statistico-shell--with-views \{\s*\n\s*margin-bottom:\s*0 !important;/);
-    expect(css).toMatch(/\.ws-mode-tab\.active::after[\s\S]*bottom:\s*0 !important/);
-    expect(css).toMatch(/height:\s*2px !important;/);
+    expect(css).toMatch(/border-bottom:\s*2px solid var\(--st-contained-indicator\) !important;/);
     expect(header).toMatch(/setAttribute\('data-tabs', next\)/);
     expect(header).toMatch(/shared-contained-tabs\.css/);
     expect(tabsJs).toMatch(/ws-tab-scroll-wrap/);

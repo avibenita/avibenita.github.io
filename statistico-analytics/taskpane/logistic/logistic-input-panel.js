@@ -282,7 +282,8 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
   const yName = modelSpec.y || headers[0];
   const xn = modelSpec.xn || [];
   const xc = modelSpec.xc || [];
-  const includeIntercept = modelSpec.intercept !== false;
+  const excluded = new Set((modelSpec.excludedTerms || []).map(function (name) { return String(name); }));
+  const includeIntercept = modelSpec.intercept !== false && !excluded.has("Intercept");
   const yIdx = headers.indexOf(yName);
 
   if (yIdx < 0) throw new Error("Y variable not found in data headers");
@@ -303,16 +304,25 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
     catLevels[c.name] = levels;
   });
 
-  const predictorNames = [];
-  xnIdx.forEach(v => predictorNames.push(v.name));
+  // excludedTerms drops individual coefficient columns. Complete-case rules still
+  // use every original predictor so the reduced fit stays on the same rows.
+  const columns = [];
+  xnIdx.forEach(v => {
+    if (!excluded.has(v.name)) columns.push({ kind: "num", name: v.name, idx: v.idx });
+  });
   const referenceMap = {};
   xcIdx.forEach(c => {
     const levels = catLevels[c.name] || [];
     referenceMap[c.name] = levels.length > 0 ? levels[0] : "—";
     for (let i = 1; i < levels.length; i++) {
-      predictorNames.push(`${c.name}_${levels[i]}`);
+      const name = `${c.name}_${levels[i]}`;
+      if (!excluded.has(name)) columns.push({ kind: "dum", name: name, idx: c.idx, level: levels[i] });
     }
   });
+  const predictorNames = columns.map(c => c.name);
+  if (!includeIntercept && !columns.length) {
+    throw new Error("At least one term has to stay in the model");
+  }
 
   const X = [];
   const y = [];
@@ -330,30 +340,27 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
       return;
     }
 
-    const xRow = [];
-
     for (let i = 0; i < xnIdx.length; i++) {
       const val = Number(r[xnIdx[i].idx]);
       if (!isFinite(val)) {
         droppedMissing++;
         return;
       }
-      xRow.push(val);
     }
 
     for (let i = 0; i < xcIdx.length; i++) {
       const c = xcIdx[i];
-      const levels = catLevels[c.name] || [];
       const raw = r[c.idx];
       if (raw === null || raw === undefined || raw === "") {
         droppedMissing++;
         return;
       }
-      const sval = String(raw);
-      for (let j = 1; j < levels.length; j++) {
-        xRow.push(sval === levels[j] ? 1 : 0);
-      }
     }
+
+    const xRow = columns.map(function (col) {
+      if (col.kind === "num") return Number(r[col.idx]);
+      return String(r[col.idx]) === col.level ? 1 : 0;
+    });
 
     X.push(xRow);
     y.push(yNum);

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Logistic fit worker</title>
+</head>
+<body>
+  <!--
+    Hidden iframe used by logistic-results-v3.html to refit a reduced model
+    with the same engine as the taskpane (computeLogisticBundle / fitLogisticIRLS).
+    Kept out of the results page so the taskpane script's globals stay isolated.
+  -->
+  <script src="../../../taskpane/logistic/logistic-input-panel.js"></script>
+  <script>
+    window.addEventListener("message", function (event) {
+      var data = event.data;
+      if (!data || data.type !== "LOGISTIC_FIT_REQUEST" || !event.source) return;
+      try {
+        var computed = computeLogisticBundle(data.headers, data.rows, data.modelSpec, data.threshold);
+        event.source.postMessage({
+          type: "LOGISTIC_FIT_RESULT",
+          requestId: data.requestId,
+          payload: computed.bundle
+        }, "*");
+      } catch (err) {
+        event.source.postMessage({
+          type: "LOGISTIC_FIT_ERROR",
+          requestId: data.requestId,
+          error: String((err && err.message) || err)
+        }, "*");
+      }
+    });
+  </script>
+</body>
+</html>

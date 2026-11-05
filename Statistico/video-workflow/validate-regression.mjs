@@ -149,7 +149,7 @@ try {
     if (pageData.kpiR2 !== '65.63%') failures.push(`R² display ${pageData.kpiR2}`);
     if (!pageData.verdict.includes('< 0.0001')) failures.push(`conclusion does not show p < 0.0001: ${pageData.verdict}`);
     if (pageData.kpiFp !== '< 0.0001') {
-      limits.push(`The overview F-test chip shows "${pageData.kpiFp}" while the conclusion and the independent tail probability are below 0.0001. The film quotes the conclusion, not the chip.`);
+      limits.push(`Overview F-test chip shows "${pageData.kpiFp}" while the conclusion text is below 0.0001. Deferred to the validation project. Not featured.`);
     }
     const ad = pageData.table.find((row) => row[0] === 'Ad Spend');
     if (!ad) failures.push('Ad Spend row is missing');
@@ -167,7 +167,7 @@ try {
         if (index === 0) return;
         if (!String(ad[index] || '').includes(text)) failures.push(`Ad Spend column ${index} shows "${ad[index]}", expected to include ${text}`);
       });
-      if (ad[7] !== '—') limits.push(`VIF cell shows "${ad[7]}" because computeOLS is called without the VIF flag. The film does not quote a VIF.`);
+      if (ad[7] !== '—') limits.push(`VIF cell shows "${ad[7]}" because computeOLS is called without the VIF flag. Deferred. Not featured.`);
     }
     await page.evaluate(() => switchTab('results-detail'));
     const fPanel = await page.textContent('#fPValue');
@@ -194,7 +194,7 @@ try {
     const deltaSlope = ref.coefficients[1] * (Number(endPred.ad) - Number(startPred.ad));
     near(failures, 'scenario change equals Ad Spend slope', deltaShown, deltaSlope, 0.03);
     if (startPred.region === 'West') {
-      limits.push('The scenario dropdown opens on West, but its dummy coding drops the first encountered level. The displayed level matches the North reference linear predictor. The film states the on-screen change, which matches the Ad Spend slope, and does not attribute that level to the West coefficient.');
+      limits.push('Scenario region control opens on West while the linear predictor uses the North reference. Deferred. The film does not use the region control.');
     }
     await page.evaluate(() => switchTab('diag-influence'));
     await page.waitForSelector('.res-refit-btn', { timeout: 8000 });
@@ -210,10 +210,10 @@ try {
     if (!comparison.includes(refitR2)) failures.push(`refit panel missing R² ${refitR2}: ${comparison.slice(0, 300)}`);
     if (!comparison.includes(refitRmse)) failures.push(`refit panel missing RMSE ${refitRmse}`);
     if (!comparison.includes(String(ref.refit.n))) failures.push(`refit panel missing n ${ref.refit.n}`);
-    limits.push(`Shapiro-Wilk and Breusch-Pagan on the diagnostics overview are random draws in the page, not a reproducible test. An independent Shapiro-Wilk on these residuals is W ${ref.limits.shapiro_w.toFixed(4)}, p ${ref.limits.shapiro_p.toFixed(4)}. The film uses the residual plots and does not quote those cards.`);
-    limits.push(`Durbin-Watson in the page drops the first squared residual. The independent statistic is ${ref.limits.durbin_watson.toFixed(4)}. The film does not quote it.`);
-    limits.push(`Cook's distance on screen uses leverage k/n for every row (page maximum about ${ref.limits.max_page_formula_cooks.toFixed(4)}). Classical hat-value Cook's distance has maximum ${ref.limits.max_classical_cooks.toFixed(4)}. The narration says the screen's calculation stays under 0.5.`);
-    limits.push('Scenario interval widths use 0.3×RMSE and 1.1×RMSE with t = 1.96. They are not classical mean and prediction standard errors. The film follows the moving prediction, not those widths.');
+    limits.push(`Shapiro-Wilk and Breusch-Pagan cards are random draws. An outside Shapiro-Wilk on these residuals is W ${ref.limits.shapiro_w.toFixed(4)}, p ${ref.limits.shapiro_p.toFixed(4)}. Deferred. Not featured.`);
+    limits.push(`Durbin-Watson on the page drops the first squared residual. The outside statistic is ${ref.limits.durbin_watson.toFixed(4)}. Deferred. Not featured.`);
+    limits.push(`Cook's distance on screen uses leverage k/n for every row (page maximum about ${ref.limits.max_page_formula_cooks.toFixed(4)}). Classical hat-value Cook's distance has maximum ${ref.limits.max_classical_cooks.toFixed(4)}. Deferred. The film uses the flagged rows and the refit, and does not describe Cook's distance.`);
+    limits.push('Scenario interval widths use 0.3×RMSE and 1.1×RMSE with t = 1.96. They are not classical standard errors. Deferred. The film does not describe those widths.');
     const report = {
       ok: failures.length === 0,
       reference: ref,
@@ -243,5 +243,7 @@ if (failures.length) {
   console.error(failures.join('\n'));
   process.exit(1);
 }
-console.log('Regression numerical contract passed for demo seed 20260812.');
+console.log('Regression production check passed for demo seed 20260812.');
+console.log('This check does not sign off the module as independently validated.');
+console.log('Outstanding findings: Statistico/validation/regression/FINDINGS.md');
 for (const line of limits) console.log(`Limitation: ${line}`);

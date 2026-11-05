@@ -4,8 +4,8 @@ export const HIGHLIGHT_SPEC = Object.freeze({
   offsetPx: 10,
   cornerPx: 4,
   cornerLengthPx: 22,
-  fadeInMs: 250,
-  pulseMs: 1200,
+  fadeInMs: 300,
+  breatheMs: 2400,
   fadeOutMs: 200,
   dim: 'rgba(7, 17, 28, 0.22)',
   glow: 'rgba(255, 209, 138, 0.55)'
@@ -40,15 +40,16 @@ export const FILM_HIGHLIGHT_CSS = `
 #filmHighlight .film-bracket.tr { top: -1px; right: -1px; border-top-width: ${HIGHLIGHT_SPEC.cornerPx}px; border-right-width: ${HIGHLIGHT_SPEC.cornerPx}px; }
 #filmHighlight .film-bracket.bl { bottom: -1px; left: -1px; border-bottom-width: ${HIGHLIGHT_SPEC.cornerPx}px; border-left-width: ${HIGHLIGHT_SPEC.cornerPx}px; }
 #filmHighlight .film-bracket.br { bottom: -1px; right: -1px; border-bottom-width: ${HIGHLIGHT_SPEC.cornerPx}px; border-right-width: ${HIGHLIGHT_SPEC.cornerPx}px; }
-#filmHighlight.is-in { animation: filmHighlightFadeIn ${HIGHLIGHT_SPEC.fadeInMs}ms linear forwards; }
-#filmHighlight.is-in .film-glow { animation: filmHighlightPulse ${HIGHLIGHT_SPEC.pulseMs}ms ease-in-out ${HIGHLIGHT_SPEC.fadeInMs}ms 1 forwards; }
+#filmHighlight.is-in { animation: filmHighlightFadeIn ${HIGHLIGHT_SPEC.fadeInMs}ms ease forwards; }
+#filmHighlight.is-in .film-bracket { animation: filmBracketDraw ${HIGHLIGHT_SPEC.fadeInMs}ms ease forwards; }
+#filmHighlight.is-in .film-glow { animation: filmHighlightBreathe ${HIGHLIGHT_SPEC.breatheMs}ms ease-in-out ${HIGHLIGHT_SPEC.fadeInMs}ms infinite; }
 #filmHighlight.is-out { animation: filmHighlightFadeOut ${HIGHLIGHT_SPEC.fadeOutMs}ms linear forwards; }
 @keyframes filmHighlightFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes filmHighlightFadeOut { from { opacity: 1; } to { opacity: 0; } }
-@keyframes filmHighlightPulse {
-  0% { opacity: 0.28; }
-  42% { opacity: 1; }
-  100% { opacity: 0.42; }
+@keyframes filmBracketDraw { from { width: 0; height: 0; } to { width: ${HIGHLIGHT_SPEC.cornerLengthPx}px; height: ${HIGHLIGHT_SPEC.cornerLengthPx}px; } }
+@keyframes filmHighlightBreathe {
+  0%, 100% { opacity: 0.34; }
+  50% { opacity: 0.92; }
 }
 `;
 
@@ -58,9 +59,10 @@ export function highlightStandardIssues(spec = HIGHLIGHT_SPEC) {
   if (spec.outlinePx !== 2) issues.push(`highlight outline ${spec.outlinePx}px, expected 2px`);
   if (!(spec.offsetPx >= 8 && spec.offsetPx <= 12)) issues.push(`highlight offset ${spec.offsetPx}px is outside 8–12px`);
   if (!(spec.cornerPx > spec.outlinePx)) issues.push('highlight corners must be stronger than the 2px outline');
-  if (spec.fadeInMs !== 250) issues.push(`highlight fade-in ${spec.fadeInMs}ms, expected 250ms`);
-  if (spec.pulseMs !== 1200) issues.push(`highlight pulse ${spec.pulseMs}ms, expected 1200ms`);
+  if (spec.fadeInMs !== 300) issues.push(`highlight fade-in ${spec.fadeInMs}ms, expected 300ms`);
+  if (spec.breatheMs !== 2400) issues.push(`highlight breathe cycle ${spec.breatheMs}ms, expected 2400ms`);
   if (spec.fadeOutMs !== 200) issues.push(`highlight fade-out ${spec.fadeOutMs}ms, expected 200ms`);
+  if (spec.pulseMs != null) issues.push('highlight still uses a one-shot pulse');
   if (!spec.dim) issues.push('highlight dim is missing');
   return issues;
 }
@@ -70,9 +72,12 @@ export function highlightCssIssues(css = FILM_HIGHLIGHT_CSS, spec = HIGHLIGHT_SP
   if (!css.includes(spec.color)) issues.push('highlight CSS is missing #FFD18A');
   if (!css.includes(`${spec.outlinePx}px solid ${spec.color}`)) issues.push('highlight CSS is missing the 2px outline');
   if (!css.includes(`border-top-width: ${spec.cornerPx}px`)) issues.push('highlight CSS is missing stronger corner brackets');
-  if (!css.includes(`${spec.fadeInMs}ms`)) issues.push('highlight CSS is missing the 250ms fade-in');
-  if (!css.includes(`${spec.pulseMs}ms`)) issues.push('highlight CSS is missing the 1.2s glow pulse');
-  if (!css.includes(`${spec.fadeOutMs}ms`)) issues.push('highlight CSS is missing the 200ms fade-out');
+  if (!css.includes(`filmHighlightFadeIn ${spec.fadeInMs}ms`)) issues.push('highlight CSS is missing the 300ms fade-in');
+  if (!css.includes('filmBracketDraw')) issues.push('highlight CSS does not draw the corner brackets');
+  if (!css.includes(`filmHighlightBreathe ${spec.breatheMs}ms`)) issues.push('highlight CSS is missing the 2.4s breathing glow');
+  if (!css.includes('infinite')) issues.push('highlight glow does not breathe continuously while the frame is active');
+  if (!css.includes(`filmHighlightFadeOut ${spec.fadeOutMs}ms`)) issues.push('highlight CSS is missing the 200ms fade-out');
+  if (/filmHighlightPulse|animation:[^;]*\bleft\b|@keyframes[^}]*\bleft\s*:/.test(css)) issues.push('highlight CSS moves the frame or uses the retired one-shot pulse');
   if (!css.includes(spec.dim)) issues.push('highlight CSS is missing the surrounding dim');
   if (!css.includes('100vmax')) issues.push('highlight CSS is missing the outer dim');
   return issues;
@@ -108,6 +113,15 @@ export function highlightIssuesFromManifest(manifest, moduleConfig = {}) {
   const events = manifest?.highlight?.events || manifest?.highlights || [];
   if (moduleConfig.highlightRequired && !events.some((event) => event.action !== 'clear')) {
     issues.push('highlight log is missing, so the warm-gold overlay was not recorded');
+  }
+  if (moduleConfig.highlightRequired) {
+    for (const event of events) {
+      if (!event || event.action === 'clear') continue;
+      const where = event.selector || 'highlight';
+      if (event.fadeInMs !== HIGHLIGHT_SPEC.fadeInMs) issues.push(`${where} fade-in ${event.fadeInMs}ms, expected ${HIGHLIGHT_SPEC.fadeInMs}ms`);
+      if (event.breatheMs !== HIGHLIGHT_SPEC.breatheMs) issues.push(`${where} breathe cycle ${event.breatheMs}ms, expected ${HIGHLIGHT_SPEC.breatheMs}ms`);
+      if (event.fadeOutMs !== HIGHLIGHT_SPEC.fadeOutMs) issues.push(`${where} fade-out ${event.fadeOutMs}ms, expected ${HIGHLIGHT_SPEC.fadeOutMs}ms`);
+    }
   }
   issues.push(...highlightEventIssues(events));
   return issues;
@@ -207,6 +221,9 @@ async function runHighlight(page, action, selector, zoom) {
       outlinePx: spec.outlinePx,
       cornerPx: spec.cornerPx,
       offsetPx: spec.offsetPx,
+      fadeInMs: spec.fadeInMs,
+      breatheMs: spec.breatheMs,
+      fadeOutMs: spec.fadeOutMs,
       target: placed.target,
       frame: { x: measured.x, y: measured.y, w: measured.width, h: measured.height },
       nx: (placed.target.x + placed.target.w / 2) / window.innerWidth,
@@ -229,6 +246,20 @@ export async function clearFilmHighlight(page) {
   await page.waitForTimeout(HIGHLIGHT_SPEC.fadeOutMs);
 }
 
+export function meanChannelDelta(before, after) {
+  if (!before || !after || !before.length || before.length !== after.length) return null;
+  let sum = 0;
+  for (let i = 0; i < before.length; i += 1) sum += Math.abs(before[i] - after[i]);
+  return sum / before.length;
+}
+
+export function glowDeltaIssue(before, after, minDelta = 2.5) {
+  const mean = meanChannelDelta(before, after);
+  if (mean == null) return 'glow sample missing';
+  if (mean < minDelta) return `encoded glow changed by ${mean.toFixed(2)} per channel, below ${minDelta}`;
+  return '';
+}
+
 export async function readHighlightLog(page, usefulMs) {
   return page.evaluate((useful) => (window.__filmHighlightLog || []).map((event) => ({
     action: event.action,
@@ -237,6 +268,9 @@ export async function readHighlightLog(page, usefulMs) {
     outlinePx: event.outlinePx ?? null,
     cornerPx: event.cornerPx ?? null,
     offsetPx: event.offsetPx ?? null,
+    fadeInMs: event.fadeInMs ?? null,
+    breatheMs: event.breatheMs ?? null,
+    fadeOutMs: event.fadeOutMs ?? null,
     target: event.target || null,
     frame: event.frame || null,
     nx: event.nx ?? null,

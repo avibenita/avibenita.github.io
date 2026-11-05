@@ -83,7 +83,7 @@ const bridge = byId.bridge;
 if (!bridge) throw new Error('bridge scene is missing');
 if (!byId.thanks) throw new Error('thanks scene is missing');
 
-const sequence = ['open', 'overview', 'coefficients', 'scenario', 'plots', 'influence', 'thanks', 'close'];
+const sequence = ['open', 'enter', 'scenario', 'chapter', 'influence', 'thanks', 'close'];
 const filters = [`[${sequence.length}:v]split=${sequence.length - 1}`];
 const splitLabels = [];
 for (let i = 0; i < sequence.length - 1; i += 1) splitLabels.push(`[b${i}]`);

@@ -1,9 +1,14 @@
-# Regression module brief r001
+# Regression brief r001
 
-The film demonstrates the Regression module that is already in `statistico-analytics`: model overview, coefficient uncertainty, a real slider change, residual plots, and a refit. It uses the module's seeded case-study worker (`embed=1&demo=1`, seed 20260812): Sales on Ad Spend, Store Size, and Region, 120 stores.
+One seeded sales model, brought in with `demo=1`. The film does not tour static tables.
 
-The statistical engine is `regression-compute.js`. The film does not change it. Displayed coefficients, standard errors, t statistics, 95% intervals, R², adjusted R², RMSE, F, and the refit are checked against an independent NumPy and SciPy fit before recording.
+The opening is narrated, then a short card separates that introduction from the module. The live demonstration is four responses:
 
-Target length is about two minutes. The shared standard does not set another duration for this module. Opening, bridge, thank-you, close, voice, and the warm-gold overlay are the shared treatment. The module's own navy interface is left as implemented.
+1. Move Ad Spend. Predicted sales and the profile title change.
+2. Switch the profile to Store Size, then move that slider. The chart axis and the prediction change.
+3. The screen's flagged rows are the selection. Refit Excluding Flagged shows the original fit beside the refit.
+4. Restore Original removes that comparison.
 
-Publication and `06_approved` stay empty until the film has been viewed.
+Each step shows the control first, performs the action, and holds the result. Narration explains the consequence and does not read the figures. The refit is a sensitivity comparison.
+
+The production check confirms the seeded page, the predictor response, and the refit panel. It does not sign off the module as independently validated. Calculation findings that the film avoids are in `Statistico/validation/regression/FINDINGS.md`.

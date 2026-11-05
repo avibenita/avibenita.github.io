@@ -1,22 +1,18 @@
 # Regression capability inventory r001
 
-Verified against the page and an independent OLS fit of the seeded 120-row case study.
+Used in the film, because the page performs them:
 
-Shown in the film:
+- Scenario sliders for Ad Spend and Store Size. Moving a slider recomputes the displayed prediction and retargets the profile chart to that predictor.
+- Profile axis buttons. Choosing Store Size redraws the profile along that predictor.
+- The influence table's flagged rows, from the screen's residual rule.
+- Refit Excluding Flagged, which refits without that set and shows the original beside the refit.
+- Restore Original, which clears the comparison.
 
-- Model overview: n, R², and the F conclusion. R² is 0.6563111758, displayed as 65.63%. The independent F tail probability is far below 0.0001. The conclusion and the technical F panel print “< 0.0001”.
-- Technical coefficient table from `computeOLS`: coefficient, standard error, t, p, and 95% interval. Ad Spend is 1.759914893, displayed as 1.76, with interval 1.51 to 2.01. Reference category for Region is North, the first sorted level.
-- Scenario Ad Spend slider. The change in predicted sales equals the Ad Spend coefficient times the slider change.
-- Residual-versus-fitted and normal Q-Q plots drawn from the model residuals.
-- Influence table flags rows 18, 61, and 83 by standardized residual above 2. Cook's distance on this screen uses leverage k/n and stays under 0.5.
-- Refit Excluding Flagged calls `computeOLS` on the remaining 117 rows. Independent refit R² is 0.6930473813, displayed as 0.6930. RMSE is 17.8640.
+Not used, because the module does not support them or the result is a known defect:
 
-Present in the module and not used as a result in the film:
+- Clicking a chart point or a table row does not select an observation. The Action column is text, not a control.
+- There is no confidence-level control. Scenario interval bands use a fixed approximation and are not described.
+- The region dropdown does not match the model's reference coding.
+- The overview F chip, VIF column, Shapiro–Wilk, Breusch–Pagan, Durbin–Watson, and on-screen Cook's distance are deferred in `Statistico/validation/regression/FINDINGS.md`.
 
-- The overview F chip prints 0.0001 rather than “< 0.0001”.
-- The VIF column is an em dash. `computeOLS` is called without the VIF flag.
-- Shapiro-Wilk and Breusch-Pagan on the diagnostics overview are random numbers, not tests of these residuals.
-- The page Durbin-Watson omits the first squared residual.
-- Scenario intervals use 0.3×RMSE and 1.1×RMSE. They are not classical standard errors.
-- The scenario region control opens on West, while zero dummies in that control match the North reference row of the coefficient table.
-- By Group, interactions, power, correlations, and descriptives are real navigation targets and are outside this two-minute demonstration.
+The statistical implementation is unchanged.

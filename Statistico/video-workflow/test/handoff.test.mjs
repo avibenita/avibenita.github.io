@@ -4,8 +4,8 @@ import os from 'os';
 import path from 'path';
 import test from 'node:test';
 import { spawn } from 'child_process';
-import { classifySilence, DETECTION_LIMITS } from '../evidence.mjs';
-import { FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC, highlightCssIssues, highlightEventIssues, highlightStandardIssues } from '../overlay/highlight.mjs';
+import { classifySilence, DETECTION_LIMITS, recitedNarrationIssues } from '../evidence.mjs';
+import { FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC, glowDeltaIssue, highlightCssIssues, highlightEventIssues, highlightStandardIssues } from '../overlay/highlight.mjs';
 import { demoAdapters, demoConfig, runAuto } from '../controller.mjs';
 import { doctorLines, dryRunLines } from '../producer.mjs';
 import { REPO_ROOT, loadModule, readJson, writeJson } from '../util.mjs';
@@ -316,6 +316,13 @@ test('the warm-gold highlight spec matches the shared overlay', () => {
     frame: { x: 100, y: 80, w: 40, h: 20 }
   }]);
   assert.ok(covering.length >= 2);
+  assert.equal(glowDeltaIssue(Buffer.from([0, 0, 0]), Buffer.from([0, 0, 0])), 'encoded glow changed by 0.00 per channel, below 2.5');
+  assert.equal(glowDeltaIssue(Buffer.from([0, 0, 0]), Buffer.from([20, 0, 0])), '');
+  const cues = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'Statistico', 'regression', 'produce', 'cues.json'), 'utf8'));
+  assert.equal(recitedNarrationIssues(cues).length, 0);
+  assert.match(cues.find((cue) => cue.id === 'open-1').spoken, /^Put your regression model in motion\./);
+  assert.equal(HIGHLIGHT_SPEC.breatheMs, 2400);
+  assert.equal(HIGHLIGHT_SPEC.fadeInMs, 300);
 });
 
 test('the pre-existing assemble command still targets the r001 review file by default', () => {

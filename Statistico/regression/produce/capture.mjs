@@ -72,11 +72,7 @@ async function hot(page, selector, zoom = 1.22) {
     return;
   }
   await showFilmHighlight(page, selector, { zoom });
-  await page.waitForTimeout(PROBE ? 40 : 280);
-}
-
-async function park(page) {
-  await page.mouse.move(12, 12);
+  await page.waitForTimeout(PROBE ? 40 : 320);
 }
 
 async function loadFilm(page) {
@@ -92,43 +88,13 @@ async function loadFilm(page) {
   await page.waitForTimeout(PROBE ? 80 : 350);
 }
 
-async function mode(page, attr, value) {
-  const sel = `.ws-mode-tab[data-${attr}="${value}"]`;
-  await page.waitForSelector(sel, { timeout: 8000 });
-  await hot(page, sel, 1);
-  await page.click(sel);
-  await page.waitForTimeout(PROBE ? 80 : 450);
-  await park(page);
-}
-
-async function overview(page, { mark, say }) {
-  await loadFilm(page);
+async function opening(page, { mark, say }) {
+  await page.goto(`${BASE}/Statistico/regression/produce/open.html`, { waitUntil: 'load' });
+  await page.evaluate(() => document.body.classList.add('go'));
   mark();
-  await hot(page, '#kpiStrip', 1.16);
-  await say('overview-1');
-  await page.waitForTimeout(PROBE ? 80 : 2000);
-  await clearFilmHighlight(page);
-}
-
-async function coefficients(page, { mark, say }) {
-  await loadFilm(page);
-  mark();
-  await mode(page, 'reg-tab', 'results-detail');
-  await page.evaluate(() => {
-    const row = [...document.querySelectorAll('#dataTableBody tr')].find((tr) => /Ad Spend/.test(tr.cells[0]?.textContent || ''));
-    if (!row) return;
-    row.id = 'filmAdSpend';
-    row.scrollIntoView({ block: 'center', inline: 'nearest' });
-  });
-  await page.waitForTimeout(PROBE ? 60 : 400);
-  const text = await page.locator('#filmAdSpend').innerText();
-  if (!text.includes('1.76') || !text.includes('1.51') || !text.includes('2.01')) {
-    throw new Error(`Ad Spend row is not the verified display: ${text}`);
-  }
-  await hot(page, '#filmAdSpend', 1);
-  await say('coefficients-1');
-  await page.waitForTimeout(PROBE ? 80 : 2400);
-  await clearFilmHighlight(page);
+  await page.waitForTimeout(PROBE ? 40 : 160);
+  await say('open-1');
+  await page.waitForTimeout(PROBE ? 40 : 500);
 }
 
 async function scenario(page, { mark, note, say }) {
@@ -136,63 +102,109 @@ async function scenario(page, { mark, note, say }) {
   mark();
   await page.evaluate(() => switchTab('pred-scenario'));
   await page.waitForFunction(() => {
-    const el = document.getElementById('predictedValue');
-    return el && el.textContent && el.textContent !== '-';
+    const value = document.getElementById('predictedValue');
+    const chart = document.querySelector('#predProfileChart .highcharts-container, #predProfileChart svg');
+    return value && value.textContent && value.textContent !== '-' && chart;
   }, null, { timeout: 8000 });
-  await page.waitForTimeout(PROBE ? 60 : 400);
+  await page.waitForTimeout(PROBE ? 40 : 500);
   const before = await page.locator('#predictedValue').innerText();
-  await hot(page, '[id="input-Ad Spend"]', 1.2);
+  const beforeTitle = await page.locator('#predProfileTitle').innerText();
+  await hot(page, '[id="input-Ad Spend"]', 1);
+  await page.waitForTimeout(PROBE ? 40 : 1100);
   note('scenario-1');
-  const total = dur('scenario-1');
-  await page.waitForTimeout(total * 0.38 * 1000);
+  const first = dur('scenario-1');
+  await page.waitForTimeout(first * 0.42 * 1000);
   await page.evaluate(() => {
     const slider = document.getElementById('input-Ad Spend');
     slider.value = slider.max;
     slider.dispatchEvent(new Event('input', { bubbles: true }));
-    slider.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await page.waitForTimeout(PROBE ? 60 : 350);
+  await page.waitForTimeout(PROBE ? 40 : 450);
   const after = await page.locator('#predictedValue').innerText();
-  if (before === after) throw new Error('Moving ad spend did not change predicted sales');
-  await hot(page, '#predictedValue', 1.16);
-  await page.waitForTimeout(Math.max(0, total * 0.62) * 1000);
-  await page.waitForTimeout(PROBE ? 80 : 2200);
+  const afterTitle = await page.locator('#predProfileTitle').innerText();
+  if (before === after) throw new Error('Moving ad spend did not change the prediction');
+  if (beforeTitle === afterTitle) throw new Error('Moving ad spend did not change the profile');
+  await clearFilmHighlight(page);
+  await hot(page, '#predictedValue', 1);
+  await page.waitForTimeout(Math.max(0, first * 0.58) * 1000);
+  await page.waitForTimeout(PROBE ? 40 : 2800);
+  await clearFilmHighlight(page);
+  const mid = await page.locator('#predictedValue').innerText();
+  await page.locator('[data-pred-axis="Store%20Size"]').scrollIntoViewIfNeeded();
+  note('scenario-2');
+  const second = dur('scenario-2');
+  await hot(page, '[data-pred-axis="Store%20Size"]', 1);
+  await page.waitForTimeout(Math.min(second * 0.28, 1.1) * 1000);
+  await page.click('[data-pred-axis="Store%20Size"]');
+  await page.waitForTimeout(PROBE ? 40 : 450);
+  const axis = await page.evaluate(() => window._predProfileChart?.xAxis?.[0]?.options?.title?.text || '');
+  if (!/Store Size/i.test(axis)) throw new Error(`Profile axis did not switch to Store Size: ${axis}`);
+  await clearFilmHighlight(page);
+  await hot(page, '[id="input-Store Size"]', 1);
+  await page.waitForTimeout(Math.max(0, second * 0.22) * 1000);
+  await page.evaluate(() => {
+    const slider = document.getElementById('input-Store Size');
+    slider.value = slider.min;
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(PROBE ? 40 : 450);
+  const end = await page.locator('#predictedValue').innerText();
+  if (mid === end) throw new Error('Moving store size did not change the prediction');
+  await clearFilmHighlight(page);
+  await hot(page, '#predProfileChart', 1);
+  await page.waitForTimeout(Math.max(0, second * 0.5) * 1000);
+  await page.waitForTimeout(PROBE ? 40 : 3000);
   await clearFilmHighlight(page);
 }
 
-async function plots(page, { mark, say }) {
-  await loadFilm(page);
-  mark();
-  await page.evaluate(() => switchTab('diag-plots'));
-  await page.waitForFunction(() => !!document.querySelector('#resChart1 svg, #resChart1 .highcharts-container'), null, { timeout: 8000 });
-  await page.waitForTimeout(PROBE ? 60 : 500);
-  await hot(page, '#resChart1', 1.24);
-  await say('plots-1');
-  await page.waitForTimeout(PROBE ? 80 : 2000);
-  await clearFilmHighlight(page);
-}
-
-async function influence(page, { mark, say }) {
+async function influence(page, { mark, note, say }) {
   await loadFilm(page);
   mark();
   await page.evaluate(() => switchTab('diag-influence'));
-  await page.waitForSelector('#resCooksChart', { timeout: 8000 });
-  await page.waitForTimeout(PROBE ? 60 : 450);
-  await hot(page, '#resCooksChart', 1.08);
+  await page.waitForSelector('.res-outliers-table', { timeout: 8000 });
+  await page.waitForTimeout(PROBE ? 40 : 400);
+  await page.evaluate(() => {
+    const table = document.querySelector('.res-outliers-table');
+    if (table) {
+      table.id = 'filmFlagged';
+      table.scrollIntoView({ block: 'center', inline: 'nearest' });
+    }
+  });
+  await page.waitForTimeout(PROBE ? 40 : 350);
+  const flagged = await page.locator('#filmFlagged').innerText();
+  if (!/Outlier/.test(flagged)) throw new Error('Flagged observation table did not list the selection');
+  await hot(page, '#filmFlagged', 1);
   await say('influence-1');
+  await page.waitForTimeout(PROBE ? 40 : 2200);
   await clearFilmHighlight(page);
+  await hot(page, '.res-refit-btn', 1);
+  await page.waitForTimeout(PROBE ? 40 : 600);
   await page.click('.res-refit-btn');
   await page.waitForSelector('#resComparisonPanel', { timeout: 8000 });
-  await page.waitForTimeout(PROBE ? 60 : 400);
+  await page.waitForTimeout(PROBE ? 40 : 400);
   const text = await page.locator('#resComparisonPanel').innerText();
-  if (!text.includes('0.6930') || !text.includes('117')) {
-    throw new Error(`Refit comparison is not the verified result: ${text.slice(0, 240)}`);
+  if (!/original model/i.test(text) || !/refitted model/i.test(text)) {
+    throw new Error(`Refit comparison did not appear: ${text.slice(0, 240)}`);
   }
   await page.evaluate(() => document.getElementById('resComparisonPanel')?.scrollIntoView({ block: 'center', inline: 'nearest' }));
-  await page.waitForTimeout(PROBE ? 40 : 300);
+  await clearFilmHighlight(page);
   await hot(page, '#resComparisonPanel', 1);
   await say('influence-2');
-  await page.waitForTimeout(PROBE ? 80 : 2500);
+  await page.waitForTimeout(PROBE ? 40 : 3200);
+  await clearFilmHighlight(page);
+  await hot(page, '#resComparisonPanel button', 1);
+  note('influence-3');
+  const third = dur('influence-3');
+  await page.waitForTimeout(third * 0.55 * 1000);
+  await page.click('#resComparisonPanel button');
+  await page.waitForFunction(() => {
+    const panel = document.getElementById('resComparisonPanel');
+    return panel && panel.style.display === 'none';
+  }, null, { timeout: 4000 });
+  await clearFilmHighlight(page);
+  await hot(page, '#filmFlagged', 1);
+  await page.waitForTimeout(Math.max(0, third * 0.45) * 1000);
+  await page.waitForTimeout(PROBE ? 40 : 2200);
   await clearFilmHighlight(page);
 }
 
@@ -271,11 +283,10 @@ async function main() {
   const scenes = [];
   try {
     const jobs = [
-      ['open', (page, api) => brand(page, 'open.html', 5, api)],
-      ['overview', overview],
-      ['coefficients', coefficients],
+      ['open', opening],
+      ['enter', (page, api) => brand(page, 'enter.html', 2.8, api)],
       ['scenario', scenario],
-      ['plots', plots],
+      ['chapter', (page, api) => brand(page, 'chapter.html', 2.6, api)],
       ['influence', influence],
       ['bridge', (page, api) => brand(page, 'bridge.html', 1.2, api)],
       ['thanks', async (page, api) => {

@@ -28,7 +28,7 @@ export function writeReport(runDir, state) {
   lines.push('## Unassessed checks');
   for (const item of state.unassessed || []) lines.push(`- ${item}`);
   lines.push('');
-  lines.push('## Validation');
+  lines.push(state.moduleId === 'regression' ? '## Production check' : '## Validation');
   lines.push(state.validationSummary || 'No validation summary was recorded.');
   lines.push('');
   lines.push('## Candidates');
@@ -39,7 +39,9 @@ export function writeReport(runDir, state) {
   lines.push('## What to view and listen to');
   const viewing = state.moduleId === 'independent-means'
     ? `Open ${state.recommended}. Check the picture, the narration, the silent capability cards, and the closing. Confirm the on-screen Welch result, interval, and planning totals against the numerical report.`
-    : `Open ${state.recommended}. Check the picture, the narration, and the closing. Confirm the on-screen results against the numerical validation in this report.`;
+    : state.moduleId === 'regression'
+      ? `Open ${state.recommended}. Check the picture, the narration, and the closing. The production check confirms the featured actions. It is not a validation sign-off.`
+      : `Open ${state.recommended}. Check the picture, the narration, and the closing. Confirm the on-screen results against the production check in this report.`;
   lines.push(state.recommended ? viewing : 'There is no candidate to approve.');
   if (state.stoppedReason) {
     lines.push('');

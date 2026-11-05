@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { ffmpegText, sha256File, writeJson } from './util.mjs';
-import { highlightIssuesFromManifest } from './overlay/highlight.mjs';
+import { spawnSync } from 'child_process';
+import { ffmpegText, REPO_ROOT, sha256File, writeJson } from './util.mjs';
+import { glowDeltaIssue, highlightIssuesFromManifest, meanChannelDelta } from './overlay/highlight.mjs';
 
 function hasFaststart(file) {
   const buf = fs.readFileSync(file);
@@ -122,6 +123,69 @@ export function highlightTechnicalIssues(manifest, moduleConfig) {
   return highlightIssuesFromManifest(manifest, moduleConfig);
 }
 
+const RECITED_VALUE = /\d|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|hundred|thousand|percent|percentage)\b|\br-squared\b|\bp-?value\b/i;
+
+export function recitedNarrationIssues(lines) {
+  const issues = [];
+  for (const line of lines || []) {
+    if (RECITED_VALUE.test(line.spoken || '')) issues.push(`${line.id || 'narration'} recites a displayed value: ${line.spoken}`);
+  }
+  return issues;
+}
+
+function narrationLines(moduleConfig) {
+  if (!moduleConfig?.narrationMeaningOnly || !moduleConfig.narration) return [];
+  const file = path.join(REPO_ROOT, moduleConfig.narration);
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function rawCrop(ffmpeg, mp4, t, crop) {
+  const result = spawnSync(ffmpeg, [
+    '-v', 'error', '-ss', t.toFixed(3), '-i', mp4, '-frames:v', '1',
+    '-vf', `crop=${crop.w}:${crop.h}:${crop.x}:${crop.y}`,
+    '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'
+  ], { maxBuffer: 1024 * 1024 });
+  return result.stdout && result.stdout.length ? result.stdout : null;
+}
+
+function clampCrop(x, y, w, h, videoW, videoH) {
+  const cx = Math.max(0, Math.min(videoW - w, Math.round(x)));
+  const cy = Math.max(0, Math.min(videoH - h, Math.round(y)));
+  return { x: cx, y: cy, w, h };
+}
+
+export function encodedGlowMotion(ffmpeg, mp4, highlight, videoW, videoH) {
+  const events = highlight?.events || [];
+  const candidates = events.filter((event, index) => {
+    if (event.action !== 'show' || event.filmAt == null || !event.frame) return false;
+    if (event.zoom != null && Number(event.zoom) > 1.01) return false;
+    const next = events[index + 1];
+    const end = next && next.filmAt != null ? Number(next.filmAt) : Number(event.filmAt) + 3;
+    return end - Number(event.filmAt) >= 2.2;
+  });
+  const preferred = candidates.find((event) => /predictedValue|res-outliers-table|filmFlagged/.test(event.selector || '')) || candidates[0];
+  if (!preferred) return { checked: false, note: 'No stationary highlight lasted long enough to sample the breathing glow.' };
+  const t0 = Number(preferred.filmAt) + 0.55;
+  const t1 = t0 + 1.2;
+  const glow = clampCrop(preferred.frame.x + preferred.frame.w / 2 - 12, preferred.frame.y - 18, 24, 14, videoW, videoH);
+  const interior = clampCrop(preferred.frame.x + 14, preferred.frame.y + 14, 18, 14, videoW, videoH);
+  const glowA = rawCrop(ffmpeg, mp4, t0, glow);
+  const glowB = rawCrop(ffmpeg, mp4, t1, glow);
+  const insideA = rawCrop(ffmpeg, mp4, t0, interior);
+  const insideB = rawCrop(ffmpeg, mp4, t1, interior);
+  const glowDelta = meanChannelDelta(glowA, glowB);
+  const interiorDelta = meanChannelDelta(insideA, insideB);
+  const report = { checked: true, selector: preferred.selector, t0, t1, glowDelta, interiorDelta };
+  if (glowDelta == null) return { ...report, issue: 'The encoded highlight sample could not be read.' };
+  if (interiorDelta != null && interiorDelta > 12) {
+    return { ...report, note: 'The target content changed between glow samples, so the breathing check was not applied.' };
+  }
+  const glowIssue = glowDeltaIssue(glowA, glowB);
+  if (glowIssue) return { ...report, issue: `The breathing glow is not visible in the encoded picture (${glowIssue}).` };
+  return report;
+}
+
 export function samplePlan(duration, scenes, caps) {
   const overviewCap = caps.overviewFrameCap || 160;
   const detailCap = caps.detailFrameCap || 80;
@@ -152,7 +216,13 @@ export async function packageEvidence({ ffmpeg, mp4, manifest, moduleConfig, run
   const scenes = normalizeScenes(manifest, probe.duration, moduleConfig);
   const silenceFindings = classifySilence(silence, scenes, probe.duration);
   const highlight = manifest?.highlight || null;
-  const tech = technicalIssues(probe, loudness, moduleConfig).concat(highlightTechnicalIssues(manifest, moduleConfig));
+  const glowMotion = highlight ? encodedGlowMotion(ffmpeg, mp4, highlight, probe.width, probe.height) : { checked: false };
+  const spoken = narrationLines(moduleConfig);
+  const tech = technicalIssues(probe, loudness, moduleConfig)
+    .concat(highlightTechnicalIssues(manifest, moduleConfig))
+    .concat(spoken == null ? ['Narration file is missing.'] : recitedNarrationIssues(spoken));
+  if (moduleConfig?.highlightRequired && glowMotion.issue) tech.push(glowMotion.issue);
+  if (moduleConfig?.highlightRequired && glowMotion.checked === false && glowMotion.note) tech.push(glowMotion.note);
   const plan = samplePlan(probe.duration, scenes, limits || {});
   const frameDir = path.join(runDir, 'evidence', `v${round}`);
   fs.mkdirSync(frameDir, { recursive: true });
@@ -189,6 +259,7 @@ export async function packageEvidence({ ffmpeg, mp4, manifest, moduleConfig, run
     unsampled: plan.unsampled,
     numerical: numerical || null,
     highlight,
+    highlightMotion: glowMotion,
     transcript: { status: 'not_run', reason: 'Transcription runs only during a paid review of this exact MP4.' },
     detectionLimits: DETECTION_LIMITS,
     samplingNote: 'Sampling is not a complete motion review.'

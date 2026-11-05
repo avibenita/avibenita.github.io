@@ -27,6 +27,7 @@
   
   <!-- Regression computation library -->
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <script src="../../shared/regression-effect-plot.js?v=20261105factor"></script>
   
   <!-- Saved analyses manager -->
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
@@ -2110,6 +2111,105 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+    #tab-partial-grid .pg-banner {
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(120,200,255,.28);
+      background: rgba(120,200,255,.08);
+      color: var(--text-secondary);
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+    #tab-partial-grid .pg-banner strong { color: var(--text-primary); font-weight: 700; }
+    html[data-theme="light"] #tab-partial-grid .pg-banner {
+      background: rgba(14,165,233,.08);
+      border-color: rgba(14,165,233,.35);
+    }
+    #tab-partial-grid .pg-card { min-height: 0; }
+    #tab-partial-grid .pg-copy {
+      flex: 0 0 auto;
+      padding: 8px 12px 4px;
+    }
+    #tab-partial-grid .pg-interp {
+      margin: 0;
+      font-size: 12.5px;
+      line-height: 1.4;
+      color: var(--text-primary);
+    }
+    #tab-partial-grid .pg-slope {
+      margin: 3px 0 8px;
+      font-size: 12px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
+    }
+    #tab-partial-grid .pg-slope.is-p001 { color: #4ade80; }
+    #tab-partial-grid .pg-slope.is-p01 { color: #86efac; }
+    #tab-partial-grid .pg-slope.is-p05 { color: #fbbf24; }
+    #tab-partial-grid .pg-slope.is-ns { color: rgba(251,113,133,.95); }
+    html[data-theme="light"] #tab-partial-grid .pg-slope.is-p001 { color: #15803d; }
+    html[data-theme="light"] #tab-partial-grid .pg-slope.is-p01 { color: #166534; }
+    html[data-theme="light"] #tab-partial-grid .pg-slope.is-p05 { color: #b45309; }
+    html[data-theme="light"] #tab-partial-grid .pg-slope.is-ns { color: #be123c; }
+    #tab-partial-grid .pg-read h3 {
+      margin: 0 0 3px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+    #tab-partial-grid .pg-read p,
+    #tab-partial-grid .pg-read li {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--text-secondary);
+    }
+    #tab-partial-grid .pg-read ul {
+      margin: 3px 0;
+      padding-left: 1.15em;
+    }
+    #tab-partial-grid .pg-read li { margin: 1px 0; }
+    #tab-partial-grid .pg-neg { margin-top: 4px !important; }
+    #tab-partial-grid .pg-tech { margin-top: 6px; }
+    #tab-partial-grid .pg-tech > summary {
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-2, #78c8ff);
+      list-style: none;
+    }
+    #tab-partial-grid .pg-tech > summary::-webkit-details-marker { display: none; }
+    #tab-partial-grid .pg-tech > summary::before { content: "\25B8\00a0"; }
+    #tab-partial-grid .pg-tech[open] > summary::before { content: "\25BE\00a0"; }
+    #tab-partial-grid .pg-tech-body {
+      margin-top: 4px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(148,163,184,.08);
+      color: var(--text-secondary);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    #tab-partial-grid .pg-tech-body p { margin: 0 0 6px; }
+    #tab-partial-grid .pg-tech-body p:last-child { margin: 0; }
+    #tab-partial-grid .pg-math {
+      font-family: Consolas, "Cascadia Mono", ui-monospace, monospace;
+      font-size: 11.5px;
+      color: var(--text-primary);
+    }
+    #tab-partial-grid .pg-plot {
+      position: relative;
+      flex: 1 1 auto;
+      min-height: 200px;
+    }
+    #tab-partial-grid .pg-chart {
+      position: absolute;
+      inset: 0;
+      min-height: 0;
+      width: 100%;
     }
     #tab-pred-overview .tab-panel.ix-workspace,
     #tab-pred-overview .ws-shell {
@@ -5476,7 +5576,7 @@
                   <button type="button" class="ws-mode-tab active" data-viz-tab="viz-partial" onclick="switchTab('viz-partial')" title="How the outcome changes with each predictor">
                     <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Predictor Effects</span>
                   </button>
-                  <button type="button" class="ws-mode-tab" data-viz-tab="viz-unique" onclick="switchTab('viz-unique')" title="Effect after controlling for other predictors">
+                  <button type="button" class="ws-mode-tab" data-viz-tab="viz-unique" onclick="switchTab('viz-unique')" title="Adjusted relationship after the other predictors. Does not show the percentage of variance uniquely explained.">
                     <i class="fa-solid fa-border-all" aria-hidden="true"></i><span>Unique Contribution</span>
                   </button>
                 </nav>
@@ -5509,7 +5609,7 @@
               <div style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:9px 14px;flex-shrink:0;overflow-x:auto;">
                 <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:7px;">
                   <span style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);">Full Model Coefficients</span>
-                  <span style="font-size:10px;color:var(--text-muted);">Click a row to plot that predictor · highlighted row = current X axis</span>
+                  <span style="font-size:10px;color:var(--text-muted);">Click a row to plot that predictor. A category plots every level of its factor, with the reference level marked.</span>
                 </div>
                 <table id="modelVizCoefTable" style="width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;"></table>
                 <div style="font-size:9.5px;color:var(--text-muted);margin-top:5px;">Significance codes: *** p&lt;0.001 &nbsp;** p&lt;0.01 &nbsp;* p&lt;0.05 &nbsp;. p&lt;0.1</div>
@@ -5539,7 +5639,7 @@
                   <button type="button" class="ws-mode-tab" data-viz-tab="viz-partial" onclick="switchTab('viz-partial')" title="How the outcome changes with each predictor">
                     <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Predictor Effects</span>
                   </button>
-                  <button type="button" class="ws-mode-tab active" data-viz-tab="viz-unique" onclick="switchTab('viz-unique')" title="Effect after controlling for other predictors">
+                  <button type="button" class="ws-mode-tab active" data-viz-tab="viz-unique" onclick="switchTab('viz-unique')" title="Adjusted relationship after the other predictors. Does not show the percentage of variance uniquely explained.">
                     <i class="fa-solid fa-border-all" aria-hidden="true"></i><span>Unique Contribution</span>
                   </button>
                 </nav>
@@ -5556,8 +5656,14 @@
             <!-- Content -->
             <div id="pgContent" style="display:none;flex-direction:column;flex:1;min-height:0;gap:9px;">
 
+              <p class="pg-banner" id="pgBanner">
+                <strong>Adjusted relationship.</strong>
+                Each chart shows how a predictor relates to the outcome after the other predictors are accounted for.
+                It illustrates that relationship. It does not display the percentage of variance uniquely explained.
+              </p>
+
               <!-- Scrollable grid of charts -->
-              <div id="pgGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:12px;overflow-y:auto;flex:1;padding-right:4px;padding-bottom:4px;"></div>
+              <div id="pgGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(265px,1fr));gap:12px;overflow-y:auto;flex:1;min-height:0;padding-right:4px;padding-bottom:4px;"></div>
 
             </div><!-- /pgContent -->
           </div>
@@ -8828,7 +8934,8 @@ ${sectionsHtml}
       if (was.predOv) run(() => loadPredOverviewTab());
       if (was.pred) run(() => { initializePredictions(); window.predictionsLoaded = true; });
       if (was.viz) run(() => {
-        if (!(window.globalXnVars || []).length) {
+        const hasPredictor = (window.globalXnVars || []).length || (window.globalXcVars || []).length;
+        if (!hasPredictor) {
           const loading = document.getElementById('modelVizLoading');
           const content = document.getElementById('modelVizContent');
           if (content) content.style.display = 'none';
@@ -14241,129 +14348,245 @@ ${sectionsHtml}
     // ============================================================================
 
     let _modelVizChart = null;
-    let _mvSelectedIdx = 0;   // index into globalXnVars currently shown on X axis
+    let _mvChartMode = '';
+    let _mvPicks = [];
+    let _mvSelection = null;
+
+    function _mvFail(message) {
+      const loading = document.getElementById('modelVizLoading');
+      const content = document.getElementById('modelVizContent');
+      if (content) content.style.display = 'none';
+      if (!loading) return;
+      loading.style.display = '';
+      loading.innerHTML =
+        '<i class="fa-solid fa-triangle-exclamation" style="font-size:36px;color:var(--accent-danger,#f87171);margin-bottom:12px;display:block;"></i>' +
+        '<p>' + message + '</p>';
+    }
+
+    function _mvContext() {
+      const FX = window.StatisticoRegressionEffectPlot;
+      const dat = window.regressionData;
+      const res = window.regressionResults;
+      const names = window.regressionVariableNames || [];
+      const active = window._regActiveColumns;
+      const columns = (Array.isArray(active) && active.length === names.length) ? active : null;
+      const terms = FX.termCatalog(columns, names, window.globalCategoricalInfo || [], window.globalXnVars || []);
+      const factors = FX.factorsFromTerms(terms, window.globalCategoricalInfo || []);
+      const colMeans = FX.columnMeans(dat && dat.xMatrix);
+      return {
+        FX: FX,
+        dat: dat,
+        res: res,
+        terms: terms,
+        factors: factors,
+        colMeans: colMeans,
+        numericMeans: FX.numericValueMap(terms, colMeans),
+        incl: !!(dat && (dat.intercept === 1 || dat.intercept === true)),
+        yVar: window.globalYVar || 'Y'
+      };
+    }
+
+    function _mvBuildPicks(ctx) {
+      const picks = [];
+      ctx.terms.forEach(term => {
+        if (term.kind === 'numeric') picks.push({ mode: 'numeric', name: term.name, index: term.index });
+      });
+      ctx.factors.forEach(factor => {
+        picks.push({ mode: 'factor', factor: factor.name, index: -1 });
+      });
+      if (!picks.length) {
+        ctx.terms.forEach(term => picks.push({ mode: 'column', name: term.name, index: term.index }));
+      }
+      return picks;
+    }
+
+    function _mvSelectionFromPick(pick, ctx) {
+      if (!pick) return null;
+      if (pick.mode === 'factor') {
+        const factor = ctx.factors.find(item => item.name === pick.factor);
+        const level = factor ? ctx.FX.defaultFactorLevel(factor) : null;
+        const term = ctx.terms.find(item => item.kind === 'dummy' && item.factor === pick.factor && String(item.level) === String(level));
+        return term
+          ? ctx.FX.selectionFromTerm(term)
+          : { mode: 'factor', factor: pick.factor, level: level, name: pick.factor, index: -1 };
+      }
+      const term = ctx.terms.find(item => item.index === pick.index) || ctx.terms.find(item => item.name === pick.name);
+      return ctx.FX.selectionFromTerm(term);
+    }
+
+    function _mvSameSelection(a, b) {
+      if (!a || !b || a.mode !== b.mode) return false;
+      if (a.mode === 'numeric') return a.name === b.name;
+      if (a.mode === 'factor') return a.factor === b.factor && String(a.level) === String(b.level);
+      return a.index === b.index;
+    }
+
+    function _mvPickIsActive(pick) {
+      const sel = _mvSelection;
+      if (!sel || !pick) return false;
+      if (pick.mode === 'factor') return sel.mode === 'factor' && sel.factor === pick.factor;
+      if (pick.mode === 'numeric') return sel.mode === 'numeric' && sel.name === pick.name;
+      return sel.mode === 'column' && sel.index === pick.index;
+    }
+
+    function _mvSyncPills() {
+      _mvPicks.forEach((pick, i) => {
+        const btn = document.getElementById('mvpill' + i);
+        if (!btn) return;
+        const active = _mvPickIsActive(pick);
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = 'fa-solid ' + (active ? 'fa-check' : (pick.mode === 'factor' ? 'fa-tags' : 'fa-chart-line'));
+      });
+    }
+
+    function _mvSelectedTerm(ctx) {
+      const sel = _mvSelection;
+      if (!sel) return null;
+      if (sel.mode === 'factor') {
+        return ctx.terms.find(term => term.kind === 'dummy' && term.factor === sel.factor && String(term.level) === String(sel.level)) || null;
+      }
+      if (sel.mode === 'numeric') return ctx.terms.find(term => term.kind === 'numeric' && term.name === sel.name) || null;
+      return ctx.terms.find(term => term.index === sel.index) || null;
+    }
 
     function loadModelVizTab() {
       const res = window.regressionResults;
       const dat = window.regressionData;
-
-      if (!res || !dat) {
-        document.getElementById('modelVizLoading').innerHTML =
-          '<i class="fa-solid fa-triangle-exclamation" style="font-size:36px;color:var(--accent-danger,#f87171);margin-bottom:12px;display:block;"></i>' +
-          '<p>No regression results available. Run a model first.</p>';
+      if (!res || !dat || !dat.xMatrix || !dat.xMatrix.length) {
+        _mvFail('No regression results available. Run a model first.');
         return;
       }
-      const xnVars = window.globalXnVars || [];
-      if (xnVars.length === 0) {
-        document.getElementById('modelVizLoading').innerHTML =
-          '<i class="fa-solid fa-triangle-exclamation" style="font-size:36px;color:var(--accent-danger,#f87171);margin-bottom:12px;display:block;"></i>' +
-          '<p>No numeric predictors found.</p>';
+      if (!window.StatisticoRegressionEffectPlot) {
+        _mvFail('Predictor effect chart is unavailable.');
+        return;
+      }
+      const ctx = _mvContext();
+      if (ctx.terms.length !== dat.xMatrix[0].length) {
+        _mvFail('Predictor effect chart is unavailable for this model.');
+        return;
+      }
+      _mvPicks = _mvBuildPicks(ctx);
+      if (!_mvPicks.length) {
+        _mvFail('No predictors to plot.');
         return;
       }
 
-      // Update Y label in explanation
-      const yVar = window.globalYVar || 'Y';
       const yLbl = document.getElementById('mvYLabel');
-      if (yLbl) yLbl.textContent = yVar;
+      if (yLbl) yLbl.textContent = ctx.yVar;
+      _mvSelection = _mvSelectionFromPick(_mvPicks[0], ctx);
 
-      _mvSelectedIdx = 0;
-
-      // Build radio-pill row
       const cbRow = document.getElementById('modelVizCbRow');
-      cbRow.innerHTML = xnVars.map((v, i) => `
-        <button type="button" id="mvpill${i}" class="mv-axis-pill${i === 0 ? ' is-active' : ''}"
-          onclick="onModelVizSelect(${i})" aria-pressed="${i === 0 ? 'true' : 'false'}">
-          <i class="fa-solid ${i === 0 ? 'fa-check' : 'fa-chart-line'}" aria-hidden="true"></i>
-          <span>${v}</span>
-        </button>`).join('');
+      cbRow.innerHTML = _mvPicks.map((pick, i) => {
+        const label = pick.mode === 'factor' ? pick.factor : pick.name;
+        const active = _mvPickIsActive(pick);
+        const icon = active ? 'fa-check' : (pick.mode === 'factor' ? 'fa-tags' : 'fa-chart-line');
+        return '<button type="button" id="mvpill' + i + '" class="mv-axis-pill' + (active ? ' is-active' : '') + '"' +
+          ' onclick="onModelVizPick(' + i + ')" aria-pressed="' + (active ? 'true' : 'false') + '">' +
+          '<i class="fa-solid ' + icon + '" aria-hidden="true"></i>' +
+          '<span>' + escapeHtmlText(label) + '</span></button>';
+      }).join('');
 
-      // Reveal content
       document.getElementById('modelVizLoading').style.display = 'none';
       document.getElementById('modelVizContent').style.display = 'flex';
-
       _mvRefresh();
     }
 
-    function onModelVizSelect(idx) {
-      if (idx === _mvSelectedIdx) return;
-      const xnVars = window.globalXnVars || [];
-      _mvSelectedIdx = idx;
-      xnVars.forEach((_, i) => {
-        const btn = document.getElementById('mvpill' + i);
-        if (!btn) return;
-        const active = i === idx;
-        btn.classList.toggle('is-active', active);
-        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-        const icon = btn.querySelector('i');
-        if (icon) icon.className = 'fa-solid ' + (active ? 'fa-check' : 'fa-chart-line');
-      });
+    function onModelVizPick(index) {
+      const ctx = _mvContext();
+      const pick = _mvPicks[index];
+      if (!pick) return;
+      if (pick.mode === 'factor' && _mvSelection && _mvSelection.mode === 'factor' && _mvSelection.factor === pick.factor) return;
+      if (pick.mode === 'numeric' && _mvSelection && _mvSelection.mode === 'numeric' && _mvSelection.name === pick.name) return;
+      if (pick.mode === 'column' && _mvSelection && _mvSelection.mode === 'column' && _mvSelection.index === pick.index) return;
+      _mvSelection = _mvSelectionFromPick(pick, ctx);
+      _mvSyncPills();
       scheduleResultRefresh(() => _mvRefresh());
     }
 
+    function onModelVizTerm(index) {
+      const ctx = _mvContext();
+      const term = ctx.terms.find(item => item.index === index);
+      if (!term) return;
+      const next = ctx.FX.selectionFromTerm(term);
+      if (_mvSameSelection(_mvSelection, next)) return;
+      _mvSelection = next;
+      _mvSyncPills();
+      scheduleResultRefresh(() => _mvRefresh());
+    }
+
+    function _mvCriticalT(res, n, width) {
+      const df = Number.isFinite(res.df) ? res.df : (n - width);
+      if (df > 0 && typeof tInverse === 'function') {
+        const t = tInverse(0.025, df);
+        if (Number.isFinite(t) && t > 0) return t;
+      }
+      return 1.96;
+    }
+
+    function _mvXtXInv(dat, incl) {
+      const Xfull = dat.xMatrix.map(row => incl ? [1, ...row] : row.slice());
+      const width = Xfull[0].length;
+      const xtx = Array.from({ length: width }, (_, i) =>
+        Array.from({ length: width }, (_, j) => Xfull.reduce((sum, row) => sum + row[i] * row[j], 0)));
+      return _mvMatInv(xtx);
+    }
+
     function _mvRefresh() {
-      const res    = window.regressionResults;
-      const dat    = window.regressionData;
-      const xnVars = window.globalXnVars || [];
-      const yVar   = window.globalYVar   || 'Y';
-      if (!res || !dat) return;
+      const res = window.regressionResults;
+      const dat = window.regressionData;
+      if (!res || !dat || !dat.xMatrix || !dat.xMatrix.length || !window.StatisticoRegressionEffectPlot) return;
+      const ctx = _mvContext();
+      if (!_mvSelection) _mvSelection = _mvSelectionFromPick(_mvPicks[0], ctx);
+      if (!_mvSelection || ctx.terms.length !== dat.xMatrix[0].length) return;
 
-      const n      = dat.yVector.length;
-      const incl   = dat.intercept === 1 || dat.intercept === true;
-      const nPreds = dat.xMatrix[0].length;
-      const xIdx   = _mvSelectedIdx;
-      const xName  = xnVars[xIdx] || `X${xIdx + 1}`;
+      const xtxInv = _mvXtXInv(dat, ctx.incl);
+      const tCrit = _mvCriticalT(res, dat.yVector.length, (ctx.incl ? 1 : 0) + ctx.terms.length);
+      _mvRenderPredictorRow(ctx);
+      _mvRenderCoefTable(ctx);
+      const expected = (ctx.incl ? 1 : 0) + ctx.terms.length;
+      if (!Array.isArray(res.coefficients) || res.coefficients.length !== expected) return;
 
-      // Column means for all predictors
-      const means = Array.from({ length: nPreds }, (_, j) =>
-        dat.xMatrix.reduce((s, r) => s + r[j], 0) / n);
-
-      // Predictor-specific stats (global fit lives on Predictions → Overview)
-      _mvRenderPredictorRow(res, xIdx, xnVars, incl, dat);
-      _mvRenderCoefTable(res, xIdx, xnVars, incl);
-
-      // Chart data
-      const xCol = dat.xMatrix.map(r => r[xIdx]);
-      const xMin = Math.min(...xCol), xMax = Math.max(...xCol);
-      const beta = res.coefficients;
-      const MSE  = res.MSE;
-
-      // Compute XtXinv for CI bands
-      const Xfull  = dat.xMatrix.map(r => incl ? [1, ...r] : [...r]);
-      const kk     = Xfull[0].length;
-      const XtXmat = Array.from({ length: kk }, (_, i) =>
-        Array.from({ length: kk }, (_, j) => Xfull.reduce((s, row) => s + row[i] * row[j], 0)));
-      const XtXinv = _mvMatInv(XtXmat);
-
-      // Scatter
-      const scatterData = dat.yVector.map((y, i) => ({ x: xCol[i], y }));
-
-      // Fitted line + CI (vary xIdx, hold others at mean)
-      const lineData = [], bandData = [];
-      for (let s = 0; s <= 60; s++) {
-        const x    = xMin + (xMax - xMin) * s / 60;
-        const xVec = incl ? [1] : [];
-        means.forEach((m, j) => xVec.push(j === xIdx ? x : m));
-        const yhat = xVec.reduce((acc, v, j) => acc + v * beta[j], 0);
-        let hw = 0;
-        if (XtXinv) {
-          const Ax = XtXinv.map(row => row.reduce((acc, v, k) => acc + v * xVec[k], 0));
-          hw = 1.96 * Math.sqrt(Math.max(0, Ax.reduce((acc, v, k) => acc + v * xVec[k], 0) * MSE));
-        }
-        lineData.push([x, yhat]);
-        bandData.push([x, yhat - hw, yhat + hw]);
+      const sel = _mvSelection;
+      const held = ctx.FX.heldAdjustments(ctx.terms, ctx.factors, ctx.numericMeans, sel);
+      if (sel.mode === 'factor') {
+        const factor = ctx.factors.find(item => item.name === sel.factor);
+        if (!factor) return;
+        const predictions = ctx.FX.factorPredictions({
+          includeIntercept: ctx.incl,
+          terms: ctx.terms,
+          factors: ctx.factors,
+          focalFactor: factor.name,
+          numericMeans: ctx.numericMeans,
+          columnMeans: ctx.colMeans,
+          beta: res.coefficients,
+          xtxInv: xtxInv,
+          mse: res.MSE,
+          tCrit: tCrit
+        });
+        const copy = ctx.FX.chartCopy({
+          mode: 'factor',
+          focalName: factor.name,
+          yName: ctx.yVar,
+          heldNumerics: held.heldNumerics,
+          heldFactors: held.heldFactors,
+          referenceLevel: factor.reference
+        });
+        _mvRenderFactorChart(ctx, factor, predictions, copy);
+        return;
       }
 
-      // Chart title + subtitle: explicit "Adjusted effect of <X>" with a
-      // small parenthetical explaining the controlled covariates.
-      const others = xnVars.filter((_, i) => i !== xIdx);
-      const chartTitle = others.length
-        ? `Adjusted effect of ${xName}`
-        : `Effect of ${xName}`;
-      const chartSubtitle = others.length
-        ? `(other predictors fixed at their average values)`
-        : '';
-
-      _mvRenderChart(scatterData, lineData, bandData, xName, yVar, chartTitle, chartSubtitle);
+      const focal = _mvSelectedTerm(ctx);
+      if (!focal) return;
+      const copy = ctx.FX.chartCopy({
+        mode: sel.mode === 'numeric' ? 'numeric' : 'column',
+        focalName: focal.name,
+        yName: ctx.yVar,
+        heldNumerics: held.heldNumerics,
+        heldFactors: held.heldFactors
+      });
+      _mvRenderNumericChart(ctx, focal, xtxInv, tCrit, copy);
     }
 
     function _mvStdBeta(beta, dat, xIdx) {
@@ -14380,163 +14603,162 @@ ${sectionsHtml}
       return sy ? beta * sx / sy : null;
     }
 
-    function _mvRenderPredictorRow(res, xIdx, xnVars, incl, dat) {
+    function _mvDash() { return '\u2014'; }
+
+    function _mvRenderPredictorRow(ctx) {
       function fmtP(p) { return p < 0.001 ? '< .001' : p.toFixed(3); }
-
-      const i = incl ? xIdx + 1 : xIdx;
-      const xName = xnVars[xIdx] || `X${xIdx + 1}`;
-      const beta = res.coefficients[i];
-      const se = res.std_errors[i];
-      const t = res.t_values[i];
-      const p = res.p_values[i];
-      const ciLo = (res.CI_lower || [])[i];
-      const ciHi = (res.CI_upper || [])[i];
-      const stdB = dat ? _mvStdBeta(beta, dat, xIdx) : null;
-
+      const res = ctx.res;
+      const term = _mvSelectedTerm(ctx);
+      const sel = _mvSelection || {};
+      const displayName = term ? term.name : (sel.name || sel.factor || 'Predictor');
+      let note = '';
+      if (term && term.kind === 'dummy') {
+        const factor = ctx.factors.find(item => item.name === term.factor);
+        if (factor) note = 'vs ' + factor.reference + ' (reference)';
+      }
+      const i = term ? (ctx.incl ? term.index + 1 : term.index) : -1;
+      const has = i >= 0 && Array.isArray(res.coefficients) && Number.isFinite(res.coefficients[i]);
+      const beta = has ? res.coefficients[i] : NaN;
+      const se = has ? res.std_errors[i] : NaN;
+      const t = has ? res.t_values[i] : NaN;
+      const p = has ? res.p_values[i] : NaN;
+      const ciLo = has ? (res.CI_lower || [])[i] : NaN;
+      const ciHi = has ? (res.CI_upper || [])[i] : NaN;
+      const stdB = has && ctx.dat ? _mvStdBeta(beta, ctx.dat, term.index) : null;
+      const num = (value, digits) => Number.isFinite(value) ? value.toFixed(digits) : _mvDash();
       const cells = [
-        { label: 'β',              sub: 'Unstandardised',  val: beta.toFixed(4) },
-        { label: 'Standardised β', sub: 'Effect size',       val: stdB != null ? stdB.toFixed(3) : '—' },
-        { label: 'SE',             sub: 'Std. error',        val: se.toFixed(4) },
-        { label: 't',              sub: 't-value',           val: t.toFixed(3) },
-        { label: 'p',              sub: 'Significance',      val: fmtP(p), accent: p < 0.05 },
-        { label: '95% CI',         sub: 'Confidence interval', val: `${ciLo.toFixed(3)} – ${ciHi.toFixed(3)}` },
+        { label: 'β', sub: 'Unstandardised', val: num(beta, 4) },
+        { label: 'Standardised β', sub: 'Effect size', val: stdB != null ? stdB.toFixed(3) : _mvDash() },
+        { label: 'SE', sub: 'Std. error', val: num(se, 4) },
+        { label: 't', sub: 't-value', val: num(t, 3) },
+        { label: 'p', sub: 'Significance', val: Number.isFinite(p) ? fmtP(p) : _mvDash(), accent: Number.isFinite(p) && p < 0.05 },
+        { label: '95% CI', sub: 'Confidence interval', val: Number.isFinite(ciLo) && Number.isFinite(ciHi) ? (ciLo.toFixed(3) + ' \u2013 ' + ciHi.toFixed(3)) : _mvDash() }
       ];
-
+      const noteHtml = note
+        ? '<div style="font-size:10px;color:#a7f3d0;line-height:1.3;">' + escapeHtmlText(note) + '</div>'
+        : '';
       document.getElementById('modelVizFitRow').innerHTML =
-        `<div style="background:rgba(52,211,153,0.14);border:1px solid rgba(52,211,153,0.45);border-left:3px solid #34D399;border-radius:8px;padding:9px 14px;min-width:120px;display:flex;flex-direction:column;gap:3px;justify-content:center;">
-          <div style="font-size:10px;font-weight:600;color:#6ee7b7;letter-spacing:0.06em;text-transform:uppercase;">Selected predictor</div>
-          <div style="font-size:15px;font-weight:700;color:#e2fbe8;line-height:1.2;">${xName}</div>
-        </div>` +
-        cells.map(c => `
-        <div style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:9px 14px;min-width:80px;flex:1;display:flex;flex-direction:column;gap:3px;">
-          <div style="font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;">${c.label}</div>
-          <div style="font-size:18px;font-weight:600;color:${c.accent ? '#6ee7b7' : 'var(--text-primary)'};font-variant-numeric:tabular-nums;line-height:1.15;">${c.val}</div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">${c.sub}</div>
-        </div>`).join('');
+        '<div style="background:rgba(52,211,153,0.14);border:1px solid rgba(52,211,153,0.45);border-left:3px solid #34D399;border-radius:8px;padding:9px 14px;min-width:120px;display:flex;flex-direction:column;gap:3px;justify-content:center;">' +
+          '<div style="font-size:10px;font-weight:600;color:#6ee7b7;letter-spacing:0.06em;text-transform:uppercase;">Selected predictor</div>' +
+          '<div style="font-size:15px;font-weight:700;color:#e2fbe8;line-height:1.2;">' + escapeHtmlText(displayName) + '</div>' +
+          noteHtml +
+        '</div>' +
+        cells.map(c =>
+          '<div style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:9px 14px;min-width:80px;flex:1;display:flex;flex-direction:column;gap:3px;">' +
+            '<div style="font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:0.06em;text-transform:uppercase;">' + c.label + '</div>' +
+            '<div style="font-size:18px;font-weight:600;color:' + (c.accent ? '#6ee7b7' : 'var(--text-primary)') + ';font-variant-numeric:tabular-nums;line-height:1.15;">' + c.val + '</div>' +
+            '<div style="font-size:10px;color:var(--text-muted);margin-top:1px;">' + c.sub + '</div>' +
+          '</div>'
+        ).join('');
     }
 
-    function _mvRenderCoefTable(res, xAxisIdx, xnVars, incl) {
+    function _mvRowRole(term) {
+      const sel = _mvSelection;
+      if (!sel || !term || term.intercept) return '';
+      if (sel.mode === 'factor' && term.kind === 'dummy' && term.factor === sel.factor) {
+        return String(term.level) === String(sel.level) ? 'focus' : 'family';
+      }
+      if (sel.mode === 'numeric' && term.kind === 'numeric' && term.name === sel.name) return 'focus';
+      if (sel.mode === 'column' && term.index === sel.index) return 'focus';
+      return '';
+    }
+
+    function _mvRenderCoefTable(ctx) {
       function fmtP(p) { return p < 0.001 ? '< .001' : p.toFixed(3); }
       function pCol(p) { return p < 0.05 ? '#6ee7b7' : p < 0.1 ? '#fcd34d' : 'var(--text-muted)'; }
       function stars(p){ return p<0.001?'***':p<0.01?'**':p<0.05?'*':p<0.1?'.':''; }
 
-      const varNames = window.regressionVariableNames || xnVars;
-      const allNames = incl ? ['(Intercept)', ...varNames] : varNames;
-      const { coefficients: beta, std_errors: se, t_values: tv, p_values: pv } = res;
+      const res = ctx.res;
+      const beta = res.coefficients || [];
+      const se = res.std_errors || [];
+      const tv = res.t_values || [];
+      const pv = res.p_values || [];
+      const rows = [];
+      if (ctx.incl) rows.push({ intercept: true, name: '(Intercept)' });
+      ctx.terms.forEach(term => rows.push(term));
 
       const thS = 'text-align:right;font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-muted);padding:6px 10px 8px;border-bottom:1px solid var(--border);';
       const tdS = 'text-align:right;padding:7px 10px;font-variant-numeric:tabular-nums;font-size:12.5px;';
+      const thead = '<thead><tr>' +
+        '<th style="' + thS + ';text-align:left;">Predictor</th>' +
+        '<th style="' + thS + '">Coefficient (β̂)</th>' +
+        '<th style="' + thS + '">Std. Error</th>' +
+        '<th style="' + thS + '">t-value</th>' +
+        '<th style="' + thS + '">p-value</th>' +
+        '<th style="' + thS + '"></th>' +
+        '</tr></thead>';
 
-      const thead = `<thead><tr>
-        <th style="${thS};text-align:left;">Predictor</th>
-        <th style="${thS}">Coefficient (β̂)</th>
-        <th style="${thS}">Std. Error</th>
-        <th style="${thS}">t-value</th>
-        <th style="${thS}">p-value</th>
-        <th style="${thS}"></th>
-      </tr></thead>`;
-
-      const rows = allNames.map((name, i) => {
-        const isInt  = name === '(Intercept)' || name === 'Intercept';
-        const predIdx = isInt ? -1 : varNames.indexOf(name);
-        const isXpred = predIdx === xAxisIdx;
-        const rowBg  = isXpred ? 'background:rgba(52,211,153,0.20);' : '';
-        const lbord  = isXpred ? 'border-left:3px solid #34D399;' : 'border-left:3px solid transparent;';
-        const ring   = isXpred ? 'box-shadow:inset 0 0 0 1px rgba(52,211,153,0.45);' : '';
-        const click  = predIdx >= 0 ? ` onclick="onModelVizSelect(${predIdx})" title="Plot ${name} on X axis"` : '';
-        const cursor = predIdx >= 0 ? 'cursor:pointer;' : '';
-        const nameS  = isInt
+      const body = rows.map((term, i) => {
+        const isInt = !!(term && term.intercept);
+        const role = _mvRowRole(term);
+        const isFocus = role === 'focus';
+        const rowBg = isFocus ? 'background:rgba(52,211,153,0.20);' : (role === 'family' ? 'background:rgba(52,211,153,0.08);' : '');
+        const lbord = isFocus ? 'border-left:3px solid #34D399;' : 'border-left:3px solid transparent;';
+        const ring = isFocus ? 'box-shadow:inset 0 0 0 1px rgba(52,211,153,0.45);' : '';
+        const plotTitle = isInt ? '' : (term.kind === 'dummy'
+          ? ('Plot ' + term.factor + ', highlighting ' + term.name)
+          : ('Plot ' + term.name));
+        const click = isInt ? '' : (' onclick="onModelVizTerm(' + term.index + ')" title="' + escapeHtmlText(plotTitle) + '"');
+        const cursor = isInt ? '' : 'cursor:pointer;';
+        const nameS = isInt
           ? 'color:var(--text-muted);font-style:italic;font-size:11.5px;'
-          : isXpred ? 'color:#6ee7b7;font-weight:700;font-size:12.5px;' : 'color:var(--text-primary);font-size:12.5px;';
+          : isFocus ? 'color:#6ee7b7;font-weight:700;font-size:12.5px;' : 'color:var(--text-primary);font-size:12.5px;';
         const p = pv[i];
-        const cellWt = isXpred ? 'font-weight:600;color:#e2fbe8;' : '';
-        return `<tr style="border-bottom:1px solid rgba(148,163,184,.08);${rowBg}${lbord}${ring}${cursor}"${click}>
-          <td style="text-align:left;padding:7px 10px;${nameS}">${isXpred ? '→ ' : ''}${name}</td>
-          <td style="${tdS}color:var(--text-primary);font-weight:500;${cellWt}">${beta[i].toFixed(4)}</td>
-          <td style="${tdS}color:var(--text-muted);${cellWt}">${se[i].toFixed(4)}</td>
-          <td style="${tdS}color:var(--text-secondary);${cellWt}">${tv[i].toFixed(3)}</td>
-          <td style="${tdS}font-weight:${p<0.05?'600':'500'};color:${pCol(p)};">${fmtP(p)}</td>
-          <td style="padding:7px 6px;color:var(--text-muted);font-size:11px;font-weight:600;">${stars(p)}</td>
-        </tr>`;
+        const cellWt = isFocus ? 'font-weight:600;color:#e2fbe8;' : '';
+        const shown = escapeHtmlText(isInt ? term.name : term.name);
+        return '<tr style="border-bottom:1px solid rgba(148,163,184,.08);' + rowBg + lbord + ring + cursor + '"' + click + '>' +
+          '<td style="text-align:left;padding:7px 10px;' + nameS + '">' + (isFocus ? '→ ' : '') + shown + '</td>' +
+          '<td style="' + tdS + 'color:var(--text-primary);font-weight:500;' + cellWt + '">' + (Number.isFinite(beta[i]) ? beta[i].toFixed(4) : _mvDash()) + '</td>' +
+          '<td style="' + tdS + 'color:var(--text-muted);' + cellWt + '">' + (Number.isFinite(se[i]) ? se[i].toFixed(4) : _mvDash()) + '</td>' +
+          '<td style="' + tdS + 'color:var(--text-secondary);' + cellWt + '">' + (Number.isFinite(tv[i]) ? tv[i].toFixed(3) : _mvDash()) + '</td>' +
+          '<td style="' + tdS + 'font-weight:' + (p < 0.05 ? '600' : '500') + ';color:' + pCol(p) + ';">' + (Number.isFinite(p) ? fmtP(p) : _mvDash()) + '</td>' +
+          '<td style="padding:7px 6px;color:var(--text-muted);font-size:11px;font-weight:600;">' + (Number.isFinite(p) ? stars(p) : '') + '</td>' +
+          '</tr>';
       }).join('');
 
-      document.getElementById('modelVizCoefTable').innerHTML = thead + `<tbody>${rows}</tbody>`;
+      document.getElementById('modelVizCoefTable').innerHTML = thead + '<tbody>' + body + '</tbody>';
     }
 
-    function _mvRenderChart(scatterData, lineData, bandData, xName, yName, chartTitle, chartSubtitle) {
-      const series = [
-        {
-          type: 'arearange', name: '95% confidence band',
-          data: bandData,
-          color: 'rgba(120,200,255,0.11)', fillOpacity: 1, lineWidth: 0,
-          marker: { enabled: false }, enableMouseTracking: false, zIndex: 1
-        },
-        {
-          type: 'scatter', name: 'Observed data',
-          data: scatterData,
-          color: 'rgba(120,200,255,0.78)',
-          marker: { radius: 4.5, symbol: 'circle' },
-          zIndex: 3,
-          tooltip: {
-            pointFormatter: function () {
-              return `<b>${xName}:</b> ${this.x.toFixed(3)}<br><b>${yName}:</b> ${this.y.toFixed(3)}`;
-            }
-          }
-        },
-        {
-          type: 'line', name: 'Adjusted prediction',
-          data: lineData,
-          color: 'rgba(120,200,255,0.92)',
-          lineWidth: 2.5, marker: { enabled: false }, zIndex: 4,
-          enableMouseTracking: false
-        }
-      ];
+    function _mvAxisTitleStyle() {
+      return { color: 'rgba(255,255,255,0.78)', fontSize: '12px', fontWeight: '700' };
+    }
 
-      if (_modelVizChart) {
-        while (_modelVizChart.series.length) _modelVizChart.series[0].remove(false);
-        series.forEach(s => _modelVizChart.addSeries(s, false));
-        _modelVizChart.xAxis[0].update({ title: { text: xName } }, false);
-        _modelVizChart.yAxis[0].update({ title: { text: yName } }, false);
-        _modelVizChart.setTitle(
-          { text: chartTitle, style: { color: 'rgba(255,255,255,0.92)', fontSize: '14px', fontWeight: '600' } },
-          { text: chartSubtitle, style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px', fontStyle: 'italic' } },
-          false
-        );
-        _modelVizChart.redraw({ duration: 300 });
-        return;
-      }
+    function _mvTickStyle() {
+      return { color: 'rgba(255,255,255,0.6)', fontSize: '11px' };
+    }
 
-      _modelVizChart = Highcharts.chart('modelVizChart', {
+    function _mvYAxis(yName) {
+      return {
+        title: { text: yName, style: _mvAxisTitleStyle() },
+        labels: { style: _mvTickStyle() },
+        gridLineColor: 'rgba(255,255,255,0.055)'
+      };
+    }
+
+    function _mvChartOptions(parts) {
+      return {
         chart: {
           backgroundColor: 'transparent',
           animation: { duration: 400 },
           style: { fontFamily: "'Segoe UI', system-ui, sans-serif" }
         },
         title: {
-          text: chartTitle,
+          text: parts.title,
           align: 'center',
           style: { color: 'rgba(255,255,255,0.92)', fontSize: '14px', fontWeight: '600' }
         },
         subtitle: {
-          text: chartSubtitle,
+          text: parts.subtitle || '',
           align: 'center',
           style: { color: 'rgba(255,255,255,0.55)', fontSize: '11px', fontStyle: 'italic' }
         },
-        xAxis: {
-          title: { text: xName, style: { color: 'rgba(255,255,255,0.78)', fontSize: '12px', fontWeight: '700' } },
-          labels: { style: { color: 'rgba(255,255,255,0.6)', fontSize: '11px' } },
-          gridLineColor: 'rgba(255,255,255,0.055)',
-          lineColor: 'rgba(255,255,255,0.15)', tickColor: 'rgba(255,255,255,0.15)'
-        },
-        yAxis: {
-          title: { text: yName, style: { color: 'rgba(255,255,255,0.78)', fontSize: '12px', fontWeight: '700' } },
-          labels: { style: { color: 'rgba(255,255,255,0.6)', fontSize: '11px' } },
-          gridLineColor: 'rgba(255,255,255,0.055)'
-        },
+        xAxis: parts.xAxis,
+        yAxis: parts.yAxis,
         legend: {
           itemStyle: { color: 'rgba(255,255,255,0.72)', fontSize: '11.5px', fontWeight: '600' },
           itemHoverStyle: { color: '#fff' },
-          backgroundColor: 'transparent', borderWidth: 0
+          backgroundColor: 'transparent',
+          borderWidth: 0
         },
         credits: { enabled: false },
         tooltip: {
@@ -14546,22 +14768,392 @@ ${sectionsHtml}
           style: { color: '#e0e8f0', fontSize: '12px' },
           headerFormat: ''
         },
-        series
-      });
+        series: parts.series
+      };
     }
 
-    // Backward-compat stubs
-    function renderModelVizChart() { _mvRefresh(); }
-    function renderModelVizStats(res) {
-      const dat = window.regressionData;
-      const xnVars = window.globalXnVars || [];
-      const incl = dat && (dat.intercept === 1 || dat.intercept === true);
-      _mvRenderPredictorRow(res, _mvSelectedIdx, xnVars, incl, dat);
+    function _mvMountChart(mode, options) {
+      const host = document.getElementById('modelVizChart');
+      if (!host || typeof Highcharts === 'undefined') return;
+      if (_modelVizChart) {
+        try { _modelVizChart.destroy(); } catch (_err) {}
+        _modelVizChart = null;
+      }
+      _mvChartMode = mode;
+      try {
+        _modelVizChart = Highcharts.chart(host, options);
+      } catch (err) {
+        console.error('Predictor effect chart failed:', err);
+      }
     }
+
+    function _mvLinearAxis(title) {
+      return {
+        title: { text: title, style: _mvAxisTitleStyle() },
+        labels: { style: _mvTickStyle() },
+        gridLineColor: 'rgba(255,255,255,0.055)',
+        lineColor: 'rgba(255,255,255,0.15)',
+        tickColor: 'rgba(255,255,255,0.15)'
+      };
+    }
+
+    function _mvRenderNumericChart(ctx, focal, xtxInv, tCrit, copy) {
+      const dat = ctx.dat;
+      const res = ctx.res;
+      const xCol = dat.xMatrix.map(row => row[focal.index]);
+      const xMin = Math.min.apply(null, xCol);
+      const xMax = Math.max.apply(null, xCol);
+      const levels = ctx.FX.referenceLevelMap(ctx.factors);
+      const lineData = [];
+      const bandData = [];
+      const steps = xMax === xMin ? 1 : 60;
+      for (let s = 0; s <= steps; s++) {
+        const x = xMin + (xMax - xMin) * (s / steps);
+        let vector;
+        if (focal.kind === 'numeric') {
+          const numbers = Object.assign({}, ctx.numericMeans);
+          numbers[focal.name] = x;
+          vector = ctx.FX.designVector(ctx.incl, ctx.terms, numbers, levels, ctx.colMeans);
+        } else {
+          const base = ctx.FX.designVector(ctx.incl, ctx.terms, ctx.numericMeans, levels, ctx.colMeans);
+          vector = ctx.FX.withColumnValue(base, ctx.incl, focal.index, x);
+        }
+        const fit = ctx.FX.fittedMean(vector, res.coefficients, xtxInv, res.MSE, tCrit);
+        lineData.push([x, fit.estimate]);
+        bandData.push([x, fit.low, fit.high]);
+      }
+      const xName = focal.name;
+      const yName = ctx.yVar;
+      _mvMountChart('numeric', _mvChartOptions({
+        title: copy.title,
+        subtitle: copy.subtitle,
+        xAxis: _mvLinearAxis(copy.xAxisTitle),
+        yAxis: _mvYAxis(yName),
+        series: [
+          {
+            type: 'arearange', name: '95% confidence band',
+            data: bandData,
+            color: 'rgba(120,200,255,0.11)', fillOpacity: 1, lineWidth: 0,
+            marker: { enabled: false }, enableMouseTracking: false, zIndex: 1
+          },
+          {
+            type: 'scatter', name: 'Observed data',
+            data: dat.yVector.map((y, i) => ({ x: xCol[i], y: y })),
+            color: 'rgba(120,200,255,0.78)',
+            marker: { radius: 4.5, symbol: 'circle' },
+            turboThreshold: 0,
+            zIndex: 3,
+            tooltip: {
+              pointFormatter: function () {
+                return '<b>' + escapeHtmlText(xName) + ':</b> ' + this.x.toFixed(3) +
+                  '<br><b>' + escapeHtmlText(yName) + ':</b> ' + this.y.toFixed(3);
+              }
+            }
+          },
+          {
+            type: 'line', name: 'Adjusted prediction',
+            data: lineData,
+            color: 'rgba(120,200,255,0.92)',
+            lineWidth: 2.5, marker: { enabled: false }, zIndex: 4,
+            enableMouseTracking: false
+          }
+        ]
+      }));
+    }
+
+    function _mvRenderFactorChart(ctx, factor, predictions, copy) {
+      const categories = predictions.map(row => ctx.FX.levelAxisLabel(row.level, factor.reference));
+      const focus = _mvSelection ? String(_mvSelection.level) : '';
+      const points = predictions.map((row, i) => {
+        const focused = String(row.level) === focus;
+        return {
+          x: i,
+          y: row.estimate,
+          color: focused ? '#34D399' : (row.isReference ? 'rgba(252,211,77,0.95)' : 'rgba(120,200,255,0.95)'),
+          marker: {
+            symbol: row.isReference ? 'diamond' : 'circle',
+            radius: focused ? 8 : 6,
+            lineWidth: 1,
+            lineColor: 'rgba(255,255,255,0.85)'
+          },
+          custom: {
+            label: categories[i],
+            low: row.low,
+            high: row.high,
+            difference: row.difference,
+            isReference: row.isReference
+          }
+        };
+      });
+      const yName = ctx.yVar;
+      const reference = factor.reference;
+      _mvMountChart('factor', _mvChartOptions({
+        title: copy.title,
+        subtitle: copy.subtitle,
+        xAxis: Object.assign(_mvLinearAxis(copy.xAxisTitle), {
+          categories: categories,
+          min: 0,
+          max: Math.max(0, categories.length - 1),
+          tickInterval: 1
+        }),
+        yAxis: _mvYAxis(yName),
+        series: [
+          {
+            type: 'errorbar',
+            id: 'mv-factor-ci',
+            name: '95% confidence interval',
+            data: predictions.map((row, i) => [i, row.low, row.high]),
+            color: 'rgba(120,200,255,0.9)',
+            stemWidth: 2,
+            whiskerLength: 10,
+            whiskerWidth: 2,
+            enableMouseTracking: false,
+            zIndex: 2
+          },
+          {
+            type: 'scatter',
+            id: 'mv-factor-means',
+            name: 'Adjusted mean',
+            data: points,
+            turboThreshold: 0,
+            zIndex: 4,
+            tooltip: {
+              pointFormatter: function () {
+                const info = this.custom || (this.options && this.options.custom) || {};
+                let html = '<b>' + escapeHtmlText(info.label || '') + '</b><br>' +
+                  escapeHtmlText(yName) + ': ' + this.y.toFixed(2);
+                if (Number.isFinite(info.low) && Number.isFinite(info.high)) {
+                  html += '<br>95% CI: ' + info.low.toFixed(2) + ' to ' + info.high.toFixed(2);
+                }
+                if (!info.isReference && Number.isFinite(info.difference)) {
+                  html += '<br>Difference vs ' + escapeHtmlText(reference) + ': ' +
+                    (info.difference > 0 ? '+' : '') + info.difference.toFixed(2);
+                }
+                return html;
+              }
+            }
+          }
+        ]
+      }));
+    }
+
+    function renderModelVizChart() { _mvRefresh(); }
+    function renderModelVizStats() { _mvRefresh(); }
 
     // ─────────────────────────────────────────────────────────────────────────
     //  PARTIAL REGRESSION GRID  (Added Variable Plots)
     // ─────────────────────────────────────────────────────────────────────────
+
+    /** Readable name and unit for an added-variable axis or sentence. */
+    function _pgUnitFromToken(token) {
+      const t = String(token || '').trim().toLowerCase();
+      const map = {
+        year: ['years', 'year'], years: ['years', 'year'],
+        month: ['months', 'month'], months: ['months', 'month'],
+        week: ['weeks', 'week'], weeks: ['weeks', 'week'],
+        day: ['days', 'day'], days: ['days', 'day'],
+        hour: ['hours', 'hour'], hours: ['hours', 'hour'],
+        minute: ['minutes', 'minute'], minutes: ['minutes', 'minute'],
+        second: ['seconds', 'second'], seconds: ['seconds', 'second'],
+        percent: ['percent', 'percent'], '%': ['percent', 'percent']
+      };
+      return map[t] ? { unit: map[t][0], singular: map[t][1] } : null;
+    }
+
+    function _pgReadable(name) {
+      const original = String(name == null ? '' : name).trim();
+      let stem = original;
+      let unit = null;
+      let unitSingular = null;
+      const paren = stem.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+      if (paren) {
+        const parsed = _pgUnitFromToken(paren[2]);
+        if (parsed) {
+          stem = paren[1].trim();
+          unit = parsed.unit;
+          unitSingular = parsed.singular;
+        }
+      }
+      const suffixes = [
+        [/[_ ]months?$/i, 'months', 'month'],
+        [/[_ ]years?$/i, 'years', 'year'],
+        [/[_ ]weeks?$/i, 'weeks', 'week'],
+        [/[_ ]days?$/i, 'days', 'day'],
+        [/[_ ]hours?$/i, 'hours', 'hour'],
+        [/[_ ]minutes?$/i, 'minutes', 'minute'],
+        [/[_ ]seconds?$/i, 'seconds', 'second'],
+        [/[_ ](?:pct|percent)$/i, 'percent', 'percent']
+      ];
+      if (!unit) {
+        for (let i = 0; i < suffixes.length; i++) {
+          if (suffixes[i][0].test(stem)) {
+            unit = suffixes[i][1];
+            unitSingular = suffixes[i][2];
+            stem = stem.replace(suffixes[i][0], '').trim();
+            break;
+          }
+        }
+      }
+      if (!unit && /^age$/i.test(stem)) {
+        unit = 'years';
+        unitSingular = 'year';
+      }
+      const words = stem.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+      const label = words.length
+        ? words.map((w, i) => i === 0 ? (w.charAt(0).toUpperCase() + w.slice(1)) : w.toLowerCase()).join(' ')
+        : (original || 'Variable');
+      return { raw: original, label: label, labelLower: label.toLowerCase(), unit: unit, unitSingular: unitSingular };
+    }
+
+    function _pgIsTime(meta) {
+      return !!(meta && meta.unit && /^(months|years|weeks|days|hours|minutes|seconds)$/.test(meta.unit));
+    }
+
+    function _pgAboveWord(meta) {
+      return _pgIsTime(meta) ? 'longer' : 'higher';
+    }
+
+    function _pgSlopeWord(meta, positive) {
+      if (_pgIsTime(meta)) return positive ? 'longer' : 'shorter';
+      return positive ? 'higher' : 'lower';
+    }
+
+    function _pgNegativeNoun(meta) {
+      const lower = meta.labelLower;
+      const last = lower.split(' ').pop();
+      const mass = {
+        tenure: 1, income: 1, spend: 1, sales: 1, experience: 1, time: 1,
+        satisfaction: 1, revenue: 1, profit: 1, cost: 1, price: 1
+      };
+      if (last === 'age') return 'negative ' + lower.replace(/age$/, 'ages');
+      if (mass[last] || /s$/i.test(last)) return 'negative ' + lower;
+      let pluralLast = last + 's';
+      if (/[^aeiou]y$/i.test(last)) pluralLast = last.slice(0, -1) + 'ies';
+      return 'negative ' + lower.replace(new RegExp(last + '$'), pluralLast);
+    }
+
+    function _pgP(p) {
+      if (!Number.isFinite(p)) return 'p unavailable';
+      if (p < 0.001) return 'p < .001';
+      return 'p = ' + p.toFixed(3).replace(/^0/, '');
+    }
+
+    function _pgPHtml(p) {
+      return escapeHtmlText(_pgP(p));
+    }
+
+    function _pgStatNum(n) {
+      if (!Number.isFinite(n)) return '\u2014';
+      const a = Math.abs(n);
+      if (a >= 1000) return n.toFixed(1);
+      if (a >= 0.0005) return n.toFixed(3);
+      return n.toExponential(2);
+    }
+
+    function _pgApprox(n) {
+      const a = Math.abs(n);
+      if (!Number.isFinite(a)) return '\u2014';
+      if (a >= 10) return a.toFixed(1);
+      if (a >= 0.1) return a.toFixed(2);
+      if (a >= 0.01) return a.toFixed(3);
+      if (a === 0) return '0';
+      return a.toPrecision(2);
+    }
+
+    function _pgCountUnit(meta, amount) {
+      const one = Math.abs(Math.abs(amount) - 1) < 0.005;
+      if (!meta.unit) return one ? 'unit' : 'units';
+      if (one && meta.unitSingular) return meta.unitSingular;
+      return meta.unit;
+    }
+
+    function _pgSigClass(p) {
+      if (p < 0.001) return 'is-p001';
+      if (p < 0.01) return 'is-p01';
+      if (p < 0.05) return 'is-p05';
+      return 'is-ns';
+    }
+
+    function _pgStars(p) {
+      return p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : p < 0.1 ? '.' : 'ns';
+    }
+
+    function _pgAxisTitle(meta) {
+      return meta.unit
+        ? (meta.label + ' after adjustment (' + meta.unit + ')')
+        : (meta.label + ' after adjustment');
+    }
+
+    function _pgInterp(xMeta, yMeta, beta, p, othersPhrase) {
+      const xBit = xMeta.unitSingular
+        ? (xMeta.unitSingular + ' of ' + xMeta.labelLower)
+        : ('unit of ' + xMeta.labelLower);
+      const mag = Math.abs(beta);
+      const yUnit = _pgCountUnit(yMeta, mag);
+      const dir = beta >= 0 ? 'additional' : 'fewer';
+      return 'After accounting for ' + othersPhrase + ', each additional ' + xBit
+        + ' is associated with approximately ' + _pgApprox(beta) + ' ' + dir + ' ' + yUnit
+        + ' of ' + yMeta.labelLower + ' (' + _pgP(p) + ').';
+    }
+
+    function _pgLineSentence(xMeta, yMeta, beta, se, p) {
+      const x = xMeta.labelLower;
+      const y = yMeta.labelLower;
+      const weak = !Number.isFinite(beta) || Math.abs(beta) < 1e-12
+        || (Number.isFinite(se) && se > 0 && Math.abs(beta) <= se * 0.5 && p >= 0.1);
+      if (weak) {
+        return 'The nearly flat line shows little association between ' + x + ' and ' + y + ' after adjustment.';
+      }
+      const rising = beta > 0;
+      return 'The ' + (rising ? 'rising' : 'falling') + ' line shows that higher ' + x
+        + ' is associated with ' + _pgSlopeWord(yMeta, rising) + ' ' + y + ' after adjustment.';
+    }
+
+    function _pgAmountPhrase(meta, value) {
+      const abs = Math.abs(value);
+      if (!Number.isFinite(value) || abs < 0.005) return null;
+      const num = abs.toFixed(2);
+      if (!meta.unit) return num;
+      const unit = (Math.abs(abs - 1) < 0.005 && meta.unitSingular) ? meta.unitSingular : meta.unit;
+      return num + ' ' + unit;
+    }
+
+    function _pgResidualSentence(meta, value, othersPhrase) {
+      const amount = _pgAmountPhrase(meta, value);
+      const label = '<b>' + escapeHtmlText(meta.label) + ':</b> ';
+      if (!amount) return label + 'about as expected from ' + othersPhrase + '.';
+      const dir = value > 0 ? 'above' : 'below';
+      return label + amount + ' ' + dir + ' expected from ' + othersPhrase + '.';
+    }
+
+    function _pgLineNote(xMeta, yMeta, x, y, beta, tol) {
+      const gap = y - beta * x;
+      const yName = yMeta.labelLower;
+      const xName = xMeta.labelLower;
+      if (gap > tol) {
+        return 'That point is above the fitted line: its ' + yName
+          + ' is higher than the model predicts when ' + xName + ' is also included.';
+      }
+      if (gap < -tol) {
+        return 'That point is below the fitted line: its ' + yName
+          + ' is lower than the model predicts when ' + xName + ' is also included.';
+      }
+      return 'That point is close to the fitted line: its ' + yName
+        + ' is about what the model predicts when ' + xName + ' is also included.';
+    }
+
+    function _pgTechHtml(xMeta, yMeta, beta, se, othersPhrase) {
+      const x = escapeHtmlText(xMeta.labelLower);
+      const y = escapeHtmlText(yMeta.labelLower);
+      const xRaw = escapeHtmlText(xMeta.raw || xMeta.label);
+      const yRaw = escapeHtmlText(yMeta.raw || yMeta.label);
+      return '<p>This is an added-variable plot: both ' + x + ' and ' + y
+        + ' have been adjusted for ' + othersPhrase + '. The horizontal axis is the residual <span class="pg-math">e('
+        + xRaw + ' | others)</span>, and the vertical axis is <span class="pg-math">e('
+        + yRaw + ' | others)</span>. Its fitted slope equals ' + x
+        + '\u2019s coefficient in the full regression (B = ' + _pgStatNum(beta) + ', SE = ' + _pgStatNum(Math.abs(se)) + ').</p>'
+        + '<p>The chart illustrates that adjusted relationship. It does not itself display the percentage of variance uniquely explained by ' + x + '.</p>';
+    }
 
     /** OLS residuals: y - X·β  (Xmat includes intercept column) */
     function _pgOlsResiduals(Xmat, y) {
@@ -14597,14 +15189,15 @@ ${sectionsHtml}
       const yVec  = dat.yVector;
       const xMat  = dat.xMatrix;
 
-      // Update Y label in explanation
-      const pgYLbl = document.getElementById('pgYLabel');
-      if (pgYLbl) pgYLbl.textContent = yVar;
+      const yMeta = _pgReadable(yVar);
+      const othersPhrase = xnVars.length > 1 ? 'the other predictors' : 'the rest of the model';
+      const pgBanner = document.getElementById('pgBanner');
+      if (pgBanner) {
+        pgBanner.innerHTML = '<strong>Adjusted relationship.</strong> Each chart shows how a predictor relates to '
+          + escapeHtmlText(yMeta.labelLower) + ' after accounting for ' + othersPhrase + '. '
+          + 'It illustrates that adjusted relationship. It does not display the percentage of variance uniquely explained.';
+      }
 
-      // Build a grid cell per predictor.
-      // Choose a column count that keeps cells reasonably wide regardless of
-      // predictor count, then size both rows and columns with 1fr so the grid
-      // fills the available container height (no big empty space below).
       const pgGrid = document.getElementById('pgGrid');
       const n = xnVars.length;
       const cols = n <= 1 ? 1
@@ -14615,129 +15208,170 @@ ${sectionsHtml}
                  : n <= 9  ? 3
                  :           4;
       const rows = Math.max(1, Math.ceil(n / cols));
-      pgGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-      pgGrid.style.gridTemplateRows    = `repeat(${rows}, minmax(0, 1fr))`;
+      pgGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(280px, 1fr))`;
+      pgGrid.style.gridTemplateRows    = `repeat(${rows}, minmax(520px, 1fr))`;
       pgGrid.style.gridAutoRows        = '';
       pgGrid.style.height              = '100%';
-      pgGrid.style.overflowY           = rows > 3 ? 'auto' : 'hidden';
-      pgGrid.innerHTML = xnVars.map((name, i) =>
-        `<div class="chart-panel" style="min-height:0;min-width:0;">
-           <div class="chart-panel-h"><i class="fa-solid fa-chart-scatter"></i> ${name}</div>
-           <div class="chart-panel-b">
-             <div id="pgc${i}" style="flex:1 1 0;min-height:140px;width:100%;"></div>
-           </div>
-         </div>`
-      ).join('');
+      pgGrid.style.overflowY           = 'auto';
 
-      // Reveal content
+      (Highcharts.charts || []).forEach(c => {
+        if (c && c.renderTo && /^pgc\d+$/.test(c.renderTo.id || '')) {
+          try { c.destroy(); } catch (_e) {}
+        }
+      });
+
+      const themeLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const jobs = [];
+      pgGrid.innerHTML = xnVars.map((xName, xIdx) => {
+        const Xother = xMat.map(row => {
+          const r = [1];
+          row.forEach((v, j) => { if (j !== xIdx) r.push(v); });
+          return r;
+        });
+        const eY = _pgOlsResiduals(Xother, yVec);
+        const eXi = _pgOlsResiduals(Xother, xMat.map(r => r[xIdx]));
+        const betaIdx = incl ? xIdx + 1 : xIdx;
+        const beta = Number(res.coefficients[betaIdx]);
+        const p = Number(res.p_values[betaIdx]);
+        const se = Number(res.std_errors && res.std_errors[betaIdx]);
+        const xMeta = _pgReadable(xName);
+        const gaps = eY.map((y, i) => y - beta * eXi[i]);
+        const gapSd = Math.sqrt(gaps.reduce((s, g) => s + g * g, 0) / Math.max(1, gaps.length));
+        jobs.push({
+          xIdx, xName, xMeta, eXi, eY, beta, p, se,
+          tol: Math.max(0.05, 0.15 * (Number.isFinite(gapSd) ? gapSd : 0))
+        });
+        const above = _pgAboveWord(yMeta);
+        return `<div class="chart-panel pg-card" style="min-height:0;min-width:0;">
+           <div class="chart-panel-h"><i class="fa-solid fa-chart-scatter" aria-hidden="true"></i> ${escapeHtmlText(xName)}</div>
+           <div class="pg-copy">
+             <p class="pg-interp">${escapeHtmlText(_pgInterp(xMeta, yMeta, beta, p, othersPhrase))}</p>
+             <p class="pg-slope ${_pgSigClass(p)}">Slope B = ${_pgStatNum(beta)} · SE = ${_pgStatNum(Math.abs(se))} &nbsp;&nbsp; ${_pgPHtml(p)} ${_pgStars(p)}</p>
+             <div class="pg-read">
+               <h3>How to read this chart</h3>
+               <p>Each dot represents one observation. Both axes show differences remaining after accounting for ${othersPhrase}.</p>
+               <ul>
+                 <li>Right of zero: ${escapeHtmlText(xMeta.labelLower)} is higher than expected from ${othersPhrase}.</li>
+                 <li>Above zero: ${escapeHtmlText(yMeta.labelLower)} is ${above} than expected from ${othersPhrase}.</li>
+                 <li>${escapeHtmlText(_pgLineSentence(xMeta, yMeta, beta, se, p))}</li>
+                 <li>Dots closer to the line follow this relationship more closely.</li>
+               </ul>
+               <p class="pg-neg">Negative axis values represent differences from expected values\u2014not ${escapeHtmlText(_pgNegativeNoun(xMeta))} or ${escapeHtmlText(_pgNegativeNoun(yMeta))}.</p>
+               <details class="pg-tech" id="pgTech${xIdx}">
+                 <summary>Technical explanation</summary>
+                 <div class="pg-tech-body">${_pgTechHtml(xMeta, yMeta, beta, se, othersPhrase)}</div>
+               </details>
+             </div>
+           </div>
+           <div class="chart-panel-b pg-plot">
+             <div id="pgc${xIdx}" class="pg-chart"></div>
+           </div>
+         </div>`;
+      }).join('');
+
       document.getElementById('pgLoading').style.display = 'none';
       document.getElementById('pgContent').style.display = 'flex';
 
-      // Render charts after DOM update
       setTimeout(() => {
         function sigColor(p) {
+          if (themeLight) {
+            return p < 0.001 ? '#15803d'
+                 : p < 0.01  ? '#166534'
+                 : p < 0.05  ? '#b45309'
+                 : '#be123c';
+          }
           return p < 0.001 ? '#4ade80'
                : p < 0.01  ? '#86efac'
                : p < 0.05  ? '#fbbf24'
                : 'rgba(255,100,100,0.82)';
         }
-        function stars(p) {
-          return p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : p < 0.1 ? '.' : 'ns';
-        }
+        const axStyle = {
+          color: themeLight ? '#334155' : 'rgba(226,232,240,0.85)',
+          fontSize: '11px',
+          fontWeight: '500'
+        };
+        const axTitleStyle = {
+          color: themeLight ? '#1e293b' : 'rgba(226,232,240,0.88)',
+          fontSize: '11px',
+          fontWeight: '600'
+        };
+        const grid = themeLight ? 'rgba(15,23,42,0.08)' : 'rgba(148,163,184,0.10)';
+        const axisLine = themeLight ? 'rgba(15,23,42,0.28)' : 'rgba(148,163,184,0.30)';
+        const zeroLine = themeLight ? 'rgba(15,23,42,0.28)' : 'rgba(255,255,255,0.18)';
+        const pointColor = themeLight ? 'rgba(14,116,144,0.72)' : 'rgba(120,200,255,0.55)';
 
-        xnVars.forEach((xName, xIdx) => {
-          // X_other: all columns except xIdx, with prepended intercept
-          const Xother = xMat.map(row => {
-            const r = [1];
-            row.forEach((v, j) => { if (j !== xIdx) r.push(v); });
-            return r;
-          });
-
-          const eY  = _pgOlsResiduals(Xother, yVec);
-          const eXi = _pgOlsResiduals(Xother, xMat.map(r => r[xIdx]));
-
-          const scatter = eXi.map((x, i) => ({ x, y: eY[i] }));
-
-          // Fitted line slope = full-model coefficient for this predictor
-          const betaIdx = incl ? xIdx + 1 : xIdx;
-          const beta_i  = res.coefficients[betaIdx];
-          const p_i     = res.p_values[betaIdx];
-          const se_i    = res.std_errors[betaIdx];
-          const minX    = Math.min(...eXi);
-          const maxX    = Math.max(...eXi);
-          const lineData = [[minX, beta_i * minX], [maxX, beta_i * maxX]];
-
-          const sc = sigColor(p_i);
-
-          const axStyle  = { color: 'rgba(226,232,240,0.85)', fontSize: '11.5px', fontWeight: '500' };
-          const axTitleStyle = { color: 'rgba(226,232,240,0.78)', fontSize: '11.5px', fontWeight: '600' };
-          const ttlStyle = (fz, op) => ({ color: `rgba(255,255,255,${op})`, fontSize: fz });
-
-          Highcharts.chart(`pgc${xIdx}`, {
+        jobs.forEach(job => {
+          const minX = Math.min.apply(null, job.eXi);
+          const maxX = Math.max.apply(null, job.eXi);
+          const lineData = [[minX, job.beta * minX], [maxX, job.beta * maxX]];
+          const scatter = job.eXi.map((x, i) => ({ x: x, y: job.eY[i] }));
+          const sc = sigColor(job.p);
+          const chart = Highcharts.chart('pgc' + job.xIdx, {
             chart: {
               backgroundColor: 'transparent',
               animation: false,
               style: { fontFamily: "'Segoe UI', system-ui, sans-serif" },
-              margin: [40, 12, 56, 62],
-              spacing: [4, 4, 4, 4],
+              spacing: [8, 12, 8, 8],
               events: {
                 load: function () {
-                  // Re-fit after layout settles so the chart fills its flex cell.
                   const c = this;
                   setTimeout(() => { try { c.reflow(); } catch (_e) {} }, 0);
-                  setTimeout(() => { try { c.reflow(); } catch (_e) {} }, 120);
+                  setTimeout(() => { try { c.reflow(); } catch (_e) {} }, 160);
                 }
               }
             },
-            title: {
-              text: xName,
-              style: { color: 'rgba(255,255,255,0.92)', fontSize: '13px', fontWeight: '700' },
-              margin: 2
-            },
-            subtitle: {
-              text: `β̂ = ${beta_i.toFixed(4)} ± ${se_i.toFixed(4)} &nbsp; p ${p_i < 0.001 ? '&lt; .001' : '= ' + p_i.toFixed(3)} <b>${stars(p_i)}</b>`,
-              useHTML: true,
-              style: { color: sc, fontSize: '11px', fontWeight: '600' }
-            },
+            title: { text: null },
+            subtitle: { text: null },
             xAxis: {
-              title: { text: `e(${xName} | others)`, style: axTitleStyle, margin: 8 },
-              labels: { style: axStyle, distance: 8 },
-              gridLineColor: 'rgba(148,163,184,0.10)',
-              lineColor: 'rgba(148,163,184,0.30)',
-              tickColor: 'rgba(148,163,184,0.30)',
+              title: { text: _pgAxisTitle(job.xMeta), style: axTitleStyle, margin: 8 },
+              labels: { style: axStyle },
+              gridLineColor: grid,
+              lineColor: axisLine,
+              tickColor: axisLine,
               tickLength: 4,
-              plotLines: [{ value: 0, color: 'rgba(255,255,255,0.18)', width: 1, zIndex: 2 }]
+              plotLines: [{ value: 0, color: zeroLine, width: 1, zIndex: 2 }]
             },
             yAxis: {
-              title: { text: `e(${yVar} | others)`, style: axTitleStyle, margin: 12 },
-              labels: { style: axStyle, x: -6 },
-              gridLineColor: 'rgba(148,163,184,0.10)',
-              lineColor: 'rgba(148,163,184,0.30)',
-              tickColor: 'rgba(148,163,184,0.30)',
-              plotLines: [{ value: 0, color: 'rgba(255,255,255,0.18)', width: 1, zIndex: 2 }]
+              title: { text: _pgAxisTitle(yMeta), style: axTitleStyle, margin: 14 },
+              labels: { style: axStyle },
+              gridLineColor: grid,
+              lineColor: axisLine,
+              tickColor: axisLine,
+              plotLines: [{ value: 0, color: zeroLine, width: 1, zIndex: 2 }]
             },
             legend: { enabled: false },
             credits: { enabled: false },
             exporting: { enabled: false },
             tooltip: {
-              backgroundColor: 'rgba(10,14,22,0.94)',
-              borderColor: 'rgba(120,200,255,0.3)',
-              style: { color: '#e0e8f0', fontSize: '11px' },
+              useHTML: true,
+              outside: true,
+              backgroundColor: 'rgba(10,14,22,0.96)',
+              borderColor: 'rgba(120,200,255,0.35)',
+              borderRadius: 8,
+              style: { color: '#e8eef6', fontSize: '12px' },
               headerFormat: '',
-              pointFormatter() {
-                return `<b>e(${xName}):</b> ${this.x.toFixed(3)}<br><b>e(${yVar}):</b> ${this.y.toFixed(3)}`;
+              pointFormatter: function () {
+                const xLine = _pgResidualSentence(job.xMeta, this.x, othersPhrase);
+                const yLine = _pgResidualSentence(yMeta, this.y, othersPhrase);
+                const note = escapeHtmlText(_pgLineNote(job.xMeta, yMeta, this.x, this.y, job.beta, job.tol));
+                return '<div style="max-width:300px;line-height:1.45;white-space:normal;">'
+                  + '<div>' + xLine + '</div>'
+                  + '<div style="margin-top:4px;">' + yLine + '</div>'
+                  + '<div style="margin-top:8px;">' + note + '</div></div>';
               }
             },
             series: [
               {
                 type: 'scatter',
+                name: 'Observation',
                 data: scatter,
-                color: 'rgba(120,200,255,0.52)',
-                marker: { radius: 3, symbol: 'circle' },
+                color: pointColor,
+                marker: { radius: 3.2, symbol: 'circle' },
                 zIndex: 3
               },
               {
                 type: 'line',
+                name: 'Adjusted slope',
                 data: lineData,
                 color: sc,
                 lineWidth: 2.2,
@@ -14747,6 +15381,12 @@ ${sectionsHtml}
               }
             ]
           });
+          const tech = document.getElementById('pgTech' + job.xIdx);
+          if (tech) {
+            tech.addEventListener('toggle', function () {
+              setTimeout(() => { try { chart.reflow(); } catch (_e) {} }, 0);
+            });
+          }
         });
       }, 80);
     }

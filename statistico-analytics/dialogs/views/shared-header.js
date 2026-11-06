@@ -8908,29 +8908,30 @@ REPORT: [one polished paragraph suitable for a report]`;
 
   _mountModuleAboutButton(footer) {
     if (!footer || this.module === 'segmentation') return;
+    if (document.getElementById('sbModuleAboutBtn')) return;
     const moduleName = this.module;
-    this._ensureModuleGuideScript(() => {
-      if (!footer.isConnected) return;
-      if (!window.StatisticoModuleGuide || !window.StatisticoModuleGuide.has(moduleName)) return;
-      if (document.getElementById('sbModuleAboutBtn')) return;
-      const wrap = document.createElement('div');
-      wrap.id = 'sbModuleAbout';
-      wrap.className = 'sb-module-about-wrap';
-      wrap.innerHTML = ''
-        + '<button type="button" class="sb-module-about" id="sbModuleAboutBtn"'
-        + ' aria-expanded="false" aria-controls="moduleGuideOverlay"'
-        + ' title="What this method does, when to use it, and what it cannot show.">'
-        + '<i class="fa-solid fa-book-open" aria-hidden="true"></i>'
-        + '<span class="sb-item-label">About this module</span>'
-        + '</button>';
-      footer.appendChild(wrap);
-      const btn = wrap.querySelector('#sbModuleAboutBtn');
-      if (btn) {
-        btn.addEventListener('click', () => {
-          if (window.StatisticoModuleGuide) window.StatisticoModuleGuide.toggle(moduleName);
+    const wrap = document.createElement('div');
+    wrap.id = 'sbModuleAbout';
+    wrap.className = 'sb-module-about-wrap';
+    wrap.innerHTML = ''
+      + '<button type="button" class="sb-module-about" id="sbModuleAboutBtn"'
+      + ' aria-expanded="false" aria-controls="moduleGuideOverlay"'
+      + ' title="What this method does, when to use it, and what it cannot show.">'
+      + '<i class="fa-solid fa-book-open" aria-hidden="true"></i>'
+      + '<span class="sb-item-label">About this module</span>'
+      + '</button>';
+    footer.appendChild(wrap);
+    const btn = wrap.querySelector('#sbModuleAboutBtn');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        this._ensureModuleGuideScript(() => {
+          if (window.StatisticoModuleGuide && window.StatisticoModuleGuide.has(moduleName)) {
+            window.StatisticoModuleGuide.toggle(moduleName);
+          }
         });
-      }
-    });
+      });
+    }
+    this._ensureModuleGuideScript();
   },
 
   _ensureModuleGuideScript(done) {
@@ -8944,14 +8945,21 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (document.getElementById('statistico-module-guide-js')) return;
     const script = document.createElement('script');
     script.id = 'statistico-module-guide-js';
-    script.src = this.resolveDialogUrl('shared/module-guide.js?v=20261106about');
+    const headerScript = document.querySelector('script[src*="shared-header.js"]');
+    const fromHeader = headerScript && headerScript.src
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261106about2')
+      : '';
+    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261106about2');
     const release = () => {
       const waiters = this._moduleGuideWaiters || [];
       this._moduleGuideWaiters = null;
       waiters.forEach((fn) => { try { fn(); } catch (_e) {} });
     };
     script.onload = release;
-    script.onerror = release;
+    script.onerror = () => {
+      script.remove();
+      release();
+    };
     document.head.appendChild(script);
   },
 

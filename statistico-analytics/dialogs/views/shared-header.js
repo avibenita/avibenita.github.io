@@ -7692,7 +7692,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       factor: 'Prioritize factorability, retained dimensions, loadings, communalities, and factor meaning.',
       pca: 'Prioritize retained dimensions, loadings, communalities, and component meaning.',
       reliability: 'Prioritize overall reliability, weak items, improvement if deleted, and dimensionality.',
-      logistic: 'Prioritize discrimination, calibration, threshold trade-offs, and classification errors.',
+      logistic: 'Prioritize discrimination (AUC), calibration (Brier, slope, intercept, Hosmer–Lemeshow), threshold trade-offs, and classification counts. Use the computed payload. Do not invent a trust score, reliability percentage, readiness rating, or a strongest-predictor ranking.',
       'meta-analysis': 'Prioritize the pooled effect, heterogeneity, influential studies, and publication-bias indicators.',
       'mixed-model': 'Prioritize fixed effects, ICC or variance components, model fit, and convergence.',
       contingency: 'Prioritize association strength, residuals, and whether the pattern is consistent across cells.',
@@ -9224,11 +9224,11 @@ REPORT: [one polished paragraph suitable for a report]`;
       // Logistic — workspace sub-views (each describes the actual chart/table
       // shown, not a generic "logistic regression" overview).
       'logistic-model-results-overview':
-        'Read the headline conclusion (model converged? overall significant?), the discrimination band (AUC), and a one-line summary of the strongest effect. Use this view to decide whether the logistic model is worth interpreting in detail.',
+        'Read the Model Summary counts and fit statistics (observations, events, event rate, AUC, overall p, likelihood ratio, pseudo-R², AIC, Brier, events per predictor), the coefficient table (in-model status, beta, odds ratio, p), and the ROC preview. The page does not print a trust score, reliability percentage, or readiness rating. Use the computed payload for outcome coding, reference categories, and predictor units.',
       'logistic-model-results-technical':
-        'Read the coefficient table on the log-odds scale, plus odds ratios with 95% CI, Wald z, p, and the omnibus likelihood-ratio chi-square. Use this view to interpret each predictor numerically.',
+        'Read the coefficient table on the log-odds scale, plus odds ratios with 95% CI, Wald z, p, the model equation, and the omnibus likelihood-ratio, Wald, and score statistics. Use the computed payload. Do not add a trust score or a strongest-predictor ranking.',
       'logistic-predictive-performance-overview':
-        'Read accuracy, sensitivity, specificity, PPV, NPV, and the confusion matrix at the chosen cutoff. Use this view to judge classification quality at the operating threshold, not separation.',
+        'Read AUC, sensitivity, specificity, precision, accuracy, F1, the confusion-matrix counts, and the threshold summary. These are the classification numbers at the current cutoff. Do not add a quality label that is not printed on the page.',
       'logistic-predictive-performance-roc-thresholds':
         'The ROC curve plots sensitivity (true positive rate) against 1 - specificity across all possible cutoffs. AUC summarises overall discrimination (0.5 = chance, 1.0 = perfect). Use the threshold slider to read sensitivity / specificity / Youden\'s J at any cutoff and pick an operating point.',
       'logistic-predictive-performance-calibration':
@@ -9246,7 +9246,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'logistic-interactions-technical':
         'Read interaction coefficients on the log-odds scale, the likelihood-ratio test for the interaction term, and any coding notes. Use this view for the technical write-up.',
       'logistic-diagnostics-overview':
-        'Read the assumption verdict (separation, multicollinearity, sample size per cell), and the high-level health summary. Use this view to flag warnings before trusting coefficients or probabilities.',
+        'Read the residual and influence counts in the Checks table, and any computation warning shown above it. Use the computed payload for separation risk, sparse cells, and whether influence was computed. Do not add a trust or readiness rating.',
       'logistic-diagnostics-residuals':
         'Inspect deviance and Pearson residuals, optionally stratified by predicted probability bins. Patterns (curvature, large residuals at the extremes) suggest mis-specification rather than random noise.',
       'logistic-diagnostics-influence':
@@ -11929,6 +11929,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     if (this._aiForceRefresh) return false;
     const cache = this._readAiCache(scope);
     if (!cache || !cache.sections) return false;
+    if (scope === 'local' && cache.view && fallbackView && cache.view !== fallbackView) return false;
     this._showAiOverlay(
       cache.sections,
       cache.view || fallbackView,

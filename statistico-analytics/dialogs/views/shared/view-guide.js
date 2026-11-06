@@ -362,6 +362,9 @@
     open: function () {
       const ai = document.getElementById('sbAiOverlay');
       if (ai) ai.remove();
+      if (window.StatisticoModuleGuide && typeof window.StatisticoModuleGuide.close === 'function') {
+        window.StatisticoModuleGuide.close({ silent: true });
+      }
       const guideBtn = document.getElementById('sbViewGuideBtn');
       if (guideBtn && document.activeElement !== guideBtn) this._returnFocus = guideBtn;
       else if (guideBtn) this._returnFocus = guideBtn;

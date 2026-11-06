@@ -718,8 +718,38 @@
     }
     .cmp-factor-panel{
       border:1.5px solid var(--border); border-radius:9px;
-      overflow:hidden; margin-bottom:10px;
+      overflow:visible; margin-bottom:10px;
     }
+    .cmp-split{
+      display:grid;
+      grid-template-columns:minmax(300px,.86fr) minmax(0,1.2fr);
+      gap:8px 18px;
+      align-items:start;
+    }
+    @media (max-width:980px){
+      .cmp-split{ grid-template-columns:1fr; }
+    }
+    .cmp-chart-head{
+      font-size:16px; font-weight:750; color:var(--text-primary);
+      letter-spacing:.01em; min-height:22px;
+    }
+    .cmp-chart-note{
+      margin:2px 0 4px;
+      font-size:12px; line-height:1.45; color:var(--text-muted);
+      white-space:pre-line;
+    }
+    .cmp-chart{ width:100%; height:420px; }
+    tr.cmp-pair{ cursor:pointer; }
+    tr.cmp-selected td{
+      background:rgba(94,234,212,.10) !important;
+    }
+    tr.cmp-selected td:first-child{
+      box-shadow:inset 3px 0 0 #5eead4;
+      font-weight:750;
+      color:var(--text-primary) !important;
+    }
+    :root[data-theme="light"] tr.cmp-selected td{ background:rgba(15,118,110,.08) !important; }
+    :root[data-theme="light"] tr.cmp-selected td:first-child{ box-shadow:inset 3px 0 0 #0f766e; }
     .cmp-factor-head{
       display:flex; align-items:center; gap:8px; flex-wrap:wrap;
       padding:9px 14px; background:var(--surface-2);
@@ -2159,6 +2189,13 @@
         if (_bundle) { try { renderSpreadChart(_bundle); } catch (e) {} }
       }, 60);
     }
+    if (id === 'comparisons' || id === 'posthoc') {
+      setTimeout(function () {
+        Object.keys(_cmpView).forEach(function (key) {
+          try { _drawCmpChart(key); } catch (e) {}
+        });
+      }, 60);
+    }
 
     if (id === 'power' && window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
       window.StatisticoPowerAnalysis._activeEngine.calculate(window._bundle || _bundle);
@@ -2623,6 +2660,382 @@
     _renderPosthoc(b);
   }
 
+  /* ── Pair chart: means on the outcome scale, difference beside them ── */
+  var _cmpView = {};
+  var _qTukeyCache = {};
+  function _logGammaCmp(z) {
+    var c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.001208650973866179, -0.000005395239384953];
+    var x = z, y = z, tmp = x + 5.5;
+    tmp -= (x + 0.5) * Math.log(tmp);
+    var ser = 1.000000000190015;
+    for (var j = 0; j < 6; j++) ser += c[j] / ++y;
+    return Math.log(2.5066282746310005 * ser / x) - tmp;
+  }
+  function _normCdfCmp(z) {
+    var sign = z < 0 ? -1 : 1;
+    var ax = Math.abs(z);
+    var t = 1 / (1 + 0.3275911 * ax);
+    var y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-ax * ax);
+    return 0.5 * (1 + sign * y);
+  }
+  function _rangeCdfCmp(w, k) {
+    if (!(w > 0)) return 0;
+    var steps = 160, a = -8, b = 8, h = (b - a) / steps, sum = 0, i, x, d, wt;
+    for (i = 0; i <= steps; i++) {
+      x = a + i * h;
+      d = Math.max(0, _normCdfCmp(x + w) - _normCdfCmp(x));
+      wt = (i === 0 || i === steps) ? 0.5 : 1;
+      sum += wt * k * Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI) * Math.pow(d, k - 1);
+    }
+    return Math.max(0, Math.min(1, sum * h));
+  }
+  function _qTukey(p, k, df) {
+    k = Math.max(2, Math.round(k));
+    df = Math.max(1, Math.round(df));
+    if (df > 5000) df = 5000;
+    var key = p + '|' + k + '|' + df;
+    if (_qTukeyCache[key]) return _qTukeyCache[key];
+    var lo = 0.1, hi = 12, n, mid, s, half, logf, dens, y, wt, sum, h, a, b, steps, i;
+    function cdf(q) {
+      steps = 200; a = 0.02; b = Math.max(3.2, 1 + 10 / Math.sqrt(df)); h = (b - a) / steps; sum = 0;
+      for (i = 0; i <= steps; i++) {
+        s = a + i * h;
+        half = df / 2;
+        logf = -(half - 1) * Math.LN2 - _logGammaCmp(half) + half * Math.log(df) + (df - 1) * Math.log(s) - 0.5 * df * s * s;
+        dens = Math.exp(logf);
+        y = (isFinite(dens) ? dens : 0) * _rangeCdfCmp(q * s, k);
+        wt = (i === 0 || i === steps) ? 0.5 : 1;
+        sum += wt * y;
+      }
+      return sum * h;
+    }
+    for (n = 0; n < 26; n++) {
+      mid = (lo + hi) / 2;
+      if (cdf(mid) < p) lo = mid; else hi = mid;
+    }
+    _qTukeyCache[key] = (lo + hi) / 2;
+    return _qTukeyCache[key];
+  }
+  function _tCritCmp(tail, df) {
+    if (typeof jStat !== 'undefined' && jStat.studentt && jStat.studentt.inv) {
+      return jStat.studentt.inv(tail, df);
+    }
+    return 1.96;
+  }
+  function _cmpDf(b) {
+    if (b.oneWay && isFinite(b.oneWay.df2)) return b.oneWay.df2;
+    if (b.twoWay && isFinite(b.twoWay.dfError)) return b.twoWay.dfError;
+    if (b.repeated && isFinite(b.repeated.dfError)) return b.repeated.dfError;
+    return NaN;
+  }
+  function _cmpGroups(b, factorKey, stratumLevel) {
+    var name, desc, cells, rows;
+    if (stratumLevel && b.cellDesc && b.cellDesc.length) {
+      cells = b.cellDesc.filter(function (c) {
+        return factorKey === 'A' ? c.b === stratumLevel : c.a === stratumLevel;
+      });
+      rows = cells.map(function (c) {
+        return { level: String(factorKey === 'A' ? c.a : c.b), mean: +c.mean };
+      }).filter(function (g) { return isFinite(g.mean); });
+      name = factorKey === 'B' ? ((b.spec && b.spec.factor2) || 'Factor B') : ((b.spec && b.spec.factor1) || 'Factor A');
+      return _sortByLevelOrder(rows, function (g) { return g.level; }, _preferredLevelOrder(rows.map(function (g) { return g.level; }), b, name));
+    }
+    if (b.type === 'two-way' && factorKey === 'B') {
+      name = (b.spec && b.spec.factor2) || 'Factor B';
+      desc = b.descB || [];
+    } else if (b.type === 'repeated') {
+      name = 'Condition';
+      desc = b.descriptives || [];
+    } else if (b.type === 'two-way') {
+      name = (b.spec && b.spec.factor1) || 'Factor A';
+      desc = b.descA || [];
+    } else {
+      name = (b.spec && (b.spec.factor1 || b.spec.factor)) || 'Group';
+      desc = b.descriptives || b.descA || [];
+    }
+    return _orderDesc(desc, b, name).filter(function (d) { return isFinite(d.mean); }).map(function (d) {
+      return { level: String(d.level), mean: +d.mean };
+    });
+  }
+  function _cmpEnds(comparison, groups) {
+    var parts = String(comparison || '').split(/\s+vs\s+/i);
+    function resolve(raw) {
+      var s = String(raw || '').trim();
+      var exact = groups.filter(function (g) { return g.level === s; })[0];
+      if (exact) return exact;
+      var hits = groups.filter(function (g) {
+        return s.endsWith(' ' + g.level) || s.endsWith(':' + g.level);
+      });
+      hits.sort(function (a, b) { return b.level.length - a.level.length; });
+      return hits[0] || null;
+    }
+    return { a: resolve(parts[0]), b: resolve(parts[1]) };
+  }
+  function _cmpInterval(row, view) {
+    if (row && isFinite(row.ciLow) && isFinite(row.ciHigh)) {
+      return { lo: +row.ciLow, hi: +row.ciHigh, kind: row.ciKind || 'Tukey' };
+    }
+    var diff = row ? row.diff : NaN;
+    var se = row ? row.se : NaN;
+    if (!isFinite(diff) || !isFinite(se)) return { lo: NaN, hi: NaN, kind: '' };
+    var half = NaN, kind = 'Tukey';
+    if (view.method === 'bonferroni') {
+      kind = 'Bonferroni';
+      var m = Math.max(1, (view.rows || []).length);
+      half = _tCritCmp(1 - view.alpha / (2 * m), view.df) * se;
+    } else if (view.method === 'games') {
+      kind = 'Games-Howell';
+      var qg = _qTukey(1 - view.alpha, view.k, (row && isFinite(row.df)) ? row.df : view.df);
+      half = qg / Math.SQRT2 * se;
+    } else if (isFinite(view.df) && view.k >= 2) {
+      half = _qTukey(1 - view.alpha, view.k, view.df) * se;
+    }
+    return { lo: diff - half, hi: diff + half, kind: kind };
+  }
+  function _cmpScale(view) {
+    var ys = [];
+    (view.groups || []).forEach(function (g) { if (isFinite(g.mean)) ys.push(g.mean); });
+    (view.rows || []).forEach(function (r) {
+      var ends = _cmpEnds(r.comparison, view.groups);
+      var ci = _cmpInterval(r, view);
+      if (!ends.a || !isFinite(ci.lo) || !isFinite(ci.hi) || !isFinite(r.diff)) return;
+      var half = Math.max(Math.abs(r.diff - ci.lo), Math.abs(ci.hi - r.diff));
+      ys.push(ends.a.mean - half, ends.a.mean + half);
+    });
+    if (!ys.length) return { min: -1, max: 1 };
+    var lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys);
+    var span = hi - lo || 1;
+    return { min: lo - span * 0.14, max: hi + span * 0.18 };
+  }
+  function _signedDiff(v) {
+    if (!isFinite(v)) return '—';
+    var body = Math.abs(v).toFixed(2);
+    if (v > 0) return '+' + body;
+    if (v < 0) return '−' + body;
+    return body;
+  }
+  function _bound2(v) {
+    if (!isFinite(v)) return '—';
+    return (v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
+  }
+  function _pPhrase(p) {
+    if (!isFinite(p)) return 'p —';
+    if (p < 0.001) return 'p < .001';
+    return 'p = ' + fmtP(p);
+  }
+  function _cmpRowsHtml(rows, alpha, key, selected) {
+    return rows.map(function (r, i) {
+      var p = r.pAdj !== undefined ? r.pAdj : r.p;
+      return '<tr class="cmp-pair' + (i === selected ? ' cmp-selected' : '') + '" onclick="selectCmpPair(\'' + key + '\',' + i + ')">' +
+        '<td>' + _escHtml(r.comparison) + '</td>' +
+        '<td class="num">' + fmt(r.diff) + '</td>' +
+        '<td class="num">' + fmt(r.se) + '</td>' +
+        '<td class="num ' + sigCell(p, alpha) + '">' + fmtP(p) + '</td>' +
+        '<td>' + sigBadge(p, alpha) + '</td></tr>';
+    }).join('');
+  }
+  function _cmpPairMeta(view) {
+    var row = view.rows[view.index] || view.rows[0];
+    if (!row) return null;
+    var ends = _cmpEnds(row.comparison, view.groups);
+    var ci = _cmpInterval(row, view);
+    var p = row.pAdj !== undefined ? row.pAdj : row.p;
+    var aName = ends.a ? ends.a.level : '';
+    var bName = ends.b ? ends.b.level : '';
+    var stats = _signedDiff(row.diff);
+    if (isFinite(ci.lo) && isFinite(ci.hi)) {
+      stats += '  ·  ' + (ci.kind || 'Tukey') + ' CI ' + _bound2(ci.lo) + ' to ' + _bound2(ci.hi);
+    }
+    stats += '  ·  ' + _pPhrase(p);
+    var align = bName ? ('Zero on the difference scale lines up with ' + bName + '.') : '';
+    return {
+      row: row, ends: ends, ci: ci, p: p,
+      title: (aName && bName) ? (aName + ' − ' + bName) : String(row.comparison).replace(/\s+vs\s+/i, ' − '),
+      note: align ? (stats + '\n' + align) : stats
+    };
+  }
+  function selectCmpPair(key, index) {
+    var view = _cmpView[key];
+    if (!view || !view.rows || !view.rows.length) return;
+    view.index = Math.max(0, Math.min(view.rows.length - 1, index));
+    var panel = document.getElementById('cmpPanel_' + key);
+    if (panel) {
+      var trs = panel.querySelectorAll('tbody tr.cmp-pair');
+      Array.prototype.forEach.call(trs, function (tr, i) {
+        tr.classList.toggle('cmp-selected', i === view.index);
+      });
+    }
+    var meta = _cmpPairMeta(view);
+    var head = document.getElementById('cmpHead_' + key);
+    var note = document.getElementById('cmpNote_' + key);
+    if (head && meta) head.textContent = meta.title;
+    if (note && meta) note.textContent = meta.note;
+    _drawCmpChart(key);
+  }
+  function _cmpColors(isDark) {
+    return isDark
+      ? { a: '#5eead4', b: '#f0c14d', fade: 'rgba(148,163,184,.38)', line: 'rgba(226,232,240,.72)', zero: 'rgba(255,255,255,.32)', label: '#eef4ff' }
+      : { a: '#0f766e', b: '#b45309', fade: 'rgba(100,116,139,.45)', line: 'rgba(15,23,42,.55)', zero: 'rgba(15,23,42,.35)', label: '#111827' };
+  }
+  function _drawCmpChart(key, attempt) {
+    var view = _cmpView[key];
+    var host = document.getElementById('cmpChart_' + key);
+    if (!view || !host || !view.groups || !view.groups.length || !view.rows || !view.rows.length) return;
+    if (host.offsetWidth < 20) {
+      if ((attempt || 0) < 6) setTimeout(function () { _drawCmpChart(key, (attempt || 0) + 1); }, 50);
+      return;
+    }
+    var meta = _cmpPairMeta(view);
+    if (!meta || !meta.ends.a || !meta.ends.b) return;
+    if (!view.scale) view.scale = _cmpScale(view);
+    var groups = view.groups;
+    var k = groups.length;
+    var iA = -1, iB = -1;
+    groups.forEach(function (g, i) {
+      if (g.level === meta.ends.a.level) iA = i;
+      if (g.level === meta.ends.b.level) iB = i;
+    });
+    if (iA < 0 || iB < 0) return;
+    var meanA = groups[iA].mean, meanB = groups[iB].mean;
+    var Lmin = view.scale.min, Lmax = view.scale.max;
+    var xMark = k - 0.18;
+    var xDiff = k + 1.15;
+    var t = _visTheme();
+    var col = _cmpColors(t.isDark);
+    var ci = meta.ci;
+    var delta = 'Δ = ' + _signedDiff(meta.row.diff);
+    var ciText = (isFinite(ci.lo) && isFinite(ci.hi))
+      ? ((ci.kind ? ci.kind + ' CI ' : 'CI ') + _bound2(ci.lo) + ' to ' + _bound2(ci.hi))
+      : '';
+    var meanPoints = groups.map(function (g, i) {
+      var on = i === iA || i === iB;
+      var color = i === iA ? col.a : i === iB ? col.b : col.fade;
+      return {
+        x: i, y: g.mean, color: color,
+        marker: { radius: on ? 8 : 4.5, fillColor: color, lineWidth: 0, symbol: 'circle' },
+        dataLabels: on ? {
+          enabled: true, format: '{y:.2f}', y: -10, crop: false, overflow: 'allow',
+          style: { color: color, fontSize: '12px', fontWeight: '700', textOutline: 'none' }
+        } : { enabled: false }
+      };
+    });
+    var yAxes = [
+      {
+        min: Lmin, max: Lmax, startOnTick: false, endOnTick: false,
+        title: { text: 'Mean ' + (view.dv || 'Outcome'), style: { color: t.tc, fontSize: '13px', fontWeight: '700' } },
+        labels: { style: { color: t.tc, fontSize: '12px', fontWeight: '600' } },
+        gridLineColor: t.isDark ? 'rgba(255,255,255,.06)' : '#e6eef2'
+      },
+      {
+        min: Lmin - meanB, max: Lmax - meanB, startOnTick: false, endOnTick: false, opposite: true,
+        title: { text: 'Difference', style: { color: t.tc, fontSize: '13px', fontWeight: '700' } },
+        labels: { style: { color: t.tc, fontSize: '12px', fontWeight: '600' } },
+        gridLineWidth: 0,
+        plotLines: [{ value: 0, color: col.zero, width: 1, zIndex: 3 }]
+      }
+    ];
+    var series = [
+      {
+        type: 'scatter', name: 'Means', yAxis: 0, zIndex: 3, data: meanPoints,
+        enableMouseTracking: true
+      },
+      {
+        type: 'line', name: 'Bracket', yAxis: 0, zIndex: 2, enableMouseTracking: false,
+        color: col.line, lineWidth: 1.25, marker: { enabled: false },
+        data: [
+          { x: iA, y: meanA },
+          { x: xMark, y: meanA },
+          { x: xMark, y: meanB },
+          { x: iB, y: meanB }
+        ]
+      },
+      {
+        type: 'scatter', name: 'Delta', yAxis: 0, zIndex: 4, enableMouseTracking: false,
+        marker: { enabled: false },
+        dataLabels: {
+          enabled: true, crop: false, overflow: 'allow',
+          align: 'left', x: 8, y: 4,
+          formatter: function () { return this.point.custom && this.point.custom.delta; },
+          style: { color: col.label, fontSize: '12px', fontWeight: '750', textOutline: 'none' }
+        },
+        data: [{ x: xMark, y: (meanA + meanB) / 2, custom: { delta: delta } }]
+      },
+      {
+        type: 'errorbar', name: 'Interval', yAxis: 1, zIndex: 3, color: col.a,
+        stemWidth: 1.6, whiskerLength: 8, whiskerWidth: 1.6,
+        data: (isFinite(ci.lo) && isFinite(ci.hi)) ? [{ x: xDiff, low: ci.lo, high: ci.hi }] : []
+      },
+      {
+        type: 'scatter', name: 'Difference', yAxis: 1, zIndex: 4,
+        color: col.a,
+        marker: { radius: 7, symbol: 'circle', fillColor: col.a, lineWidth: 0 },
+        dataLabels: { enabled: false },
+        data: [{ x: xDiff, y: meta.row.diff }]
+      }
+    ];
+    var xAxis = {
+      min: -0.55, max: k + 2.35,
+      tickPositions: groups.map(function (_, i) { return i; }).concat([xDiff]),
+      lineColor: t.isDark ? 'rgba(255,255,255,.08)' : '#e6eef2',
+      tickLength: 0,
+      labels: {
+        style: { color: t.tc, fontSize: '12px', fontWeight: '650' },
+        formatter: function () {
+          if (Math.abs(this.value - xDiff) < 0.01) return 'Difference';
+          var g = groups[Math.round(this.value)];
+          return g ? g.level : '';
+        }
+      },
+      plotLines: [{ value: k - 0.02, color: t.isDark ? 'rgba(255,255,255,.08)' : 'rgba(15,23,42,.08)', width: 1, zIndex: 1 }]
+    };
+    var existing = _charts['cmp_' + key];
+    if (existing) {
+      existing.update({ xAxis: xAxis, yAxis: yAxes }, false);
+      series.forEach(function (s, i) {
+        if (existing.series[i]) existing.series[i].setData(s.data, false);
+      });
+      existing.redraw();
+      return;
+    }
+    _charts['cmp_' + key] = Highcharts.chart(host, {
+      chart: {
+        backgroundColor: 'transparent',
+        style: { fontFamily: 'Segoe UI, sans-serif' },
+        spacingTop: 28, spacingRight: 12, spacingBottom: 8, spacingLeft: 8,
+        animation: { duration: 280 }
+      },
+      title: { text: '' },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: xAxis,
+      yAxis: yAxes,
+      tooltip: {
+        backgroundColor: t.isDark ? '#1e293b' : '#fff',
+        style: { color: t.isDark ? '#f1f5f9' : '#1f2937' },
+        borderRadius: 8,
+        formatter: function () {
+          if (this.series.name === 'Means') {
+            var g = groups[this.point.x];
+            return g ? '<b>' + _escHtml(g.level) + '</b><br>Mean = <b>' + g.mean.toFixed(2) + '</b>' : false;
+          }
+          if (this.series.name === 'Difference' || this.series.name === 'Interval') {
+            return '<b>' + _escHtml(meta.title) + '</b><br>' +
+              'Difference = <b>' + _signedDiff(meta.row.diff) + '</b><br>' +
+              (ciText ? ciText + '<br>' : '') + _pPhrase(meta.p);
+          }
+          return false;
+        }
+      },
+      plotOptions: {
+        series: { animation: { duration: 280 } },
+        scatter: { animation: { duration: 280 } },
+        line: { animation: { duration: 280 } },
+        errorbar: { animation: { duration: 280 } }
+      },
+      series: series
+    });
+  }
+
   var _b_posthoc = null;
 
   /* ── chip filter: factorKey = 'A'|'B', level = string|'__all__' ── */
@@ -2657,10 +3070,10 @@
       var margRows = (b.posthoc || []).filter(function(r){
         return (r.factor === thisFactorName) || (!r.factor && factorKey === 'A');
       });
-      tbody.innerHTML = margRows.map(function(r){
-        var p = r.pAdj !== undefined ? r.pAdj : r.p;
-        return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
-      }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);font-style:italic;padding:8px 0;">No marginal comparisons available</td></tr>';
+      tbody.innerHTML = margRows.length
+        ? _cmpRowsHtml(margRows, alpha, factorKey, 0)
+        : '<tr><td colspan="5" style="color:var(--text-muted);font-style:italic;padding:8px 0;">No marginal comparisons available</td></tr>';
+      _cmpBind(factorKey, margRows, null);
 
       /* update label */
       var metaEl = panel.querySelector('.cmp-strata-note');
@@ -2673,10 +3086,10 @@
       });
       var seRows = se ? se.rows : [];
 
-      tbody.innerHTML = seRows.map(function(r){
-        var p = r.pAdj !== undefined ? r.pAdj : r.p;
-        return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
-      }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);font-style:italic;padding:8px 0;">No pairs for ' + otherFactorName + ' = ' + level + '</td></tr>';
+      tbody.innerHTML = seRows.length
+        ? _cmpRowsHtml(seRows, alpha, factorKey, 0)
+        : '<tr><td colspan="5" style="color:var(--text-muted);font-style:italic;padding:8px 0;">No pairs for ' + otherFactorName + ' = ' + level + '</td></tr>';
+      _cmpBind(factorKey, seRows, level);
 
       /* update label */
       var metaEl = panel.querySelector('.cmp-strata-note');
@@ -2684,7 +3097,34 @@
     }
   }
 
+  function _cmpBind(factorKey, rows, stratumLevel) {
+    var view = _cmpView[factorKey];
+    if (!view) return;
+    view.rows = rows || [];
+    view.groups = _cmpGroups(_b_posthoc, factorKey, stratumLevel || null);
+    view.k = view.groups.length;
+    view.index = 0;
+    view.scale = null;
+    var meta = view.rows.length ? _cmpPairMeta(view) : null;
+    var head = document.getElementById('cmpHead_' + factorKey);
+    var note = document.getElementById('cmpNote_' + factorKey);
+    if (head) head.textContent = meta ? meta.title : '';
+    if (note) note.textContent = meta ? meta.note : '';
+    if (_charts['cmp_' + factorKey]) {
+      try { _charts['cmp_' + factorKey].destroy(); } catch (e) {}
+      _charts['cmp_' + factorKey] = null;
+    }
+    _drawCmpChart(factorKey);
+  }
+
   function _renderPosthoc(b) {
+    Object.keys(_charts).forEach(function (k) {
+      if (k.indexOf('cmp_') === 0) {
+        try { _charts[k].destroy(); } catch (e) {}
+        delete _charts[k];
+      }
+    });
+    _cmpView = {};
     var el    = document.getElementById('posthocBody');
     var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
     var method = (b.spec && b.spec.posthocMethod) || 'tukey';
@@ -2740,6 +3180,10 @@
     html += _renderMainEffectsSection(b, factors, eligibleFactors, methodLabel, alpha, interactionSig);
 
     el.innerHTML = html;
+    var cmpTab = document.getElementById('tab-posthoc');
+    if (cmpTab && cmpTab.style.display !== 'none') {
+      Object.keys(_cmpView).forEach(function (key) { _drawCmpChart(key); });
+    }
   }
 
   /* ── Section: one panel per eligible factor, with level-filter chips ── */
@@ -2806,15 +3250,31 @@
             '(' + (f.levels*(f.levels-1)/2) + ' pairs, ' + methodLabel + ')</div>' +
           '</div>';
         } else {
-          html += '<div class="cmp-factor-body">' +
-            '<div class="cmp-strata-note" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Marginal means · ' + methodLabel + ' &nbsp;|&nbsp; α = ' + alpha + '</div>' +
-            '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
-            rows.map(function(r){
-              var p = r.pAdj !== undefined ? r.pAdj : r.p;
-              return '<tr><td>' + r.comparison + '</td><td class="num">' + fmt(r.diff) + '</td><td class="num">' + fmt(r.se) + '</td><td class="num ' + sigCell(p,alpha) + '">' + fmtP(p) + '</td><td>' + sigBadge(p,alpha) + '</td></tr>';
-            }).join('') +
-            '</tbody></table>' +
-          '</div>';
+          _cmpView[f.key] = {
+            rows: rows,
+            groups: _cmpGroups(b, f.key, null),
+            index: 0,
+            alpha: alpha,
+            method: (b.spec && b.spec.posthocMethod) || 'tukey',
+            dv: (b.spec && b.spec.dv) || 'Outcome',
+            df: _cmpDf(b),
+            scale: null
+          };
+          _cmpView[f.key].k = _cmpView[f.key].groups.length;
+          var pair0 = _cmpPairMeta(_cmpView[f.key]);
+          html += '<div class="cmp-factor-body"><div class="cmp-split">' +
+            '<div>' +
+              '<div class="cmp-strata-note" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">Marginal means · ' + methodLabel + ' &nbsp;|&nbsp; α = ' + alpha + '</div>' +
+              '<table><thead><tr><th>Comparison</th><th class="num">Mean diff</th><th class="num">SE</th><th class="num">p (adj)</th><th></th></tr></thead><tbody>' +
+              _cmpRowsHtml(rows, alpha, f.key, 0) +
+              '</tbody></table>' +
+            '</div>' +
+            '<div>' +
+              '<div class="cmp-chart-head" id="cmpHead_' + f.key + '">' + _escHtml(pair0 ? pair0.title : '') + '</div>' +
+              '<div class="cmp-chart-note" id="cmpNote_' + f.key + '">' + _escHtml(pair0 ? pair0.note : '') + '</div>' +
+              '<div id="cmpChart_' + f.key + '" class="cmp-chart"></div>' +
+            '</div>' +
+          '</div></div>';
         }
       }
       html += '</div>'; /* end cmp-factor-panel */
@@ -5598,6 +6058,13 @@
         if (_bundle) {
           try { renderSummaryGroupChart(_bundle); } catch (e) {}
           try { renderSpreadChart(_bundle); } catch (e2) {}
+          Object.keys(_cmpView).forEach(function (key) {
+            if (_charts['cmp_' + key]) {
+              try { _charts['cmp_' + key].destroy(); } catch (e3) {}
+              _charts['cmp_' + key] = null;
+            }
+            try { _drawCmpChart(key); } catch (e4) {}
+          });
         }
         Object.values(_charts).forEach(function(c) { try { c.reflow(); } catch(e){} });
       }, 100);

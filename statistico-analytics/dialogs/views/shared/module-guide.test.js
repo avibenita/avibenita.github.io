@@ -115,6 +115,11 @@ vm.createContext(realm);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'module-guide.js'), 'utf8'), realm);
 
 const REQUIRED = ['does', 'when', 'data', 'works', 'obtain', 'cautions', 'other', 'refs'];
+const MODULES = [
+  'univariate', 'correlations', 'contingency', 'independent', 'dependent', 'anova',
+  'regression', 'logistic', 'mixed-model', 'factor', 'pca', 'reliability', 'cluster',
+  'meta-analysis', 'power'
+];
 
 describe('Univariate module guide', () => {
   const guide = realm.StatisticoModuleGuide;
@@ -129,17 +134,22 @@ describe('Univariate module guide', () => {
   });
 
   test('covers the eight method sections and keeps the opening short', () => {
-    const entry = guide.resolve('univariate');
-    expect(entry.sections.map((part) => part.id)).toEqual(REQUIRED);
-    expect(entry.lead.length).toBeGreaterThan(40);
-    expect(entry.lead.length).toBeLessThan(420);
-    expect(entry.lead).toMatch(/do not establish a cause/i);
-    const works = entry.sections.find((part) => part.id === 'works');
-    expect(works.detail.title).toMatch(/Mathematical background/);
-    entry.sections.forEach((part) => {
-      const text = [].concat(part.paragraphs, part.items).join(' ');
-      expect(text.trim().length).toBeGreaterThan(20);
+    MODULES.forEach((name) => {
+      const entry = guide.resolve(name);
+      expect(entry).toBeTruthy();
+      expect(entry.sections.map((part) => part.id)).toEqual(REQUIRED);
+      expect(entry.lead.length).toBeGreaterThan(40);
+      expect(entry.lead.length).toBeLessThan(520);
+      const works = entry.sections.find((part) => part.id === 'works');
+      expect(works.detail.title).toMatch(/Mathematical background/);
+      entry.sections.forEach((part) => {
+        const text = [].concat(part.paragraphs, part.items).join(' ');
+        expect(text.trim().length).toBeGreaterThan(20);
+      });
     });
+    expect(guide.resolve('univariate').lead).toMatch(/do not establish a cause/i);
+    expect(guide.resolve('logistic').lead).toMatch(/do not establish causation/i);
+    expect(guide.resolve('power').lead).toMatch(/not the probability that a hypothesis is true/i);
   });
 
   test('stays closed until opened, then shows the lead with collapsed sections', () => {
@@ -158,13 +168,13 @@ describe('Univariate module guide', () => {
   });
 
   test('other modules can register the same drawer later', () => {
-    expect(guide.has('logistic')).toBe(false);
-    guide.register('logistic', {
-      title: 'Logistic regression',
-      lead: 'A binary outcome.',
+    expect(guide.has('not-yet')).toBe(false);
+    guide.register('not-yet', {
+      title: 'Later module',
+      lead: 'A placeholder.',
       sections: []
     });
-    expect(guide.resolve('logistic').title).toMatch(/Logistic regression/);
-    delete guide._guides.logistic;
+    expect(guide.resolve('not-yet').title).toMatch(/Later module/);
+    delete guide._guides['not-yet'];
   });
 });

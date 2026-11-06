@@ -2500,6 +2500,7 @@ const StatisticoHeader = {
       globalThis.__byGroupActiveTab = next;
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+    this._syncViewGuide();
   },
 
   setBoxplotResultsTab(panel) {
@@ -2508,6 +2509,13 @@ const StatisticoHeader = {
       globalThis.switchBoxplotTab(panel);
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
+    this._syncViewGuide();
+  },
+
+  _syncViewGuide() {
+    if (window.StatisticoViewGuide && typeof window.StatisticoViewGuide.sync === 'function') {
+      window.StatisticoViewGuide.sync();
+    }
   },
 
   _TAB_ASSET_VER: '20261105tabflush',
@@ -7636,6 +7644,18 @@ const StatisticoHeader = {
       + '<sup class="sb-ai-sup">AI</sup>';
   },
 
+  _viewGuideButtonInnerHtml() {
+    return '<i class="fa-regular fa-circle-question" aria-hidden="true"></i>'
+      + '<span class="sb-ai-local-label sb-ai-local-label--full">View guide</span>'
+      + '<span class="sb-ai-local-label sb-ai-local-label--short">Guide</span>';
+  },
+
+  _interpretResultsButtonInnerHtml() {
+    return this._aiIconHtml()
+      + '<span class="sb-ai-local-label sb-ai-local-label--full">Interpret results</span>'
+      + '<span class="sb-ai-local-label sb-ai-local-label--short">Interpret</span>';
+  },
+
   _sidebarAiButtonTitle() {
     if (this.module === 'contingency') {
       return 'Open a separate interpretation of the current contingency analysis. It is not refreshed until you ask.';
@@ -7645,6 +7665,14 @@ const StatisticoHeader = {
 
   _explainViewButtonTitle() {
     return 'Interpret the results displayed on this page.';
+  },
+
+  _interpretResultsButtonTitle() {
+    return 'What do these results suggest? An explanation of the current analysis, separate from the view guide.';
+  },
+
+  _viewGuideButtonTitle() {
+    return 'How do I use and read this view? Reviewed guidance about the controls, charts, and limits.';
   },
 
   _localAiReplyFormat() {
@@ -8840,12 +8868,20 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (this.module === 'contingency') {
       const old = document.getElementById('sbAiFloatBtn');
       if (old) old.remove();
+      const guide = document.getElementById('sbViewGuideBtn');
+      if (guide) guide.remove();
+      const actions = document.getElementById('sbViewActions');
+      if (actions) actions.remove();
       const sep = document.querySelector('.header-right .sb-ai-local-sep');
       if (sep) sep.remove();
       return;
     }
     if (this.module === 'reliability') return;
     if (!this._supportsInsightGuide()) return;
+    if (this.module === 'univariate') {
+      this._ensureViewGuideScript(() => this._mountUnivariateViewActions());
+      return;
+    }
     if (document.getElementById('sbAiFloatBtn')) return;
 
     if (this.module === 'independent') {
@@ -8869,6 +8905,85 @@ REPORT: [one polished paragraph suitable for a report]`;
     this._mountLocalAiButton(btn);
   },
 
+  _ensureViewGuideScript(done) {
+    if (window.StatisticoViewGuide) {
+      done();
+      return;
+    }
+    if (!this._viewGuideWaiters) this._viewGuideWaiters = [];
+    this._viewGuideWaiters.push(done);
+    if (document.getElementById('statistico-view-guide-js')) return;
+    const script = document.createElement('script');
+    script.id = 'statistico-view-guide-js';
+    script.src = this.resolveDialogUrl('shared/view-guide.js?v=20261106guide');
+    const finish = () => {
+      const waiters = this._viewGuideWaiters || [];
+      this._viewGuideWaiters = null;
+      waiters.forEach((fn) => { try { fn(); } catch (_e) {} });
+    };
+    script.onload = finish;
+    script.onerror = finish;
+    document.head.appendChild(script);
+  },
+
+  _mountUnivariateViewActions() {
+    if (document.getElementById('sbViewGuideBtn') && document.getElementById('sbAiFloatBtn')) return;
+    const existing = document.getElementById('sbAiFloatBtn');
+    if (existing) existing.remove();
+    const oldGroup = document.getElementById('sbViewActions');
+    if (oldGroup) oldGroup.remove();
+
+    const guide = document.createElement('button');
+    guide.id = 'sbViewGuideBtn';
+    guide.type = 'button';
+    guide.className = 'sb-guide-btn';
+    guide.title = this._viewGuideButtonTitle();
+    guide.setAttribute('aria-expanded', 'false');
+    guide.setAttribute('aria-controls', 'viewGuideOverlay');
+    guide.innerHTML = this._viewGuideButtonInnerHtml();
+    guide.addEventListener('click', () => {
+      if (window.StatisticoViewGuide) window.StatisticoViewGuide.toggle();
+    });
+
+    const btn = document.createElement('button');
+    btn.id = 'sbAiFloatBtn';
+    btn.type = 'button';
+    btn.className = 'sb-ai-float-btn sb-ai-local-btn';
+    btn.title = this._interpretResultsButtonTitle();
+    btn.innerHTML = this._interpretResultsButtonInnerHtml();
+    btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
+
+    const group = document.createElement('div');
+    group.id = 'sbViewActions';
+    group.className = 'sb-view-actions';
+    group.appendChild(guide);
+    group.appendChild(btn);
+    this._mountViewActionGroup(group);
+    this._syncViewGuide();
+  },
+
+  _mountViewActionGroup(group) {
+    if (!group) return;
+    const headerRight = document.querySelector('.header-right');
+    if (!headerRight) {
+      this._mountFloatingAiButton(group);
+      return;
+    }
+    const guide = group.querySelector('#sbViewGuideBtn');
+    const interpret = group.querySelector('#sbAiFloatBtn');
+    if (guide) guide.classList.add('sb-guide-btn--header');
+    if (interpret) interpret.classList.add('sb-ai-local-btn--header');
+    headerRight.insertBefore(group, headerRight.firstChild);
+    let sep = headerRight.querySelector('.sb-ai-local-sep');
+    if (!sep) {
+      sep = document.createElement('span');
+      sep.className = 'sb-ai-local-sep';
+      sep.setAttribute('aria-hidden', 'true');
+    }
+    if (group.nextSibling !== sep) headerRight.insertBefore(sep, group.nextSibling);
+    this._wireLocalAiCompactLabel(group, headerRight);
+  },
+
   _supportsInsightGuide() {
     if (this.module === 'univariate') return true;
     if (this.module === 'cluster') return true;
@@ -8881,6 +8996,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     return {
       histogram: 'Histogram',
       boxplot: 'Box Plot & Outliers',
+      'boxplot-outliers': 'Outliers',
       cdf: 'CDF',
       percentile: 'Percentiles',
       kernel: 'Kernel',
@@ -8911,6 +9027,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (this.module === 'univariate' && this.currentView === 'by-group') {
       const tab = globalThis.__byGroupActiveTab || 'stats';
       return `by-group-${tab}`;
+    }
+    if (this.module === 'univariate' && this.currentView === 'boxplot') {
+      return globalThis.__boxplotActiveTab === 'outliers' ? 'boxplot-outliers' : 'boxplot';
     }
     if (this.module === 'correlations' && this.currentView === 'correlation-by-group') {
       const tab = globalThis.__corrByGroupActiveTab || 'table';
@@ -9980,8 +10099,8 @@ ${this._overallAiReplyFormat()}`;
       if (!btn) return;
       btn.disabled = busy;
       btn.innerHTML = busy
-        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view…</span>'
-        : this._explainViewButtonInnerHtml();
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>' + (this.module === 'univariate' ? 'Interpreting…' : 'Explaining view…') + '</span>'
+        : (this.module === 'univariate' ? this._interpretResultsButtonInnerHtml() : this._explainViewButtonInnerHtml());
     };
     this._lastAiInvoke = { mode: 'per-view', kind: 'generic' };
     const viewKey = this._getInsightGuideViewKey();
@@ -11152,6 +11271,7 @@ ${this._overallAiReplyFormat()}`;
       histogram: `Controls available: (1) Binning Method dropdown (Manual / Sturges / Scott / Freedman-Diaconis) — changes how bars are grouped; (2) Bin Count slider (1–50, only active in Manual mode) — drag to increase/decrease bar count; (3) Show Normal Curve checkbox — toggles a theoretical normal overlay on the histogram; (4) Left/Right Truncation sliders — trim extreme observations by percentile to focus on the core distribution.`,
 
       boxplot: `Two tabbed views under Box plot: (1) Box plot — stacked charts showing the full data range and the IQR-fence view together; (2) Outliers — the full outlier detection module (IQR, Z-Score, Grubbs, MAD) with scatter visualization and detail table. Switch tabs in the header bar.`,
+      'boxplot-outliers': `Outliers tab of Box plot. Detection method buttons: IQR (1.5×IQR), Z-Score (|z| > 3), Grubbs, and MAD. By Index / By Value reorder the chart. Show Details opens the flagged-point list. A flag is a rule, not a decision to delete the row.`,
 
       cdf: `Controls available: (1) Distribution overlay dropdown (None / Normal / Log-Normal / Exponential / Uniform) — adds a theoretical CDF curve for visual comparison; (2) Toggle Distribution button — shows or hides the theoretical overlay; (3) Value slider (noUiSlider) — drag the marker along the x-axis to read F(x), the cumulative probability at any point; (4) Quartile shortcut cards (Q1, Median, Q3, P95) — click to jump the slider to those key positions.`,
 
@@ -11558,7 +11678,7 @@ ${this._overallAiReplyFormat()}`;
     }
 
     // ── Per-view: Insight Guide (elaborate view explanation + controls guidance) ──
-    const viewName = { histogram:'Histogram', boxplot:'Box Plot & Outliers', cdf:'Cumulative Distribution Function',
+    const viewName = { histogram:'Histogram', boxplot:'Box Plot & Outliers', 'boxplot-outliers':'Outliers', cdf:'Cumulative Distribution Function',
       percentile:'Percentiles', kernel:'Kernel', outliers:'Outliers',
       normality:'Tests', qqplot:'PP/QQ', confidence:'Confidence Intervals',
       hypothesis:'One-Sample Test' }[view] || view;
@@ -12008,6 +12128,9 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
   },
 
   _showAiOverlay(sections, view, mode = 'per-view', meta = null) {
+    if (window.StatisticoViewGuide && typeof window.StatisticoViewGuide.close === 'function') {
+      window.StatisticoViewGuide.close({ silent: true });
+    }
     const existing = document.getElementById('sbAiOverlay');
     if (existing) existing.remove();
 

@@ -13,6 +13,10 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(header).toMatch(/All results/);
     expect(header).toMatch(/This view/);
     expect(header).toMatch(/Explain this view/);
+    expect(header).toMatch(/View guide/);
+    expect(header).toMatch(/Interpret results/);
+    expect(header).toMatch(/_mountUnivariateViewActions/);
+    expect(header).toMatch(/shared\/view-guide\.js/);
     expect(css).toMatch(/\.sb-ai-panel--overall/);
     expect(css).toMatch(/#1d4ed8/);
     expect(header).toMatch(/Synthesize findings, diagnostics and limitations across the complete analysis/);
@@ -32,6 +36,9 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(css).toMatch(/\.sb-ai-local-sep/);
     expect(css).toMatch(/@media \(max-width:\s*1400px\)/);
     expect(css).toMatch(/background:\s*rgba\(139,92,246,\.12\)/);
+    expect(css).toMatch(/\.sb-guide-btn/);
+    expect(css).toMatch(/\.vg-panel/);
+    expect(css).toMatch(/\.sb-view-actions/);
   });
 
   test('drawer stays readable and sized for comparison with the result', () => {

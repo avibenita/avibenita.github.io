@@ -295,8 +295,64 @@ function welchAnova(grouped, levels) {
   return { F, df1: k - 1, df2: Math.max(1, df2), p: Math.max(0, Math.min(1, fPval(F, k - 1, df2))) };
 }
 
+/* Studentized-range critical value for a Tukey interval.
+   The half-width is q_crit × √(MSE × (1/ni + 1/nj) / 2), not a
+   combination of the separate mean intervals. */
+function _logGammaTukey(z) {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let x = z, y = z, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) ser += c[j] / ++y;
+  return Math.log(2.5066282746310005 * ser / x) - tmp;
+}
+function _rangeCdfTukey(w, k) {
+  if (!(w > 0)) return 0;
+  const steps = 160, a = -8, b = 8, h = (b - a) / steps;
+  let sum = 0;
+  for (let i = 0; i <= steps; i++) {
+    const x = a + i * h;
+    const phi = Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+    const d = Math.max(0, normalCdf(x + w) - normalCdf(x));
+    const wt = (i === 0 || i === steps) ? 0.5 : 1;
+    sum += wt * k * phi * Math.pow(d, k - 1);
+  }
+  return Math.max(0, Math.min(1, sum * h));
+}
+function _tukeyCdf(q, k, df) {
+  const steps = 200;
+  const a = 0.02;
+  const b = Math.max(3.2, 1 + 10 / Math.sqrt(df));
+  const h = (b - a) / steps;
+  let sum = 0;
+  for (let i = 0; i <= steps; i++) {
+    const s = a + i * h;
+    const half = df / 2;
+    const logf = -(half - 1) * Math.LN2 - _logGammaTukey(half) + half * Math.log(df) + (df - 1) * Math.log(s) - 0.5 * df * s * s;
+    const dens = Math.exp(logf);
+    const y = (isFinite(dens) ? dens : 0) * _rangeCdfTukey(q * s, k);
+    const wt = (i === 0 || i === steps) ? 0.5 : 1;
+    sum += wt * y;
+  }
+  return sum * h;
+}
+function qTukey(p, k, df) {
+  k = Math.max(2, Math.round(k));
+  df = Math.max(1, Math.round(df));
+  if (df > 5000) df = 5000;
+  let lo = 0.1, hi = 12;
+  for (let i = 0; i < 26; i++) {
+    const mid = (lo + hi) / 2;
+    if (_tukeyCdf(mid, k, df) < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 /* ── Post-hoc: Tukey HSD (balanced) ─────────────────────────── */
-function tukeyHSD(grouped, levels, msError, dfError) {
+function tukeyHSD(grouped, levels, msError, dfError, alpha) {
+  alpha = alpha > 0 && alpha < 1 ? alpha : 0.05;
+  const qCrit = (levels.length >= 2 && dfError > 0) ? qTukey(1 - alpha, levels.length, dfError) : NaN;
   const rows = [];
   for (let i = 0; i < levels.length - 1; i++) {
     for (let j = i + 1; j < levels.length; j++) {
@@ -308,7 +364,11 @@ function tukeyHSD(grouped, levels, msError, dfError) {
       const q  = se > 0 ? Math.abs(diff) / se : 0;
       /* Approximate p via normal CDF (studentized range) */
       const p  = Math.max(0, Math.min(1, 2 * (1 - normalCdf(q / Math.SQRT2))));
-      rows.push({ comparison: `${levels[i]} vs ${levels[j]}`, diff, se, q, p, method: 'Tukey HSD' });
+      const half = isFinite(qCrit) ? qCrit * se : NaN;
+      rows.push({
+        comparison: `${levels[i]} vs ${levels[j]}`, diff, se, q, p, method: 'Tukey HSD',
+        ciLow: diff - half, ciHigh: diff + half, ciKind: 'Tukey'
+      });
     }
   }
   return rows;
@@ -442,7 +502,7 @@ function buildAnovaBundle(headers, rows, spec) {
 
     let posthoc = [];
     if (levels.length >= 2) {
-      if (posthocMethod === 'tukey')      posthoc = tukeyHSD(grouped, levels, anova.msWithin, anova.df2);
+      if (posthocMethod === 'tukey')      posthoc = tukeyHSD(grouped, levels, anova.msWithin, anova.df2, alpha);
       else if (posthocMethod === 'games') posthoc = gamesHowell(grouped, levels);
       else                                posthoc = bonferroniPosthoc(grouped, levels, anova.msWithin, anova.df2);
     }
@@ -496,7 +556,7 @@ function buildAnovaBundle(headers, rows, spec) {
     function runPosthoc(grouped, levels) {
       if (posthocMethod === 'games')           return gamesHowell(grouped, levels);
       if (posthocMethod === 'bonferroni')      return bonferroniPosthoc(grouped, levels, anova.msError, anova.dfError);
-      return tukeyHSD(grouped, levels, anova.msError, anova.dfError);
+      return tukeyHSD(grouped, levels, anova.msError, anova.dfError, alpha);
     }
 
     /* ── Main-effect post-hoc (used when interaction NOT significant) */

@@ -647,11 +647,20 @@
       font-size: 10px;
     }
     .coef-mini-table td { border-bottom: none; padding: 4px 6px; font-size: 12px; }
-    .coef-mini-table td:first-child { color: var(--text-secondary); font-weight: 600; }
-    .coef-mini-table td:nth-child(2), .coef-mini-table td:nth-child(3),
-    .coef-mini-table th:nth-child(2), .coef-mini-table th:nth-child(3) { text-align: right; white-space: nowrap; }
+    .coef-mini-table th.coef-include-col,
+    .coef-mini-table td.coef-include-cell { width: 58px; text-align: center; font-weight: 500; color: var(--text-muted); }
+    .coef-mini-table td.coef-mini-name { text-align: left; color: var(--text-secondary); font-weight: 600; }
+    .var-intercept { color: #fbbf24; }
+    .coef-mini-table td.coef-mini-num,
+    .coef-mini-table th.coef-mini-num { text-align: right; white-space: nowrap; }
     .coef-mini-sig td { color: var(--text-primary); }
-    .coef-mini-sig td:nth-child(3) { color: #86efac; font-weight: 800; }
+    .coef-mini-sig td.coef-mini-p { color: #86efac; font-weight: 800; }
+    .coef-mini-intercept { background: rgba(251, 191, 36, 0.08); }
+    .coef-in-model { margin: 0 0 8px; font-size: 12px; line-height: 1.45; color: var(--text-primary); }
+    .coef-in-model[hidden] { display: none !important; }
+    .coef-in-model-k, .coef-in-model-out { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin-right: 4px; }
+    .coef-in-model-k { color: #38bdf8; }
+    .coef-in-model-out { color: #fbbf24; margin-left: 8px; }
     .coef-mini-link {
       display: inline-flex;
       align-items: center;
@@ -1475,12 +1484,16 @@
                           Every term starts in the model. Uncheck a row to drop it. The overview and every analysis recalculate, and the row dims.
                         </p>
                         <p class="coef-include-status" id="coefIncludeStatus" hidden aria-live="polite"></p>
+                        <p class="coef-in-model" id="coefInModelLine" hidden></p>
                         <table class="coef-mini-table">
                           <thead><tr>
                             <th class="coef-include-col" title="Uncheck a term to drop it from the model. The overview and every analysis recalculate, and the row dims.">In model</th>
-                            <th>Predictor</th><th>OR</th><th>p</th>
+                            <th>Predictor</th>
+                            <th class="coef-mini-num" title="Log-odds coefficient">Beta</th>
+                            <th class="coef-mini-num">OR</th>
+                            <th class="coef-mini-num">p</th>
                           </tr></thead>
-                          <tbody id="coefMiniBody"><tr><td colspan="4" class="findings-empty">Awaiting coefficients...</td></tr></tbody>
+                          <tbody id="coefMiniBody"><tr><td colspan="5" class="findings-empty">Awaiting coefficients...</td></tr></tbody>
                         </table>
                         <button type="button" class="coef-mini-link" onclick="switchSub('model-results','technical')">View complete coefficient table <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
                       </div>
@@ -2030,8 +2043,44 @@
     function logModelIsReduced() {
       return logExcluded.size > 0 && !!logFullSnapshot;
     }
+    function isInterceptName(name) {
+      var s = String(name || "").toLowerCase().replace(/[()]/g, "").trim();
+      return s === "intercept" || s === "const" || s === "constant";
+    }
+    function interceptRowFromResults(results) {
+      if (!results || results.includeIntercept === false) return null;
+      var beta = n(firstDefined(results, ["intercept", "Intercept"], NaN));
+      if (!isFinite(beta)) return null;
+      return {
+        Variable: "Intercept",
+        Beta: beta.toFixed(4),
+        OR: Math.exp(beta).toFixed(4),
+        PValue: firstDefined(results, ["interceptPValue", "interceptP"], ""),
+        SE: firstDefined(results, ["interceptSE", "interceptSe"], ""),
+        WaldZ: ""
+      };
+    }
+    function withInterceptRow(rows, results) {
+      var list = (rows || []).slice();
+      var idx = -1;
+      for (var i = 0; i < list.length; i++) {
+        if (isInterceptName(list[i] && list[i].Variable)) { idx = i; break; }
+      }
+      if (idx === -1) {
+        var made = interceptRowFromResults(results);
+        if (made) list.unshift(made);
+      } else if (idx > 0) {
+        var row = list.splice(idx, 1)[0];
+        row.Variable = "Intercept";
+        list.unshift(row);
+      } else {
+        list[0].Variable = "Intercept";
+      }
+      return list;
+    }
     function rememberFullModel() {
       if (logExcluded.size) return;
+      state.coefficients = withInterceptRow(state.coefficients, state.results);
       if (!state.coefficients || !state.coefficients.length) return;
       logFullSnapshot = {
         results: JSON.parse(JSON.stringify(state.results || {})),
@@ -2097,6 +2146,7 @@
         el.hidden = true;
         el.innerHTML = "";
         setCoefIncludeStatus("");
+        syncInModelLine();
         return;
       }
       var labels = keptAndRemovedLabels();
@@ -2111,6 +2161,27 @@
         "</strong>. Values in parentheses are the full model. Check a dimmed row to put a term back.</span>",
         false
       );
+      syncInModelLine();
+    }
+    function syncInModelLine(rows) {
+      var el = document.getElementById("coefInModelLine");
+      if (!el) return;
+      if (!rows) rows = coefficientDisplayRows();
+      var kept = [];
+      var removed = [];
+      rows.forEach(function (row) {
+        var label = isInterceptName(row.name) ? "Intercept" : friendlyVarName(row.name);
+        (row.dropped ? removed : kept).push(label);
+      });
+      if (!kept.length && !removed.length) {
+        el.hidden = true;
+        el.innerHTML = "";
+        return;
+      }
+      el.hidden = false;
+      var html = "<span class='coef-in-model-k'>In the model</span> " + (kept.length ? formatNameList(kept) : "none");
+      if (removed.length) html += " <span class='coef-in-model-out'>Removed</span> " + formatNameList(removed);
+      el.innerHTML = html;
     }
     function canRefitLogistic() {
       var ctx = state.dataContext;
@@ -2133,7 +2204,22 @@
         if (seen[name]) return;
         rows.push({ name: name, current: c, prior: null, dropped: logExcluded.has(name) });
       });
+      rows.forEach(function (row) {
+        if (isInterceptName(row.name)) row.name = "Intercept";
+      });
+      rows.sort(function (a, b) {
+        return (isInterceptName(a.name) ? 0 : 1) - (isInterceptName(b.name) ? 0 : 1);
+      });
       return rows;
+    }
+    function betaCellText(coef) {
+      if (!coef) return "";
+      var b = n(firstDefined(coef, ["Beta", "beta"], NaN));
+      if (!isFinite(b)) {
+        var or = n(coef.OR);
+        if (isFinite(or) && or > 0) b = Math.log(or);
+      }
+      return isFinite(b) ? b.toFixed(3) : "";
     }
     function coefIncludeCell(name, dropped, interactive) {
       var action = dropped
@@ -3376,8 +3462,9 @@
           return { name: String(c.Variable || ""), current: c, prior: null, dropped: false };
         });
       }
+      syncInModelLine(rows);
       if (!rows.length) {
-        body.innerHTML = "<tr><td colspan='4' class='findings-empty'>Awaiting coefficients...</td></tr>";
+        body.innerHTML = "<tr><td colspan='5' class='findings-empty'>Awaiting coefficients...</td></tr>";
         return;
       }
       function fmtP(p) {
@@ -3387,16 +3474,23 @@
       body.innerHTML = rows.map(function (row) {
         var cur = row.current;
         var prior = row.dropped ? (row.prior || fullCoefByName(row.name)) : fullCoefByName(row.name);
+        var betaText = cur ? (betaCellText(cur) || "—") : "—";
         var orText = cur && isFinite(n(cur.OR)) ? n(cur.OR).toFixed(2) : "—";
         var pText = cur ? fmtP(n(cur.PValue)) : "—";
+        var priorBeta = betaCellText(prior);
         var priorOr = prior && isFinite(n(prior.OR)) ? n(prior.OR).toFixed(2) : "";
         var priorP = prior ? fmtP(n(prior.PValue)) : "";
         var sig = cur && isStatSig(n(cur.PValue));
         var droppedTag = row.dropped ? "<span class='coef-dropped-tag'>Dropped</span>" : "";
-        return "<tr" + (row.dropped ? " class='coef-row-excluded'" : (sig ? " class='coef-mini-sig'" : "")) + ">" +
+        var intercept = isInterceptName(row.name);
+        var cls = row.dropped ? "coef-row-excluded" : (intercept ? "coef-mini-intercept" : (sig ? "coef-mini-sig" : ""));
+        var nameCls = intercept ? "var-intercept" : "";
+        return "<tr" + (cls ? " class='" + cls + "'" : "") + ">" +
           coefIncludeCell(row.name, row.dropped, interactive) +
-          "<td>" + esc(friendlyVarName(row.name)) + droppedTag + "</td>" +
-          "<td>" + withFull(orText, priorOr) + "</td><td>" + withFull(pText, priorP) + "</td></tr>";
+          "<td class='coef-mini-name'><span class='" + nameCls + "'>" + esc(intercept ? "Intercept" : friendlyVarName(row.name)) + "</span>" + droppedTag + "</td>" +
+          "<td class='coef-mini-num'>" + withFull(betaText, priorBeta) + "</td>" +
+          "<td class='coef-mini-num'>" + withFull(orText, priorOr) + "</td>" +
+          "<td class='coef-mini-num coef-mini-p'>" + withFull(pText, priorP) + "</td></tr>";
       }).join("");
     }
 
@@ -3673,9 +3767,10 @@
             var ciPrior = (prior && prior.OR_CI_Lower != null && prior.OR_CI_Upper != null && String(prior.OR_CI_Lower) !== "")
               ? String(prior.OR_CI_Lower) + " – " + String(prior.OR_CI_Upper) : "";
             var droppedTag = row.dropped ? "<span class='coef-dropped-tag'>Dropped</span>" : "";
-            return "<tr" + (row.dropped ? " class='coef-row-excluded'" : "") + ">" +
+            var intercept = isInterceptName(row.name);
+            return "<tr" + (row.dropped ? " class='coef-row-excluded'" : (intercept ? " class='coef-mini-intercept'" : "")) + ">" +
               coefIncludeCell(row.name, row.dropped, interactive) +
-              "<td>" + esc(row.name) + droppedTag + "</td>" +
+              "<td>" + (intercept ? "<span class='var-intercept'>Intercept</span>" : esc(friendlyVarName(row.name))) + droppedTag + "</td>" +
               "<td>" + withFull(row.current ? r.Beta : "—", prior && prior.Beta) + "</td>" +
               "<td>" + withFull(row.current ? r.SE : "—", prior && prior.SE) + "</td>" +
               "<td>" + withFull(row.current ? r.WaldZ : "—", prior && prior.WaldZ) + "</td>" +

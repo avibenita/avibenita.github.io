@@ -149,9 +149,40 @@ async function scenario(page, { mark, note, say }) {
     return value && value.textContent && value.textContent !== '-' && chart;
   }, null, { timeout: 8000 });
   await page.waitForTimeout(PROBE ? 40 : 500);
+  await page.evaluate(() => {
+    const scroller = document.querySelector('#tab-predictions .ws-body');
+    if (scroller) scroller.scrollTop = 0;
+    const nodes = [
+      document.getElementById('header-container'),
+      document.querySelector('#tab-predictions [data-pred-tab="pred-scenario"]'),
+      document.getElementById('input-Ad Spend')?.closest('.input-group'),
+      document.querySelector('#tab-predictions .output-card.main-prediction'),
+      document.getElementById('predProfileChart')
+    ].filter(Boolean);
+    if (nodes.length < 4) throw new Error('Scenario frame targets are missing');
+    const rects = nodes.map((node) => node.getBoundingClientRect());
+    const left = Math.min(...rects.map((rect) => rect.left));
+    const top = Math.min(...rects.map((rect) => rect.top));
+    const right = Math.max(...rects.map((rect) => rect.right));
+    const bottom = Math.max(...rects.map((rect) => rect.bottom));
+    let marker = document.getElementById('filmScenarioView');
+    if (!marker) {
+      marker = document.createElement('div');
+      marker.id = 'filmScenarioView';
+      marker.style.position = 'fixed';
+      marker.style.pointerEvents = 'none';
+      marker.style.background = 'transparent';
+      marker.style.zIndex = '0';
+      document.body.appendChild(marker);
+    }
+    marker.style.left = `${left}px`;
+    marker.style.top = `${top}px`;
+    marker.style.width = `${Math.max(1, right - left)}px`;
+    marker.style.height = `${Math.max(1, bottom - top)}px`;
+  });
   const before = await page.locator('#predictedValue').innerText();
   const beforeTitle = await page.locator('#predProfileTitle').innerText();
-  await hot(page, '[id="input-Ad Spend"]', 1);
+  await hot(page, '#filmScenarioView', 1.16);
   await page.waitForTimeout(PROBE ? 40 : 1100);
   note('scenario-1');
   const first = dur('scenario-1');
@@ -166,44 +197,6 @@ async function scenario(page, { mark, note, say }) {
   const afterTitle = await page.locator('#predProfileTitle').innerText();
   if (before === after) throw new Error('Moving ad spend did not change the prediction');
   if (beforeTitle === afterTitle) throw new Error('Moving ad spend did not change the profile');
-  await clearFilmHighlight(page);
-  await page.evaluate(() => {
-    const label = document.querySelector('.output-card.main-prediction .output-label');
-    const value = document.getElementById('predictedValue');
-    const sub = document.querySelector('.output-card.main-prediction .output-sublabel');
-    const host = document.querySelector('.output-card.main-prediction');
-    const nodes = [label, value, sub].filter(Boolean);
-    if (!host || nodes.length < 2) return;
-    const style = getComputedStyle(host);
-    if (style.position === 'static') host.style.position = 'relative';
-    const hostRect = host.getBoundingClientRect();
-    const borderLeft = parseFloat(style.borderLeftWidth) || 0;
-    const borderTop = parseFloat(style.borderTopWidth) || 0;
-    const rects = nodes.map((node) => {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      const rect = range.getBoundingClientRect();
-      return rect.width > 1 && rect.height > 1 ? rect : node.getBoundingClientRect();
-    });
-    const left = Math.min(...rects.map((rect) => rect.left));
-    const top = Math.min(...rects.map((rect) => rect.top));
-    const right = Math.max(...rects.map((rect) => rect.right));
-    const bottom = Math.max(...rects.map((rect) => rect.bottom));
-    let marker = document.getElementById('filmPredictionEstimate');
-    if (!marker) {
-      marker = document.createElement('div');
-      marker.id = 'filmPredictionEstimate';
-      marker.style.position = 'absolute';
-      marker.style.pointerEvents = 'none';
-      marker.style.background = 'transparent';
-      host.appendChild(marker);
-    }
-    marker.style.left = `${left - hostRect.left - borderLeft}px`;
-    marker.style.top = `${top - hostRect.top - borderTop}px`;
-    marker.style.width = `${Math.max(1, right - left)}px`;
-    marker.style.height = `${Math.max(1, bottom - top)}px`;
-  });
-  await hot(page, '#filmPredictionEstimate', 1);
   if (process.env.FILM_PREVIEW === '1') {
     await page.waitForTimeout(280);
     await shot(page, 'preview-prediction');

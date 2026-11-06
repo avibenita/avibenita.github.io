@@ -56,6 +56,7 @@ if (command === 'auto') {
     dryRun: Boolean(args.flags['dry-run']),
     resume: args.flags.resume && args.flags.resume !== true ? args.flags.resume : null,
     importFile: args.flags.import && args.flags.import !== true ? path.resolve(args.flags.import) : null,
+    correction: args.flags.correction && args.flags.correction !== true ? args.flags.correction : null,
     reveal: true,
     log: (line) => console.log(line)
   });

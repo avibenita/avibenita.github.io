@@ -1,21 +1,21 @@
 # Regression video run 20261105-203644-ca0ecd
 
 Status: READY_FOR_HUMAN_REVIEW
-Recommended candidate: E:\OneDrive\GitHub\Statistico\regression\04_review\runs\20261105-203644-ca0ecd\candidates\v1.mp4
+Recommended candidate: E:\OneDrive\GitHub\Statistico\regression\04_review\runs\20261105-203644-ca0ecd\candidates\v2.mp4
 
 Automated readiness is not publication approval. Watch and listen to the recommended candidate, then decide any CapCut export yourself. This run does not write the approved folder and does not replace website assets.
 
 ## What changed
-No source revision was applied.
+A revised candidate was produced from an accepted source diff.
+- Round 1: The agent edited permitted files. The diff is the evidence that the correction was applied. The exit status alone is not that evidence.
+  - modified Statistico/regression/produce/capture.mjs
 
 ## Required issues still open
 None recorded by the last accepted review.
 
 ## Unassessed checks
-- Sampling alone cannot conclusively verify the 300ms gold frame draw-in, 2.4s breathing cycle, or 200ms fade-out—relies on log and overlay constants, not direct full-motion evidence.
-- Complete motion review (transitions, pacing, animation continuity) is not possible from frame or transcript subsampling.
-- Voice naturalness, pronunciation, presence/absence of background noise/music, and subjective narration or transition quality are unassessed—require human review.
-- Visible catalogue cards and content are not independently OCR-verified, only visually sampled for presence and structure.
+- Highlight 200ms fade durations are not directly provable by frame sample; this check is fulfilled by overlay constants and highlight log per current standards.
+- Review does not judge narration naturalness, pronunciation accuracy, music/noise absence, or subjective transition feel—those are left for human and CapCut review.
 - Overview frames are a bounded sample, not a complete motion review. Unsampled intervals are listed with the evidence.
 - Blank results and cropped labels are not measured by a local pixel oracle. They are visible to the vision review when that review runs, and they remain unassessed when it does not.
 - A transcript does not prove voice naturalness, pronunciation, absence of music or noise, or pleasant transitions. Those stay on the human listening and motion pass.
@@ -33,6 +33,7 @@ Limitation: Scenario interval widths use 0.3×RMSE and 1.1×RMSE with t = 1.96. 
 
 ## Candidates
 - v1: E:\OneDrive\GitHub\Statistico\regression\04_review\runs\20261105-203644-ca0ecd\candidates\v1.mp4
+- v2: E:\OneDrive\GitHub\Statistico\regression\04_review\runs\20261105-203644-ca0ecd\candidates\v2.mp4
 
 ## What to view and listen to
-Open E:\OneDrive\GitHub\Statistico\regression\04_review\runs\20261105-203644-ca0ecd\candidates\v1.mp4. Check the picture, the narration, and the closing. The production check confirms the featured actions. It is not a validation sign-off.
+Open E:\OneDrive\GitHub\Statistico\regression\04_review\runs\20261105-203644-ca0ecd\candidates\v2.mp4. Check the picture, the narration, and the closing. The production check confirms the featured actions. It is not a validation sign-off.

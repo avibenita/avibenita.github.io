@@ -15,10 +15,27 @@ trustSystemCertificates();
 export const REVIEW_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['verdict', 'summary', 'issues', 'resolved_issue_ids', 'unassessed_checks'],
+  required: ['verdict', 'summary', 'requirements', 'issues', 'resolved_issue_ids', 'unassessed_checks'],
   properties: {
     verdict: { type: 'string', enum: ['ready_for_human_review', 'needs_revision', 'blocked'] },
     summary: { type: 'string' },
+    requirements: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'requirement', 'status', 'scene', 'start_seconds', 'end_seconds', 'evidence'],
+        properties: {
+          id: { type: 'string' },
+          requirement: { type: 'string' },
+          status: { type: 'string', enum: ['met', 'missing', 'unassessed'] },
+          scene: { type: 'string' },
+          start_seconds: { type: 'number' },
+          end_seconds: { type: 'number' },
+          evidence: { type: 'array', items: { type: 'string' } }
+        }
+      }
+    },
     issues: {
       type: 'array',
       items: {
@@ -54,8 +71,14 @@ export function validateReview(review, evidence) {
   if (!Array.isArray(review.issues) || !Array.isArray(review.resolved_issue_ids) || !Array.isArray(review.unassessed_checks)) {
     throw new Error('malformed review schema');
   }
+  if (review.requirements != null && !Array.isArray(review.requirements)) throw new Error('malformed requirement assessment');
   const duration = evidence?.probe?.duration ?? evidence?.duration ?? 0;
   const frameNames = new Set((evidence?.frames || []).map((frame) => frame.file));
+  for (const item of review.requirements || []) {
+    if (item.start_seconds < -0.05 || item.end_seconds > duration + 0.25) {
+      throw new Error(`requirement timestamp ${item.start_seconds}-${item.end_seconds} is outside the ${duration.toFixed(2)}s candidate`);
+    }
+  }
   for (const issue of review.issues) {
     if (!issue.id || !issue.severity) throw new Error('malformed review issue');
     if (issue.start_seconds < -0.05 || issue.end_seconds > duration + 0.25) {
@@ -139,7 +162,7 @@ export async function transcribeMp4({ ffmpeg, ffmpegText, mp4, runDir, limits, a
   };
 }
 
-export async function reviewWithOpenAI({ evidence, standards, previousIssues, limits, apiKey, round }) {
+export async function reviewWithOpenAI({ evidence, standards, briefs, previousIssues, limits, apiKey, round }) {
   const frames = (evidence.frames || []).map((frame) => path.join(evidence.frameDir, frame.file)).filter((file) => fs.existsSync(file));
   const estimate = estimateReviewUsd(limits, frames.length, evidence.probe?.duration || 0);
   if (!(limits.maxEstimatedUsd >= 0) || !Number.isFinite(limits.maxEstimatedUsd)) {
@@ -158,7 +181,7 @@ export async function reviewWithOpenAI({ evidence, standards, previousIssues, li
       {
         role: 'user',
         content: [
-          { type: 'text', text: batchPrompt(evidence, standards, previousIssues, round, batch) },
+          { type: 'text', text: batchPrompt(evidence, standards, briefs, previousIssues, round, batch) },
           ...batch.map((file) => imagePart(file, 'low'))
         ]
       }
@@ -170,7 +193,7 @@ export async function reviewWithOpenAI({ evidence, standards, previousIssues, li
     {
       role: 'user',
       content: [
-        { type: 'text', text: `Consolidate these batch notes into one final review. Keep uncertainty. Do not invent observations that no batch recorded.\n${JSON.stringify(partials).slice(0, 120000)}` },
+        { type: 'text', text: `Consolidate these batch notes into one final review. Keep uncertainty. Do not invent observations that no batch recorded. Include a requirement-by-requirement assessment. Mark an element unassessed when the frames do not show it. A missing required element means needs_revision.\n${JSON.stringify(partials).slice(0, 120000)}` },
         ...crops.map((file) => imagePart(file, 'high'))
       ]
     }
@@ -188,7 +211,9 @@ function reviewerSystem() {
     'Do not request a change to statistical engines, fixture data, reference tests, or acceptance thresholds.',
     'The final human viewing and CapCut approval remain required.',
     'You are the local video-review API used by the Statistico controller. You have no connection to any other conversation.',
-    'The attention frame is one thin solid outline, #D9B878, about 1.5px at the export size, with a 4px corner radius and about 8px of padding around the target. It fades in over 200ms, stays steady, and fades out over 200ms. It has no corner brackets, outer glow, shadow, dim, or breathing motion. It must not recolor the target. The visible animation is the analytical change: the estimate, chart, or selection.',
+    'The current highlight specification supersedes every earlier instruction about corner brackets, an outer glow, a shadow, a dimmed surround, or a breathing frame. The outline is one steady 1.5px stroke, #D9B878, with a 4px corner radius and about 8px of padding. It fades in over 200ms and fades out over 200ms. It must not recolor the target. The visible animation is the analytical change: the estimate, chart, or selection.',
+    'Assess every required element from the production requirements and the standards. Return one requirements entry each, with status met, missing, or unassessed, a scene, and start and end timestamps. Use timestamps only when the frames or transcript show that interval. If the evidence does not show the element, mark it unassessed and name the missing evidence. Do not mark an unassessed element as met or as passed.',
+    'A missing required element is a required issue and the verdict is needs_revision. Do not pass the film because loudness or other technical checks succeeded.',
     'Sampled frames cannot prove the 200ms fades by themselves. Those timings belong to the overlay constants and the highlight log. Say so under unassessed checks.',
     'For a module film built to the module-story structure, a substantive overview is mandatory. Three or four distinct analytical demonstrations are required. Every demonstration must show a visible action and its response. Controls, chart changes, and relevant labels must be readable. A complete feature catalogue is mandatory before the close. If any of these is missing, return verdict needs_revision and a required issue for that item. Each required issue needs an id, a scene, a specific requested_change, and an acceptance_check. Do not pass the film because loudness or frame checks succeeded. The outline does not count as the demonstration.',
     'Narration explains the question, the action, and the consequence. It must not recite coefficients, predictions, p-values, sample sizes, percentages, or R². A refit is a sensitivity comparison, not proof that a higher score is a better model.',
@@ -206,9 +231,10 @@ export function measuredHighlightIssues(evidence, moduleConfig) {
   }, moduleConfig || {});
 }
 
-function batchPrompt(evidence, standards, previousIssues, round, batch) {
+function batchPrompt(evidence, standards, briefs, previousIssues, round, batch) {
   return [
     `Candidate round ${round}. MP4 hash ${evidence.sha256}. Duration ${evidence.probe?.duration}s. ${evidence.probe?.width}x${evidence.probe?.height} at ${evidence.probe?.fps} fps.`,
+    'The highlight specification in the standards replaces any older bracket, glow, or breathing instruction.',
     `Scenes: ${JSON.stringify(evidence.scenes)}`,
     `Measured loudness: ${JSON.stringify({ integratedLufs: evidence.loudness?.integratedLufs, peakDbfs: evidence.loudness?.peakDbfs })}`,
     `Silence findings: ${JSON.stringify(evidence.silenceFindings)}`,
@@ -217,7 +243,8 @@ function batchPrompt(evidence, standards, previousIssues, round, batch) {
     `Numerical check: ${JSON.stringify(evidence.numerical)}`,
     `Transcript: ${transcriptNote(evidence.transcript)}`,
     `Unsampled intervals: ${JSON.stringify(evidence.unsampled)}`,
-    `Previous required issue ids: ${(previousIssues || []).map((issue) => issue.id).join(', ') || 'none'}`,
+    `Previous required issues: ${JSON.stringify(previousIssues || [])}`,
+    `Production requirements:\n${briefs || 'No module brief was supplied.'}`,
     `Frame files in this batch, in order: ${batch.map((file) => path.basename(file)).join(', ')}`,
     `Standards:\n${standards}`
   ].join('\n');
@@ -303,7 +330,7 @@ async function completeReview(apiKey, limits, messages) {
         model: limits.reviewModel,
         messages,
         response_format: { type: 'json_schema', json_schema: { name: 'video_review', strict: true, schema: REVIEW_SCHEMA } },
-        max_completion_tokens: 4000
+        max_completion_tokens: 8000
       }),
       signal: AbortSignal.timeout(limits.requestTimeoutMs || 120000)
     });

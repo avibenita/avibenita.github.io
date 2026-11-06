@@ -5,6 +5,7 @@ import path from 'path';
 import test from 'node:test';
 import { spawn } from 'child_process';
 import { classifySilence, DETECTION_LIMITS, moduleStoryIssues, recitedNarrationIssues } from '../evidence.mjs';
+import { revisionOutcome } from '../revision.mjs';
 import { FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC, highlightCssIssues, highlightEventIssues, highlightStandardIssues, outlinePulseIssue } from '../overlay/highlight.mjs';
 import { demoAdapters, demoConfig, runAuto } from '../controller.mjs';
 import { doctorLines, dryRunLines } from '../producer.mjs';
@@ -291,6 +292,16 @@ test('intentional silence is not failed speech, and a speech gap is', () => {
   const tail = classifySilence([{ start: 227.29, end: 231.11 }], [{ id: 'thanks', start: 225.55, end: 229.75, intentionalSilence: false }], 237);
   assert.equal(tail.length, 0);
   assert.ok(DETECTION_LIMITS.some((item) => /cropped labels/.test(item)));
+});
+
+test('an agent exit without a diff is not an applied correction', () => {
+  const empty = revisionOutcome({ status: 0, changes: [], pathsAccepted: true });
+  assert.equal(empty.accepted, false);
+  assert.match(empty.summary, /no file diff/);
+  const kept = revisionOutcome({ status: 0, changes: [{ path: 'Statistico/regression/produce/capture.mjs' }], pathsAccepted: true });
+  assert.equal(kept.accepted, true);
+  const outside = revisionOutcome({ status: 0, changes: [{ path: 'statistico-analytics/x.js' }], pathsAccepted: false });
+  assert.equal(outside.accepted, false);
 });
 
 test('the warm-gold highlight spec matches the shared overlay', () => {

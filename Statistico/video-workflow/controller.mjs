@@ -6,7 +6,7 @@ import { packageEvidence, classifySilence, normalizeScenes, DETECTION_LIMITS, ma
 import { finish } from './report.mjs';
 import { dryRunLines, produceCandidate } from './producer.mjs';
 import { estimateReviewUsd, requiredIssues, reviewWithOpenAI, transcribeMp4, validateReview } from './reviewer.mjs';
-import { acceptChanges, proposeWithCursor, revisionRequest, writeRevisionInstructions, ISOLATION_NOTE } from './revision.mjs';
+import { acceptChanges, proposeWithCursor, revisionOutcome, revisionRequest, writeRevisionInstructions } from './revision.mjs';
 import { acquireLock, captureBytes, diffBytes, exists, findFfmpeg, ffmpegText, readJson, restoreBytes, runProcess, SETUP_TEXT, sha256File, writeJson } from './util.mjs';
 
 function newId() {
@@ -105,50 +105,101 @@ export async function runAuto(options) {
       round = 1;
     }
 
+    if (options.correction && !state.openIssues.some((issue) => issue.id === 'scenario-readability')) {
+      state.openIssues.push({
+        id: 'scenario-readability',
+        severity: 'required',
+        category: 'presentation',
+        scene: 'scenario',
+        start_seconds: 38.19,
+        end_seconds: 50.52,
+        evidence: [],
+        observed: 'The scenario demonstration does not keep the active slider, the predicted response, and the affected chart clearly readable together.',
+        requested_change: String(options.correction),
+        acceptance_check: 'The revised scenario shows the active slider, the predicted response, and the affected chart together for the whole action, with enough of the surrounding view to identify it.',
+        permitted_edit: 'render',
+        confidence: 1
+      });
+      save();
+    }
     let reviewRound = state.reviews.length;
     while (reviewRound < limits.maxCandidateReviews) {
       const candidate = state.candidates[state.candidates.length - 1];
-      if (reviewRound > 0) say(log, 'Checking revised film');
-      const evidencePath = path.join(runDir, 'evidence', `v${candidate.round}`, 'evidence.json');
-      const evidence = state.completed[`evidence-${candidate.round}`]
-        ? readJson(evidencePath)
-        : await buildEvidence({ root, config, limits, runDir, candidate, state, adapters, options });
-      if (repairCollapsedTimeline(evidence, candidate.manifest, config)) writeJson(evidencePath, evidence);
-      state.completed[`evidence-${candidate.round}`] = true;
-      candidate.technicalOk = !evidence.technicalIssues?.length && !evidence.silenceFindings?.length;
-      save();
-      say(log, 'Reviewing');
-      const review = await obtainReview({ evidence, config, limits, root, runDir, round: candidate.round, previous: state.openIssues, adapters, options });
-      state.reviews.push({ round: candidate.round, verdict: review.verdict, file: review.file });
-      state.openIssues = requiredIssues(review.review);
-      state.unassessed = [...new Set([...(review.review.unassessed_checks || []), ...DETECTION_LIMITS])];
-      state.completed[`review-${candidate.round}`] = true;
-      save();
-      reviewRound += 1;
-      if (review.review.verdict === 'blocked') throw stop(review.review.summary || 'review blocked the candidate', 'blocked');
-      if (!state.openIssues.length && !evidence.technicalIssues?.length && !evidence.silenceFindings?.length) {
+      const alreadyReviewed = Boolean(state.completed[`review-${candidate.round}`]);
+      if (!alreadyReviewed) {
+        if (candidate.round > 1) say(log, 'Checking revised film');
+        const evidencePath = path.join(runDir, 'evidence', `v${candidate.round}`, 'evidence.json');
+        const evidence = state.completed[`evidence-${candidate.round}`]
+          ? readJson(evidencePath)
+          : await buildEvidence({ root, config, limits, runDir, candidate, state, adapters, options });
+        if (repairCollapsedTimeline(evidence, candidate.manifest, config)) writeJson(evidencePath, evidence);
+        state.completed[`evidence-${candidate.round}`] = true;
+        candidate.technicalOk = !evidence.technicalIssues?.length && !evidence.silenceFindings?.length;
+        save();
+        say(log, 'Reviewing');
+        const review = await obtainReview({ evidence, config, limits, root, runDir, round: candidate.round, previous: state.openIssues, adapters, options });
+        state.reviews.push({ round: candidate.round, verdict: review.verdict, file: review.file });
+        state.openIssues = requiredIssues(review.review);
+        for (const item of review.review.requirements || []) {
+          if (item.status !== 'missing') continue;
+          if (state.openIssues.some((issue) => issue.id === item.id)) continue;
+          state.openIssues.push({
+            id: item.id,
+            severity: 'required',
+            category: 'requirement',
+            scene: item.scene || 'film',
+            start_seconds: Number(item.start_seconds) || 0,
+            end_seconds: Number(item.end_seconds) || evidence.probe?.duration || 0,
+            evidence: item.evidence || [],
+            observed: item.requirement,
+            requested_change: `Restore this required element: ${item.requirement}`,
+            acceptance_check: 'The next review marks this requirement met, with timestamps, or records why the frames still do not show it.',
+            permitted_edit: 'render',
+            confidence: 1
+          });
+        }
+        state.unassessed = [...new Set([...(review.review.unassessed_checks || []), ...DETECTION_LIMITS])];
+        state.completed[`review-${candidate.round}`] = true;
+        save();
+        reviewRound += 1;
+        if (review.review.verdict === 'blocked') throw stop(review.review.summary || 'review blocked the candidate', 'blocked');
+        const missing = (review.review.requirements || []).some((item) => item.status === 'missing');
+        if (!state.openIssues.length && !missing && !evidence.technicalIssues?.length && !evidence.silenceFindings?.length) {
+          state.status = 'READY_FOR_HUMAN_REVIEW';
+          state.recommended = candidate.mp4;
+          state.stoppedReason = undefined;
+          say(log, 'Ready for your review');
+          break;
+        }
+        const technical = [...(evidence.technicalIssues || []), ...(evidence.silenceFindings || []).map((item) => item.observed)];
+        if (technical.length) {
+          state.openIssues.push(...technical.map((observed, index) => ({
+            id: `TECH-${candidate.round}-${index + 1}`,
+            severity: 'required',
+            category: 'technical',
+            scene: 'film',
+            start_seconds: 0,
+            end_seconds: evidence.probe?.duration || 0,
+            evidence: [],
+            observed,
+            requested_change: observed,
+            acceptance_check: 'The next export no longer reports this measurement, and the earlier candidate is kept.',
+            permitted_edit: 'render',
+            confidence: 1
+          })));
+        }
+      }
+      if (!state.openIssues.length) {
         state.status = 'READY_FOR_HUMAN_REVIEW';
         state.recommended = candidate.mp4;
         state.stoppedReason = undefined;
         say(log, 'Ready for your review');
         break;
       }
-      const technical = [...(evidence.technicalIssues || []), ...(evidence.silenceFindings || []).map((item) => item.observed)];
-      if (technical.length) {
-        state.openIssues.push(...technical.map((observed, index) => ({
-          id: `TECH-${candidate.round}-${index + 1}`,
-          severity: 'required',
-          category: 'technical',
-          scene: 'film',
-          start_seconds: 0,
-          end_seconds: evidence.probe?.duration || 0,
-          evidence: [],
-          observed,
-          requested_change: observed,
-          acceptance_check: 'The next export no longer reports this measurement, and the earlier candidate is kept.',
-          permitted_edit: 'render',
-          confidence: 1
-        })));
+      if (options.correction && state.revisions.some((item) => item.accepted) && candidate.round > 1) {
+        state.status = 'NEEDS_HUMAN_REVIEW';
+        state.recommended = candidate.mp4;
+        throw stop('The revised candidate still has required issues after the one correction cycle.', 'NEEDS_HUMAN_REVIEW');
       }
       if (state.revisions.length >= limits.maxRevisionRounds || reviewRound >= limits.maxCandidateReviews) {
         state.status = 'NEEDS_HUMAN_REVIEW';
@@ -159,11 +210,13 @@ export async function runAuto(options) {
       say(log, `Applying revision ${revisionIndex} of ${limits.maxRevisionRounds}`);
       const applied = await applyRevision({ root, config, limits, runDir, issues: state.openIssues, adapters, options });
       state.revisions.push({ round: revisionIndex, ...applied });
+      save();
       if (!applied.accepted) {
         if (applied.unattendedBlocked) {
           state.recommended = candidate.mp4;
           throw stop(`${applied.summary} The reviewed candidate was kept and was not re-recorded.`, 'NEEDS_HUMAN_REVIEW');
         }
+        state.recommended = candidate.mp4;
         throw stop(applied.summary, 'blocked');
       }
       const next = await renderRound({ root, config, runDir, round: candidate.round + 1, log, adapters, state, options });
@@ -258,6 +311,9 @@ async function obtainReview({ evidence, config, limits, root, runDir, round, pre
   const standards = config.standards && exists(path.join(root, config.standards))
     ? fs.readFileSync(path.join(root, config.standards), 'utf8')
     : '';
+  const briefs = (config.briefs || []).filter((rel) => exists(path.join(root, rel))).map((rel) => (
+    `## ${rel}\n${fs.readFileSync(path.join(root, rel), 'utf8')}`
+  )).join('\n\n');
   let result;
   if (adapters.review) {
     result = { review: await adapters.review({ evidence, round, previousIssues: previous }), raw: null, usage: { note: 'fake adapter' }, estimate: null };
@@ -283,6 +339,7 @@ async function obtainReview({ evidence, config, limits, root, runDir, round, pre
     result = await reviewWithOpenAI({
       evidence,
       standards,
+      briefs,
       previousIssues: previous,
       limits,
       apiKey: process.env.OPENAI_API_KEY,
@@ -297,7 +354,11 @@ async function obtainReview({ evidence, config, limits, root, runDir, round, pre
 }
 
 function readableReview(review) {
-  const lines = [`Verdict: ${review.verdict}`, '', review.summary, '', 'Changes:'];
+  const lines = [`Verdict: ${review.verdict}`, '', review.summary, '', 'Requirements:'];
+  for (const item of review.requirements || []) {
+    lines.push(`- ${item.id} [${item.status}] ${item.scene} ${item.start_seconds}-${item.end_seconds}s: ${item.requirement}`);
+  }
+  lines.push('', 'Changes:');
   for (const issue of review.issues || []) {
     lines.push(`- ${issue.id} [${issue.severity}] ${issue.scene}: ${issue.requested_change}`);
   }
@@ -310,38 +371,68 @@ function readableReview(review) {
 async function applyRevision({ root, config, limits, runDir, issues, adapters }) {
   const watched = [...(config.permittedPrefixes || []), ...(config.protectedPrefixes || [])];
   const before = captureBytes(root, watched);
-  const request = revisionRequest({
+  const scenario = (issues || []).some((issue) => issue.id === 'scenario-readability')
+    ? '\n\nFor the scenario readability correction, edit Statistico/regression/produce/capture.mjs. In the scenario recording, keep the Ad Spend slider, the predicted response, and the profile chart visible together for the whole action. Make those three larger than they are in the full-page view, and leave the module header and the Scenario Engine tab visible so the view can be identified. Do not edit statistico-analytics or the statistical engine.'
+    : '';
+  const request = `${revisionRequest({
     issues,
     permitted: config.permittedPrefixes || [],
     protectedPaths: config.protectedPrefixes || []
-  });
+  })}${scenario}`;
+  const requestFile = path.join(runDir, 'revision-request.md');
+  fs.mkdirSync(runDir, { recursive: true });
+  fs.writeFileSync(requestFile, `${request}\n`);
   let summary = 'Revision adapter made no described change.';
+  let proposal = null;
   if (adapters.revise) {
     const revised = await adapters.revise({ issues, root, request });
     summary = revised?.summary || summary;
   } else {
-    const proposal = proposeWithCursor({
+    proposal = proposeWithCursor({
       cwd: root,
-      prompt: `${request}\n\nDo not modify files. Return a unified diff only.`,
-      timeoutMs: limits.requestTimeoutMs
+      prompt: `Read ${requestFile} and apply every required change by editing the permitted files in place. Do not edit the request file, and do not stop after describing the change.`,
+      timeoutMs: Math.max(limits.requestTimeoutMs || 0, 360000)
     });
-    writeRevisionInstructions(runDir, request, proposal.proposal || proposal.reason);
-    summary = proposal.reason || ISOLATION_NOTE;
-    restoreBytes(root, before, watched);
-    return { round: issues.length, accepted: false, unattendedBlocked: !proposal.available, summary, changes: [] };
+    if (!proposal.available) {
+      writeRevisionInstructions(runDir, request, { ...proposal, accepted: false, changes: [] });
+      restoreBytes(root, before, watched);
+      return { accepted: false, unattendedBlocked: true, summary: proposal.reason, changes: [], command: proposal.command, status: proposal.status };
+    }
   }
   const changes = diffBytes(root, before, watched);
   const gate = acceptChanges(changes, config.permittedPrefixes || [], config.protectedPrefixes || []);
-  if (!gate.accepted) {
-    restoreBytes(root, before, watched);
-    return {
-      accepted: false,
-      summary: `Prohibited diff rejected: ${gate.rejected.map((item) => item.path).join(', ')}`,
-      changes
+  const outcome = proposal
+    ? revisionOutcome({ status: proposal.status, changes, pathsAccepted: gate.accepted })
+    : {
+      accepted: gate.accepted,
+      summary: gate.accepted ? summary : `Prohibited diff rejected: ${gate.rejected.map((item) => item.path).join(', ')}`
     };
+  if (!outcome.accepted) restoreBytes(root, before, watched);
+  const kept = outcome.accepted ? changes : [];
+  if (proposal) {
+    writeRevisionInstructions(runDir, request, {
+      accepted: outcome.accepted,
+      exitProvesApplication: false,
+      command: proposal.command,
+      status: proposal.status,
+      signal: proposal.signal,
+      error: proposal.error,
+      stdout: proposal.stdout,
+      stderr: proposal.stderr,
+      legacyLaunch: proposal.legacy,
+      changes: kept,
+      rejected: gate.rejected.map((item) => item.path)
+    });
   }
-  writeJson(path.join(runDir, 'revisions', `changes-${Date.now()}.json`), changes);
-  return { accepted: true, summary, changes };
+  if (outcome.accepted) writeJson(path.join(runDir, 'revisions', `changes-${Date.now()}.json`), kept);
+  return {
+    accepted: outcome.accepted,
+    unattendedBlocked: Boolean(proposal && !proposal.available),
+    summary: outcome.summary,
+    changes: kept,
+    command: proposal?.command || [],
+    status: proposal?.status
+  };
 }
 
 export async function runDemo(options = {}) {

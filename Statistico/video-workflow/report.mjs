@@ -18,7 +18,9 @@ export function writeReport(runDir, state) {
     lines.push('No source revision was applied.');
     lines.push('The automatic revision stage was not invoked. It is unverified on this run.');
   } else if (!(state.revisions || []).some((revision) => revision.accepted) || (state.candidates || []).length < 2) {
-    lines.push('The automatic revision stage is unverified. No distinct revised MP4 was produced or reviewed again.');
+    lines.push('The revision stage ran. No distinct revised MP4 was produced.');
+  } else {
+    lines.push('A revised candidate was produced from an accepted source diff.');
   }
   for (const revision of state.revisions || []) {
     lines.push(`- Round ${revision.round}: ${revision.summary}`);

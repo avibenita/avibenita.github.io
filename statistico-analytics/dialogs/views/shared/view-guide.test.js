@@ -175,4 +175,25 @@ describe('Univariate view guide', () => {
     const entry = guide.resolve({ module: 'univariate', key: 'by-group' });
     expect(entry.title).toMatch(/Grouped statistics/);
   });
+
+  test('every other analytic view has the same four sections', () => {
+    const modules = Object.keys(guide._guides).filter((name) => name !== 'univariate');
+    expect(modules.length).toBeGreaterThan(10);
+    modules.forEach((moduleName) => {
+      const table = guide._guides[moduleName];
+      expect(Object.keys(table).length).toBeGreaterThan(0);
+      Object.keys(table).forEach((key) => {
+        const entry = guide.resolve({ module: moduleName, key });
+        expect(entry).toBeTruthy();
+        expect(entry.sections.map((section) => section.id)).toEqual(REQUIRED);
+        entry.sections.forEach((section) => {
+          const text = [].concat(section.paragraphs || [], section.items || []).join(' ');
+          expect(text.trim().length).toBeGreaterThan(20);
+        });
+      });
+    });
+    expect(guide.resolve({ module: 'independent', key: 'independent-results' }).title).toMatch(/Test results/);
+    expect(guide.resolve({ module: 'power', key: 'power-sbMeans' }).sections[0].paragraphs.join(' ')).toMatch(/not available yet/);
+    expect(guide.resolve({ module: 'logistic', key: 'logistic-model-results-overview' }).title).toMatch(/overview/i);
+  });
 });

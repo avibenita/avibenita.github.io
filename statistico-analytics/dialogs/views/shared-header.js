@@ -8866,44 +8866,8 @@ REPORT: [one polished paragraph suitable for a report]`;
   },
 
   _injectPerViewAiButton() {
-    if (this.module === 'contingency') {
-      const old = document.getElementById('sbAiFloatBtn');
-      if (old) old.remove();
-      const guide = document.getElementById('sbViewGuideBtn');
-      if (guide) guide.remove();
-      const actions = document.getElementById('sbViewActions');
-      if (actions) actions.remove();
-      const sep = document.querySelector('.header-right .sb-ai-local-sep');
-      if (sep) sep.remove();
-      return;
-    }
-    if (this.module === 'reliability') return;
     if (!this._supportsInsightGuide()) return;
-    if (this.module === 'univariate') {
-      this._ensureViewGuideScript(() => this._mountUnivariateViewActions());
-      return;
-    }
-    if (document.getElementById('sbAiFloatBtn')) return;
-
-    if (this.module === 'independent') {
-      const btn = document.createElement('button');
-      btn.id = 'sbAiFloatBtn';
-      btn.className = 'sb-ai-float-btn sb-ai-local-btn';
-      btn.title = this._explainViewButtonTitle();
-      btn.innerHTML = this._explainViewButtonInnerHtml();
-      btn.addEventListener('click', () => StatisticoHeader._sbAiIndependentTabInterpret());
-      this._mountLocalAiButton(btn);
-      return;
-    }
-
-    const btn = document.createElement('button');
-    btn.id = 'sbAiFloatBtn';
-    btn.className = 'sb-ai-float-btn sb-ai-local-btn';
-    btn.title = this._explainViewButtonTitle();
-    btn.innerHTML = this._explainViewButtonInnerHtml();
-    btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
-
-    this._mountLocalAiButton(btn);
+    this._ensureViewGuideScript(() => this._mountViewActions());
   },
 
   _mountModuleAboutButton(footer) {
@@ -8964,27 +8928,39 @@ REPORT: [one polished paragraph suitable for a report]`;
   },
 
   _ensureViewGuideScript(done) {
+    const finish = typeof done === 'function' ? done : function () {};
     if (window.StatisticoViewGuide) {
-      done();
+      finish();
       return;
     }
     if (!this._viewGuideWaiters) this._viewGuideWaiters = [];
-    this._viewGuideWaiters.push(done);
+    this._viewGuideWaiters.push(finish);
     if (document.getElementById('statistico-view-guide-js')) return;
     const script = document.createElement('script');
     script.id = 'statistico-view-guide-js';
-    script.src = this.resolveDialogUrl('shared/view-guide.js?v=20261106module');
-    const finish = () => {
+    const headerScript = document.querySelector('script[src*="shared-header.js"]');
+    const fromHeader = headerScript && headerScript.src
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261106guides')
+      : '';
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261106guides');
+    const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
       waiters.forEach((fn) => { try { fn(); } catch (_e) {} });
     };
-    script.onload = finish;
-    script.onerror = finish;
+    script.onload = release;
+    script.onerror = () => {
+      script.remove();
+      release();
+    };
     document.head.appendChild(script);
   },
 
   _mountUnivariateViewActions() {
+    this._mountViewActions();
+  },
+
+  _mountViewActions() {
     if (document.getElementById('sbViewGuideBtn') && document.getElementById('sbAiFloatBtn')) return;
     const existing = document.getElementById('sbAiFloatBtn');
     if (existing) existing.remove();
@@ -9000,7 +8976,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     guide.setAttribute('aria-controls', 'viewGuideOverlay');
     guide.innerHTML = this._viewGuideButtonInnerHtml();
     guide.addEventListener('click', () => {
-      if (window.StatisticoViewGuide) window.StatisticoViewGuide.toggle();
+      this._ensureViewGuideScript(() => {
+        if (window.StatisticoViewGuide) window.StatisticoViewGuide.toggle();
+      });
     });
 
     const btn = document.createElement('button');
@@ -9009,7 +8987,10 @@ REPORT: [one polished paragraph suitable for a report]`;
     btn.className = 'sb-ai-float-btn sb-ai-local-btn';
     btn.title = this._interpretResultsButtonTitle();
     btn.innerHTML = this._interpretResultsButtonInnerHtml();
-    btn.addEventListener('click', () => StatisticoHeader._sbAiPerViewInterpret());
+    btn.addEventListener('click', () => {
+      if (StatisticoHeader.module === 'independent') StatisticoHeader._sbAiIndependentTabInterpret();
+      else StatisticoHeader._sbAiPerViewInterpret();
+    });
 
     const group = document.createElement('div');
     group.id = 'sbViewActions';
@@ -9017,7 +8998,20 @@ REPORT: [one polished paragraph suitable for a report]`;
     group.appendChild(guide);
     group.appendChild(btn);
     this._mountViewActionGroup(group);
+    this._bindViewGuideSync();
     this._syncViewGuide();
+  },
+
+  _bindViewGuideSync() {
+    if (document.documentElement.dataset.statisticoGuideSync === '1') return;
+    document.documentElement.dataset.statisticoGuideSync = '1';
+    document.addEventListener('click', (event) => {
+      const hit = event.target && event.target.closest
+        ? event.target.closest('.sb-item, .ws-mode-tab, .sb-facet, .sb-cluster-nav')
+        : null;
+      if (!hit) return;
+      setTimeout(() => this._syncViewGuide(), 0);
+    });
   },
 
   _mountViewActionGroup(group) {
@@ -9047,6 +9041,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (this.module === 'cluster') return true;
     if (this.module === 'meta-analysis') return true;
     if (this.module === 'multivariable') return true;
+    if (this.module === 'mixed-model') return true;
     return this._isSharedSidebarModule();
   },
 
@@ -9149,11 +9144,16 @@ REPORT: [one polished paragraph suitable for a report]`;
     // inner sub-view selected by data-sub on workspace tabs. Combine them so
     // the AI prompt is anchored on the actual sub-view (overview, technical,
     // roc-thresholds, calibration, scenario-engine, risk-profiles, etc.).
+    if (this.module === 'segmentation') {
+      const segTab = globalThis.__segmentationActiveTab
+        || (globalThis.__segmentationProduct === 'split' ? 'drivers' : 'overview');
+      return `segmentation-${segTab}`;
+    }
     if (this.module === 'logistic' && tab) {
       const subBtn = document.querySelector('.ws-mode-tab.active[data-sub]');
-      const sub = subBtn?.dataset?.sub;
-      if (sub && sub !== 'overview') return `logistic-${tab}-${sub}`;
-      if (sub === 'overview') return `logistic-${tab}-overview`;
+      const subSection = document.querySelector('.subview.active[data-parent="' + tab + '"]');
+      const sub = subBtn?.dataset?.sub || subSection?.dataset?.sub;
+      if (sub) return `logistic-${tab}-${sub}`;
     }
 
     return `${this.module}-${tab || this.currentView || 'view'}`;
@@ -9731,7 +9731,7 @@ ${this._localAiReplyFormat()}`;
     const btn = document.getElementById('sbAiFloatBtn');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Explaining view...</span>';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Interpreting…</span>';
     }
     try {
       this._lastAiMeta = null;
@@ -9749,7 +9749,7 @@ ${this._localAiReplyFormat()}`;
       this._aiForceRefresh = false;
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = this._explainViewButtonInnerHtml();
+        btn.innerHTML = this._interpretResultsButtonInnerHtml();
       }
     }
   },
@@ -10157,8 +10157,8 @@ ${this._overallAiReplyFormat()}`;
       if (!btn) return;
       btn.disabled = busy;
       btn.innerHTML = busy
-        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>' + (this.module === 'univariate' ? 'Interpreting…' : 'Explaining view…') + '</span>'
-        : (this.module === 'univariate' ? this._interpretResultsButtonInnerHtml() : this._explainViewButtonInnerHtml());
+        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Interpreting…</span>'
+        : this._interpretResultsButtonInnerHtml();
     };
     this._lastAiInvoke = { mode: 'per-view', kind: 'generic' };
     const viewKey = this._getInsightGuideViewKey();

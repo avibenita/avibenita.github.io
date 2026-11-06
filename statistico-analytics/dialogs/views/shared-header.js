@@ -9242,7 +9242,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       // Logistic — workspace sub-views (each describes the actual chart/table
       // shown, not a generic "logistic regression" overview).
       'logistic-model-results-overview':
-        'Read the Model Summary counts and fit statistics (observations, events, event rate, AUC, overall p, likelihood ratio, pseudo-R², AIC, Brier, events per predictor), the coefficient table (in-model status, beta, odds ratio, p), and the ROC preview. The page does not print a trust score, reliability percentage, or readiness rating. Use the computed payload for outcome coding, reference categories, and predictor units.',
+        'Read the Model Summary in four groups: Sample (observations, events, event rate), Model structure (predictors, events per predictor), Overall fit (likelihood-ratio chi-square, overall model p, AIC), and Pseudo-R² (McFadden, Nagelkerke). AUC is on the prediction-performance panel, not in this summary. Then read the coefficient table (in-model status, beta, odds ratio, p) and the ROC preview. The page does not print a trust score, reliability percentage, or readiness rating. Use the computed payload for outcome coding, reference categories, and predictor units.',
       'logistic-model-results-technical':
         'Read the coefficient table on the log-odds scale, plus odds ratios with 95% CI, Wald z, p, the model equation, and the omnibus likelihood-ratio, Wald, and score statistics. Use the computed payload. Do not add a trust score or a strongest-predictor ranking.',
       'logistic-predictive-performance-overview':

@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260828viewcta" />
   <link rel="stylesheet" href="../shared-logistic-power.css?v=20260708b" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261106aifree"></script>
+  <script src="../shared-header.js?v=20261106summarygroups"></script>
   <script src="../shared-workspace-tabs.js?v=20260828viewcta"></script>
   <script src="../shared-logistic-power.js?v=20260708c"></script>
 
@@ -750,7 +750,24 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
     }
-    .model-summary-cards { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+    .model-summary-groups {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px 16px;
+    }
+    .model-summary-group-title {
+      margin: 0 0 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+    .model-summary-cards { grid-template-columns: 1fr; }
+    .model-summary-group .stat-card-label { white-space: normal; }
+    @media (max-width: 1100px) {
+      .model-summary-groups { grid-template-columns: 1fr 1fr; }
+    }
     .log-compute-warning {
       margin: 0 0 8px;
       padding: 8px 10px;
@@ -1467,7 +1484,7 @@
                   <div class="panel-h">Model Summary</div>
                   <div class="panel-b">
                     <div id="logComputeWarning" class="log-compute-warning" hidden></div>
-                    <div class="stat-cards model-summary-cards" id="modelSummaryCards"><div class="empty">Awaiting model output...</div></div>
+                    <div class="model-summary-groups" id="modelSummaryCards"><div class="empty">Awaiting model output...</div></div>
                   </div>
                 </div>
 
@@ -3132,19 +3149,29 @@
       function card(label, value, tip, prior) {
         return statCardHtml(label, withFull(value, prior), tip);
       }
+      function group(title, cards) {
+        return "<section class='model-summary-group'><div class='model-summary-group-title'>" + esc(title) + "</div><div class='stat-cards model-summary-cards'>" + cards + "</div></section>";
+      }
+      var overallP = isFinite(ctx.p) ? (ctx.p < 0.001 ? "<0.001" : ctx.p.toFixed(3)) : "—";
       host.innerHTML =
-        card("Observations", isFinite(ctx.obsCount) ? String(Math.round(ctx.obsCount)) : "—", "Complete cases used in the fit.", full && full.observations) +
-        card("Events", isFinite(ctx.eventCount) ? String(Math.round(ctx.eventCount)) : "—", "Outcome coded as the event.", full && full.events) +
-        card("Event rate", isFinite(ctx.prevalence) ? (ctx.prevalence * 100).toFixed(1) + "%" : "—", "Events ÷ observations.") +
-        card("Predictors", isFinite(ctx.numPred) ? String(ctx.numPred) : "—", "Terms in the linear predictor, excluding the intercept.", full && full.predictors) +
-        card("AUC", isFinite(ctx.auc) ? toFixedOrDash(ctx.auc, 3) : "—", "Area under the ROC curve.", full ? toFixedOrDash(n(full.auc), 3) : "") +
-        card("Overall p", isFinite(ctx.p) ? (ctx.p < 0.001 ? "<0.001" : ctx.p.toFixed(3)) : "—", "Likelihood-ratio test of the fitted model against the intercept-only model.", full && full.overallPValue) +
-        card("Likelihood ratio", firstDefined(r, ["lrTest", "likelihoodRatio"], "—"), "Likelihood-ratio chi-square statistic.", full && full.lrTest) +
-        card("McFadden R²", firstDefined(r, ["mcfaddenR2", "mcfadden"], "—"), "1 − (log likelihood of the model ÷ log likelihood of the intercept-only model).", full && full.mcfaddenR2) +
-        card("Nagelkerke R²", firstDefined(r, ["nagelkerkeR2", "nagelkerke"], "—"), "Cox–Snell R² scaled so the maximum is 1.", full && full.nagelkerkeR2) +
-        card("AIC", firstDefined(r, ["aic", "AIC"], "—"), "Akaike information criterion. Lower values fit the same sample with less complexity.", full && full.aic) +
-        card("Brier", isFinite(ctx.brier) ? ctx.brier.toFixed(3) : "—", "Mean squared error of the predicted probabilities.") +
-        card("Events / predictor", isFinite(ctx.epv) ? ctx.epv.toFixed(1) : "—", "Events ÷ predictors. A common stability check uses about 10–15.");
+        group("Sample",
+          card("Observations", isFinite(ctx.obsCount) ? String(Math.round(ctx.obsCount)) : "—", "Complete cases used in the fit.", full && full.observations) +
+          card("Events", isFinite(ctx.eventCount) ? String(Math.round(ctx.eventCount)) : "—", "Outcome coded as the event.", full && full.events) +
+          card("Event rate", isFinite(ctx.prevalence) ? (ctx.prevalence * 100).toFixed(1) + "%" : "—", "Events ÷ observations.")
+        ) +
+        group("Model structure",
+          card("Predictors", isFinite(ctx.numPred) ? String(ctx.numPred) : "—", "Terms in the linear predictor, excluding the intercept.", full && full.predictors) +
+          card("Events per predictor", isFinite(ctx.epv) ? ctx.epv.toFixed(1) : "—", "Events ÷ predictors.")
+        ) +
+        group("Overall fit",
+          card("Likelihood-ratio χ²", firstDefined(r, ["lrTest", "likelihoodRatio"], "—"), "Likelihood-ratio chi-square statistic for the fitted model against the intercept-only model.", full && full.lrTest) +
+          card("Overall model p", overallP, "P-value of that likelihood-ratio test.", full && full.overallPValue) +
+          card("AIC", firstDefined(r, ["aic", "AIC"], "—"), "Akaike information criterion. Lower values fit the same sample with less complexity.", full && full.aic)
+        ) +
+        group("Pseudo-R²",
+          card("McFadden R²", firstDefined(r, ["mcfaddenR2", "mcfadden"], "—"), "1 − (log likelihood of the model ÷ log likelihood of the intercept-only model).", full && full.mcfaddenR2) +
+          card("Nagelkerke R²", firstDefined(r, ["nagelkerkeR2", "nagelkerke"], "—"), "Cox–Snell R² scaled so the maximum is 1.", full && full.nagelkerkeR2)
+        );
       var warnings = [];
       var converged = firstDefined(r, ["converged", "convergence"], "");
       if (converged !== "" && converged !== "-" && /false|no|fail/i.test(String(converged))) {

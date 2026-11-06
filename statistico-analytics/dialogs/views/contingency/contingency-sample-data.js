@@ -112,6 +112,25 @@
         return r;
       })()
     },
+    regionConverted: {
+      id: 'regionConverted',
+      title: 'Region × converted',
+      description: '512 observations. Region × converted. Excluding SOUTH leaves N = 378.',
+      headers: ['Region', 'converted'],
+      rows: (function () {
+        var r = [], i;
+        var cells = [
+          ['WEST', '0', 68], ['WEST', '1', 63],
+          ['EAST', '0', 47], ['EAST', '1', 70],
+          ['SOUTH', '0', 81], ['SOUTH', '1', 53],
+          ['NORTH', '0', 75], ['NORTH', '1', 55]
+        ];
+        cells.forEach(function (c) {
+          for (i = 0; i < c[2]; i++) r.push([c[0], c[1]]);
+        });
+        return r;
+      })()
+    },
     sparse2x2: {
       id: 'sparse2x2',
       title: 'Simulated sparse 2×2',

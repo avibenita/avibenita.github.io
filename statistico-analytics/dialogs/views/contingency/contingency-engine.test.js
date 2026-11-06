@@ -486,6 +486,62 @@ describe('Larger contingency tables', () => {
     expect(sparse.tests.fisher.p).toBeCloseTo(0.2063492063, 6);
   });
 
+  test('category inclusion keeps the engine on the retained observations', () => {
+    const cells = [
+      ['WEST', '0', 68], ['WEST', '1', 63],
+      ['EAST', '0', 47], ['EAST', '1', 70],
+      ['SOUTH', '0', 81], ['SOUTH', '1', 53],
+      ['NORTH', '0', 75], ['NORTH', '1', 55]
+    ];
+    const rows = [];
+    cells.forEach((cell) => {
+      for (let i = 0; i < cell[2]; i += 1) rows.push([cell[0], cell[1]]);
+    });
+    const headers = ['Region', 'converted'];
+    const full = CT.analyze(headers, rows, { rowVar: 'Region', colVar: 'converted' });
+    expect(full.analyzable).toBe(true);
+    expect(full.N).toBe(512);
+    expect(full.tests.pearson.df).toBe(3);
+    expect(full.tests.pearson.stat).toBeCloseTo(11.92, 2);
+    expect(full.tests.pearson.p).toBeCloseTo(0.0077, 3);
+    expect(full.tests.cramersV).toBeCloseTo(0.153, 3);
+
+    const kept = ['WEST', 'EAST', 'NORTH'];
+    const filtered = CT.analyze(headers, rows, {
+      rowVar: 'Region', colVar: 'converted', rowLevels: kept
+    });
+    const direct = CT.analyze(headers, rows.filter((row) => kept.indexOf(row[0]) >= 0), {
+      rowVar: 'Region', colVar: 'converted'
+    });
+    expect(filtered.N).toBe(378);
+    expect(filtered.colTotals.reduce((sum, v) => sum + v, 0)).toBe(378);
+    expect(filtered.colTotals.slice().sort((a, b) => a - b)).toEqual([188, 190]);
+    const totals = {};
+    filtered.rowLabels.forEach((label, i) => { totals[label] = filtered.rowTotals[i]; });
+    expect(totals.EAST).toBe(117);
+    expect(totals.WEST).toBe(131);
+    expect(totals.NORTH).toBe(130);
+    expect(filtered.tests.pearson.stat).toBeCloseTo(direct.tests.pearson.stat, 8);
+    expect(filtered.tests.pearson.p).toBeCloseTo(direct.tests.pearson.p, 8);
+    expect(filtered.tests.cramersV).toBeCloseTo(direct.tests.cramersV, 8);
+    expect(filtered.rowPct[0][0]).toBeCloseTo(direct.rowPct[0][0], 8);
+
+    const oneColumn = CT.analyze(headers, rows, {
+      rowVar: 'Region', colVar: 'converted', colLevels: ['1']
+    });
+    expect(oneColumn.analyzable).toBe(false);
+    expect(oneColumn.N).toBe(241);
+    expect(oneColumn.nCols).toBe(1);
+    expect(oneColumn.tests).toBeUndefined();
+    expect(oneColumn.observed.reduce((sum, row) => sum + row[0], 0)).toBe(241);
+
+    const none = CT.analyze(headers, rows.filter(() => false), {
+      rowVar: 'Region', colVar: 'converted'
+    });
+    expect(none.analyzable).toBe(false);
+    expect(none.N > 0).toBe(false);
+  });
+
   test('Monte Carlo p-value is small for a strongly associated table and stable for a seed', () => {
     const observed = [[20, 1, 1], [1, 18, 1], [1, 1, 16]];
     const once = CT.monteCarloIndependence(observed, { nSims: 499, seed: 11 });

@@ -144,8 +144,8 @@ export async function runAuto(options) {
           end_seconds: evidence.probe?.duration || 0,
           evidence: [],
           observed,
-          requested_change: 'Correct the measured technical failure without inventing statistical results.',
-          acceptance_check: 'The next candidate passes the same measurement.',
+          requested_change: observed,
+          acceptance_check: 'The next export no longer reports this measurement, and the earlier candidate is kept.',
           permitted_edit: 'render',
           confidence: 1
         })));

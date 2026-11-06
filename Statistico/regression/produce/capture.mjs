@@ -167,7 +167,47 @@ async function scenario(page, { mark, note, say }) {
   if (before === after) throw new Error('Moving ad spend did not change the prediction');
   if (beforeTitle === afterTitle) throw new Error('Moving ad spend did not change the profile');
   await clearFilmHighlight(page);
-  await hot(page, '#predictedValue', 1);
+  await page.evaluate(() => {
+    const label = document.querySelector('.output-card.main-prediction .output-label');
+    const value = document.getElementById('predictedValue');
+    const sub = document.querySelector('.output-card.main-prediction .output-sublabel');
+    const host = document.querySelector('.output-card.main-prediction');
+    const nodes = [label, value, sub].filter(Boolean);
+    if (!host || nodes.length < 2) return;
+    const style = getComputedStyle(host);
+    if (style.position === 'static') host.style.position = 'relative';
+    const hostRect = host.getBoundingClientRect();
+    const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+    const borderTop = parseFloat(style.borderTopWidth) || 0;
+    const rects = nodes.map((node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const rect = range.getBoundingClientRect();
+      return rect.width > 1 && rect.height > 1 ? rect : node.getBoundingClientRect();
+    });
+    const left = Math.min(...rects.map((rect) => rect.left));
+    const top = Math.min(...rects.map((rect) => rect.top));
+    const right = Math.max(...rects.map((rect) => rect.right));
+    const bottom = Math.max(...rects.map((rect) => rect.bottom));
+    let marker = document.getElementById('filmPredictionEstimate');
+    if (!marker) {
+      marker = document.createElement('div');
+      marker.id = 'filmPredictionEstimate';
+      marker.style.position = 'absolute';
+      marker.style.pointerEvents = 'none';
+      marker.style.background = 'transparent';
+      host.appendChild(marker);
+    }
+    marker.style.left = `${left - hostRect.left - borderLeft}px`;
+    marker.style.top = `${top - hostRect.top - borderTop}px`;
+    marker.style.width = `${Math.max(1, right - left)}px`;
+    marker.style.height = `${Math.max(1, bottom - top)}px`;
+  });
+  await hot(page, '#filmPredictionEstimate', 1);
+  if (process.env.FILM_PREVIEW === '1') {
+    await page.waitForTimeout(280);
+    await shot(page, 'preview-prediction');
+  }
   await page.waitForTimeout(Math.max(0, first * 0.58) * 1000);
   await page.waitForTimeout(PROBE ? 40 : 3000);
   await clearFilmHighlight(page);
@@ -290,7 +330,8 @@ async function recordScene(browser, name, run) {
 }
 
 async function main() {
-  if (!fs.existsSync(path.join(WORK, 'reference.json'))) {
+  const preview = process.argv.includes('--preview-scenario');
+  if (!preview && !fs.existsSync(path.join(WORK, 'reference.json'))) {
     throw new Error('Run validate-regression.mjs before capture. The reference file is missing.');
   }
   const server = serve();
@@ -298,7 +339,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const scenes = [];
   try {
-    const jobs = [
+    const jobs = preview ? [['scenario', scenario]] : [
       ['overview', overview],
       ['enter', (page, api) => brand(page, 'enter.html', 2.4, api)],
       ['effects', effects],
@@ -335,8 +376,28 @@ async function main() {
       process.stdout.write(`scene ${name}\n`);
       scenes.push(await recordScene(browser, name, fn));
     }
-    fs.writeFileSync(path.join(WORK, 'scenes.json'), JSON.stringify(scenes, null, 2));
+    const sceneFile = preview ? path.join(WORK, 'preview-scenes.json') : path.join(WORK, 'scenes.json');
+    fs.writeFileSync(sceneFile, JSON.stringify(scenes, null, 2));
     console.log(JSON.stringify(scenes.map((scene) => ({ id: scene.id, trim: scene.trim, cues: scene.cues })), null, 2));
+    if (preview) {
+      const scene = scenes[0];
+      const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');
+      fs.mkdirSync(outDir, { recursive: true });
+      const out = path.join(outDir, 'scenario-highlight.mp4');
+      const cue = (scene.cues || []).find((item) => item.id === 'scenario-1');
+      const audio = path.join(AUDIO, 'scenario-1.mp3');
+      const args = ['-y', '-ss', String(scene.trim), '-i', scene.src];
+      if (cue && fs.existsSync(audio)) args.push('-itsoffset', String(cue.at), '-i', audio);
+      args.push(
+        '-vf', 'scale=1728:1080:flags=lanczos,fps=30,format=yuv420p',
+        '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p'
+      );
+      if (cue && fs.existsSync(audio)) args.push('-map', '0:v:0', '-map', '1:a:0', '-c:a', 'aac');
+      args.push('-movflags', '+faststart', out);
+      const encoded = spawnSync(FFMPEG, args, { encoding: 'utf8' });
+      if (encoded.status !== 0) throw new Error((encoded.stderr || 'preview encode failed').slice(-800));
+      console.log(out);
+    }
   } finally {
     await browser.close();
     server.close();

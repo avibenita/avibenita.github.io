@@ -14,7 +14,12 @@ export function writeReport(runDir, state) {
   lines.push('Automated readiness is not publication approval. Watch and listen to the recommended candidate, then decide any CapCut export yourself. This run does not write the approved folder and does not replace website assets.');
   lines.push('');
   lines.push('## What changed');
-  if (!state.revisions?.length) lines.push('No source revision was applied.');
+  if (!state.revisions?.length) {
+    lines.push('No source revision was applied.');
+    lines.push('The automatic revision stage was not invoked. It is unverified on this run.');
+  } else if (!(state.revisions || []).some((revision) => revision.accepted) || (state.candidates || []).length < 2) {
+    lines.push('The automatic revision stage is unverified. No distinct revised MP4 was produced or reviewed again.');
+  }
   for (const revision of state.revisions || []) {
     lines.push(`- Round ${revision.round}: ${revision.summary}`);
     for (const change of revision.changes || []) lines.push(`  - ${change.change} ${change.path}`);

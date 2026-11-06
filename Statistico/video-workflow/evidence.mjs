@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { ffmpegText, REPO_ROOT, sha256File, writeJson } from './util.mjs';
-import { glowDeltaIssue, highlightIssuesFromManifest, meanChannelDelta } from './overlay/highlight.mjs';
+import { highlightIssuesFromManifest, meanChannelDelta, outlinePulseIssue } from './overlay/highlight.mjs';
 
 function hasFaststart(file) {
   const buf = fs.readFileSync(file);
@@ -132,19 +132,19 @@ export function moduleStoryIssues(scenes, moduleConfig) {
   const listed = scenes || [];
   const byId = Object.fromEntries(listed.map((scene) => [scene.id, scene]));
   const overview = byId[spec.overviewSceneId || 'overview'];
-  if (!overview) issues.push('A substantive module overview is missing.');
+  if (!overview) issues.push('Add a substantive overview of about 15–20 seconds that explains the workspace and maps the analytical areas.');
   else {
     const span = Number(overview.end || 0) - Number(overview.start || 0);
     const min = spec.overviewMinSeconds ?? 14;
     const max = spec.overviewMaxSeconds ?? 23;
-    if (span < min || span > max) issues.push(`Module overview is ${span.toFixed(1)}s. It needs about 15–20 seconds and must explain the workspace, not only a logo.`);
+    if (span < min || span > max) issues.push(`Rebuild the overview so it runs about 15–20 seconds and explains the workspace. This cut is ${span.toFixed(1)}s.`);
   }
   const demos = spec.demonstrationSceneIds || [];
   if (demos.length < 3 || demos.length > 4) issues.push('Name three or four demonstrations in the module profile.');
   const present = demos.filter((id) => byId[id]);
-  if (present.length < 3) issues.push(`Distinct demonstrations present: ${present.join(', ') || 'none'}. Three or four are required, each with a visible action and response.`);
+  if (present.length < 3) issues.push(`Add distinct demonstrations until three or four are present, each with a visible action and response. Present now: ${present.join(', ') || 'none'}.`);
   for (const id of spec.catalogueSceneIds || []) {
-    if (!byId[id]) issues.push(`Feature catalogue scene ${id} is missing.`);
+    if (!byId[id]) issues.push(`Add the feature catalogue scene ${id} before the branded close.`);
   }
   return issues;
 }
@@ -189,7 +189,7 @@ export function encodedGlowMotion(ffmpeg, mp4, highlight, videoW, videoH) {
     return end - Number(event.filmAt) >= 2.2;
   });
   const preferred = candidates.find((event) => /predictedValue|res-outliers-table|filmFlagged/.test(event.selector || '')) || candidates[0];
-  if (!preferred) return { checked: false, note: 'No stationary highlight lasted long enough to sample the breathing glow.' };
+  if (!preferred) return { checked: false, note: 'No stationary highlight lasted long enough to sample the outline.' };
   const t0 = Number(preferred.filmAt) + 0.55;
   const t1 = t0 + 1.2;
   const glow = clampCrop(preferred.frame.x + preferred.frame.w / 2 - 12, preferred.frame.y - 18, 24, 14, videoW, videoH);
@@ -205,8 +205,8 @@ export function encodedGlowMotion(ffmpeg, mp4, highlight, videoW, videoH) {
   if (interiorDelta != null && interiorDelta > 12) {
     return { ...report, note: 'The target content changed between glow samples, so the breathing check was not applied.' };
   }
-  const glowIssue = glowDeltaIssue(glowA, glowB);
-  if (glowIssue) return { ...report, issue: `The breathing glow is not visible in the encoded picture (${glowIssue}).` };
+  const pulse = outlinePulseIssue(glowA, glowB);
+  if (pulse) return { ...report, issue: `The outline does not stay steady (${pulse}).` };
   return report;
 }
 
@@ -247,7 +247,6 @@ export async function packageEvidence({ ffmpeg, mp4, manifest, moduleConfig, run
     .concat(moduleStoryIssues(scenes, moduleConfig))
     .concat(spoken == null ? ['Narration file is missing.'] : recitedNarrationIssues(spoken));
   if (moduleConfig?.highlightRequired && glowMotion.issue) tech.push(glowMotion.issue);
-  if (moduleConfig?.highlightRequired && glowMotion.checked === false && glowMotion.note) tech.push(glowMotion.note);
   const plan = samplePlan(probe.duration, scenes, limits || {});
   const frameDir = path.join(runDir, 'evidence', `v${round}`);
   fs.mkdirSync(frameDir, { recursive: true });

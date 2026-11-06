@@ -5,7 +5,7 @@ import path from 'path';
 import test from 'node:test';
 import { spawn } from 'child_process';
 import { classifySilence, DETECTION_LIMITS, moduleStoryIssues, recitedNarrationIssues } from '../evidence.mjs';
-import { FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC, glowDeltaIssue, highlightCssIssues, highlightEventIssues, highlightStandardIssues } from '../overlay/highlight.mjs';
+import { FILM_HIGHLIGHT_CSS, HIGHLIGHT_SPEC, highlightCssIssues, highlightEventIssues, highlightStandardIssues, outlinePulseIssue } from '../overlay/highlight.mjs';
 import { demoAdapters, demoConfig, runAuto } from '../controller.mjs';
 import { doctorLines, dryRunLines } from '../producer.mjs';
 import { REPO_ROOT, loadModule, readJson, writeJson } from '../util.mjs';
@@ -299,11 +299,10 @@ test('the warm-gold highlight spec matches the shared overlay', () => {
   const aligned = highlightEventIssues([{
     action: 'show',
     selector: '#kpiStrip',
-    color: '#FFD18A',
-    outlinePx: 2,
-    cornerPx: 4,
+    color: '#D9B878',
+    outlinePx: 1.5,
     target: { x: 100, y: 80, w: 240, h: 60 },
-    frame: { x: 90, y: 70, w: 260, h: 80 }
+    frame: { x: 92, y: 72, w: 256, h: 76 }
   }]);
   assert.deepEqual(aligned, []);
   const covering = highlightEventIssues([{
@@ -311,13 +310,13 @@ test('the warm-gold highlight spec matches the shared overlay', () => {
     selector: '#kpiStrip',
     color: '#7dd3fc',
     outlinePx: 3,
-    cornerPx: 3,
+    breatheMs: 2400,
     target: { x: 100, y: 80, w: 40, h: 20 },
     frame: { x: 100, y: 80, w: 40, h: 20 }
   }]);
   assert.ok(covering.length >= 2);
-  assert.equal(glowDeltaIssue(Buffer.from([0, 0, 0]), Buffer.from([0, 0, 0])), 'encoded glow changed by 0.00 per channel, below 2.5');
-  assert.equal(glowDeltaIssue(Buffer.from([0, 0, 0]), Buffer.from([20, 0, 0])), '');
+  assert.equal(outlinePulseIssue(Buffer.from([0, 0, 0]), Buffer.from([0, 0, 0])), '');
+  assert.match(outlinePulseIssue(Buffer.from([0, 0, 0]), Buffer.from([20, 0, 0])), /not steady|above 6/);
   const cues = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'Statistico', 'regression', 'produce', 'cues.json'), 'utf8'));
   assert.equal(recitedNarrationIssues(cues).length, 0);
   assert.match(cues.find((cue) => cue.id === 'overview-1').spoken, /one interactive workspace/);
@@ -336,8 +335,9 @@ test('the warm-gold highlight spec matches the shared overlay', () => {
   });
   assert.ok(story.some((line) => /overview/.test(line)));
   assert.ok(story.some((line) => /catalogue/.test(line)));
-  assert.equal(HIGHLIGHT_SPEC.breatheMs, 2400);
-  assert.equal(HIGHLIGHT_SPEC.fadeInMs, 300);
+  assert.equal(HIGHLIGHT_SPEC.fadeInMs, 200);
+  assert.equal(HIGHLIGHT_SPEC.fadeOutMs, 200);
+  assert.equal(HIGHLIGHT_SPEC.color, '#D9B878');
 });
 
 test('the pre-existing assemble command still targets the r001 review file by default', () => {

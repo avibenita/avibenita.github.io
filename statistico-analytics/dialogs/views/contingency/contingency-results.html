@@ -150,6 +150,16 @@
       font-size:1.45rem; font-weight:800; color:var(--text-primary); letter-spacing:-.02em;
       font-variant-numeric:tabular-nums; line-height:1.15; margin-top:0;
     }
+    .kpi-row--strip .full-model-ref {
+      font-weight:650; font-size:.55em; color:var(--text-muted, #94a3b8);
+      margin-left:.35em; letter-spacing:0; white-space:nowrap;
+    }
+    .kpi-row--strip { margin-bottom:4px; }
+    .ct-include-bar {
+      margin-top:28px; padding-top:18px;
+      border-top:1px solid rgba(148,163,184,.38);
+    }
+    .ct-table-card { margin-top:16px; }
     :root[data-theme="light"] .kpi-row--strip .kpi {
       background:linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
       border-color:rgba(148,163,184,.28);
@@ -1639,8 +1649,21 @@
       });
     }
 
-    function kpi(k, v, tip, mod) {
-      return '<div class="kpi' + (mod ? ' kpi-card--' + mod : '') + '"><div class="kpi-k">' + esc(k) + (tip ? infoTip(k, tip) : '') + '</div><div class="kpi-v">' + esc(v) + '</div></div>';
+    function kpi(k, vHtml, tip, mod) {
+      return '<div class="kpi' + (mod ? ' kpi-card--' + mod : '') + '"><div class="kpi-k">' + esc(k) + (tip ? infoTip(k, tip) : '') + '</div><div class="kpi-v">' + vHtml + '</div></div>';
+    }
+    function selectionIsReduced() {
+      if (!baseBundle) return false;
+      if (excludedLabels(catalogRows, includedRows).length || excludedLabels(catalogCols, includedCols).length) return true;
+      var cur = bundle ? representedNOf(bundle) : NaN;
+      var full = representedNOf(baseBundle);
+      return isFinite(cur) && isFinite(full) && cur !== full;
+    }
+    function withFull(current, full) {
+      var cur = current == null || current === '' ? '—' : String(current);
+      if (!selectionIsReduced() || full == null || full === '' || full === '—') return esc(cur);
+      if (cur === String(full)) return esc(cur);
+      return esc(cur) + '<span class="full-model-ref" title="Full table, all categories"> (' + esc(full) + ')</span>';
     }
 
     function renderOverview() {
@@ -1648,17 +1671,20 @@
       if (!r) return;
       var ready = !!(r.testsAvailable !== false && r.analyzable && r.tests && r.tests.pearson);
       var p = ready ? r.tests.pearson : null;
+      var full = baseBundle;
+      var fullReady = !!(full && full.analyzable && full.tests && full.tests.pearson);
+      var fp = fullReady ? full.tests.pearson : null;
       var unavailable = 'Unavailable for this selection.';
       qsHtml('overviewKpis', [
-        kpi('N', fmtAnalysisN(representedNOf(r)), freqCol(r)
-          ? 'Observations retained in the current category selection. This is the sum of the frequency column “' + esc(freqCol(r)) + '”. Input rows = ' + fmtAnalysisN(inputRowCountOf(r)) + '.'
-          : 'Observations retained in the current category selection.', 'n'),
-        kpi('Pearson χ²', ready ? fmtN(p.stat, 2) : '—', ready
-          ? 'Tests whether row and column variables are independent. Large values mean the counts differ from what independence would predict.'
+        kpi('N', withFull(fmtAnalysisN(representedNOf(r)), full ? fmtAnalysisN(representedNOf(full)) : null), freqCol(r)
+          ? 'Observations retained in the current category selection. This is the sum of the frequency column “' + esc(freqCol(r)) + '”. Input rows = ' + fmtAnalysisN(inputRowCountOf(r)) + '. The value in parentheses is the full table.'
+          : 'Observations retained in the current category selection. The value in parentheses is the full table.', 'n'),
+        kpi('Pearson χ²', withFull(ready ? fmtN(p.stat, 2) : '—', fullReady ? fmtN(fp.stat, 2) : null), ready
+          ? 'Tests whether row and column variables are independent. Large values mean the counts differ from what independence would predict. The value in parentheses is the full table.'
           : unavailable, 'chi'),
-        kpi('df', ready ? String(p.df) : '—', 'Degrees of freedom = (rows − 1) × (columns − 1). The chi-square curve used for the p-value has this df.', 'df'),
-        kpi('p-value', ready ? fmtP(p.p) : '—', 'Probability of a χ² at least this large if the variables were independent. Small p (e.g. &lt; 0.05) is evidence of association.', 'p'),
-        kpi("Cramér’s V", ready ? fmtN(r.tests.cramersV, 3) : '—', 'Association strength from 0 (none) to 1 (perfect). Unlike χ², V does not grow just because N is large. Rough guide: ~0.1 small, ~0.3 medium, ~0.5 large.', 'v')
+        kpi('df', withFull(ready ? String(p.df) : '—', fullReady ? String(fp.df) : null), 'Degrees of freedom = (rows − 1) × (columns − 1). The chi-square curve used for the p-value has this df. The value in parentheses is the full table.', 'df'),
+        kpi('p-value', withFull(ready ? fmtP(p.p) : '—', fullReady ? fmtP(fp.p) : null), 'Probability of a χ² at least this large if the variables were independent. Small p (e.g. &lt; 0.05) is evidence of association. The value in parentheses is the full table.', 'p'),
+        kpi("Cramér’s V", withFull(ready ? fmtN(r.tests.cramersV, 3) : '—', fullReady ? fmtN(full.tests.cramersV, 3) : null), 'Association strength from 0 (none) to 1 (perfect). Unlike χ², V does not grow just because N is large. Rough guide: ~0.1 small, ~0.3 medium, ~0.5 large. The value in parentheses is the full table.', 'v')
       ].join(''));
       var warn = '';
       if (!ready && r.testsReason) warn = r.testsReason;

@@ -16,9 +16,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-header.css?v=20261105tabflush"/>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261105tabflush"></script>
+  <script src="../shared-header.js?v=20261106analysis"></script>
   <script src="contingency-engine.js?v=20260911freq1"></script>
-  <script src="contingency-sample-data.js?v=20260911freq1"></script>
+  <script src="contingency-sample-data.js?v=20261106region"></script>
   <style>
     :root {
       --surface-0:#0E141B; --surface-1:#242C37; --surface-2:#242C37; --border:rgba(255,255,255,.14);
@@ -107,10 +107,56 @@
     .ct-help-swatches { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
     .ct-help-swatch { border-radius:7px; padding:6px 10px; font-size:12px; font-weight:700; color:#fff; }
     .ct-help-swatch span { display:block; font-size:10.5px; font-weight:600; opacity:.9; }
-    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px; overflow:visible; }
-    .kpi { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 14px; overflow:visible; }
-    .kpi-k { font-size:13px; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:6px; line-height:1.2; }
-    .kpi-v { font-size:24px; font-weight:700; color:var(--accent-ct); margin-top:4px; }
+    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); gap:8px; overflow:visible; }
+    .kpi-row--strip { grid-template-columns:repeat(5, minmax(0, 1fr)); }
+    .kpi { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:8px 10px; overflow:visible; }
+    .kpi-k { font-size:12px; font-weight:700; text-transform:uppercase; color:var(--text-muted); display:flex; align-items:center; gap:6px; line-height:1.2; }
+    .kpi-v { font-size:22px; font-weight:700; color:var(--accent-ct); margin-top:2px; }
+    .ct-updating { display:none; margin:0; padding:6px 10px; border-radius:8px; background:rgba(139,92,246,.14); border:1px solid rgba(167,139,250,.4); color:#ddd6fe; font-size:13px; font-weight:700; }
+    .ct-updating.show { display:block; }
+    .ct-busy { opacity:.55; pointer-events:none; }
+    .ct-include-bar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+    .ct-cat-menu { position:relative; }
+    .ct-cat-btn, .ct-reset-btn {
+      border:1px solid var(--border); background:var(--surface-1); color:var(--text-secondary);
+      border-radius:8px; padding:6px 10px; font-size:12.5px; font-weight:700; cursor:pointer;
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .ct-cat-btn[aria-expanded="true"] { border-color:rgba(167,139,250,.7); color:var(--text-primary); }
+    .ct-cat-count { color:var(--accent-ct); font-variant-numeric:tabular-nums; }
+    .ct-cat-panel {
+      position:absolute; z-index:30; top:calc(100% + 4px); left:0; min-width:180px; max-height:240px; overflow:auto;
+      background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:6px;
+      box-shadow:0 12px 28px rgba(0,0,0,.35);
+    }
+    .ct-cat-panel label {
+      display:flex; align-items:center; gap:8px; padding:5px 6px; border-radius:6px;
+      font-size:13px; font-weight:650; color:var(--text-primary); cursor:pointer;
+    }
+    .ct-cat-panel label:hover { background:rgba(139,92,246,.12); }
+    .ct-cat-panel input { accent-color:#a78bfa; }
+    .ct-selection-status { font-size:13px; color:var(--text-secondary); min-width:0; }
+    .ct-selection-status strong { color:var(--accent-1); font-weight:750; }
+    .show-in-cells { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+    .show-in-cells-label { font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); }
+    .ct-more-tests { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:0; }
+    .ct-more-tests summary {
+      cursor:pointer; padding:10px 14px; font-size:13px; font-weight:800; letter-spacing:.04em;
+      text-transform:uppercase; color:var(--text-muted); list-style:none;
+    }
+    .ct-more-tests summary::-webkit-details-marker { display:none; }
+    .ct-more-tests summary:before { content:"▸ "; color:var(--accent-ct); }
+    .ct-more-tests[open] summary:before { content:"▾ "; }
+    .ct-more-tests .tbl-wrap, .ct-more-tests .ct-tests-note { padding:0 14px 12px; }
+    .ct-tests-note { font-size:14px; color:var(--text-secondary); margin:0; }
+    .ct-empty { display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+    #analysisEmpty[hidden],
+    #analysisBody[hidden],
+    .ct-cat-panel[hidden],
+    #testsNote[hidden],
+    #ctxTitle[hidden] { display:none !important; }
+    .ct-empty p { font-size:15px; line-height:1.45; }
+    .ct-table-card { display:flex; flex-direction:column; gap:0; }
     .interp { font-size:16px; line-height:1.5; color:var(--text-secondary); }
     .interp p { margin:0 0 6px; }
     .interp p:last-child { margin-bottom:0; }
@@ -136,6 +182,14 @@
       accent-color:#c4b5fd; cursor:pointer;
     }
     #measureBar .ws-mode-tab.active input { accent-color:#fff; }
+    @media (max-width: 1200px) {
+      .kpi-row--strip { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+      #measureBar.ws-mode-tabbar { grid-template-columns:repeat(4, minmax(0, 1fr)); }
+    }
+    @media (max-width: 820px) {
+      .kpi-row--strip { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+      #measureBar.ws-mode-tabbar { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    }
     .measure-row { display:flex; align-items:stretch; gap:8px; margin-bottom:8px; }
     .measure-row #measureBar { flex:1; margin-bottom:0; }
     .info-icon {
@@ -354,7 +408,10 @@
     }
     .viz-check input { accent-color:#8b5cf6; }
     #vizChartWrap.chart-wrap { width:100%; height:380px; border-radius:10px; overflow:hidden; }
-    #vizChart { width:100%; height:100%; }
+    #vizChart { width:100%; height:100%; min-height:360px; }
+    /* The page-wide border-box rule collapses Highcharts column rects, leaving only data labels. */
+    #vizChart .highcharts-container,
+    #vizChart .highcharts-container * { box-sizing:content-box; }
     .tt-map {
       display:grid; grid-template-columns:minmax(240px,1fr) auto; gap:14px 20px; align-items:start;
     }
@@ -403,32 +460,42 @@
       <div class="results-container" data-preview-canvas>
         <div id="loadingState" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading contingency results…</div>
         <div id="errorState" class="tab-panel"><div class="card error-card" id="errorText"></div></div>
-        <div id="tab-overview" class="tab-panel">
+        <div id="tab-analysis" class="tab-panel">
+          <div id="analysisUpdating" class="ct-updating" role="status">Updating results…</div>
           <div class="warn-banner" id="overviewWarn"></div>
-          <div class="kpi-row" id="overviewKpis"></div>
-          <div class="card"><div class="card-title">Interpretation</div><div class="interp" id="overviewInterp"></div></div>
-          <div class="card">
-            <div class="card-title">Tests</div>
-            <div class="tbl-wrap" id="testsWrap"></div>
+          <div id="analysisEmpty" class="card ct-empty" hidden>
+            <p id="analysisEmptyText">No observations remain in this selection.</p>
+            <button type="button" class="ct-reset-btn" id="emptyResetBtn">Reset selection</button>
           </div>
-        </div>
-        <div id="tab-table" class="tab-panel">
-          <div class="card">
-            <div class="measure-row">
-              <div class="ws-mode-tabbar" id="measureBar"></div>
-              <span class="info-icon" aria-label="About this table">i<span class="tip">
-                Check the tiles to choose which statistics appear in each cell. The first selected value is shown largest; the others sit underneath.<br><br>
-                <b>Color by</b> sets the heat-map independently of which numbers are shown: observed n, expected, row %, column %, total %, or adjusted residuals.<br><br>
-                <b>Adjusted residual</b> measures how far a cell is from independence. |r| &lt; 2 is typical, 2–3 is notable, and ≥ 3 is strong. Blue = fewer than expected; orange = more than expected.<br><br>
-                Click the row-names header (first column) to sort A→Z / Z→A. Drag a row or column name to reorder by hand. Hover a cell for the full breakdown.
-              </span></span>
+          <div id="analysisBody">
+            <div class="kpi-row kpi-row--strip" id="overviewKpis"></div>
+            <div class="ct-include-bar" id="includeBar"></div>
+            <div class="card ct-table-card">
+              <div class="show-in-cells">
+                <div class="show-in-cells-label">Show in cells</div>
+                <div class="measure-row">
+                  <div class="ws-mode-tabbar" id="measureBar"></div>
+                  <span class="info-icon" aria-label="About this table">i<span class="tip">
+                    These choices change what is printed in each cell. They do not change N, the tests, or the effect size.<br><br>
+                    The first selected value is shown largest; the others sit underneath. <b>All</b> selects every display measure.<br><br>
+                    <b>Color by</b> sets the heat-map independently of which numbers are shown.<br><br>
+                    <b>Adjusted residual</b> measures how far a cell is from independence. |r| &lt; 2 is typical, 2–3 is notable, and ≥ 3 is strong. Blue = fewer than expected; orange = more than expected.<br><br>
+                    Click the row-names header to sort A→Z / Z→A. Drag a row or column name to reorder. That order is presentation only.
+                  </span></span>
+                </div>
+              </div>
+              <div class="cell-legend" id="cellLegend"></div>
+              <div class="tbl-wrap" id="tableWrap"></div>
+              <div class="tbl-actions">
+                <button class="mini-btn" type="button" onclick="copyCurrentTable()"><i class="fa-solid fa-copy"></i> Copy table</button>
+                <button class="mini-btn" type="button" onclick="exportCurrentCsv()"><i class="fa-solid fa-download"></i> Export CSV</button>
+              </div>
             </div>
-            <div class="cell-legend" id="cellLegend"></div>
-            <div class="tbl-wrap" id="tableWrap"></div>
-            <div class="tbl-actions">
-              <button class="mini-btn" type="button" onclick="copyCurrentTable()"><i class="fa-solid fa-copy"></i> Copy table</button>
-              <button class="mini-btn" type="button" onclick="exportCurrentCsv()"><i class="fa-solid fa-download"></i> Export CSV</button>
-            </div>
+            <details class="ct-more-tests" id="moreTests">
+              <summary>Additional tests</summary>
+              <p class="ct-tests-note" id="testsNote" hidden></p>
+              <div class="tbl-wrap" id="testsWrap"></div>
+            </details>
           </div>
         </div>
         <div id="tab-diagnostics" class="tab-panel">
@@ -580,12 +647,24 @@
 
   <script>
     var bundle = null;
-    var activeTab = 'overview';
+    var baseBundle = null;
+    var sourcePack = null;
+    var inputLevelFilter = null;
+    var catalogRows = [];
+    var catalogCols = [];
+    var includedRows = {};
+    var includedCols = {};
+    var baseN = NaN;
+    var calcToken = 0;
+    var testsAvailable = true;
+    var activeTab = 'analysis';
     var selectedMeasures = { observed: true };
     var measureOrder = ['observed'];
     var diagMode = 'heat';
     var colorMetric = 'observed';
     var rowSortDir = 0;
+    var rowOrderCustom = false;
+    var colOrderCustom = false;
     var rowOrderLabels = [];
     var rowOrderOriginal = [];
     var colOrderLabels = [];
@@ -596,14 +675,17 @@
     var vizBound = false;
     var outcomeBeneficial = true;
     var TITLE_MAP = {
-      overview: 'Overview',
-      table: 'Contingency Table',
+      analysis: 'Analysis',
+      overview: 'Analysis',
+      table: 'Analysis',
       visualization: 'Diagnostics & Visualization',
       diagnostics: 'Diagnostics & Visualization',
       twobytwo: '2×2 Measures'
     };
     try {
       var bootTab = new URLSearchParams(window.location.search).get('tab');
+      if (bootTab === 'overview' || bootTab === 'table' || bootTab === 'tests') bootTab = 'analysis';
+      if (bootTab === 'viz' || bootTab === 'visualization') bootTab = 'diagnostics';
       if (bootTab) activeTab = bootTab;
     } catch (_tabErr) {}
     window.__contingencyActiveTab = activeTab;
@@ -670,6 +752,313 @@
       syncSelectedFromOrder();
     }
 
+    function selectedLabels(catalog, map) {
+      return (catalog || []).filter(function (label) { return map[label] !== false; });
+    }
+    function excludedLabels(catalog, map) {
+      return (catalog || []).filter(function (label) { return map[label] === false; });
+    }
+    function selectionKey() {
+      return selectedLabels(catalogRows, includedRows).join('\u0001') + '\u0002' +
+        selectedLabels(catalogCols, includedCols).join('\u0001');
+    }
+    window.__contingencySelectionKey = selectionKey;
+    function listPhrase(items) {
+      if (!items.length) return '';
+      if (items.length === 1) return items[0];
+      if (items.length === 2) return items[0] + ' and ' + items[1];
+      return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
+    }
+    function exclusionPhrase() {
+      var rows = excludedLabels(catalogRows, includedRows);
+      var cols = excludedLabels(catalogCols, includedCols);
+      var parts = [];
+      if (rows.length) parts.push(listPhrase(rows));
+      if (cols.length) {
+        var colName = (baseBundle && baseBundle.colVar) || 'column';
+        parts.push(listPhrase(cols.map(function (label) { return colName + ' ' + label; })));
+      }
+      if (!parts.length) return '';
+      return listPhrase(parts) + ' excluded';
+    }
+    function statusText(activeRepresented) {
+      var total = isFinite(baseN) ? baseN : activeRepresented;
+      var line = fmtAnalysisN(activeRepresented) + ' of ' + fmtAnalysisN(total) + ' observations';
+      var extra = exclusionPhrase();
+      return extra ? line + ' · ' + extra : line;
+    }
+    function captureInputLevels(spec) {
+      if (inputLevelFilter || !spec) return;
+      if (!spec.rowLevels && !spec.colLevels) return;
+      inputLevelFilter = {
+        rowLevels: spec.rowLevels ? spec.rowLevels.slice() : null,
+        colLevels: spec.colLevels ? spec.colLevels.slice() : null
+      };
+    }
+    function rememberSource(headers, rows, spec) {
+      if (!headers || !rows) return;
+      captureInputLevels(spec || {});
+      sourcePack = {
+        headers: headers.slice(),
+        rows: rows.map(function (row) { return Array.isArray(row) ? row.slice() : row; }),
+        spec: spec || {}
+      };
+    }
+    function captureSourceFromNav() {
+      if (sourcePack) return;
+      var nav = window.contingencyNavData;
+      if (!nav) {
+        try { nav = JSON.parse(sessionStorage.getItem('contingencyNavData') || 'null'); } catch (_e) { nav = null; }
+      }
+      if (nav && Array.isArray(nav.headers) && Array.isArray(nav.rows)) rememberSource(nav.headers, nav.rows, nav.spec || {});
+    }
+    function testsReasonText(nRows, nCols) {
+      if (nCols < 2 && nRows >= 2) return 'Only one column category remains, so association tests and effect sizes are unavailable.';
+      if (nRows < 2 && nCols >= 2) return 'Only one row category remains, so association tests and effect sizes are unavailable.';
+      return 'Association tests and effect sizes need at least two nonempty categories on each variable.';
+    }
+    function copyMeta(result, base) {
+      if (!result || !base) return result;
+      result.rowVar = result.rowVar || base.rowVar;
+      result.colVar = result.colVar || base.colVar;
+      result.frequencyColumn = base.frequencyColumn || null;
+      result.weightVar = base.weightVar || base.frequencyColumn || null;
+      result.frequencyWeightingApplied = !!base.frequencyWeightingApplied;
+      result.weightType = base.weightType || null;
+      result.frequencyNote = base.frequencyNote || null;
+      result.missingMode = base.missingMode;
+      result.confidence = base.confidence;
+      result.datasetTitle = base.datasetTitle;
+      if (!isFinite(result.representedN)) result.representedN = isFinite(result.N) ? result.N : 0;
+      if (!isFinite(result.inputRowCount)) result.inputRowCount = result.representedN;
+      return result;
+    }
+    function descriptiveBundle(partial, reason) {
+      var obs = partial.observed || [];
+      var rowLabels = (partial.rowLabels || []).slice();
+      var colLabels = (partial.colLabels || []).slice();
+      var rowTotals = partial.rowTotals || rowLabels.map(function (_, i) {
+        return (obs[i] || []).reduce(function (sum, v) { return sum + (Number(v) || 0); }, 0);
+      });
+      var colTotals = partial.colTotals || colLabels.map(function (_, j) {
+        return obs.reduce(function (sum, row) { return sum + (Number(row && row[j]) || 0); }, 0);
+      });
+      var N = isFinite(partial.N) ? partial.N : rowTotals.reduce(function (sum, v) { return sum + v; }, 0);
+      var rowPct = [], colPct = [], totPct = [];
+      rowLabels.forEach(function (_, i) {
+        rowPct[i] = []; colPct[i] = []; totPct[i] = [];
+        colLabels.forEach(function (_, j) {
+          var O = Number(obs[i] && obs[i][j]) || 0;
+          rowPct[i][j] = rowTotals[i] > 0 ? 100 * O / rowTotals[i] : NaN;
+          colPct[i][j] = colTotals[j] > 0 ? 100 * O / colTotals[j] : NaN;
+          totPct[i][j] = N > 0 ? 100 * O / N : NaN;
+        });
+      });
+      var next = {
+        analyzable: false,
+        descriptiveOnly: true,
+        testsAvailable: false,
+        testsReason: reason,
+        nRows: rowLabels.length,
+        nCols: colLabels.length,
+        N: N,
+        representedN: isFinite(partial.representedN) ? partial.representedN : N,
+        rowLabels: rowLabels,
+        colLabels: colLabels,
+        observed: obs,
+        rowPct: rowPct,
+        colPct: colPct,
+        totPct: totPct,
+        expected: null,
+        stdResiduals: null,
+        rowTotals: rowTotals,
+        colTotals: colTotals,
+        tests: null,
+        diagnostics: null,
+        measures2x2: null,
+        interpretation: null
+      };
+      return copyMeta(next, partial.rowVar ? partial : (baseBundle || partial));
+    }
+    function subsetCounts(base, rowLabs, colLabs) {
+      var rIndex = {}, cIndex = {};
+      (base.rowLabels || []).forEach(function (label, i) { rIndex[String(label)] = i; });
+      (base.colLabels || []).forEach(function (label, i) { cIndex[String(label)] = i; });
+      var rows = rowLabs.filter(function (label) { return rIndex[String(label)] != null; });
+      var cols = colLabs.filter(function (label) { return cIndex[String(label)] != null; });
+      var obs = rows.map(function (rl) {
+        return cols.map(function (cl) { return base.observed[rIndex[String(rl)]][cIndex[String(cl)]]; });
+      });
+      return { rows: rows, cols: cols, observed: obs };
+    }
+    function finishComputed(result) {
+      if (!result) return { empty: true };
+      var n = isFinite(result.representedN) ? result.representedN : result.N;
+      if (!(n > 0) || result.error && !(result.observed && result.rowLabels && result.rowLabels.length)) {
+        return { empty: true, result: result };
+      }
+      var nRows = result.nRows || (result.rowLabels || []).length;
+      var nCols = result.nCols || (result.colLabels || []).length;
+      if (result.analyzable && nRows >= 2 && nCols >= 2 && result.tests) {
+        result.testsAvailable = true;
+        result.descriptiveOnly = false;
+        return { empty: false, result: result };
+      }
+      if (result.observed && (result.rowLabels || []).length && (result.colLabels || []).length) {
+        return { empty: false, result: descriptiveBundle(result, testsReasonText(nRows, nCols)) };
+      }
+      return { empty: true, result: result };
+    }
+    function computeActive() {
+      var rowLabs = selectedLabels(catalogRows, includedRows);
+      var colLabs = selectedLabels(catalogCols, includedCols);
+      if (!rowLabs.length || !colLabs.length || !baseBundle) return { empty: true };
+      var result = null;
+      if (sourcePack && sourcePack.headers && sourcePack.rows && window.StatisticoContingency) {
+        var spec = Object.assign({}, sourcePack.spec || {}, {
+          rowVar: baseBundle.rowVar,
+          colVar: baseBundle.colVar,
+          frequencyColumn: freqCol(baseBundle),
+          weightVar: freqCol(baseBundle),
+          missing: baseBundle.missingMode,
+          confidence: baseBundle.confidence || 0.95,
+          rowLevels: rowLabs,
+          colLevels: colLabs
+        });
+        result = StatisticoContingency.analyze(sourcePack.headers, sourcePack.rows, spec);
+        if (baseBundle.datasetTitle) result.datasetTitle = baseBundle.datasetTitle;
+      } else if (baseBundle.observed && window.StatisticoContingency && StatisticoContingency.analyzeCounts) {
+        var sub = subsetCounts(baseBundle, rowLabs, colLabs);
+        result = StatisticoContingency.analyzeCounts(sub.observed, sub.rows, sub.cols, { confidence: baseBundle.confidence || 0.95 });
+        copyMeta(result, baseBundle);
+        result.rowVar = baseBundle.rowVar;
+        result.colVar = baseBundle.colVar;
+      } else {
+        result = baseBundle;
+      }
+      return finishComputed(result);
+    }
+    function setUpdating(on) {
+      var note = document.getElementById('analysisUpdating');
+      var body = document.getElementById('analysisBody');
+      var diag = document.getElementById('tab-diagnostics');
+      if (note) note.classList.toggle('show', !!on);
+      if (body) body.classList.toggle('ct-busy', !!on);
+      if (diag) diag.classList.toggle('ct-busy', !!on);
+      var status = document.getElementById('selectionStatus');
+      if (on && status) status.textContent = 'Updating…';
+    }
+    function scheduleRecalc() {
+      var token = ++calcToken;
+      setUpdating(true);
+      setTimeout(function () {
+        if (token !== calcToken) return;
+        var next = computeActive();
+        if (token !== calcToken) return;
+        applyActive(next);
+      }, 0);
+    }
+    function resetSelection() {
+      catalogRows.forEach(function (label) { includedRows[label] = true; });
+      catalogCols.forEach(function (label) { includedCols[label] = true; });
+      renderIncludeBar();
+      scheduleRecalc();
+    }
+    window.resetContingencySelection = resetSelection;
+    function closeCatMenus(except) {
+      document.querySelectorAll('.ct-cat-panel').forEach(function (panel) {
+        if (except && panel === except) return;
+        panel.hidden = true;
+        var btn = panel.parentNode && panel.parentNode.querySelector('.ct-cat-btn');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      });
+    }
+    function renderIncludeBar() {
+      var host = document.getElementById('includeBar');
+      if (!host || !baseBundle) return;
+      var openBtn = host.querySelector('.ct-cat-btn[aria-expanded="true"]');
+      var keepAxis = openBtn ? openBtn.getAttribute('data-axis') : '';
+      function menu(axis, title, catalog, map) {
+        var selected = selectedLabels(catalog, map).length;
+        var boxes = catalog.map(function (label) {
+          var on = map[label] !== false;
+          return '<label><input type="checkbox" data-axis="' + axis + '" data-label="' + esc(label) + '"' +
+            (on ? ' checked' : '') + '> ' + esc(label) + '</label>';
+        }).join('');
+        return '<div class="ct-cat-menu">' +
+          '<button type="button" class="ct-cat-btn" data-axis="' + axis + '" aria-expanded="false">' +
+            esc(title) + ' <span class="ct-cat-count">' + selected + '/' + catalog.length + '</span></button>' +
+          '<div class="ct-cat-panel" hidden>' + boxes + '</div></div>';
+      }
+      var activeN = bundle && isFinite(representedNOf(bundle)) ? representedNOf(bundle) : baseN;
+      host.innerHTML =
+        menu('row', 'Row categories', catalogRows, includedRows) +
+        menu('col', 'Column categories', catalogCols, includedCols) +
+        '<button type="button" class="ct-reset-btn" id="resetSelectionBtn">Reset selection</button>' +
+        '<span class="ct-selection-status" id="selectionStatus">' + esc(statusText(activeN)) + '</span>';
+      host.querySelectorAll('.ct-cat-btn').forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          var panel = btn.parentNode.querySelector('.ct-cat-panel');
+          var open = panel.hidden;
+          closeCatMenus(open ? panel : null);
+          panel.hidden = !open;
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+      });
+      host.querySelectorAll('.ct-cat-panel input').forEach(function (input) {
+        input.onchange = function () {
+          var axis = input.getAttribute('data-axis');
+          var label = input.getAttribute('data-label');
+          var map = axis === 'col' ? includedCols : includedRows;
+          map[label] = !!input.checked;
+          renderIncludeBar();
+          var still = host.querySelector('.ct-cat-btn[data-axis="' + axis + '"]');
+          if (still) {
+            var panel = still.parentNode.querySelector('.ct-cat-panel');
+            panel.hidden = false;
+            still.setAttribute('aria-expanded', 'true');
+          }
+          scheduleRecalc();
+        };
+      });
+      var reset = document.getElementById('resetSelectionBtn');
+      if (reset) reset.onclick = function () { closeCatMenus(); resetSelection(); };
+      if (keepAxis) {
+        var kept = host.querySelector('.ct-cat-btn[data-axis="' + keepAxis + '"]');
+        var keptPanel = kept && kept.parentNode.querySelector('.ct-cat-panel');
+        if (kept && keptPanel) {
+          keptPanel.hidden = false;
+          kept.setAttribute('aria-expanded', 'true');
+        }
+      }
+    }
+    function selectionSnapshot() {
+      return {
+        rowVar: baseBundle && baseBundle.rowVar,
+        colVar: baseBundle && baseBundle.colVar,
+        baseN: baseN,
+        activeN: bundle ? representedNOf(bundle) : 0,
+        retainedRowCategories: selectedLabels(catalogRows, includedRows),
+        retainedColumnCategories: selectedLabels(catalogCols, includedCols),
+        excludedRowCategories: excludedLabels(catalogRows, includedRows),
+        excludedColumnCategories: excludedLabels(catalogCols, includedCols),
+        testsAvailable: !!(bundle && bundle.testsAvailable !== false && bundle.analyzable),
+        testsReason: bundle && bundle.testsReason || null
+      };
+    }
+    function exportPrefaceLines() {
+      var snap = selectionSnapshot();
+      return [
+        'Row variable: ' + (snap.rowVar || ''),
+        'Column variable: ' + (snap.colVar || ''),
+        'Retained row categories: ' + (snap.retainedRowCategories.join(', ') || '(none)'),
+        'Retained column categories: ' + (snap.retainedColumnCategories.join(', ') || '(none)'),
+        'Excluded: ' + (exclusionPhrase() || 'none'),
+        'N: ' + fmtAnalysisN(snap.activeN) + ' of ' + fmtAnalysisN(snap.baseN)
+      ];
+    }
+
     function fmtP(p) {
       if (!(p >= 0) || !isFinite(p)) return '—';
       if (p < 0.001) return '< .001';
@@ -718,11 +1107,11 @@
     function cellValue(r, i, j, id) {
       id = id || (measureList()[0] && measureList()[0].id);
       if (id === 'observed') return fmtCount(r.observed[i][j]);
-      if (id === 'expected') return fmtN(r.expected[i][j], 2);
+      if (id === 'expected') return r.expected ? fmtN(r.expected[i][j], 2) : '—';
       if (id === 'rowPct') return fmtN(r.rowPct[i][j], 1) + '%';
       if (id === 'colPct') return fmtN(r.colPct[i][j], 1) + '%';
       if (id === 'totPct') return fmtN(r.totPct[i][j], 1) + '%';
-      return fmtN(r.stdResiduals[i][j], 2);
+      return r.stdResiduals ? fmtN(r.stdResiduals[i][j], 2) : '—';
     }
     function marginValue(r, id, kind, idx) {
       if (id === 'stdResiduals') return '';
@@ -774,16 +1163,17 @@
     function heatMax(r, mode) {
       if (mode === 'residual' || mode === 'rowPct' || mode === 'colPct' || mode === 'totPct') return 1;
       var m = 0, i, j;
-      var src = mode === 'expected' ? r.expected : r.observed;
+      var src = mode === 'expected' && r.expected ? r.expected : r.observed;
+      if (!src) return 1;
       for (i = 0; i < r.nRows; i++) {
         for (j = 0; j < r.nCols; j++) if (src[i][j] > m) m = src[i][j];
       }
       return m || 1;
     }
     function cellHeat(r, i, j, mode, maxV) {
-      if (mode === 'residual') return residColor(r.stdResiduals[i][j]);
+      if (mode === 'residual') return r.stdResiduals ? residColor(r.stdResiduals[i][j]) : 'transparent';
       var v = 0;
-      if (mode === 'observed') v = r.observed[i][j] / maxV;
+      if (mode === 'observed' || (mode === 'expected' && !r.expected)) v = r.observed[i][j] / maxV;
       else if (mode === 'expected') v = r.expected[i][j] / maxV;
       else if (mode === 'totPct') v = r.totPct[i][j] / 100;
       else if (mode === 'colPct') v = r.colPct[i][j] / 100;
@@ -800,7 +1190,7 @@
       return 'Darker = larger row %';
     }
     function cellLines(r, i, j) {
-      var sr = r.stdResiduals[i][j];
+      var sr = r.stdResiduals ? r.stdResiduals[i][j] : NaN;
       return measureList().map(function (m) {
         return {
           id: m.id,
@@ -942,11 +1332,23 @@
       sel.value = prev;
       return prev;
     }
+    function clearVizChart() {
+      if (vizChart) {
+        try { vizChart.destroy(); } catch (_d) {}
+        vizChart = null;
+      }
+      var host = document.getElementById('vizChart');
+      if (host) host.innerHTML = '';
+    }
     function renderVizChart() {
-      if (!bundle || !bundle.analyzable) return;
+      if (!bundle || !(representedNOf(bundle) > 0) || !bundle.observed) {
+        clearVizChart();
+        return;
+      }
       if (typeof Highcharts === 'undefined') return;
       bindVizControls();
       var metric = (document.getElementById('vizMetric') || {}).value || 'observed';
+      if ((metric === 'expected' && !bundle.expected) || (metric === 'stdResiduals' && !bundle.stdResiduals)) metric = 'observed';
       var typeId = (document.getElementById('vizType') || {}).value || 'column';
       var scale = (document.getElementById('vizScale') || {}).value || 'linear';
       var showLabels = !!(document.getElementById('vizLabels') && document.getElementById('vizLabels').checked);
@@ -1025,7 +1427,7 @@
       }
       var pctMetric = metric.indexOf('Pct') >= 0;
       var opts = {
-        chart: { type: hcType, backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI, sans-serif' }, animation: { duration: 280 } },
+        chart: { type: hcType, backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI, sans-serif' }, animation: false, height: 360 },
         title: { text: '' },
         credits: { enabled: false },
         xAxis: {
@@ -1049,6 +1451,7 @@
         plotOptions: {
           series: {
             stacking: stacking,
+            animation: false,
             dataLabels: {
               enabled: showLabels,
               style: { color: axis, fontSize: '10px', fontWeight: '700', textOutline: 'none' },
@@ -1084,20 +1487,22 @@
           frequencyColumn: freqCol(bundle),
           weightVar: freqCol(bundle),
           missing: bundle.missingMode,
-          confidence: bundle.confidence,
-          rowLevels: bundle.rowLabels,
-          colLevels: bundle.colLabels
+          confidence: bundle.confidence
         };
+        if (inputLevelFilter && inputLevelFilter.rowLevels) nav.spec.rowLevels = inputLevelFilter.rowLevels.slice();
+        if (inputLevelFilter && inputLevelFilter.colLevels) nav.spec.colLevels = inputLevelFilter.colLevels.slice();
         nav.rowVar = bundle.rowVar;
         nav.colVar = bundle.colVar;
-        nav.is2x2 = bundle.nRows === 2 && bundle.nCols === 2;
+        var shape = baseBundle || bundle;
+        nav.is2x2 = !!(shape && shape.analyzable && shape.nRows === 2 && shape.nCols === 2);
       }
       window.contingencyNavData = nav;
       try { sessionStorage.setItem('contingencyNavData', JSON.stringify(nav)); } catch (_e2) {}
     }
 
     function refreshSharedSidebar() {
-      window.__contingencyIs2x2 = !!(bundle && bundle.nRows === 2 && bundle.nCols === 2);
+      window.__contingencyIs2x2 = !!(bundle && bundle.analyzable && bundle.nRows === 2 && bundle.nCols === 2);
+      window.__contingencyAiDisabled = !(bundle && representedNOf(bundle) > 0);
       if (typeof StatisticoHeader === 'undefined') return;
       try { StatisticoHeader._renderSharedSidebar(); } catch (_e) {}
       try { StatisticoHeader._bindCollapsibleSidebarGroups(); } catch (_e2) {}
@@ -1105,9 +1510,9 @@
     }
 
     function switchTab(name) {
-      if (name === 'tests') name = 'overview';
+      if (name === 'tests' || name === 'overview' || name === 'table') name = 'analysis';
       if (name === 'viz' || name === 'visualization') name = 'diagnostics';
-      if (name === 'twobytwo' && !(bundle && bundle.nRows === 2 && bundle.nCols === 2)) name = 'overview';
+      if (name === 'twobytwo' && !(bundle && bundle.analyzable && bundle.nRows === 2 && bundle.nCols === 2)) name = 'analysis';
       activeTab = name;
       window.__contingencyActiveTab = name;
       document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
@@ -1194,23 +1599,26 @@
 
     function renderOverview() {
       var r = bundle;
-      var p = r.tests.pearson;
+      if (!r) return;
+      var ready = !!(r.testsAvailable !== false && r.analyzable && r.tests && r.tests.pearson);
+      var p = ready ? r.tests.pearson : null;
+      var unavailable = 'Unavailable for this selection.';
       qsHtml('overviewKpis', [
-        freqCol(r)
-          ? kpi('Cases represented', fmtAnalysisN(representedNOf(r)), 'Sum of the aggregated frequency column “' + esc(freqCol(r)) + '”. Input rows = ' + fmtAnalysisN(inputRowCountOf(r)) + '.')
-          : kpi('N', fmtAnalysisN(representedNOf(r)), 'Number of observations in the table.'),
-        freqCol(r) ? kpi('Input rows', fmtAnalysisN(inputRowCountOf(r)), 'Excel rows included after missing-value and category filters.') : '',
-        kpi('Pearson χ²', fmtN(p.stat, 2), 'Tests whether row and column variables are independent. Large values mean the counts differ from what independence would predict.'),
-        kpi('df', String(p.df), 'Degrees of freedom = (rows − 1) × (columns − 1). The chi-square curve used for the p-value has this df.'),
-        kpi('p-value', fmtP(p.p), 'Probability of a χ² at least this large if the variables were independent. Small p (e.g. &lt; 0.05) is evidence of association.'),
-        kpi("Cramér’s V", fmtN(r.tests.cramersV, 3), 'Association strength from 0 (none) to 1 (perfect). Unlike χ², V does not grow just because N is large. Rough guide: ~0.1 small, ~0.3 medium, ~0.5 large.')
+        kpi('N', fmtAnalysisN(representedNOf(r)), freqCol(r)
+          ? 'Observations retained in the current category selection. This is the sum of the frequency column “' + esc(freqCol(r)) + '”. Input rows = ' + fmtAnalysisN(inputRowCountOf(r)) + '.'
+          : 'Observations retained in the current category selection.'),
+        kpi('Pearson χ²', ready ? fmtN(p.stat, 2) : '—', ready
+          ? 'Tests whether row and column variables are independent. Large values mean the counts differ from what independence would predict.'
+          : unavailable),
+        kpi('df', ready ? String(p.df) : '—', 'Degrees of freedom = (rows − 1) × (columns − 1). The chi-square curve used for the p-value has this df.'),
+        kpi('p-value', ready ? fmtP(p.p) : '—', 'Probability of a χ² at least this large if the variables were independent. Small p (e.g. &lt; 0.05) is evidence of association.'),
+        kpi("Cramér’s V", ready ? fmtN(r.tests.cramersV, 3) : '—', 'Association strength from 0 (none) to 1 (perfect). Unlike χ², V does not grow just because N is large. Rough guide: ~0.1 small, ~0.3 medium, ~0.5 large.')
       ].join(''));
-      setWarn('overviewWarn', r.diagnostics && r.diagnostics.assumptionWarning);
-      var interp = r.interpretation || {};
-      var html = '<p>' + esc(interp.summary || '') + '</p>';
-      (interp.details || []).forEach(function (d) { html += '<p>' + esc(d) + '</p>'; });
-      if (r.frequencyNote) html += '<p>' + esc(r.frequencyNote) + '</p>';
-      qsHtml('overviewInterp', html);
+      var warn = '';
+      if (!ready && r.testsReason) warn = r.testsReason;
+      else if (r.diagnostics && r.diagnostics.assumptionWarning) warn = r.diagnostics.assumptionWarning;
+      if (r.frequencyNote) warn = warn ? (warn + ' ' + r.frequencyNote) : r.frequencyNote;
+      setWarn('overviewWarn', warn);
       renderTests();
     }
 
@@ -1291,7 +1699,9 @@
       rowSortDir = rowSortDir === 0 ? 1 : rowSortDir === 1 ? -1 : 0;
       if (rowSortDir === 0) {
         rowOrderLabels = rowOrderOriginal.slice();
+        rowOrderCustom = false;
       } else {
+        rowOrderCustom = true;
         rowOrderLabels = (bundle.rowLabels || []).slice().sort(function (a, b) {
           return naturalCompare(a, b) * rowSortDir;
         });
@@ -1326,8 +1736,8 @@
       rows.forEach(function (i, rpos) {
         html += '<tr><th class="stub row-drag" data-pos="' + rpos + '" title="Drag to reorder rows">' + esc(r.rowLabels[i]) + '</th>';
         cols.forEach(function (j) {
-          var sr = r.stdResiduals[i][j];
-          var cls = 'heat' + (stacked ? ' stacked' : '') + (hasMeasure('stdResiduals') ? ' ' + bandClass(sr) : '');
+          var sr = r.stdResiduals ? r.stdResiduals[i][j] : NaN;
+          var cls = 'heat' + (stacked ? ' stacked' : '') + (hasMeasure('stdResiduals') && r.stdResiduals ? ' ' + bandClass(sr) : '');
           var bg = cellHeat(r, i, j, mode, maxV);
           html += '<td class="' + cls + '" style="background:' + bg + ';color:' + cellInk(bg) + '" title="' + tip(r, i, j) + '">' + stackHtml(cellLines(r, i, j)) + '</td>';
         });
@@ -1398,8 +1808,11 @@
         if (!toEl) return;
         var insertAt = Number(toEl.getAttribute('data-pos'));
         if (after) insertAt += 1;
-        if (kind === 'col') colOrderLabels = moveOrder(colOrderLabels, bundle.colLabels, from, insertAt);
-        else {
+        if (kind === 'col') {
+          colOrderCustom = true;
+          colOrderLabels = moveOrder(colOrderLabels, bundle.colLabels, from, insertAt);
+        } else {
+          rowOrderCustom = true;
           rowOrderLabels = moveOrder(rowOrderLabels, bundle.rowLabels, from, insertAt);
           rowSortDir = 0;
         }
@@ -1432,14 +1845,24 @@
     function tip(r, i, j) {
       return r.rowLabels[i] + ' × ' + r.colLabels[j] +
         ' | Observed ' + fmtCount(r.observed[i][j]) +
-        ' | Expected ' + fmtN(r.expected[i][j], 2) +
+        ' | Expected ' + (r.expected ? fmtN(r.expected[i][j], 2) : '—') +
         ' | Row ' + fmtN(r.rowPct[i][j], 1) + '%' +
         ' | Col ' + fmtN(r.colPct[i][j], 1) + '%' +
         ' | Total ' + fmtN(r.totPct[i][j], 1) + '%' +
-        ' | Adjusted residual ' + fmtN(r.stdResiduals[i][j], 2);
+        ' | Adjusted residual ' + (r.stdResiduals ? fmtN(r.stdResiduals[i][j], 2) : '—');
     }
 
     function renderTests() {
+      var note = document.getElementById('testsNote');
+      if (!bundle || bundle.testsAvailable === false || !bundle.tests || !bundle.analyzable) {
+        if (note) {
+          note.hidden = false;
+          note.textContent = (bundle && bundle.testsReason) || 'Association tests and effect sizes are unavailable for this selection.';
+        }
+        qsHtml('testsWrap', '');
+        return;
+      }
+      if (note) { note.hidden = true; note.textContent = ''; }
       var t = bundle.tests;
       var rows = [
         ['Pearson chi-square', fmtN(t.pearson.stat, 3), t.pearson.df, fmtP(t.pearson.p),
@@ -1467,6 +1890,15 @@
     }
 
     function renderDiagView() {
+      if (!bundle || bundle.testsAvailable === false || !bundle.diagnostics) {
+        qsHtml('diagKpis', '');
+        setWarn('diagWarn', (bundle && bundle.testsReason) || 'Diagnostics need a table with at least two nonempty categories on each variable.');
+        qsHtml('diagModeBar', '');
+        qsHtml('heatWrap', '<p class="muted">Adjusted residuals and expected counts are unavailable for this selection. Observed counts remain on the chart when the selection still has observations.</p>');
+        var vals = document.getElementById('residWrap');
+        if (vals) { vals.style.display = 'none'; vals.innerHTML = ''; }
+        return;
+      }
       var d = bundle.diagnostics;
       qsHtml('diagKpis', [
         kpi('Cells E < 5', d.nExpectedBelow5 + ' (' + fmtN(d.pctExpectedBelow5, 1) + '%)', 'Chi-square p-values are less reliable when many expected counts are below 5. A common rule of thumb is that no more than 20% of cells should have E &lt; 5.'),
@@ -1496,7 +1928,7 @@
 
     function renderResidValues() {
       var r = bundle;
-      if (!r) return;
+      if (!r || !r.stdResiduals) return;
       var rows = rowIdxs(r);
       var cols = colIdxs(r);
       var html = '<table class="ct"><thead><tr><th class="stub"></th>';
@@ -1569,7 +2001,7 @@
           '<div class="kpi-k">' + esc(title) + (tip ? infoTip(title, tip) : '') + '</div>' +
           '<div class="kpi-v-main">' + esc(main) + '</div>' +
           (ci ? '<div class="kpi-ci">' + esc(ci) + '</div>' : '') +
-          (interp ? '<div class="kpi-interp">' + esc(interp) + '</div>' : '') +
+          '' +
           '</div>';
       }
       var cards = '';
@@ -1645,7 +2077,7 @@
 
     function renderHeat() {
       var r = bundle;
-      if (!r) return;
+      if (!r || !r.stdResiduals) return;
       var rows = rowIdxs(r);
       var cols = colIdxs(r);
       var html = '<div class="heat-grid" style="grid-template-columns:minmax(90px,1.1fr) repeat(' + cols.length + ', minmax(70px,1fr));">';
@@ -1675,14 +2107,15 @@
       var header = [r.rowVar + ' / ' + r.colVar];
       if (multi) header.push('Measure');
       header = header.concat(cols.map(function (j) { return r.colLabels[j]; })).concat(['Total']);
-      var lines = [header];
+      var lines = exportPrefaceLines().map(function (line) { return '# ' + line; });
+      lines.push(header.join('\t'));
       rows.forEach(function (i) {
         list.forEach(function (m) {
           var row = [r.rowLabels[i]];
           if (multi) row.push(m.label);
           cols.forEach(function (j) { row.push(cellValue(r, i, j, m.id)); });
           row.push(marginValue(r, m.id, 'row', i));
-          lines.push(row);
+          lines.push(row.join('\t'));
         });
       });
       list.forEach(function (m) {
@@ -1690,9 +2123,9 @@
         if (multi) row.push(m.label);
         cols.forEach(function (j2) { row.push(marginValue(r, m.id, 'col', j2)); });
         row.push(marginValue(r, m.id, 'grand', 0));
-        lines.push(row);
+        lines.push(row.join('\t'));
       });
-      return lines.map(function (row) { return row.join('\t'); }).join('\n');
+      return lines.join('\n');
     }
 
     function copyCurrentTable() {
@@ -1709,8 +2142,94 @@
       a.click();
     }
 
+    function syncOrders(labels, saved, custom, catalog) {
+      var visible = labels || [];
+      var home = (catalog && catalog.length) ? catalog : visible;
+      if (!custom) {
+        return home.filter(function (label) { return visible.indexOf(label) >= 0; });
+      }
+      var rank = {};
+      home.forEach(function (label, i) { rank[label] = i; });
+      var next = [];
+      (saved || []).forEach(function (label) {
+        if (visible.indexOf(label) >= 0 && next.indexOf(label) < 0) next.push(label);
+      });
+      visible.forEach(function (label) {
+        if (next.indexOf(label) >= 0) return;
+        var at = rank[label];
+        var insertAt = next.findIndex(function (existing) { return rank[existing] > at; });
+        if (insertAt < 0) next.push(label);
+        else next.splice(insertAt, 0, label);
+      });
+      return next;
+    }
+    function showEmptyAnalysis() {
+      testsAvailable = false;
+      bundle = {
+        analyzable: false,
+        testsAvailable: false,
+        descriptiveOnly: true,
+        testsReason: 'No observations remain in this selection.',
+        N: 0,
+        representedN: 0,
+        nRows: 0,
+        nCols: 0,
+        rowLabels: [],
+        colLabels: [],
+        observed: [],
+        tests: null,
+        diagnostics: null,
+        rowVar: baseBundle && baseBundle.rowVar,
+        colVar: baseBundle && baseBundle.colVar,
+        datasetTitle: baseBundle && baseBundle.datasetTitle
+      };
+      window.__contingencyResult = bundle;
+      window.__contingencySelection = selectionSnapshot();
+      var empty = document.getElementById('analysisEmpty');
+      var body = document.getElementById('analysisBody');
+      if (empty) empty.hidden = false;
+      if (body) body.hidden = true;
+      setWarn('overviewWarn', '');
+      setWarn('diagWarn', '');
+      qsHtml('overviewKpis', '');
+      qsHtml('tableWrap', '');
+      qsHtml('testsWrap', '');
+      qsHtml('diagKpis', '');
+      qsHtml('heatWrap', '');
+      qsHtml('residWrap', '');
+      clearVizChart();
+      document.getElementById('ctxN').textContent = '0';
+      renderIncludeBar();
+      refreshSharedSidebar();
+      setUpdating(false);
+      if (window.StatisticoHeader && StatisticoHeader.markOpenAiStale) StatisticoHeader.markOpenAiStale();
+    }
+    function applyActive(computed) {
+      setUpdating(false);
+      if (!computed || computed.empty) {
+        showEmptyAnalysis();
+        return;
+      }
+      bundle = computed.result;
+      bundle.catalogRowLabels = catalogRows.slice();
+      bundle.catalogColLabels = catalogCols.slice();
+      testsAvailable = bundle.testsAvailable !== false && !!bundle.analyzable;
+      bundle.selection = selectionSnapshot();
+      window.__contingencyResult = bundle;
+      window.__contingencySelection = bundle.selection;
+      try { sessionStorage.setItem('contingencyBundle', JSON.stringify(bundle)); } catch (_store) {}
+      var empty = document.getElementById('analysisEmpty');
+      var body = document.getElementById('analysisBody');
+      if (empty) empty.hidden = true;
+      if (body) body.hidden = false;
+      if (bundle.rowLabels) rowOrderLabels = syncOrders(bundle.rowLabels, rowOrderLabels, rowOrderCustom, catalogRows);
+      if (bundle.colLabels) colOrderLabels = syncOrders(bundle.colLabels, colOrderLabels, colOrderCustom, catalogCols);
+      vizUnweightedCache = null;
+      renderAll();
+      if (window.StatisticoHeader && StatisticoHeader.markOpenAiStale) StatisticoHeader.markOpenAiStale();
+    }
     function renderAll() {
-      if (!bundle || !bundle.analyzable) return;
+      if (!bundle) return;
       window.__contingencyResult = bundle;
       document.getElementById('ctxRow').textContent = bundle.rowVar || '—';
       document.getElementById('ctxCol').textContent = bundle.colVar || '—';
@@ -1748,6 +2267,7 @@
         if (freqSep) freqSep.style.display = 'none';
       }
       refreshSharedSidebar();
+      renderIncludeBar();
       renderOverview();
       renderMeasureBar();
       renderTable();
@@ -1780,28 +2300,45 @@
         return;
       }
       document.getElementById('errorState').classList.remove('active');
-      rowOrderLabels = (b.rowLabels || []).slice();
+      baseBundle = b;
+      b.testsAvailable = true;
+      catalogRows = (b.rowLabels || []).slice();
+      catalogCols = (b.colLabels || []).slice();
+      includedRows = {};
+      includedCols = {};
+      catalogRows.forEach(function (label) { includedRows[label] = true; });
+      catalogCols.forEach(function (label) { includedCols[label] = true; });
+      baseN = representedNOf(b);
+      captureSourceFromNav();
+      rowOrderCustom = false;
+      colOrderCustom = false;
+      rowOrderLabels = catalogRows.slice();
       rowOrderOriginal = rowOrderLabels.slice();
       rowSortDir = 0;
-      colOrderLabels = (b.colLabels || []).slice();
+      colOrderLabels = catalogCols.slice();
       vizUnweightedCache = null;
       vizWeighted = !!freqCol(b);
+      var empty = document.getElementById('analysisEmpty');
+      var body = document.getElementById('analysisBody');
+      if (empty) empty.hidden = true;
+      if (body) body.hidden = false;
+      b.catalogRowLabels = catalogRows.slice();
+      b.catalogColLabels = catalogCols.slice();
       renderAll();
       persistContingencyNav();
-      switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'overview' : (activeTab || 'overview'));
+      switchTab(activeTab === 'twobytwo' && !(b.nRows === 2 && b.nCols === 2) ? 'analysis' : (activeTab || 'analysis'));
     }
 
     function exportContingencyHtml() {
-      if (!bundle || !bundle.analyzable) {
-        alert('Run the analysis first.');
+      if (!bundle || !(representedNOf(bundle) > 0)) {
+        alert('This selection has no observations to export.');
         return;
       }
       var sections = [
-        { id: 'overview', label: 'Overview' },
-        { id: 'table', label: 'Contingency Table' },
+        { id: 'analysis', label: 'Analysis' },
         { id: 'diagnostics', label: 'Diagnostics & Visualization' }
       ];
-      if (bundle.nRows === 2 && bundle.nCols === 2) {
+      if (bundle.analyzable && bundle.nRows === 2 && bundle.nCols === 2) {
         sections.push({ id: 'twobytwo', label: '2×2 Measures' });
       }
       var subject = (bundle.rowVar || '') + ' × ' + (bundle.colVar || '');
@@ -1816,7 +2353,7 @@
           title: 'Contingency Tables Report',
           subtitle: 'Statistico Interactive',
           subject: subject,
-          description: (bundle.interpretation && bundle.interpretation.summary) || ''
+          description: statusText(representedNOf(bundle))
         }
       });
     }
@@ -1846,19 +2383,26 @@
             '<h2>' + (i + 1) + '. ' + escR(s.label) + '</h2>' +
             snapshotTabHtml(s.id) + '</section>';
         }).join('');
+        var selectionNote = '<p class="meta">' + exportPrefaceLines().map(escR).join('<br>') +
+          (bundle.frequencyNote ? '<br>' + escR(bundle.frequencyNote) : '') +
+          '<br>' + escR(new Date().toLocaleString()) + '</p>';
+        var aiHtml = '';
+        if (cover && cover.aiInterpretationPerSection && window.StatisticoHeader && StatisticoHeader._readAiCache) {
+          var aiCache = StatisticoHeader._readAiCache('overall');
+          if (!aiCache || !aiCache.sections) {
+            aiHtml = '<p class="meta">AI interpretation was requested, but none has been generated for this selection.</p>';
+          } else if (aiCache.stale) {
+            aiHtml = '<p class="meta">AI interpretation was not included because it is outdated for the current category selection.</p>';
+          } else {
+            var aiText = aiCache.sections.REPORT || aiCache.sections.CONCLUSION || '';
+            if (aiText) aiHtml = '<section><h2>AI Interpretation</h2><p>' + escR(aiText) + '</p></section>';
+          }
+        }
         var intro = (cover && cover.enabled)
-          ? '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>'
-          : '<h1>Contingency Tables Report</h1>' +
-            '<p class="meta"><strong>' + escR(bundle.rowVar) + ' × ' + escR(bundle.colVar) +
-            '</strong> &nbsp;·&nbsp; ' +
-            (freqCol(bundle)
-              ? 'Cases represented: ' + escR(fmtAnalysisN(representedNOf(bundle))) +
-                ' &nbsp;·&nbsp; Input rows: ' + escR(fmtAnalysisN(inputRowCountOf(bundle))) +
-                ' &nbsp;·&nbsp; Frequency: ' + escR(freqCol(bundle))
-              : 'N = ' + escR(fmtAnalysisN(representedNOf(bundle)))) +
-            (bundle.frequencyNote ? '<br>' + escR(bundle.frequencyNote) : '') +
-            ' &nbsp;·&nbsp; ' + escR(new Date().toLocaleString()) + '</p>' +
+          ? selectionNote + '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>'
+          : '<h1>Contingency Tables Report</h1>' + selectionNote +
             '<nav><strong>Included sections</strong><ol>' + toc + '</ol></nav>';
+        intro += aiHtml;
         var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>' +
           '<title>Contingency Tables Report</title>' +
           '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>' +
@@ -2008,7 +2552,14 @@
         },
         diagnostics: bundle.diagnostics || null,
         measures2x2: bundle.measures2x2 || null,
-        interpretation: bundle.interpretation || null
+        testsAvailable: bundle.testsAvailable !== false && !!bundle.analyzable,
+        testsUnavailableReason: bundle.testsReason || null,
+        selection: selectionSnapshot(),
+        rowLabels: bundle.rowLabels || [],
+        colLabels: bundle.colLabels || [],
+        rowTotals: bundle.rowTotals || [],
+        colTotals: bundle.colTotals || [],
+        limitations: (bundle.diagnostics && bundle.diagnostics.assumptionWarning) || bundle.testsReason || null
       };
     }
     window.buildAIPayload = buildAIPayload;
@@ -2095,9 +2646,13 @@
               var msg = JSON.parse(arg.message || '{}');
               if (msg.type === 'CONTINGENCY_BUNDLE' && msg.payload) showBundle(msg.payload);
               if (msg.type === 'CONTINGENCY_SOURCE' && msg.payload) {
+                var srcHeaders = msg.payload.headers || [];
+                var srcRows = msg.payload.rows || [];
+                var srcSpec = msg.payload.spec || {};
+                rememberSource(srcHeaders, srcRows, srcSpec);
                 persistContingencyNav({
-                  headers: msg.payload.headers || [],
-                  rows: msg.payload.rows || []
+                  headers: srcHeaders,
+                  rows: srcRows
                 });
               }
               if (msg.type === 'CONTINGENCY_VIEW_DATA' && msg.payload) {
@@ -2123,6 +2678,12 @@
       function openHelp() { if (modal) modal.classList.add('open'); }
       function closeHelp() { if (modal) modal.classList.remove('open'); }
       if (openBtn) openBtn.addEventListener('click', openHelp);
+      var emptyReset = document.getElementById('emptyResetBtn');
+      if (emptyReset) emptyReset.addEventListener('click', function () { resetSelection(); });
+      document.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('.ct-cat-menu')) return;
+        closeCatMenus();
+      });
       if (closeBtn) closeBtn.addEventListener('click', closeHelp);
       if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) closeHelp(); });
       document.addEventListener('keydown', function (e) {
@@ -2132,7 +2693,7 @@
       function schedulePaint() {
         clearTimeout(paintTimer);
         paintTimer = setTimeout(function () {
-          if (bundle && bundle.analyzable) {
+          if (bundle && bundle.observed && bundle.observed.length) {
             renderTable();
             if (activeTab === 'diagnostics') renderDiagView();
             if (activeTab === 'diagnostics') renderVizChart();

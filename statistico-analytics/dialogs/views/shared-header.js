@@ -1978,7 +1978,7 @@ const StatisticoHeader = {
 
     if (this.module === 'contingency') {
       const onByGroup = this.currentView === 'contingency-by-group';
-      const activeTab = globalThis.__contingencyActiveTab || 'overview';
+      const activeTab = globalThis.__contingencyActiveTab || 'analysis';
       const resultsFile = 'contingency/contingency-results.html';
       const resultItem = (tab, icon, label, description) => {
         if (onByGroup) {
@@ -2000,8 +2000,7 @@ const StatisticoHeader = {
         };
       };
       const resultItems = [
-        resultItem('overview', 'fa-chart-bar', 'Overview', 'N, χ², p, Cramér’s V, and tests.'),
-        resultItem('table', 'fa-table', 'Contingency Table', 'Counts, percents, adjusted residuals.'),
+        resultItem('analysis', 'fa-table', 'Analysis', 'Counts, percentages, tests, and association.'),
         resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics & Visualization', 'Residual map, expected-count checks, and charts.')
       ];
       if (globalThis.__contingencyIs2x2) {
@@ -7626,6 +7625,7 @@ const StatisticoHeader = {
 
   _sidebarAiButtonInnerHtml(busy) {
     if (busy) return '<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking…</span>';
+    if (this.module === 'contingency') return this._aiIconHtml() + '<span>AI Interpretation</span>';
     return this._aiIconHtml() + '<span>Analyze all results</span><sup class="sb-ai-sup sb-ai-sup--all">ALL</sup>';
   },
 
@@ -7637,6 +7637,9 @@ const StatisticoHeader = {
   },
 
   _sidebarAiButtonTitle() {
+    if (this.module === 'contingency') {
+      return 'Open a separate interpretation of the current contingency analysis. It is not refreshed until you ask.';
+    }
     return 'Synthesize findings, diagnostics and limitations across the complete analysis.';
   },
 
@@ -7775,6 +7778,13 @@ REPORT: [one polished paragraph suitable for a report]`;
       </button>
     `;
     footer.appendChild(aiSection);
+    if (this.module === 'contingency' && window.__contingencyAiDisabled) {
+      const aiBtn = aiSection.querySelector('#sbAiBtn');
+      if (aiBtn) {
+        aiBtn.disabled = true;
+        aiBtn.title = 'AI interpretation is unavailable because this selection has no observations.';
+      }
+    }
     }
 
     const exportWrap = document.createElement('div');
@@ -8827,6 +8837,13 @@ REPORT: [one polished paragraph suitable for a report]`;
   },
 
   _injectPerViewAiButton() {
+    if (this.module === 'contingency') {
+      const old = document.getElementById('sbAiFloatBtn');
+      if (old) old.remove();
+      const sep = document.querySelector('.header-right .sb-ai-local-sep');
+      if (sep) sep.remove();
+      return;
+    }
     if (this.module === 'reliability') return;
     if (!this._supportsInsightGuide()) return;
     if (document.getElementById('sbAiFloatBtn')) return;
@@ -8983,8 +9000,9 @@ REPORT: [one polished paragraph suitable for a report]`;
       'meta-heterogeneity': 'Heterogeneity',
       'meta-bias': 'Small-study Effects',
       'meta-studies': 'Study Details',
-      'contingency-overview': 'Overview',
-      'contingency-table': 'Contingency Table',
+      'contingency-analysis': 'Analysis',
+      'contingency-overview': 'Analysis',
+      'contingency-table': 'Analysis',
       'contingency-diagnostics': 'Diagnostics & Visualization',
       'contingency-twobytwo': '2×2 Measures',
       'contingency-by-group': 'By-Group Analysis',
@@ -9881,7 +9899,7 @@ ${this._overallAiReplyFormat()}`;
       delete compact.observed;
       delete compact.expected;
     }
-    const views = ['Overview', 'Contingency table', 'Diagnostics & visualization'];
+    const views = ['Analysis', 'Diagnostics & visualization'];
     if (compact.measures2x2) views.push('2×2 measures');
     const groupCtx = globalThis.__byGroupStandardContext;
     if (groupCtx && groupCtx.status) views.push('By Group');
@@ -9891,11 +9909,25 @@ ${this._overallAiReplyFormat()}`;
       strengthLevel: null,
       strengthNote: null
     };
+    const selection = compact.selection || {};
+    const retainedRows = (selection.retainedRowCategories || compact.rowLabels || []).join(', ') || '(none)';
+    const retainedCols = (selection.retainedColumnCategories || compact.colLabels || []).join(', ') || '(none)';
+    const excludedRows = (selection.excludedRowCategories || []).join(', ') || 'none';
+    const excludedCols = (selection.excludedColumnCategories || []).join(', ') || 'none';
+    const testsNote = compact.testsAvailable === false
+      ? ('Association tests and effect sizes are unavailable. Reason: ' + (compact.testsUnavailableReason || selection.testsReason || 'not reported') + ' Do not quote a chi-square, p-value, or effect size.')
+      : 'Use the supplied test statistics. Do not recompute them.';
     return `You are writing the overall assessment of a Statistico contingency-table analysis.
+
+This snapshot is the current category selection only.
+Row variable: ${compact.rowVar || 'rows'}. Retained row categories: ${retainedRows}. Excluded row categories: ${excludedRows}.
+Column variable: ${compact.colVar || 'columns'}. Retained column categories: ${retainedCols}. Excluded column categories: ${excludedCols}.
+Active N: ${selection.activeN != null ? selection.activeN : (compact.representedN != null ? compact.representedN : 'not reported')} of base N ${selection.baseN != null ? selection.baseN : 'not reported'}.
+${testsNote}
 
 Synthesize the association test, strength, adjusted-residual pattern, expected-count checks, 2×2 measures when present, and group consistency into one decision. This is the whole analysis, not an explanation of the tab that happens to be open.
 Do not recompute statistics. Do not invent numbers that are absent. Adjusted residuals describe cells inside the table: orange/positive means more cases than independence, blue/negative means fewer. They are not a test that groups differ.
-A |residual| around 2 is a large cell departure. Expected counts below 5 weaken the chi-square approximation.
+A |residual| around 2 is a large cell departure. Expected counts below 5 weaken the chi-square approximation. Category inclusion drops observations; it does not adjust for another variable.
 
 Views covered: ${views.join(', ')}
 
@@ -9910,6 +9942,7 @@ ${this._overallAiReplyFormat()}`;
   },
 
   async _sbAiContingencyInterpret() {
+    if (window.__contingencyAiDisabled) return;
     const btn = document.getElementById('sbAiBtn');
     const setBusy = (busy) => {
       if (!btn) return;
@@ -11692,6 +11725,9 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
 
   _aiFingerprint() {
     const bits = [this.module, this.currentView, this.variableName, this.sampleSize, this._aiRunNonce || 0];
+    if (this.module === 'contingency' && typeof window.__contingencySelectionKey === 'function') {
+      try { bits.push(String(window.__contingencySelectionKey())); } catch (_e) {}
+    }
     if (this.module === 'correlations') {
       const pair = this._getPartialSelectedPair();
       bits.push(pair ? `${pair.x}|${pair.y}` : '');
@@ -11937,6 +11973,20 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       Object.assign({}, cache.meta || {}, { stale: cache.stale, fromCache: true })
     );
     return true;
+  },
+
+  markOpenAiStale() {
+    const overlay = document.getElementById('sbAiOverlay');
+    if (!overlay) return;
+    const mode = overlay.classList.contains('sb-ai-overlay--overall') ? 'full' : 'per-view';
+    const cache = this._readAiCache(mode === 'full' ? 'overall' : 'local');
+    if (!cache || !cache.sections || !cache.stale) return;
+    this._showAiOverlay(
+      cache.sections,
+      cache.view || this.currentView,
+      mode,
+      Object.assign({}, cache.meta || {}, { stale: true, fromCache: true })
+    );
   },
 
   _refreshLastAi() {

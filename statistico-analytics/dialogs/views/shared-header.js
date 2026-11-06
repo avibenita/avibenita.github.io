@@ -8915,7 +8915,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (document.getElementById('statistico-view-guide-js')) return;
     const script = document.createElement('script');
     script.id = 'statistico-view-guide-js';
-    script.src = this.resolveDialogUrl('shared/view-guide.js?v=20261106guide');
+    script.src = this.resolveDialogUrl('shared/view-guide.js?v=20261106theme');
     const finish = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -12040,6 +12040,16 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     return textCard(cls, 'Group consistency', text, 'fa-solid fa-layer-group');
   },
 
+  _reviewedGuideForView(view) {
+    const guide = window.StatisticoViewGuide;
+    if (!guide || typeof guide.resolve !== 'function') return null;
+    try {
+      return guide.resolve({ module: this.module, key: view || this.currentView, label: '' }) || null;
+    } catch (_e) {
+      return null;
+    }
+  },
+
   _aboutThisViewHtml(sections, viewLabel, meta) {
     const allowHtml = !!meta?.ruleBased;
     const questions = (!meta?.ruleBased || meta?.includeQuestions) ? this._getQuestionsAnsweredContent() : [];
@@ -12212,6 +12222,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
       const evidence = sections.EVIDENCE;
       const checks = sections.CHECKS;
       const next = sections.NEXT || sections.ACTION;
+      const reviewedGuide = this._reviewedGuideForView(view);
       bodyHtml = `
         ${stale ? `<div class="sb-ai-stale"><i class="fa-solid fa-rotate"></i> Out of date — results changed since this interpretation was generated. <button type="button" class="sb-ai-stale-btn" data-ai-action="refresh">Update interpretation</button></div>` : ''}
         ${meta?.resultBadge ? `<div class="sb-ai-result-badge">${this._escapeAiHtml(meta.resultBadge)}</div>` : ''}
@@ -12220,13 +12231,17 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
         ${textCard('sb-ai-section--means', 'What it means', meaning)}
         ${listCard('sb-ai-section--checks', 'Checks and cautions', checks)}
         ${listCard('sb-ai-section--next', 'Suggested next step', next)}
-        ${this._aboutThisViewHtml(sections, viewLabel, meta)}
+        ${reviewedGuide ? '' : this._aboutThisViewHtml(sections, viewLabel, meta)}
       `;
     }
 
+    const reviewedGuide = mode === 'full' ? null : this._reviewedGuideForView(view);
     const footerNote = meta?.ruleBased
       ? 'Rule-based explanation of the current statistics — not an AI narrative.'
       : 'AI-generated interpretation. Verify critical decisions and domain conclusions.';
+    const guideNote = reviewedGuide
+      ? '<div class="sb-ai-guide-note">How to use and read this view is in <strong>View guide</strong>.</div>'
+      : '';
     const overlay = document.createElement('div');
     overlay.id = 'sbAiOverlay';
     overlay.className = 'sb-ai-overlay' + (mode === 'full' ? ' sb-ai-overlay--overall' : ' sb-ai-overlay--local');
@@ -12247,6 +12262,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
             <button type="button" class="sb-ai-action-btn" data-ai-action="refresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
             <span id="sbAiActionStatus" class="sb-ai-action-status" hidden></span>
           </div>
+          ${guideNote}
           <div class="sb-ai-disclaimer">${footerNote}</div>
         </div>
       </div>

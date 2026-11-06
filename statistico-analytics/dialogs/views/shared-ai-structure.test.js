@@ -54,6 +54,8 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(header).toMatch(/Checks and cautions/);
     expect(header).toMatch(/Suggested next step/);
     expect(header).toMatch(/About this view/);
+    expect(header).toMatch(/_reviewedGuideForView/);
+    expect(header).toMatch(/How to use and read this view is in/);
     expect(header).toMatch(/BOTTOMLINE:/);
     expect(header).toMatch(/Start with the current result/);
   });

@@ -377,6 +377,41 @@ function factorLevelAllowed(spec, factorName, level) {
   return map[factorName].indexOf(String(level ?? '').trim()) >= 0;
 }
 
+/* Keep a meaningful level order. Alphabetical sort turns
+   Placebo, Low, Medium, High into High, Low, Medium, Placebo.
+   Use a dose/severity scale when every level belongs to it,
+   numeric labels when every level is numeric, otherwise the
+   order the levels first appear in the data. */
+function orderFactorLevels(levels) {
+  const list = (levels || []).map(lv => String(lv));
+  const ordinalRank = {
+    none: 10, 'no treatment': 10, control: 10, ctrl: 10, placebo: 10, baseline: 10, sham: 10, vehicle: 10,
+    'very low': 20, minimal: 20, lowest: 20,
+    low: 30, 'low dose': 30, small: 30, mild: 30,
+    medium: 40, 'medium dose': 40, moderate: 40, mid: 40, intermediate: 40,
+    high: 50, 'high dose': 50, large: 50, severe: 50,
+    'very high': 60, highest: 60, extreme: 60
+  };
+  function ordinal(label) {
+    const s = String(label == null ? '' : label).trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+    return Object.prototype.hasOwnProperty.call(ordinalRank, s) ? ordinalRank[s] : null;
+  }
+  const ranks = list.map(ordinal);
+  if (list.length && ranks.every(r => r != null)) {
+    const seen = {};
+    const unique = ranks.every(r => (seen[r] ? false : (seen[r] = true)));
+    if (unique) return list.slice().sort((a, b) => ordinal(a) - ordinal(b));
+  }
+  const numeric = list.map(label => {
+    const m = String(label).trim().match(/^([-+]?\d+(?:\.\d+)?)(?:\s*[a-z%]*)?$/i);
+    return m ? parseFloat(m[1]) : null;
+  });
+  if (list.length && numeric.every(n => n != null && isFinite(n))) {
+    return list.slice().sort((a, b) => parseFloat(a) - parseFloat(b));
+  }
+  return list;
+}
+
 function buildAnovaBundle(headers, rows, spec) {
   const type = spec.type || 'one-way';  // 'one-way' | 'two-way' | 'repeated'
   const posthocMethod = spec.posthocMethod || 'tukey';
@@ -396,7 +431,7 @@ function buildAnovaBundle(headers, rows, spec) {
       if (!grouped[lv]) grouped[lv] = [];
       grouped[lv].push(v);
     });
-    const levels = Object.keys(grouped).sort();
+    const levels = orderFactorLevels(Object.keys(grouped));
 
     const anova   = oneWayAnova(grouped, levels);
     const kw      = kruskalWallis(grouped, levels);
@@ -438,7 +473,7 @@ function buildAnovaBundle(headers, rows, spec) {
       if (!cells[key]) cells[key] = [];
       cells[key].push(v);
     });
-    const aLevels = [...aSet].sort(), bLevels = [...bSet].sort();
+    const aLevels = orderFactorLevels([...aSet]), bLevels = orderFactorLevels([...bSet]);
     const anova = twoWayAnova(cells, aLevels, bLevels);
 
     /* Marginal descriptives — using groupDescriptivesFixed for full stats */

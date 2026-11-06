@@ -923,6 +923,29 @@ const StatisticoHeader = {
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
+
+  _aboutButtonLabel(moduleName) {
+    const names = {
+      univariate: 'univariate analysis',
+      correlations: 'correlation analysis',
+      regression: 'linear regression',
+      independent: 'independent means',
+      dependent: 'repeated measures',
+      logistic: 'logistic regression',
+      factor: 'factor analysis',
+      pca: 'PCA',
+      reliability: 'scale reliability',
+      cluster: 'cluster analysis',
+      anova: 'ANOVA',
+      power: 'power and sample size',
+      'mixed-model': 'the linear mixed model',
+      'meta-analysis': 'meta-analysis',
+      contingency: 'contingency tables',
+      multivariable: 'the multivariable explorer'
+    };
+    const name = names[moduleName];
+    return name ? ('About ' + name) : 'About this module';
+  },
   
   showModificationNotice() {
     let notice = document.getElementById('header-modification-notice');
@@ -8874,15 +8897,16 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (!footer || this.module === 'segmentation') return;
     if (document.getElementById('sbModuleAboutBtn')) return;
     const moduleName = this.module;
+    const aboutLabel = this._aboutButtonLabel(moduleName);
     const wrap = document.createElement('div');
     wrap.id = 'sbModuleAbout';
     wrap.className = 'sb-module-about-wrap';
     wrap.innerHTML = ''
       + '<button type="button" class="sb-module-about" id="sbModuleAboutBtn"'
       + ' aria-expanded="false" aria-controls="moduleGuideOverlay"'
-      + ' title="What this method does, when to use it, and what it cannot show.">'
+      + ' title="' + aboutLabel.replace(/"/g, '&quot;') + '">'
       + '<i class="fa-solid fa-book-open" aria-hidden="true"></i>'
-      + '<span class="sb-item-label">About this module</span>'
+      + '<span class="sb-item-label">' + aboutLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>'
       + '</button>';
     footer.appendChild(wrap);
     const btn = wrap.querySelector('#sbModuleAboutBtn');
@@ -8911,9 +8935,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     script.id = 'statistico-module-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261106about2')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261106aboutlabel')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261106about2');
+    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261106aboutlabel');
     const release = () => {
       const waiters = this._moduleGuideWaiters || [];
       this._moduleGuideWaiters = null;

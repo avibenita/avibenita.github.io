@@ -1428,11 +1428,48 @@
       return overlay;
     },
 
+    buttonLabel: function (moduleName) {
+      const names = {
+        univariate: 'univariate analysis',
+        correlations: 'correlation analysis',
+        regression: 'linear regression',
+        independent: 'independent means',
+        dependent: 'repeated measures',
+        logistic: 'logistic regression',
+        factor: 'factor analysis',
+        pca: 'PCA',
+        reliability: 'scale reliability',
+        cluster: 'cluster analysis',
+        anova: 'ANOVA',
+        power: 'power and sample size',
+        'mixed-model': 'the linear mixed model',
+        'meta-analysis': 'meta-analysis',
+        contingency: 'contingency tables',
+        multivariable: 'the multivariable explorer'
+      };
+      const name = names[moduleName];
+      return name ? ('About ' + name) : 'About this module';
+    },
+
+    paintAboutButtons: function (root) {
+      const scope = root && root.querySelectorAll ? root : document;
+      scope.querySelectorAll('.mg-launch').forEach(function (button) {
+        let moduleName = button.getAttribute('data-module');
+        if (!moduleName && (button.id === 'aboutModuleBtn' || button.id === 'aboutModuleSetup')) moduleName = 'univariate';
+        const label = StatisticoModuleGuide.buttonLabel(moduleName);
+        const span = button.querySelector('span');
+        if (span) span.textContent = label;
+        button.title = label;
+      });
+    },
+
     _render: function () {
       const overlay = this._ensureOverlay();
       const entry = this.resolve(this._activeModule);
       const title = overlay.querySelector('.mg-title');
+      const kicker = overlay.querySelector('.mg-kicker');
       const body = overlay.querySelector('.mg-body');
+      if (kicker) kicker.textContent = this.buttonLabel(this._activeModule);
       if (title) title.textContent = (entry && entry.title) || 'This module';
       if (!body) return;
       if (!entry) {
@@ -1454,4 +1491,11 @@
   };
 
   window.StatisticoModuleGuide = StatisticoModuleGuide;
+  if (document.querySelectorAll) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { StatisticoModuleGuide.paintAboutButtons(); });
+    } else {
+      StatisticoModuleGuide.paintAboutButtons();
+    }
+  }
 })();

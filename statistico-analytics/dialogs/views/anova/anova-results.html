@@ -367,17 +367,17 @@
     .sig-cell{ color:var(--col-p); font-weight:800; }
     .ns-cell { color:var(--text-muted); }
 
-    /* Error and total stay in the table at full strength */
+    /* Error and total use the same full-strength text as the effect row */
+    .error-row,
+    .total-row{
+      opacity:1;
+    }
     .error-row td,
     .total-row td{
-      color:var(--text-secondary);
-      font-size:15px;
-      font-weight:500;
-    }
-    .error-row td:first-child,
-    .total-row td:first-child{
-      color:var(--text-primary);
-      font-weight:650;
+      color:var(--text-primary) !important;
+      opacity:1 !important;
+      font-size:15px !important;
+      font-weight:700 !important;
     }
     .total-row td{ border-top:1.5px solid var(--border-mid); }
 
@@ -785,6 +785,80 @@
     :root[data-theme="light"] .assump-icon.warn{ color:#92400e; }
     .assump-text .at{ font-size:15px; font-weight:700; color:var(--text-primary); }
     .assump-text .ad{ font-size:13px; color:var(--text-muted); margin-top:4px; line-height:1.65; }
+    .assump-compact .results-panel-heading{ font-size:13px; font-weight:650; color:var(--text-secondary); }
+    .assump-compact .results-panel-body{ padding:6px 16px 8px; }
+    .assump-compact .assump-row{ gap:8px; padding:7px 0; }
+    .assump-compact .assump-icon{ width:22px; height:22px; font-size:10px; margin-top:1px; }
+    .assump-compact .assump-text .at{ font-size:13px; }
+    .assump-compact .assump-text .ad{ font-size:12px; margin-top:1px; line-height:1.4; }
+
+    /* ── Within-group spread diagnostic ─────────────────────── */
+    .spread-layout{
+      display:grid;
+      grid-template-columns:minmax(0,1.45fr) minmax(260px,.85fr);
+      gap:18px 22px;
+      align-items:start;
+    }
+    .spread-layout.spread-stats-only{ grid-template-columns:1fr; }
+    @media (max-width:900px){
+      .spread-layout{ grid-template-columns:1fr; }
+    }
+    .spread-kicker{
+      margin:0 0 6px;
+      font-size:11px; font-weight:700; letter-spacing:.06em;
+      text-transform:uppercase; color:var(--text-muted);
+    }
+    .spread-chart{ width:100%; height:380px; }
+    .spread-caption{
+      margin:2px 4px 0;
+      text-align:center;
+      font-size:12px; font-weight:500; line-height:1.45;
+      color:var(--text-muted);
+    }
+    .spread-obs-btn{
+      border:1px solid var(--border);
+      background:transparent;
+      color:var(--text-secondary);
+      font-size:12px; font-weight:700; font-family:inherit;
+      padding:5px 11px; border-radius:8px; cursor:pointer;
+      min-height:30px;
+    }
+    .spread-obs-btn:hover{ color:var(--text-primary); border-color:var(--text-muted); }
+    .spread-obs-btn.active{
+      background:rgba(94,234,212,.16);
+      border-color:rgba(94,234,212,.55);
+      color:#5eead4;
+    }
+    :root[data-theme="light"] .spread-obs-btn.active{
+      background:rgba(15,118,110,.10);
+      border-color:rgba(15,118,110,.40);
+      color:#0f766e;
+    }
+    .spread-table{ font-size:13.5px; }
+    .spread-table th, .spread-table td{ padding:8px 8px; }
+    .spread-sub{
+      display:block; margin-top:1px;
+      font-size:11px; font-weight:500; color:var(--text-muted);
+    }
+    .spread-status-row td{
+      padding-top:0; padding-bottom:12px;
+      background:transparent !important;
+      border-left:none !important;
+    }
+    .badge.badge-wrap{
+      white-space:normal; text-align:left;
+      border-radius:8px; font-size:11.5px; font-weight:700;
+      line-height:1.35; padding:4px 8px;
+    }
+    .badge-neutral{
+      background:rgba(148,163,184,.12); color:#d5deea;
+      border:1.5px solid rgba(148,163,184,.32);
+    }
+    :root[data-theme="light"] .badge-neutral{ color:#334155; border-color:rgba(100,116,139,.40); background:rgba(100,116,139,.08); }
+    .spread-note{
+      margin:4px 0 0;
+      font-size:12px; line-height:1.45; color:var(--text-secondary);
+    }
 
     /* ── Chart containers ───────────────────────────────────── */
     .chart-wrap-std{ width:100%; height:320px; }
@@ -1632,12 +1706,27 @@
 
         <!-- ── ASSUMPTIONS ───────────────────────────────────── -->
         <div class="tab-panel" id="tab-diagnostics" style="display:none;">
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-shield-halved"></i>Homogeneity of Variance</div>
-            <div class="results-panel-body" id="assumptionsBody"></div>
+          <div class="results-panel" id="panelSpread">
+            <div class="results-panel-heading">
+              <span><i class="fa-solid fa-shield-halved"></i>Homogeneity of variance</span>
+              <button type="button" id="btnSpreadObs" class="spread-obs-btn" aria-pressed="false" onclick="toggleSpreadObservations()">Show observations</button>
+            </div>
+            <div class="results-panel-body">
+              <div class="spread-layout" id="spreadLayout">
+                <div id="spreadChartCol">
+                  <div class="spread-kicker">Within-group spread</div>
+                  <div id="spreadChart" class="spread-chart"></div>
+                  <p class="spread-caption">Compare box heights and whisker lengths to assess differences in spread.</p>
+                </div>
+                <div>
+                  <div class="spread-kicker">Variance tests</div>
+                  <div id="assumptionsBody"></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-circle-info"></i>Assumption Checklist</div>
+          <div class="results-panel assump-compact">
+            <div class="results-panel-heading"><i class="fa-solid fa-circle-info"></i>Assumption checklist</div>
             <div class="results-panel-body">
               <div class="assump-row">
                 <div class="assump-icon warn"><i class="fa-solid fa-bell"></i></div>
@@ -1933,6 +2022,7 @@
   var _factorChartWhich = 'a';
   var _factorChartMode = 'bar';
   var _summaryChartMode = 'means';
+  var _spreadShowObs = false;
   var _summaryRendering = false;
   var _ixHighlight = '';
   /* Original (host-precomputed) bundle preserved for two reasons: a clean
@@ -2064,6 +2154,11 @@
         });
       }, 60);
     }
+    if (id === 'assumptions' || id === 'diagnostics') {
+      setTimeout(function () {
+        if (_bundle) { try { renderSpreadChart(_bundle); } catch (e) {} }
+      }, 60);
+    }
 
     if (id === 'power' && window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
       window.StatisticoPowerAnalysis._activeEngine.calculate(window._bundle || _bundle);
@@ -2139,6 +2234,7 @@
 
     setTimeout(function() {
       renderSummaryGroupChart(b);
+      renderSpreadChart(b);
       renderAllVisuals(b);
       renderPatternsCompare(b);
     }, 80);
@@ -2834,33 +2930,201 @@
     el.innerHTML = html;
   }
 
-  /* ── Assumptions ─────────────────────────────────────────── */
-  function populateAssumptions(b) {
-    var el    = document.getElementById('assumptionsBody');
-    var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
-    if (!b.levene) {
-      el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">Homogeneity tests are only computed for one-way ANOVA.</p>';
+  /* ── Assumptions: centered spread chart + variance tests ─ */
+  function _spreadQuantile(sorted, p) {
+    if (!sorted.length) return NaN;
+    var x = (sorted.length - 1) * p;
+    var i = Math.floor(x);
+    var f = x - i;
+    if (i >= sorted.length - 1) return sorted[sorted.length - 1];
+    return sorted[i] * (1 - f) + sorted[i + 1] * f;
+  }
+  function _spreadGroups(b) {
+    var factor = _summaryFactor(b);
+    var raw = _getRawSeriesByLevel(b, factor.col || factor.name);
+    var levels = _preferredLevelOrder(Object.keys(raw), b, factor.col || factor.name);
+    return levels.map(function (lv) {
+      var vals = (raw[lv] || []).filter(function (v) { return isFinite(v); }).map(function (v) { return +v; });
+      if (vals.length < 2) return null;
+      var mean = vals.reduce(function (s, v) { return s + v; }, 0) / vals.length;
+      var dev = vals.map(function (v) { return v - mean; });
+      var sorted = dev.slice().sort(function (a, c) { return a - c; });
+      var q1 = _spreadQuantile(sorted, 0.25);
+      var q3 = _spreadQuantile(sorted, 0.75);
+      var ss = dev.reduce(function (s, v) { return s + v * v; }, 0);
+      return {
+        level: lv,
+        n: vals.length,
+        sd: Math.sqrt(ss / (vals.length - 1)),
+        iqr: q3 - q1,
+        low: sorted[0],
+        q1: q1,
+        median: _spreadQuantile(sorted, 0.5),
+        q3: q3,
+        high: sorted[sorted.length - 1],
+        dev: dev
+      };
+    }).filter(Boolean);
+  }
+  function _varianceStatusBadge(p, alpha) {
+    if (!isFinite(p)) return '<span class="badge badge-neutral badge-wrap">—</span>';
+    if (p < alpha) return '<span class="badge badge-warn badge-wrap">Evidence of unequal variances</span>';
+    return '<span class="badge badge-neutral badge-wrap">No evidence of unequal variances</span>';
+  }
+  function _varianceTestRows(name, detail, test, alpha) {
+    if (!test) return '';
+    return '<tr>' +
+      '<td>' + name + '<span class="spread-sub">' + detail + '</span></td>' +
+      '<td class="num">' + fmt(test.F, 2) + '</td>' +
+      '<td class="num">' + test.df1 + ', ' + test.df2 + '</td>' +
+      '<td class="num ' + sigCell(test.p, alpha) + '">' + fmtP(test.p) + '</td>' +
+    '</tr>' +
+    '<tr class="spread-status-row"><td colspan="4">' + _varianceStatusBadge(test.p, alpha) + '</td></tr>';
+  }
+  function toggleSpreadObservations() {
+    _spreadShowObs = !_spreadShowObs;
+    var btn = document.getElementById('btnSpreadObs');
+    if (btn) {
+      btn.classList.toggle('active', _spreadShowObs);
+      btn.setAttribute('aria-pressed', _spreadShowObs ? 'true' : 'false');
+    }
+    if (_bundle) renderSpreadChart(_bundle);
+  }
+  function renderSpreadChart(b, attempt) {
+    var host = document.getElementById('spreadChart');
+    var panel = document.getElementById('tab-diagnostics');
+    if (!host || !b || !b.levene) return;
+    var visible = panel && panel.style.display !== 'none' && host.offsetWidth > 20;
+    if (!visible) {
+      if ((attempt || 0) < 6 && panel && (panel.classList.contains('active') || panel.style.display !== 'none')) {
+        setTimeout(function () { renderSpreadChart(b, (attempt || 0) + 1); }, 50);
+      }
       return;
     }
+    var groups = _spreadGroups(b);
+    if (!groups.length) {
+      host.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:12px;">Group values are not available for the spread chart.</p>';
+      return;
+    }
+    if (_charts.spread) { try { _charts.spread.destroy(); } catch (e) {} _charts.spread = null; }
+    var t = _visTheme();
+    var teal = _summaryTeal(t.isDark);
+    var obsColor = t.isDark ? 'rgba(94,234,212,.42)' : 'rgba(15,118,110,.45)';
+    var zero = t.isDark ? 'rgba(255,255,255,.28)' : 'rgba(15,23,42,.28)';
+    var labelStyle = { color: t.tc, fontSize: '13px', fontWeight: '600' };
+    var titleStyle = { color: t.tc, fontSize: '13px', fontWeight: '700' };
+    var obs = [];
+    if (_spreadShowObs) {
+      groups.forEach(function (g, gi) {
+        g.dev.forEach(function (v, i) {
+          var frac = ((i + 1) * 0.61803398875) % 1;
+          obs.push({ x: gi + (frac - 0.5) * 0.34, y: v });
+        });
+      });
+    }
+    _charts.spread = Highcharts.chart('spreadChart', {
+      chart: {
+        backgroundColor: 'transparent',
+        style: { fontFamily: 'Segoe UI, sans-serif' },
+        spacingTop: 16, spacingRight: 12, spacingBottom: 8, spacingLeft: 8,
+        animation: false
+      },
+      title: { text: '' },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: {
+        categories: groups.map(function (g) { return g.level; }),
+        labels: { style: labelStyle, rotation: groups.length > 8 ? -30 : 0 },
+        lineColor: teal.grid,
+        tickColor: teal.grid,
+        tickLength: 0
+      },
+      yAxis: {
+        title: { text: 'Deviation from group mean', style: titleStyle },
+        labels: { style: labelStyle },
+        gridLineColor: teal.grid,
+        plotLines: [{ value: 0, color: zero, width: 1, zIndex: 2 }]
+      },
+      plotOptions: {
+        boxplot: {
+          fillColor: teal.fill,
+          medianColor: teal.point,
+          medianWidth: 2,
+          color: teal.point,
+          lineWidth: 1.5,
+          stemColor: teal.stem,
+          whiskerColor: teal.point,
+          whiskerLength: '50%'
+        },
+        scatter: {
+          enableMouseTracking: false,
+          marker: { radius: 2.6, symbol: 'circle', lineWidth: 0, fillColor: obsColor },
+          states: { inactive: { opacity: 1 } }
+        }
+      },
+      tooltip: {
+        backgroundColor: t.isDark ? '#1e293b' : '#fff',
+        style: { color: t.isDark ? '#f1f5f9' : '#1f2937' },
+        borderRadius: 8,
+        shadow: true,
+        formatter: function () {
+          var g = groups[this.point.x];
+          if (!g || this.series.type === 'scatter') return false;
+          return '<b>' + _escHtml(g.level) + '</b><br>' +
+            'n = <b>' + g.n + '</b><br>' +
+            'SD = <b>' + (isFinite(g.sd) ? g.sd.toFixed(2) : '—') + '</b><br>' +
+            'IQR = <b>' + (isFinite(g.iqr) ? g.iqr.toFixed(2) : '—') + '</b>';
+        }
+      },
+      series: [
+        {
+          type: 'boxplot',
+          name: 'Spread',
+          data: groups.map(function (g) {
+            return { low: g.low, q1: g.q1, median: g.median, q3: g.q3, high: g.high };
+          })
+        },
+        { type: 'scatter', name: 'Observations', data: obs }
+      ]
+    });
+  }
+
+  function populateAssumptions(b) {
+    var el = document.getElementById('assumptionsBody');
+    var layout = document.getElementById('spreadLayout');
+    var chartCol = document.getElementById('spreadChartCol');
+    var obsBtn = document.getElementById('btnSpreadObs');
+    var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
+    if (!b.levene) {
+      if (layout) layout.classList.add('spread-stats-only');
+      if (chartCol) chartCol.style.display = 'none';
+      if (obsBtn) obsBtn.style.display = 'none';
+      if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">Homogeneity tests are only computed for one-way ANOVA.</p>';
+      return;
+    }
+    if (layout) layout.classList.remove('spread-stats-only');
+    if (chartCol) chartCol.style.display = '';
+    if (obsBtn) obsBtn.style.display = '';
     var lev = b.levene;
-    var bf  = b.brownForsythe;
-    var unequalVar = isFinite(lev.p) && lev.p < alpha;
+    var bf = b.brownForsythe;
+    var unequalVar = (isFinite(lev.p) && lev.p < alpha) || (bf && isFinite(bf.p) && bf.p < alpha);
 
-    /* Show smart warning in Inference tab if variances unequal */
     var warn = document.getElementById('welchWarning');
-    if (warn) warn.style.display = unequalVar ? '' : 'none';
+    if (warn) warn.style.display = (isFinite(lev.p) && lev.p < alpha) ? '' : 'none';
     var welchPanel = document.getElementById('accWelch');
-    if (welchPanel) welchPanel.classList.toggle('is-recommended', unequalVar);
+    if (welchPanel) welchPanel.classList.toggle('is-recommended', isFinite(lev.p) && lev.p < alpha);
 
+    if (!el) return;
     el.innerHTML =
-      '<table><thead><tr><th>Test</th><th class="num">F</th><th class="num">df1</th><th class="num">df2</th><th class="num">p</th><th>Verdict</th></tr></thead><tbody>' +
-      '<tr><td>Levene\'s (mean-based)</td><td class="num">' + fmt(lev.F,2) + '</td><td class="num">' + lev.df1 + '</td><td class="num">' + lev.df2 + '</td><td class="num ' + sigCell(lev.p,alpha) + '">' + fmtP(lev.p) + '</td><td>' + (lev.p >= alpha ? '<span class="badge badge-sig">Equal variances</span>' : '<span class="badge badge-warn">Unequal variances</span>') + '</td></tr>' +
-      (bf ? '<tr><td>Brown-Forsythe (median-based)</td><td class="num">' + fmt(bf.F,2) + '</td><td class="num">' + bf.df1 + '</td><td class="num">' + bf.df2 + '</td><td class="num ' + sigCell(bf.p,alpha) + '">' + fmtP(bf.p) + '</td><td>' + (bf.p >= alpha ? '<span class="badge badge-sig">Equal variances</span>' : '<span class="badge badge-warn">Unequal variances</span>') + '</td></tr>' : '') +
+      '<table class="spread-table"><thead><tr>' +
+        '<th>Test</th><th class="num">F</th><th class="num">df</th><th class="num">p</th>' +
+      '</tr></thead><tbody>' +
+      _varianceTestRows('Levene\'s', 'mean-based', lev, alpha) +
+      _varianceTestRows('Brown–Forsythe', 'median-based', bf, alpha) +
       '</tbody></table>' +
-      '<p style="margin-top:10px;font-size:12px;color:var(--text-muted);">' +
-        (unequalVar ? '⚠ Unequal variances detected. Use Welch\'s ANOVA (Results → Robust) and consider Games-Howell post-hoc.' :
-          '✓ Homogeneity of variance is supported. Standard ANOVA is appropriate.') +
-      '</p>';
+      (unequalVar
+        ? '<p class="spread-note">A variance test is below α. That is evidence of unequal variances, so a method that does not assume equal variances, such as Welch\'s ANOVA, is the safer summary.</p>'
+        : '');
   }
 
   /* ── Effect Sizes ────────────────────────────────────────── */
@@ -4309,6 +4573,7 @@
     if (_bundle) {
       setTimeout(function () {
         try { renderSummaryGroupChart(_bundle); } catch (_e0) {}
+        try { renderSpreadChart(_bundle); } catch (_eSpread) {}
         try { renderPatternsCompare(_bundle); } catch (_e) {}
         try { renderOverallHistogram(_bundle); } catch (_e2) {}
       }, 0);
@@ -5330,7 +5595,10 @@
     /* Theme change — reflow charts */
     document.addEventListener('statistico-theme-changed', function() {
       setTimeout(function() {
-        if (_bundle) { try { renderSummaryGroupChart(_bundle); } catch (e) {} }
+        if (_bundle) {
+          try { renderSummaryGroupChart(_bundle); } catch (e) {}
+          try { renderSpreadChart(_bundle); } catch (e2) {}
+        }
         Object.values(_charts).forEach(function(c) { try { c.reflow(); } catch(e){} });
       }, 100);
     });

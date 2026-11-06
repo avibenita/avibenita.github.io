@@ -16,6 +16,7 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(header).toMatch(/View guide/);
     expect(header).toMatch(/Interpret results/);
     expect(header).toMatch(/_mountUnivariateViewActions/);
+    expect(header).toMatch(/_mountViewActions/);
     expect(header).toMatch(/About this module/);
     expect(header).toMatch(/_mountModuleAboutButton/);
     expect(header).toMatch(/shared\/module-guide\.js/);

@@ -475,9 +475,13 @@
     .viz-check input { accent-color:#8b5cf6; }
     #vizChartWrap.chart-wrap { width:100%; height:380px; border-radius:10px; overflow:hidden; }
     #vizChart { width:100%; height:100%; min-height:360px; }
-    /* The page-wide border-box rule collapses Highcharts column rects, leaving only data labels. */
+    /* The page-wide border-box rule collapses Highcharts column rects, leaving only data labels.
+       Limit the override to the SVG so the tooltip cannot resize the chart under the pointer. */
     #vizChart .highcharts-container,
-    #vizChart .highcharts-container * { box-sizing:content-box; }
+    #vizChart .highcharts-container svg,
+    #vizChart .highcharts-container svg * { box-sizing:content-box; }
+    .highcharts-tooltip,
+    .highcharts-tooltip * { pointer-events:none !important; box-sizing:border-box !important; }
     .tt-map {
       display:grid; grid-template-columns:minmax(240px,1fr) auto; gap:14px 20px; align-items:start;
     }
@@ -1499,8 +1503,10 @@
         },
         tooltip: {
           shared: hcType === 'line' || hcType === 'spline' || hcType === 'area',
+          outside: true,
+          animation: false,
           backgroundColor: light ? 'rgba(255,248,230,.96)' : 'rgba(15,23,42,.95)',
-          style: { color: light ? '#1c1917' : '#e2e8f0' },
+          style: { color: light ? '#1c1917' : '#e2e8f0', pointerEvents: 'none' },
           valueDecimals: metric === 'observed' ? 0 : (pctMetric ? 1 : 2),
           valueSuffix: pctMetric && stacking !== 'percent' ? '%' : ''
         },
@@ -1508,6 +1514,11 @@
           series: {
             stacking: stacking,
             animation: false,
+            stickyTracking: false,
+            states: {
+              hover: { animation: { duration: 0 }, halo: { size: 0 } },
+              inactive: { enabled: false, opacity: 1 }
+            },
             dataLabels: {
               enabled: showLabels,
               style: { color: axis, fontSize: '10px', fontWeight: '700', textOutline: 'none' },
@@ -2817,9 +2828,13 @@
       }
       window.addEventListener('statistico:preview-template', schedulePaint);
       try {
+        // Watch the theme attribute only. Also watching `class` redraws the chart
+        // forever: each chart paint removes `preview-tpl-light`, which schedules
+        // another paint, which destroys the chart under the pointer and replaces
+        // the Heat map / Values buttons before a click can land.
         new MutationObserver(schedulePaint).observe(document.documentElement, {
           attributes: true,
-          attributeFilter: ['data-theme', 'class']
+          attributeFilter: ['data-theme']
         });
       } catch (_obs) {}
     });

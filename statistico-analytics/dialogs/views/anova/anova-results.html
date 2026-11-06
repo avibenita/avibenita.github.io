@@ -526,6 +526,106 @@
       color:#92400e;
     }
 
+    /* ── Summary: design strip, one-line result, group chart ─ */
+    .design-strip{
+      display:flex; flex-wrap:wrap; align-items:center;
+      gap:4px 0;
+      margin:0 0 12px;
+      padding:7px 12px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.025);
+      color:var(--text-secondary);
+      font-size:13px;
+      font-weight:600;
+      line-height:1.45;
+    }
+    .design-strip > span{ white-space:nowrap; }
+    .design-sep{
+      margin:0 10px;
+      color:var(--text-muted);
+      font-weight:400;
+      opacity:.65;
+    }
+    :root[data-theme="light"] .design-strip{ background:#f8fafc; }
+    .decision-line{
+      margin:0 0 12px;
+      padding:8px 14px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:transparent;
+    }
+    .decision-line.is-sig{
+      border-color:rgba(45,212,191,.32);
+      background:rgba(45,212,191,.06);
+    }
+    .decision-line.is-ns{
+      border-color:var(--border);
+      background:rgba(148,163,184,.05);
+    }
+    .decision-eq{
+      display:block;
+      font-size:14.5px;
+      font-weight:650;
+      letter-spacing:.01em;
+      color:var(--text-primary);
+      font-variant-numeric:tabular-nums;
+    }
+    .decision-line.is-ns .decision-eq{ color:var(--text-secondary); }
+    :root[data-theme="light"] .decision-line.is-sig{
+      border-color:rgba(15,118,110,.28);
+      background:rgba(15,118,110,.06);
+    }
+    .summary-chart-panel{ margin-bottom:0; }
+    .summary-chart-panel .results-panel-heading{
+      color:var(--text-primary);
+      font-weight:650;
+      background:transparent;
+    }
+    .summary-chart-body{ padding:4px 8px 12px; }
+    .chart-wrap-summary{ width:100%; height:440px; }
+    .summary-chart-foot{
+      margin:0 8px 2px;
+      font-size:12px;
+      font-weight:500;
+      color:var(--text-muted);
+      letter-spacing:.01em;
+    }
+    .chart-switch{
+      display:inline-flex;
+      padding:2px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.03);
+    }
+    .chart-switch button{
+      border:0;
+      background:transparent;
+      color:var(--text-muted);
+      font-size:12px;
+      font-weight:650;
+      font-family:inherit;
+      padding:4px 10px;
+      border-radius:6px;
+      cursor:pointer;
+    }
+    .chart-switch button:hover{ color:var(--text-primary); }
+    .chart-switch button.active{
+      background:rgba(45,212,191,.16);
+      color:#5eead4;
+    }
+    :root[data-theme="light"] .chart-switch{ background:#f8fafc; }
+    :root[data-theme="light"] .chart-switch button.active{
+      background:rgba(15,118,110,.12);
+      color:#0f766e;
+    }
+    .drill-note{
+      margin-top:8px;
+      font-size:12.5px;
+      color:var(--text-muted);
+      text-align:center;
+    }
+
     /* ── Stat cards (summary overview) ─────────────────────── */
     .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
     .stat-card{ background:var(--surface-2); border:1.5px solid var(--border); border-radius:9px; padding:13px 14px; text-align:center; }
@@ -733,7 +833,7 @@
     #drillModal.open{ display:flex; }
     #drillModal .dm-box{
       background:var(--surface-1); border:1px solid var(--border);
-      border-radius:14px; width:92%; max-width:520px; overflow:hidden;
+      border-radius:14px; width:92%; max-width:680px; overflow:hidden;
       box-shadow:0 24px 60px rgba(0,0,0,.45);
       animation: dmSlide .18s ease;
     }
@@ -1342,19 +1442,24 @@
 
         <!-- ── OVERVIEW ─────────────────────────────────────── -->
         <div class="tab-panel active" id="tab-overview" style="display:block;">
+          <div class="design-strip" id="overviewDesignStrip"></div>
           <div class="stat-grid" id="overviewCards"></div>
-          <div class="results-panel" id="panelDecision">
-            <div class="results-panel-heading">
-              <span><i class="fa-solid fa-scale-balanced"></i>Decision</span>
-              <button class="power-btn" onclick="switchTab('power')" title="Open Power &amp; Sample Size Analysis">
-                <i class="fa-solid fa-bolt"></i> Power &amp; Sample Size
-              </button>
-            </div>
-            <div class="results-panel-body" id="overviewDecisionBody"></div>
+          <div class="decision-line" id="overviewDecision">
+            <div id="overviewDecisionBody"></div>
           </div>
-          <div class="results-panel">
-            <div class="results-panel-heading"><i class="fa-solid fa-diagram-project"></i>Design</div>
-            <div class="results-panel-body" id="overviewDesignBody"></div>
+          <div class="results-panel summary-chart-panel" id="panelSummaryChart">
+            <div class="results-panel-heading">
+              <span id="summaryChartTitle">Group means</span>
+              <div class="chart-switch" role="group" aria-label="Chart display">
+                <button type="button" id="btnSummaryMeans" class="active" onclick="switchSummaryChart('means')">Means + CI</button>
+                <button type="button" id="btnSummaryBox" onclick="switchSummaryChart('box')">Box plot</button>
+              </div>
+            </div>
+            <div class="results-panel-body summary-chart-body">
+              <div class="chart-wrap-summary" id="summaryMeansChart"></div>
+              <div class="chart-wrap-summary" id="summaryBoxChart" style="display:none;"></div>
+              <div class="summary-chart-foot" id="summaryChartFoot">Select a group to explore its distribution.</div>
+            </div>
           </div>
         </div>
 
@@ -1795,6 +1900,7 @@
             </div>
             <div style="padding:10px;">
               <div id="drillChart"></div>
+              <div id="drillNote" class="drill-note"></div>
             </div>
           </div>
         </div>
@@ -1855,6 +1961,8 @@
   var _bundle   = null;
   var _factorChartWhich = 'a';
   var _factorChartMode = 'bar';
+  var _summaryChartMode = 'means';
+  var _summaryRendering = false;
   var _ixHighlight = '';
   /* Original (host-precomputed) bundle preserved for two reasons: a clean
      restore when the user clears the row filter, and access to spec /
@@ -1989,10 +2097,10 @@
     var btn = document.querySelector('.sb-item[data-tab="' + id + '"]');
     if (btn) btn.classList.add('active');
 
-    if (id === 'patterns' || id === 'visuals' || id === 'interactions') {
+    if (id === 'overview' || id === 'patterns' || id === 'visuals' || id === 'interactions') {
       setTimeout(function() {
         /* reflow all visible charts after tab becomes visible */
-        ['grpBar','grpBox','timBar','timBox','interaction','meansMini','ranksMini','overallHist'].forEach(function(k){
+        ['summaryMeans','summaryBox','grpBar','grpBox','timBar','timBox','interaction','meansMini','ranksMini','overallHist'].forEach(function(k){
           if (_charts[k]) try { _charts[k].reflow(); } catch(e){}
         });
       }, 60);
@@ -2071,6 +2179,7 @@
     populateReport(b);
 
     setTimeout(function() {
+      renderSummaryGroupChart(b);
       renderAllVisuals(b);
       renderPatternsCompare(b);
     }, 80);
@@ -2087,13 +2196,178 @@
     }
   }
 
+  /* ── Level order ───────────────────────────────────────────
+     Alphabetical sort hides a dose order such as
+     Placebo → Low → Medium → High. Prefer that scale when
+     every level belongs to it, numeric order when every
+     label is numeric, otherwise first appearance in the
+     data. Repeated-measures columns stay in the user's
+     column order. Mirrors orderFactorLevels in the engine. */
+  function _ordinalLevelOrder(list) {
+    var table = {
+      none: 10, 'no treatment': 10, control: 10, ctrl: 10, placebo: 10, baseline: 10, sham: 10, vehicle: 10,
+      'very low': 20, minimal: 20, lowest: 20,
+      low: 30, 'low dose': 30, small: 30, mild: 30,
+      medium: 40, 'medium dose': 40, moderate: 40, mid: 40, intermediate: 40,
+      high: 50, 'high dose': 50, large: 50, severe: 50,
+      'very high': 60, highest: 60, extreme: 60
+    };
+    function rank(label) {
+      var s = String(label == null ? '' : label).trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+      return Object.prototype.hasOwnProperty.call(table, s) ? table[s] : null;
+    }
+    var ranks = list.map(rank);
+    if (!list.length || ranks.some(function (r) { return r == null; })) return null;
+    var seen = {};
+    for (var i = 0; i < ranks.length; i++) {
+      if (seen[ranks[i]]) return null;
+      seen[ranks[i]] = true;
+    }
+    return list.slice().sort(function (a, b) { return rank(a) - rank(b); });
+  }
+  function _numericLevelOrder(list) {
+    var ranks = list.map(function (label) {
+      var m = String(label).trim().match(/^([-+]?\d+(?:\.\d+)?)(?:\s*[a-z%]*)?$/i);
+      return m ? parseFloat(m[1]) : null;
+    });
+    if (!list.length || ranks.some(function (n) { return n == null || !isFinite(n); })) return null;
+    return list.slice().sort(function (a, b) { return parseFloat(a) - parseFloat(b); });
+  }
+  function _appearanceOrder(bundle, factorName) {
+    var rows = (Array.isArray(_vdFiltered) && _vdFiltered.length ? _vdFiltered : _vdRows) || [];
+    var cols = Array.isArray(_vdCols) ? _vdCols : [];
+    var idx = factorName ? cols.indexOf(factorName) : -1;
+    if (!rows.length || idx < 0) return null;
+    var seen = {};
+    var order = [];
+    rows.forEach(function (r) {
+      if (!Array.isArray(r)) return;
+      var key = _normalizeLevelKey(r[idx]);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      order.push(key);
+    });
+    return order.length ? order : null;
+  }
+  function _preferredLevelOrder(levels, bundle, factorName) {
+    var list = (levels || []).map(function (lv) { return String(lv); });
+    if (bundle && bundle.type === 'repeated') return list;
+    var ordinal = _ordinalLevelOrder(list);
+    if (ordinal) return ordinal;
+    var numeric = _numericLevelOrder(list);
+    if (numeric) return numeric;
+    var appearance = _appearanceOrder(bundle, factorName);
+    if (appearance && appearance.length) {
+      var rank = {};
+      appearance.forEach(function (lv, i) { if (rank[lv] == null) rank[lv] = i; });
+      var known = list.filter(function (lv) { return rank[lv] != null; });
+      var unknown = list.filter(function (lv) { return rank[lv] == null; });
+      known.sort(function (a, b) { return rank[a] - rank[b]; });
+      return known.concat(unknown);
+    }
+    return list;
+  }
+  function _sortByLevelOrder(items, levelOf, order) {
+    var rank = {};
+    (order || []).forEach(function (lv, i) { rank[String(lv)] = i; });
+    return (items || []).slice().sort(function (a, b) {
+      var ia = rank[String(levelOf(a))];
+      var ib = rank[String(levelOf(b))];
+      if (ia == null) ia = 1e9;
+      if (ib == null) ib = 1e9;
+      return ia - ib;
+    });
+  }
+  function _orderDesc(desc, bundle, factorName) {
+    var rows = desc || [];
+    var order = _preferredLevelOrder(rows.map(function (d) { return d.level; }), bundle, factorName);
+    return _sortByLevelOrder(rows, function (d) { return d.level; }, order);
+  }
+  function _fmtAlpha(a) {
+    if (!isFinite(a)) return '—';
+    if (a > 0 && a < 1) {
+      var s = a.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+      if (s.charAt(0) === '0') s = s.slice(1);
+      return s || String(a);
+    }
+    return String(a);
+  }
+  function _fmtDf(v) {
+    if (!isFinite(v)) return '—';
+    var rounded = Math.round(v * 10) / 10;
+    if (Math.abs(rounded - Math.round(rounded)) < 1e-6) return String(Math.round(rounded));
+    return rounded.toFixed(1);
+  }
+  function _posthocLabel(method) {
+    var m = String(method || '').toLowerCase().replace(/[\s_-]+/g, '');
+    if (!m) return '';
+    if (m === 'tukey' || m === 'tukeyhsd') return 'Tukey';
+    if (m === 'games' || m === 'gameshowell') return 'Games-Howell';
+    if (m === 'bonferroni') return 'Bonferroni';
+    return String(method);
+  }
+  function _countPhrase(n, noun) {
+    n = isFinite(n) ? n : 0;
+    return n + ' ' + noun + (n === 1 ? '' : 's');
+  }
+  function _designStripHtml(b) {
+    var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
+    var dv = (b.spec && b.spec.dv) ? b.spec.dv : '—';
+    var parts = [];
+    if (b.type === 'two-way') {
+      parts.push('Two-way ANOVA');
+      parts.push('Outcome: ' + dv);
+      var nA = (b.aLevels && b.aLevels.length) || (b.descA && b.descA.length) || 0;
+      var nB = (b.bLevels && b.bLevels.length) || (b.descB && b.descB.length) || 0;
+      parts.push('Factor: ' + ((b.spec && b.spec.factor1) || 'Factor A') + ' · ' + _countPhrase(nA, 'group'));
+      parts.push('Factor: ' + ((b.spec && b.spec.factor2) || 'Factor B') + ' · ' + _countPhrase(nB, 'group'));
+    } else if (b.type === 'repeated') {
+      parts.push('Repeated-measures ANOVA');
+      parts.push('Outcome: ' + dv);
+      var nC = (b.spec && b.spec.conditions && b.spec.conditions.length) || (b.descriptives && b.descriptives.length) || 0;
+      parts.push('Within: ' + _countPhrase(nC, 'condition'));
+    } else {
+      parts.push('One-way ANOVA');
+      parts.push('Outcome: ' + dv);
+      var nG = (b.levels && b.levels.length) || (b.descriptives && b.descriptives.length) || 0;
+      parts.push('Factor: ' + ((b.spec && (b.spec.factor1 || b.spec.factor)) || 'Factor') + ' · ' + _countPhrase(nG, 'group'));
+    }
+    var ph = _posthocLabel(b.spec && b.spec.posthocMethod);
+    if (ph) parts.push('Post hoc: ' + ph);
+    parts.push('α = ' + _fmtAlpha(alpha));
+    return parts.map(function (part, i) {
+      return '<span>' + (i ? '<span class="design-sep" aria-hidden="true">│</span>' : '') + _escHtml(part) + '</span>';
+    }).join('');
+  }
+  function _primaryTest(b) {
+    if (b.type === 'two-way' && b.twoWay) {
+      return {
+        F: b.twoWay.FA, p: b.twoWay.pA, df1: b.twoWay.dfA, df2: b.twoWay.dfError,
+        lead: ((b.spec && b.spec.factor1) || 'Factor A') + ' means'
+      };
+    }
+    if (b.type === 'repeated' && b.repeated) {
+      return {
+        F: b.repeated.F, p: b.repeated.p, df1: b.repeated.dfConditions, df2: b.repeated.dfError,
+        lead: 'Condition means'
+      };
+    }
+    var a = b.oneWay || {};
+    return { F: a.F, p: a.p, df1: a.df1, df2: a.df2, lead: 'Group means' };
+  }
+
   /* ── Overview ────────────────────────────────────────────── */
   function populateOverview(b) {
-    var F     = b.oneWay ? b.oneWay.F    : (b.twoWay ? b.twoWay.FA    : (b.repeated ? b.repeated.F    : NaN));
-    var p     = b.oneWay ? b.oneWay.p    : (b.twoWay ? b.twoWay.pA    : (b.repeated ? b.repeated.p    : NaN));
+    var test  = _primaryTest(b);
+    var F     = test.F;
+    var p     = test.p;
     var eta   = b.oneWay ? b.oneWay.etaSq: (b.twoWay ? b.twoWay.etaSqA: (b.repeated ? b.repeated.etaSqP: NaN));
     var N     = b.oneWay ? b.oneWay.N    : (b.twoWay ? b.twoWay.N     : (b.repeated ? b.repeated.N    : 0));
     var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
+    var sig   = isFinite(p) && p < alpha;
+
+    var strip = document.getElementById('overviewDesignStrip');
+    if (strip) strip.innerHTML = _designStripHtml(b);
 
     document.getElementById('overviewCards').innerHTML =
       '<div class="stat-card"><div class="sv">' + fmt(F,2) + '</div><div class="sl">F Statistic</div></div>' +
@@ -2101,31 +2375,16 @@
       '<div class="stat-card"><div class="sv">' + fmt(eta,3) + '</div><div class="sl">η² <span class="stat-info-tip" title="Eta-squared effect size: the proportion of total variance explained by group differences."><i class="fa-solid fa-circle-info" aria-hidden="true"></i></span></div></div>' +
       '<div class="stat-card"><div class="sv">' + (N || '—') + '</div><div class="sl">N (total)</div></div>';
 
-    var sig = isFinite(p) && p < alpha;
+    var pText = !isFinite(p) ? 'p —' : (p < 0.001 ? 'p < .001' : ('p = ' + fmtP(p)));
+    var line = document.getElementById('overviewDecision');
+    if (line) {
+      line.classList.toggle('is-sig', sig);
+      line.classList.toggle('is-ns', !sig);
+    }
     document.getElementById('overviewDecisionBody').innerHTML =
-      '<div class="decision-hero ' + (sig ? 'is-sig' : 'is-ns') + '">' +
-        sigBadge(p, alpha) +
-        '<div class="decision-copy">' +
-          '<div class="decision-title">' + (sig ? 'Significant group difference detected' : 'No significant group difference detected') + '</div>' +
-          '<div class="decision-text">' +
-            (sig ? 'The group means differ beyond random sampling noise at the current alpha level.'
-                 : 'Any observed mean differences are consistent with random sampling variability at the current alpha level.') +
-          '</div>' +
-          '<div class="decision-meta">Observed p-value: ' + fmtP(p) + ' | alpha: ' + alpha + '</div>' +
-        '</div>' +
-      '</div>';
-
-    var typeLabel = b.type === 'one-way' ? 'One-Way ANOVA' :
-                    b.type === 'two-way' ? 'Two-Way Factorial ANOVA' : 'One-Way Repeated Measures ANOVA';
-    var rows = '<tr><td><strong>Design</strong></td><td>' + typeLabel + '</td></tr>';
-    if (b.spec && b.spec.dv)      rows += '<tr><td><strong>Dependent variable</strong></td><td>' + b.spec.dv + '</td></tr>';
-    if (b.spec && b.spec.factor1) rows += '<tr><td><strong>Factor A</strong></td><td>' + b.spec.factor1 + '</td></tr>';
-    if (b.spec && b.spec.factor2) rows += '<tr><td><strong>Factor B</strong></td><td>' + b.spec.factor2 + '</td></tr>';
-    if (b.levels)                 rows += '<tr><td><strong>Groups</strong></td><td>' + b.levels.join(', ') + '</td></tr>';
-    if (b.spec && b.spec.conditions) rows += '<tr><td><strong>Conditions</strong></td><td>' + b.spec.conditions.join(', ') + '</td></tr>';
-    if (b.spec && b.spec.posthocMethod) rows += '<tr><td><strong>Post-hoc method</strong></td><td>' + b.spec.posthocMethod + '</td></tr>';
-    rows += '<tr><td><strong>α</strong></td><td>' + alpha + '</td></tr>';
-    document.getElementById('overviewDesignBody').innerHTML = '<table><tbody>' + rows + '</tbody></table>';
+      '<span class="decision-eq">' + _escHtml(test.lead) + ' ' + (sig ? 'differ' : 'do not differ') +
+      ' · F(' + _fmtDf(test.df1) + ', ' + _fmtDf(test.df2) + ') = ' + fmt(F, 2) +
+      ' · ' + _escHtml(pText) + '</span>';
   }
 
   /* ── ANOVA Table ─────────────────────────────────────────── */
@@ -2602,7 +2861,7 @@
         '</tbody></table></div>';
     }
 
-    var desc = b.descriptives || b.descA;
+    var desc = _orderDesc(b.descriptives || b.descA || [], b, fA);
     if (!desc || !desc.length) {
       el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">No descriptive statistics available.</p>';
       return;
@@ -2611,7 +2870,7 @@
     var html = descTable(fA, desc);
     /* For two-way: also show Factor B descriptives */
     if (fB && b.descB && b.descB.length) {
-      html += descTable(fB, b.descB);
+      html += descTable(fB, _orderDesc(b.descB, b, fB));
     }
     el.innerHTML = html;
   }
@@ -3181,11 +3440,12 @@
     var useB = isTwoWay && which === 'b';
     var name = useB
       ? ((b.spec && b.spec.factor2) || 'Time')
-      : (isTwoWay ? ((b.spec && b.spec.factor1) || 'Group') : ((b.spec && b.spec.factor) || 'Group'));
+      : ((b.spec && (b.spec.factor1 || b.spec.factor)) || 'Group');
     var other = useB
       ? ((b.spec && b.spec.factor1) || 'Group')
       : ((b.spec && b.spec.factor2) || 'Time');
     var desc = useB ? (b.descB || []) : ((b.descA && b.descA.length) ? b.descA : (b.descriptives || []));
+    desc = _orderDesc(desc, b, name);
     return { name: name, other: other, desc: desc, useB: useB };
   }
 
@@ -3275,6 +3535,349 @@
     renderPatternsCompare(_bundle);
   }
 
+  function _summaryTeal(isDark) {
+    return isDark
+      ? { point: '#5eead4', stem: 'rgba(94,234,212,.88)', fill: 'rgba(94,234,212,.14)', grid: 'rgba(255,255,255,.06)', label: 'rgba(238,244,255,.92)' }
+      : { point: '#0f766e', stem: 'rgba(15,118,110,.90)', fill: 'rgba(15,118,110,.10)', grid: '#e6eef2', label: '#134e4a' };
+  }
+  function _descCi(d) {
+    if (d && isFinite(d.ciLow) && isFinite(d.ciHigh)) return { lo: d.ciLow, hi: d.ciHigh };
+    if (!d || !isFinite(d.mean) || !isFinite(d.sd) || !(d.n > 1)) return { lo: NaN, hi: NaN };
+    var se = isFinite(d.se) ? d.se : d.sd / Math.sqrt(d.n);
+    var half = _tCrit95(d.n - 1) * se;
+    return { lo: d.mean - half, hi: d.mean + half };
+  }
+  function _meanTooltipHtml(d) {
+    var ci = _descCi(d);
+    var ciText = (isFinite(ci.lo) && isFinite(ci.hi)) ? (Number(ci.lo).toFixed(2) + ' to ' + Number(ci.hi).toFixed(2)) : '—';
+    return '<span style="font-weight:700">' + _escHtml(d.level) + '</span><br>' +
+      'n = <b>' + (d && d.n != null ? d.n : '—') + '</b><br>' +
+      'SD = <b>' + (d && isFinite(d.sd) ? Number(d.sd).toFixed(2) : '—') + '</b><br>' +
+      'Mean = <b>' + (d && isFinite(d.mean) ? Number(d.mean).toFixed(2) : '—') + '</b><br>' +
+      '95% CI = <b>' + ciText + '</b>';
+  }
+  function _summaryFactor(b) {
+    if (!b) return { name: 'Group', col: 'Group', desc: [] };
+    if (b.type === 'two-way') {
+      var nameA = (b.spec && b.spec.factor1) || 'Group';
+      return { name: nameA, col: nameA, desc: _orderDesc(b.descA || [], b, nameA) };
+    }
+    if (b.type === 'repeated') {
+      return { name: 'Condition', col: '', desc: (b.descriptives || []).slice() };
+    }
+    var name = (b.spec && (b.spec.factor1 || b.spec.factor)) || 'Group';
+    return { name: name, col: name, desc: _orderDesc(b.descriptives || b.descA || [], b, name) };
+  }
+  function _placeMeanLabels(chart, desc, color) {
+    if (!chart || !chart.series || !chart.series[1] || !chart.yAxis || !chart.yAxis[0]) return;
+    var series = chart.series[1];
+    series.points.forEach(function (pt) {
+      var d = _descByPoint(desc, pt);
+      if (!pt || !d || !isFinite(d.mean) || !isFinite(pt.plotX)) return;
+      var text = Number(d.mean).toFixed(2);
+      if (!pt._meanLabel) {
+        pt._meanLabel = chart.renderer.text(text, 0, 0)
+          .css({ color: color, fontSize: '13px', fontWeight: '700', fontFamily: 'Segoe UI, sans-serif' })
+          .attr({ align: 'center', zIndex: 6 })
+          .add();
+      } else if (pt._meanLabel.textStr !== text) {
+        pt._meanLabel.attr({ text: text });
+      }
+      var ci = _descCi(d);
+      var yVal = isFinite(ci.hi) ? ci.hi : d.mean;
+      var yPx = chart.yAxis[0].toPixels(yVal, false);
+      pt._meanLabel.attr({ x: pt.plotX + chart.plotLeft, y: yPx - 6 });
+    });
+  }
+  function _summaryTooltip(isDark) {
+    return {
+      backgroundColor: isDark ? '#1e293b' : '#fff',
+      style: { color: isDark ? '#f1f5f9' : '#1f2937', fontSize: '13px' },
+      borderRadius: 8,
+      shadow: true,
+      useHTML: true
+    };
+  }
+  function _applySummaryMode() {
+    var meansEl = document.getElementById('summaryMeansChart');
+    var boxEl = document.getElementById('summaryBoxChart');
+    var btnM = document.getElementById('btnSummaryMeans');
+    var btnB = document.getElementById('btnSummaryBox');
+    if (meansEl) meansEl.style.display = _summaryChartMode === 'means' ? '' : 'none';
+    if (boxEl) boxEl.style.display = _summaryChartMode === 'box' ? '' : 'none';
+    if (btnM) btnM.classList.toggle('active', _summaryChartMode === 'means');
+    if (btnB) btnB.classList.toggle('active', _summaryChartMode === 'box');
+  }
+  function switchSummaryChart(mode) {
+    _summaryChartMode = mode === 'box' ? 'box' : 'means';
+    _applySummaryMode();
+    var key = _summaryChartMode === 'box' ? 'summaryBox' : 'summaryMeans';
+    if (!_charts[key] && _bundle && !_summaryRendering) {
+      renderSummaryGroupChart(_bundle);
+      return;
+    }
+    setTimeout(function () {
+      var c = _charts[key];
+      if (c) try { c.reflow(); } catch (e) {}
+    }, 40);
+  }
+  function _descByPoint(desc, point) {
+    var name = point && point.category != null ? point.category : (point ? point.x : '');
+    for (var i = 0; i < desc.length; i++) {
+      if (String(desc[i].level) === String(name)) return desc[i];
+    }
+    return desc[point && point.index] || null;
+  }
+  function renderSummaryGroupChart(b, attempt) {
+    var meansEl = document.getElementById('summaryMeansChart');
+    var boxEl = document.getElementById('summaryBoxChart');
+    var titleEl = document.getElementById('summaryChartTitle');
+    var foot = document.getElementById('summaryChartFoot');
+    if (!meansEl || !b) return;
+    var view = _summaryFactor(b);
+    var desc = view.desc || [];
+    var t = _visTheme();
+    var teal = _summaryTeal(t.isDark);
+    var dv = (b.spec && b.spec.dv) || 'Outcome';
+    if (titleEl) titleEl.textContent = view.name || 'Group means';
+    if (foot) foot.style.display = desc.length ? '' : 'none';
+    _applySummaryMode();
+    var host = _summaryChartMode === 'box' ? boxEl : meansEl;
+    var overview = document.getElementById('tab-overview');
+    var overviewOpen = overview && overview.style.display !== 'none';
+    if (host && desc.length && overviewOpen && host.offsetWidth < 20 && (attempt || 0) < 5) {
+      setTimeout(function () { renderSummaryGroupChart(b, (attempt || 0) + 1); }, 50);
+      return;
+    }
+    _summaryRendering = true;
+    if (_charts.summaryMeans) { try { _charts.summaryMeans.destroy(); } catch (_e) {} _charts.summaryMeans = null; }
+    if (_charts.summaryBox) { try { _charts.summaryBox.destroy(); } catch (_e2) {} _charts.summaryBox = null; }
+    if (!desc.length) {
+      _summaryRendering = false;
+      meansEl.innerHTML = '<div class="patterns-empty">Group means appear when descriptive statistics are available.</div>';
+      if (boxEl) boxEl.innerHTML = '';
+      return;
+    }
+    var cats = desc.map(function (d) { return String(d.level); });
+    var clickLevel = function () {
+      var d = _descByPoint(desc, this);
+      if (d) openGroupDistribution(d.level, b);
+    };
+    try {
+    if (_summaryChartMode !== 'box') {
+      _charts.summaryMeans = Highcharts.chart('summaryMeansChart', {
+        chart: {
+          backgroundColor: 'transparent',
+          style: { fontFamily: 'Segoe UI, sans-serif' },
+          spacingTop: 28, spacingRight: 28, spacingBottom: 12, spacingLeft: 8,
+          animation: { duration: 360 },
+          events: { render: function () { _placeMeanLabels(this, desc, teal.label); } }
+        },
+        title: { text: '' },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: {
+          categories: cats,
+          title: { text: view.name, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc), rotation: cats.length > 8 ? -30 : 0 },
+          lineColor: teal.grid,
+          tickColor: teal.grid,
+          tickLength: 0
+        },
+        yAxis: {
+          title: { text: 'Mean ' + dv, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc) },
+          gridLineColor: teal.grid,
+          gridLineWidth: 1,
+          maxPadding: 0.22,
+          minPadding: 0.12
+        },
+        plotOptions: {
+          errorbar: {
+            color: teal.stem,
+            stemWidth: 1.6,
+            whiskerWidth: 1.6,
+            whiskerLength: 12,
+            lineWidth: 1.6,
+            cursor: 'pointer',
+            point: { events: { click: clickLevel } }
+          },
+          scatter: {
+            cursor: 'pointer',
+            marker: { symbol: 'circle', radius: 7, lineWidth: 0, fillColor: teal.point },
+            point: { events: { click: clickLevel } }
+          }
+        },
+        tooltip: Object.assign(_summaryTooltip(t.isDark), {
+          formatter: function () {
+            var d = _descByPoint(desc, this.point);
+            return d ? _meanTooltipHtml(d) : false;
+          }
+        }),
+        series: [
+          {
+            type: 'errorbar',
+            name: '95% CI',
+            zIndex: 1,
+            data: desc.map(function (d) {
+              var ci = _descCi(d);
+              return (isFinite(ci.lo) && isFinite(ci.hi)) ? { low: ci.lo, high: ci.hi } : null;
+            })
+          },
+          {
+            type: 'scatter',
+            name: 'Mean',
+            zIndex: 2,
+            color: teal.point,
+            data: desc.map(function (d) { return isFinite(d.mean) ? d.mean : null; })
+          }
+        ]
+      });
+    }
+    if (_summaryChartMode === 'box' && boxEl) {
+      _charts.summaryBox = Highcharts.chart('summaryBoxChart', {
+        chart: {
+          type: 'boxplot',
+          backgroundColor: 'transparent',
+          style: { fontFamily: 'Segoe UI, sans-serif' },
+          spacingTop: 24, spacingRight: 28, spacingBottom: 12, spacingLeft: 8,
+          animation: { duration: 360 }
+        },
+        title: { text: '' },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: {
+          categories: cats,
+          title: { text: view.name, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc), rotation: cats.length > 8 ? -30 : 0 },
+          lineColor: teal.grid,
+          tickColor: teal.grid,
+          tickLength: 0
+        },
+        yAxis: {
+          title: { text: dv, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc) },
+          gridLineColor: teal.grid
+        },
+        plotOptions: {
+          boxplot: {
+            fillColor: teal.fill,
+            medianColor: teal.point,
+            medianWidth: 2,
+            color: teal.point,
+            lineWidth: 1.5,
+            stemColor: teal.stem,
+            whiskerColor: teal.point,
+            whiskerLength: '50%',
+            cursor: 'pointer',
+            point: { events: { click: clickLevel } }
+          }
+        },
+        series: [{
+          name: 'Distribution',
+          data: _descToBoxData(desc)
+        }],
+        tooltip: Object.assign(_summaryTooltip(t.isDark), {
+          formatter: function () {
+            var d = _descByPoint(desc, this.point);
+            var p = this.point;
+            if (!d) return false;
+            return _meanTooltipHtml(d) +
+              '<br>Min = <b>' + fmt(p.low, 2) + '</b>' +
+              '<br>Q1 = <b>' + fmt(p.q1, 2) + '</b>' +
+              '<br>Median = <b>' + fmt(p.median, 2) + '</b>' +
+              '<br>Q3 = <b>' + fmt(p.q3, 2) + '</b>' +
+              '<br>Max = <b>' + fmt(p.high, 2) + '</b>';
+          }
+        })
+      });
+    }
+    } finally {
+      _summaryRendering = false;
+    }
+  }
+  function _setDrillNote(text) {
+    var note = document.getElementById('drillNote');
+    if (note) note.textContent = text || '';
+  }
+  function _valuesForGroup(b, level, factorName) {
+    var rows = (Array.isArray(_vdFiltered) && _vdFiltered.length ? _vdFiltered : _vdRows) || [];
+    var cols = Array.isArray(_vdCols) ? _vdCols : [];
+    if (b && b.type === 'repeated') {
+      var condIdx = cols.indexOf(String(level));
+      if (condIdx >= 0 && rows.length) {
+        return rows.map(function (r) { return Array.isArray(r) ? parseFloat(r[condIdx]) : NaN; }).filter(function (v) { return isFinite(v); });
+      }
+    }
+    var series = _getRawSeriesByLevel(b, factorName);
+    var key = _normalizeLevelKey(level);
+    return (series && series[key]) ? series[key].slice() : [];
+  }
+  function openGroupDistribution(level, b) {
+    b = b || _bundle;
+    if (!b) return;
+    var view = _summaryFactor(b);
+    var desc = (view.desc || []).filter(function (d) { return String(d.level) === String(level); })[0];
+    var vals = _valuesForGroup(b, level, view.col);
+    var t = _visTheme();
+    var teal = _summaryTeal(t.isDark);
+    var dv = (b.spec && b.spec.dv) || 'Outcome';
+    document.getElementById('drillTitle').textContent = level + ' — distribution';
+    document.getElementById('drillModal').classList.add('open');
+    var note = '';
+    if (desc) {
+      note = 'n = ' + (desc.n != null ? desc.n : '—') +
+        ' · mean ' + (isFinite(desc.mean) ? Number(desc.mean).toFixed(2) : '—') +
+        ' · SD ' + (isFinite(desc.sd) ? Number(desc.sd).toFixed(2) : '—');
+    }
+    _setDrillNote(note);
+    setTimeout(function () {
+      if (_charts.drill) { try { _charts.drill.destroy(); } catch (e) {} _charts.drill = null; }
+      var host = document.getElementById('drillChart');
+      var hist = _histogramBins(vals);
+      if (!hist || !host) {
+        if (host) host.innerHTML = '<div class="patterns-empty">This group’s raw values are not available yet.</div>';
+        return;
+      }
+      _charts.drill = Highcharts.chart('drillChart', {
+        chart: {
+          type: 'column',
+          backgroundColor: 'transparent',
+          style: { fontFamily: 'Segoe UI, sans-serif' },
+          spacingTop: 12,
+          spacingBottom: 4,
+          animation: false
+        },
+        title: { text: '' },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: {
+          categories: hist.categories,
+          title: { text: dv, style: _axisTitleStyle(t.tc) },
+          labels: {
+            style: { color: t.tc, fontSize: '11px', fontWeight: '600' },
+            step: hist.categories.length > 10 ? 2 : 1,
+            rotation: hist.categories.length > 6 ? -40 : 0
+          },
+          lineColor: teal.grid,
+          tickColor: teal.grid
+        },
+        yAxis: {
+          title: { text: 'Count', style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc) },
+          gridLineColor: teal.grid,
+          allowDecimals: false
+        },
+        plotOptions: { column: { color: teal.point, borderWidth: 0, borderRadius: 2, groupPadding: 0, pointPadding: 0.06 } },
+        series: [{ name: 'Count', data: hist.counts }],
+        tooltip: Object.assign(_summaryTooltip(t.isDark), {
+          headerFormat: '',
+          pointFormat: '<b>{point.category}</b><br>Count: <b>{point.y}</b>'
+        })
+      });
+    }, 40);
+  }
+
   /* ── Main entry: render all visuals panels ── */
   function renderAllVisuals(b) {
     var t = _visTheme();
@@ -3352,6 +3955,7 @@
 
   /* ── Drill-down: click a Group bar → show times for that group ── */
   function openDrillGroups(groupLevel, b) {
+    _setDrillNote('');
     var f1 = (b.spec && b.spec.factor1) || 'Group';
     var f2 = (b.spec && b.spec.factor2) || 'Time';
     var dv = (b.spec && b.spec.dv) || 'Mean';
@@ -3479,7 +4083,10 @@
     var means = view.desc || [];
     var rankFactor = (b.spec && (b.spec.factor1 || b.spec.factor)) || 'Group';
     var rawSeriesByLevel = _getRawSeriesByLevel(b, factor);
-    var ranks = (b.kruskalWallis && Array.isArray(b.kruskalWallis.meanRanks)) ? b.kruskalWallis.meanRanks : [];
+    var ranks = (b.kruskalWallis && Array.isArray(b.kruskalWallis.meanRanks)) ? b.kruskalWallis.meanRanks.slice() : [];
+    if (means.length && ranks.length) {
+      ranks = _sortByLevelOrder(ranks, function (r) { return r.level; }, means.map(function (d) { return d.level; }));
+    }
     var meansTitle = document.getElementById('meansCardTitle');
     if (meansTitle) meansTitle.textContent = 'Means by ' + factor;
 
@@ -3568,6 +4175,7 @@
 
   /* ── Drill-down: click a Time bar → show groups for that time ── */
   function openDrillTimes(timeLevel, b) {
+    _setDrillNote('');
     var f1 = (b.spec && b.spec.factor1) || 'Group';
     var f2 = (b.spec && b.spec.factor2) || 'Time';
     var dv = (b.spec && b.spec.dv) || 'Mean';
@@ -3612,6 +4220,7 @@
   /* ── close drill modal ── */
   function closeDrill() {
     document.getElementById('drillModal').classList.remove('open');
+    _setDrillNote('');
   }
 
   /* ── openRowChart: called from ANOVA table chart buttons ──────
@@ -3620,6 +4229,7 @@
             'AB' → interaction line chart
   ── */
   function openRowChart(type) {
+    _setDrillNote('');
     var b = _bundle;
     if (!b) return;
     var t  = _visTheme();
@@ -3739,6 +4349,7 @@
     // histogram sparklines can be computed per level.
     if (_bundle) {
       setTimeout(function () {
+        try { renderSummaryGroupChart(_bundle); } catch (_e0) {}
         try { renderPatternsCompare(_bundle); } catch (_e) {}
         try { renderOverallHistogram(_bundle); } catch (_e2) {}
       }, 0);
@@ -4763,6 +5374,7 @@
     /* Theme change — reflow charts */
     document.addEventListener('statistico-theme-changed', function() {
       setTimeout(function() {
+        if (_bundle) { try { renderSummaryGroupChart(_bundle); } catch (e) {} }
         Object.values(_charts).forEach(function(c) { try { c.reflow(); } catch(e){} });
       }, 100);
     });

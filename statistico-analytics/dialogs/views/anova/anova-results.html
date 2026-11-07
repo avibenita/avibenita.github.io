@@ -2853,7 +2853,8 @@
       var aName = ends.a ? ends.a.level : '';
       var bName = ends.b ? ends.b.level : '';
       var title = (aName && bName) ? (aName + ' − ' + bName) : String(r.comparison || '').replace(/\s+vs\s+/i, ' − ');
-      return { i: i, title: title, diff: r.diff, lo: ci.lo, hi: ci.hi, kind: ci.kind || 'Tukey', p: p, selected: i === view.index };
+      var sig = isFinite(p) && p < (view.alpha || 0.05);
+      return { i: i, title: title, diff: r.diff, lo: ci.lo, hi: ci.hi, kind: ci.kind || 'Tukey', p: p, sig: sig, selected: i === view.index };
     });
   }
   function _cmpDiffScale(items) {
@@ -2964,7 +2965,7 @@
       var yPx = chart.yAxis[0].toPixels(outer, false);
       lbl.css({ color: c.selected ? hot : mute });
       lbl.attr({
-        text: _signedDiff(c.diff),
+        text: _signedDiff(c.diff) + (c.sig ? ' *' : ''),
         x: pt.plotX + chart.plotLeft,
         y: c.diff >= 0 ? yPx - 4 : yPx + 14
       });
@@ -2988,20 +2989,20 @@
     var zero = t.isDark ? 'rgba(255,255,255,.38)' : 'rgba(15,23,42,.38)';
     var band = t.isDark ? 'rgba(94,234,212,.10)' : 'rgba(15,118,110,.10)';
     var grid = t.isDark ? 'rgba(255,255,255,.06)' : '#e6eef2';
+    var whisker = t.isDark ? '#f8fafc' : '#111827';
     var customOf = function (it) {
-      return { i: it.i, title: it.title, diff: it.diff, lo: it.lo, hi: it.hi, kind: it.kind, p: it.p, selected: it.selected };
+      return { i: it.i, title: it.title, diff: it.diff, lo: it.lo, hi: it.hi, kind: it.kind, p: it.p, sig: it.sig, selected: it.selected };
     };
     var errData = items.map(function (it) {
-      var color = _cmpBarColor(it.selected, t.isDark);
       return (isFinite(it.lo) && isFinite(it.hi))
-        ? { low: it.lo, high: it.hi, color: color, custom: customOf(it) }
+        ? { low: it.lo, high: it.hi, color: whisker, custom: customOf(it) }
         : { low: null, high: null, custom: customOf(it) };
     });
     var colData = items.map(function (it) {
       return { y: isFinite(it.diff) ? it.diff : null, color: _cmpBarColor(it.selected, t.isDark), custom: customOf(it) };
     });
     var xAxis = {
-      categories: items.map(function (it) { return it.title; }),
+      categories: items.map(function (it) { return it.sig ? (it.title + ' *') : it.title; }),
       lineColor: grid,
       tickLength: 0,
       labels: {
@@ -3076,15 +3077,16 @@
           point: { events: { click: pick } }
         },
         errorbar: {
-          stemWidth: 1.6,
-          whiskerWidth: 1.6,
-          whiskerLength: 10,
+          color: whisker,
+          stemWidth: 2,
+          whiskerWidth: 2,
+          whiskerLength: 12,
           point: { events: { click: pick } }
         }
       },
       series: [
-        { type: 'errorbar', name: '95% CI', zIndex: 3, data: errData },
-        { type: 'column', name: 'Difference', zIndex: 2, data: colData }
+        { type: 'errorbar', name: '95% CI', zIndex: 6, color: whisker, data: errData },
+        { type: 'column', name: 'Difference', zIndex: 1, data: colData }
       ]
     });
   }

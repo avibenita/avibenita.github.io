@@ -173,7 +173,7 @@
     #tab-posthoc > .stat-panel{flex:1 1 0;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
     #tab-posthoc .posthoc-body{flex:1 1 0;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:8px 12px 10px!important;}
     .posthoc-body-top{flex:0 0 auto;}
-    .posthoc-body-scroll{flex:1 1 0;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;}
+    .posthoc-body-scroll{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;}
     .posthoc-body-foot{flex:0 0 auto;padding-top:8px;}
     .posthoc-body-foot .posthoc-interpret + .posthoc-note{margin-top:6px;}
     #posthocTableWrap.table-container{max-height:none!important;margin:0!important;overflow:visible;}
@@ -303,8 +303,9 @@
     #setPosthocWrap,#setCorrectionWrap{min-width:180px;max-width:220px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
     #setPosthocWrap label,#setCorrectionWrap label{white-space:nowrap;line-height:1;margin-bottom:0;font-size:11px;}
     #setPosthocMethod,#setPosthocCorrection{height:34px;min-width:150px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:13px;font-weight:500;cursor:pointer;}
-    .posthoc-stage{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.85fr);gap:12px;align-items:start;}
-    .pair-inspector{background:#121820;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;min-width:0;}
+    .posthoc-stage{flex:1 1 0;min-height:0;overflow:hidden;display:grid;grid-template-columns:minmax(0,1.45fr) minmax(220px,300px);grid-template-rows:minmax(0,1fr);gap:12px;}
+    .posthoc-stage>.posthoc-body-scroll,.posthoc-stage>.pair-inspector{min-height:0;max-height:100%;overflow:auto;}
+    .pair-inspector{background:#121820;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;min-width:0;box-sizing:border-box;}
     .pair-inspector-kicker{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);}
     .pair-inspector-title{font-size:16px;font-weight:750;margin:2px 0 8px;color:var(--text-primary);}
     .pair-inspector-charts{display:grid;gap:8px;}
@@ -1032,11 +1033,11 @@
                 <div class="pair-inspector-charts">
                   <div>
                     <div class="pair-inspector-label">Shared scale</div>
-                    <svg id="pairSpread" viewBox="0 0 280 128" role="img" aria-label="Selected groups on a shared measurement scale"></svg>
+                    <svg id="pairSpread" viewBox="0 0 300 156" role="img" aria-label="Selected groups on a shared measurement scale"></svg>
                   </div>
                   <div>
                     <div class="pair-inspector-label">Contrast, zero at the center</div>
-                    <svg id="pairContrast" viewBox="0 0 280 128" role="img" aria-label="Selected contrast and its interval"></svg>
+                    <svg id="pairContrast" viewBox="0 0 300 112" role="img" aria-label="Selected contrast and its interval"></svg>
                   </div>
                 </div>
                 <p id="pairInspectorStat"></p>
@@ -3091,52 +3092,78 @@
       });
       return m > 0 ? m * 1.15 : 1;
     }
-    function svgText(x, y, text, fill) {
+    function svgText(x, y, text, fill, anchor) {
       var safe = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-      return '<text x="' + x + '" y="' + y + '" fill="' + (fill || "#94a3b8") + '" font-size="11" font-family="inherit">' + safe + '</text>';
+      return '<text x="' + x + '" y="' + y + '" fill="' + (fill || "#94a3b8") + '" font-size="11" font-family="inherit" text-anchor="' + (anchor || "start") + '">' + safe + '</text>';
+    }
+    function fiveNumber(values) {
+      var s = values.slice().sort(function(a, b){ return a - b; });
+      function at(p) {
+        var i = (s.length - 1) * p;
+        var lo = Math.floor(i), hi = Math.ceil(i);
+        if (lo === hi) return s[lo];
+        return s[lo] * (hi - i) + s[hi] * (i - lo);
+      }
+      return { min: s[0], q1: at(0.25), med: at(0.5), q3: at(0.75), max: s[s.length - 1] };
     }
     function drawPairSpread(svg, nameA, a, nameB, b) {
+      svg.setAttribute("viewBox", "0 0 300 156");
       if (!a.length || !b.length) {
-        svg.innerHTML = svgText(12, 64, "Distribution unavailable without the original observations.");
+        svg.innerHTML = svgText(12, 78, "Distribution unavailable without the original observations.");
         return;
       }
       var vals = a.concat(b);
       var lo = Math.min.apply(null, vals);
       var hi = Math.max.apply(null, vals);
-      if (lo === hi) { lo -= 1; hi += 1; }
-      var pad = 16;
-      function xOf(v) { return pad + ((v - lo) / (hi - lo)) * (280 - pad * 2); }
-      var dots = a.map(function(v, i) {
-        return '<circle cx="' + xOf(v) + '" cy="' + (42 + (i % 5) * 3) + '" r="3.5" fill="' + groupColor(nameA) + '"/>';
-      }).join("") + b.map(function(v, i) {
-        return '<circle cx="' + xOf(v) + '" cy="' + (84 + (i % 5) * 3) + '" r="3.5" fill="' + groupColor(nameB) + '"/>';
-      }).join("");
-      svg.innerHTML = '<line x1="' + pad + '" y1="110" x2="' + (280 - pad) + '" y2="110" stroke="rgba(255,255,255,.2)"/>'
-        + svgText(8, 24, nameA + "  n=" + a.length, groupColor(nameA))
-        + svgText(8, 70, nameB + "  n=" + b.length, groupColor(nameB))
-        + dots
-        + svgText(pad, 124, fmt(lo))
-        + svgText(220, 124, fmt(hi));
+      var pad = (hi - lo) * 0.04 || 1;
+      lo -= pad; hi += pad;
+      var x0 = 46, x1 = 292;
+      function xOf(v) { return x0 + ((v - lo) / (hi - lo)) * (x1 - x0); }
+      function lane(name, values, y, color) {
+        var q = fiveNumber(values);
+        var rug = values.map(function(v) {
+          return '<line x1="' + xOf(v) + '" y1="' + (y + 16) + '" x2="' + xOf(v) + '" y2="' + (y + 24) + '" stroke="' + color + '" stroke-opacity="0.35"/>';
+        }).join("");
+        return svgText(4, y - 10, name, color)
+          + svgText(4, y + 2, "n=" + values.length, "#94a3b8")
+          + '<line x1="' + xOf(q.min) + '" y1="' + y + '" x2="' + xOf(q.max) + '" y2="' + y + '" stroke="' + color + '" stroke-width="1.5"/>'
+          + '<line x1="' + xOf(q.min) + '" y1="' + (y - 6) + '" x2="' + xOf(q.min) + '" y2="' + (y + 6) + '" stroke="' + color + '"/>'
+          + '<line x1="' + xOf(q.max) + '" y1="' + (y - 6) + '" x2="' + xOf(q.max) + '" y2="' + (y + 6) + '" stroke="' + color + '"/>'
+          + '<rect x="' + xOf(q.q1) + '" y="' + (y - 8) + '" width="' + Math.max(2, xOf(q.q3) - xOf(q.q1)) + '" height="16" fill="' + color + '" fill-opacity="0.22" stroke="' + color + '"/>'
+          + '<line x1="' + xOf(q.med) + '" y1="' + (y - 8) + '" x2="' + xOf(q.med) + '" y2="' + (y + 8) + '" stroke="' + color + '" stroke-width="2"/>'
+          + rug;
+      }
+      var mid = (lo + hi) / 2;
+      svg.innerHTML = lane(nameA, a, 42, groupColor(nameA))
+        + lane(nameB, b, 96, groupColor(nameB))
+        + '<line x1="' + x0 + '" y1="132" x2="' + x1 + '" y2="132" stroke="rgba(255,255,255,.22)"/>'
+        + svgText(x0, 148, fmt(lo + pad), "#94a3b8", "start")
+        + svgText((x0 + x1) / 2, 148, fmt(mid), "#94a3b8", "middle")
+        + svgText(x1, 148, fmt(hi - pad), "#94a3b8", "end");
     }
     function drawPairContrast(svg, row, limit) {
-      var mid = 140;
-      var scale = 110 / limit;
+      svg.setAttribute("viewBox", "0 0 300 112");
+      var x0 = 28, x1 = 272, mid = (x0 + x1) / 2, y = 52;
+      var scale = ((x1 - x0) / 2) / limit;
       function xOf(v) { return mid + v * scale; }
       var mark = "";
       if (isFinite(meaningfulDifference) && meaningfulDifference > 0) {
-        mark = '<line x1="' + xOf(meaningfulDifference) + '" y1="28" x2="' + xOf(meaningfulDifference) + '" y2="100" stroke="#fbbf24" stroke-dasharray="3 3"/>'
-          + '<line x1="' + xOf(-meaningfulDifference) + '" y1="28" x2="' + xOf(-meaningfulDifference) + '" y2="100" stroke="#fbbf24" stroke-dasharray="3 3"/>';
+        mark = '<line x1="' + xOf(meaningfulDifference) + '" y1="22" x2="' + xOf(meaningfulDifference) + '" y2="82" stroke="#fbbf24" stroke-dasharray="3 3"/>'
+          + '<line x1="' + xOf(-meaningfulDifference) + '" y1="22" x2="' + xOf(-meaningfulDifference) + '" y2="82" stroke="#fbbf24" stroke-dasharray="3 3"/>';
       }
       var interval = "";
       if (isFinite(row.ciLower) && isFinite(row.ciUpper)) {
-        interval = '<line x1="' + xOf(row.ciLower) + '" y1="64" x2="' + xOf(row.ciUpper) + '" y2="64" stroke="#67e8f9" stroke-width="3"/>';
+        interval = '<line x1="' + xOf(row.ciLower) + '" y1="' + y + '" x2="' + xOf(row.ciUpper) + '" y2="' + y + '" stroke="#67e8f9" stroke-width="6" stroke-linecap="round" stroke-opacity="0.85"/>';
       }
-      svg.innerHTML = '<line x1="' + mid + '" y1="24" x2="' + mid + '" y2="104" stroke="rgba(255,255,255,.35)"/>'
+      var estimate = isFinite(row.estimate) ? row.estimate : 0;
+      var labelX = Math.max(36, Math.min(264, xOf(estimate)));
+      svg.innerHTML = '<line x1="' + mid + '" y1="18" x2="' + mid + '" y2="86" stroke="rgba(255,255,255,.35)"/>'
         + mark + interval
-        + '<circle cx="' + xOf(isFinite(row.estimate) ? row.estimate : 0) + '" cy="64" r="5" fill="#67e8f9"/>'
-        + svgText(8, 18, "−")
-        + svgText(136, 18, "0")
-        + svgText(258, 18, "+");
+        + '<circle cx="' + xOf(estimate) + '" cy="' + y + '" r="5" fill="#0b1220" stroke="#67e8f9" stroke-width="2"/>'
+        + svgText(labelX, 16, fmt(estimate), "#e2e8f0", "middle")
+        + svgText(x0, 104, fmt(-limit), "#94a3b8", "start")
+        + svgText(mid, 104, "0", "#94a3b8", "middle")
+        + svgText(x1, 104, fmt(limit), "#94a3b8", "end");
     }
     function renderPairInspector(allRows) {
       var title = document.getElementById("pairInspectorTitle");

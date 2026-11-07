@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260817prep1"/>
   <script src="../shared-config.js?v=20260715b"></script>
-  <script src="prepare-engine.js?v=20260910chk1"></script>
-  <script src="prepare-op-examples-v5.js?v=20260818ex5"></script>
+  <script src="prepare-engine.js?v=20261107split1"></script>
+  <script src="prepare-op-examples-v5.js?v=20261107split1"></script>
   <style>
     :root { --prep-acc: #14b8a6; }
     [data-theme="light"] { --prep-acc: #0f766e; }
@@ -430,6 +430,15 @@
             <select class="fld" id="longValue"></select>
             <div class="help" style="margin-top:4px;">These cell values fill the new occasion columns. One row per ID.</div>
           </div>
+          <div id="splitGroupBlock" class="op-lead rc-card">
+            <div class="rc-card-h"><span class="rc-n" id="splitCardN">1</span> Identify columns</div>
+            <label class="lbl" for="splitGroup">Group column</label>
+            <select class="fld" id="splitGroup"></select>
+            <div class="help" style="margin-top:4px;">Each distinct value here becomes a column name, in the order it first appears. A and a are the same column.</div>
+            <label class="lbl" for="splitValue">Value column</label>
+            <select class="fld" id="splitValue"></select>
+            <div class="help" style="margin-top:4px;">Values stack down that group’s column. Other columns, including the ID, are left out. A shorter group is filled with blanks.</div>
+          </div>
 
           <div class="rc-card prep-vars" id="prepVars">
             <div class="rc-card-h"><span class="rc-n" id="varsCardN">1</span> <span id="varTitle">Columns</span></div>
@@ -618,6 +627,7 @@
               </div>
             </div>
             <div class="op-sec" id="sec-longToWide"></div>
+            <div class="op-sec" id="sec-splitByGroup"></div>
             <div class="op-sec" id="sec-transpose">
               <div class="rc-card">
                 <div class="rc-card-h"><span class="rc-n">1</span> How the table is flipped</div>
@@ -776,6 +786,12 @@
         title: 'Long to wide',
         blurb: 'Spread an occasion column into new columns. One row per person.',
         how: 'Choose the ID, occasion, and value columns, then preview.'
+      },
+      splitByGroup: {
+        usesVars: 'none',
+        title: 'Split by group',
+        blurb: 'Put each group’s values in its own column, stacked in the order they appear.',
+        how: 'Choose the group column and the value column, then preview.'
       },
       transpose: {
         usesVars: 'none',
@@ -1233,6 +1249,7 @@
       }
       if (type === 'wideToLong') stamp(qs('wideCardN'));
       if (type === 'longToWide') stamp(qs('longCardN'));
+      if (type === 'splitByGroup') stamp(qs('splitCardN'));
       if (meta.usesVars !== 'none') stamp(qs('varsCardN'));
       var sec = qs('sec-' + type);
       if (sec) {
@@ -1295,6 +1312,11 @@
         step.timeVar = qs('longTime').value;
         step.valueVar = qs('longValue').value;
         step.variables = [step.idVar, step.timeVar, step.valueVar];
+      }
+      if (type === 'splitByGroup') {
+        step.groupVar = qs('splitGroup').value;
+        step.valueVar = qs('splitValue').value;
+        step.variables = [step.groupVar, step.valueVar];
       }
       if (type === 'transpose') step.variables = [];
       return step;
@@ -1391,6 +1413,29 @@
         html += impactRow('Occasion → columns', qs('longTime').value, false);
         html += impactRow('Values from', qs('longValue').value, false);
         html += impactRow('New shape', 'One row per ID', false);
+      } else if (type === 'splitByGroup') {
+        var splitApplied = StatisticoPrepare.applyRecipe(headers, STATE.rows, [currentDraft()]);
+        var splitStep = splitApplied.steps[0] || {};
+        html += impactRow('Group column', qs('splitGroup').value, false);
+        html += impactRow('Values from', qs('splitValue').value, false);
+        if (splitStep.status === 'error') {
+          html += impactRow('New shape', splitStep.error || 'Could not split this table', true);
+        } else {
+          var splitCols = splitApplied.headers || [];
+          var splitColText = splitCols.length <= 8
+            ? splitCols.join(', ')
+            : splitCols.slice(0, 8).join(', ') + ' … (' + splitCols.length + ')';
+          var splitUneven = (splitApplied.rows || []).some(function (row) {
+            return (row || []).some(function (cell) { return cell == null || cell === ''; });
+          });
+          html += impactRow('New columns', splitColText, false);
+          html += impactRow('New shape', splitApplied.nVars + ' columns × ' + splitApplied.nRows + ' rows', false);
+          if (splitUneven) html += impactRow('Shorter groups', 'Filled with blanks', false);
+          if (splitApplied.nRows === 1 && splitApplied.nVars > 1) {
+            html += impactRow('Check the group column', 'Each group appears only once, so the result is a single row', true);
+          }
+        }
+        html += impactRow('Original columns', 'Left out', false);
       } else if (type === 'transpose') {
         html += impactRow('New headers', 'First column’s values', false);
         html += impactRow('First new column', 'Current headers', false);
@@ -1472,6 +1517,18 @@
       if (keep && STATE.headers.indexOf(keep) >= 0) sel.value = keep;
     }
 
+    function fillSplitGroup() {
+      fillHeaderSelect('splitGroup');
+      fillHeaderSelect('splitValue');
+      var h = STATE.headers;
+      if (h.length < 2) return;
+      var groupName = qs('splitGroup').value;
+      var valueName = qs('splitValue').value;
+      if (groupName && valueName && groupName !== valueName) return;
+      qs('splitGroup').value = h.length >= 3 ? h[1] : h[0];
+      qs('splitValue').value = h[h.length - 1];
+    }
+
     function fillLongWide() {
       fillHeaderSelect('longId');
       fillHeaderSelect('longTime');
@@ -1546,6 +1603,7 @@
       if (sec) sec.classList.add('on');
       qs('wideIdBlock').classList.toggle('on', type === 'wideToLong');
       qs('longWideBlock').classList.toggle('on', type === 'longToWide');
+      qs('splitGroupBlock').classList.toggle('on', type === 'splitByGroup');
       qs('opTitle').textContent = meta.title || opLabel(type);
       qs('opBlurb').textContent = meta.blurb || '';
       qs('opHow').textContent = meta.how || '';
@@ -1564,6 +1622,7 @@
         }
       }
       if (type === 'longToWide') fillLongWide();
+      if (type === 'splitByGroup') fillSplitGroup();
       if (type === 'recode') {
         fillRecodeSource();
         syncRecodeMethod();
@@ -1844,7 +1903,7 @@
       renderVars();
       updateAffected();
     });
-    ['missCodes','recodeSource','recodeName','recodeOtherwise','recodeOtherVal','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideTime','wideValue','filtLogic','longId','longTime','longValue'].forEach(function (id) {
+    ['missCodes','recodeSource','recodeName','recodeOtherwise','recodeOtherVal','computeName','computeFormula','revMin','revMax','revPattern','compName','compMethod','compMin','dupName','wideTime','wideValue','filtLogic','longId','longTime','longValue','splitGroup','splitValue'].forEach(function (id) {
       var el = qs(id);
       if (el) el.addEventListener('input', updateAffected);
       if (el) el.addEventListener('change', updateAffected);

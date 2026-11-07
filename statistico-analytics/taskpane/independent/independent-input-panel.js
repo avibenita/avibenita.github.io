@@ -219,6 +219,48 @@ function chiSquareUpperTailApprox(x, df) {
   return Math.max(0, Math.min(1, 1 - normalCdf(z)));
 }
 
+function gammaLowerSeries(a, x) {
+  let ap = a;
+  let sum = 1 / a;
+  let del = sum;
+  for (let n = 1; n <= 200; n++) {
+    ap += 1;
+    del *= x / ap;
+    sum += del;
+    if (Math.abs(del) < Math.abs(sum) * 1e-12) break;
+  }
+  return sum * Math.exp(-x + a * Math.log(x) - lnGamma(a));
+}
+
+function gammaUpperFraction(a, x) {
+  let b = x + 1 - a;
+  let c = 1 / 1e-30;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i <= 200; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b;
+    if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = b + an / c;
+    if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-12) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - lnGamma(a)) * h;
+}
+
+function chiSquareUpperTail(x, df) {
+  if (!isFinite(x) || !isFinite(df) || df <= 0) return NaN;
+  if (x <= 0) return 1;
+  const a = df / 2;
+  const xx = x / 2;
+  const q = xx < a + 1 ? 1 - gammaLowerSeries(a, xx) : gammaUpperFraction(a, xx);
+  return isFinite(q) ? Math.max(0, Math.min(1, q)) : chiSquareUpperTailApprox(x, df);
+}
+
 function pearsonCorrelation(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || a.length < 3) return NaN;
   const ma = mean(a), mb = mean(b);
@@ -393,52 +435,225 @@ function adjustPValues(raw, method) {
   return raw.slice();
 }
 
-function computePosthocRows(grouped, levels, framework, correction) {
+function logGammaTukey(z) {
+  const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  let x = z, y = z, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < 6; j++) ser += c[j] / ++y;
+  return Math.log(2.5066282746310005 * ser / x) - tmp;
+}
+
+function rangeCdfTukey(w, k) {
+  if (!(w > 0)) return 0;
+  const steps = 160, a = -8, b = 8, h = (b - a) / steps;
+  let sum = 0;
+  for (let i = 0; i <= steps; i++) {
+    const x = a + i * h;
+    const phi = Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+    const d = Math.max(0, normalCdf(x + w) - normalCdf(x));
+    const wt = (i === 0 || i === steps) ? 0.5 : 1;
+    sum += wt * k * phi * Math.pow(d, k - 1);
+  }
+  return Math.max(0, Math.min(1, sum * h));
+}
+
+function tukeyCdf(q, k, df) {
+  if (!(q > 0) || !(k >= 2) || !(df > 0)) return q <= 0 ? 0 : NaN;
+  const steps = 200;
+  const a = 0.02;
+  const b = Math.max(3.2, 1 + 10 / Math.sqrt(df));
+  const h = (b - a) / steps;
+  let sum = 0;
+  for (let i = 0; i <= steps; i++) {
+    const s = a + i * h;
+    const half = df / 2;
+    const logf = -(half - 1) * Math.LN2 - logGammaTukey(half) + half * Math.log(df) + (df - 1) * Math.log(s) - 0.5 * df * s * s;
+    const dens = Math.exp(logf);
+    const y = (isFinite(dens) ? dens : 0) * rangeCdfTukey(q * s, k);
+    const wt = (i === 0 || i === steps) ? 0.5 : 1;
+    sum += wt * y;
+  }
+  return Math.max(0, Math.min(1, sum * h));
+}
+
+function tukeyQuantile(p, k, df) {
+  k = Math.max(2, Math.round(k));
+  df = Math.max(1, df);
+  if (df > 5000) df = 5000;
+  let lo = 0.1, hi = 12;
+  for (let i = 0; i < 26; i++) {
+    const mid = (lo + hi) / 2;
+    if (tukeyCdf(mid, k, df) < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+function pooledRankTable(grouped, levels) {
+  const pooled = [];
+  levels.forEach((lv, gi) => (grouped[lv] || []).forEach(v => pooled.push({ v, gi })));
+  pooled.sort((a, b) => a.v - b.v);
+  let tieCube = 0;
+  let i = 0;
+  while (i < pooled.length) {
+    let j = i + 1;
+    while (j < pooled.length && pooled[j].v === pooled[i].v) j++;
+    const t = j - i;
+    if (t > 1) tieCube += (t * t * t) - t;
+    const r = (i + 1 + j) / 2;
+    for (let k = i; k < j; k++) pooled[k].rank = r;
+    i = j;
+  }
+  const N = pooled.length;
+  const rankSums = Array(levels.length).fill(0);
+  pooled.forEach(p => { rankSums[p.gi] += p.rank; });
+  const meanRanks = {};
+  levels.forEach((lv, g) => {
+    meanRanks[lv] = rankSums[g] / Math.max(1, (grouped[lv] || []).length);
+  });
+  let hRaw = 0;
+  levels.forEach((lv, g) => {
+    const ng = (grouped[lv] || []).length;
+    hRaw += (rankSums[g] * rankSums[g]) / Math.max(1, ng);
+  });
+  hRaw = (12 / (N * (N + 1))) * hRaw - 3 * (N + 1);
+  const tieDenom = (N * N * N) - N;
+  const tieFactor = tieDenom > 0 ? tieCube / tieDenom : 0;
+  const correction = tieFactor > 0 && tieFactor < 1 ? 1 - tieFactor : 1;
+  const h = correction > 0 && correction < 1 ? hRaw / correction : hRaw;
+  return { N, meanRanks, hRaw, h, tieFactor, tieCube, tieCorrection: tieFactor > 0 };
+}
+
+function resolvePosthocMethod(requested, framework, primaryTest) {
+  if (framework === "nonparametric") {
+    return requested === "mann-whitney" ? "mann-whitney" : "dunn";
+  }
+  if (requested === "games-howell" || requested === "gameshowell" || requested === "games") return "games-howell";
+  if (requested === "tukey") return "tukey";
+  return primaryTest === "welch" ? "games-howell" : "tukey";
+}
+
+function computePosthocRows(grouped, levels, framework, correction, spec) {
+  spec = spec || {};
+  const method = resolvePosthocMethod(spec.method, framework, spec.primaryTest);
+  const k = levels.length;
   const rows = [];
-  const rawP = [];
-  for (let i = 0; i < levels.length - 1; i++) {
-    for (let j = i + 1; j < levels.length; j++) {
-      const a = grouped[levels[i]] || [];
-      const b = grouped[levels[j]] || [];
-      if (framework === "nonparametric") {
+  if (method === "mann-whitney") {
+    for (let i = 0; i < k - 1; i++) {
+      for (let j = i + 1; j < k; j++) {
+        const a = grouped[levels[i]] || [];
+        const b = grouped[levels[j]] || [];
         const mw = computeMannWhitney(a, b, "two-sided");
         rows.push({
           comparison: `${levels[i]} vs ${levels[j]}`,
           statistic: `U=${mw.u.toFixed(2)}`,
           rawP: mw.p,
-          estimate: (2 * (mw.u / Math.max(1, a.length * b.length)) - 1)
+          estimate: (2 * (mw.u / Math.max(1, a.length * b.length)) - 1),
+          estimateKind: "rank-biserial"
         });
-        rawP.push(mw.p);
-      } else {
-        const w = computeWelch(a, b, "two-sided");
-        const n1 = a.length, n2 = b.length;
-        const v1 = variance(a), v2 = variance(b);
-        const sp = Math.sqrt((((Math.max(0, n1 - 1)) * v1) + ((Math.max(0, n2 - 1)) * v2)) / Math.max(1, n1 + n2 - 2));
-        const cohenD = sp > 0 ? (w.diff / sp) : 0;
+      }
+    }
+  } else if (method === "dunn") {
+    const ranks = pooledRankTable(grouped, levels);
+    const N = ranks.N;
+    const tieTerm = ranks.tieCube / (12 * Math.max(1, N - 1));
+    const base = (N * (N + 1) / 12) - tieTerm;
+    for (let i = 0; i < k - 1; i++) {
+      for (let j = i + 1; j < k; j++) {
+        const ni = (grouped[levels[i]] || []).length;
+        const nj = (grouped[levels[j]] || []).length;
+        const diff = ranks.meanRanks[levels[i]] - ranks.meanRanks[levels[j]];
+        const se = Math.sqrt(Math.max(0, base) * (1 / Math.max(1, ni) + 1 / Math.max(1, nj)));
+        const z = se > 0 ? diff / se : 0;
+        const p = se > 0 ? 2 * (1 - normalCdf(Math.abs(z))) : NaN;
         rows.push({
           comparison: `${levels[i]} vs ${levels[j]}`,
-          statistic: `t=${w.t.toFixed(2)}`,
-          rawP: w.p,
-          estimate: w.diff,
-          ciLower: w.ciLow,
-          ciUpper: w.ciHigh,
-          cohenD: cohenD
+          statistic: `z=${z.toFixed(2)}`,
+          rawP: p,
+          estimate: diff,
+          estimateKind: "mean-rank-difference"
         });
-        rawP.push(w.p);
+      }
+    }
+  } else if (method === "games-howell") {
+    for (let i = 0; i < k - 1; i++) {
+      for (let j = i + 1; j < k; j++) {
+        const a = grouped[levels[i]] || [];
+        const b = grouped[levels[j]] || [];
+        const na = a.length, nb = b.length;
+        const va = variance(a), vb = variance(b);
+        const diff = mean(a) - mean(b);
+        const se = Math.sqrt(0.5 * (va / Math.max(1, na) + vb / Math.max(1, nb)));
+        const q = se > 0 ? Math.abs(diff) / se : 0;
+        const df = Math.pow(va / na + vb / nb, 2) / (Math.pow(va / na, 2) / Math.max(1, na - 1) + Math.pow(vb / nb, 2) / Math.max(1, nb - 1));
+        const p = se > 0 ? 1 - tukeyCdf(q, k, df) : NaN;
+        const crit = tukeyQuantile(1 - (spec.alpha || 0.05), k, df);
+        const sp = Math.sqrt((((Math.max(0, na - 1)) * va) + ((Math.max(0, nb - 1)) * vb)) / Math.max(1, na + nb - 2));
+        rows.push({
+          comparison: `${levels[i]} vs ${levels[j]}`,
+          statistic: `q=${q.toFixed(2)}`,
+          rawP: NaN,
+          adjP: p,
+          estimate: diff,
+          estimateKind: "mean-difference",
+          ciLower: diff - crit * se,
+          ciUpper: diff + crit * se,
+          cohenD: sp > 0 ? diff / sp : 0
+        });
+      }
+    }
+  } else {
+    const ms = spec.msWithin;
+    const df = spec.dfError;
+    for (let i = 0; i < k - 1; i++) {
+      for (let j = i + 1; j < k; j++) {
+        const a = grouped[levels[i]] || [];
+        const b = grouped[levels[j]] || [];
+        const na = a.length, nb = b.length;
+        const diff = mean(a) - mean(b);
+        const se = ms > 0 ? Math.sqrt(ms * 0.5 * (1 / Math.max(1, na) + 1 / Math.max(1, nb))) : 0;
+        const q = se > 0 ? Math.abs(diff) / se : 0;
+        const p = se > 0 ? 1 - tukeyCdf(q, k, df) : NaN;
+        const crit = tukeyQuantile(1 - (spec.alpha || 0.05), k, df);
+        const sp = Math.sqrt(ms);
+        rows.push({
+          comparison: `${levels[i]} vs ${levels[j]}`,
+          statistic: `q=${q.toFixed(2)}`,
+          rawP: NaN,
+          adjP: p,
+          estimate: diff,
+          estimateKind: "mean-difference",
+          ciLower: isFinite(crit) ? diff - crit * se : NaN,
+          ciUpper: isFinite(crit) ? diff + crit * se : NaN,
+          cohenD: sp > 0 ? diff / sp : 0
+        });
       }
     }
   }
-  const adj = adjustPValues(rawP, correction);
-  return rows.map((r, i) => ({
-    comparison: r.comparison,
-    statistic: r.statistic,
-    rawP: r.rawP,
-    adjP: adj[i],
-    estimate: r.estimate,
-    ciLower: r.ciLower,
-    ciUpper: r.ciUpper,
-    cohenD: r.cohenD
-  }));
+  const builtin = method === "tukey" || method === "games-howell";
+  const familySize = rows.length;
+  const adj = builtin ? null : adjustPValues(rows.map(r => r.rawP), correction || "holm");
+  const estimateLabel = method === "dunn"
+    ? "Mean rank difference"
+    : (method === "mann-whitney" ? "Rank-biserial r" : "Mean difference");
+  return {
+    method,
+    correction: builtin ? "builtin" : (correction || "holm"),
+    familySize,
+    estimateLabel,
+    rows: rows.map((r, i) => ({
+      comparison: r.comparison,
+      statistic: r.statistic,
+      rawP: r.rawP,
+      adjP: builtin ? r.adjP : adj[i],
+      estimate: r.estimate,
+      estimateKind: r.estimateKind,
+      ciLower: r.ciLower,
+      ciUpper: r.ciUpper,
+      cohenD: r.cohenD
+    }))
+  };
 }
 
 function lnGamma(z) {
@@ -579,9 +794,9 @@ function buildIndependentBundle(headers, rows, spec) {
   console.log("compareMode:", compareMode);
   const mode = compareMode === "k-plus" ? "k-plus" : "two-column";
   const primaryFramework = spec.primaryFramework || "parametric";
-  const posthocMethod = spec.posthocMethod || (primaryFramework === "nonparametric" ? "dunn" : "games-howell");
-  const posthocCorrection = spec.posthocCorrection || "holm";
   const primaryTest = spec.primaryTest || "welch";
+  const posthocMethod = resolvePosthocMethod(spec.posthocMethod, primaryFramework, primaryTest);
+  const posthocCorrection = spec.posthocCorrection || "holm";
   let selectedColumns = Array.isArray(spec.selectedColumns) && spec.selectedColumns.length
     ? spec.selectedColumns.filter(name => headers.indexOf(name) >= 0)
     : headers.slice();
@@ -691,38 +906,19 @@ function buildIndependentBundle(headers, rows, spec) {
     const f = anova ? anova.f : 0;
     const pAnova = anova ? anova.p : NaN;
 
-    // Kruskal-Wallis
-    const pooled = [];
-    levels.forEach((lv, gi) => grouped[lv].forEach(v => pooled.push({ v, gi })));
-    pooled.sort((a, b) => a.v - b.v);
-    let i = 0;
-    while (i < pooled.length) {
-      let j = i + 1;
-      while (j < pooled.length && pooled[j].v === pooled[i].v) j++;
-      const r = (i + 1 + j) / 2;
-      for (let k = i; k < j; k++) pooled[k].rank = r;
-      i = j;
-    }
-    const rankSums = Array(levels.length).fill(0);
-    pooled.forEach(p => { rankSums[p.gi] += p.rank; });
-    let H = 0;
-    const meanRanks = {};
-    for (let g = 0; g < levels.length; g++) {
-      const ng = grouped[levels[g]].length;
-      H += (rankSums[g] * rankSums[g]) / Math.max(1, ng);
-      meanRanks[levels[g]] = rankSums[g] / Math.max(1, ng);
-    }
-    H = (12 / (N * (N + 1))) * H - 3 * (N + 1);
-    const pKw = chiSquareUpperTailApprox(H, df1);
+    const ranks = pooledRankTable(grouped, levels);
+    const H = ranks.h;
+    const meanRanks = ranks.meanRanks;
+    const pKw = chiSquareUpperTail(H, df1);
     const etaSquared = (anova && (anova.ssBetween + anova.ssWithin) > 0) ? (anova.ssBetween / (anova.ssBetween + anova.ssWithin)) : NaN;
     const omegaSquared = (anova && (anova.ssTotal + anova.msWithin) > 0)
       ? Math.max(0, (anova.ssBetween - (anova.df1 * anova.msWithin)) / (anova.ssTotal + anova.msWithin))
       : NaN;
     const cohenF = (isFinite(etaSquared) && etaSquared >= 0 && etaSquared < 1) ? Math.sqrt(etaSquared / Math.max(1e-12, (1 - etaSquared))) : NaN;
-    const epsilonSquared = (N > levels.length)
-      ? Math.max(0, (H - levels.length + 1) / Math.max(1e-12, (N - levels.length)))
+    const epsilonSquared = N > 1 ? Math.max(0, H / (N - 1)) : NaN;
+    const etaSquaredH = (N > levels.length)
+      ? Math.max(0, (H - levels.length + 1) / (N - levels.length))
       : NaN;
-    const etaSquaredH = N > 1 ? Math.max(0, H / Math.max(1, N - 1)) : NaN;
     const levene = computeLeveneLike(grouped, levels, false);
     const brownForsythe = computeLeveneLike(grouped, levels, true);
     const welchAnova = computeWelchAnova(grouped, levels);
@@ -742,8 +938,10 @@ function buildIndependentBundle(headers, rows, spec) {
       omegaSquared,
       cohenF,
       kwH: H,
+      kwHUncorrected: ranks.hRaw,
       kwDf: df1,
       kwP: pKw,
+      tieCorrection: ranks.tieCorrection,
       epsilonSquared,
       etaSquaredH,
       meanRanks,
@@ -752,11 +950,20 @@ function buildIndependentBundle(headers, rows, spec) {
       brownForsythe,
       welchAnova
     };
+    const posthocComputed = computePosthocRows(grouped, levels, primaryFramework, posthocCorrection, {
+      method: posthocMethod,
+      primaryTest,
+      msWithin: anova ? anova.msWithin : NaN,
+      dfError: anova ? anova.df2 : NaN,
+      alpha
+    });
     posthoc = {
       enabled: true,
-      method: posthocMethod,
-      correction: posthocCorrection,
-      rows: computePosthocRows(grouped, levels, primaryFramework, posthocCorrection)
+      method: posthocComputed.method,
+      correction: posthocComputed.correction,
+      familySize: posthocComputed.familySize,
+      estimateLabel: posthocComputed.estimateLabel,
+      rows: posthocComputed.rows
     };
   }
   const recommendation = designValidation.status === "paired-warning"

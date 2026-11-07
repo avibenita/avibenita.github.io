@@ -182,26 +182,42 @@ async function scenario(page, { mark, note, say }) {
   });
   const before = await page.locator('#predictedValue').innerText();
   const beforeTitle = await page.locator('#predProfileTitle').innerText();
-  await hot(page, '#filmScenarioView', 1.16);
-  await page.waitForTimeout(PROBE ? 40 : 1100);
+  await hot(page, '#filmScenarioView', 1);
+  await page.waitForTimeout(PROBE ? 40 : 700);
   note('scenario-1');
-  const first = dur('scenario-1');
-  await page.waitForTimeout(first * 0.42 * 1000);
+  // The question lands on the starting view. The move itself is the second sentence.
+  await page.waitForTimeout(PROBE ? 40 : 2200);
+  if (process.argv.includes('--preview-scenario')) await shot(page, 'scenario-start');
+  const steps = PROBE ? 2 : 12;
+  const stepMs = PROBE ? 20 : 500;
   await page.evaluate(() => {
     const slider = document.getElementById('input-Ad Spend');
-    slider.value = slider.max;
-    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    if (!slider) throw new Error('Ad Spend slider is missing');
+    slider.dataset.filmFrom = slider.value;
   });
-  await page.waitForTimeout(PROBE ? 40 : 450);
+  for (let i = 1; i <= steps; i += 1) {
+    await page.evaluate(({ i, steps }) => {
+      const slider = document.getElementById('input-Ad Spend');
+      const from = Number(slider.dataset.filmFrom);
+      const to = Number(slider.max);
+      slider.value = String(from + (to - from) * (i / steps));
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    }, { i, steps });
+    if (process.argv.includes('--preview-scenario') && i === Math.ceil(steps / 2)) {
+      await shot(page, 'scenario-action');
+    }
+    await page.waitForTimeout(stepMs);
+  }
+  await page.waitForTimeout(PROBE ? 40 : 350);
   const after = await page.locator('#predictedValue').innerText();
   const afterTitle = await page.locator('#predProfileTitle').innerText();
+  const afterHeld = await page.locator('#predProfileHeld').innerText();
   if (before === after) throw new Error('Moving ad spend did not change the prediction');
   if (beforeTitle === afterTitle) throw new Error('Moving ad spend did not change the profile');
-  if (process.env.FILM_PREVIEW === '1') {
-    await page.waitForTimeout(280);
-    await shot(page, 'preview-prediction');
+  if (!/Ad Spend \d/.test(afterHeld) || /Ad Spend held at/.test(afterHeld)) {
+    throw new Error(`The profile left Ad Spend during the move: ${afterHeld}`);
   }
-  await page.waitForTimeout(Math.max(0, first * 0.58) * 1000);
+  if (process.argv.includes('--preview-scenario')) await shot(page, 'scenario-result');
   await page.waitForTimeout(PROBE ? 40 : 3000);
   await clearFilmHighlight(page);
 }

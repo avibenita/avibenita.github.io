@@ -233,9 +233,24 @@
     #tab-interactions > .results-panel{
       flex:0 0 auto;
     }
-    /* Interaction / times charts: no outer frame, no rule under the title */
-    #panelInteraction.results-panel,
+    /* Times chart keeps a frame; the tables sit in their own panel below. */
     #panelTimes.results-panel{
+      box-shadow:var(--panel-shadow);
+      overflow:visible;
+      height:auto;
+      min-height:0;
+      margin-bottom:0;
+    }
+    /* Match the dose chart's centered width so the two panels line up. */
+    #panelPatternsTables.results-panel{
+      width:75% !important;
+      max-width:75% !important;
+      margin-left:auto !important;
+      margin-right:auto !important;
+      justify-self:center;
+      box-sizing:border-box;
+    }
+    #panelInteraction.results-panel{
       border:none;
       box-shadow:none;
       overflow:visible;
@@ -1192,10 +1207,14 @@
       max-height:none;
       flex:0 0 auto;
     }
-    .chart-panel-tables{
-      margin-top:12px;
-      padding-top:12px;
-      border-top:1px solid var(--border);
+    .hist-bin{
+      display:inline-flex; align-items:center; gap:8px;
+      font-size:12px; font-weight:650; color:var(--text-muted);
+    }
+    .hist-bin input[type="range"]{ width:128px; accent-color:#5eead4; cursor:pointer; }
+    .hist-bin-val{
+      min-width:1.5em; text-align:right; color:var(--text-primary);
+      font-variant-numeric:tabular-nums;
     }
     .patterns-mini-table table{ font-size:13px; }
     .patterns-empty{
@@ -1840,7 +1859,13 @@
           <div class="results-panel" id="panelOverallHist" style="margin-bottom:10px;">
             <div class="results-panel-heading">
               <span><i class="fa-solid fa-chart-area"></i>&nbsp;Overall Histogram</span>
-              <span id="overallHistSubtitle" style="font-size:13px;font-weight:600;color:var(--text-muted);"></span>
+              <span style="display:inline-flex;align-items:center;gap:14px;">
+                <span id="overallHistSubtitle" style="font-size:13px;font-weight:600;color:var(--text-muted);"></span>
+                <label class="hist-bin">Bins
+                  <input type="range" id="histBinSlider" min="5" max="30" value="12" oninput="setHistBins(this.value)">
+                  <span class="hist-bin-val" id="histBinValue">12</span>
+                </label>
+              </span>
             </div>
             <div class="results-panel-body" style="padding:8px;">
               <div class="chart-wrap-std" id="overallHistChart"></div>
@@ -1848,7 +1873,7 @@
           </div>
 
           <!-- ── Row 1: Times panel (two-way only) ───────────── -->
-          <div id="mainEffectsRow" style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px;">
+          <div id="mainEffectsRow" style="display:grid;grid-template-columns:1fr;gap:22px;margin-bottom:10px;">
             <!-- Panel: Times (two-way only, injected into grid via JS) -->
             <div class="results-panel chart-solo" id="panelTimes" style="display:none;margin-bottom:0;">
               <div class="results-panel-heading">
@@ -1869,27 +1894,26 @@
                 <div id="hintTim" class="drill-hint"><i class="fa-solid fa-magnifying-glass-chart"></i> Click any bar to drill into <strong>group</strong> breakdown</div>
                 <div class="chart-wrap-std" id="timBarChart"></div>
                 <div class="chart-wrap-std" id="timBoxChart" style="display:none;"></div>
-                <div class="chart-panel-tables">
-                  <div class="patterns-dual-grid">
-                    <div>
-                      <div class="patterns-card-title">
-                        <span><i class="fa-solid fa-users"></i> <span id="meansCardTitle">Means</span></span>
-                      </div>
-                      <div id="meansByGroupTableWrap" class="patterns-mini-table" style="display:block;">
-                        <div id="meansByGroupTable"></div>
-                      </div>
+              </div>
+            </div>
+            <div class="results-panel" id="panelPatternsTables">
+              <div class="results-panel-body">
+                <div class="patterns-dual-grid">
+                  <div>
+                    <div class="patterns-card-title">
+                      <span><i class="fa-solid fa-users"></i> <span id="meansCardTitle">Means</span></span>
                     </div>
-                    <div id="meanRanksBlock">
-                      <div class="patterns-card-title"><i class="fa-solid fa-sort-numeric-up"></i> Mean Ranks by Group</div>
-                      <div id="meanRanksByGroupChart" class="patterns-mini-chart"></div>
-                      <div id="meanRanksByGroupTableWrap" class="patterns-mini-table" style="display:block;">
-                        <div id="meanRanksByGroupTable"></div>
-                      </div>
+                    <div id="meansByGroupTableWrap" class="patterns-mini-table" style="display:block;">
+                      <div id="meansByGroupTable"></div>
                     </div>
                   </div>
-                  <div style="margin-top:8px;">
-                    <button class="power-btn subtle" id="patternsTablesToggleBtn" onclick="toggleMeansTable()"><i class="fa-solid fa-table"></i> Hide tables</button>
+                  <div id="meanRanksBlock">
+                    <div class="patterns-card-title"><i class="fa-solid fa-sort-numeric-up"></i> Mean Ranks by Group</div>
+                    <div id="meanRanksByGroupChart" class="patterns-mini-chart"></div>
                   </div>
+                </div>
+                <div style="margin-top:8px;">
+                  <button class="power-btn subtle" id="patternsTablesToggleBtn" onclick="toggleMeansTable()"><i class="fa-solid fa-table"></i> Hide tables</button>
                 </div>
               </div>
             </div>
@@ -4091,22 +4115,26 @@
     return vals;
   }
 
-  function _histogramBins(values) {
+  function _histogramBins(values, binCount) {
     var nums = values.filter(function (v) { return isFinite(v); }).slice().sort(function (a, b) { return a - b; });
     var n = nums.length;
     if (!n) return null;
     var min = nums[0];
     var max = nums[n - 1];
-    var bins = 16;
-    if (n > 1 && max > min) {
-      var q1 = nums[Math.floor(n * 0.25)];
-      var q3 = nums[Math.floor(n * 0.75)];
-      var iqr = q3 - q1;
-      var width = iqr > 0 ? (2 * iqr * Math.pow(n, -1 / 3)) : 0;
-      if (width > 0) bins = Math.ceil((max - min) / width);
+    var bins = binCount;
+    if (!(bins >= 1)) {
+      bins = 16;
+      if (n > 1 && max > min) {
+        var q1 = nums[Math.floor(n * 0.25)];
+        var q3 = nums[Math.floor(n * 0.75)];
+        var iqr = q3 - q1;
+        var width = iqr > 0 ? (2 * iqr * Math.pow(n, -1 / 3)) : 0;
+        if (width > 0) bins = Math.ceil((max - min) / width);
+      }
+      if (!isFinite(bins) || bins < 8) bins = 8;
+      if (bins > 24) bins = 24;
     }
-    if (!isFinite(bins) || bins < 8) bins = 8;
-    if (bins > 24) bins = 24;
+    bins = Math.max(1, Math.round(bins));
     if (min === max) bins = 1;
     var span = max - min;
     var binWidth = bins === 1 ? 1 : span / bins;
@@ -4126,6 +4154,17 @@
     return { categories: categories, counts: counts, min: min, max: max };
   }
 
+  var _histBinCount = null;
+  function setHistBins(v) {
+    var n = parseInt(v, 10);
+    if (!isFinite(n)) return;
+    _histBinCount = Math.max(5, Math.min(30, n));
+    var lab = document.getElementById('histBinValue');
+    var slider = document.getElementById('histBinSlider');
+    if (lab) lab.textContent = String(_histBinCount);
+    if (slider && String(slider.value) !== String(_histBinCount)) slider.value = String(_histBinCount);
+    if (_bundle) renderOverallHistogram(_bundle);
+  }
   function renderOverallHistogram(b) {
     var el = document.getElementById('overallHistChart');
     if (!el || !b) return;
@@ -4142,10 +4181,15 @@
       if (sub) sub.textContent = '';
       return;
     }
-    var hist = _histogramBins(vals);
+    var hist = _histogramBins(vals, _histBinCount);
     if (!hist) return;
+    var slider = document.getElementById('histBinSlider');
+    var binLab = document.getElementById('histBinValue');
+    if (slider && _histBinCount == null) slider.value = String(hist.categories.length);
+    if (binLab) binLab.textContent = String(hist.categories.length);
     if (sub) sub.textContent = dv + '  ·  n=' + vals.length.toLocaleString();
     var step = hist.categories.length > 12 ? 2 : 1;
+    var teal = _summaryTeal(t.isDark);
     _charts.overallHist = Highcharts.chart('overallHistChart', {
       chart: {
         type: 'column',
@@ -4172,8 +4216,9 @@
       },
       plotOptions: {
         column: {
-          color: t.colors[0],
-          borderWidth: 0,
+          color: teal.fill,
+          borderColor: teal.point,
+          borderWidth: 1,
           borderRadius: 2,
           groupPadding: 0,
           pointPadding: 0.04
@@ -4349,6 +4394,8 @@
     var titleEl = document.getElementById('factorChartTitle');
     if (row) row.style.display = has ? 'grid' : 'none';
     if (panel) panel.style.display = has ? '' : 'none';
+    var tablesPanel = document.getElementById('panelPatternsTables');
+    if (tablesPanel) tablesPanel.style.display = has ? '' : 'none';
     if (radios) radios.style.display = isTwoWay ? 'inline-flex' : 'none';
     if (titleEl) {
       titleEl.style.display = isTwoWay ? 'none' : '';
@@ -4377,9 +4424,12 @@
     }
 
     var cats = view.desc.map(function (d) { return String(d.level); });
+    var teal = _summaryTeal(t.isDark);
     var series = [{
       name: dv,
-      color: t.colors[1],
+      color: teal.fill,
+      borderColor: teal.point,
+      borderWidth: 1.5,
       data: view.desc.map(function (d) { return isFinite(d.mean) ? +d.mean.toFixed(4) : null; }),
       cursor: isTwoWay ? 'pointer' : 'default'
     }];
@@ -4392,11 +4442,13 @@
       }
     } : {};
     var cfg = _colCfg(cats, series, dv, t.tc, t.gc, click);
+    cfg.plotOptions.column.borderWidth = 1.5;
+    cfg.plotOptions.column.borderColor = teal.point;
     cfg.xAxis.title = { text: view.name, style: _axisTitleStyle(t.tc) };
     if (isTwoWay) cfg.plotOptions.column.cursor = 'pointer';
     _charts.timBar = Highcharts.chart('timBarChart', cfg);
     _charts.timBox = Highcharts.chart('timBoxChart',
-      _boxCfg(cats, _descToBoxData(view.desc), dv, t.tc, t.gc, t.colors[1]));
+      _boxCfg(cats, _descToBoxData(view.desc), dv, t.tc, t.gc, teal.point));
     if (_charts.timBox && _charts.timBox.xAxis && _charts.timBox.xAxis[0]) {
       _charts.timBox.xAxis[0].setTitle({ text: view.name, style: _axisTitleStyle(t.tc) }, false);
       _charts.timBox.redraw();
@@ -5040,8 +5092,7 @@
   function renderPatternsCompare(b) {
     var meansTableEl = document.getElementById('meansByGroupTable');
     var ranksChartEl = document.getElementById('meanRanksByGroupChart');
-    var ranksTableEl = document.getElementById('meanRanksByGroupTable');
-    if (!meansTableEl || !ranksChartEl || !ranksTableEl) return;
+    if (!meansTableEl || !ranksChartEl) return;
 
     var t = _visTheme();
     var view = _factorChartView(b, _factorChartWhich);
@@ -5078,6 +5129,7 @@
     if (ranks.length) {
       var rankCats = ranks.map(function (r) { return r.level; });
       var rankVals = ranks.map(function (r) { return isFinite(r.meanRank) ? +r.meanRank.toFixed(4) : null; });
+      var teal = _summaryTeal(t.isDark);
       _charts.ranksMini = Highcharts.chart('meanRanksByGroupChart', {
         chart: { type: 'bar', backgroundColor: 'transparent', style: { fontFamily: 'Segoe UI,sans-serif' } },
         title: { text: '' },
@@ -5090,7 +5142,7 @@
           lineColor: t.gc
         },
         yAxis: { title: { text: 'Mean Rank', style: _axisTitleStyle(t.tc) }, labels: { style: _axisLabelStyle(t.tc) }, gridLineColor: t.gc },
-        plotOptions: { bar: { color: t.colors[1], borderRadius: 4, borderWidth: 0, dataLabels: { enabled: true, format: '{point.y:.2f}', style: { color: t.tc, fontSize: '11px', fontWeight: '700', textOutline: 'none' } } } },
+        plotOptions: { bar: { color: teal.fill, borderColor: teal.point, borderWidth: 1.5, borderRadius: 4, dataLabels: { enabled: true, format: '{point.y:.2f}', style: { color: t.tc, fontSize: '11px', fontWeight: '700', textOutline: 'none' } } } },
         series: [{ name: 'Mean Rank', data: rankVals }],
         tooltip: {
           backgroundColor: t.isDark ? '#1e293b' : '#fff',
@@ -5098,15 +5150,8 @@
           pointFormat: '<b>{point.category}</b><br>Mean rank: <b>{point.y:.2f}</b>'
         }
       });
-      ranksTableEl.innerHTML =
-        '<table><thead><tr><th>' + rankFactor + '</th><th class="num">Mean Rank</th></tr></thead><tbody>' +
-        ranks.map(function (r) {
-          return '<tr><td>' + r.level + '</td><td class="num">' + fmt(r.meanRank,2) + '</td></tr>';
-        }).join('') +
-        '</tbody></table>';
     } else {
       ranksChartEl.innerHTML = '<div class="patterns-empty">Mean ranks available for one-way Kruskal-Wallis results.</div>';
-      ranksTableEl.innerHTML = '';
     }
   }
 
@@ -5128,12 +5173,10 @@
 
   function toggleMeansTable() {
     var meansWrap = document.getElementById('meansByGroupTableWrap');
-    var ranksWrap = document.getElementById('meanRanksByGroupTableWrap');
     var btn = document.getElementById('patternsTablesToggleBtn');
-    if (!meansWrap || !ranksWrap || !btn) return;
-    var opening = meansWrap.style.display === 'none' || !meansWrap.style.display;
+    if (!meansWrap || !btn) return;
+    var opening = meansWrap.style.display === 'none';
     meansWrap.style.display = opening ? 'block' : 'none';
-    ranksWrap.style.display = opening ? 'block' : 'none';
     btn.innerHTML = opening
       ? '<i class="fa-solid fa-table"></i> Hide tables'
       : '<i class="fa-solid fa-table"></i> Show tables';

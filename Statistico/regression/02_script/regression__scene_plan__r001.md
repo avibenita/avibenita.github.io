@@ -15,3 +15,5 @@
 | 9 | Close | 1:55.9–2:02.3 | Logo, the closing line, statistico.live. | close-1 |
 
 Residual plots are in the catalogue. Opening that tab is not a demonstration, because the plots do not expose a separate control in this film.
+
+The review preview `04_review/preview/results-scenario.mp4` places a Model Results chapter immediately before the 13-second Scenario Engine clip. That chapter is not yet in the measured full-film times above.

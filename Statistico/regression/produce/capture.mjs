@@ -30,9 +30,9 @@ function loudnormMeasured(file) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
-function leveledVoice(mp3) {
+function leveledVoice(mp3, dest) {
   const measured = loudnormMeasured(mp3);
-  const wav = path.join(WORK, 'scenario-1-level.wav');
+  const wav = dest || path.join(WORK, 'scenario-1-level.wav');
   const leveled = spawnSync(FFMPEG, [
     '-y', '-i', mp3,
     '-af', `loudnorm=I=-16.6:TP=-1.5:LRA=11:measured_I=${measured.input_i}:measured_TP=${measured.input_tp}:measured_LRA=${measured.input_lra}:measured_thresh=${measured.input_thresh}:offset=${measured.target_offset}:linear=true`,
@@ -158,6 +158,129 @@ async function effects(page, { mark, note }) {
   await page.waitForTimeout(Math.max(0, total * 0.42) * 1000);
   await page.waitForTimeout(PROBE ? 40 : 3000);
   await clearFilmHighlight(page);
+}
+
+async function tagStoreSize(page) {
+  const tagged = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('#dataTableBody tr')].find((tr) => /Store Size/.test(tr.textContent || ''));
+    if (!row) return false;
+    row.id = 'filmStoreSizeRow';
+    const box = row.querySelector('.coef-include-check');
+    if (box) box.id = 'filmStoreSizeCheck';
+    return Boolean(box);
+  });
+  if (!tagged) throw new Error('Store Size is not in the coefficient table');
+}
+
+async function frameResults(page, mode) {
+  await page.evaluate((which) => {
+    const scroller = document.querySelector('#tab-results .ws-body');
+    const target = which === 'equation'
+      ? document.getElementById('equationSection')
+      : document.querySelector('.reg-overview-block');
+    if (!scroller || !target) return;
+    const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = Math.max(0, top - (which === 'equation' ? 280 : 0));
+  }, mode);
+}
+
+async function results(page, { mark, note }) {
+  await loadFilm(page);
+  await page.waitForFunction(() => {
+    const r2 = document.getElementById('kpiRSquared');
+    const table = document.getElementById('dataTableBody');
+    const eq = document.getElementById('equationFormula');
+    const overlay = document.getElementById('loadingOverlay');
+    const view = document.getElementById('headerViewName');
+    const variable = document.getElementById('headerVariableName');
+    const sample = document.getElementById('headerSampleSize');
+    const overviewTab = document.querySelector('#tab-results [data-reg-tab="results-overview"]');
+    return r2 && /65\.63%/.test(r2.textContent || '')
+      && table && /Store Size/.test(table.textContent || '')
+      && eq && /Sales/.test(eq.textContent || '') && /Store Size/.test(eq.textContent || '')
+      && view && /Results|Overview/.test(view.textContent || '')
+      && overviewTab && overviewTab.classList.contains('active')
+      && variable && /Sales/.test(variable.textContent || '')
+      && sample && /120/.test(sample.textContent || '')
+      && overlay && overlay.classList.contains('hidden');
+  }, null, { timeout: 12000 });
+  await page.evaluate(() => {
+    const card = document.querySelector('.kpi-card--r2');
+    if (card) card.id = 'filmRSquared';
+  });
+  await tagStoreSize(page);
+  await frameResults(page, 'overview');
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await page.waitForTimeout(PROBE ? 40 : 200);
+  mark();
+  await page.waitForTimeout(PROBE ? 40 : 500);
+  await hot(page, '#filmRSquared', 1);
+  note('results-1');
+  await page.waitForTimeout((PROBE ? 0.04 : dur('results-1')) * 1000);
+  await page.waitForTimeout(PROBE ? 40 : 350);
+  await clearFilmHighlight(page);
+  await frameResults(page, 'overview');
+  await tagStoreSize(page);
+  await hot(page, '#filmStoreSizeRow', 1);
+  await page.waitForTimeout(PROBE ? 40 : 450);
+  const beforeR2 = await page.locator('#kpiRSquared').innerText();
+  const beforeEquation = await page.locator('#equationFormula').innerText();
+  await page.locator('#filmStoreSizeCheck').click();
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('loadingOverlay');
+    const r2 = (document.getElementById('kpiRSquared')?.textContent || '').trim();
+    const eq = document.getElementById('equationFormula')?.textContent || '';
+    const row = [...document.querySelectorAll('#dataTableBody tr')].find((tr) => /Store Size/.test(tr.textContent || ''));
+    const box = row && row.querySelector('.coef-include-check');
+    return overlay && overlay.classList.contains('hidden')
+      && !/^65\.63%/.test(r2)
+      && !/Store Size/.test(eq)
+      && row && row.classList.contains('coef-row-excluded')
+      && box && !box.checked;
+  }, null, { timeout: 8000 });
+  if (beforeR2 === await page.locator('#kpiRSquared').innerText()) {
+    throw new Error('Removing Store Size did not change R²');
+  }
+  if (beforeEquation === await page.locator('#equationFormula').innerText()) {
+    throw new Error('Removing Store Size did not change the equation');
+  }
+  await tagStoreSize(page);
+  await frameResults(page, 'equation');
+  await clearFilmHighlight(page);
+  await showFilmHighlights(page, ['#coefficientsTable', '#equationSection'], { zoom: 1 });
+  await page.waitForTimeout(PROBE ? 40 : 220);
+  note('results-2');
+  await page.waitForTimeout((PROBE ? 0.04 : dur('results-2') + 0.4) * 1000);
+  await clearFilmHighlight(page);
+  await tagStoreSize(page);
+  await hot(page, '#filmStoreSizeRow', 1);
+  await page.waitForTimeout(PROBE ? 40 : 280);
+  await page.locator('#filmStoreSizeCheck').click();
+  await page.waitForFunction(() => {
+    const overlay = document.getElementById('loadingOverlay');
+    const r2 = (document.getElementById('kpiRSquared')?.textContent || '').trim();
+    const eq = document.getElementById('equationFormula')?.textContent || '';
+    const n = document.getElementById('kpiN')?.textContent || '';
+    const sample = document.getElementById('headerSampleSize')?.textContent || '';
+    const row = [...document.querySelectorAll('#dataTableBody tr')].find((tr) => /Store Size/.test(tr.textContent || ''));
+    const box = row && row.querySelector('.coef-include-check');
+    return overlay && overlay.classList.contains('hidden')
+      && /65\.63%/.test(r2)
+      && /Store Size/.test(eq)
+      && /Ad Spend/.test(eq)
+      && /120/.test(n)
+      && /120/.test(sample)
+      && row && !row.classList.contains('coef-row-excluded')
+      && box && box.checked;
+  }, null, { timeout: 8000 });
+  await frameResults(page, 'overview');
+  await clearFilmHighlight(page);
+  await page.waitForTimeout(PROBE ? 40 : 120);
+  note('results-3');
+  await page.waitForTimeout((PROBE ? 0.04 : dur('results-3')) * 1000);
+  await page.waitForTimeout(PROBE ? 40 : 200);
 }
 
 async function scenario(page, { mark, note }) {
@@ -367,7 +490,7 @@ async function recordScene(browser, name, run) {
   try {
     await run(page, { mark, note, say });
     highlights = await readHighlightLog(page, useful).catch(() => []);
-    await shot(page, name);
+    if (!process.argv.includes('--preview-results')) await shot(page, name);
   } catch (err) {
     await shot(page, `${name}-error`).catch(() => {});
     throw err;
@@ -383,8 +506,69 @@ async function recordScene(browser, name, run) {
   return { id: name, src: dest.replace(/\\/g, '/'), trim: Math.max(0, (useful - t0) / 1000), cues, highlights };
 }
 
+function mixSpeech(cues, duration, dest) {
+  const args = ['-y'];
+  const filters = [];
+  const mix = [];
+  cues.forEach((cue, i) => {
+    args.push('-i', path.join(AUDIO, `${cue.id}.mp3`));
+    const ms = Math.max(0, Math.round(Number(cue.at) * 1000));
+    filters.push(`[${i}:a]aformat=sample_fmts=s16:sample_rates=48000:channel_layouts=mono,adelay=${ms}:all=1,apad=pad_dur=${duration.toFixed(3)}[a${i}]`);
+    mix.push(`[a${i}]`);
+  });
+  const raw = path.join(WORK, 'results-speech.wav');
+  args.push(
+    '-filter_complex', `${filters.join(';')};${mix.join('')}amix=inputs=${cues.length}:normalize=0:duration=longest:dropout_transition=0[a]`,
+    '-map', '[a]', '-t', duration.toFixed(3), raw
+  );
+  const mixed = spawnSync(FFMPEG, args, { encoding: 'utf8' });
+  if (mixed.status !== 0) throw new Error((mixed.stderr || 'speech mix failed').slice(-800));
+  return leveledVoice(raw, dest);
+}
+
+function encodeResultsPreview(scene) {
+  const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');
+  fs.mkdirSync(outDir, { recursive: true });
+  const picture = path.join(WORK, 'results-picture.mp4');
+  const chapter = path.join(outDir, 'results-chapter.mp4');
+  const scenarioClip = path.join(outDir, 'scenario-highlight.mp4');
+  const combined = path.join(outDir, 'results-scenario.mp4');
+  if (!fs.existsSync(scenarioClip)) throw new Error('The Scenario Engine clip is missing.');
+  const trimmed = spawnSync(FFMPEG, [
+    '-y', '-ss', String(scene.trim), '-i', scene.src,
+    '-vf', 'scale=1728:1080:flags=lanczos,fps=30,format=yuv420p',
+    '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
+    picture
+  ], { encoding: 'utf8' });
+  if (trimmed.status !== 0) throw new Error((trimmed.stderr || 'results picture failed').slice(-800));
+  const duration = mediaDuration(picture);
+  if (duration < 20 || duration > 25) {
+    throw new Error(`Model Results chapter is ${duration.toFixed(2)}s, outside 20–25 seconds.`);
+  }
+  const voice = mixSpeech(scene.cues || [], duration, path.join(WORK, 'results-level.wav'));
+  const muxed = spawnSync(FFMPEG, [
+    '-y', '-i', picture, '-i', voice,
+    '-map', '0:v:0', '-map', '1:a:0',
+    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '1',
+    '-movflags', '+faststart', chapter
+  ], { encoding: 'utf8' });
+  if (muxed.status !== 0) throw new Error((muxed.stderr || 'results mux failed').slice(-800));
+  const joined = spawnSync(FFMPEG, [
+    '-y', '-i', chapter, '-i', scenarioClip,
+    '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]',
+    '-map', '[v]', '-map', '[a]',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', '30',
+    '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '1',
+    '-movflags', '+faststart', combined
+  ], { encoding: 'utf8' });
+  if (joined.status !== 0) throw new Error((joined.stderr || 'preview join failed').slice(-800));
+  console.log(chapter);
+  console.log(combined);
+}
+
 async function main() {
-  const preview = process.argv.includes('--preview-scenario');
+  const previewResults = process.argv.includes('--preview-results');
+  const preview = previewResults || process.argv.includes('--preview-scenario');
   if (!preview && !fs.existsSync(path.join(WORK, 'reference.json'))) {
     throw new Error('Run validate-regression.mjs before capture. The reference file is missing.');
   }
@@ -393,7 +577,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const scenes = [];
   try {
-    const jobs = preview ? [['scenario', scenario]] : [
+    const jobs = previewResults ? [['results', results]] : preview ? [['scenario', scenario]] : [
       ['overview', overview],
       ['enter', (page, api) => brand(page, 'enter.html', 2.4, api)],
       ['effects', effects],
@@ -430,10 +614,14 @@ async function main() {
       process.stdout.write(`scene ${name}\n`);
       scenes.push(await recordScene(browser, name, fn));
     }
-    const sceneFile = preview ? path.join(WORK, 'preview-scenes.json') : path.join(WORK, 'scenes.json');
+    const sceneFile = previewResults
+      ? path.join(WORK, 'preview-results-scenes.json')
+      : preview ? path.join(WORK, 'preview-scenes.json') : path.join(WORK, 'scenes.json');
     fs.writeFileSync(sceneFile, JSON.stringify(scenes, null, 2));
     console.log(JSON.stringify(scenes.map((scene) => ({ id: scene.id, trim: scene.trim, cues: scene.cues })), null, 2));
-    if (preview) {
+    if (previewResults) {
+      encodeResultsPreview(scenes[0]);
+    } else if (preview) {
       const scene = scenes[0];
       const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');
       fs.mkdirSync(outDir, { recursive: true });

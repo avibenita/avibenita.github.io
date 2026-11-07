@@ -138,6 +138,18 @@
       hitBefore: ['col:2', 'col:3'],
       hitAfter: ['col:2', 'col:3']
     },
+    splitByGroup: {
+      title: 'Split by group',
+      beforeNote: 'Each person is in one group. Days sit in a single column.',
+      howNote: 'Group names become the new headers. Days stack in the order they appear. The ID is left out.',
+      afterNote: 'A, B, and C are columns. The shorter group ends in a blank.',
+      headers: ['ID', 'Group', 'Days'],
+      before: [['K1', 'A', '34'], ['K2', 'B', '14'], ['K3', 'C', '30'], ['K4', 'A', '9'], ['K5', 'B', '15']],
+      afterHeaders: ['A', 'B', 'C'],
+      after: [['34', '14', '30'], ['9', '15', '']],
+      hitBefore: ['col:1', 'col:2'],
+      hitAfter: ['col:0', 'col:1', 'col:2']
+    },
     transpose: {
       title: 'Transpose',
       beforeNote: 'People are rows. Age and Score are columns.',
@@ -314,7 +326,7 @@
     }
   }
 
-  var STAGED = { wideToLong: true, longToWide: true, composite: true };
+  var STAGED = { wideToLong: true, longToWide: true, splitByGroup: true, composite: true };
 
   function compactHtml(ex) {
     var afterHeaders = ex.afterHeaders || ex.headers;

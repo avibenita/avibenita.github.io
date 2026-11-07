@@ -637,6 +637,8 @@
         return 'Reshaped ' + (step.measureVars || []).join(', ') + ' into long format';
       case 'longToWide':
         return 'Reshaped ' + (step.timeVar || 'occasion') + ' / ' + (step.valueVar || 'value') + ' into wide format';
+      case 'splitByGroup':
+        return 'Split ' + (step.valueVar || 'values') + ' into columns by ' + (step.groupVar || 'group');
       case 'transpose':
         return 'Transposed the table (first column became the new headers)';
       case 'dropVariables':
@@ -1204,6 +1206,46 @@
     return { casesAffected: newRows.length, outputRows: newRows.length, inputRows: nOld };
   }
 
+  function applySplitByGroup(ds, step) {
+    var groupIdx = headerIndex(ds.headers, step.groupVar);
+    var valueIdx = headerIndex(ds.headers, step.valueVar);
+    if (groupIdx < 0) return { error: 'Select the group column (its values become the new column names).', casesAffected: 0 };
+    if (valueIdx < 0) return { error: 'Select the value column to stack.', casesAffected: 0 };
+    if (groupIdx === valueIdx) return { error: 'Group and value must be two different columns.', casesAffected: 0 };
+    var buckets = [];
+    var keyToBucket = {};
+    var names = [];
+    ds.rows.forEach(function (row) {
+      if (isBlank(row[groupIdx]) && isBlank(row[valueIdx])) return;
+      var raw = occasionName(row[groupIdx]);
+      var key = raw.toLowerCase();
+      var bi = keyToBucket[key];
+      if (bi == null) {
+        var name = uniqueName(names, raw);
+        bi = names.length;
+        keyToBucket[key] = bi;
+        names.push(name);
+        buckets.push([]);
+      }
+      buckets[bi].push(isBlank(row[valueIdx]) ? MISSING : row[valueIdx]);
+    });
+    if (!names.length) return { error: 'The group column has no values to spread.', casesAffected: 0 };
+    var height = 0;
+    buckets.forEach(function (b) { if (b.length > height) height = b.length; });
+    var newRows = [];
+    for (var r = 0; r < height; r++) {
+      newRows.push(names.map(function (_name, c) {
+        return r < buckets[c].length ? buckets[c][r] : MISSING;
+      }));
+    }
+    var nOld = ds.rows.length;
+    ds.headers = names;
+    ds.rows = newRows;
+    ds.structural = true;
+    ds.newVariables = ds.newVariables.concat(names);
+    return { casesAffected: newRows.length, outputRows: newRows.length, inputRows: nOld, columns: names.length };
+  }
+
   function applyTranspose(ds) {
     if (ds.headers.length < 2) return { error: 'Need at least two columns to transpose.', casesAffected: 0 };
     if (!ds.rows.length) return { error: 'Need at least one data row to transpose.', casesAffected: 0 };
@@ -1261,6 +1303,7 @@
     flagDuplicates: applyFlagDuplicates,
     wideToLong: applyWideToLong,
     longToWide: applyLongToWide,
+    splitByGroup: applySplitByGroup,
     transpose: applyTranspose,
     dropVariables: applyDropVariables
   };
@@ -1321,6 +1364,13 @@
       if (headerIndex(headers, step.idVar) < 0 || headerIndex(headers, step.timeVar) < 0 || headerIndex(headers, step.valueVar) < 0) {
         return { ok: false, error: 'ID, occasion, and value must be columns in the current dataset.' };
       }
+    }
+    if (step.type === 'splitByGroup') {
+      var splitGroupIdx = headerIndex(headers, step.groupVar);
+      var splitValueIdx = headerIndex(headers, step.valueVar);
+      if (splitGroupIdx < 0) return { ok: false, error: 'Select the group column.' };
+      if (splitValueIdx < 0) return { ok: false, error: 'Select the value column.' };
+      if (splitGroupIdx === splitValueIdx) return { ok: false, error: 'Group and value must be two different columns.' };
     }
     if (step.type === 'transpose') {
       if ((headers || []).length < 2) return { ok: false, error: 'Need at least two columns to transpose.' };
@@ -1521,6 +1571,7 @@
       { id: 'flagDuplicates', category: 'cases', label: 'Flag duplicates' },
       { id: 'wideToLong', category: 'structure', label: 'Wide to long' },
       { id: 'longToWide', category: 'structure', label: 'Long to wide' },
+      { id: 'splitByGroup', category: 'structure', label: 'Split by group' },
       { id: 'transpose', category: 'structure', label: 'Transpose' }
     ]
   };

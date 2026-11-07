@@ -298,6 +298,74 @@ describe('Statistico Prepare Data engine', () => {
     expect(out.rows[1]).toEqual([11, 30, 5, 6]);
   });
 
+  test('split by group stacks values into one column per group', () => {
+    const headers = ['ID', 'Group', 'Days'];
+    const data = [
+      ['K1', 'A', 34.3],
+      ['K2', 'B', 13.8],
+      ['K3', 'C', 30.1],
+      ['K4', 'A', 8.7],
+      ['K5', 'B', 15.3]
+    ];
+    const out = Prep.applyRecipe(headers, data, [{
+      type: 'splitByGroup',
+      groupVar: 'Group',
+      valueVar: 'Days',
+      enabled: true
+    }]);
+    expect(out.headers).toEqual(['A', 'B', 'C']);
+    expect(out.rows).toEqual([
+      [34.3, 13.8, 30.1],
+      [8.7, 15.3, null]
+    ]);
+    expect(out.structural).toBe(true);
+    expect(out.nRows).toBe(2);
+    expect(out.nVars).toBe(3);
+    expect(out.steps[0].status).toBe('applied');
+    expect(out.steps[0].description).toBe('Split Days into columns by Group');
+  });
+
+  test('split by group rejects the same column for group and value', () => {
+    const valid = Prep.validateStep({
+      type: 'splitByGroup',
+      groupVar: 'Group',
+      valueVar: 'Group'
+    }, ['ID', 'Group', 'Days']);
+    expect(valid.ok).toBe(false);
+  });
+
+  test('split by group folds capitalization and keeps a blank value in order', () => {
+    const out = Prep.applyRecipe(['G', 'V'], [['A', 1], ['a', null], ['A', 3], ['B', 9]], [{
+      type: 'splitByGroup',
+      groupVar: 'G',
+      valueVar: 'V',
+      enabled: true
+    }]);
+    expect(out.headers).toEqual(['A', 'B']);
+    expect(out.rows).toEqual([[1, 9], [null, null], [3, null]]);
+  });
+
+  test('split by group makes a safe column name and skips empty rows', () => {
+    const out = Prep.applyRecipe(['G', 'V'], [['A/B', 1], ['', ''], ['A/B', 2]], [{
+      type: 'splitByGroup',
+      groupVar: 'G',
+      valueVar: 'V',
+      enabled: true
+    }]);
+    expect(out.headers).toEqual(['A_B']);
+    expect(out.rows).toEqual([[1], [2]]);
+  });
+
+  test('split by group reports an error when the group column is empty', () => {
+    const out = Prep.applyRecipe(['G', 'V'], [], [{
+      type: 'splitByGroup',
+      groupVar: 'G',
+      valueVar: 'V',
+      enabled: true
+    }]);
+    expect(out.steps[0].status).toBe('error');
+  });
+
   test('transpose uses the first column as the new headers', () => {
     const out = Prep.applyRecipe(['ID', 'Age', 'Score'], [['A', 22, 3], ['B', 30, 4]], [{
       type: 'transpose',

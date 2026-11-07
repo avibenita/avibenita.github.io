@@ -317,20 +317,29 @@
     .inference-row{display:flex;align-items:stretch;justify-content:flex-start;gap:12px;flex-wrap:wrap;width:100%;}
     .inference-card{display:flex;align-items:stretch;gap:0;flex-wrap:nowrap;justify-content:flex-start;padding:0;border:0;border-radius:0;background:transparent;min-width:0;}
     .inference-card--framework{flex:0 0 auto;min-width:0;}
-    .context-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%;}
-    .context-row #compareStatsRow{flex:1 1 auto;min-width:0;}
+    .context-row{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;width:100%;min-height:32px;}
+    .context-identity{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding-right:12px;margin-right:2px;border-right:1px solid rgba(255,255,255,.12);}
+    .context-identity #compareStatsRow{flex:0 0 auto;min-width:0;gap:0;}
+    .context-identity .stat-chip,.settings-bar.parametric .context-identity .stat-chip,.settings-bar.nonparametric .context-identity .stat-chip{background:transparent;border:0;box-shadow:none;padding:0;border-radius:0;font-size:13px;font-weight:700;color:var(--text-primary);}
     .context-n{font-size:13px;font-weight:650;color:var(--text-secondary);white-space:nowrap;}
-    .context-field{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:650;color:var(--text-muted);white-space:nowrap;}
-    .context-field select,.context-alpha input{height:30px;border-radius:6px;border:1px solid rgba(255,255,255,.14);background:#121820;color:var(--text-primary);font-size:13px;font-weight:650;padding:0 8px;}
+    .context-identity:has(.stat-chip) .context-n::before{content:"·";margin-right:8px;color:var(--text-muted);font-weight:500;}
+    .context-field{display:inline-flex;align-items:center;gap:6px;height:32px;font-size:12px;font-weight:650;color:var(--text-muted);white-space:nowrap;}
+    .context-field select,.context-alpha input{height:32px;border-radius:6px;border:1px solid rgba(255,255,255,.14);background:#121820;color:var(--text-primary);font-size:13px;font-weight:650;padding:0 8px;}
     .context-field select:focus,.context-alpha input:focus{outline:none;border-color:#67e8f9;box-shadow:0 0 0 2px rgba(103,232,249,.25);}
-    .context-alpha input{width:72px;font-variant-numeric:tabular-nums;}
+    .context-alpha input{width:68px;font-variant-numeric:tabular-nums;}
+    .context-row .fw-select{min-width:0;}
+    .context-row .fw-select .fw-dropdown{width:auto;min-width:0;height:32px;padding:0 10px;}
     .fw-dropdown.parametric,.fw-dropdown.nonparametric{background:#121820;border-color:rgba(255,255,255,.14);color:var(--text-primary);}
     .fw-dropdown.parametric.is-selected,.context-row .fw-dropdown:focus{border-color:#67e8f9;}
-    .hyp-disclosure{border:1px solid rgba(255,255,255,.12);border-radius:8px;background:transparent;padding:0;}
-    .hyp-disclosure>summary{cursor:pointer;list-style:none;padding:6px 10px;font-size:12px;font-weight:700;color:var(--text-secondary);}
+    .context-row>.hyp-disclosure{display:contents;}
+    .hyp-disclosure>summary{cursor:pointer;list-style:none;height:32px;display:inline-flex;align-items:center;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,.14);background:#121820;font-size:12px;font-weight:700;color:var(--text-secondary);}
     .hyp-disclosure>summary::-webkit-details-marker{display:none;}
-    .hyp-disclosure[open]>summary{color:#67e8f9;}
-    .hyp-disclosure .hyp-card{margin:0;border:0;border-top:1px solid rgba(255,255,255,.08);border-radius:0;background:transparent;box-shadow:none;}
+    .hyp-disclosure>summary::after{content:"";margin-left:8px;border:4px solid transparent;border-top-color:currentColor;transform:translateY(2px);}
+    .hyp-disclosure[open]>summary{color:#67e8f9;border-color:rgba(103,232,249,.45);}
+    .hyp-disclosure[open]>summary::after{border-top-color:transparent;border-bottom-color:currentColor;transform:translateY(-2px);}
+    .settings-bar .hyp-disclosure .hyp-card{flex:1 0 100%;margin:4px 0 0;padding:8px 2px 2px;border:0;border-top:1px solid rgba(255,255,255,.08);border-radius:0;background:transparent;box-shadow:none;}
+    .hyp-disclosure:not([open]) .hyp-card{display:none;}
+    .settings-bar .hyp-disclosure .hyp-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 24px;}
     .omnibus-layout{display:flex;flex-direction:column;gap:12px;}
     .omnibus-main{display:grid;grid-template-columns:minmax(0,3fr) minmax(280px,2fr);gap:12px;align-items:stretch;}
     .omnibus-chart,.omnibus-summary,.test-details{background:#161d27;border:1px solid rgba(255,255,255,.08);border-radius:10px;box-shadow:none;}
@@ -564,8 +573,10 @@
 
         <div class="settings-bar parametric">
           <div class="context-row">
-            <div class="hdr-row" id="compareStatsRow"></div>
-            <span class="context-n" id="contextTotalN">N = …</span>
+            <div class="context-identity">
+              <div class="hdr-row" id="compareStatsRow"></div>
+              <span class="context-n" id="contextTotalN">N = …</span>
+            </div>
             <div class="fw-select" id="fwFrameworkSelectWrap">
               <button type="button" class="fw-dropdown parametric" id="fwFrameworkBtn" aria-haspopup="listbox" aria-expanded="false">
                 <span id="fwFrameworkLabel">Parametric (means)</span>
@@ -3369,7 +3380,10 @@
       setFrameworkButtons(s.primaryFramework || primaryFramework);
       window._independentPrimaryFramework = primaryFramework;
       var alphaEl = document.getElementById("setAlpha");
-      if (alphaEl) alphaEl.value = String(1 - (parseMaybeNumber(s.confidence) || 0.95));
+      if (alphaEl) {
+        var alphaShown = 1 - (parseMaybeNumber(s.confidence) || 0.95);
+        alphaEl.value = String(Math.round((isFinite(alphaShown) ? alphaShown : 0.05) * 1000) / 1000);
+      }
       var orientation = s.hypothesis || "two-sided";
       currentHypothesis = orientation;
       var radio = document.querySelector('input[name="h1Orientation"][value="' + orientation + '"]');

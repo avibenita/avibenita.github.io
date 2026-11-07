@@ -2135,7 +2135,7 @@ const StatisticoHeader = {
     if (this.module === 'dependent') {
       const isKplus = this.currentView === 'dependent-results-kplus';
       const analysisItems = [
-        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Test Results', description: isKplus ? 'Repeated-measures omnibus result.' : 'Paired t and the signed-rank check.', active: true },
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: isKplus ? 'Overview' : 'Test Results', description: isKplus ? 'Repeated-measures omnibus result.' : 'Paired t and the signed-rank check.', active: true },
         { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions', description: isKplus ? 'Sphericity and the repeated-measures checks.' : 'What the change scores need to satisfy.' }
       ];
       if (isKplus) {

@@ -1157,12 +1157,27 @@ function sendIndependentBundle() {
   const modelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
   const bundle = buildIndependentBundle(headers, rows, modelSpec);
   console.log("sendIndependentBundle: rows=" + rows.length + "/" + fullRows.length + (isFiltered ? " (filtered)" : ""));
-  independentDialog.messageChild(JSON.stringify({
+  const selected = (bundle.setup && bundle.setup.selectedColumns) || [];
+  const keep = selected.map(function (name) { return headers.indexOf(name); }).filter(function (i) { return i >= 0; });
+  const cols = keep.length ? keep : headers.map(function (_, i) { return i; });
+  const slimHeaders = cols.map(function (i) { return headers[i]; });
+  const slimRows = rows.map(function (r) { return cols.map(function (i) { return r[i]; }); });
+  let message = JSON.stringify({
     type: "INDEPENDENT_BUNDLE",
     payload: bundle,
-    rawData: independentRangeData,                                   // full source — filter UI / View Data
-    analysisRows: isFiltered ? [headers].concat(rows) : null         // filter-aware — extractVector helpers
-  }));
+    rawData: [slimHeaders].concat(slimRows),
+    analysisRows: [slimHeaders].concat(slimRows)
+  });
+  if (message.length > 900000 && bundle.results && bundle.results.posthoc) {
+    bundle.results.posthoc.groupValues = null;
+    message = JSON.stringify({
+      type: "INDEPENDENT_BUNDLE",
+      payload: bundle,
+      rawData: [slimHeaders].concat(slimRows),
+      analysisRows: [slimHeaders].concat(slimRows)
+    });
+  }
+  independentDialog.messageChild(message);
   } catch (err) {
     console.error("sendIndependentBundle failed", err);
   }

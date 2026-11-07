@@ -534,6 +534,12 @@ function resolvePosthocMethod(requested, framework, primaryTest) {
   return primaryTest === "welch" ? "games-howell" : "tukey";
 }
 
+function studentTTwoSidedP(t, df) {
+  if (!isFinite(t) || !isFinite(df) || df <= 0) return NaN;
+  const x = df / (df + t * t);
+  return regularizedIncompleteBeta(df / 2, 0.5, x);
+}
+
 function computePosthocRows(grouped, levels, framework, correction, spec) {
   spec = spec || {};
   const method = resolvePosthocMethod(spec.method, framework, spec.primaryTest);
@@ -585,7 +591,9 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
         const b = grouped[levels[j]] || [];
         const na = a.length, nb = b.length;
         const va = variance(a), vb = variance(b);
-        const diff = mean(a) - mean(b);
+        const meanA = mean(a);
+        const meanB = mean(b);
+        const diff = meanA - meanB;
         const se = Math.sqrt(0.5 * (va / Math.max(1, na) + vb / Math.max(1, nb)));
         const q = se > 0 ? Math.abs(diff) / se : 0;
         const df = Math.pow(va / na + vb / nb, 2) / (Math.pow(va / na, 2) / Math.max(1, na - 1) + Math.pow(vb / nb, 2) / Math.max(1, nb - 1));
@@ -602,7 +610,11 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
           intervalKind: "simultaneous",
           ciLower: diff - crit * se,
           ciUpper: diff + crit * se,
-          cohenD: sp > 0 ? diff / sp : 0
+          cohenD: sp > 0 ? diff / sp : 0,
+          n1: na,
+          n2: nb,
+          mean1: meanA,
+          mean2: meanB
         });
       }
     }
@@ -614,23 +626,31 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
         const a = grouped[levels[i]] || [];
         const b = grouped[levels[j]] || [];
         const na = a.length, nb = b.length;
-        const diff = mean(a) - mean(b);
+        const meanA = mean(a);
+        const meanB = mean(b);
+        const diff = meanA - meanB;
         const se = ms > 0 ? Math.sqrt(ms * 0.5 * (1 / Math.max(1, na) + 1 / Math.max(1, nb))) : 0;
         const q = se > 0 ? Math.abs(diff) / se : 0;
         const p = se > 0 ? 1 - tukeyCdf(q, k, df) : NaN;
         const crit = tukeyQuantile(1 - (spec.alpha || 0.05), k, df);
+        const seDiff = se > 0 ? se * Math.SQRT2 : 0;
+        const unadjustedP = seDiff > 0 ? studentTTwoSidedP(diff / seDiff, df) : NaN;
         const sp = Math.sqrt(ms);
         rows.push({
           comparison: `${levels[i]} vs ${levels[j]}`,
           statistic: `q=${q.toFixed(2)}`,
-          rawP: NaN,
+          rawP: unadjustedP,
           adjP: p,
           estimate: diff,
           estimateKind: "mean-difference",
           intervalKind: "simultaneous",
           ciLower: isFinite(crit) ? diff - crit * se : NaN,
           ciUpper: isFinite(crit) ? diff + crit * se : NaN,
-          cohenD: sp > 0 ? diff / sp : 0
+          cohenD: sp > 0 ? diff / sp : 0,
+          n1: na,
+          n2: nb,
+          mean1: meanA,
+          mean2: meanB
         });
       }
     }
@@ -663,7 +683,11 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
       intervalKind: r.intervalKind || (builtin ? "simultaneous" : "unavailable"),
       ciLower: r.ciLower,
       ciUpper: r.ciUpper,
-      cohenD: r.cohenD
+      cohenD: r.cohenD,
+      n1: r.n1,
+      n2: r.n2,
+      mean1: r.mean1,
+      mean2: r.mean2
     }))
   };
 }
@@ -969,12 +993,17 @@ function buildIndependentBundle(headers, rows, spec) {
       dfError: anova ? anova.df2 : NaN,
       alpha
     });
+    const groupValues = {};
+    levels.forEach((lv) => { groupValues[lv] = (grouped[lv] || []).slice(); });
     posthoc = {
       enabled: true,
       method: posthocComputed.method,
       correction: posthocComputed.correction,
       familySize: posthocComputed.familySize,
       estimateLabel: posthocComputed.estimateLabel,
+      intervalNote: posthocComputed.intervalNote,
+      treatment: posthocComputed.treatment,
+      groupValues,
       rows: posthocComputed.rows
     };
   }

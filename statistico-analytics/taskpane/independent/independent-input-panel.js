@@ -1140,6 +1140,28 @@ function openIndependentResultsDialog() {
   );
 }
 
+function ensureIndependentContract() {
+  if (globalThis.StatisticoIndependentContract) return true;
+  var src = "independent-contract.js";
+  var scripts = document.getElementsByTagName("script");
+  for (var i = 0; i < scripts.length; i++) {
+    var s = scripts[i].src || "";
+    if (s.indexOf("independent-input-panel.js") >= 0) {
+      src = s.replace(/independent-input-panel\.js(?:\?.*)?$/, "independent-contract.js");
+      break;
+    }
+  }
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", src, false);
+    xhr.send(null);
+    if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 0) (0, eval)(xhr.responseText);
+  } catch (err) {
+    console.error("ensureIndependentContract", err);
+  }
+  return !!globalThis.StatisticoIndependentContract;
+}
+
 function sendIndependentBundle() {
   console.log("=== sendIndependentBundle called ===");
   if (!independentDialog || !independentRangeData) {
@@ -1147,6 +1169,7 @@ function sendIndependentBundle() {
     return;
   }
   try {
+  ensureIndependentContract();
   const headers = independentRangeData[0] || [];
   const fullRows = independentRangeData.slice(1);
   // Honour the cached filter (if any). Settings changes always flow through
@@ -1164,6 +1187,7 @@ function sendIndependentBundle() {
   const slimRows = rows.map(function (r) { return cols.map(function (i) { return r[i]; }); });
   let message = JSON.stringify({
     type: "INDEPENDENT_BUNDLE",
+    savedAt: Date.now(),
     payload: bundle,
     rawData: [slimHeaders].concat(slimRows),
     analysisRows: [slimHeaders].concat(slimRows)
@@ -1172,10 +1196,21 @@ function sendIndependentBundle() {
     bundle.results.posthoc.groupValues = null;
     message = JSON.stringify({
       type: "INDEPENDENT_BUNDLE",
+      savedAt: Date.now(),
       payload: bundle,
       rawData: [slimHeaders].concat(slimRows),
       analysisRows: [slimHeaders].concat(slimRows)
     });
+  }
+  try { localStorage.setItem("statistico.independent.bundle", message); }
+  catch (_storeErr) {
+    try {
+      localStorage.setItem("statistico.independent.bundle", JSON.stringify({
+        type: "INDEPENDENT_BUNDLE",
+        savedAt: Date.now(),
+        payload: bundle
+      }));
+    } catch (_storeErr2) {}
   }
   independentDialog.messageChild(message);
   } catch (err) {

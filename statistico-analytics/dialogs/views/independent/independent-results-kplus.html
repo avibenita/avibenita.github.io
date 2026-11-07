@@ -4145,7 +4145,27 @@
       const blob = new Blob([clone.outerHTML], {type:"text/html"});
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "independent-means-report.html"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),500);
     }
+    var independentPageStarted = Date.now();
+    function applyStoredIndependentBundle() {
+      if (lastBundle) return true;
+      var raw = "";
+      try { raw = localStorage.getItem("statistico.independent.bundle") || ""; } catch (_e) { return false; }
+      if (!raw) return false;
+      var msg;
+      try { msg = JSON.parse(raw); } catch (_e) { return false; }
+      if (!msg || msg.type !== "INDEPENDENT_BUNDLE" || !(msg.savedAt >= independentPageStarted - 120000)) return false;
+      if (msg.rawData) window.independentRangeData = msg.rawData;
+      window.independentAnalysisRows = (msg.analysisRows && msg.analysisRows.length) ? msg.analysisRows : null;
+      try { populateBundle(msg.payload || {}); }
+      catch (err) { console.error("populateBundle failed", err); return false; }
+      return !!lastBundle;
+    }
     document.addEventListener("DOMContentLoaded", function(){
+      applyStoredIndependentBundle();
+      var storedTries = 0;
+      var storedPump = setInterval(function() {
+        if (applyStoredIndependentBundle() || storedTries++ > 40) clearInterval(storedPump);
+      }, 400);
       // Initialize shared header
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('independent-results-kplus', '', 0, 'independent');

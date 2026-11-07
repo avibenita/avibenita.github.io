@@ -831,31 +831,57 @@
     .assump-compact .assump-text .at{ font-size:13px; }
     .assump-compact .assump-text .ad{ font-size:12px; margin-top:1px; line-height:1.4; }
 
-    /* ── Within-group spread diagnostic ─────────────────────── */
-    .spread-layout{
+    /* ── Variance tests and the two diagnostic charts ──────── */
+    .assum-charts{
       display:grid;
-      grid-template-columns:minmax(0,1.45fr) minmax(260px,.85fr);
-      gap:18px 22px;
-      align-items:start;
+      grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+      gap:16px;
+      margin-bottom:16px;
     }
-    .spread-layout.spread-stats-only{ grid-template-columns:1fr; }
-    @media (max-width:900px){
-      .spread-layout{ grid-template-columns:1fr; }
+    .assum-charts > .results-panel{ margin-bottom:0; overflow:visible; }
+    @media (max-width:980px){
+      .assum-charts{ grid-template-columns:1fr; }
     }
-    .spread-kicker{
-      margin:0 0 6px;
-      font-size:11px; font-weight:700; letter-spacing:.06em;
+    .var-cards{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+      gap:12px;
+    }
+    @media (max-width:720px){
+      .var-cards{ grid-template-columns:1fr; }
+    }
+    .var-card{
+      background:var(--surface-2);
+      border:1.5px solid var(--border);
+      border-radius:10px;
+      padding:14px 16px 12px;
+    }
+    .var-card.is-sig{ border-color:rgba(251,191,36,.55); }
+    .var-card-name{ font-size:15px; font-weight:750; color:var(--text-primary); }
+    .var-card-sub{ margin-top:2px; font-size:12px; font-weight:600; color:var(--text-muted); }
+    .var-card-metrics{
+      display:grid;
+      grid-template-columns:1.15fr .9fr 1fr;
+      gap:8px;
+      margin:12px 0 10px;
+    }
+    .var-card-metrics .sv{
+      font-size:26px; font-weight:800; color:var(--text-primary); line-height:1.05;
+      font-variant-numeric:tabular-nums;
+    }
+    .var-card-metrics .sv.is-sig{ color:var(--warning); }
+    .var-card-metrics .sl{
+      margin-top:3px;
+      font-size:11px; font-weight:700; letter-spacing:.05em;
       text-transform:uppercase; color:var(--text-muted);
     }
-    .spread-chart{ width:100%; height:380px; }
+    .spread-chart, .variance-chart{ width:100%; height:340px; }
     .spread-caption{
       margin:2px 4px 0;
       text-align:center;
       font-size:12px; font-weight:500; line-height:1.45;
       color:var(--text-muted);
     }
-    .variance-block{ margin-top:18px; }
-    .variance-chart{ width:100%; height:280px; }
     .spread-obs-btn{
       border:1px solid var(--border);
       background:transparent;
@@ -1749,27 +1775,34 @@
 
         <!-- ── ASSUMPTIONS ───────────────────────────────────── -->
         <div class="tab-panel" id="tab-diagnostics" style="display:none;">
-          <div class="results-panel" id="panelSpread">
+          <div class="results-panel" id="panelVarianceTests">
             <div class="results-panel-heading">
-              <span><i class="fa-solid fa-shield-halved"></i>Homogeneity of variance</span>
-              <button type="button" id="btnSpreadObs" class="spread-obs-btn" aria-pressed="false" onclick="toggleSpreadObservations()">Show observations</button>
+              <span><i class="fa-solid fa-shield-halved"></i>Variance tests</span>
             </div>
-            <div class="results-panel-body">
-              <div class="spread-layout" id="spreadLayout">
-                <div id="spreadChartCol">
-                  <div class="spread-kicker">Within-group spread</div>
-                  <div id="spreadChart" class="spread-chart"></div>
-                  <p class="spread-caption">Compare box heights and whisker lengths to assess differences in spread.</p>
-                </div>
-                <div>
-                  <div class="spread-kicker">Variance tests</div>
-                  <div id="assumptionsBody"></div>
+            <div class="results-panel-body" id="assumptionsBody"></div>
+          </div>
+          <div class="assum-charts" id="assumCharts">
+            <div class="results-panel" id="panelSpread">
+              <div class="results-panel-heading">
+                <span>Within-group spread</span>
+                <button type="button" id="btnSpreadObs" class="spread-obs-btn" aria-pressed="false" onclick="toggleSpreadObservations()">Show observations</button>
+              </div>
+              <div class="results-panel-body">
+                <div id="spreadChart" class="spread-chart"></div>
+                <p class="spread-caption">Compare box heights and whisker lengths to assess differences in spread.</p>
+              </div>
+            </div>
+            <div class="results-panel" id="varianceChartBlock">
+              <div class="results-panel-heading">
+                <span>Group variances</span>
+                <div class="chart-switch" role="group" aria-label="Variance chart display">
+                  <button type="button" id="btnVarianceBar" class="active" onclick="switchVarianceChart('bar')">Bars + CI</button>
+                  <button type="button" id="btnVariancePoints" onclick="switchVarianceChart('points')">Points + CI</button>
                 </div>
               </div>
-              <div id="varianceChartBlock" class="variance-block">
-                <div class="spread-kicker">Group variances</div>
+              <div class="results-panel-body">
                 <div id="varianceChart" class="variance-chart"></div>
-                <p class="spread-caption">Each point is the sample variance. Whiskers are its 95% confidence interval.</p>
+                <p class="spread-caption" id="varianceCaption">Each bar is the sample variance. Whiskers are its 95% confidence interval.</p>
               </div>
             </div>
           </div>
@@ -2071,6 +2104,8 @@
   var _factorChartMode = 'bar';
   var _summaryChartMode = 'bar';
   var _spreadShowObs = false;
+  var _varianceChartMode = 'bar';
+  var _varianceGroups = null;
   var _summaryRendering = false;
   var _ixHighlight = '';
   /* Original (host-precomputed) bundle preserved for two reasons: a clean
@@ -3482,7 +3517,8 @@
     var host = document.getElementById('varianceChart');
     var block = document.getElementById('varianceChartBlock');
     if (!host) return;
-    if (!groups || !groups.length) {
+    _varianceGroups = groups && groups.length ? groups : null;
+    if (!_varianceGroups) {
       if (block) block.style.display = 'none';
       if (_charts.variance) { try { _charts.variance.destroy(); } catch (e) {} _charts.variance = null; }
       return;
@@ -3491,15 +3527,21 @@
     if (host.offsetWidth < 20) return;
     groups.forEach(function (g) { g._vci = _varianceCi(g); });
     if (_charts.variance) { try { _charts.variance.destroy(); } catch (e2) {} _charts.variance = null; }
+    var bars = _varianceChartMode !== 'points';
     var t = _visTheme();
     var teal = _summaryTeal(t.isDark);
     var labelStyle = { color: t.tc, fontSize: '13px', fontWeight: '600' };
     var titleStyle = { color: t.tc, fontSize: '13px', fontWeight: '700' };
+    var ciData = groups.map(function (g) {
+      var ci = g._vci;
+      return (ci && isFinite(ci.lo) && isFinite(ci.hi)) ? { low: ci.lo, high: ci.hi } : null;
+    });
+    var valueData = groups.map(function (g) { return g._vci && isFinite(g._vci.v) ? g._vci.v : null; });
     _charts.variance = Highcharts.chart('varianceChart', {
       chart: {
         backgroundColor: 'transparent',
         style: { fontFamily: 'Segoe UI, sans-serif' },
-        spacingTop: 26, spacingRight: 18, spacingBottom: 8, spacingLeft: 8,
+        spacingTop: 26, spacingRight: 12, spacingBottom: 8, spacingLeft: 8,
         animation: false,
         events: { render: function () { _placeVarianceLabels(this, groups, teal.label); } }
       },
@@ -3521,6 +3563,14 @@
         maxPadding: 0.22
       },
       plotOptions: {
+        column: {
+          color: teal.fill,
+          borderColor: teal.point,
+          borderWidth: 1.5,
+          borderRadius: 4,
+          pointPadding: 0.16,
+          groupPadding: 0.18
+        },
         errorbar: {
           color: teal.stem,
           stemWidth: 1.6,
@@ -3551,39 +3601,45 @@
         }
       },
       series: [
-        {
-          type: 'errorbar',
-          name: '95% CI',
-          zIndex: 1,
-          data: groups.map(function (g) {
-            var ci = g._vci;
-            return (ci && isFinite(ci.lo) && isFinite(ci.hi)) ? { low: ci.lo, high: ci.hi } : null;
-          })
-        },
-        {
-          type: 'scatter',
-          name: 'Variance',
-          zIndex: 2,
-          color: teal.point,
-          data: groups.map(function (g) { return g._vci && isFinite(g._vci.v) ? g._vci.v : null; })
-        }
+        { type: 'errorbar', name: '95% CI', zIndex: 2, data: ciData },
+        bars
+          ? { type: 'column', name: 'Variance', zIndex: 1, data: valueData }
+          : { type: 'scatter', name: 'Variance', zIndex: 3, color: teal.point, data: valueData }
       ]
     });
+  }
+  function switchVarianceChart(mode) {
+    _varianceChartMode = mode === 'points' ? 'points' : 'bar';
+    var barBtn = document.getElementById('btnVarianceBar');
+    var ptBtn = document.getElementById('btnVariancePoints');
+    if (barBtn) barBtn.classList.toggle('active', _varianceChartMode === 'bar');
+    if (ptBtn) ptBtn.classList.toggle('active', _varianceChartMode === 'points');
+    var cap = document.getElementById('varianceCaption');
+    if (cap) {
+      cap.textContent = _varianceChartMode === 'bar'
+        ? 'Each bar is the sample variance. Whiskers are its 95% confidence interval.'
+        : 'Each point is the sample variance. Whiskers are its 95% confidence interval.';
+    }
+    if (_varianceGroups) renderVarianceChart(_varianceGroups);
   }
   function _varianceStatusBadge(p, alpha) {
     if (!isFinite(p)) return '<span class="badge badge-neutral badge-wrap">—</span>';
     if (p < alpha) return '<span class="badge badge-warn badge-wrap">Evidence of unequal variances</span>';
     return '<span class="badge badge-neutral badge-wrap">No evidence of unequal variances</span>';
   }
-  function _varianceTestRows(name, detail, test, alpha) {
+  function _varianceTestCard(name, detail, test, alpha) {
     if (!test) return '';
-    return '<tr>' +
-      '<td>' + name + '<span class="spread-sub">' + detail + '</span></td>' +
-      '<td class="num">' + fmt(test.F, 2) + '</td>' +
-      '<td class="num">' + test.df1 + ', ' + test.df2 + '</td>' +
-      '<td class="num ' + sigCell(test.p, alpha) + '">' + fmtP(test.p) + '</td>' +
-    '</tr>' +
-    '<tr class="spread-status-row"><td colspan="4">' + _varianceStatusBadge(test.p, alpha) + '</td></tr>';
+    var sig = isFinite(test.p) && test.p < alpha;
+    return '<div class="var-card' + (sig ? ' is-sig' : '') + '">' +
+      '<div class="var-card-name">' + name + '</div>' +
+      '<div class="var-card-sub">' + detail + '</div>' +
+      '<div class="var-card-metrics">' +
+        '<div><div class="sv">' + fmt(test.F, 2) + '</div><div class="sl">F</div></div>' +
+        '<div><div class="sv">' + test.df1 + ', ' + test.df2 + '</div><div class="sl">df</div></div>' +
+        '<div><div class="sv' + (sig ? ' is-sig' : '') + '">' + fmtP(test.p) + '</div><div class="sl">p</div></div>' +
+      '</div>' +
+      _varianceStatusBadge(test.p, alpha) +
+    '</div>';
   }
   function toggleSpreadObservations() {
     _spreadShowObs = !_spreadShowObs;
@@ -3700,21 +3756,16 @@
 
   function populateAssumptions(b) {
     var el = document.getElementById('assumptionsBody');
-    var layout = document.getElementById('spreadLayout');
-    var chartCol = document.getElementById('spreadChartCol');
+    var charts = document.getElementById('assumCharts');
     var obsBtn = document.getElementById('btnSpreadObs');
     var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
-    var varBlock = document.getElementById('varianceChartBlock');
     if (!b.levene) {
-      if (layout) layout.classList.add('spread-stats-only');
-      if (chartCol) chartCol.style.display = 'none';
+      if (charts) charts.style.display = 'none';
       if (obsBtn) obsBtn.style.display = 'none';
-      if (varBlock) varBlock.style.display = 'none';
       if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">Homogeneity tests are only computed for one-way ANOVA.</p>';
       return;
     }
-    if (layout) layout.classList.remove('spread-stats-only');
-    if (chartCol) chartCol.style.display = '';
+    if (charts) charts.style.display = '';
     if (obsBtn) obsBtn.style.display = '';
     var lev = b.levene;
     var bf = b.brownForsythe;
@@ -3727,12 +3778,10 @@
 
     if (!el) return;
     el.innerHTML =
-      '<table class="spread-table"><thead><tr>' +
-        '<th>Test</th><th class="num">F</th><th class="num">df</th><th class="num">p</th>' +
-      '</tr></thead><tbody>' +
-      _varianceTestRows('Levene\'s', 'mean-based', lev, alpha) +
-      _varianceTestRows('Brown–Forsythe', 'median-based', bf, alpha) +
-      '</tbody></table>' +
+      '<div class="var-cards">' +
+        _varianceTestCard('Levene\'s', 'mean-based', lev, alpha) +
+        _varianceTestCard('Brown–Forsythe', 'median-based', bf, alpha) +
+      '</div>' +
       (unequalVar
         ? '<p class="spread-note">A variance test is below α. That is evidence of unequal variances, so a method that does not assume equal variances, such as Welch\'s ANOVA, is the safer summary.</p>'
         : '');

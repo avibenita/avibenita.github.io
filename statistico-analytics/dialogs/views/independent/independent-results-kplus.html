@@ -4244,19 +4244,32 @@
           }
         });
         
-        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
-          const msg = JSON.parse(arg.message||"{}");
-          if(msg.type==="INDEPENDENT_BUNDLE"){
-            // Store raw data for descriptive stats
-            if (msg.rawData) {
-              window.independentRangeData = msg.rawData;
+        function requestIndependentBundle() {
+          if (lastBundle) return;
+          try {
+            if (Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+              Office.context.ui.messageParent(JSON.stringify({ action: "ready" }));
             }
+          } catch (_e) {}
+          sendToHost("independentDashboardReady", {});
+        }
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
+          var msg = {};
+          try { msg = JSON.parse(arg.message || "{}"); } catch (_e) { return; }
+          if (msg.type === "INDEPENDENT_BUNDLE") {
+            if (msg.rawData) window.independentRangeData = msg.rawData;
             window.independentAnalysisRows = (msg.analysisRows && msg.analysisRows.length) ? msg.analysisRows : null;
-            populateBundle(msg.payload||{});
+            try { populateBundle(msg.payload || {}); }
+            catch (err) { console.error("populateBundle failed", err); }
           } else if (msg.theme) { applyTheme(msg.theme); }
+        }, function() {
+          requestIndependentBundle();
+          var tries = 0;
+          var pump = setInterval(function() {
+            if (lastBundle || tries++ > 24) { clearInterval(pump); return; }
+            requestIndependentBundle();
+          }, 500);
         });
-        sendToHost("independentDashboardReady",{});
-        setTimeout(()=>sendToHost("independentDashboardReady",{}),500);
       });
     });
     

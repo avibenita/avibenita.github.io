@@ -21,6 +21,27 @@ const PROBE = process.argv.includes('probe');
 fs.mkdirSync(WORK, { recursive: true });
 fs.mkdirSync(path.join(WORK, 'qa'), { recursive: true });
 
+function loudnormMeasured(file) {
+  const r = spawnSync(FFMPEG, ['-i', file, '-af', 'loudnorm=I=-16.6:TP=-1.5:LRA=11:print_format=json', '-f', 'null', '-'], { encoding: 'utf8' });
+  const text = `${r.stdout || ''}\n${r.stderr || ''}`;
+  const start = text.lastIndexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end < start) throw new Error(`loudnorm measure failed\n${text.slice(-1500)}`);
+  return JSON.parse(text.slice(start, end + 1));
+}
+
+function leveledVoice(mp3) {
+  const measured = loudnormMeasured(mp3);
+  const wav = path.join(WORK, 'scenario-1-level.wav');
+  const leveled = spawnSync(FFMPEG, [
+    '-y', '-i', mp3,
+    '-af', `loudnorm=I=-16.6:TP=-1.5:LRA=11:measured_I=${measured.input_i}:measured_TP=${measured.input_tp}:measured_LRA=${measured.input_lra}:measured_thresh=${measured.input_thresh}:offset=${measured.target_offset}:linear=true`,
+    wav
+  ], { encoding: 'utf8' });
+  if (leveled.status !== 0) throw new Error((leveled.stderr || 'loudnorm failed').slice(-800));
+  return wav;
+}
+
 function mediaDuration(file) {
   const r = spawnSync(FFMPEG, ['-i', file], { encoding: 'utf8' });
   const m = /Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/.exec(`${r.stdout || ''}\n${r.stderr || ''}`);
@@ -419,13 +440,14 @@ async function main() {
       const out = path.join(outDir, 'scenario-highlight.mp4');
       const cue = (scene.cues || []).find((item) => item.id === 'scenario-1');
       const audio = path.join(AUDIO, 'scenario-1.mp3');
+      const voice = cue && fs.existsSync(audio) ? leveledVoice(audio) : null;
       const args = ['-y', '-ss', String(scene.trim), '-i', scene.src];
-      if (cue && fs.existsSync(audio)) args.push('-itsoffset', String(cue.at), '-i', audio);
+      if (voice) args.push('-itsoffset', String(cue.at), '-i', voice);
       args.push(
         '-vf', 'scale=1728:1080:flags=lanczos,fps=30,format=yuv420p',
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p'
       );
-      if (cue && fs.existsSync(audio)) args.push('-map', '0:v:0', '-map', '1:a:0', '-c:a', 'aac');
+      if (voice) args.push('-map', '0:v:0', '-map', '1:a:0', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000');
       args.push('-movflags', '+faststart', out);
       const encoded = spawnSync(FFMPEG, args, { encoding: 'utf8' });
       if (encoded.status !== 0) throw new Error((encoded.stderr || 'preview encode failed').slice(-800));

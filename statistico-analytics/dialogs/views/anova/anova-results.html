@@ -845,6 +845,8 @@
       font-size:12px; font-weight:500; line-height:1.45;
       color:var(--text-muted);
     }
+    .variance-block{ margin-top:18px; }
+    .variance-chart{ width:100%; height:280px; }
     .spread-obs-btn{
       border:1px solid var(--border);
       background:transparent;
@@ -1533,11 +1535,13 @@
               <span id="summaryChartTitle">Group means</span>
               <div class="chart-switch" role="group" aria-label="Chart display">
                 <button type="button" id="btnSummaryMeans" class="active" onclick="switchSummaryChart('means')">Means + CI</button>
+                <button type="button" id="btnSummaryBar" onclick="switchSummaryChart('bar')">Bars + CI</button>
                 <button type="button" id="btnSummaryBox" onclick="switchSummaryChart('box')">Box plot</button>
               </div>
             </div>
             <div class="results-panel-body summary-chart-body">
               <div class="chart-wrap-summary" id="summaryMeansChart"></div>
+              <div class="chart-wrap-summary" id="summaryBarChart" style="display:none;"></div>
               <div class="chart-wrap-summary" id="summaryBoxChart" style="display:none;"></div>
               <div class="summary-chart-foot" id="summaryChartFoot">Select a group to explore its distribution.</div>
             </div>
@@ -1752,6 +1756,11 @@
                   <div class="spread-kicker">Variance tests</div>
                   <div id="assumptionsBody"></div>
                 </div>
+              </div>
+              <div id="varianceChartBlock" class="variance-block">
+                <div class="spread-kicker">Group variances</div>
+                <div id="varianceChart" class="variance-chart"></div>
+                <p class="spread-caption">Each point is the sample variance. Whiskers are its 95% confidence interval.</p>
               </div>
             </div>
           </div>
@@ -2179,7 +2188,7 @@
     if (id === 'overview' || id === 'patterns' || id === 'visuals' || id === 'interactions') {
       setTimeout(function() {
         /* reflow all visible charts after tab becomes visible */
-        ['summaryMeans','summaryBox','grpBar','grpBox','timBar','timBox','interaction','meansMini','ranksMini','overallHist'].forEach(function(k){
+        ['summaryMeans','summaryBar','summaryBox','grpBar','grpBox','timBar','timBox','interaction','meansMini','ranksMini','overallHist'].forEach(function(k){
           if (_charts[k]) try { _charts[k].reflow(); } catch(e){}
         });
       }, 60);
@@ -3426,6 +3435,132 @@
       };
     }).filter(Boolean);
   }
+  function _chi2Inv(p, df) {
+    if (typeof jStat !== 'undefined' && jStat.chisquare && typeof jStat.chisquare.inv === 'function') {
+      return jStat.chisquare.inv(p, df);
+    }
+    return NaN;
+  }
+  function _varianceCi(g) {
+    var df = g && g.n ? g.n - 1 : 0;
+    var s2 = g && isFinite(g.sd) ? g.sd * g.sd : NaN;
+    if (!(df > 0) || !isFinite(s2)) return { v: NaN, lo: NaN, hi: NaN };
+    var chiLo = _chi2Inv(0.025, df);
+    var chiHi = _chi2Inv(0.975, df);
+    if (!(chiLo > 0) || !(chiHi > 0)) return { v: s2, lo: NaN, hi: NaN };
+    return { v: s2, lo: (df * s2) / chiHi, hi: (df * s2) / chiLo };
+  }
+  function _placeVarianceLabels(chart, groups, color) {
+    if (!chart || !chart.series || !chart.series[1] || !chart.yAxis || !chart.yAxis[0]) return;
+    chart.series[1].points.forEach(function (pt, i) {
+      var g = groups[i];
+      var ci = g && g._vci;
+      if (!pt || !ci || !isFinite(ci.v) || !isFinite(pt.plotX)) return;
+      var text = ci.v.toFixed(2);
+      if (!pt._varLabel) {
+        pt._varLabel = chart.renderer.text(text, 0, 0)
+          .css({ color: color, fontSize: '13px', fontWeight: '700', fontFamily: 'Segoe UI, sans-serif' })
+          .attr({ align: 'center', zIndex: 6 })
+          .add();
+      } else if (pt._varLabel.textStr !== text) {
+        pt._varLabel.attr({ text: text });
+      }
+      var yVal = isFinite(ci.hi) ? ci.hi : ci.v;
+      pt._varLabel.attr({ x: pt.plotX + chart.plotLeft, y: chart.yAxis[0].toPixels(yVal, false) - 6 });
+    });
+  }
+  function renderVarianceChart(groups) {
+    var host = document.getElementById('varianceChart');
+    var block = document.getElementById('varianceChartBlock');
+    if (!host) return;
+    if (!groups || !groups.length) {
+      if (block) block.style.display = 'none';
+      if (_charts.variance) { try { _charts.variance.destroy(); } catch (e) {} _charts.variance = null; }
+      return;
+    }
+    if (block) block.style.display = '';
+    if (host.offsetWidth < 20) return;
+    groups.forEach(function (g) { g._vci = _varianceCi(g); });
+    if (_charts.variance) { try { _charts.variance.destroy(); } catch (e2) {} _charts.variance = null; }
+    var t = _visTheme();
+    var teal = _summaryTeal(t.isDark);
+    var labelStyle = { color: t.tc, fontSize: '13px', fontWeight: '600' };
+    var titleStyle = { color: t.tc, fontSize: '13px', fontWeight: '700' };
+    _charts.variance = Highcharts.chart('varianceChart', {
+      chart: {
+        backgroundColor: 'transparent',
+        style: { fontFamily: 'Segoe UI, sans-serif' },
+        spacingTop: 26, spacingRight: 18, spacingBottom: 8, spacingLeft: 8,
+        animation: false,
+        events: { render: function () { _placeVarianceLabels(this, groups, teal.label); } }
+      },
+      title: { text: '' },
+      credits: { enabled: false },
+      legend: { enabled: false },
+      xAxis: {
+        categories: groups.map(function (g) { return g.level; }),
+        labels: { style: labelStyle, rotation: groups.length > 8 ? -30 : 0 },
+        lineColor: teal.grid,
+        tickColor: teal.grid,
+        tickLength: 0
+      },
+      yAxis: {
+        min: 0,
+        title: { text: 'Variance', style: titleStyle },
+        labels: { style: labelStyle },
+        gridLineColor: teal.grid,
+        maxPadding: 0.22
+      },
+      plotOptions: {
+        errorbar: {
+          color: teal.stem,
+          stemWidth: 1.6,
+          whiskerWidth: 1.6,
+          whiskerLength: 12,
+          lineWidth: 1.6
+        },
+        scatter: {
+          marker: { symbol: 'circle', radius: 7, lineWidth: 0, fillColor: teal.point }
+        }
+      },
+      tooltip: {
+        backgroundColor: t.isDark ? '#1e293b' : '#fff',
+        style: { color: t.isDark ? '#f1f5f9' : '#1f2937', fontSize: '13px' },
+        borderRadius: 8,
+        shadow: true,
+        useHTML: true,
+        formatter: function () {
+          var g = groups[this.point.x];
+          var ci = g && g._vci;
+          if (!g || !ci) return false;
+          var span = (isFinite(ci.lo) && isFinite(ci.hi)) ? (ci.lo.toFixed(2) + ' to ' + ci.hi.toFixed(2)) : '—';
+          return '<span style="font-weight:700">' + _escHtml(g.level) + '</span><br>' +
+            'n = <b>' + g.n + '</b><br>' +
+            'Variance = <b>' + ci.v.toFixed(2) + '</b><br>' +
+            'SD = <b>' + g.sd.toFixed(2) + '</b><br>' +
+            '95% CI = <b>' + span + '</b>';
+        }
+      },
+      series: [
+        {
+          type: 'errorbar',
+          name: '95% CI',
+          zIndex: 1,
+          data: groups.map(function (g) {
+            var ci = g._vci;
+            return (ci && isFinite(ci.lo) && isFinite(ci.hi)) ? { low: ci.lo, high: ci.hi } : null;
+          })
+        },
+        {
+          type: 'scatter',
+          name: 'Variance',
+          zIndex: 2,
+          color: teal.point,
+          data: groups.map(function (g) { return g._vci && isFinite(g._vci.v) ? g._vci.v : null; })
+        }
+      ]
+    });
+  }
   function _varianceStatusBadge(p, alpha) {
     if (!isFinite(p)) return '<span class="badge badge-neutral badge-wrap">—</span>';
     if (p < alpha) return '<span class="badge badge-warn badge-wrap">Evidence of unequal variances</span>';
@@ -3453,7 +3588,10 @@
   function renderSpreadChart(b, attempt) {
     var host = document.getElementById('spreadChart');
     var panel = document.getElementById('tab-diagnostics');
-    if (!host || !b || !b.levene) return;
+    if (!host || !b || !b.levene) {
+      renderVarianceChart(null);
+      return;
+    }
     var visible = panel && panel.style.display !== 'none' && host.offsetWidth > 20;
     if (!visible) {
       if ((attempt || 0) < 6 && panel && (panel.classList.contains('active') || panel.style.display !== 'none')) {
@@ -3464,6 +3602,7 @@
     var groups = _spreadGroups(b);
     if (!groups.length) {
       host.innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:12px;">Group values are not available for the spread chart.</p>';
+      renderVarianceChart(null);
       return;
     }
     if (_charts.spread) { try { _charts.spread.destroy(); } catch (e) {} _charts.spread = null; }
@@ -3547,6 +3686,7 @@
         { type: 'scatter', name: 'Observations', data: obs }
       ]
     });
+    renderVarianceChart(groups);
   }
 
   function populateAssumptions(b) {
@@ -3555,10 +3695,12 @@
     var chartCol = document.getElementById('spreadChartCol');
     var obsBtn = document.getElementById('btnSpreadObs');
     var alpha = (b.spec && b.spec.alpha) ? b.spec.alpha : 0.05;
+    var varBlock = document.getElementById('varianceChartBlock');
     if (!b.levene) {
       if (layout) layout.classList.add('spread-stats-only');
       if (chartCol) chartCol.style.display = 'none';
       if (obsBtn) obsBtn.style.display = 'none';
+      if (varBlock) varBlock.style.display = 'none';
       if (el) el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">Homogeneity tests are only computed for one-way ANOVA.</p>';
       return;
     }
@@ -4283,18 +4425,22 @@
   }
   function _applySummaryMode() {
     var meansEl = document.getElementById('summaryMeansChart');
+    var barEl = document.getElementById('summaryBarChart');
     var boxEl = document.getElementById('summaryBoxChart');
     var btnM = document.getElementById('btnSummaryMeans');
+    var btnBar = document.getElementById('btnSummaryBar');
     var btnB = document.getElementById('btnSummaryBox');
     if (meansEl) meansEl.style.display = _summaryChartMode === 'means' ? '' : 'none';
+    if (barEl) barEl.style.display = _summaryChartMode === 'bar' ? '' : 'none';
     if (boxEl) boxEl.style.display = _summaryChartMode === 'box' ? '' : 'none';
     if (btnM) btnM.classList.toggle('active', _summaryChartMode === 'means');
+    if (btnBar) btnBar.classList.toggle('active', _summaryChartMode === 'bar');
     if (btnB) btnB.classList.toggle('active', _summaryChartMode === 'box');
   }
   function switchSummaryChart(mode) {
-    _summaryChartMode = mode === 'box' ? 'box' : 'means';
+    _summaryChartMode = mode === 'box' ? 'box' : (mode === 'bar' ? 'bar' : 'means');
     _applySummaryMode();
-    var key = _summaryChartMode === 'box' ? 'summaryBox' : 'summaryMeans';
+    var key = _summaryChartMode === 'box' ? 'summaryBox' : (_summaryChartMode === 'bar' ? 'summaryBar' : 'summaryMeans');
     if (!_charts[key] && _bundle && !_summaryRendering) {
       renderSummaryGroupChart(_bundle);
       return;
@@ -4313,6 +4459,7 @@
   }
   function renderSummaryGroupChart(b, attempt) {
     var meansEl = document.getElementById('summaryMeansChart');
+    var barEl = document.getElementById('summaryBarChart');
     var boxEl = document.getElementById('summaryBoxChart');
     var titleEl = document.getElementById('summaryChartTitle');
     var foot = document.getElementById('summaryChartFoot');
@@ -4325,7 +4472,7 @@
     if (titleEl) titleEl.textContent = view.name || 'Group means';
     if (foot) foot.style.display = desc.length ? '' : 'none';
     _applySummaryMode();
-    var host = _summaryChartMode === 'box' ? boxEl : meansEl;
+    var host = _summaryChartMode === 'box' ? boxEl : (_summaryChartMode === 'bar' ? barEl : meansEl);
     var overview = document.getElementById('tab-overview');
     var overviewOpen = overview && overview.style.display !== 'none';
     if (host && desc.length && overviewOpen && host.offsetWidth < 20 && (attempt || 0) < 5) {
@@ -4334,10 +4481,12 @@
     }
     _summaryRendering = true;
     if (_charts.summaryMeans) { try { _charts.summaryMeans.destroy(); } catch (_e) {} _charts.summaryMeans = null; }
+    if (_charts.summaryBar) { try { _charts.summaryBar.destroy(); } catch (_e1) {} _charts.summaryBar = null; }
     if (_charts.summaryBox) { try { _charts.summaryBox.destroy(); } catch (_e2) {} _charts.summaryBox = null; }
     if (!desc.length) {
       _summaryRendering = false;
       meansEl.innerHTML = '<div class="patterns-empty">Group means appear when descriptive statistics are available.</div>';
+      if (barEl) barEl.innerHTML = '';
       if (boxEl) boxEl.innerHTML = '';
       return;
     }
@@ -4347,7 +4496,81 @@
       if (d) openGroupDistribution(d.level, b);
     };
     try {
-    if (_summaryChartMode !== 'box') {
+    if (_summaryChartMode === 'bar' && barEl) {
+      _charts.summaryBar = Highcharts.chart('summaryBarChart', {
+        chart: {
+          backgroundColor: 'transparent',
+          style: { fontFamily: 'Segoe UI, sans-serif' },
+          spacingTop: 28, spacingRight: 28, spacingBottom: 12, spacingLeft: 8,
+          animation: { duration: 360 },
+          events: { render: function () { _placeMeanLabels(this, desc, teal.label); } }
+        },
+        title: { text: '' },
+        credits: { enabled: false },
+        legend: { enabled: false },
+        xAxis: {
+          categories: cats,
+          title: { text: view.name, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc), rotation: cats.length > 8 ? -30 : 0 },
+          lineColor: teal.grid,
+          tickColor: teal.grid,
+          tickLength: 0
+        },
+        yAxis: {
+          title: { text: 'Mean ' + dv, style: _axisTitleStyle(t.tc) },
+          labels: { style: _axisLabelStyle(t.tc) },
+          gridLineColor: teal.grid,
+          gridLineWidth: 1,
+          maxPadding: 0.22,
+          minPadding: 0.12
+        },
+        plotOptions: {
+          column: {
+            color: teal.fill,
+            borderColor: teal.point,
+            borderWidth: 1.5,
+            borderRadius: 4,
+            pointPadding: 0.16,
+            groupPadding: 0.18,
+            cursor: 'pointer',
+            point: { events: { click: clickLevel } }
+          },
+          errorbar: {
+            color: teal.stem,
+            stemWidth: 1.6,
+            whiskerWidth: 1.6,
+            whiskerLength: 12,
+            lineWidth: 1.6,
+            cursor: 'pointer',
+            point: { events: { click: clickLevel } }
+          }
+        },
+        tooltip: Object.assign(_summaryTooltip(t.isDark), {
+          formatter: function () {
+            var d = _descByPoint(desc, this.point);
+            return d ? _meanTooltipHtml(d) : false;
+          }
+        }),
+        series: [
+          {
+            type: 'errorbar',
+            name: '95% CI',
+            zIndex: 2,
+            data: desc.map(function (d) {
+              var ci = _descCi(d);
+              return (isFinite(ci.lo) && isFinite(ci.hi)) ? { low: ci.lo, high: ci.hi } : null;
+            })
+          },
+          {
+            type: 'column',
+            name: 'Mean',
+            zIndex: 1,
+            data: desc.map(function (d) { return isFinite(d.mean) ? d.mean : null; })
+          }
+        ]
+      });
+    }
+    if (_summaryChartMode === 'means') {
       _charts.summaryMeans = Highcharts.chart('summaryMeansChart', {
         chart: {
           backgroundColor: 'transparent',

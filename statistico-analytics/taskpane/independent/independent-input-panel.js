@@ -469,6 +469,61 @@ function computePosthocRows(grouped, levels, framework, correction) {
   }));
 }
 
+function lnGamma(z) {
+  const p = [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+    771.32342877765313, -176.61502916214059, 12.507343278686905,
+    -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (z < 0.5) return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * z)) - lnGamma(1 - z);
+  z -= 1;
+  let x = p[0];
+  for (let i = 1; i < 9; i++) x += p[i] / (z + i);
+  const t = z + 7.5;
+  return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+
+function regularizedIncompleteBeta(a, b, x) {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  if (x > (a + 1) / (a + b + 2)) return 1 - regularizedIncompleteBeta(b, a, 1 - x);
+  const lbeta = lnGamma(a) + lnGamma(b) - lnGamma(a + b);
+  const front = Math.exp(Math.log(x) * a + Math.log(1 - x) * b - lbeta) / a;
+  const STOP = 1e-12;
+  const TINY = 1e-30;
+  const qab = a + b;
+  const qap = a + 1;
+  const qam = a - 1;
+  let c = 1;
+  let d = 1 - qab * x / qap;
+  if (Math.abs(d) < TINY) d = TINY;
+  d = 1 / d;
+  let h = d;
+  for (let i = 1; i <= 200; i++) {
+    const m2 = 2 * i;
+    let aa = i * (b - i) * x / ((qam + m2) * (a + m2));
+    d = 1 + aa * d; if (Math.abs(d) < TINY) d = TINY;
+    c = 1 + aa / c; if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    h *= d * c;
+    aa = -(a + i) * (qab + i) * x / ((a + m2) * (qap + m2));
+    d = 1 + aa * d; if (Math.abs(d) < TINY) d = TINY;
+    c = 1 + aa / c; if (Math.abs(c) < TINY) c = TINY;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < STOP) break;
+  }
+  return Math.max(0, Math.min(1, front * h));
+}
+
+function fUpperTail(f, df1, df2) {
+  if (!isFinite(f) || !isFinite(df1) || !isFinite(df2) || df1 <= 0 || df2 <= 0) return NaN;
+  if (f <= 0) return 1;
+  const x = (df1 * f) / (df1 * f + df2);
+  const cdf = regularizedIncompleteBeta(df1 / 2, df2 / 2, x);
+  if (!isFinite(cdf)) return NaN;
+  return Math.max(0, Math.min(1, 1 - cdf));
+}
+
 function computeOneWayAnovaFromArrays(arrays) {
   const clean = (arrays || []).filter(a => Array.isArray(a) && a.length > 0);
   const k = clean.length;
@@ -489,7 +544,7 @@ function computeOneWayAnovaFromArrays(arrays) {
   const msBetween = ssBetween / df1;
   const msWithin = ssWithin / df2;
   const f = msWithin > 0 ? (msBetween / msWithin) : 0;
-  const p = chiSquareUpperTailApprox(f * df1, df1);
+  const p = fUpperTail(f, df1, df2);
   return { k, N, ssBetween, ssWithin, ssTotal, df1, df2, msBetween, msWithin, f, p };
 }
 
@@ -540,8 +595,9 @@ function computeWelchAnova(grouped, levels) {
   const c = 1 + (2 * Math.max(0, k - 2) / Math.max(1e-12, (k * k - 1))) * uSum;
   const f = c > 0 ? a / c : 0;
   const df2 = uSum > 0 ? ((k * k - 1) / (3 * uSum)) : 1;
-  const p = chiSquareUpperTailApprox(f * df1, df1);
-  return { f, df1, df2: Math.max(1, df2), p };
+  const df2Safe = Math.max(1, df2);
+  const p = fUpperTail(f, df1, df2Safe);
+  return { f, df1, df2: df2Safe, p };
 }
 
 function buildIndependentBundle(headers, rows, spec) {

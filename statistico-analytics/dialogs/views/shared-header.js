@@ -7814,8 +7814,10 @@ REPORT: [one polished paragraph suitable for a report]`;
 
     // ── AI pill — above export / tools (every sidebar module) ─────────────
     if (!surveySidebar) {
+    const hideCompetingAi = this.module === 'independent';
     const isDependentKplus = this.module === 'dependent' && this.currentView === 'dependent-results-kplus';
-    const supportsFullAiPill = this.module === 'independent' || isDependentKplus;
+    const supportsFullAiPill = isDependentKplus;
+    if (!hideCompetingAi) {
     const aiSection = document.createElement('div');
     aiSection.id = 'sbAiSection';
     aiSection.className = 'sb-ai-section-wrap';
@@ -7829,6 +7831,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       </button>
     `;
     footer.appendChild(aiSection);
+    }
     this._mountModuleAboutButton(footer);
     if (this.module === 'contingency' && window.__contingencyAiDisabled) {
       const aiBtn = aiSection.querySelector('#sbAiBtn');
@@ -12330,12 +12333,18 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     const overlay = document.createElement('div');
     overlay.id = 'sbAiOverlay';
     overlay.className = 'sb-ai-overlay' + (mode === 'full' ? ' sb-ai-overlay--overall' : ' sb-ai-overlay--local');
-    const scopeLabel = mode === 'full' ? 'All results' : 'This view';
+    const scopeLabel = mode === 'full' ? 'Full analysis' : 'This view';
+    const scopeHtml = this.module === 'independent'
+      ? `<div class="sb-ai-scope-switch" role="group" aria-label="Interpretation scope">
+          <button type="button" class="sb-ai-scope-btn${mode === 'full' ? '' : ' is-selected'}" data-ai-scope="view">This view</button>
+          <button type="button" class="sb-ai-scope-btn${mode === 'full' ? ' is-selected' : ''}" data-ai-scope="full">Full analysis</button>
+        </div>`
+      : `<span class="sb-ai-scope">${scopeLabel}</span>`;
     overlay.innerHTML = `
       <div class="sb-ai-panel ${mode === 'full' ? 'sb-ai-panel--overall' : 'sb-ai-panel--local'}">
         <div class="sb-ai-header">
           <div class="sb-ai-header-copy">
-            <span class="sb-ai-scope">${scopeLabel}</span>
+            ${scopeHtml}
             <span class="sb-ai-title">${titleIconHtml} ${this._escapeAiHtml(title)}</span>
           </div>
           <button class="sb-ai-close" onclick="document.getElementById('sbAiOverlay').remove()" title="Close">&times;</button>
@@ -12354,6 +12363,13 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     `;
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) { overlay.remove(); return; }
+      const scopeBtn = e.target.closest('[data-ai-scope]');
+      if (scopeBtn && this.module === 'independent') {
+        const scope = scopeBtn.getAttribute('data-ai-scope');
+        if (scope === 'full' && mode !== 'full') this._sbAiIndependentInterpret();
+        else if (scope === 'view' && mode === 'full') this._sbAiIndependentTabInterpret();
+        return;
+      }
       const actionBtn = e.target.closest('[data-ai-action]');
       if (actionBtn) {
         const action = actionBtn.getAttribute('data-ai-action');

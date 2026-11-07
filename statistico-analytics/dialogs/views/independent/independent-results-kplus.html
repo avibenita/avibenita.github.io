@@ -617,14 +617,8 @@
             <div id="setPosthocWrap" style="display:none;">
               <label for="setPosthocMethod">Post-hoc</label>
               <select id="setPosthocMethod" onchange="notifySettingsChanged()">
-                <optgroup label="Parametric">
-                  <option value="games-howell" selected>Games-Howell</option>
-                  <option value="tukey">Tukey HSD</option>
-                </optgroup>
-                <optgroup label="Non-parametric">
-                  <option value="dunn">Dunn</option>
-                  <option value="conover">Conover</option>
-                </optgroup>
+                <option value="tukey" selected>Tukey–Kramer</option>
+                <option value="games-howell">Games–Howell</option>
               </select>
             </div>
             <div id="setCorrectionWrap" style="display:none;">
@@ -985,10 +979,10 @@
                     <tr>
                       <th style="cursor:pointer;" onclick="sortPosthocTable('comparison')">Comparison</th>
                       <th style="cursor:pointer;" onclick="sortPosthocTable('statistic')">Statistic</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('estimate')" title="Mean difference (parametric) or rank-biserial r (non-parametric)">Difference</th>
-                      <th style="cursor:pointer;" onclick="sortPosthocTable('ci')" title="95% confidence interval">95% CI</th>
+                      <th id="posthocRawHead" style="cursor:pointer;" onclick="sortPosthocTable('rawp')">Raw p</th>
+                      <th id="posthocAdjHead" style="cursor:pointer;" onclick="sortPosthocTable('adjp')">Adj p</th>
+                      <th id="posthocEstimateHead" style="cursor:pointer;" onclick="sortPosthocTable('estimate')">Mean difference</th>
+                      <th id="posthocCiHead" style="cursor:pointer;" onclick="sortPosthocTable('ci')">95% CI</th>
                       <th style="text-align:center;">Magnitude</th>
                     </tr>
                   </thead>
@@ -1048,8 +1042,8 @@
                 <div class="stat-panel effects-metric-card np" id="effectsNpCard">
                   <div class="stat-panel-body" style="padding:10px 12px!important;">
                     <div class="effects-metric-title">Non-parametric</div>
-                    <div class="stat-field"><span class="stat-label">Epsilon squared (ε²)</span><span class="stat-value" id="efEpsilon">...</span></div>
-                    <div class="stat-field"><span class="stat-label">Eta squared H (η²<sub>H</sub>)</span><span class="stat-value" id="efEtaH">...</span></div>
+                    <div class="stat-field"><span class="stat-label" title="ε² = H / (N − 1), using the same H as the Kruskal–Wallis test">Epsilon squared (ε²)</span><span class="stat-value" id="efEpsilon">...</span></div>
+                    <div class="stat-field"><span class="stat-label" title="η²ₕ = (H − k + 1) / (N − k), using the same H">Eta squared H (η²<sub>H</sub>)</span><span class="stat-value" id="efEtaH">...</span></div>
                   </div>
                 </div>
               </div>
@@ -1173,6 +1167,33 @@
       const p=fUpperTail(test.f, test.df1, test.df2);
       if(isFinite(p)) test.p=p;
     }
+    function gammaLowerSeriesLocal(a, x){
+      let ap=a, sum=1/a, del=sum;
+      for(let n=1;n<=200;n++){
+        ap+=1; del*=x/ap; sum+=del;
+        if(Math.abs(del)<Math.abs(sum)*1e-12) break;
+      }
+      return sum*Math.exp(-x+a*Math.log(x)-lnGammaLocal(a));
+    }
+    function gammaUpperFractionLocal(a, x){
+      let b=x+1-a, c=1/1e-30, d=1/b, h=d;
+      for(let i=1;i<=200;i++){
+        const an=-i*(i-a);
+        b+=2; d=an*d+b; if(Math.abs(d)<1e-30) d=1e-30;
+        c=b+an/c; if(Math.abs(c)<1e-30) c=1e-30;
+        d=1/d; const del=d*c; h*=del;
+        if(Math.abs(del-1)<1e-12) break;
+      }
+      return Math.exp(-x+a*Math.log(x)-lnGammaLocal(a))*h;
+    }
+    function chiSquareUpperTailLocal(x, df){
+      x=parseMaybeNumber(x); df=parseMaybeNumber(df);
+      if(!isFinite(x)||!isFinite(df)||df<=0) return NaN;
+      if(x<=0) return 1;
+      const a=df/2, xx=x/2;
+      const q=xx<a+1 ? 1-gammaLowerSeriesLocal(a, xx) : gammaUpperFractionLocal(a, xx);
+      return isFinite(q) ? Math.max(0, Math.min(1, q)) : NaN;
+    }
     function alignOmnibus(ob){
       if(!ob) return ob;
       const p=fUpperTail(ob.anovaF, ob.anovaDf1, ob.anovaDf2);
@@ -1180,6 +1201,13 @@
       alignTestRecord(ob.levene);
       alignTestRecord(ob.brownForsythe);
       alignTestRecord(ob.welchAnova);
+      const kwP=chiSquareUpperTailLocal(ob.kwH, ob.kwDf);
+      if(isFinite(kwP)) ob.kwP=kwP;
+      const N=parseMaybeNumber(ob.N);
+      const k=Array.isArray(ob.levels) ? ob.levels.length : (parseMaybeNumber(ob.kwDf)+1);
+      const H=parseMaybeNumber(ob.kwH);
+      if(isFinite(H) && N>1) ob.epsilonSquared=Math.max(0, H/(N-1));
+      if(isFinite(H) && isFinite(k) && N>k) ob.etaSquaredH=Math.max(0, (H-k+1)/(N-k));
       return ob;
     }
     function setDecimalPrecision(){ globalDecimalPrecision=(document.getElementById("decimalSelect")||{value:"auto"}).value; if(lastBundle) populateBundle(lastBundle); }
@@ -1238,7 +1266,7 @@
         valueColumn: persistedColumns.valueColumn || "",
         groupColumn: persistedColumns.groupColumn || "",
         primaryTest: (document.getElementById("setPrimaryTest") || {}).value || currentPrimaryTest || "welch",
-        posthocMethod: (document.getElementById("setPosthocMethod") || {}).value || "games-howell",
+        posthocMethod: (document.getElementById("setPosthocMethod") || {}).value || (primaryFramework === "nonparametric" ? "dunn" : (currentPrimaryTest === "welch" ? "games-howell" : "tukey")),
         posthocCorrection: (document.getElementById("setPosthocCorrection") || {}).value || "holm"
       };
     }
@@ -1267,14 +1295,46 @@
       if (methodSlot && methodWrap && methodWrap.parentNode !== methodSlot) methodSlot.appendChild(methodWrap);
       if (correctionSlot && correctionWrap && correctionWrap.parentNode !== correctionSlot) correctionSlot.appendChild(correctionWrap);
     }
-    function updatePosthocOptions(){
+    function posthocMethodChoices(){
+      if (primaryFramework === "nonparametric" || currentPrimaryTest === "kruskal") {
+        return [{ v: "dunn", t: "Dunn" }, { v: "mann-whitney", t: "Mann–Whitney" }];
+      }
+      if (currentPrimaryTest === "welch") {
+        return [{ v: "games-howell", t: "Games–Howell" }, { v: "tukey", t: "Tukey–Kramer" }];
+      }
+      return [{ v: "tukey", t: "Tukey–Kramer" }, { v: "games-howell", t: "Games–Howell" }];
+    }
+    function updatePosthocOptions(forceDefault){
       var sel = document.getElementById("setPosthocMethod");
+      var corr = document.getElementById("setPosthocCorrection");
       if (!sel) return;
-      var isNonParam = primaryFramework === "nonparametric" || currentPrimaryTest === "kruskal";
-      // Never rebuild the option list - just validate and default the selected value.
-      // All 4 options always live in the HTML; we just steer the default.
-      var validVals = isNonParam ? ["dunn","conover"] : ["games-howell","tukey"];
-      if (validVals.indexOf(sel.value) < 0) sel.value = validVals[0];
+      var options = posthocMethodChoices();
+      var previous = sel.value;
+      sel.innerHTML = options.map(function(o){ return '<option value="' + o.v + '">' + o.t + '</option>'; }).join("");
+      var keep = !forceDefault && options.some(function(o){ return o.v === previous; });
+      sel.value = keep ? previous : options[0].v;
+      var builtin = sel.value === "tukey" || sel.value === "games-howell";
+      if (corr) {
+        if (!corr.dataset.adjustmentOptions) corr.dataset.adjustmentOptions = corr.innerHTML;
+        if (corr.querySelector('option[value="bonferroni"]')) corr.dataset.lastAdjustment = corr.value || "holm";
+        if (builtin) {
+          corr.innerHTML = '<option value="holm">Included in the test</option>';
+          corr.value = "holm";
+          corr.disabled = true;
+        } else {
+          var keepCorr = corr.dataset.lastAdjustment || "holm";
+          corr.innerHTML = corr.dataset.adjustmentOptions;
+          corr.disabled = false;
+          corr.value = Array.prototype.some.call(corr.options, function(o){ return o.value === keepCorr; }) ? keepCorr : "holm";
+        }
+      }
+      var corrSub = document.querySelector("#posthocCorrectionSlot") && document.querySelector("#posthocCorrectionSlot").parentElement
+        ? document.querySelector("#posthocCorrectionSlot").parentElement.querySelector(".posthoc-menu-card-sub") : null;
+      if (corrSub) {
+        corrSub.textContent = builtin
+          ? "This procedure already adjusts for every pair. A second correction is not applied."
+          : "Holm, Benjamini–Hochberg, or Bonferroni is applied to the full set of pairs, not only the pairs on screen.";
+      }
     }
     var FW_FRAMEWORK_LABELS = { parametric: "Parametric (means)", nonparametric: "Non-parametric (ranks)" };
     function syncFrameworkSelectUI(mode) {
@@ -1520,8 +1580,10 @@
               + Math.round(ob.kwDf) + '</td><td>' + fmtP(ob.kwP) + '</td><td>' + epsSq + '</td></tr>';
             var tieNote = document.getElementById("kwTieNote");
             if (tieNote) {
-              var tieApplied = ob.tieCorrection === true || ob.tieCorrection === "yes" || ob.tieCorrectionApplied === true;
-              tieNote.textContent = 'Tie correction: ' + (tieApplied ? 'Applied' : 'Not applied');
+              var tieApplied = ob.tieCorrection === true;
+              tieNote.textContent = tieApplied
+                ? ("Tie-corrected H = " + fmt(ob.kwH) + " (uncorrected " + fmt(ob.kwHUncorrected) + "). ε² and η²ₕ use this H.")
+                : ("H = " + fmt(ob.kwH) + ". No tie correction. ε² and η²ₕ use this H.");
               tieNote.style.color = tieApplied ? '#80cbc4' : 'rgba(255,255,255,.5)';
             }
           }
@@ -1985,11 +2047,14 @@
     }
     
     let posthocData = [];
-    let posthocSortColumn = 'adjp';
-    let posthocSortAsc = true;
+    let posthocFamilySize = 0;
+    let posthocEstimateLabel = "Difference";
+    let posthocSortColumn = 'estimate';
+    let posthocSortAsc = false;
     let posthocGroups = [];
 
     function posthocMagnitudeBadge(row, isNP) {
+      if (row && row.estimateKind === "mean-rank-difference") return "—";
       var val = isNP ? Math.abs(parseMaybeNumber(row.estimate)) : Math.abs(parseMaybeNumber(row.cohenD != null ? row.cohenD : row.estimate));
       var label = 'Negligible';
       var cls = 'negligible';
@@ -2018,11 +2083,11 @@
       var strongest = sortedByAbs[0];
       var weakest = sortedByAbs[sortedByAbs.length - 1];
       body.innerHTML = ''
-        + '<div><strong>Total comparisons:</strong> ' + displayData.length + '</div>'
-        + '<div><strong>Significant:</strong> ' + sig.length + '</div>'
-        + '<div><strong>Non-significant:</strong> ' + (displayData.length - sig.length) + '</div>'
-        + '<div><strong>Strongest:</strong> ' + (strongest ? strongest.comparison + ' (' + fmt(strongest.estimate) + ')' : '—') + '</div>'
-        + '<div><strong>Weakest:</strong> ' + (weakest ? weakest.comparison + ' (' + fmt(weakest.estimate) + ')' : '—') + '</div>';
+        + '<div><strong>Shown:</strong> ' + displayData.length + (posthocFamilySize ? (' of ' + posthocFamilySize) : '') + '</div>'
+        + '<div><strong>Meet α:</strong> ' + sig.length + '</div>'
+        + '<div><strong>Do not meet α:</strong> ' + (displayData.length - sig.length) + '</div>'
+        + '<div><strong>Largest |effect|:</strong> ' + (strongest ? strongest.comparison + ' (' + fmt(strongest.estimate) + ')' : '—') + '</div>'
+        + '<div><strong>Smallest |effect|:</strong> ' + (weakest ? weakest.comparison + ' (' + fmt(weakest.estimate) + ')' : '—') + '</div>';
       card.style.display = 'block';
     }
 
@@ -2037,16 +2102,27 @@
       var sorted = displayData.slice().sort(function(a, b) { return Math.abs(b.estimate) - Math.abs(a.estimate); });
       var strongest = sorted[0];
       var weakest = sorted[sorted.length - 1];
+      var methodName = { "tukey": "Tukey–Kramer", "games-howell": "Games–Howell", "dunn": "Dunn", "mann-whitney": "Mann–Whitney" };
+      var adjustName = { holm: "Holm", bh: "Benjamini–Hochberg", bonferroni: "Bonferroni", none: "no multiplicity", builtin: "" };
+      var procedure = (lastBundle && lastBundle.results && lastBundle.results.posthoc && lastBundle.results.posthoc.method) || "";
+      var builtin = correction === "builtin" || procedure === "tukey" || procedure === "games-howell";
+      var adjustLabel = builtin
+        ? (methodName[procedure] || "the pairwise procedure") + ", which already adjusts all " + (posthocFamilySize || displayData.length) + " pairs"
+        : ((adjustName[String(correction).toLowerCase()] || correction || "Holm") + " adjustment of all " + (posthocFamilySize || displayData.length) + " pairs");
       var html = '';
-      if (sig.length === displayData.length) {
-        html += '<p>All ' + displayData.length + ' pairwise comparisons remain significant after ' + (correction || 'Holm') + ' correction.</p>';
-      } else if (sig.length === 0) {
-        html += '<p>No pairwise comparisons remain significant after ' + (correction || 'Holm') + ' correction.</p>';
-      } else {
-        html += '<p>' + sig.length + ' of ' + displayData.length + ' comparisons remain significant after ' + (correction || 'Holm') + ' correction.</p>';
+      if (posthocFamilySize && displayData.length < posthocFamilySize) {
+        html += '<p>The table is showing ' + displayData.length + ' of ' + posthocFamilySize + ' pairs. The adjustment still used all ' + posthocFamilySize + '.</p>';
       }
-      if (strongest) html += '<p>The largest difference is between <strong>' + strongest.comparison.replace(/\s*vs\.?\s*/i, '</strong> vs <strong>') + '</strong> (difference = ' + fmt(strongest.estimate) + ').</p>';
-      if (weakest && weakest.comparison !== strongest.comparison) html += '<p>The smallest difference is between <strong>' + weakest.comparison.replace(/\s*vs\.?\s*/i, '</strong> vs <strong>') + '</strong> (difference = ' + fmt(weakest.estimate) + ').</p>';
+      if (sig.length === displayData.length) {
+        html += '<p>All ' + displayData.length + ' pairwise comparisons meet α under ' + adjustLabel + '.</p>';
+      } else if (sig.length === 0) {
+        html += '<p>No pairwise comparisons meet α under ' + adjustLabel + '.</p>';
+      } else {
+        html += '<p>' + sig.length + ' of ' + displayData.length + ' comparisons meet α under ' + adjustLabel + '.</p>';
+      }
+      var effectName = (posthocEstimateLabel || "effect").toLowerCase();
+      if (strongest) html += '<p>The largest absolute ' + effectName + ' is between <strong>' + strongest.comparison.replace(/\s*vs\.?\s*/i, '</strong> vs <strong>') + '</strong> (' + fmt(strongest.estimate) + ').</p>';
+      if (weakest && weakest.comparison !== strongest.comparison) html += '<p>The smallest absolute ' + effectName + ' is between <strong>' + weakest.comparison.replace(/\s*vs\.?\s*/i, '</strong> vs <strong>') + '</strong> (' + fmt(weakest.estimate) + ').</p>';
       text.innerHTML = html;
       box.style.display = 'block';
     }
@@ -2117,42 +2193,58 @@
         return;
       }
       
-      // Check omnibus significance and show warning
-      if (warningEl && lastBundle && lastBundle.results && lastBundle.results.omnibus) {
-        const ob = lastBundle.results.omnibus;
-        const anovaP = parseMaybeNumber(ob.anovaP);
-        const alpha = 0.05;
-        if (anovaP > alpha) {
-          warningEl.style.display = 'block';
-        } else {
-          warningEl.style.display = 'none';
-        }
-      }
-      
-      // Update method note
-      const method = posthoc.method || "Games-Howell";
-      const correction = posthoc.correction || "Holm";
+      const method = posthoc.method || "tukey";
+      const correction = posthoc.correction || "holm";
       const isNP = primaryFramework === "nonparametric";
+      const alpha = Number((document.getElementById("setAlpha") || { value: "0.05" }).value || 0.05);
+      posthocFamilySize = parseMaybeNumber(posthoc.familySize) || (posthoc.rows || []).length;
+      posthocEstimateLabel = posthoc.estimateLabel || (method === "dunn" ? "Mean rank difference" : (method === "mann-whitney" ? "Rank-biserial r" : "Mean difference"));
+      const builtinAdjust = correction === "builtin" || method === "tukey" || method === "games-howell";
+      const estimateHeader = document.getElementById("posthocEstimateHead");
+      const rawHead = document.getElementById("posthocRawHead");
+      const adjHead = document.getElementById("posthocAdjHead");
+      const ciHead = document.getElementById("posthocCiHead");
+      if (estimateHeader) estimateHeader.textContent = posthocEstimateLabel;
+      if (rawHead) rawHead.textContent = builtinAdjust ? "Unadjusted p" : "Raw p";
+      if (adjHead) adjHead.textContent = builtinAdjust ? "p" : "Adj p";
+      if (ciHead) ciHead.textContent = (Math.round((1 - alpha) * 1000) / 10) + "% CI";
+      if (warningEl && lastBundle && lastBundle.results && lastBundle.results.omnibus) {
+        const ob = alignOmnibus(lastBundle.results.omnibus);
+        const welch = ob.welchAnova || {};
+        const useKw = primaryFramework === "nonparametric";
+        const useWelch = !useKw && currentPrimaryTest === "welch" && isFinite(parseMaybeNumber(welch.p));
+        const omnibusName = useKw ? "Kruskal–Wallis" : (useWelch ? "Welch ANOVA" : "One-way ANOVA");
+        const omnibusP = useKw ? parseMaybeNumber(ob.kwP) : (useWelch ? parseMaybeNumber(welch.p) : parseMaybeNumber(ob.anovaP));
+        const omnibusStat = useKw
+          ? ("H(" + fmtDf(ob.kwDf) + ") = " + fmt(ob.kwH))
+          : (useWelch
+            ? ("F(" + fmtDf(welch.df1) + ", " + fmtDf(welch.df2) + ") = " + fmt(welch.f))
+            : ("F(" + fmtDf(ob.anovaDf1) + ", " + fmtDf(ob.anovaDf2) + ") = " + fmt(ob.anovaF)));
+        const met = isFinite(omnibusP) && omnibusP < alpha;
+        warningEl.style.display = "block";
+        warningEl.style.background = met ? "rgba(103,232,249,.08)" : "rgba(251,191,36,.12)";
+        warningEl.style.borderLeftColor = met ? "#67e8f9" : "#fbbf24";
+        warningEl.innerHTML = '<span style="font-size:14px;font-weight:650;color:var(--text-primary);">'
+          + omnibusName + " " + omnibusStat + ", p = " + fmtP(omnibusP) + ". "
+          + (met
+            ? ("The omnibus test met α = " + fmtAlphaLabel(alpha) + ".")
+            : ("The omnibus test fell short of α = " + fmtAlphaLabel(alpha) + ". Interpret these pairwise results as exploratory."))
+          + "</span>";
+      }
       if (noteEl) {
-        let methodDesc = "";
-        if (method === "gameshowell" || method === "Games-Howell") {
-          methodDesc = "Welch-type t (Games-Howell) without equal variance assumption";
-        } else if (method === "tukey" || method === "Tukey") {
-          methodDesc = "Studentized range q (Tukey HSD) assuming equal variances";
-        } else if (method === "dunn" || method === "Dunn") {
-          methodDesc = "Rank-based z (Dunn) for nonparametric comparisons";
-        } else {
-          methodDesc = method + " test";
-        }
-        noteEl.textContent = methodDesc + " | p-value correction: " + correction;
+        const methodNames = {
+          "games-howell": "Games–Howell q, using each pair’s variances",
+          "tukey": "Tukey–Kramer q, using the pooled within-group variance",
+          "dunn": "Dunn z on mean ranks",
+          "mann-whitney": "Mann–Whitney U"
+        };
+        const adjustNote = correction === "builtin"
+          ? ("The p-value already includes all " + posthocFamilySize + " pairs.")
+          : ((correction || "Holm") + " adjusts all " + posthocFamilySize + " pairs. Filtering the table does not change that family.");
+        noteEl.textContent = (methodNames[method] || method) + ". " + adjustNote;
       }
-      // Explain the Effect Est. column
       const estNoteEl = document.getElementById("posthocEstimateNote");
-      if (estNoteEl) {
-        estNoteEl.textContent = isNP
-          ? "Difference = rank-biserial correlation r (range -1 to +1)"
-          : "Difference = mean difference (group A - group B); magnitude uses Cohen's d";
-      }
+      if (estNoteEl) estNoteEl.textContent = posthocEstimateLabel + ".";
       
       const rows = posthoc.rows || [];
       if (!rows.length) {
@@ -2161,33 +2253,19 @@
       }
       
       // Store data globally for sorting/filtering
+      const rowAlpha = Number((document.getElementById("setAlpha") || { value: "0.05" }).value || 0.05);
       posthocData = rows.map(function(r) {
-        // Calculate CI if not provided (using standard error approximation)
-        let ciLower = parseMaybeNumber(r.ciLower);
-        let ciUpper = parseMaybeNumber(r.ciUpper);
-        if (!isFinite(ciLower) || !isFinite(ciUpper)) {
-          // Approximate CI from estimate and test statistic
-          const est = parseMaybeNumber(r.estimate);
-          const statNum = extractStatNum(r.statistic);
-          // Only approximate if statistic looks like z/t (< 30), not U (could be 100s)
-          if (isFinite(est) && isFinite(statNum) && statNum > 0 && statNum < 30) {
-            const se = Math.abs(est / statNum);
-            const zCrit = 1.96; // 95% z-critical
-            ciLower = est - zCrit * se;
-            ciUpper = est + zCrit * se;
-          }
-        }
-        
         return {
           comparison: r.comparison || "",
           statistic: r.statistic,
           rawP: parseMaybeNumber(r.rawP),
           adjP: parseMaybeNumber(r.adjP),
           estimate: parseMaybeNumber(r.estimate),
-          ciLower: ciLower,
-          ciUpper: ciUpper,
+          estimateKind: r.estimateKind || "",
+          ciLower: parseMaybeNumber(r.ciLower),
+          ciUpper: parseMaybeNumber(r.ciUpper),
           cohenD: parseMaybeNumber(r.cohenD),
-          significant: parseMaybeNumber(r.adjP) < 0.05
+          significant: parseMaybeNumber(r.adjP) < rowAlpha
         };
       });
       
@@ -2442,7 +2520,7 @@
       var tiedObs = all.filter(function(v) { return freq[v] > 1; }).length;
       var tieRate = tiedObs / all.length;
       var tiePct = Math.round(tieRate * 100);
-      var correctionNote = "Tie correction was applied to the H statistic (average ranks).";
+      var correctionNote = "Tied observations share an average rank. The Kruskal–Wallis result states whether the chi-square tie correction was applied to H.";
       if (tieRate === 0) {
         return {
           status: "ok",
@@ -2651,7 +2729,8 @@
         else npNotes.push("Review shape differences in the table above");
         if (sizes.status === "ok") npNotes.push("Sample sizes are adequate");
         else npNotes.push("Sample sizes may limit χ² approximation");
-        if (ties.hasTies) npNotes.push("Tie correction applied (average ranks)");
+        if (ob.tieCorrection) npNotes.push("Tie correction applied to H (" + fmt(ob.kwHUncorrected) + " to " + fmt(ob.kwH) + ")");
+        else if (ties.hasTies) npNotes.push("Ties use average ranks; H needed no further correction");
         else npNotes.push("No tied values detected");
         if (balance.status === "warn") npNotes.push("Uneven sample sizes — optional design note above");
         var npIssues = verifiedRows.filter(function(r) { return r.status === "warn" || r.status === "fail"; }).length;
@@ -2846,8 +2925,9 @@
         tr.appendChild(td);
         
         td = document.createElement("td");
-        td.textContent = fmtP(r.rawP);
+        td.textContent = isFinite(r.rawP) ? fmtP(r.rawP) : "—";
         td.style.fontFamily = "monospace";
+        if (!isFinite(r.rawP)) td.title = "This procedure does not report a separate unadjusted p-value.";
         tr.appendChild(td);
         
         td = document.createElement("td");
@@ -2974,7 +3054,7 @@
         if (isFinite(primaryVal)) {
           var pct = Math.round(Math.abs(primaryVal) * 1000) / 10;
           varianceText.textContent = isNP
-            ? pct + '% of rank variability is associated with differences between variables (ε²).'
+            ? pct + '% of rank variability is associated with differences between groups (ε² = H / (N − 1), using the same H as the test).'
             : pct + '% of the outcome variability is explained by group membership (η²).';
         } else {
           varianceText.textContent = 'Effect size unavailable for the current analysis.';
@@ -2988,8 +3068,8 @@
           html += isFinite(epsilon)
             ? 'The omnibus rank effect (ε² = ' + fmt(epsilon) + ') is <strong>' + mag.label.toLowerCase() + '</strong>. '
             : '';
-          if (isFinite(etaH)) html += 'η²(H) = ' + fmt(etaH) + ' provides an alternate rank effect index. ';
-          html += 'Pairwise contrasts below use rank-biserial r.';
+          if (isFinite(etaH)) html += 'η²ₕ = ' + fmt(etaH) + ' is (H − k + 1) / (N − k), from the same H. ';
+          html += 'Pairwise contrasts below use ' + (posthocEstimateLabel || 'the selected rank contrast') + '.';
         } else {
           html += isFinite(eta)
             ? 'The omnibus mean effect (η² = ' + fmt(eta) + ') is <strong>' + mag.label.toLowerCase() + '</strong>. '
@@ -3001,7 +3081,7 @@
         interpretBox.innerHTML = html;
       }
 
-      if (pairwiseCol) pairwiseCol.textContent = isNP ? 'Rank-biserial r' : "Cohen's d";
+      if (pairwiseCol) pairwiseCol.textContent = isNP ? (posthocEstimateLabel || 'Rank contrast') : "Cohen's d";
       if (pairwiseHeading) pairwiseHeading.className = 'stat-panel-heading ' + (isNP ? 'nonparametric' : 'parametric');
 
       var tbody = document.getElementById('effectsPairwiseBody');
@@ -3016,7 +3096,8 @@
         } else {
           tbody.innerHTML = rows.map(function(r) {
             var effectVal = isNP ? r.estimate : (isFinite(r.cohenD) ? r.cohenD : r.estimate);
-            return '<tr><td>' + r.comparison + '</td><td style="font-family:monospace;">' + fmt(effectVal) + '</td><td style="text-align:center;">' + pairwiseEffectMagnitude(effectVal, isNP) + '</td></tr>';
+            var mag = r.estimateKind === 'mean-rank-difference' ? '—' : pairwiseEffectMagnitude(effectVal, isNP && r.estimateKind !== 'mean-difference');
+            return '<tr><td>' + r.comparison + '</td><td style="font-family:monospace;">' + fmt(effectVal) + '</td><td style="text-align:center;">' + mag + '</td></tr>';
           }).join('');
         }
       }
@@ -3301,7 +3382,7 @@
       updatePosthocOptions(); // resets to Dunn/GH if saved value is wrong for active framework
       const phc = document.getElementById("setPosthocCorrection"); if (phc) phc.value = s.posthocCorrection || "holm";
       const ksum = e.kplusSummary || {};
-      const ob = r.omnibus || {};
+      const ob = alignOmnibus(r.omnibus || {});
       const groupCount = isFinite(parseMaybeNumber(ksum.variableCount)) 
         ? parseMaybeNumber(ksum.variableCount) 
         : (Array.isArray(ob.groupDescriptives) ? ob.groupDescriptives.length : (Array.isArray(s.selectedColumns) ? s.selectedColumns.length : "..."));
@@ -3389,16 +3470,6 @@
         }
       }
       
-      // Auto-select post-hoc method based on recommendation
-      const variancesEqual = leveneP >= alpha && (!isFinite(bfP) || bfP >= alpha);
-      const posthocSelect = document.getElementById("setPosthocMethod");
-      if (posthocSelect) {
-        if (variancesEqual) {
-          posthocSelect.value = "tukey";
-        } else {
-          posthocSelect.value = "gameshowell";
-        }
-      }
       updateResultsPanels(r, fx, s, 1 - (parseMaybeNumber(s.confidence) || 0.95));
       renderPosthoc(r.posthoc || {}, "k-plus");
       updateEffectsPanel(ob);
@@ -3467,6 +3538,7 @@
           if (id === "setPrimaryTest") {
             currentPrimaryTest = el.value || "anova";
             if (currentPrimaryTest === "anova" || currentPrimaryTest === "welch") parametricPrimaryTest = currentPrimaryTest;
+            updatePosthocOptions(true);
             if (lastBundle && lastBundle.results && lastBundle.results.omnibus) {
               updateAnovaConclusion(lastBundle.results.omnibus, Number(document.getElementById("setAlpha").value || 0.05));
             }

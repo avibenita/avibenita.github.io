@@ -16,4 +16,4 @@
 
 Residual plots are in the catalogue. Opening that tab is not a demonstration, because the plots do not expose a separate control in this film.
 
-The review preview `04_review/preview/results-scenario.mp4` places a Model Results chapter immediately before the 13-second Scenario Engine clip. That chapter is not yet in the measured full-film times above.
+The review preview `04_review/preview/results-scenario.mp4` places a Model Results chapter immediately before the 13-second Scenario Engine clip. The chapter asks what Store Size adds: the full-model R², the live refit without Store Size, the enlarged comparison, then the restored fit. That chapter is not yet in the measured full-film times above.

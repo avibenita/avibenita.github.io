@@ -166,10 +166,111 @@ async function tagStoreSize(page) {
     if (!row) return false;
     row.id = 'filmStoreSizeRow';
     const box = row.querySelector('.coef-include-check');
-    if (box) box.id = 'filmStoreSizeCheck';
-    return Boolean(box);
+    const label = row.querySelector('.coef-var-cell');
+    if (!box || !label) return false;
+    box.id = 'filmStoreSizeCheck';
+    label.id = 'filmStoreSizeLabel';
+    const root = document.querySelector('.sb-layout');
+    if (root) root.style.position = 'relative';
+    let anchor = document.getElementById('filmStoreSizeAnchor');
+    if (!anchor && root) {
+      anchor = document.createElement('div');
+      anchor.id = 'filmStoreSizeAnchor';
+      anchor.style.cssText = 'position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;pointer-events:none;';
+      root.appendChild(anchor);
+    }
+    if (anchor) {
+      const state = window.__filmCam || { scale: 1, x: 0, y: 0 };
+      const a = box.getBoundingClientRect();
+      const b = label.getBoundingClientRect();
+      const vx = (Math.min(a.left, b.left) + Math.max(a.right, b.right)) / 2;
+      const vy = (Math.min(a.top, b.top) + Math.max(a.bottom, b.bottom)) / 2;
+      anchor.style.left = `${(vx - state.x) / state.scale}px`;
+      anchor.style.top = `${(vy - state.y) / state.scale}px`;
+    }
+    let focus = document.getElementById('filmStoreSizeFocus');
+    if (!focus) {
+      focus = document.createElement('div');
+      focus.id = 'filmStoreSizeFocus';
+      focus.style.cssText = 'position:fixed;z-index:99999;pointer-events:none;background:transparent;';
+      document.body.appendChild(focus);
+      const track = () => {
+        const check = document.getElementById('filmStoreSizeCheck');
+        const name = document.getElementById('filmStoreSizeLabel');
+        const el = document.getElementById('filmStoreSizeFocus');
+        if (check && name && el && check.isConnected && name.isConnected) {
+          const a = check.getBoundingClientRect();
+          const b = name.getBoundingClientRect();
+          const left = Math.min(a.left, b.left);
+          const top = Math.min(a.top, b.top);
+          el.style.left = `${left}px`;
+          el.style.top = `${top}px`;
+          el.style.width = `${Math.max(a.right, b.right) - left}px`;
+          el.style.height = `${Math.max(a.bottom, b.bottom) - top}px`;
+        }
+        window.__filmStoreFocusRaf = requestAnimationFrame(track);
+      };
+      if (!window.__filmStoreFocusRaf) track();
+    }
+    return true;
   });
   if (!tagged) throw new Error('Store Size is not in the coefficient table');
+}
+
+async function filmCamera(page, selector, scale) {
+  const ok = await page.evaluate(({ selector, scale }) => {
+    const root = document.querySelector('.sb-layout');
+    if (!root) return false;
+    if (!document.getElementById('filmCameraCss')) {
+      const style = document.createElement('style');
+      style.id = 'filmCameraCss';
+      style.textContent = [
+        '#filmRSquared.film-r2-read #kpiRSquared { white-space: nowrap; }',
+        '#filmRSquared.film-r2-read .full-model-ref {',
+        '  font-size: 0.78em !important;',
+        '  font-weight: 750;',
+        '  color: #f8fafc;',
+        '}'
+      ].join('\n');
+      document.head.appendChild(style);
+    }
+    if (!window.__filmCam) {
+      root.style.transformOrigin = '0 0';
+      root.style.transition = 'transform 520ms cubic-bezier(.22,.61,.24,1)';
+      root.style.willChange = 'transform';
+      window.__filmCam = { scale: 1, x: 0, y: 0 };
+    }
+    const home = !selector;
+    const target = home ? root : document.querySelector(selector);
+    if (!target) return false;
+    const state = window.__filmCam;
+    const rect = target.getBoundingClientRect();
+    const next = home ? 1 : Number(scale) || 1;
+    const cx = (rect.left + rect.width / 2 - state.x) / state.scale;
+    const cy = (rect.top + rect.height / 2 - state.y) / state.scale;
+    const x = home ? 0 : window.innerWidth / 2 - cx * next;
+    const y = home ? 0 : window.innerHeight / 2 - cy * next;
+    root.style.transform = `translate(${x}px, ${y}px) scale(${next})`;
+    window.__filmCam = { scale: next, x, y };
+    return true;
+  }, { selector, scale });
+  if (!ok) throw new Error(`Camera target missing: ${selector || 'full view'}`);
+  await page.waitForTimeout(PROBE ? 40 : 540);
+}
+
+async function toggleStoreSize(page) {
+  const clicked = await page.evaluate(() => {
+    const box = document.getElementById('filmStoreSizeCheck');
+    if (!box) return false;
+    box.checked = !box.checked;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  });
+  if (!clicked) throw new Error('Store Size checkbox is not available');
+}
+
+async function since(started, seconds) {
+  return Math.max(0, seconds * 1000 - (Date.now() - started));
 }
 
 async function frameResults(page, mode) {
@@ -213,21 +314,39 @@ async function results(page, { mark, note }) {
   await page.evaluate(() => new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(resolve));
   }));
-  await page.waitForTimeout(PROBE ? 40 : 200);
+  await page.waitForTimeout(PROBE ? 40 : 180);
   mark();
-  await page.waitForTimeout(PROBE ? 40 : 500);
-  await hot(page, '#filmRSquared', 1);
+  const line1 = dur('results-1');
+  const line2 = dur('results-2');
+  const line3 = dur('results-3');
+  // Word times are seconds into each stem: R-squared 3.07, removed 1.04, "The value" 5.79.
+  await page.waitForTimeout(PROBE ? 40 : 280);
   note('results-1');
-  await page.waitForTimeout((PROBE ? 0.04 : dur('results-1')) * 1000);
-  await page.waitForTimeout(PROBE ? 40 : 350);
+  const say1 = Date.now();
+  await page.waitForTimeout(PROBE ? 40 : await since(say1, 3.07 - 0.54));
+  await filmCamera(page, '#filmRSquared', 2.25);
+  await hot(page, '#filmRSquared', 1);
+  await page.waitForTimeout(PROBE ? 40 : await since(say1, 6.5));
   await clearFilmHighlight(page);
-  await frameResults(page, 'overview');
-  await tagStoreSize(page);
-  await hot(page, '#filmStoreSizeRow', 1);
-  await page.waitForTimeout(PROBE ? 40 : 450);
+  await filmCamera(page, '#filmStoreSizeAnchor', 1.72);
+  await hot(page, '#filmStoreSizeFocus', 1);
+  const actionVisible = await page.evaluate(() => {
+    const box = document.getElementById('filmStoreSizeCheck');
+    const label = document.getElementById('filmStoreSizeLabel');
+    if (!box || !label) return false;
+    const a = box.getBoundingClientRect();
+    const b = label.getBoundingClientRect();
+    const m = 16;
+    return a.width > 8 && a.left > m && b.right < window.innerWidth - m && a.top > m && b.bottom < window.innerHeight - m;
+  });
+  if (!actionVisible) throw new Error('Store Size label and checkbox are not both on screen');
+  await page.waitForTimeout(PROBE ? 40 : await since(say1, line1));
+  note('results-2');
+  const say2 = Date.now();
+  await page.waitForTimeout(PROBE ? 40 : await since(say2, 1.04));
   const beforeR2 = await page.locator('#kpiRSquared').innerText();
   const beforeEquation = await page.locator('#equationFormula').innerText();
-  await page.locator('#filmStoreSizeCheck').click();
+  await toggleStoreSize(page);
   await page.waitForFunction(() => {
     const overlay = document.getElementById('loadingOverlay');
     const r2 = (document.getElementById('kpiRSquared')?.textContent || '').trim();
@@ -246,18 +365,32 @@ async function results(page, { mark, note }) {
   if (beforeEquation === await page.locator('#equationFormula').innerText()) {
     throw new Error('Removing Store Size did not change the equation');
   }
+  const reduced = await page.locator('#kpiRSquared').innerText();
+  if (!/62\.96%/.test(reduced) || !/65\.63%/.test(reduced)) {
+    throw new Error(`The refit did not show both fit values: ${reduced}`);
+  }
   await tagStoreSize(page);
-  await frameResults(page, 'equation');
   await clearFilmHighlight(page);
-  await showFilmHighlights(page, ['#coefficientsTable', '#equationSection'], { zoom: 1 });
-  await page.waitForTimeout(PROBE ? 40 : 220);
-  note('results-2');
-  await page.waitForTimeout((PROBE ? 0.04 : dur('results-2') + 0.4) * 1000);
+  await hot(page, '#filmStoreSizeFocus', 1);
+  await page.waitForTimeout(PROBE ? 40 : await since(say2, 5.2));
+  await page.evaluate(() => document.getElementById('filmRSquared')?.classList.add('film-r2-read'));
   await clearFilmHighlight(page);
+  await filmCamera(page, '#filmRSquared', 2.7);
+  await hot(page, '#filmRSquared', 1);
+  const parenPx = await page.evaluate(() => {
+    const el = document.querySelector('#filmRSquared .full-model-ref');
+    return el ? el.getBoundingClientRect().height : 0;
+  });
+  if (parenPx < 34) {
+    throw new Error(`Full-model R² is ${parenPx.toFixed(1)}px tall, too small to read in the website player`);
+  }
+  await page.waitForTimeout(PROBE ? 40 : await since(say2, 8.74));
+  await clearFilmHighlight(page);
+  await page.evaluate(() => document.getElementById('filmRSquared')?.classList.remove('film-r2-read'));
   await tagStoreSize(page);
-  await hot(page, '#filmStoreSizeRow', 1);
-  await page.waitForTimeout(PROBE ? 40 : 280);
-  await page.locator('#filmStoreSizeCheck').click();
+  await filmCamera(page, '#filmStoreSizeAnchor', 1.72);
+  await hot(page, '#filmStoreSizeFocus', 1);
+  await toggleStoreSize(page);
   await page.waitForFunction(() => {
     const overlay = document.getElementById('loadingOverlay');
     const r2 = (document.getElementById('kpiRSquared')?.textContent || '').trim();
@@ -275,12 +408,17 @@ async function results(page, { mark, note }) {
       && row && !row.classList.contains('coef-row-excluded')
       && box && box.checked;
   }, null, { timeout: 8000 });
-  await frameResults(page, 'overview');
   await clearFilmHighlight(page);
-  await page.waitForTimeout(PROBE ? 40 : 120);
+  await filmCamera(page, '#filmRSquared', 2.25);
+  await hot(page, '#filmRSquared', 1);
+  await page.waitForTimeout(PROBE ? 40 : await since(say2, line2));
   note('results-3');
-  await page.waitForTimeout((PROBE ? 0.04 : dur('results-3')) * 1000);
-  await page.waitForTimeout(PROBE ? 40 : 200);
+  const say3 = Date.now();
+  await page.waitForTimeout(PROBE ? 40 : 1050);
+  await clearFilmHighlight(page);
+  await filmCamera(page, null, 1);
+  await page.waitForTimeout(PROBE ? 40 : await since(say3, line3));
+  await page.waitForTimeout(PROBE ? 40 : 160);
 }
 
 async function scenario(page, { mark, note }) {

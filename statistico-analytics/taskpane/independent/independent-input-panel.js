@@ -550,7 +550,8 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
           statistic: `U=${mw.u.toFixed(2)}`,
           rawP: mw.p,
           estimate: (2 * (mw.u / Math.max(1, a.length * b.length)) - 1),
-          estimateKind: "rank-biserial"
+          estimateKind: "rank-biserial",
+          intervalKind: "unavailable"
         });
       }
     }
@@ -572,7 +573,8 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
           statistic: `z=${z.toFixed(2)}`,
           rawP: p,
           estimate: diff,
-          estimateKind: "mean-rank-difference"
+          estimateKind: "mean-rank-difference",
+          intervalKind: "unavailable"
         });
       }
     }
@@ -597,6 +599,7 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
           adjP: p,
           estimate: diff,
           estimateKind: "mean-difference",
+          intervalKind: "simultaneous",
           ciLower: diff - crit * se,
           ciUpper: diff + crit * se,
           cohenD: sp > 0 ? diff / sp : 0
@@ -624,6 +627,7 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
           adjP: p,
           estimate: diff,
           estimateKind: "mean-difference",
+          intervalKind: "simultaneous",
           ciLower: isFinite(crit) ? diff - crit * se : NaN,
           ciUpper: isFinite(crit) ? diff + crit * se : NaN,
           cohenD: sp > 0 ? diff / sp : 0
@@ -642,6 +646,13 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
     correction: builtin ? "builtin" : (correction || "holm"),
     familySize,
     estimateLabel,
+    intervalKind: builtin ? "simultaneous" : "unavailable",
+    intervalNote: builtin
+      ? "Simultaneous interval from the studentized-range critical value."
+      : "Interval unavailable for this effect estimator.",
+    treatment: method === "mann-whitney"
+      ? "Mann–Whitney U uses average ranks for ties and an asymptotic normal p-value with no continuity correction."
+      : (method === "dunn" ? "Dunn reports a mean-rank difference. Rank-biserial r is a separate effect estimator." : ""),
     rows: rows.map((r, i) => ({
       comparison: r.comparison,
       statistic: r.statistic,
@@ -649,6 +660,7 @@ function computePosthocRows(grouped, levels, framework, correction, spec) {
       adjP: builtin ? r.adjP : adj[i],
       estimate: r.estimate,
       estimateKind: r.estimateKind,
+      intervalKind: r.intervalKind || (builtin ? "simultaneous" : "unavailable"),
       ciLower: r.ciLower,
       ciUpper: r.ciUpper,
       cohenD: r.cohenD

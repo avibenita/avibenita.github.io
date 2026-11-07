@@ -303,6 +303,21 @@
     #setPosthocWrap,#setCorrectionWrap{min-width:180px;max-width:220px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
     #setPosthocWrap label,#setCorrectionWrap label{white-space:nowrap;line-height:1;margin-bottom:0;font-size:11px;}
     #setPosthocMethod,#setPosthocCorrection{height:34px;min-width:150px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:13px;font-weight:500;cursor:pointer;}
+    .posthoc-stage{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,.85fr);gap:12px;align-items:start;}
+    .pair-inspector{background:#121820;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 14px;min-width:0;}
+    .pair-inspector-kicker{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);}
+    .pair-inspector-title{font-size:16px;font-weight:750;margin:2px 0 8px;color:var(--text-primary);}
+    .pair-inspector-charts{display:grid;gap:8px;}
+    .pair-inspector-label{font-size:11px;font-weight:650;color:var(--text-muted);margin-bottom:2px;}
+    .pair-inspector svg{width:100%;height:auto;display:block;background:rgba(255,255,255,.02);border-radius:8px;}
+    .pair-inspector p{margin:8px 0 0;font-size:13px;line-height:1.45;color:var(--text-secondary);}
+    .pair-smd{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;font-weight:650;color:var(--text-muted);}
+    .pair-smd input{width:88px;height:30px;border-radius:6px;border:1px solid rgba(255,255,255,.14);background:#161d27;color:var(--text-primary);padding:0 8px;}
+    .pair-plan{margin-top:8px;height:30px;padding:0 10px;border-radius:6px;border:1px solid rgba(103,232,249,.45);background:transparent;color:#67e8f9;font-weight:700;cursor:pointer;}
+    #posthocTable tr.pair-row{cursor:pointer;}
+    #posthocTable tr.pair-row.is-selected td{background:rgba(103,232,249,.1);}
+    .posthoc-heatmap td.is-selected{outline:2px solid #67e8f9;outline-offset:-2px;}
+    @media (max-width:980px){.posthoc-stage{grid-template-columns:1fr;}}
     .posthoc-menu{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:8px;margin-bottom:8px;padding:10px;border:1px solid rgba(120,200,255,.28);border-radius:10px;background:linear-gradient(135deg,rgba(15,23,42,.62),rgba(30,41,59,.44));}
     .posthoc-menu-card{min-width:0;padding:10px 12px;border:1px solid rgba(148,163,184,.22);border-radius:8px;background:rgba(255,255,255,.035);display:flex;flex-direction:column;gap:6px;}
     .posthoc-menu-card-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.55px;color:var(--accent-2);}
@@ -745,8 +760,8 @@
                         <tr><th>Test</th><th>F</th><th>df1</th><th>df2</th><th>p-value</th></tr>
                       </thead>
                       <tbody id="varianceTestBody">
-                        <tr><td>Levene</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
-                        <tr><td>Brown–Forsythe</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+                        <tr><td>Levene (mean-centered)</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+                        <tr><td>Brown–Forsythe (median-centered)</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -983,6 +998,7 @@
               </div>
               </div>
 
+              <div class="posthoc-stage">
               <div class="posthoc-body-scroll" id="posthocScrollArea">
               <div class="table-container" id="posthocTableWrap" style="margin:0;">
                 <table class="analysis-table" id="posthocTable">
@@ -1006,6 +1022,27 @@
               <div id="posthocHeatmapWrap" class="posthoc-heatmap-wrap">
                 <table class="posthoc-heatmap" id="posthocHeatmap"></table>
               </div>
+              </div>
+              <aside class="pair-inspector" id="pairInspector">
+                <div class="pair-inspector-kicker">Selected pair</div>
+                <div class="pair-inspector-title" id="pairInspectorTitle">No pair selected</div>
+                <div class="pair-inspector-charts">
+                  <div>
+                    <div class="pair-inspector-label">Shared scale</div>
+                    <svg id="pairSpread" viewBox="0 0 280 128" role="img" aria-label="Selected groups on a shared measurement scale"></svg>
+                  </div>
+                  <div>
+                    <div class="pair-inspector-label">Contrast, zero at the center</div>
+                    <svg id="pairContrast" viewBox="0 0 280 128" role="img" aria-label="Selected contrast and its interval"></svg>
+                  </div>
+                </div>
+                <p id="pairInspectorStat"></p>
+                <p id="pairInspectorNote"></p>
+                <label class="pair-smd" id="pairSmdWrap">Smallest meaningful difference
+                  <input id="pairSmd" type="number" min="0" step="any" inputmode="decimal" placeholder="in outcome units">
+                </label>
+                <button type="button" class="pair-plan" id="pairPlanStudy">Plan a study</button>
+              </aside>
               </div>
               
               <div class="posthoc-body-foot">
@@ -1573,8 +1610,8 @@
           const lv = ob.levene || {};
           const bf = ob.brownForsythe || {};
           varBody.innerHTML = ''
-            + '<tr><td>Levene</td><td>' + fmt(lv.f) + '</td><td>' + fmtDf(lv.df1) + '</td><td>' + fmtDf(lv.df2) + '</td><td>' + fmtP(lv.p) + '</td></tr>'
-            + '<tr><td>Brown–Forsythe</td><td>' + fmt(bf.f) + '</td><td>' + fmtDf(bf.df1) + '</td><td>' + fmtDf(bf.df2) + '</td><td>' + fmtP(bf.p) + '</td></tr>';
+            + '<tr><td>Levene (mean-centered)</td><td>' + fmt(lv.f) + '</td><td>' + fmtDf(lv.df1) + '</td><td>' + fmtDf(lv.df2) + '</td><td>' + fmtP(lv.p) + '</td></tr>'
+            + '<tr><td>Brown–Forsythe (median-centered)</td><td>' + fmt(bf.f) + '</td><td>' + fmtDf(bf.df1) + '</td><td>' + fmtDf(bf.df2) + '</td><td>' + fmtP(bf.p) + '</td></tr>';
         }
 
         renderGroupVarianceTable(ob);
@@ -2058,6 +2095,8 @@
     }
     
     let posthocData = [];
+    let selectedPairKey = "";
+    let meaningfulDifference = NaN;
     let posthocFamilySize = 0;
     let posthocEstimateLabel = "Difference";
     let posthocSortColumn = 'estimate';
@@ -2093,8 +2132,16 @@
       var sortedByAbs = displayData.slice().sort(function(a, b) { return Math.abs(b.estimate) - Math.abs(a.estimate); });
       var strongest = sortedByAbs[0];
       var weakest = sortedByAbs[sortedByAbs.length - 1];
+      var posthocMeta = (lastBundle && lastBundle.results && lastBundle.results.posthoc) || {};
+      var procedureName = posthocMeta.method || "";
+      var familyNames = { tukey: "Tukey–Kramer", "games-howell": "Games–Howell", dunn: "Dunn", "mann-whitney": "Mann–Whitney", holm: "Holm", bh: "Benjamini–Hochberg", bonferroni: "Bonferroni" };
+      var familyCount = posthocFamilySize || displayData.length;
+      var adjustKey = String(posthocMeta.correction || "holm").toLowerCase();
+      var familyHow = (procedureName === "tukey" || procedureName === "games-howell")
+        ? ((familyNames[procedureName] || "The procedure") + " adjusts all " + familyCount + " pairs")
+        : ((familyNames[adjustKey] || posthocMeta.correction || "Holm") + " across " + familyCount + " tests");
       body.innerHTML = ''
-        + '<div><strong>Shown:</strong> ' + displayData.length + (posthocFamilySize ? (' of ' + posthocFamilySize) : '') + '</div>'
+        + '<div><strong>Showing ' + displayData.length + ' of ' + familyCount + ' pairs</strong> · ' + familyHow + '</div>'
         + '<div><strong>Meet α:</strong> ' + sig.length + '</div>'
         + '<div><strong>Do not meet α:</strong> ' + (displayData.length - sig.length) + '</div>'
         + '<div><strong>Largest |effect|:</strong> ' + (strongest ? strongest.comparison + ' (' + fmt(strongest.estimate) + ')' : '—') + '</div>'
@@ -2163,7 +2210,8 @@
           var bg = r.significant
             ? 'rgba(74,222,128,' + (0.15 + intensity * 0.55) + ')'
             : 'rgba(100,116,139,' + (0.08 + intensity * 0.2) + ')';
-          return '<td class="' + (r.significant ? 'ph-cell--sig' : '') + '" style="background:' + bg + ';" title="' + r.comparison + ': ' + fmt(r.estimate) + ', adj p ' + fmtP(r.adjP) + '">' + (r.significant ? '✓' : '·') + '</td>';
+          var selected = r.comparison === selectedPairKey ? ' is-selected' : '';
+          return '<td data-pair="' + String(r.comparison).replace(/"/g, '&quot;') + '" class="' + (r.significant ? 'ph-cell--sig' : '') + selected + '" style="background:' + bg + ';cursor:pointer;" title="' + r.comparison + ': ' + fmt(r.estimate) + ', adj p ' + fmtP(r.adjP) + '">' + (r.significant ? '✓' : '·') + '</td>';
         }).join('');
         return '<tr><td>' + g1 + '</td>' + cells + '</tr>';
       }).join('');
@@ -2218,7 +2266,7 @@
       if (estimateHeader) estimateHeader.textContent = posthocEstimateLabel;
       if (rawHead) rawHead.textContent = builtinAdjust ? "Unadjusted p" : "Raw p";
       if (adjHead) adjHead.textContent = builtinAdjust ? "p" : "Adj p";
-      if (ciHead) ciHead.textContent = (Math.round((1 - alpha) * 1000) / 10) + "% CI";
+      if (ciHead) ciHead.textContent = builtinAdjust ? ((Math.round((1 - alpha) * 1000) / 10) + "% simultaneous CI") : "Interval";
       if (warningEl && lastBundle && lastBundle.results && lastBundle.results.omnibus) {
         const ob = alignOmnibus(lastBundle.results.omnibus);
         const welch = ob.welchAnova || {};
@@ -2252,7 +2300,8 @@
         const adjustNote = correction === "builtin"
           ? ("The p-value already includes all " + posthocFamilySize + " pairs.")
           : ((correction || "Holm") + " adjusts all " + posthocFamilySize + " pairs. Filtering the table does not change that family.");
-        noteEl.textContent = (methodNames[method] || method) + ". " + adjustNote;
+        var treatment = posthoc.treatment ? (" " + posthoc.treatment) : "";
+        noteEl.textContent = (methodNames[method] || method) + ". " + adjustNote + treatment;
       }
       const estNoteEl = document.getElementById("posthocEstimateNote");
       if (estNoteEl) estNoteEl.textContent = posthocEstimateLabel + ".";
@@ -2273,6 +2322,7 @@
           adjP: parseMaybeNumber(r.adjP),
           estimate: parseMaybeNumber(r.estimate),
           estimateKind: r.estimateKind || "",
+          intervalKind: r.intervalKind || "",
           ciLower: parseMaybeNumber(r.ciLower),
           ciUpper: parseMaybeNumber(r.ciUpper),
           cohenD: parseMaybeNumber(r.cohenD),
@@ -2864,7 +2914,7 @@
       const heatmapWrap = document.getElementById("posthocHeatmapWrap");
       const isNP = primaryFramework === "nonparametric";
       const correction = (lastBundle && lastBundle.results && lastBundle.results.posthoc && lastBundle.results.posthoc.correction) || "Holm";
-      if (!body || !posthocData.length) return;
+      if (!body || !posthocData.length) { renderPairInspector([]); return; }
       
       const grouping = document.querySelector('input[name="posthocGrouping"]:checked')?.value || 'all';
       const refRadio = document.querySelector('input[name="posthocRefRadio"]:checked');
@@ -2906,12 +2956,25 @@
       
       updatePosthocSummary(displayData, isNP);
       updatePosthocInterpretation(displayData, correction);
+      if (!displayData.some(function(r){ return r.comparison === selectedPairKey; })) {
+        selectedPairKey = displayData.length ? displayData[0].comparison : "";
+      }
+      renderPairInspector(posthocData);
       
       const viewMode = document.querySelector('input[name="posthocViewMode"]:checked')?.value || 'table';
       if (tableWrap) tableWrap.style.display = viewMode === 'table' ? 'block' : 'none';
       if (heatmapWrap) {
         heatmapWrap.style.display = viewMode === 'heatmap' ? 'block' : 'none';
-        if (viewMode === 'heatmap') buildPosthocHeatmap(grouping === 'ref' ? posthocData : displayData, posthocGroups);
+        if (viewMode === 'heatmap') buildPosthocHeatmap(displayData, posthocGroups);
+        if (heatmapWrap && !heatmapWrap.dataset.bound) {
+          heatmapWrap.dataset.bound = "1";
+          heatmapWrap.addEventListener("click", function(ev) {
+            var cell = ev.target.closest("td[data-pair]");
+            if (!cell) return;
+            selectedPairKey = cell.getAttribute("data-pair");
+            updatePosthocDisplay();
+          });
+        }
       }
       
       if (viewMode !== 'table') {
@@ -2925,6 +2988,13 @@
       
       rowsToRender.forEach(function(r){
         const tr = document.createElement("tr");
+        tr.tabIndex = 0;
+        tr.className = r.comparison === selectedPairKey ? "pair-row is-selected" : "pair-row";
+        tr.setAttribute("data-pair", r.comparison);
+        tr.addEventListener("click", function(){ selectedPairKey = r.comparison; updatePosthocDisplay(); });
+        tr.addEventListener("keydown", function(ev){
+          if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectedPairKey = r.comparison; updatePosthocDisplay(); }
+        });
         
         let td = document.createElement("td");
         td.textContent = r.comparison;
@@ -2955,8 +3025,9 @@
         td.style.fontFamily = "monospace";
         if (isFinite(r.ciLower) && isFinite(r.ciUpper)) {
           td.textContent = "[" + fmt(r.ciLower) + ", " + fmt(r.ciUpper) + "]";
+          td.title = r.intervalKind === "simultaneous" ? "Simultaneous interval for every pair." : "";
         } else {
-          td.innerHTML = '<span title="CI not available for this statistic" style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(100,116,139,.18);color:#94a3b8;font-size:12px;font-family:sans-serif;">n/a</span>';
+          td.innerHTML = '<span title="Interval unavailable for this effect estimator" style="display:inline-block;padding:2px 7px;border-radius:4px;background:rgba(100,116,139,.18);color:#94a3b8;font-size:12px;font-family:sans-serif;">n/a</span>';
         }
         tr.appendChild(td);
         
@@ -2982,6 +3053,134 @@
       requestAnimationFrame(function(){ if (typeof fitIndependentLayout === 'function') fitIndependentLayout(); });
     }
     
+    var PAIR_COLORS = ["#67e8f9", "#fbbf24", "#c4b5fd", "#86efac", "#fda4af", "#93c5fd"];
+    function groupColor(name) {
+      var i = posthocGroups.indexOf(name);
+      return PAIR_COLORS[(i < 0 ? 0 : i) % PAIR_COLORS.length];
+    }
+    function pairParts(comparison) {
+      var parts = String(comparison || "").split(/\s*vs\.?\s*/i);
+      return parts.length === 2 ? [parts[0].trim(), parts[1].trim()] : ["", ""];
+    }
+    function rankBiserialFromValues(x, y) {
+      var all = [];
+      x.forEach(function(v){ all.push({ v: v, g: 1 }); });
+      y.forEach(function(v){ all.push({ v: v, g: 2 }); });
+      all.sort(function(a, b){ return a.v - b.v; });
+      var i = 0;
+      while (i < all.length) {
+        var j = i + 1;
+        while (j < all.length && all[j].v === all[i].v) j++;
+        var rank = (i + 1 + j) / 2;
+        for (var k = i; k < j; k++) all[k].rank = rank;
+        i = j;
+      }
+      var n1 = x.length, n2 = y.length;
+      var r1 = 0;
+      all.forEach(function(d){ if (d.g === 1) r1 += d.rank; });
+      var u = r1 - (n1 * (n1 + 1) / 2);
+      return { u: u, r: (n1 && n2) ? (2 * u / (n1 * n2) - 1) : NaN };
+    }
+    function contrastLimit(rows) {
+      var m = isFinite(meaningfulDifference) ? Math.abs(meaningfulDifference) : 0;
+      (rows || []).forEach(function(r) {
+        [r.estimate, r.ciLower, r.ciUpper].forEach(function(v){ if (isFinite(v)) m = Math.max(m, Math.abs(v)); });
+      });
+      return m > 0 ? m * 1.15 : 1;
+    }
+    function svgText(x, y, text, fill) {
+      var safe = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      return '<text x="' + x + '" y="' + y + '" fill="' + (fill || "#94a3b8") + '" font-size="11" font-family="inherit">' + safe + '</text>';
+    }
+    function drawPairSpread(svg, nameA, a, nameB, b) {
+      if (!a.length || !b.length) {
+        svg.innerHTML = svgText(12, 64, "Distribution unavailable without the original observations.");
+        return;
+      }
+      var vals = a.concat(b);
+      var lo = Math.min.apply(null, vals);
+      var hi = Math.max.apply(null, vals);
+      if (lo === hi) { lo -= 1; hi += 1; }
+      var pad = 16;
+      function xOf(v) { return pad + ((v - lo) / (hi - lo)) * (280 - pad * 2); }
+      var dots = a.map(function(v, i) {
+        return '<circle cx="' + xOf(v) + '" cy="' + (42 + (i % 5) * 3) + '" r="3.5" fill="' + groupColor(nameA) + '"/>';
+      }).join("") + b.map(function(v, i) {
+        return '<circle cx="' + xOf(v) + '" cy="' + (84 + (i % 5) * 3) + '" r="3.5" fill="' + groupColor(nameB) + '"/>';
+      }).join("");
+      svg.innerHTML = '<line x1="' + pad + '" y1="110" x2="' + (280 - pad) + '" y2="110" stroke="rgba(255,255,255,.2)"/>'
+        + svgText(8, 24, nameA + "  n=" + a.length, groupColor(nameA))
+        + svgText(8, 70, nameB + "  n=" + b.length, groupColor(nameB))
+        + dots
+        + svgText(pad, 124, fmt(lo))
+        + svgText(220, 124, fmt(hi));
+    }
+    function drawPairContrast(svg, row, limit) {
+      var mid = 140;
+      var scale = 110 / limit;
+      function xOf(v) { return mid + v * scale; }
+      var mark = "";
+      if (isFinite(meaningfulDifference) && meaningfulDifference > 0) {
+        mark = '<line x1="' + xOf(meaningfulDifference) + '" y1="28" x2="' + xOf(meaningfulDifference) + '" y2="100" stroke="#fbbf24" stroke-dasharray="3 3"/>'
+          + '<line x1="' + xOf(-meaningfulDifference) + '" y1="28" x2="' + xOf(-meaningfulDifference) + '" y2="100" stroke="#fbbf24" stroke-dasharray="3 3"/>';
+      }
+      var interval = "";
+      if (isFinite(row.ciLower) && isFinite(row.ciUpper)) {
+        interval = '<line x1="' + xOf(row.ciLower) + '" y1="64" x2="' + xOf(row.ciUpper) + '" y2="64" stroke="#67e8f9" stroke-width="3"/>';
+      }
+      svg.innerHTML = '<line x1="' + mid + '" y1="24" x2="' + mid + '" y2="104" stroke="rgba(255,255,255,.35)"/>'
+        + mark + interval
+        + '<circle cx="' + xOf(isFinite(row.estimate) ? row.estimate : 0) + '" cy="64" r="5" fill="#67e8f9"/>'
+        + svgText(8, 18, "−")
+        + svgText(136, 18, "0")
+        + svgText(258, 18, "+");
+    }
+    function renderPairInspector(allRows) {
+      var title = document.getElementById("pairInspectorTitle");
+      var stat = document.getElementById("pairInspectorStat");
+      var note = document.getElementById("pairInspectorNote");
+      var spread = document.getElementById("pairSpread");
+      var contrast = document.getElementById("pairContrast");
+      if (!title || !stat || !note || !spread || !contrast) return;
+      var row = (allRows || []).filter(function(r){ return r.comparison === selectedPairKey; })[0];
+      if (!row) {
+        title.textContent = "No pair selected";
+        stat.textContent = "";
+        note.textContent = "No eligible pairs.";
+        spread.innerHTML = "";
+        contrast.innerHTML = "";
+        return;
+      }
+      var names = pairParts(row.comparison);
+      title.textContent = names[0] + " vs " + names[1];
+      var cols = (lastBundle && lastBundle.setup && lastBundle.setup.selectedColumns) || posthocGroups;
+      var grouped = getGroupedValuesFromData(cols);
+      var a = grouped[names[0]] || [];
+      var b = grouped[names[1]] || [];
+      var alpha = Number((document.getElementById("setAlpha") || { value: "0.05" }).value || 0.05);
+      var pct = Math.round((1 - alpha) * 1000) / 10;
+      var intervalText = (isFinite(row.ciLower) && isFinite(row.ciUpper))
+        ? (pct + "% simultaneous interval [" + fmt(row.ciLower) + ", " + fmt(row.ciUpper) + "]. Direction is " + names[0] + " minus " + names[1] + ".")
+        : "Interval unavailable for this effect estimator.";
+      stat.textContent = (posthocEstimateLabel || "Effect") + " = " + fmt(row.estimate) + ". Adjusted p = " + fmtP(row.adjP) + ". " + intervalText;
+      var extra = "";
+      if (a.length && b.length && (row.estimateKind === "rank-biserial" || row.estimateKind === "mean-rank-difference")) {
+        var rb = row.estimateKind === "rank-biserial" ? { r: row.estimate } : rankBiserialFromValues(a, b);
+        var share = (1 + rb.r) / 2;
+        extra = names[0] + " is higher than " + names[1] + " in about " + Math.round(share * 100) + "% of cross-group comparisons, counting ties as half.";
+        if (row.estimateKind === "mean-rank-difference") extra += " Rank-biserial r = " + fmt(rb.r) + " is a separate effect estimator from the Dunn result.";
+      } else if (!a.length || !b.length) {
+        extra = "The distribution plot needs the original observations.";
+      }
+      if (row.estimateKind === "mean-difference") {
+        extra += (extra ? " " : "") + "Plan a study opens Power & Sample Size, which uses Cohen's f. This outcome-unit difference stays on the contrast.";
+      }
+      note.textContent = extra;
+      drawPairSpread(spread, names[0], a, names[1], b);
+      drawPairContrast(contrast, row, contrastLimit(allRows));
+      var smdWrap = document.getElementById("pairSmdWrap");
+      if (smdWrap) smdWrap.style.display = row.estimateKind === "mean-difference" ? "flex" : "none";
+    }
     function sortPosthocTable(column) {
       if (posthocSortColumn === column) {
         posthocSortAsc = !posthocSortAsc;
@@ -3576,6 +3775,17 @@
         }
       });
       document.querySelectorAll('input[name="h1Orientation"]').forEach(function(el){ el.addEventListener("change", notifySettingsChanged); });
+      var smdInput = document.getElementById("pairSmd");
+      if (smdInput) smdInput.addEventListener("input", function() {
+        var n = parseMaybeNumber(smdInput.value);
+        meaningfulDifference = isFinite(n) && n > 0 ? n : NaN;
+        renderPairInspector(posthocData);
+      });
+      var planBtn = document.getElementById("pairPlanStudy");
+      if (planBtn) planBtn.addEventListener("click", function() {
+        window._independentMeaningfulDifference = isFinite(meaningfulDifference) ? meaningfulDifference : null;
+        switchTab("power");
+      });
       // Framework custom select wired in initFrameworkSelect()
       initFrameworkSelect();
       setFrameworkButtons(primaryFramework);

@@ -8,7 +8,7 @@ export const HIGHLIGHT_SPEC = Object.freeze({
 });
 
 export const FILM_HIGHLIGHT_CSS = `
-#filmHighlight {
+.film-highlight {
   position: fixed;
   z-index: 100000;
   pointer-events: none;
@@ -19,8 +19,8 @@ export const FILM_HIGHLIGHT_CSS = `
   opacity: 0;
   box-shadow: none;
 }
-#filmHighlight.is-in { animation: filmHighlightFadeIn ${HIGHLIGHT_SPEC.fadeInMs}ms ease forwards; }
-#filmHighlight.is-out { animation: filmHighlightFadeOut ${HIGHLIGHT_SPEC.fadeOutMs}ms linear forwards; }
+.film-highlight.is-in { animation: filmHighlightFadeIn ${HIGHLIGHT_SPEC.fadeInMs}ms ease forwards; }
+.film-highlight.is-out { animation: filmHighlightFadeOut ${HIGHLIGHT_SPEC.fadeOutMs}ms linear forwards; }
 @keyframes filmHighlightFadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes filmHighlightFadeOut { from { opacity: 1; } to { opacity: 0; } }
 `;
@@ -112,8 +112,8 @@ export function highlightReport(scenes, starts = {}) {
   return { spec: HIGHLIGHT_SPEC, events };
 }
 
-async function runHighlight(page, action, selector, zoom) {
-  return page.evaluate(({ css, spec, action, selector, zoom }) => {
+async function runHighlight(page, action, selectors, zoom) {
+  return page.evaluate(({ css, spec, action, selectors, zoom }) => {
     function install() {
       if (!document.getElementById('filmHighlightCss')) {
         const style = document.createElement('style');
@@ -123,11 +123,13 @@ async function runHighlight(page, action, selector, zoom) {
       }
       window.__filmHighlightLog = window.__filmHighlightLog || [];
     }
-    function ensure() {
-      let el = document.getElementById('filmHighlight');
+    function ensure(index) {
+      const id = index === 0 ? 'filmHighlight' : `filmHighlight-${index}`;
+      let el = document.getElementById(id);
       if (!el) {
         el = document.createElement('div');
-        el.id = 'filmHighlight';
+        el.id = id;
+        el.className = 'film-highlight';
         el.innerHTML = '';
         document.body.appendChild(el);
       }
@@ -149,65 +151,85 @@ async function runHighlight(page, action, selector, zoom) {
       return { target: { x: rect.x, y: rect.y, w: rect.width, h: rect.height }, frame };
     }
     function track() {
-      const el = document.getElementById('filmHighlight');
-      const target = window.__filmHighlightTarget;
-      if (!el || !target || !target.isConnected) return;
-      place(el, target);
+      const pairs = window.__filmHighlightTargets || [];
+      if (!pairs.length) return;
+      pairs.forEach((pair) => {
+        if (pair.el && pair.target && pair.target.isConnected) place(pair.el, pair.target);
+      });
       window.__filmHighlightRaf = requestAnimationFrame(track);
     }
     install();
     if (action === 'clear') {
-      const el = document.getElementById('filmHighlight');
-      if (!el) return null;
-      el.classList.remove('is-in');
-      void el.offsetWidth;
-      el.classList.add('is-out');
+      const nodes = [...document.querySelectorAll('.film-highlight')];
+      if (!nodes.length) return null;
+      nodes.forEach((el) => {
+        el.classList.remove('is-in');
+        void el.offsetWidth;
+        el.classList.add('is-out');
+      });
       window.__filmHighlightLog.push({ action: 'clear', wall: Date.now() });
-      const node = window.__filmHighlightTarget;
+      const retiring = window.__filmHighlightTargets;
       setTimeout(() => {
-        if (window.__filmHighlightTarget === node) {
-          window.__filmHighlightTarget = null;
+        if (window.__filmHighlightTargets === retiring) {
+          window.__filmHighlightTargets = [];
           if (window.__filmHighlightRaf) cancelAnimationFrame(window.__filmHighlightRaf);
         }
       }, spec.fadeOutMs);
-      return { action: 'clear' };
+      return [{ action: 'clear' }];
     }
-    const target = selector ? document.querySelector(selector) : null;
-    if (!target) return null;
-    const el = ensure();
-    const placed = place(el, target);
-    const measured = el.getBoundingClientRect();
-    el.classList.remove('is-out', 'is-in');
-    void el.offsetWidth;
-    el.classList.add('is-in');
-    window.__filmHighlightTarget = target;
+    const entries = [];
+    const pairs = [];
+    (selectors || []).forEach((selector, index) => {
+      const target = selector ? document.querySelector(selector) : null;
+      if (!target) return;
+      const el = ensure(index);
+      const placed = place(el, target);
+      const measured = el.getBoundingClientRect();
+      el.classList.remove('is-out', 'is-in');
+      void el.offsetWidth;
+      el.classList.add('is-in');
+      const entry = {
+        action: 'show',
+        wall: Date.now(),
+        selector,
+        color: spec.color,
+        outlinePx: spec.outlinePx,
+        radiusPx: spec.radiusPx,
+        offsetPx: spec.offsetPx,
+        fadeInMs: spec.fadeInMs,
+        fadeOutMs: spec.fadeOutMs,
+        target: placed.target,
+        frame: { x: measured.x, y: measured.y, w: measured.width, h: measured.height },
+        nx: (placed.target.x + placed.target.w / 2) / window.innerWidth,
+        ny: (placed.target.y + placed.target.h / 2) / window.innerHeight,
+        zoom: zoom || 1.24
+      };
+      window.__filmHighlightLog.push(entry);
+      entries.push(entry);
+      pairs.push({ el, target });
+    });
+    document.querySelectorAll('.film-highlight').forEach((el) => {
+      if (!pairs.some((pair) => pair.el === el)) el.classList.add('is-out');
+    });
+    window.__filmHighlightTargets = pairs;
     if (window.__filmHighlightRaf) cancelAnimationFrame(window.__filmHighlightRaf);
     window.__filmHighlightRaf = requestAnimationFrame(track);
-    const entry = {
-      action: 'show',
-      wall: Date.now(),
-      selector,
-      color: spec.color,
-      outlinePx: spec.outlinePx,
-      radiusPx: spec.radiusPx,
-      offsetPx: spec.offsetPx,
-      fadeInMs: spec.fadeInMs,
-      fadeOutMs: spec.fadeOutMs,
-      target: placed.target,
-      frame: { x: measured.x, y: measured.y, w: measured.width, h: measured.height },
-      nx: (placed.target.x + placed.target.w / 2) / window.innerWidth,
-      ny: (placed.target.y + placed.target.h / 2) / window.innerHeight,
-      zoom: zoom || 1.24
-    };
-    window.__filmHighlightLog.push(entry);
-    return entry;
-  }, { css: FILM_HIGHLIGHT_CSS, spec: HIGHLIGHT_SPEC, action, selector, zoom });
+    return entries;
+  }, { css: FILM_HIGHLIGHT_CSS, spec: HIGHLIGHT_SPEC, action, selectors, zoom });
 }
 
 export async function showFilmHighlight(page, selector, options = {}) {
-  const entry = await runHighlight(page, 'show', selector, options.zoom || 1.24);
-  if (!entry) throw new Error(`Highlight target not found: ${selector}`);
-  return entry;
+  const entries = await runHighlight(page, 'show', [selector], options.zoom || 1.24);
+  if (!entries || !entries.length) throw new Error(`Highlight target not found: ${selector}`);
+  return entries[0];
+}
+
+export async function showFilmHighlights(page, selectors, options = {}) {
+  const entries = await runHighlight(page, 'show', selectors, options.zoom || 1);
+  if (!entries || entries.length !== selectors.length) {
+    throw new Error(`Highlight target not found: ${(selectors || []).join(', ')}`);
+  }
+  return entries;
 }
 
 export async function clearFilmHighlight(page) {

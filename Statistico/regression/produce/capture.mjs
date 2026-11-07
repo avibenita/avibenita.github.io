@@ -4,7 +4,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
-import { clearFilmHighlight, readHighlightLog, showFilmHighlight } from '../../video-workflow/overlay/highlight.mjs';
+import { clearFilmHighlight, readHighlightLog, showFilmHighlight, showFilmHighlights } from '../../video-workflow/overlay/highlight.mjs';
 
 const require = createRequire('e:/OneDrive/GitHub/statistico-analytics/package.json');
 const { chromium } = require('playwright');
@@ -139,60 +139,65 @@ async function effects(page, { mark, note }) {
   await clearFilmHighlight(page);
 }
 
-async function scenario(page, { mark, note, say }) {
+async function scenario(page, { mark, note }) {
   await loadFilm(page);
-  mark();
   await page.evaluate(() => switchTab('pred-scenario'));
   await page.waitForFunction(() => {
     const value = document.getElementById('predictedValue');
-    const chart = document.querySelector('#predProfileChart .highcharts-container, #predProfileChart svg');
-    return value && value.textContent && value.textContent !== '-' && chart;
-  }, null, { timeout: 8000 });
-  await page.waitForTimeout(PROBE ? 40 : 500);
+    const slider = document.getElementById('input-Ad Spend');
+    const card = document.querySelector('#tab-predictions .output-card.main-prediction');
+    const chart = document.querySelector('#predProfileChart .highcharts-series');
+    const overlay = document.getElementById('loadingOverlay');
+    const box = chart && chart.getBoundingClientRect();
+    return value && /116\.37/.test(value.textContent || '')
+      && slider && Number(slider.value) > 0
+      && card && chart && box && box.width > 40 && box.height > 40
+      && overlay && overlay.classList.contains('hidden');
+  }, null, { timeout: 12000 });
   await page.evaluate(() => {
     const scroller = document.querySelector('#tab-predictions .ws-body');
     if (scroller) scroller.scrollTop = 0;
-    const nodes = [
-      document.getElementById('header-container'),
-      document.querySelector('#tab-predictions [data-pred-tab="pred-scenario"]'),
-      document.getElementById('input-Ad Spend')?.closest('.input-group'),
-      document.querySelector('#tab-predictions .output-card.main-prediction'),
-      document.getElementById('predProfileChart')
-    ].filter(Boolean);
-    if (nodes.length < 4) throw new Error('Scenario frame targets are missing');
-    const rects = nodes.map((node) => node.getBoundingClientRect());
-    const left = Math.min(...rects.map((rect) => rect.left));
-    const top = Math.min(...rects.map((rect) => rect.top));
-    const right = Math.max(...rects.map((rect) => rect.right));
-    const bottom = Math.max(...rects.map((rect) => rect.bottom));
-    let marker = document.getElementById('filmScenarioView');
-    if (!marker) {
-      marker = document.createElement('div');
-      marker.id = 'filmScenarioView';
-      marker.style.position = 'fixed';
-      marker.style.pointerEvents = 'none';
-      marker.style.background = 'transparent';
-      marker.style.zIndex = '0';
-      document.body.appendChild(marker);
-    }
-    marker.style.left = `${left}px`;
-    marker.style.top = `${top}px`;
-    marker.style.width = `${Math.max(1, right - left)}px`;
-    marker.style.height = `${Math.max(1, bottom - top)}px`;
+    const slider = document.getElementById('input-Ad Spend');
+    const group = slider && slider.closest('.input-group');
+    const card = document.querySelector('#tab-predictions .output-card.main-prediction');
+    if (!group || !card) throw new Error('Scenario controls are missing');
+    group.id = 'filmAdSpend';
+    card.id = 'filmPredictedSales';
   });
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await page.waitForTimeout(PROBE ? 40 : 250);
+  mark();
   const before = await page.locator('#predictedValue').innerText();
   const beforeTitle = await page.locator('#predProfileTitle').innerText();
-  await hot(page, '#filmScenarioView', 1);
-  await page.waitForTimeout(PROBE ? 40 : 700);
-  note('scenario-1');
-  // The question lands on the starting view. The move itself is the second sentence.
-  await page.waitForTimeout(PROBE ? 40 : 2200);
-  if (process.argv.includes('--preview-scenario')) await shot(page, 'scenario-start');
+  const openMs = PROBE ? 40 : 700;
+  const afterHotMs = PROBE ? 40 : 450;
   const steps = PROBE ? 2 : 12;
-  const stepMs = PROBE ? 20 : 500;
+  const stepMs = PROBE ? 20 : 450;
+  const afterDragMs = PROBE ? 40 : 300;
+  const fadeMs = 200;
+  const resultInMs = PROBE ? 40 : 220;
+  const settleHoldMs = PROBE ? 40 : 3700;
+  const hotMs = PROBE ? 40 : 320;
+  const resultAt = openMs + hotMs + afterHotMs + steps * stepMs + afterDragMs + fadeMs + resultInMs;
+  const voiceAt = resultAt + settleHoldMs - dur('scenario-1') * 1000 - 150;
+  let voiced = false;
+  let elapsed = 0;
+  const voice = () => {
+    if (voiced || elapsed < voiceAt) return;
+    note('scenario-1');
+    voiced = true;
+  };
+  await page.waitForTimeout(openMs);
+  elapsed += openMs;
+  await hot(page, '#filmAdSpend', 1);
+  elapsed += hotMs;
+  await page.waitForTimeout(afterHotMs);
+  elapsed += afterHotMs;
+  voice();
   await page.evaluate(() => {
     const slider = document.getElementById('input-Ad Spend');
-    if (!slider) throw new Error('Ad Spend slider is missing');
     slider.dataset.filmFrom = slider.value;
   });
   for (let i = 1; i <= steps; i += 1) {
@@ -203,22 +208,41 @@ async function scenario(page, { mark, note, say }) {
       slider.value = String(from + (to - from) * (i / steps));
       slider.dispatchEvent(new Event('input', { bubbles: true }));
     }, { i, steps });
-    if (process.argv.includes('--preview-scenario') && i === Math.ceil(steps / 2)) {
-      await shot(page, 'scenario-action');
-    }
+    elapsed += stepMs;
+    voice();
     await page.waitForTimeout(stepMs);
   }
-  await page.waitForTimeout(PROBE ? 40 : 350);
+  await page.waitForTimeout(afterDragMs);
+  elapsed += afterDragMs;
   const after = await page.locator('#predictedValue').innerText();
   const afterTitle = await page.locator('#predProfileTitle').innerText();
   const afterHeld = await page.locator('#predProfileHeld').innerText();
-  if (before === after) throw new Error('Moving ad spend did not change the prediction');
+  if (!/116/.test(before) || !/169|170/.test(after)) {
+    throw new Error(`Scenario did not move from about 116 to about 170: ${before} -> ${after}`);
+  }
   if (beforeTitle === afterTitle) throw new Error('Moving ad spend did not change the profile');
   if (!/Ad Spend \d/.test(afterHeld) || /Ad Spend held at/.test(afterHeld)) {
     throw new Error(`The profile left Ad Spend during the move: ${afterHeld}`);
   }
-  if (process.argv.includes('--preview-scenario')) await shot(page, 'scenario-result');
-  await page.waitForTimeout(PROBE ? 40 : 3000);
+  if (!/Store Size held at/.test(afterHeld)) throw new Error(`Store size was not held: ${afterHeld}`);
+  await clearFilmHighlight(page);
+  const tagged = await page.evaluate(() => {
+    const chart = window._predProfileChart;
+    const series = chart && chart.series.find((item) => item.name === 'Current scenario');
+    const point = series && series.points && series.points[0];
+    const el = point && point.graphic && point.graphic.element;
+    if (!el) return false;
+    el.id = 'filmScenarioMarker';
+    const box = el.getBoundingClientRect();
+    return box.width > 0 && box.height > 0;
+  });
+  if (!tagged) throw new Error('The chart marker is not on the settled profile');
+  await showFilmHighlights(page, ['#filmPredictedSales', '#filmScenarioMarker'], { zoom: 1 });
+  await page.waitForTimeout(resultInMs);
+  elapsed += fadeMs + resultInMs;
+  voice();
+  if (!voiced) note('scenario-1');
+  await page.waitForTimeout(settleHoldMs);
   await clearFilmHighlight(page);
 }
 

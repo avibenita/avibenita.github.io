@@ -26,6 +26,7 @@ function onRangeDataLoaded(values, address) {
   if (c) c.textContent = headers.length;
   showPanel(true);
   updateButtonState();
+  if (independentDialog) sendIndependentBundle();
 }
 
 function showPanel(show) {
@@ -1141,6 +1142,7 @@ function sendIndependentBundle() {
     console.log("sendIndependentBundle: early exit", { independentDialog: !!independentDialog, independentRangeData: !!independentRangeData });
     return;
   }
+  try {
   const headers = independentRangeData[0] || [];
   const fullRows = independentRangeData.slice(1);
   // Honour the cached filter (if any). Settings changes always flow through
@@ -1157,6 +1159,9 @@ function sendIndependentBundle() {
     rawData: independentRangeData,                                   // full source — filter UI / View Data
     analysisRows: isFiltered ? [headers].concat(rows) : null         // filter-aware — extractVector helpers
   }));
+  } catch (err) {
+    console.error("sendIndependentBundle failed", err);
+  }
 }
 
 // Filter-as-macro recompute: dialog handed us the filtered row set produced

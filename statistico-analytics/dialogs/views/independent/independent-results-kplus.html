@@ -3967,12 +3967,32 @@
       document.body.style.overflow = 'auto';
     }
     
+    function paintIndependentSummary(s, e, r, fx) {
+      s = s || {};
+      e = e || {};
+      try { renderCompareStatsRow(s, e); } catch (err) { console.error(err); }
+      try {
+        var alpha = 1 - (parseMaybeNumber(s.confidence) || 0.95);
+        if (r && r.omnibus) updateResultsPanels(r, fx || {}, s, alpha);
+      } catch (err) { console.error(err); }
+      try {
+        if (typeof StatisticoHeader !== "undefined") {
+          var cols = Array.isArray(s.selectedColumns) ? s.selectedColumns : [];
+          var label = cols.length ? cols.join(" / ").slice(0, 60) : (s.valueColumn || "");
+          var totalN = e.kplusSummary && isFinite(parseMaybeNumber(e.kplusSummary.totalN)) ? e.kplusSummary.totalN : 0;
+          if (label) StatisticoHeader.updateVariable(label, totalN);
+        }
+      } catch (err) { console.error(err); }
+      var statEl = document.getElementById("omnibusStat");
+      if (lastBundle && statEl && statEl.textContent.indexOf("\u2014") === -1) lastBundle.__painted = true;
+    }
     function populateBundle(b){
       console.log("populateBundle called with:", b);
       lastBundle = b || {};
       window._independentBundle = lastBundle;
       window.lastIndependentBundle = lastBundle;
       const s=b.setup||{}, e=b.explore||{}, a=b.assumptions||{}, r=b.results||{}, fx=b.effects||{}, p=b.power||{}, rep=b.report||{};
+      paintIndependentSummary(s, e, r, fx);
       console.log("Results object:", r);
       console.log("Explore object:", e);
       availableHeaders = Array.isArray(s.headers) ? s.headers.slice() : availableHeaders;
@@ -4147,6 +4167,24 @@
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "independent-means-report.html"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),500);
     }
     var independentPageStarted = Date.now();
+    var independentRowParts = {};
+    function applyIndependentRows(msg) {
+      if (!msg || msg.type !== "INDEPENDENT_ROWS" || !msg.parts) return false;
+      independentRowParts[msg.part] = msg.text || "";
+      var got = 0;
+      for (var i = 0; i < msg.parts; i++) if (independentRowParts[i] != null) got++;
+      if (got < msg.parts) return false;
+      var text = "";
+      for (var j = 0; j < msg.parts; j++) text += independentRowParts[j];
+      var grid;
+      try { grid = JSON.parse(text); } catch (_e) { return false; }
+      window.independentRangeData = grid;
+      window.independentAnalysisRows = grid;
+      if (lastBundle) {
+        try { populateBundle(lastBundle); } catch (err) { console.error(err); }
+      }
+      return true;
+    }
     function pullOfficeIndependentBundle() {
       if (lastBundle && lastBundle.__painted) return;
       var rt = (typeof OfficeRuntime !== "undefined" && OfficeRuntime.storage) ? OfficeRuntime.storage : null;
@@ -4164,6 +4202,7 @@
         pullOfficeIndependentBundle();
         return false;
       }
+      if (msg.type === "INDEPENDENT_ROWS") return applyIndependentRows(msg);
       if (msg.type !== "INDEPENDENT_BUNDLE") return false;
       if (lastBundle && lastBundle.__painted) return true;
       if (msg.savedAt && msg.savedAt < independentPageStarted - 120000) return false;

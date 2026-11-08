@@ -1169,7 +1169,10 @@ function openIndependentResultsDialog() {
           }
         } catch (_e) { console.error("Results dialog message error:", _e); }
       });
-      setTimeout(sendIndependentBundle, 1100);
+      sendIndependentBundle();
+      setTimeout(sendIndependentBundle, 400);
+      setTimeout(sendIndependentBundle, 1200);
+      setTimeout(sendIndependentBundle, 2500);
     }
   );
 }
@@ -1219,35 +1222,47 @@ function sendIndependentBundle() {
   const cols = keep.length ? keep : headers.map(function (_, i) { return i; });
   const slimHeaders = cols.map(function (i) { return headers[i]; });
   const slimRows = rows.map(function (r) { return cols.map(function (i) { return r[i]; }); });
-  let message = JSON.stringify({
-    type: "INDEPENDENT_BUNDLE",
-    savedAt: Date.now(),
-    payload: bundle,
-    rawData: [slimHeaders].concat(slimRows),
-    analysisRows: [slimHeaders].concat(slimRows)
-  });
-  if (message.length > 900000 && bundle.results && bundle.results.posthoc) {
-    bundle.results.posthoc.groupValues = null;
-    message = JSON.stringify({
-      type: "INDEPENDENT_BUNDLE",
-      savedAt: Date.now(),
-      payload: bundle,
-      rawData: [slimHeaders].concat(slimRows),
-      analysisRows: [slimHeaders].concat(slimRows)
-    });
+  const savedAt = Date.now();
+  const grid = [slimHeaders].concat(slimRows);
+  let payload = bundle;
+  let compact = JSON.stringify({ type: "INDEPENDENT_BUNDLE", savedAt: savedAt, payload: payload });
+  if (compact.length > 24000 && payload.results && payload.results.posthoc && payload.results.posthoc.groupValues) {
+    payload = JSON.parse(JSON.stringify(payload));
+    payload.results.posthoc.groupValues = null;
+    compact = JSON.stringify({ type: "INDEPENDENT_BUNDLE", savedAt: savedAt, payload: payload });
   }
+  const withRows = JSON.stringify({
+    type: "INDEPENDENT_BUNDLE",
+    savedAt: savedAt,
+    payload: payload,
+    rawData: grid,
+    analysisRows: grid
+  });
+  const message = withRows.length <= 24000 ? withRows : compact;
   try { localStorage.setItem("statistico.independent.bundle", message); } catch (_storeErr) {}
   try {
     if (window.OfficeRuntime && OfficeRuntime.storage && typeof OfficeRuntime.storage.setItem === "function") {
-      OfficeRuntime.storage.setItem("statistico.independent.bundle", message);
+      OfficeRuntime.storage.setItem("statistico.independent.bundle", compact);
     }
   } catch (_rtErr) {}
-  try {
-    independentDialog.messageChild(message);
-  } catch (_sendErr) {
-    try {
-      independentDialog.messageChild(JSON.stringify({ type: "INDEPENDENT_BUNDLE_READY", savedAt: Date.now() }));
-    } catch (_sendErr2) {}
+  try { independentDialog.messageChild(message); } catch (_sendErr) {}
+  if (withRows.length > 24000) {
+    const rawText = JSON.stringify(grid);
+    const size = 12000;
+    const parts = Math.ceil(rawText.length / size);
+    if (parts > 0 && parts <= 40) {
+      for (let i = 0; i < parts; i++) {
+        try {
+          independentDialog.messageChild(JSON.stringify({
+            type: "INDEPENDENT_ROWS",
+            savedAt: savedAt,
+            part: i,
+            parts: parts,
+            text: rawText.slice(i * size, (i + 1) * size)
+          }));
+        } catch (_partErr) { break; }
+      }
+    }
   }
   } catch (err) {
     console.error("sendIndependentBundle failed", err);

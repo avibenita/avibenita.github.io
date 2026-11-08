@@ -27,16 +27,17 @@
   
   <!-- Regression computation library -->
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <script src="../../shared/regression-case-trace.js?v=20261108case"></script>
   <script src="../../shared/regression-effect-plot.js?v=20261105factor"></script>
   
   <!-- Saved analyses manager -->
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20261106aboutlabel" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261108case" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261106aboutlabel"></script>
+  <script src="../shared-header.js?v=20261108case"></script>
   <script src="../shared-workspace-tabs.js?v=20260828viewcta"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -1456,6 +1457,30 @@
     .res-comparison-grid { display:grid; grid-template-columns:1fr auto 1fr; gap:20px; align-items:center; margin-bottom:15px; }
     .res-comparison-card { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:15px; }
     .res-comparison-label { font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600; }
+    .reg-case-dock { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
+    .reg-case-dock[hidden] { display: none !important; }
+    .reg-case-status { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+    .reg-case-status strong { color: var(--text-primary); }
+    .reg-case-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .reg-case-btn { border: 1px solid var(--border); background: var(--surface-2); color: var(--text-primary); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 650; cursor: pointer; }
+    .reg-case-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .reg-case-btn--primary { border-color: transparent; background: linear-gradient(135deg, #0ea5e9, #6366f1); color: #fff; }
+    .reg-case-note { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
+    .reg-sens { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .reg-sens-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .reg-sens-head h3 { margin: 0; font-size: 14px; color: var(--text-primary); }
+    .reg-sens-block { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+    .reg-sens-block h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: .02em; text-transform: uppercase; color: var(--accent-2); }
+    .reg-sens-row { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 0; border-top: 1px solid var(--border); }
+    .reg-sens-row:first-of-type { border-top: 0; }
+    .reg-sens-metric { flex: 1 1 140px; font-size: 12px; font-weight: 650; color: var(--text-primary); }
+    .reg-sens-values { flex: 2 1 280px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+    .reg-sens-values span { min-width: 120px; font-size: 12px; color: var(--text-secondary); }
+    .reg-sens-values em { display: block; font-style: normal; font-size: 10px; color: var(--text-muted); }
+    .res-outliers-table tr.reg-case-selected td { background: rgba(34, 211, 238, .14); box-shadow: inset 0 0 0 1.5px #22d3ee; }
+    .reg-case-pick { background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; padding: 0; }
+    .reg-case-pick .reg-case-mark { color: #22d3ee; margin-right: 4px; }
+    html[data-theme="light"] .res-outliers-table tr.reg-case-selected td { background: rgba(14, 116, 144, .12); box-shadow: inset 0 0 0 1.5px #0e7490; }
     .res-stat-improved { color:var(--success); font-weight:600; }
     .res-stat-worse    { color:var(--danger);  font-weight:600; }
     }
@@ -5245,6 +5270,7 @@
 
   <!-- Shared Header Mount Point -->
   <div id="header-container"></div>
+  <div id="regCaseDock" class="reg-case-dock" hidden></div>
 
   <!-- Loading Overlay -->
   <div class="loading-overlay" id="loadingOverlay">
@@ -6472,6 +6498,29 @@
       compareRemembered: null,
       showAllIntervals: false
     };
+
+    window._regFitInvocations = 0;
+    if (typeof computeOLS === 'function' && !computeOLS._regCounted) {
+      var _rawComputeOLS = computeOLS;
+      computeOLS = function () {
+        window._regFitInvocations += 1;
+        return _rawComputeOLS.apply(this, arguments);
+      };
+      computeOLS._regCounted = true;
+    }
+    window._regCaseSession = (typeof StatisticoCaseTrace !== 'undefined')
+      ? StatisticoCaseTrace.createCaseSession()
+      : null;
+    window._regCaseCatalog = null;
+    if (typeof StatisticoHeader !== 'undefined') {
+      StatisticoHeader._caseTrace = {
+        selectedKey: function () { return window._regCaseSession ? window._regCaseSession.selectedKey() : null; },
+        onSelect: function (key) { if (typeof selectRegCase === 'function') selectRegCase(key); }
+      };
+    }
+    window.addEventListener('pagehide', function () {
+      if (window._regCaseSession) window._regCaseSession.dispose();
+    });
     
     // Utility function to send commands to VB6 host
     function sendToHost(cmd, data) {
@@ -8049,8 +8098,16 @@ ${sectionsHtml}
               usedRange = `${sheet}${colStart}${firstUsedRow}:${colEnd}${lastUsedRow}`;
             }
           }
+          const catalog = window._regCaseCatalog;
+          const caseKeys = catalog && Array.isArray(catalog.identity)
+            ? catalog.identity.map(function (entry) { return entry.caseKey; })
+            : [];
+          const usedCaseKeys = catalog && Array.isArray(catalog.cases)
+            ? catalog.cases.map(function (entry) { return entry.caseKey; })
+            : [];
           return { headers: modelHeaders, usedRows, allRows,
-                   usedRange, fullRange: address, columnRoles };
+                   usedRange, fullRange: address, columnRoles,
+                   caseKeys: caseKeys, usedCaseKeys: usedCaseKeys };
         },
         exportHtml: () => exportResultsAsHtml(),
         exportJson: () => {
@@ -8237,6 +8294,9 @@ ${sectionsHtml}
         console.warn('⚠️ No data or model spec received yet');
         return;
       }
+      window._regCaseCatalog = null;
+      if (window._regCaseSession) window._regCaseSession.datasetReplaced(null);
+      renderRegCaseDock();
       
       showAnalysisLoading('Computing the regression…');
       
@@ -8410,80 +8470,45 @@ ${sectionsHtml}
       
       console.log('📋 Final variable names:', variableNames);
       
-      // Step 2: Build X matrix and Y vector together with synchronized filtering
-      const xMatrix = [];
-      const yVector = [];
-      const usedOriginalRows = [];        // track which original rows were used
-      const usedOriginalRowIndices = [];  // 0 degbased index into rows[]
-      
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        
-        // Get Y value
-        const yVal = parseFloat(row[yIndex]);
-        if (isNaN(yVal)) continue; // Skip if Y is invalid
-        
-        // Build X row
-        const xRow = [];
-        let validRow = true;
-        
-        // Add numeric predictors
-        for (const xnIdx of xnIndices) {
-          const val = parseFloat(row[xnIdx]);
-          if (isNaN(val)) {
-            validRow = false;
-            break;
-          }
-          xRow.push(val);
-        }
-        
-        if (!validRow) continue;
-        
-        // Add categorical predictors as dummy variables
-        for (const catInfo of categoricalInfo) {
-          const catValue = row[catInfo.index];
-          if (catValue === null || catValue === undefined || catValue === '') {
-            validRow = false;
-            break;
-          }
-          
-          // Create dummy variables for this categorical
-          const dummies = createDummyVariables(catValue, catInfo.categories, catInfo.name);
-          xRow.push(...dummies);
-        }
-        
-        // Only add if all values are valid
-        if (validRow) {
-          // Append interaction product columns
-          for (const ixi of interactionInfo) {
-            if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
-              const v1Val = parseFloat(row[ixi.v1Idx]);
-              const v2Val = parseFloat(row[ixi.v2Idx]);
-              xRow.push(v1Val * v2Val);
-            } else if (ixi.v1IsNumeric && ixi.v2Cat) {
-              const v1Val = parseFloat(row[ixi.v1Idx]);
-              const dums = createDummyVariables(row[ixi.v2Cat.index], ixi.v2Cat.categories, ixi.v2Cat.name);
-              dums.forEach(d => xRow.push(v1Val * d));
-            } else if (ixi.v1Cat && ixi.v2IsNumeric) {
-              const v2Val = parseFloat(row[ixi.v2Idx]);
-              const dums = createDummyVariables(row[ixi.v1Cat.index], ixi.v1Cat.categories, ixi.v1Cat.name);
-              dums.forEach(d => xRow.push(d * v2Val));
-            } else if (ixi.v1Cat && ixi.v2Cat) {
-              const dums1 = createDummyVariables(row[ixi.v1Cat.index], ixi.v1Cat.categories, ixi.v1Cat.name);
-              const dums2 = createDummyVariables(row[ixi.v2Cat.index], ixi.v2Cat.categories, ixi.v2Cat.name);
-              dums1.forEach(d1 => dums2.forEach(d2 => xRow.push(d1 * d2)));
-            }
-          }
-          xMatrix.push(xRow);
-          yVector.push(yVal);
-          usedOriginalRows.push(row);
-          usedOriginalRowIndices.push(i);
-        }
+      // Step 2: Build the analyzed design and stamp source identity before complete-case deletion.
+      if (typeof StatisticoCaseTrace === 'undefined') {
+        throw new Error('Case tracing did not load.');
       }
+      if (!receivedRegressionData._caseIdentity || receivedRegressionData._caseIdentity.length !== rows.length) {
+        const stamped = StatisticoCaseTrace.stampIdentity(rows, address, receivedRegressionData.rowIds || null, headers);
+        receivedRegressionData._caseIdentity = stamped.entries;
+        receivedRegressionData._caseHostIdsValid = stamped.hostIdsValid;
+      }
+      const traced = StatisticoCaseTrace.buildAnalyzedDesign({
+        headers: headers,
+        rows: rows,
+        address: address,
+        rowIds: receivedRegressionData.rowIds || null,
+        identity: receivedRegressionData._caseIdentity,
+        hostIdsValid: receivedRegressionData._caseHostIdsValid,
+        yIndex: yIndex,
+        xnIndices: xnIndices,
+        categoricalInfo: categoricalInfo,
+        interactionInfo: interactionInfo,
+        preExcludedIndexes: receivedRegressionData.excludedSourceIndexes || receivedRegressionData.preExcludedIndexes || []
+      });
+      if (!traced.ok) {
+        const tbody = document.getElementById('dataTableBody');
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="9" style="color: #ff6b6b; text-align: center; padding: 20px;">
+            <i class="fa-solid fa-exclamation-triangle"></i> ${escapeHtmlText(traced.mappingReason || 'This payload cannot be traced to individual rows.')}
+          </td></tr>`;
+        }
+        hideAnalysisLoading();
+        return;
+      }
+      const xMatrix = traced.xMatrix;
+      const yVector = traced.yVector;
+      window._regPendingCaseCatalog = traced;
 
       // Store used rows + their indices so View Data can compute the actual sub-range
-      _usedModelRows       = usedOriginalRows;
-      _usedModelRowIndices = usedOriginalRowIndices;
+      _usedModelRows       = traced.usedOriginalRows;
+      _usedModelRowIndices = traced.usedOriginalRowIndices;
       
       // Store variable names globally for display
       window.regressionVariableNames = variableNames;
@@ -8651,6 +8676,9 @@ ${sectionsHtml}
 
         // Display results in the UI
         displayRegressionResults(results, y, xn, xc, interactions, interactionColumnNames, interactionInfo);
+        window._regCaseCatalog = window._regPendingCaseCatalog || null;
+        if (window._regCaseSession) window._regCaseSession.datasetReplaced(window._regCaseCatalog);
+        renderRegCaseDock();
         
         hideAnalysisLoading();
         
@@ -9286,6 +9314,9 @@ ${sectionsHtml}
         persistSessionJson('regressionNavData', window.regressionNavData);
       }
       updateCoefIncludeStatus();
+      if (window._regCaseSession) window._regCaseSession.specChanged();
+      renderRegCaseDock();
+      applyRegCaseHighlight();
       return true;
     }
 
@@ -9806,19 +9837,22 @@ ${sectionsHtml}
           </div>`;
       const d = _resData, th = _resChartTheme();
       // Chart 1: Residuals vs Fitted
-      Highcharts.chart('resChart1',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Fitted Values',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'Residuals',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},plotLines:[{value:0,color:'rgba(255,165,120,.6)',width:2,zIndex:4}]},legend:{enabled:false},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){return`<b>Fitted:</b>${this.x.toFixed(2)}<br><b>Residual:</b>${this.y.toFixed(2)}`;}},series:[{name:'Residuals',color:'rgba(120,200,255,.6)',data:d.fitted.map((f,i)=>[f,d.residuals[i]])}],credits:{enabled:false}});
+      Highcharts.chart('resChart1',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Fitted Values',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'Residuals',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},plotLines:[{value:0,color:'rgba(255,165,120,.6)',width:2,zIndex:4}]},legend:{enabled:false},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){return`<b>Fitted:</b>${this.x.toFixed(2)}<br><b>Residual:</b>${this.y.toFixed(2)}`;}},series:[{name:'Residuals',color:'rgba(120,200,255,.6)',cursor:'pointer',point:{events:{click:regCaseClick}},data:regCasePoints(d.fitted.map((f,i)=>[f,d.residuals[i]]))}],credits:{enabled:false}});
       // Chart 2: Q-Q
-      const sorted=[...d.standardized].sort((a,b)=>a-b),n=sorted.length,theoretical=sorted.map((_,i)=>jStat.normal.inv((i+0.5)/n,0,1));
-      Highcharts.chart('resChart2',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Theoretical Quantiles',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'Sample Quantiles',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},legend:{enabled:false},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip},series:[{name:'Quantiles',color:'rgba(120,200,255,.6)',data:theoretical.map((t,i)=>[t,sorted[i]])},{name:'Reference',type:'line',color:'rgba(255,165,120,.8)',lineWidth:2,marker:{enabled:false},data:[[Math.min(...theoretical),Math.min(...theoretical)],[Math.max(...theoretical),Math.max(...theoretical)]],enableMouseTracking:false}],credits:{enabled:false}});
+      const qqOrder=d.standardized.map((_,i)=>i).sort((a,b)=>d.standardized[a]-d.standardized[b]);
+      const sorted=qqOrder.map(i=>d.standardized[i]),n=sorted.length,theoretical=sorted.map((_,i)=>jStat.normal.inv((i+0.5)/n,0,1));
+      const qqPoints=theoretical.map((t,i)=>({x:t,y:sorted[i],caseKey:regCaseKeyAt(qqOrder[i]),baseRadius:4}));
+      Highcharts.chart('resChart2',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Theoretical Quantiles',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'Sample Quantiles',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},legend:{enabled:false},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip},series:[{name:'Quantiles',color:'rgba(120,200,255,.6)',cursor:'pointer',point:{events:{click:regCaseClick}},data:qqPoints},{name:'Reference',type:'line',color:'rgba(255,165,120,.8)',lineWidth:2,marker:{enabled:false},data:[[Math.min(...theoretical),Math.min(...theoretical)],[Math.max(...theoretical),Math.max(...theoretical)]],enableMouseTracking:false}],credits:{enabled:false}});
       // Chart 3: Scale-Location
       const sqrtStd=d.standardized.map(s=>Math.sqrt(Math.abs(s)));
-      Highcharts.chart('resChart3',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Fitted Values',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'√|Std Residuals|',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},legend:{enabled:false},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip},series:[{name:'Scale-Location',color:'rgba(120,200,255,.6)',data:d.fitted.map((f,i)=>[f,sqrtStd[i]])}],credits:{enabled:false}});
+      Highcharts.chart('resChart3',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Fitted Values',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'√|Std Residuals|',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},legend:{enabled:false},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip},series:[{name:'Scale-Location',color:'rgba(120,200,255,.6)',cursor:'pointer',point:{events:{click:regCaseClick}},data:regCasePoints(d.fitted.map((f,i)=>[f,sqrtStd[i]]))}],credits:{enabled:false}});
       // Chart 4: Res vs Leverage
       const maxLev=Math.max(...d.leverage),k=d.k,c05p=[],c05n=[],c10p=[],c10n=[];
       for(let h=0.001;h<=maxLev;h+=maxLev/50){const s05=Math.sqrt(Math.abs(0.5*k*(1-h)*(1-h)/h));const s10=Math.sqrt(Math.abs(1.0*k*(1-h)*(1-h)/h));if(isFinite(s05)){c05p.push([h,s05]);c05n.push([h,-s05]);}if(isFinite(s10)){c10p.push([h,s10]);c10n.push([h,-s10]);}}
-      const obsData=d.leverage.map((l,i)=>({x:l,y:d.standardized[i],name:`Obs ${i+1}`,cookD:d.cooksD[i],color:d.cooksD[i]>1?'rgba(239,68,68,.9)':d.cooksD[i]>0.5?'rgba(245,158,11,.8)':'rgba(120,200,255,.6)',marker:{radius:d.cooksD[i]>0.5?7:4}}));
-      Highcharts.chart('resChart4',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Leverage',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'Std Residuals',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},plotLines:[{value:0,color:'rgba(255,165,120,.6)',width:2,zIndex:4}]},legend:{enabled:true,itemStyle:{color:'#fff'}},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){if(this.series.name==='Observations'){return`<b>${this.point.name}</b><br>Leverage: ${this.x.toFixed(4)}<br>Std Res: ${this.y.toFixed(2)}<br>Cook's D: ${this.point.cookD.toFixed(4)}`;}return false;}},series:[{name:"Cook's D=0.5",type:'line',data:c05p.concat(c05n.reverse()),color:'#f59e0b',dashStyle:'ShortDash',marker:{enabled:false},enableMouseTracking:false,lineWidth:2},{name:"Cook's D=1.0",type:'line',data:c10p.concat(c10n.reverse()),color:'#ef4444',dashStyle:'ShortDash',marker:{enabled:false},enableMouseTracking:false,lineWidth:2},{name:'Observations',type:'scatter',data:obsData,zIndex:3}],credits:{enabled:false}});
+      const obsData=d.leverage.map((l,i)=>({x:l,y:d.standardized[i],name:regCaseLabelAt(i),caseKey:regCaseKeyAt(i),baseRadius:d.cooksD[i]>0.5?7:4,cookD:d.cooksD[i],color:d.cooksD[i]>1?'rgba(239,68,68,.9)':d.cooksD[i]>0.5?'rgba(245,158,11,.8)':'rgba(120,200,255,.6)',marker:{radius:d.cooksD[i]>0.5?7:4}}));
+      Highcharts.chart('resChart4',{ chart:{type:'scatter',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Leverage',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}}},yAxis:{title:{text:'Std Residuals',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},plotLines:[{value:0,color:'rgba(255,165,120,.6)',width:2,zIndex:4}]},legend:{enabled:true,itemStyle:{color:'#fff'}},tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){if(this.series.name==='Observations'){return`<b>${this.point.name}</b><br>Leverage: ${this.x.toFixed(4)}<br>Std Res: ${this.y.toFixed(2)}<br>Cook's D: ${this.point.cookD.toFixed(4)}`;}return false;}},series:[{name:"Cook's D=0.5",type:'line',data:c05p.concat(c05n.reverse()),color:'#f59e0b',dashStyle:'ShortDash',marker:{enabled:false},enableMouseTracking:false,lineWidth:2},{name:"Cook's D=1.0",type:'line',data:c10p.concat(c10n.reverse()),color:'#ef4444',dashStyle:'ShortDash',marker:{enabled:false},enableMouseTracking:false,lineWidth:2},{name:'Observations',type:'scatter',cursor:'pointer',point:{events:{click:regCaseClick}},data:obsData,zIndex:3}],credits:{enabled:false}});
       window.resPlotsLoaded = true;
+      applyRegCaseHighlight();
       setTimeout(function () {
         ['resChart1', 'resChart2', 'resChart3', 'resChart4'].forEach(function (id) {
           const el = document.getElementById(id);
@@ -9832,16 +9866,328 @@ ${sectionsHtml}
       }, 80);
     }
 
+    // ── Case trace: selection highlight and temporary refit ───────
+    function regCaseCatalogAligned() {
+      const catalog = window._regCaseCatalog;
+      const data = window.regressionData;
+      if (window._regCaseTraceHold || !catalog || !catalog.mappingSafe || !data || !Array.isArray(catalog.cases)) return null;
+      if (!Array.isArray(data.yVector) || catalog.cases.length !== data.yVector.length) return null;
+      return catalog;
+    }
+
+    function regCaseKeyAt(index) {
+      const catalog = regCaseCatalogAligned();
+      const entry = catalog && catalog.cases[index];
+      return entry ? entry.caseKey : null;
+    }
+
+    function regCaseLabelAt(index) {
+      const catalog = regCaseCatalogAligned();
+      const entry = catalog && catalog.cases[index];
+      return entry ? entry.displayLabel : ('Obs ' + (index + 1));
+    }
+
+    function regCasePoints(pairs, radius) {
+      return pairs.map(function (pt, i) {
+        return { x: pt[0], y: pt[1], caseKey: regCaseKeyAt(i), baseRadius: radius || 4 };
+      });
+    }
+
+    function regCaseClick() {
+      const key = this.options && this.options.caseKey;
+      if (key) selectRegCase(key);
+    }
+
+    function selectRegCase(caseKey) {
+      if (!window._regCaseSession || !caseKey) return;
+      window._regCaseSession.select(caseKey);
+      renderRegCaseDock();
+      applyRegCaseHighlight();
+      const row = document.querySelector('.res-outliers-table tr.reg-case-selected');
+      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+    }
+    window.selectRegCase = selectRegCase;
+    window.clearRegCase = function () {
+      if (!window._regCaseSession) return;
+      window._regCaseSession.clearSelection();
+      renderRegCaseDock();
+      applyRegCaseHighlight();
+    };
+    window.closeRegComparison = function () {
+      if (!window._regCaseSession) return;
+      window._regCaseSession.closeComparison();
+      renderRegCaseDock();
+    };
+    window._regArmCaseFailure = function () {
+      if (window._regCaseSession) window._regCaseSession.armFailure();
+    };
+    window.compareWithoutSelectedCase = function () {
+      const session = window._regCaseSession;
+      if (!session || typeof StatisticoCaseTrace === 'undefined') return;
+      const token = session.beginCompare();
+      renderRegCaseDock();
+      if (!token.ok) return;
+      Promise.resolve().then(function () {
+        if (session.state().failNext) {
+          session.state().failNext = false;
+          session.completeCompare(token, { status: 'error', reason: 'The refit failed. The original fit is unchanged.', retryable: true });
+          renderRegCaseDock();
+          return;
+        }
+        let payload;
+        try {
+          payload = StatisticoCaseTrace.buildComparison(captureRegFitSnapshot(), token.caseKey);
+        } catch (err) {
+          payload = { status: 'error', reason: 'The refit failed. The original fit is unchanged.', retryable: true };
+        }
+        session.completeCompare(token, payload);
+        renderRegCaseDock();
+      });
+    };
+    window.retryRegComparison = window.compareWithoutSelectedCase;
+
+    function captureRegScenario(columns) {
+      const inputs = {};
+      const wanted = [];
+      const seen = {};
+      function addName(name, kind) {
+        if (!name || seen[name]) return;
+        seen[name] = true;
+        wanted.push({ name: name, kind: kind });
+      }
+      (columns || []).forEach(function (col) {
+        if (col.kind === 'numeric') addName(col.name, 'numeric');
+        if (col.kind === 'dummy') addName(col.factor, 'factor');
+        (col.factors || []).forEach(function (factor) {
+          if (factor.kind === 'numeric') addName(factor.name, 'numeric');
+          if (factor.kind === 'dummy') addName(factor.factor, 'factor');
+        });
+      });
+      const current = predictionData.currentInputs || {};
+      const ranges = predictionData.numericRanges || {};
+      for (let i = 0; i < wanted.length; i++) {
+        const item = wanted[i];
+        const cur = current[item.name];
+        if (cur != null && cur !== '' && !(typeof cur === 'number' && !isFinite(cur))) {
+          inputs[item.name] = cur;
+          continue;
+        }
+        if (item.kind === 'numeric') {
+          const range = ranges[item.name];
+          if (range && isFinite(range.mean)) { inputs[item.name] = range.mean; continue; }
+          const headers = window.globalRawHeaders || [];
+          const idx = headers.indexOf(item.name);
+          const rows = window.globalRawRows || [];
+          if (idx >= 0) {
+            const vals = rows.map(function (row) { return parseFloat(row[idx]); }).filter(function (v) { return !isNaN(v); });
+            if (vals.length) {
+              inputs[item.name] = vals.reduce(function (sum, v) { return sum + v; }, 0) / vals.length;
+              continue;
+            }
+          }
+        } else {
+          const info = (window.globalCategoricalInfo || []).find(function (cat) { return cat.name === item.name; });
+          const level = info && info.categories && info.categories[0];
+          if (level != null && level !== '') { inputs[item.name] = level; continue; }
+        }
+        return { ok: false, reason: 'No valid scenario is available.', settingsLabel: '' };
+      }
+      const xVector = StatisticoCaseTrace.designRowFromInputs(inputs, columns || []);
+      if (!xVector || xVector.some(function (v) { return !isFinite(v); })) {
+        return { ok: false, reason: 'No valid scenario is available.', settingsLabel: '' };
+      }
+      return {
+        ok: true,
+        inputs: Object.assign({}, inputs),
+        xVector: xVector,
+        settingsLabel: wanted.map(function (item) { return item.name + ' = ' + inputs[item.name]; }).join(', ')
+      };
+    }
+
+    function captureRegFitSnapshot() {
+      const catalog = regCaseCatalogAligned();
+      const results = window.regressionResults;
+      const data = window.regressionData;
+      if (!catalog || !results || !data) return null;
+      let columns = Array.isArray(window._regActiveColumns) ? window._regActiveColumns : null;
+      if (!columns && Array.isArray(window.regressionVariableNames) && data.xMatrix && data.xMatrix[0]) {
+        columns = window.regressionVariableNames.map(function (name) {
+          return { key: name, name: name, kind: 'numeric' };
+        });
+      }
+      const specWeights = receivedModelSpec && (receivedModelSpec.weights || receivedModelSpec.weight);
+      return {
+        cases: catalog.cases,
+        xMatrix: data.xMatrix,
+        yVector: data.yVector,
+        includeIntercept: !!results.includeIntercept,
+        columns: columns || [],
+        categoricalInfo: window.globalCategoricalInfo || [],
+        weights: specWeights || null,
+        originalResults: results,
+        scenario: captureRegScenario(columns || []),
+        computeOLS: computeOLS
+      };
+    }
+
+    function regSensValues(original, temporary, change, digits, count, omittedLabel) {
+      const fmt = count ? StatisticoCaseTrace.formatCount : function (value) { return StatisticoCaseTrace.formatFixed(value, digits); };
+      const signed = count ? function (value) { return StatisticoCaseTrace.formatSigned(value, 0); } : function (value) { return StatisticoCaseTrace.formatSigned(value, digits); };
+      const without = omittedLabel || 'this case';
+      return '<div class="reg-sens-values">'
+        + '<span><em>Original fit</em>' + fmt(original) + '</span>'
+        + '<span><em>Without ' + escapeHtmlText(without) + '</em>' + fmt(temporary) + '</span>'
+        + '<span><em>Change</em>' + (signed(change) || '—') + '</span>'
+        + '</div>';
+    }
+
+    function renderRegCaseDock() {
+      const dock = document.getElementById('regCaseDock');
+      if (!dock || typeof StatisticoCaseTrace === 'undefined' || !window._regCaseSession) return;
+      const session = window._regCaseSession;
+      const catalog = window._regCaseCatalog;
+      const key = session.selectedKey();
+      const found = catalog ? StatisticoCaseTrace.caseInCatalog(catalog, key) : null;
+      const comparison = session.state().comparison;
+      const mappingProblem = catalog && catalog.mappingSafe === false;
+      const compareBtnEarly = document.getElementById('regCompareCaseBtn');
+      if (!key && !comparison && !mappingProblem) {
+        dock.hidden = true;
+        dock.innerHTML = '';
+        if (compareBtnEarly) compareBtnEarly.disabled = true;
+        return;
+      }
+      dock.hidden = false;
+      const label = found ? found.displayLabel : (key || '');
+      const eligible = !!(found && found.analyzed !== false && catalog && catalog.mappingSafe !== false);
+      const loading = !!(comparison && comparison.status === 'loading');
+      let note = 'Selection only highlights this case. The fitted model, sample, and worksheet stay as they are.';
+      if (mappingProblem) note = catalog.mappingReason;
+      else if (found && found.analyzed === false) note = 'This row is outside the analyzed sample, so it cannot be omitted from the fit.';
+      else if (!found && key) note = 'That case is no longer in the analyzed sample.';
+      const compareDisabled = !eligible || loading;
+      let body = '';
+      body += '<div class="reg-case-status" role="status">'
+        + '<span>Selected case <strong>' + escapeHtmlText(label || '—') + '</strong></span>'
+        + '<span class="reg-case-actions">'
+        + '<button type="button" class="reg-case-btn" onclick="clearRegCase()">Clear selection</button>'
+        + '</span></div>'
+        + '<p class="reg-case-note">' + escapeHtmlText(note) + '</p>';
+      if (comparison && comparison.status === 'loading') {
+        body += '<p class="reg-case-note">Fitting a temporary model without ' + escapeHtmlText(label) + '. The original fit stays in place.</p>';
+      } else if (comparison && comparison.payload && comparison.payload.status === 'error') {
+        body += '<div class="reg-sens"><p class="reg-case-note">' + escapeHtmlText(comparison.payload.reason || 'The refit failed.') + '</p>'
+          + '<button type="button" class="reg-case-btn reg-case-btn--primary" onclick="retryRegComparison()">Retry</button></div>';
+      } else if (comparison && comparison.payload && comparison.payload.status === 'unavailable') {
+        body += '<div class="reg-sens"><p class="reg-case-note">' + escapeHtmlText(comparison.payload.reason || 'The temporary fit is unavailable.') + '</p>'
+          + '<button type="button" class="reg-case-btn" onclick="closeRegComparison()">Close comparison</button></div>';
+      } else if (comparison && comparison.payload && comparison.payload.status === 'ready') {
+        body += renderRegSensitivity(comparison.payload);
+      }
+      dock.innerHTML = body;
+      dock.dataset.compareDisabled = compareDisabled ? '1' : '0';
+      const compareBtn = document.getElementById('regCompareCaseBtn');
+      if (compareBtn) compareBtn.disabled = !!compareDisabled;
+    }
+
+    function renderRegSensitivity(payload) {
+      const digits = 6;
+      const omitted = payload.omittedLabel || 'this case';
+      const rows = [];
+      (payload.modelFit || []).forEach(function (row) {
+        const count = row.key === 'n';
+        const values = (row.original == null || row.temporary == null)
+          ? '<div class="reg-sens-values"><span><em>Unavailable</em>' + escapeHtmlText(row.unavailableReason || 'Unavailable') + '</span></div>'
+          : regSensValues(row.original, row.temporary, row.change, digits, count, omitted);
+        rows.push('<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(row.label) + '</div>' + values + '</div>');
+      });
+      const coefRows = (payload.coefficients || []).map(function (row) {
+        const est = regSensValues(row.estimate.original, row.estimate.temporary, row.estimate.change, digits, false, omitted);
+        const ciLabel = (row.ci && row.ci.label) || 'CI';
+        const ciText = '<div class="reg-sens-values">'
+          + '<span><em>Original fit ' + escapeHtmlText(ciLabel) + '</em>' + StatisticoCaseTrace.formatInterval(row.ci.original, digits) + '</span>'
+          + '<span><em>Without ' + escapeHtmlText(omitted) + ' ' + escapeHtmlText(ciLabel) + '</em>' + StatisticoCaseTrace.formatInterval(row.ci.temporary, digits) + '</span>'
+          + '</div>';
+        return '<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(row.label) + '</div>' + est + '</div>'
+          + '<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(row.label + ' ' + ciLabel) + '</div>' + ciText + '</div>';
+      }).join('');
+      let prediction = '<p class="reg-case-note">Prediction: Unavailable. ' + escapeHtmlText((payload.prediction && payload.prediction.reason) || 'No valid scenario is available.') + '</p>';
+      if (payload.prediction && payload.prediction.available && payload.prediction.estimate) {
+        const pred = payload.prediction;
+        const ci = pred.ci || {};
+        prediction = '<div class="reg-sens-row"><div class="reg-sens-metric">Scenario</div><div class="reg-sens-values"><span>' + escapeHtmlText(pred.settingsLabel || '') + '</span></div></div>'
+          + '<div class="reg-sens-row"><div class="reg-sens-metric">Fitted mean</div>' + regSensValues(pred.estimate.original, pred.estimate.temporary, pred.estimate.change, digits, false, omitted) + '</div>'
+          + '<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(ci.label || 'Fitted mean CI') + '</div><div class="reg-sens-values">'
+          + '<span><em>Original fit</em>' + StatisticoCaseTrace.formatInterval(ci.original, digits) + '</span>'
+          + '<span><em>Without ' + escapeHtmlText(omitted) + '</em>' + (ci.temporary ? StatisticoCaseTrace.formatInterval(ci.temporary, digits) : 'Unavailable') + '</span>'
+          + (ci.reason ? '<span><em>Note</em>' + escapeHtmlText(ci.reason) + '</span>' : '')
+          + '</div></div>';
+      }
+      return '<div class="reg-sens" id="regSensitivity">'
+        + '<div class="reg-sens-head"><h3>Influence sensitivity</h3><button type="button" class="reg-case-btn" onclick="closeRegComparison()">Close comparison</button></div>'
+        + '<p class="reg-case-note">' + escapeHtmlText(payload.note || '') + ' Omitted case <strong>' + escapeHtmlText(omitted) + '</strong>. '
+        + escapeHtmlText(String(payload.nOriginal)) + ' → ' + escapeHtmlText(String(payload.nTemporary)) + ' analyzed observations.</p>'
+        + '<div class="reg-sens-block"><h4>Model fit</h4>' + rows.join('') + '</div>'
+        + '<div class="reg-sens-block"><h4>Coefficients</h4>' + coefRows + '</div>'
+        + '<div class="reg-sens-block"><h4>Prediction</h4>' + prediction + '</div>'
+        + '<p class="reg-case-note">' + escapeHtmlText(payload.sensitivityNote || '') + '</p>'
+        + '</div>';
+    }
+
+    function applyRegCaseHighlight() {
+      const selected = window._regCaseSession ? window._regCaseSession.selectedKey() : null;
+      (Highcharts.charts || []).forEach(function (chart) {
+        if (!chart || !chart.series) return;
+        let dirty = false;
+        chart.series.forEach(function (series) {
+          (series.points || []).forEach(function (pt) {
+            const key = pt.options && pt.options.caseKey;
+            if (!key) return;
+            const on = key === selected;
+            if (pt._regCaseOn === on) return;
+            pt._regCaseOn = on;
+            const column = series.type === 'column' || (chart.options.chart && chart.options.chart.type === 'column');
+            if (column) {
+              pt.update({ borderColor: on ? '#22d3ee' : 'rgba(0,0,0,0)', borderWidth: on ? 2.5 : 0 }, false);
+            } else {
+              const fill = (pt.options && (pt.options.color || pt.options.fillColor)) || pt.color || series.color;
+              const base = (pt.options && pt.options.baseRadius) || 4;
+              pt.update({
+                marker: on
+                  ? { symbol: 'diamond', radius: Math.max(base + 3, 8), lineWidth: 2, lineColor: '#22d3ee', fillColor: fill }
+                  : { symbol: 'circle', radius: base, lineWidth: 0, fillColor: fill }
+              }, false);
+            }
+            dirty = true;
+          });
+        });
+        if (dirty) {
+          try { chart.redraw(); } catch (_e) {}
+        }
+      });
+      document.querySelectorAll('.res-outliers-table tr[data-case-key]').forEach(function (row) {
+        const on = row.getAttribute('data-case-key') === selected;
+        row.classList.toggle('reg-case-selected', on);
+        row.setAttribute('aria-selected', on ? 'true' : 'false');
+        const mark = row.querySelector('.reg-case-mark');
+        if (mark) mark.hidden = !on;
+      });
+      if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.syncCaseSelection) StatisticoHeader.syncCaseSelection();
+    }
+
     // ── Influential Obs tab ───────────────────────────────────────
     function loadResInfluential() {
       if (!_resData) { _resData = _resCalc(); if(!_resData) return; }
       const d = _resData;
       const maxCooksD = Math.max(...d.cooksD);
       const yAxis = { min:0, max: maxCooksD<0.5?0.55:Math.max(1.2,maxCooksD*1.1), tickInterval: maxCooksD<0.5?0.05:0.1 };
-      const cooksBarData = d.cooksD.map((val,i)=>({x:i+1,y:val,color:val>1?'#ef4444':val>0.5?'#f59e0b':'#3b82f6'}));
+      const cooksBarData = d.cooksD.map((val,i)=>({x:i+1,y:val,color:val>1?'#ef4444':val>0.5?'#f59e0b':'#3b82f6',caseKey:regCaseKeyAt(i),baseRadius:4,name:regCaseLabelAt(i)}));
       const influentialRows = d.residuals.map((r,i)=>({i,r,s:d.standardized[i],l:d.leverage[i],c:d.cooksD[i]}))
         .filter(o=>Math.abs(o.s)>2||o.l>(3*d.k/d.n)||o.c>0.5).sort((a,b)=>b.c-a.c);
+      const tracedRows = d.residuals.map((r,i)=>({i,r,s:d.standardized[i],l:d.leverage[i],c:d.cooksD[i],key:regCaseKeyAt(i),label:regCaseLabelAt(i)}))
+        .sort((a,b)=>b.c-a.c);
       window._resInfluentialIndices = influentialRows.map(o=>o.i);
+      const selectedKey = window._regCaseSession ? window._regCaseSession.selectedKey() : null;
       const influentialCount = d.cooksD.filter(v=>v>0.5).length;
       const highCount = d.cooksD.filter(v=>v>1).length;
       const th = _resChartTheme();
@@ -9861,26 +10207,48 @@ ${sectionsHtml}
               <h2 style="font-size:16px;color:var(--accent-2);margin-bottom:0;display:flex;align-items:center;gap:8px;">
                 <i class="fa-solid fa-triangle-exclamation"></i> Influential Observations
               </h2>
-              ${influentialRows.length>0?`<button class="res-refit-btn" onclick="_resRefitWithout()"><i class="fa-solid fa-rotate"></i> Refit Excluding Flagged</button>`:''}
+              <span style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="reg-case-btn reg-case-btn--primary" id="regCompareCaseBtn" onclick="compareWithoutSelectedCase()">Compare without this case</button>
+                ${influentialRows.length>0?`<button class="res-refit-btn" onclick="_resRefitWithout()"><i class="fa-solid fa-rotate"></i> Refit Excluding Flagged</button>`:''}
+              </span>
             </div>
+            <p class="reg-case-note">${influentialRows.length===0?'No influential observations are flagged. Every analyzed row below can still be selected.':'Flagged rows stay marked by status. Select any analyzed row to follow that case.'}</p>
             <div id="resComparisonPanel" class="res-comparison-panel" style="display:none;"></div>
             <div style="max-height:400px;overflow-y:auto;">
               <table class="res-outliers-table">
                 <thead><tr><th>Obs</th><th>Residual</th><th>Std</th><th>Leverage</th><th>Cook's D</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody>${influentialRows.length===0
-                  ? `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-check-circle" style="font-size:24px;margin-bottom:10px;display:block;color:var(--success);"></i>No influential observations detected</td></tr>`
-                  : influentialRows.map(o=>{
+                <tbody>${tracedRows.map(o=>{
                     const hl=o.l>(3*d.k/d.n),hi=o.c>0.5;
                     const cls=hi?'res-high-influence':hl?'res-high-leverage':'';
-                    const status=hi?'High Influence':hl?'High Leverage':'Outlier';
-                    const action=hi?'Consider exclusion':hl?'Validate data':'Review data';
-                    return `<tr><td>${o.i+1}</td><td>${o.r.toFixed(3)}</td><td>${o.s.toFixed(3)}</td><td>${o.l.toFixed(4)}</td><td>${o.c.toFixed(4)}</td><td class="${cls}">${status}</td><td style="font-size:12px;color:var(--text-muted);">${action}</td></tr>`;
+                    const status=hi?'High Influence':hl?'High Leverage':(Math.abs(o.s)>2?'Outlier':'—');
+                    const action=hi?'Consider exclusion':hl?'Validate data':(Math.abs(o.s)>2?'Review data':'—');
+                    const on = o.key && o.key === selectedKey;
+                    const keyAttr = o.key ? ` data-case-key="${escapeHtmlText(o.key)}" tabindex="0" aria-selected="${on?'true':'false'}"` : '';
+                    return `<tr class="${on?'reg-case-selected':''}"${keyAttr}><td><button type="button" class="reg-case-pick">${on?'<span class="reg-case-mark">◆</span>':''}${escapeHtmlText(o.label)}</button></td><td>${o.r.toFixed(3)}</td><td>${o.s.toFixed(3)}</td><td>${o.l.toFixed(4)}</td><td>${o.c.toFixed(4)}</td><td class="${cls}">${status}</td><td style="font-size:12px;color:var(--text-muted);">${action}</td></tr>`;
                   }).join('')
                 }</tbody>
               </table>
             </div>
           </div>`;
-      Highcharts.chart('resCooksChart',{chart:{type:'column',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Observation',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:'#aaa'},enabled:d.n<=100}},yAxis:{title:{text:"Cook's Distance",style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},min:0,max:yAxis.max,tickInterval:yAxis.tickInterval,plotLines:[{value:0.5,color:'#f59e0b',width:2,dashStyle:'Solid',label:{text:'0.5',align:'right',style:{color:'#f59e0b',fontSize:'10px',fontWeight:'bold'}},zIndex:5},{value:1.0,color:'#ef4444',width:2,dashStyle:'Solid',label:{text:'1.0',align:'right',style:{color:'#ef4444',fontSize:'10px',fontWeight:'bold'}},zIndex:5}]},legend:{enabled:false},plotOptions:{column:{pointPadding:0,borderWidth:0,groupPadding:0,shadow:false,pointWidth:d.n>100?2:null}},series:[{name:"Cook's Distance",data:cooksBarData,dataLabels:{style:{color:'#fff',textOutline:'none',fontSize:'10px'}}}],tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){return`<b>Obs ${this.x}</b><br>Cook's D: <b>${this.y.toFixed(4)}</b>`;}},credits:{enabled:false}});
+      const influencePanel = document.getElementById('resInfluentialPanel');
+      if (influencePanel && influencePanel.dataset.caseBound !== '1') {
+        influencePanel.dataset.caseBound = '1';
+        influencePanel.addEventListener('click', function (event) {
+          if (event.target.closest('#regCompareCaseBtn, .res-refit-btn, #resComparisonPanel')) return;
+          const row = event.target.closest('tr[data-case-key]');
+          if (!row) return;
+          selectRegCase(row.getAttribute('data-case-key'));
+        });
+        influencePanel.addEventListener('keydown', function (event) {
+          const row = event.target.closest('tr[data-case-key]');
+          if (!row || (event.key !== 'Enter' && event.key !== ' ')) return;
+          event.preventDefault();
+          selectRegCase(row.getAttribute('data-case-key'));
+        });
+      }
+      Highcharts.chart('resCooksChart',{chart:{type:'column',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Observation',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:'#aaa'},enabled:d.n<=100}},yAxis:{title:{text:"Cook's Distance",style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},min:0,max:yAxis.max,tickInterval:yAxis.tickInterval,plotLines:[{value:0.5,color:'#f59e0b',width:2,dashStyle:'Solid',label:{text:'0.5',align:'right',style:{color:'#f59e0b',fontSize:'10px',fontWeight:'bold'}},zIndex:5},{value:1.0,color:'#ef4444',width:2,dashStyle:'Solid',label:{text:'1.0',align:'right',style:{color:'#ef4444',fontSize:'10px',fontWeight:'bold'}},zIndex:5}]},legend:{enabled:false},plotOptions:{column:{pointPadding:0,borderWidth:0,groupPadding:0,shadow:false,pointWidth:d.n>100?2:null,cursor:'pointer',point:{events:{click:regCaseClick}}}},series:[{name:"Cook's Distance",data:cooksBarData,dataLabels:{style:{color:'#fff',textOutline:'none',fontSize:'10px'}}}],tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){const name=this.point&&this.point.options&&this.point.options.name;return`<b>${name||('Obs '+this.x)}</b><br>Cook's D: <b>${this.y.toFixed(4)}</b>`;}},credits:{enabled:false}});
+      renderRegCaseDock();
+      applyRegCaseHighlight();
       window.resInfluentialLoaded = true;
     }
 
@@ -9957,6 +10325,10 @@ ${sectionsHtml}
     // ── Refit without influential obs ─────────────────────────────
     let _resOriginalResults = null;
     function _resRefitWithout() {
+      window._regCaseTraceHold = true;
+      if (window._regCaseSession) window._regCaseSession.clearSelection();
+      renderRegCaseDock();
+      applyRegCaseHighlight();
       if (!window._resInfluentialIndices?.length || !window.regressionData) return;
       const { yVector, xMatrix } = window.regressionData;
       if (!_resOriginalResults) _resOriginalResults = JSON.parse(JSON.stringify(window.regressionResults));
@@ -9980,10 +10352,12 @@ ${sectionsHtml}
     }
     function _resRestoreModel() {
       if (!_resOriginalResults) return;
+      window._regCaseTraceHold = false;
       window.regressionResults = _resOriginalResults;
       _resOriginalResults = null;
       _resData = _resCalc();
       document.getElementById('resComparisonPanel').style.display = 'none';
+      applyRegCaseHighlight();
     }
     
     // Load Correlations Tab Content
@@ -10974,7 +11348,10 @@ ${sectionsHtml}
       if (typeof Highcharts === 'undefined') return;
       const th = _resChartTheme();
       const reversed = predOverviewAxesReversed;
-      const scatter = observed.map((y, i) => (reversed ? [y, fitted[i]] : [fitted[i], y]));
+      const scatter = observed.map((y, i) => {
+        const pair = reversed ? [y, fitted[i]] : [fitted[i], y];
+        return { x: pair[0], y: pair[1], caseKey: regCaseKeyAt(i), baseRadius: 4 };
+      });
       const lo = Math.min(...fitted, ...observed);
       const hi = Math.max(...fitted, ...observed);
       const xTitle = (reversed ? 'Observed ' : 'Predicted ') + yVar;
@@ -11002,7 +11379,7 @@ ${sectionsHtml}
           }
         },
         series: [
-          { name: 'Observed vs predicted', type: 'scatter', color: 'rgba(120,200,255,0.65)', data: scatter },
+          { name: 'Observed vs predicted', type: 'scatter', color: 'rgba(120,200,255,0.65)', cursor: 'pointer', point: { events: { click: regCaseClick } }, data: scatter },
           { name: '45° identity line', type: 'line', color: 'rgba(255,165,120,0.75)', dashStyle: 'Dash', marker: { enabled: false }, enableMouseTracking: false, data: [[lo, lo], [hi, hi]] }
         ],
         credits: { enabled: false }
@@ -11018,6 +11395,7 @@ ${sectionsHtml}
         });
       }, 80);
       window.predOverviewLoaded = true;
+      applyRegCaseHighlight();
     }
 
     function loadPredTechnicalTab() {
@@ -15542,7 +15920,7 @@ ${sectionsHtml}
           const minX = Math.min.apply(null, job.eXi);
           const maxX = Math.max.apply(null, job.eXi);
           const lineData = [[minX, job.beta * minX], [maxX, job.beta * maxX]];
-          const scatter = job.eXi.map((x, i) => ({ x: x, y: job.eY[i] }));
+          const scatter = job.eXi.map((x, i) => ({ x: x, y: job.eY[i], caseKey: regCaseKeyAt(i), baseRadius: 3.2 }));
           const sc = sigColor(job.p);
           const chart = Highcharts.chart('pgc' + job.xIdx, {
             chart: {
@@ -15604,6 +15982,8 @@ ${sectionsHtml}
                 name: 'Observation',
                 data: scatter,
                 color: pointColor,
+                cursor: 'pointer',
+                point: { events: { click: regCaseClick } },
                 marker: { radius: 3.2, symbol: 'circle' },
                 zIndex: 3
               },
@@ -15626,6 +16006,7 @@ ${sectionsHtml}
             });
           }
         });
+        applyRegCaseHighlight();
       }, 80);
     }
 

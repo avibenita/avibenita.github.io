@@ -289,6 +289,8 @@ if (typeof module !== 'undefined' && module.exports) {
         computeVIF,
         transpose,
         matrixMultiply,
-        matrixInverse
+        matrixInverse,
+        tInverse,
+        tCDF
     };
 }

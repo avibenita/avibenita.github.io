@@ -16,4 +16,4 @@
 
 Residual plots are in the catalogue. Opening that tab is not a demonstration, because the plots do not expose a separate control in this film.
 
-The review preview `04_review/preview/results-scenario.mp4` places a Model Results chapter immediately before the Scenario Engine clip. The chapter asks what Store Size adds, restores the full view, then dissolves from the Predictions click into the loaded Scenario Engine. That chapter is not yet in the measured full-film times above.
+The review preview `04_review/preview/results-scenario.mp4` places a Model Results chapter immediately before the Scenario Engine. After the restored fit, choosing Predictions plays the page’s own spotlight and panel turn into the loaded Scenario Engine. That chapter is not yet in the measured full-film times above.

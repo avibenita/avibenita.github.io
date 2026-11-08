@@ -337,6 +337,7 @@ async function frameResults(page, mode) {
 }
 
 async function results(page, { mark, note }) {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await loadFilm(page);
   await page.waitForFunction(() => {
     const r2 = document.getElementById('kpiRSquared');
@@ -466,30 +467,49 @@ async function results(page, { mark, note }) {
   });
   if (!wide) throw new Error('The restored model is not back on the full view at 65.63%');
   await page.waitForTimeout(PROBE ? 40 : 1000);
-  await tagPredictions(page);
-  await hot(page, '#filmPredictionsNav', 1);
-  note('results-3');
-  await page.waitForTimeout(PROBE ? 40 : 420);
   await clearFilmHighlight(page);
+  await page.evaluate(() => {
+    const root = document.querySelector('.sb-layout');
+    if (root) {
+      root.style.transition = 'none';
+      root.style.transform = 'none';
+    }
+    window.__filmCam = { scale: 1, x: 0, y: 0 };
+    if (!window.predictionsLoaded && typeof initializePredictions === 'function') {
+      initializePredictions();
+      window.predictionsLoaded = true;
+    }
+  });
   await page.evaluate(() => switchTab('pred-scenario'));
-  await page.waitForTimeout(PROBE ? 40 : 1560);
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  note('results-3');
+  await page.waitForFunction(() => {
+    const value = document.getElementById('predictedValue');
+    const slider = document.getElementById('input-Ad Spend');
+    const chart = document.querySelector('#predProfileChart .highcharts-series');
+    const overlay = document.getElementById('loadingOverlay');
+    const box = chart && chart.getBoundingClientRect();
+    return !document.body.classList.contains('jmp-busy')
+      && !document.body.classList.contains('jmp-turning')
+      && value && /116\.37/.test(value.textContent || '')
+      && slider && Number(slider.value) > 0
+      && box && box.width > 40 && box.height > 40
+      && overlay && overlay.classList.contains('hidden');
+  }, null, { timeout: 15000 });
+  await filmScenarioChapter(page, note);
 }
 
 async function scenario(page, { mark, note }) {
   await loadFilm(page);
   await page.evaluate(() => switchTab('pred-scenario'));
-  await page.waitForFunction(() => {
-    const value = document.getElementById('predictedValue');
-    const slider = document.getElementById('input-Ad Spend');
-    const card = document.querySelector('#tab-predictions .output-card.main-prediction');
-    const chart = document.querySelector('#predProfileChart .highcharts-series');
-    const overlay = document.getElementById('loadingOverlay');
-    const box = chart && chart.getBoundingClientRect();
-    return value && /116\.37/.test(value.textContent || '')
-      && slider && Number(slider.value) > 0
-      && card && chart && box && box.width > 40 && box.height > 40
-      && overlay && overlay.classList.contains('hidden');
-  }, null, { timeout: 12000 });
+  await page.waitForFunction(() => !document.body.classList.contains('jmp-busy'), null, { timeout: 12000 });
+  mark();
+  await filmScenarioChapter(page, note);
+}
+
+async function filmScenarioChapter(page, note) {
   await page.evaluate(() => {
     const scroller = document.querySelector('#tab-predictions .ws-body');
     if (scroller) scroller.scrollTop = 0;
@@ -500,11 +520,6 @@ async function scenario(page, { mark, note }) {
     group.id = 'filmAdSpend';
     card.id = 'filmPredictedSales';
   });
-  await page.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  }));
-  await page.waitForTimeout(PROBE ? 40 : 180);
-  mark();
   const before = await page.locator('#predictedValue').innerText();
   const beforeTitle = await page.locator('#predProfileTitle').innerText();
   if (!/116\.37/.test(before)) throw new Error(`Scenario did not open at 116.37: ${before}`);
@@ -521,7 +536,7 @@ async function scenario(page, { mark, note }) {
   const hotMs = PROBE ? 40 : 320;
   const captionFadeMs = PROBE ? 20 : 220;
   const resultAt = openMs + captionFadeMs + hotMs + afterHotMs + steps * stepMs + afterDragMs + fadeMs + resultInMs;
-  const voiceAt = Math.max(5750, resultAt + settleHoldMs - dur('scenario-1') * 1000 - 150);
+  const voiceAt = Math.max(4900, resultAt + settleHoldMs - dur('scenario-1') * 1000 - 150);
   let voiced = false;
   let elapsed = 0;
   const voice = () => {
@@ -726,7 +741,7 @@ function mixSpeech(cues, duration, dest) {
 
 function trimPicture(scene, dest) {
   const trimmed = spawnSync(FFMPEG, [
-    '-y', '-ss', String(scene.trim), '-i', scene.src,
+    '-y', '-i', scene.src, '-ss', String(scene.trim),
     '-vf', 'scale=1728:1080:flags=lanczos,fps=30,format=yuv420p',
     '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
     dest
@@ -745,45 +760,43 @@ function muxVoice(picture, voice, dest) {
   if (muxed.status !== 0) throw new Error((muxed.stderr || 'mux failed').slice(-800));
 }
 
-function encodeResultsPreview(resultsScene, scenarioScene) {
-  const fade = 0.48;
+function encodeResultsPreview(scene) {
   const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');
   fs.mkdirSync(outDir, { recursive: true });
-  const resultsPicture = path.join(WORK, 'results-picture.mp4');
-  const scenarioPicture = path.join(WORK, 'scenario-picture.mp4');
-  const dissolved = path.join(WORK, 'results-scenario-picture.mp4');
+  const picture = path.join(WORK, 'results-picture.mp4');
   const chapter = path.join(outDir, 'results-chapter.mp4');
   const scenarioClip = path.join(outDir, 'scenario-highlight.mp4');
   const combined = path.join(outDir, 'results-scenario.mp4');
-  const resultsDur = trimPicture(resultsScene, resultsPicture);
-  const scenarioDur = trimPicture(scenarioScene, scenarioPicture);
-  if (resultsDur < 18 || resultsDur > 30) {
-    throw new Error(`Model Results chapter is ${resultsDur.toFixed(2)}s, outside 18–30 seconds.`);
-  }
-  const offset = resultsDur - fade;
-  const dissolvedRun = spawnSync(FFMPEG, [
-    '-y', '-i', resultsPicture, '-i', scenarioPicture,
-    '-filter_complex', `[0:v][1:v]xfade=transition=fade:duration=${fade}:offset=${offset.toFixed(3)}[v]`,
-    '-map', '[v]',
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', '30',
-    dissolved
+  const duration = trimPicture(scene, picture);
+  const handoff = (scene.cues || []).find((cue) => cue.id === 'results-3');
+  const handoffAt = handoff ? Number(handoff.at) : Math.max(0, duration - 12);
+  const voice = mixSpeech(scene.cues || [], duration, path.join(WORK, 'handoff-level.wav'));
+  muxVoice(picture, voice, combined);
+  const chapterPicture = path.join(WORK, 'results-chapter-picture.mp4');
+  const chapterCut = spawnSync(FFMPEG, [
+    '-y', '-i', picture, '-t', handoffAt.toFixed(3),
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-an',
+    chapterPicture
   ], { encoding: 'utf8' });
-  if (dissolvedRun.status !== 0) throw new Error((dissolvedRun.stderr || 'handoff dissolve failed').slice(-800));
-  const combinedDur = mediaDuration(dissolved);
-  const handoff = (resultsScene.cues || []).find((cue) => cue.id === 'results-3');
-  const handoffEnd = handoff ? handoff.at + mediaDuration(path.join(AUDIO, 'results-3.mp3')) : 0;
-  const cues = (resultsScene.cues || []).map((cue) => ({ ...cue }));
-  for (const cue of scenarioScene.cues || []) {
-    let at = offset + Number(cue.at);
-    if (cue.id === 'scenario-1' && at < handoffEnd + 0.18) at = handoffEnd + 0.18;
-    cues.push({ id: cue.id, at });
-  }
-  const voice = mixSpeech(cues, combinedDur, path.join(WORK, 'handoff-level.wav'));
-  muxVoice(dissolved, voice, combined);
-  const chapterVoice = mixSpeech(resultsScene.cues || [], resultsDur, path.join(WORK, 'results-level.wav'));
-  muxVoice(resultsPicture, chapterVoice, chapter);
-  const scenarioCue = (scenarioScene.cues || []).find((cue) => cue.id === 'scenario-1');
-  const scenarioVoice = mixSpeech(scenarioCue ? [scenarioCue] : [], scenarioDur, path.join(WORK, 'scenario-level.wav'));
+  if (chapterCut.status !== 0) throw new Error((chapterCut.stderr || 'chapter trim failed').slice(-800));
+  const chapterVoice = mixSpeech(
+    (scene.cues || []).filter((cue) => cue.id !== 'scenario-1' && Number(cue.at) < handoffAt),
+    handoffAt,
+    path.join(WORK, 'results-level.wav')
+  );
+  muxVoice(chapterPicture, chapterVoice, chapter);
+  const scenarioPicture = path.join(WORK, 'scenario-picture.mp4');
+  const scenarioCut = spawnSync(FFMPEG, [
+    '-y', '-ss', handoffAt.toFixed(3), '-i', picture,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-an',
+    scenarioPicture
+  ], { encoding: 'utf8' });
+  if (scenarioCut.status !== 0) throw new Error((scenarioCut.stderr || 'scenario trim failed').slice(-800));
+  const scenarioDur = mediaDuration(scenarioPicture);
+  const scenarioCues = (scene.cues || [])
+    .filter((cue) => cue.id === 'results-3' || cue.id === 'scenario-1')
+    .map((cue) => ({ id: cue.id, at: Math.max(0, Number(cue.at) - handoffAt) }));
+  const scenarioVoice = mixSpeech(scenarioCues, scenarioDur, path.join(WORK, 'scenario-level.wav'));
   muxVoice(scenarioPicture, scenarioVoice, scenarioClip);
   console.log(chapter);
   console.log(scenarioClip);
@@ -801,7 +814,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const scenes = [];
   try {
-    const jobs = previewResults ? [['results', results], ['scenario', scenario]] : preview ? [['scenario', scenario]] : [
+    const jobs = previewResults ? [['results', results]] : preview ? [['scenario', scenario]] : [
       ['overview', overview],
       ['enter', (page, api) => brand(page, 'enter.html', 2.4, api)],
       ['effects', effects],
@@ -844,7 +857,7 @@ async function main() {
     fs.writeFileSync(sceneFile, JSON.stringify(scenes, null, 2));
     console.log(JSON.stringify(scenes.map((scene) => ({ id: scene.id, trim: scene.trim, cues: scene.cues })), null, 2));
     if (previewResults) {
-      encodeResultsPreview(scenes[0], scenes[1]);
+      encodeResultsPreview(scenes[0]);
     } else if (preview) {
       const scene = scenes[0];
       const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');

@@ -841,10 +841,12 @@ const StatisticoHeader = {
     if (typeof Office === 'undefined' || !Office.context || !Office.context.ui || typeof Office.context.ui.addHandlerAsync !== 'function') return;
     this._sampleListenerInstalled = true;
     const self = this;
-    Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function (arg) {
+    Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function onStatisticoHeaderParentMessage(arg) {
       try {
-        const sample = self.findAnalysisSample(JSON.parse(arg.message || '{}'));
+        const parsed = JSON.parse(arg.message || '{}');
+        const sample = self.findAnalysisSample(parsed);
         if (sample) self.showSampleNote(sample);
+        if (parsed && typeof window.__applyIndependentBundle === 'function') window.__applyIndependentBundle(parsed);
       } catch (e) {}
     });
   },

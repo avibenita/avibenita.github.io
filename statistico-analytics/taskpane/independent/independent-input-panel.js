@@ -1198,17 +1198,19 @@ function sendIndependentBundle() {
       analysisRows: [slimHeaders].concat(slimRows)
     });
   }
-  try { localStorage.setItem("statistico.independent.bundle", message); }
-  catch (_storeErr) {
+  try { localStorage.setItem("statistico.independent.bundle", message); } catch (_storeErr) {}
+  try {
+    if (window.OfficeRuntime && OfficeRuntime.storage && typeof OfficeRuntime.storage.setItem === "function") {
+      OfficeRuntime.storage.setItem("statistico.independent.bundle", message);
+    }
+  } catch (_rtErr) {}
+  try {
+    independentDialog.messageChild(message);
+  } catch (_sendErr) {
     try {
-      localStorage.setItem("statistico.independent.bundle", JSON.stringify({
-        type: "INDEPENDENT_BUNDLE",
-        savedAt: Date.now(),
-        payload: bundle
-      }));
-    } catch (_storeErr2) {}
+      independentDialog.messageChild(JSON.stringify({ type: "INDEPENDENT_BUNDLE_READY", savedAt: Date.now() }));
+    } catch (_sendErr2) {}
   }
-  independentDialog.messageChild(message);
   } catch (err) {
     console.error("sendIndependentBundle failed", err);
   }

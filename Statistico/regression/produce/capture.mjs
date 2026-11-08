@@ -469,12 +469,10 @@ async function results(page, { mark, note }) {
   await tagPredictions(page);
   await hot(page, '#filmPredictionsNav', 1);
   note('results-3');
-  await page.waitForTimeout(PROBE ? 40 : 620);
-  await page.evaluate(() => {
-    document.querySelectorAll('.sb-item.active').forEach((el) => el.classList.remove('active'));
-    document.getElementById('filmPredictionsNav')?.classList.add('active');
-  });
-  await page.waitForTimeout(PROBE ? 40 : 480);
+  await page.waitForTimeout(PROBE ? 40 : 420);
+  await clearFilmHighlight(page);
+  await page.evaluate(() => switchTab('pred-scenario'));
+  await page.waitForTimeout(PROBE ? 40 : 1560);
 }
 
 async function scenario(page, { mark, note }) {

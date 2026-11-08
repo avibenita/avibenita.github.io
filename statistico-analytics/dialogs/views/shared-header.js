@@ -4716,6 +4716,10 @@ const StatisticoHeader = {
     if (tbody) {
       const cap = 500;
       const display = rows.slice(0, cap);
+      const rowKeys = isUsed ? (result.usedCaseKeys || []) : (result.caseKeys || []);
+      const selectedKey = this._caseTrace && typeof this._caseTrace.selectedKey === 'function'
+        ? this._caseTrace.selectedKey()
+        : null;
       tbody.innerHTML = display.map((row, ri) => {
         const tds = row.map((v, ci) => {
           const role = columnRoles ? columnRoles[ci] : null;
@@ -4723,15 +4727,47 @@ const StatisticoHeader = {
           const val  = (v === null || v === undefined || v === '') ? '<span class="hdp-missing">—</span>' : v;
           return `<td class="hdp-td${cls}">${val}</td>`;
         }).join('');
-        return `<tr class="hdp-tr"><td class="hdp-td hdp-td-num">${ri + 1}</td>${tds}</tr>`;
+        const caseKey = rowKeys[ri] || '';
+        const selected = !!(caseKey && selectedKey && caseKey === selectedKey);
+        const attrs = caseKey
+          ? ` data-case-key="${String(caseKey).replace(/"/g, '&quot;')}" tabindex="0" aria-selected="${selected ? 'true' : 'false'}"`
+          : '';
+        return `<tr class="hdp-tr${selected ? ' hdp-tr--selected' : ''}"${attrs}><td class="hdp-td hdp-td-num">${ri + 1}</td>${tds}</tr>`;
       }).join('');
       if (rows.length > cap) {
         tbody.innerHTML += `<tr><td class="hdp-more" colspan="${headers.length + 1}">Showing first ${cap} of ${rows.length} rows</td></tr>`;
       }
+      if (tbody.dataset.caseBound !== '1') {
+        tbody.dataset.caseBound = '1';
+        const activate = (event) => {
+          const tr = event.target && event.target.closest ? event.target.closest('tr[data-case-key]') : null;
+          if (!tr || !tr.dataset.caseKey || !this._caseTrace || typeof this._caseTrace.onSelect !== 'function') return;
+          if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+          if (event.type === 'keydown') event.preventDefault();
+          this._caseTrace.onSelect(tr.dataset.caseKey);
+        };
+        tbody.addEventListener('click', activate);
+        tbody.addEventListener('keydown', activate);
+      }
+      const selectedRow = tbody.querySelector('.hdp-tr--selected');
+      if (selectedRow && selectedRow.scrollIntoView) selectedRow.scrollIntoView({ block: 'nearest' });
     }
 
     this._currentModalRows    = rows;
     this._currentModalHeaders = headers;
+  },
+
+  syncCaseSelection() {
+    const selected = this._caseTrace && typeof this._caseTrace.selectedKey === 'function'
+      ? this._caseTrace.selectedKey()
+      : null;
+    document.querySelectorAll('#hdpTbody tr[data-case-key]').forEach((tr) => {
+      const on = !!(selected && tr.dataset.caseKey === selected);
+      tr.classList.toggle('hdp-tr--selected', on);
+      tr.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    const selectedRow = document.querySelector('#hdpTbody tr.hdp-tr--selected');
+    if (selectedRow && selectedRow.scrollIntoView) selectedRow.scrollIntoView({ block: 'nearest' });
   },
 
   _copyModalData() {

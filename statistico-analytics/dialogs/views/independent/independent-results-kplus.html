@@ -4185,12 +4185,16 @@
       }
       return true;
     }
+    function independentResultsHaveDetail() {
+      var ph = lastBundle && lastBundle.results && lastBundle.results.posthoc;
+      return !!(window.independentRangeData && window.independentRangeData.length > 1 && ph && ph.rows && ph.rows.length);
+    }
     function pullOfficeIndependentBundle() {
-      if (lastBundle && lastBundle.__painted) return;
+      if (independentResultsHaveDetail()) return;
       var rt = (typeof OfficeRuntime !== "undefined" && OfficeRuntime.storage) ? OfficeRuntime.storage : null;
       if (!rt || typeof rt.getItem !== "function") return;
       rt.getItem("statistico.independent.bundle").then(function(raw) {
-        if (!raw || (lastBundle && lastBundle.__painted)) return;
+        if (!raw || independentResultsHaveDetail()) return;
         var msg;
         try { msg = JSON.parse(raw); } catch (_e) { return; }
         applyIndependentMessage(msg);
@@ -4204,7 +4208,9 @@
       }
       if (msg.type === "INDEPENDENT_ROWS") return applyIndependentRows(msg);
       if (msg.type !== "INDEPENDENT_BUNDLE") return false;
-      if (lastBundle && lastBundle.__painted) return true;
+      var incomingDetail = msg.payload && msg.payload.results && msg.payload.results.posthoc;
+      var incomingHasDetail = !!(msg.rawData || (incomingDetail && ((incomingDetail.rows && incomingDetail.rows.length) || incomingDetail.groupValues)));
+      if (lastBundle && lastBundle.__painted && !incomingHasDetail) return true;
       if (msg.savedAt && msg.savedAt < independentPageStarted - 120000) return false;
       if (msg.rawData) window.independentRangeData = msg.rawData;
       window.independentAnalysisRows = (msg.analysisRows && msg.analysisRows.length) ? msg.analysisRows : null;
@@ -4226,11 +4232,28 @@
       try { msg = JSON.parse(raw); } catch (_e) { return false; }
       return applyIndependentMessage(msg);
     }
+    function gridFromInjectedValues(cols, values) {
+      if (!values) return null;
+      var lists = cols.map(function (name) { return Array.isArray(values[name]) ? values[name] : []; });
+      if (!lists.some(function (list) { return list.length; })) return null;
+      var n = lists.reduce(function (max, list) { return Math.max(max, list.length); }, 0);
+      var grid = [cols.slice()];
+      for (var i = 0; i < n; i++) grid.push(lists.map(function (list) { return i < list.length ? list[i] : ""; }));
+      return grid;
+    }
     function bundleFromInjected(m) {
       if (!m || !Array.isArray(m.g) || !m.g.length) return null;
       var groups = m.g;
       var cols = Array.isArray(m.cols) && m.cols.length ? m.cols : groups.map(function (g) { return g.name; });
+      var grid = gridFromInjectedValues(cols, m.v);
+      var groupValues = null;
+      if (m.v) {
+        groupValues = {};
+        cols.forEach(function (name) { if (Array.isArray(m.v[name])) groupValues[name] = m.v[name].slice(); });
+      }
       return {
+        grid: grid,
+        bundle: {
         setup: {
           compareMode: "k-plus",
           mode: "k-plus",
@@ -4257,7 +4280,15 @@
             groupDescriptives: groups,
             welchAnova: { f: m.wF, df1: m.wDf1, df2: m.wDf2, p: m.wP }
           },
-          posthoc: { enabled: false, rows: [] }
+          posthoc: {
+            enabled: !!(m.ph && m.ph.length),
+            method: m.method || "tukey",
+            correction: m.correction || "builtin",
+            rows: Array.isArray(m.ph) ? m.ph : [],
+            groupValues: groupValues,
+            estimateLabel: "Mean difference"
+          }
+        }
         }
       };
     }
@@ -4269,9 +4300,13 @@
       }
       try {
         var injected = bundleFromInjected(JSON.parse(decodeURIComponent(match[1])));
-        if (!injected) return false;
+        if (!injected || !injected.bundle) return false;
+        if (injected.grid) {
+          window.independentRangeData = injected.grid;
+          window.independentAnalysisRows = injected.grid;
+        }
         console.log("independent results injected");
-        populateBundle(injected);
+        populateBundle(injected.bundle);
         return !!(lastBundle && lastBundle.__painted);
       } catch (err) {
         console.error("independent inject failed", err);
@@ -4286,7 +4321,7 @@
       var storedPump = setInterval(function() {
         applyStoredIndependentBundle();
         pullOfficeIndependentBundle();
-        if ((lastBundle && lastBundle.__painted) || storedTries++ > 40) clearInterval(storedPump);
+        if (independentResultsHaveDetail() || storedTries++ > 40) clearInterval(storedPump);
       }, 400);
       // Initialize shared header
       if (typeof StatisticoHeader !== 'undefined') {

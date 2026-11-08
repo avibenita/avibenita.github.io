@@ -1127,7 +1127,8 @@ function miniIndependentResults(bundle) {
     });
   }
   var wa = ob.welchAnova || {};
-  return {
+  var ph = bundle.results && bundle.results.posthoc;
+  var base = {
     cols: groups.map(function (g) { return g.name; }),
     g: groups,
     N: ob.N,
@@ -1142,6 +1143,39 @@ function miniIndependentResults(bundle) {
     conf: s.confidence || 0.95,
     hyp: s.hypothesis || "two-sided"
   };
+  function roundList(arr) {
+    return (arr || []).map(function (n) {
+      var x = Number(n);
+      return isFinite(x) ? Math.round(x * 10000) / 10000 : null;
+    }).filter(function (n) { return n !== null; });
+  }
+  function pack(withValues, withRows) {
+    var mini = base;
+    if (withValues && ph && ph.groupValues) {
+      var v = {};
+      Object.keys(ph.groupValues).forEach(function (name) { v[name] = roundList(ph.groupValues[name]); });
+      mini = Object.assign({}, mini, { v: v });
+    }
+    if (withRows && ph && ph.rows && ph.rows.length) {
+      mini = Object.assign({}, mini, {
+        method: ph.method,
+        correction: ph.correction,
+        ph: ph.rows.map(function (r) {
+          return {
+            comparison: r.comparison, statistic: r.statistic, rawP: r.rawP, adjP: r.adjP,
+            estimate: r.estimate, ciLower: r.ciLower, ciUpper: r.ciUpper,
+            n1: r.n1, n2: r.n2, mean1: r.mean1, mean2: r.mean2
+          };
+        })
+      });
+    }
+    return mini;
+  }
+  var full = pack(true, true);
+  if (encodeURIComponent(JSON.stringify(full)).length <= 5500) return full;
+  var valuesOnly = pack(true, false);
+  if (encodeURIComponent(JSON.stringify(valuesOnly)).length <= 5500) return valuesOnly;
+  return base;
 }
 
 function injectedResultsQuery() {

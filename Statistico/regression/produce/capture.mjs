@@ -92,7 +92,7 @@ async function hot(page, selector, zoom = 1.22) {
     await clearFilmHighlight(page);
     return;
   }
-  await showFilmHighlight(page, selector, { zoom });
+  await showFilmHighlight(page, selector, { zoom, tone: 'glow' });
   await page.waitForTimeout(PROBE ? 40 : 320);
 }
 
@@ -594,7 +594,7 @@ async function filmScenarioChapter(page, note) {
     return box.width > 0 && box.height > 0;
   });
   if (!tagged) throw new Error('The chart marker is not on the settled profile');
-  await showFilmHighlights(page, ['#filmPredictedSales', '#filmScenarioMarker'], { zoom: 1 });
+  await showFilmHighlights(page, ['#filmPredictedSales', '#filmScenarioMarker'], { zoom: 1, tone: 'glow' });
   await page.waitForTimeout(resultInMs);
   elapsed += fadeMs + resultInMs;
   voice();

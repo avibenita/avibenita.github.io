@@ -25,6 +25,14 @@ export const FILM_HIGHLIGHT_CSS = `
 @keyframes filmHighlightFadeOut { from { opacity: 1; } to { opacity: 0; } }
 `;
 
+const FILM_GLOW_CSS = `
+.film-highlight.film-highlight-glow {
+  border-color: transparent;
+  background: rgba(217, 184, 120, 0.06);
+  box-shadow: 0 0 28px 8px rgba(217, 184, 120, 0.36);
+}
+`;
+
 export function highlightStandardIssues(spec = HIGHLIGHT_SPEC) {
   const issues = [];
   if (String(spec.color).toUpperCase() !== '#D9B878') issues.push(`highlight color ${spec.color}, expected #D9B878`);
@@ -112,14 +120,20 @@ export function highlightReport(scenes, starts = {}) {
   return { spec: HIGHLIGHT_SPEC, events };
 }
 
-async function runHighlight(page, action, selectors, zoom) {
-  return page.evaluate(({ css, spec, action, selectors, zoom }) => {
+async function runHighlight(page, action, selectors, zoom, tone) {
+  return page.evaluate(({ css, glowCss, spec, action, selectors, zoom, tone }) => {
     function install() {
       if (!document.getElementById('filmHighlightCss')) {
         const style = document.createElement('style');
         style.id = 'filmHighlightCss';
         style.textContent = css;
         (document.head || document.documentElement).appendChild(style);
+      }
+      if (tone === 'glow' && !document.getElementById('filmHighlightGlowCss')) {
+        const glow = document.createElement('style');
+        glow.id = 'filmHighlightGlowCss';
+        glow.textContent = glowCss;
+        (document.head || document.documentElement).appendChild(glow);
       }
       window.__filmHighlightLog = window.__filmHighlightLog || [];
     }
@@ -186,6 +200,7 @@ async function runHighlight(page, action, selectors, zoom) {
       const placed = place(el, target);
       const measured = el.getBoundingClientRect();
       el.classList.remove('is-out', 'is-in');
+      el.classList.toggle('film-highlight-glow', tone === 'glow');
       void el.offsetWidth;
       el.classList.add('is-in');
       const entry = {
@@ -215,17 +230,17 @@ async function runHighlight(page, action, selectors, zoom) {
     if (window.__filmHighlightRaf) cancelAnimationFrame(window.__filmHighlightRaf);
     window.__filmHighlightRaf = requestAnimationFrame(track);
     return entries;
-  }, { css: FILM_HIGHLIGHT_CSS, spec: HIGHLIGHT_SPEC, action, selectors, zoom });
+  }, { css: FILM_HIGHLIGHT_CSS, glowCss: FILM_GLOW_CSS, spec: HIGHLIGHT_SPEC, action, selectors, zoom, tone: tone || '' });
 }
 
 export async function showFilmHighlight(page, selector, options = {}) {
-  const entries = await runHighlight(page, 'show', [selector], options.zoom || 1.24);
+  const entries = await runHighlight(page, 'show', [selector], options.zoom || 1.24, options.tone || '');
   if (!entries || !entries.length) throw new Error(`Highlight target not found: ${selector}`);
   return entries[0];
 }
 
 export async function showFilmHighlights(page, selectors, options = {}) {
-  const entries = await runHighlight(page, 'show', selectors, options.zoom || 1);
+  const entries = await runHighlight(page, 'show', selectors, options.zoom || 1, options.tone || '');
   if (!entries || entries.length !== selectors.length) {
     throw new Error(`Highlight target not found: ${(selectors || []).join(', ')}`);
   }

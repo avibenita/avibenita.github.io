@@ -12,7 +12,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20261107omnibus" />  <script src="../shared-brand-logo.js?v=20261005light1"></script>
 
-  <script src="../shared-header.js?v=20261107omnibus"></script>
+  <script src="../shared-header.js?v=20261108deliver"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jstat/1.9.5/jstat.min.js"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -4117,6 +4117,7 @@
       }
       
       updateResultsPanels(r, fx, s, 1 - (parseMaybeNumber(s.confidence) || 0.95));
+      if (lastBundle) lastBundle.__painted = true;
       renderPosthoc(r.posthoc || {}, "k-plus");
       updateEffectsPanel(ob);
       if (window.StatisticoPowerAnalysis && window.StatisticoPowerAnalysis._activeEngine) {
@@ -4146,25 +4147,54 @@
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "independent-means-report.html"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),500);
     }
     var independentPageStarted = Date.now();
+    function pullOfficeIndependentBundle() {
+      if (lastBundle && lastBundle.__painted) return;
+      var rt = (typeof OfficeRuntime !== "undefined" && OfficeRuntime.storage) ? OfficeRuntime.storage : null;
+      if (!rt || typeof rt.getItem !== "function") return;
+      rt.getItem("statistico.independent.bundle").then(function(raw) {
+        if (!raw || (lastBundle && lastBundle.__painted)) return;
+        var msg;
+        try { msg = JSON.parse(raw); } catch (_e) { return; }
+        applyIndependentMessage(msg);
+      }).catch(function() {});
+    }
+    function applyIndependentMessage(msg) {
+      if (!msg) return false;
+      if (msg.type === "INDEPENDENT_BUNDLE_READY") {
+        pullOfficeIndependentBundle();
+        return false;
+      }
+      if (msg.type !== "INDEPENDENT_BUNDLE") return false;
+      if (lastBundle && lastBundle.__painted) return true;
+      if (msg.savedAt && msg.savedAt < independentPageStarted - 120000) return false;
+      if (msg.rawData) window.independentRangeData = msg.rawData;
+      window.independentAnalysisRows = (msg.analysisRows && msg.analysisRows.length) ? msg.analysisRows : null;
+      try { populateBundle(msg.payload || {}); }
+      catch (err) {
+        console.error("populateBundle failed", err);
+        var el = document.getElementById("omnibusStat");
+        if (el && !(lastBundle && lastBundle.__painted)) el.textContent = "Results did not render";
+        return false;
+      }
+      return !!(lastBundle && lastBundle.__painted);
+    }
+    window.__applyIndependentBundle = applyIndependentMessage;
     function applyStoredIndependentBundle() {
-      if (lastBundle) return true;
       var raw = "";
       try { raw = localStorage.getItem("statistico.independent.bundle") || ""; } catch (_e) { return false; }
       if (!raw) return false;
       var msg;
       try { msg = JSON.parse(raw); } catch (_e) { return false; }
-      if (!msg || msg.type !== "INDEPENDENT_BUNDLE" || !(msg.savedAt >= independentPageStarted - 120000)) return false;
-      if (msg.rawData) window.independentRangeData = msg.rawData;
-      window.independentAnalysisRows = (msg.analysisRows && msg.analysisRows.length) ? msg.analysisRows : null;
-      try { populateBundle(msg.payload || {}); }
-      catch (err) { console.error("populateBundle failed", err); return false; }
-      return !!lastBundle;
+      return applyIndependentMessage(msg);
     }
     document.addEventListener("DOMContentLoaded", function(){
       applyStoredIndependentBundle();
+      pullOfficeIndependentBundle();
       var storedTries = 0;
       var storedPump = setInterval(function() {
-        if (applyStoredIndependentBundle() || storedTries++ > 40) clearInterval(storedPump);
+        applyStoredIndependentBundle();
+        pullOfficeIndependentBundle();
+        if ((lastBundle && lastBundle.__painted) || storedTries++ > 40) clearInterval(storedPump);
       }, 400);
       // Initialize shared header
       if (typeof StatisticoHeader !== 'undefined') {
@@ -4273,15 +4303,11 @@
           } catch (_e) {}
           sendToHost("independentDashboardReady", {});
         }
-        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function(arg){
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, function onIndependentKplusParentMessage(arg){
           var msg = {};
           try { msg = JSON.parse(arg.message || "{}"); } catch (_e) { return; }
-          if (msg.type === "INDEPENDENT_BUNDLE") {
-            if (msg.rawData) window.independentRangeData = msg.rawData;
-            window.independentAnalysisRows = (msg.analysisRows && msg.analysisRows.length) ? msg.analysisRows : null;
-            try { populateBundle(msg.payload || {}); }
-            catch (err) { console.error("populateBundle failed", err); }
-          } else if (msg.theme) { applyTheme(msg.theme); }
+          if (msg.type === "INDEPENDENT_BUNDLE" || msg.type === "INDEPENDENT_BUNDLE_READY") applyIndependentMessage(msg);
+          else if (msg.theme) applyTheme(msg.theme);
         }, function() {
           requestIndependentBundle();
           var tries = 0;

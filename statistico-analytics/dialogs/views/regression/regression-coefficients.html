@@ -299,6 +299,85 @@
       animation: fadeIn 0.2s ease;
     }
 
+    /* View change: spotlight the sidebar item, then turn the panel like a cube face. */
+    .jmp-spot,
+    .jmp-ring,
+    .jmp-cursor { position: fixed; pointer-events: none; }
+    .jmp-spot {
+      inset: 0;
+      z-index: 10040;
+      background: rgba(4, 10, 22, .72);
+      -webkit-mask: radial-gradient(circle at var(--jmp-x) var(--jmp-y), transparent 0 132px, #000 210px);
+      mask: radial-gradient(circle at var(--jmp-x) var(--jmp-y), transparent 0 132px, #000 210px);
+    }
+    .jmp-ring {
+      z-index: 10042;
+      border-radius: 8px;
+      box-shadow: 0 0 0 3px #b9e4ff, 0 0 0 10px rgba(120, 190, 255, .35), 0 0 36px rgba(160, 210, 255, .9);
+      background: rgba(64, 150, 230, .28);
+    }
+    .jmp-cursor {
+      z-index: 10043;
+      width: 16px;
+      height: 22px;
+      margin-left: -2px;
+      background: no-repeat center / contain url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='22' viewBox='0 0 16 22'><path d='M1 1 L1 17 L5.2 13.2 L8.4 20.2 L11 19 L7.8 12.2 L14 12.2 Z' fill='white' stroke='%23111' stroke-width='1'/></svg>");
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
+    }
+    .sb-item.jmp-focus {
+      position: relative;
+      z-index: 81;
+      background: #2a6eae !important;
+      color: #fff !important;
+      box-shadow: inset 3px 0 0 #9fd4ff !important;
+    }
+    .card-body.jmp-stage {
+      perspective: 1500px;
+      perspective-origin: 50% 48%;
+      background: linear-gradient(180deg, #3a78c4 0%, #1d4f96 100%);
+      overflow: visible;
+    }
+    body.jmp-turning .tab-content.active { animation: none; }
+    body.jmp-turning .tab-panel { animation: none !important; }
+    .tab-content.jmp-face {
+      display: flex !important;
+      position: absolute;
+      left: 5%;
+      right: 5%;
+      top: 4%;
+      bottom: 4%;
+      width: auto;
+      overflow: hidden;
+      border-radius: 2px;
+      background: #101820;
+      box-shadow: 0 26px 54px rgba(0, 10, 30, .42);
+      backface-visibility: hidden;
+      transform-style: preserve-3d;
+    }
+    .tab-content.jmp-face > .tab-panel {
+      display: flex !important;
+      animation: none !important;
+    }
+    .tab-content.jmp-leave {
+      z-index: 2;
+      animation: jmpFaceOut .78s cubic-bezier(.42, .04, .18, 1) forwards;
+    }
+    .tab-content.jmp-enter {
+      z-index: 1;
+      animation: jmpFaceIn .78s cubic-bezier(.42, .04, .18, 1) forwards;
+    }
+    @keyframes jmpFaceOut {
+      from { transform: rotateY(0deg) scale(1); }
+      to { transform: rotateY(-88deg) scale(.9); }
+    }
+    @keyframes jmpFaceIn {
+      from { transform: rotateY(88deg) scale(.9); }
+      to { transform: rotateY(0deg) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .jmp-spot, .jmp-ring, .jmp-cursor, .tab-content.jmp-leave, .tab-content.jmp-enter { animation: none; }
+    }
+
     /* Correlations / Descriptives iframe tabs fill the panel edge-to-edge */
     #tab-descriptive.active,
     #tab-correlations.active {
@@ -6662,6 +6741,182 @@
       // backwards compatibility with older callers.
     }
 
+    let jmpHandoffToken = 0;
+
+    function clearViewHandoff() {
+      jmpHandoffToken += 1;
+      document.querySelectorAll('.jmp-spot, .jmp-ring, .jmp-cursor').forEach(function (el) { el.remove(); });
+      document.querySelectorAll('.jmp-face').forEach(function (el) {
+        el.classList.remove('jmp-face', 'jmp-leave', 'jmp-enter');
+      });
+      document.querySelectorAll('.jmp-focus').forEach(function (el) { el.classList.remove('jmp-focus'); });
+      const stage = document.querySelector('.card-body');
+      if (stage) {
+        stage.classList.remove('jmp-stage');
+        stage.style.height = '';
+      }
+      document.body.classList.remove('jmp-turning', 'jmp-busy');
+    }
+
+    function commitRegTab(tabName) {
+      const realTabName = resolveRegContentTab(tabName);
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+        content.querySelectorAll(':scope > .tab-panel').forEach(panel => panel.classList.remove('active'));
+      });
+      const targetTab = document.getElementById('tab-' + realTabName);
+      if (targetTab) {
+        targetTab.classList.add('active');
+        targetTab.querySelectorAll(':scope > .tab-panel').forEach(panel => panel.classList.add('active'));
+      }
+
+      document.body.classList.toggle(
+        'reg-iframe-tab',
+        tabName === 'descriptive' || tabName === 'correlations'
+      );
+
+      const cardBody = document.querySelector('.card-body');
+      if (cardBody) cardBody.scrollTop = 0;
+      const viewContainer = document.querySelector('.view-container');
+      if (viewContainer) viewContainer.scrollTop = 0;
+
+      if (tabName === 'diag-overview') {
+        loadResidualsTab();
+        if (typeof _resReflowOverviewChart === 'function') setTimeout(_resReflowOverviewChart, 180);
+      } else if (tabName === 'viz-partial' && !window.modelVizLoaded) {
+        window.modelVizLoaded = true;
+        loadModelVizTab();
+      } else if (tabName === 'viz-unique' && !window.partialGridLoaded) {
+        window.partialGridLoaded = true;
+        loadPartialGridTab();
+      } else if (tabName === 'diag-influence') {
+        if (!_resData) { try { loadResidualsTab(); } catch (e) {} }
+        loadResInfluential();
+      } else if (tabName === 'diag-plots') {
+        if (!_resData) { try { loadResidualsTab(); } catch (e) {} }
+        loadResPlots();
+      } else if (tabName === 'res-ai' && !window.resAiLoaded) {
+        loadResAi();
+      } else if (tabName === 'correlations' && !window.correlationsLoaded) {
+        loadCorrelationsTab();
+      } else if (tabName === 'descriptive' && !window.descriptiveLoaded) {
+        loadDescriptiveTab();
+      } else if (tabName === 'power') {
+        refreshRegressionPowerAnalysis();
+      } else if (tabName === 'pred-scenario') {
+        if (!window.predictionsLoaded) {
+          initializePredictions();
+          window.predictionsLoaded = true;
+        } else if (window._predProfileChart) {
+          setTimeout(function() {
+            try { window._predProfileChart.setSize(null, PRED_PROFILE_CHART_H, false); } catch (_e) {}
+          }, 80);
+        }
+      } else if (tabName === 'pred-overview' && !window.predOverviewLoaded) {
+        loadPredOverviewTab();
+      } else if (tabName === 'ancova' && !window.ancovaLoaded) {
+        initializeANCOVA();
+        window.ancovaLoaded = true;
+      } else if (['ancova-results','ancova-assumptions','ancova-viz'].includes(tabName)) {
+        if (!window.ancovaLoaded) {
+          initializeANCOVA();
+          window.ancovaLoaded = true;
+        }
+        renderANCOVASubTab(tabName);
+      } else if (['ix-summary','ix-viz','ix-details'].includes(tabName)) {
+        setTimeout(() => {
+          if (!window._interactionTabData) {
+            showInteractionEmptyState(tabName);
+            return;
+          }
+          if (tabName === 'ix-summary') {
+            updateIxWorkspaceContext();
+            renderInteractionSummary();
+            renderInteractionSummarySlopes();
+            renderInteractionPreview();
+          } else if (tabName === 'ix-viz') {
+            updateIxWorkspaceContext();
+            renderInteractionPlot();
+            renderIxVizInterpretation();
+          } else if (tabName === 'ix-details') {
+            updateIxWorkspaceContext();
+            renderIxTechnicalNotes();
+          }
+        }, 50);
+      }
+      syncModelScopeBanners();
+      if (tabName === 'power') annotatePowerFullModel();
+    }
+
+    function beginViewHandoff(fromEl, tabName) {
+      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const toEl = document.getElementById('tab-' + resolveRegContentTab(tabName));
+      if (reduced || document.body.classList.contains('jmp-busy') || !fromEl || !toEl || fromEl === toEl) return false;
+      const navBtn = Array.from(document.querySelectorAll('.sb-item[data-tab]')).find(function (btn) {
+        return matchesRegNavTab(btn.dataset.tab, tabName);
+      });
+      document.body.classList.add('jmp-busy');
+      const token = ++jmpHandoffToken;
+      const spot = document.createElement('div');
+      spot.className = 'jmp-spot';
+      const ring = document.createElement('div');
+      ring.className = 'jmp-ring';
+      const cursor = document.createElement('div');
+      cursor.className = 'jmp-cursor';
+      if (navBtn) {
+        navBtn.classList.add('jmp-focus');
+        const rect = navBtn.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        spot.style.setProperty('--jmp-x', cx + 'px');
+        spot.style.setProperty('--jmp-y', cy + 'px');
+        ring.style.left = (rect.left - 4) + 'px';
+        ring.style.top = (rect.top - 3) + 'px';
+        ring.style.width = (rect.width + 8) + 'px';
+        ring.style.height = (rect.height + 6) + 'px';
+        cursor.style.left = (rect.left + 18) + 'px';
+        cursor.style.top = (rect.top + rect.height / 2 - 2) + 'px';
+      } else {
+        spot.style.setProperty('--jmp-x', '120px');
+        spot.style.setProperty('--jmp-y', '180px');
+      }
+      document.body.appendChild(spot);
+      document.body.appendChild(ring);
+      document.body.appendChild(cursor);
+
+      window.setTimeout(function () {
+        if (token !== jmpHandoffToken) return;
+        spot.remove();
+        ring.remove();
+        cursor.remove();
+        const stage = document.querySelector('.card-body');
+        if (!stage || !fromEl.isConnected) {
+          document.body.classList.remove('jmp-busy');
+          if (navBtn) navBtn.classList.remove('jmp-focus');
+          commitRegTab(tabName);
+          return;
+        }
+        stage.style.height = stage.getBoundingClientRect().height + 'px';
+        stage.classList.add('jmp-stage');
+        document.body.classList.add('jmp-turning');
+        fromEl.classList.add('jmp-face', 'jmp-leave');
+        commitRegTab(tabName);
+        const shown = document.getElementById('tab-' + resolveRegContentTab(tabName));
+        if (shown && shown !== fromEl) shown.classList.add('jmp-face', 'jmp-enter');
+        window.setTimeout(function () {
+          if (token !== jmpHandoffToken) return;
+          fromEl.classList.remove('jmp-face', 'jmp-leave', 'active');
+          fromEl.querySelectorAll(':scope > .tab-panel').forEach(function (panel) { panel.classList.remove('active'); });
+          if (shown) shown.classList.remove('jmp-face', 'jmp-enter');
+          stage.classList.remove('jmp-stage');
+          stage.style.height = '';
+          document.body.classList.remove('jmp-turning', 'jmp-busy');
+          if (navBtn) navBtn.classList.remove('jmp-focus');
+        }, 800);
+      }, 560);
+      return true;
+    }
+
     // Tab Management
     function switchTab(tabName) {
       console.log('🔄 Switching to tab:', tabName);
@@ -6747,96 +7002,10 @@
         });
       }
       
-      // Hide all tab content, show the selected one
-      const realTabName = resolveRegContentTab(tabName);
-      document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-        content.querySelectorAll(':scope > .tab-panel').forEach(panel => panel.classList.remove('active'));
-      });
-      const targetTab = document.getElementById(`tab-${realTabName}`);
-      if (targetTab) {
-        targetTab.classList.add('active');
-        targetTab.querySelectorAll(':scope > .tab-panel').forEach(panel => panel.classList.add('active'));
+      if (!beginViewHandoff(document.querySelector('.tab-content.active'), tabName)) {
+        if (document.body.classList.contains('jmp-busy')) clearViewHandoff();
+        commitRegTab(tabName);
       }
-
-      document.body.classList.toggle(
-        'reg-iframe-tab',
-        tabName === 'descriptive' || tabName === 'correlations'
-      );
-
-      // Scroll the main content area back to top
-      const cardBody = document.querySelector('.card-body');
-      if (cardBody) cardBody.scrollTop = 0;
-      const viewContainer = document.querySelector('.view-container');
-      if (viewContainer) viewContainer.scrollTop = 0;
-      
-      // Lazy load tab content if not already loaded
-      if (tabName === 'diag-overview') {
-        loadResidualsTab();
-        if (typeof _resReflowOverviewChart === 'function') setTimeout(_resReflowOverviewChart, 180);
-      } else if (tabName === 'viz-partial' && !window.modelVizLoaded) {
-        window.modelVizLoaded = true;
-        loadModelVizTab();
-      } else if (tabName === 'viz-unique' && !window.partialGridLoaded) {
-        window.partialGridLoaded = true;
-        loadPartialGridTab();
-      } else if (tabName === 'diag-influence') {
-        if (!_resData) { try { loadResidualsTab(); } catch (e) {} }
-        loadResInfluential();
-      } else if (tabName === 'diag-plots') {
-        if (!_resData) { try { loadResidualsTab(); } catch (e) {} }
-        loadResPlots();
-      } else if (tabName === 'res-ai' && !window.resAiLoaded) {
-        loadResAi();
-      } else if (tabName === 'correlations' && !window.correlationsLoaded) {
-        loadCorrelationsTab();
-      } else if (tabName === 'descriptive' && !window.descriptiveLoaded) {
-        loadDescriptiveTab();
-      } else if (tabName === 'power') {
-        refreshRegressionPowerAnalysis();
-      } else if (tabName === 'pred-scenario') {
-        if (!window.predictionsLoaded) {
-          initializePredictions();
-          window.predictionsLoaded = true;
-        } else if (window._predProfileChart) {
-          setTimeout(function() {
-            try { window._predProfileChart.setSize(null, PRED_PROFILE_CHART_H, false); } catch (_e) {}
-          }, 80);
-        }
-      } else if (tabName === 'pred-overview' && !window.predOverviewLoaded) {
-        loadPredOverviewTab();
-      } else if (tabName === 'ancova' && !window.ancovaLoaded) {
-        initializeANCOVA();
-        window.ancovaLoaded = true;
-      } else if (['ancova-results','ancova-assumptions','ancova-viz'].includes(tabName)) {
-        if (!window.ancovaLoaded) {
-          initializeANCOVA();
-          window.ancovaLoaded = true;
-        }
-        renderANCOVASubTab(tabName);
-      } else if (['ix-summary','ix-viz','ix-details'].includes(tabName)) {
-        setTimeout(() => {
-          if (!window._interactionTabData) {
-            showInteractionEmptyState(tabName);
-            return;
-          }
-          if (tabName === 'ix-summary') {
-            updateIxWorkspaceContext();
-            renderInteractionSummary();
-            renderInteractionSummarySlopes();
-            renderInteractionPreview();
-          } else if (tabName === 'ix-viz') {
-            updateIxWorkspaceContext();
-            renderInteractionPlot();
-            renderIxVizInterpretation();
-          } else if (tabName === 'ix-details') {
-            updateIxWorkspaceContext();
-            renderIxTechnicalNotes();
-          }
-        }, 50);
-      }
-      syncModelScopeBanners();
-      if (tabName === 'power') annotatePowerFullModel();
     }
 
     // Global decimal precision setting

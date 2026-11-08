@@ -835,7 +835,7 @@ src = Image.open(r'''${fromPng}''').convert('RGB')
 dst = Image.open(r'''${toPng}''').convert('RGB')
 w, h = src.size
 side, head, feather = 300, 108, 88
-frames = 12
+frames = 18
 for i in range(frames):
     t = i / (frames - 1)
     ease = 1 - (1 - t) ** 3
@@ -939,6 +939,11 @@ function encodeResultsPreview(resultsScene, scenarioScene) {
 }
 
 async function main() {
+  if (process.argv.includes('--assemble-preview')) {
+    const saved = JSON.parse(fs.readFileSync(path.join(WORK, 'preview-results-scenes.json'), 'utf8'));
+    encodeResultsPreview(saved[0], saved[1]);
+    return;
+  }
   const previewResults = process.argv.includes('--preview-results');
   const preview = previewResults || process.argv.includes('--preview-scenario');
   if (!preview && !fs.existsSync(path.join(WORK, 'reference.json'))) {

@@ -336,7 +336,7 @@ async function frameResults(page, mode) {
   }, mode);
 }
 
-async function results(page, { mark, note }) {
+async function results(page, { mark, note, stamp, omit }) {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await loadFilm(page);
   await page.waitForFunction(() => {
@@ -440,7 +440,19 @@ async function results(page, { mark, note }) {
   await tagStoreSize(page);
   await filmCamera(page, '#filmStoreSizeAnchor', 1.72);
   await hot(page, '#filmStoreSizeFocus', 1);
+  await page.evaluate(() => {
+    const overlay = document.getElementById('loadingOverlay');
+    if (!overlay) return;
+    overlay.style.transition = 'none';
+    overlay.style.display = 'none';
+  });
   await toggleStoreSize(page);
+  await page.waitForTimeout(PROBE ? 40 : 400);
+  const restoreCut = stamp();
+  await page.evaluate(() => {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.style.display = '';
+  });
   await page.waitForFunction(() => {
     const overlay = document.getElementById('loadingOverlay');
     const r2 = (document.getElementById('kpiRSquared')?.textContent || '').trim();
@@ -466,6 +478,8 @@ async function results(page, { mark, note }) {
     return cam.scale === 1 && /^65\.63%/.test(r2);
   });
   if (!wide) throw new Error('The restored model is not back on the full view at 65.63%');
+  await page.waitForTimeout(PROBE ? 20 : 350);
+  omit(restoreCut, stamp());
   await page.waitForTimeout(PROBE ? 40 : 1000);
   await clearFilmHighlight(page);
   await page.evaluate(() => {
@@ -475,16 +489,34 @@ async function results(page, { mark, note }) {
       root.style.transform = 'none';
     }
     window.__filmCam = { scale: 1, x: 0, y: 0 };
-    if (!window.predictionsLoaded && typeof initializePredictions === 'function') {
-      initializePredictions();
-      window.predictionsLoaded = true;
-    }
+    const navBtn = document.querySelector('.sb-item[data-tab="predictions"]');
+    if (!navBtn) return;
+    const spot = document.createElement('div');
+    spot.className = 'jmp-spot';
+    const ring = document.createElement('div');
+    ring.className = 'jmp-ring';
+    const cursor = document.createElement('div');
+    cursor.className = 'jmp-cursor';
+    navBtn.classList.add('jmp-focus');
+    const rect = navBtn.getBoundingClientRect();
+    spot.style.setProperty('--jmp-x', `${rect.left + rect.width / 2}px`);
+    spot.style.setProperty('--jmp-y', `${rect.top + rect.height / 2}px`);
+    ring.style.left = `${rect.left - 4}px`;
+    ring.style.top = `${rect.top - 3}px`;
+    ring.style.width = `${rect.width + 8}px`;
+    ring.style.height = `${rect.height + 6}px`;
+    cursor.style.left = `${rect.left + 18}px`;
+    cursor.style.top = `${rect.top + rect.height / 2 - 2}px`;
+    document.body.append(spot, ring, cursor);
   });
-  await page.evaluate(() => switchTab('pred-scenario'));
-  await page.evaluate(() => new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(resolve));
-  }));
   note('results-3');
+  await page.waitForTimeout(PROBE ? 40 : 460);
+}
+
+async function scenario(page, { mark, note }) {
+  await loadFilm(page);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.evaluate(() => switchTab('pred-scenario'));
   await page.waitForFunction(() => {
     const value = document.getElementById('predictedValue');
     const slider = document.getElementById('input-Ad Spend');
@@ -498,13 +530,7 @@ async function results(page, { mark, note }) {
       && box && box.width > 40 && box.height > 40
       && overlay && overlay.classList.contains('hidden');
   }, null, { timeout: 15000 });
-  await filmScenarioChapter(page, note);
-}
-
-async function scenario(page, { mark, note }) {
-  await loadFilm(page);
-  await page.evaluate(() => switchTab('pred-scenario'));
-  await page.waitForFunction(() => !document.body.classList.contains('jmp-busy'), null, { timeout: 12000 });
+  await page.waitForTimeout(PROBE ? 40 : 900);
   mark();
   await filmScenarioChapter(page, note);
 }
@@ -524,19 +550,19 @@ async function filmScenarioChapter(page, note) {
   const beforeTitle = await page.locator('#predProfileTitle').innerText();
   if (!/116\.37/.test(before)) throw new Error(`Scenario did not open at 116.37: ${before}`);
   await showFilmCaption(page, 'Scenario Engine · What-if predictions');
-  const openMs = PROBE ? 40 : 1450;
-  const afterHotMs = PROBE ? 40 : 450;
+  const openMs = PROBE ? 40 : 700;
+  const afterHotMs = PROBE ? 40 : 80;
   const steps = PROBE ? 2 : 12;
   const stepMs = PROBE ? 20 : 450;
   const afterDragMs = PROBE ? 40 : 300;
   const fadeMs = 200;
   const resultInMs = PROBE ? 40 : 220;
   const settleHoldMs = PROBE ? 40 : 3700;
-  const handoffRoomMs = PROBE ? 0 : 2400;
+  const handoffRoomMs = PROBE ? 0 : 3200;
   const hotMs = PROBE ? 40 : 320;
   const captionFadeMs = PROBE ? 20 : 220;
   const resultAt = openMs + captionFadeMs + hotMs + afterHotMs + steps * stepMs + afterDragMs + fadeMs + resultInMs;
-  const voiceAt = Math.max(4900, resultAt + settleHoldMs - dur('scenario-1') * 1000 - 150);
+  const voiceAt = Math.max(5900, resultAt + settleHoldMs - dur('scenario-1') * 1000 - 150);
   let voiced = false;
   let elapsed = 0;
   const voice = () => {
@@ -693,15 +719,18 @@ async function recordScene(browser, name, run) {
   const t0 = Date.now();
   let useful = t0;
   const cues = [];
+  const cuts = [];
   const mark = () => { useful = Date.now(); };
-  const note = (id) => cues.push({ id, at: Math.max(0, (Date.now() - useful) / 1000) });
+  const stamp = () => Math.max(0, (Date.now() - useful) / 1000);
+  const note = (id) => cues.push({ id, at: stamp() });
+  const omit = (from, to) => cuts.push({ from, to });
   const say = async (id) => {
     note(id);
     await page.waitForTimeout(dur(id) * 1000);
   };
   let highlights = [];
   try {
-    await run(page, { mark, note, say });
+    await run(page, { mark, note, say, stamp, omit });
     highlights = await readHighlightLog(page, useful).catch(() => []);
     if (!process.argv.includes('--preview-results')) await shot(page, name);
   } catch (err) {
@@ -716,7 +745,7 @@ async function recordScene(browser, name, run) {
   if (fs.existsSync(dest)) fs.unlinkSync(dest);
   fs.copyFileSync(src, dest);
   try { fs.unlinkSync(src); } catch (_e) {}
-  return { id: name, src: dest.replace(/\\/g, '/'), trim: Math.max(0, (useful - t0) / 1000), cues, highlights };
+  return { id: name, src: dest.replace(/\\/g, '/'), trim: Math.max(0, (useful - t0) / 1000), cues, cuts, highlights };
 }
 
 function mixSpeech(cues, duration, dest) {
@@ -760,42 +789,79 @@ function muxVoice(picture, voice, dest) {
   if (muxed.status !== 0) throw new Error((muxed.stderr || 'mux failed').slice(-800));
 }
 
-function encodeResultsPreview(scene) {
+function exciseSpan(picture, span, dest) {
+  const gap = span ? Number(span.to) - Number(span.from) : 0;
+  if (!span || gap < 0.08) {
+    fs.copyFileSync(picture, dest);
+    return mediaDuration(dest);
+  }
+  const cut = spawnSync(FFMPEG, [
+    '-y', '-i', picture,
+    '-filter_complex', `[0:v]trim=0:${Number(span.from).toFixed(3)},setpts=PTS-STARTPTS[a];[0:v]trim=start=${Number(span.to).toFixed(3)},setpts=PTS-STARTPTS[b];[a][b]concat=n=2:v=1:a=0[v]`,
+    '-map', '[v]',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-an',
+    dest
+  ], { encoding: 'utf8' });
+  if (cut.status !== 0) throw new Error((cut.stderr || 'restore cut failed').slice(-800));
+  return mediaDuration(dest);
+}
+
+function shiftPast(cues, span) {
+  const gap = span ? Math.max(0, Number(span.to) - Number(span.from)) : 0;
+  if (!gap) return cues.map((cue) => ({ ...cue }));
+  return cues.map((cue) => ({
+    id: cue.id,
+    at: Number(cue.at) > Number(span.from) ? Number(cue.at) - gap : Number(cue.at)
+  }));
+}
+
+function encodeResultsPreview(resultsScene, scenarioScene) {
   const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');
   fs.mkdirSync(outDir, { recursive: true });
-  const picture = path.join(WORK, 'results-picture.mp4');
+  const resultsRaw = path.join(WORK, 'results-picture.mp4');
+  const picture = path.join(WORK, 'results-cut-picture.mp4');
+  const scenarioPicture = path.join(WORK, 'scenario-picture.mp4');
+  const joined = path.join(WORK, 'results-scenario-picture.mp4');
   const chapter = path.join(outDir, 'results-chapter.mp4');
   const scenarioClip = path.join(outDir, 'scenario-highlight.mp4');
   const combined = path.join(outDir, 'results-scenario.mp4');
-  const duration = trimPicture(scene, picture);
-  const handoff = (scene.cues || []).find((cue) => cue.id === 'results-3');
-  const handoffAt = handoff ? Number(handoff.at) : Math.max(0, duration - 12);
-  const voice = mixSpeech(scene.cues || [], duration, path.join(WORK, 'handoff-level.wav'));
-  muxVoice(picture, voice, combined);
+  trimPicture(resultsScene, resultsRaw);
+  const span = (resultsScene.cuts || [])[0];
+  const resultsDur = exciseSpan(resultsRaw, span, picture);
+  const scenarioDur = trimPicture(scenarioScene, scenarioPicture);
+  const joinedRun = spawnSync(FFMPEG, [
+    '-y', '-i', picture, '-i', scenarioPicture,
+    '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]',
+    '-map', '[v]',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', '30',
+    joined
+  ], { encoding: 'utf8' });
+  if (joinedRun.status !== 0) throw new Error((joinedRun.stderr || 'hard cut failed').slice(-800));
+  const combinedDur = mediaDuration(joined);
+  const resultsCues = shiftPast(resultsScene.cues || [], span);
+  const handoff = resultsCues.find((cue) => cue.id === 'results-3');
+  const handoffAt = handoff ? Number(handoff.at) : resultsDur;
+  const handoffEnd = handoff ? handoffAt + mediaDuration(path.join(AUDIO, 'results-3.mp3')) : handoffAt;
+  const cues = resultsCues.map((cue) => ({ ...cue }));
+  for (const cue of scenarioScene.cues || []) {
+    let at = resultsDur + Number(cue.at);
+    if (cue.id === 'scenario-1' && at < handoffEnd + 0.2) at = handoffEnd + 0.2;
+    cues.push({ id: cue.id, at });
+  }
+  const voice = mixSpeech(cues, combinedDur, path.join(WORK, 'handoff-level.wav'));
+  muxVoice(joined, voice, combined);
   const chapterPicture = path.join(WORK, 'results-chapter-picture.mp4');
   const chapterCut = spawnSync(FFMPEG, [
-    '-y', '-i', picture, '-t', handoffAt.toFixed(3),
+    '-y', '-i', picture, '-t', resultsDur.toFixed(3),
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-an',
     chapterPicture
   ], { encoding: 'utf8' });
   if (chapterCut.status !== 0) throw new Error((chapterCut.stderr || 'chapter trim failed').slice(-800));
-  const chapterVoice = mixSpeech(
-    (scene.cues || []).filter((cue) => cue.id !== 'scenario-1' && Number(cue.at) < handoffAt),
-    handoffAt,
-    path.join(WORK, 'results-level.wav')
-  );
+  const chapterVoice = mixSpeech(resultsCues, resultsDur, path.join(WORK, 'results-level.wav'));
   muxVoice(chapterPicture, chapterVoice, chapter);
-  const scenarioPicture = path.join(WORK, 'scenario-picture.mp4');
-  const scenarioCut = spawnSync(FFMPEG, [
-    '-y', '-ss', handoffAt.toFixed(3), '-i', picture,
-    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-an',
-    scenarioPicture
-  ], { encoding: 'utf8' });
-  if (scenarioCut.status !== 0) throw new Error((scenarioCut.stderr || 'scenario trim failed').slice(-800));
-  const scenarioDur = mediaDuration(scenarioPicture);
-  const scenarioCues = (scene.cues || [])
+  const scenarioCues = cues
     .filter((cue) => cue.id === 'results-3' || cue.id === 'scenario-1')
-    .map((cue) => ({ id: cue.id, at: Math.max(0, Number(cue.at) - handoffAt) }));
+    .map((cue) => ({ id: cue.id, at: Math.max(0, Number(cue.at) - resultsDur) }));
   const scenarioVoice = mixSpeech(scenarioCues, scenarioDur, path.join(WORK, 'scenario-level.wav'));
   muxVoice(scenarioPicture, scenarioVoice, scenarioClip);
   console.log(chapter);
@@ -814,7 +880,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const scenes = [];
   try {
-    const jobs = previewResults ? [['results', results]] : preview ? [['scenario', scenario]] : [
+    const jobs = previewResults ? [['results', results], ['scenario', scenario]] : preview ? [['scenario', scenario]] : [
       ['overview', overview],
       ['enter', (page, api) => brand(page, 'enter.html', 2.4, api)],
       ['effects', effects],
@@ -855,9 +921,9 @@ async function main() {
       ? path.join(WORK, 'preview-results-scenes.json')
       : preview ? path.join(WORK, 'preview-scenes.json') : path.join(WORK, 'scenes.json');
     fs.writeFileSync(sceneFile, JSON.stringify(scenes, null, 2));
-    console.log(JSON.stringify(scenes.map((scene) => ({ id: scene.id, trim: scene.trim, cues: scene.cues })), null, 2));
+    console.log(JSON.stringify(scenes.map((scene) => ({ id: scene.id, trim: scene.trim, cuts: scene.cuts, cues: scene.cues })), null, 2));
     if (previewResults) {
-      encodeResultsPreview(scenes[0]);
+      encodeResultsPreview(scenes[0], scenes[1]);
     } else if (preview) {
       const scene = scenes[0];
       const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');

@@ -2051,16 +2051,17 @@ const StatisticoHeader = {
     }
 
     if (this.module === 'independent') {
+      const kplus = this.currentView === 'independent-results-kplus';
       const analysisItems = [
-        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Test Results', active: true },
-        { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions' },
+        { type: 'tab', tab: 'results', icon: 'fa-square-poll-vertical', label: 'Test Results', description: kplus ? 'Review ANOVA, Welch, and Kruskal-Wallis.' : 'Mean difference, its interval, and the rank comparison.', active: true },
+        { type: 'tab', tab: 'assumptions', icon: 'fa-shield-halved', label: 'Assumptions', description: kplus ? 'Check the omnibus assumptions and warnings.' : 'Whether the observations are paired, and how each group is shaped.' },
       ];
-      if (this.currentView === 'independent-results-kplus') {
-        analysisItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Pairwise Comparisons' });
+      if (kplus) {
+        analysisItems.push({ type: 'tab', tab: 'posthoc', icon: 'fa-table-cells', label: 'Pairwise Comparisons', description: 'Pairwise contrasts after the omnibus test.' });
       }
       analysisItems.push(
-        { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes' },
-        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis' }
+        { type: 'tab', tab: 'effects', icon: 'fa-wave-square', label: 'Effect Sizes', description: kplus ? 'Magnitude of the overall group difference.' : 'Mean difference, Hedges’ g, and the rank comparison.' },
+        { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power Analysis', description: 'Observed power and sample-size planning.' }
       );
       return {
         logoIcon: 'fa-equals',
@@ -2074,7 +2075,7 @@ const StatisticoHeader = {
           {
             title: 'Tools',
             items: [
-              { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Descriptives' }
+              { type: 'tab', tab: 'explore', icon: 'fa-chart-column', label: 'Descriptives', description: kplus ? 'Compare group descriptives visually.' : 'Both groups on one scale, with sample SD and shape.' }
             ]
           }
         ]

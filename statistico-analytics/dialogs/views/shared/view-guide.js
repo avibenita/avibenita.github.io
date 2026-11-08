@@ -322,9 +322,9 @@
           'With more than two groups this page is the overall comparison, including Welch ANOVA. Pairwise comparisons are a separate view.'
         ],
         [
-          'The decision rejects the null when the p-value is below α. The mean difference and its interval describe the size of the gap, not only the decision.',
-          'Welch uses a separate variance for each group. The equal-variance t-test pools them. Mann–Whitney compares ranks.',
-          'The robustness row is a second method. Agreement means both methods reach the same decision. It is not a second sample.'
+          'The mean difference and its interval are the result. The p-value says whether a difference of zero is surprising, not how large the gap is.',
+          'Welch compares means and allows the groups to have different spreads. Mann–Whitney answers a separate question about ranks. Agreement between them is not a second test of the mean.',
+          'A margin drawn on the interval is exploratory until an equivalence test is run.'
         ],
         [
           'A small p-value is not the size of the difference. Read the effect size for that.',
@@ -336,12 +336,12 @@
         'Assumptions',
         'Shows whether the chosen test’s sampling model is a reasonable reading of these groups.',
         [
-          'Read the normality and equal-variance checks for the groups in the analysis. They update with the current selection.',
-          'The recommendation names a safer primary test when a check fails. The test itself stays on Test Results.'
+          'The first question is whether the same people or items appear in both groups. Row alignment is a reason to ask, not proof that the observations are paired.',
+          'The Q–Q plots and the sample SDs describe each group. Welch compares means without requiring the spreads to match.'
         ],
         [
-          'A failed normality check weakens a mean test, especially in a small group. A rank test does not need that normal model.',
-          'Unequal spreads are a reason to prefer Welch over the equal-variance t-test. They do not by themselves prove the groups differ.'
+          'A curved Q–Q plot means a mean is a weaker one-number summary, especially in a small group. The rank comparison does not need that normal model.',
+          'Unequal sample SDs do not block Welch. They also do not, by themselves, show that the groups differ.'
         ],
         [
           'These checks are about the test you are about to trust. They are not a finding about the group difference.',
@@ -368,7 +368,7 @@
         'Effect sizes',
         'Puts the group difference on a common scale so “significant” is not confused with “large”.',
         [
-          'Read the effect next to the test you actually used. Hedges’ g is a mean difference in spread units. Cliff’s delta and the rank-biserial describe the rank comparison.',
+          'Read the mean difference and its interval first. Hedges’ g puts that difference in sample-SD units. Cliff’s delta and the independent rank-biserial are the same rank comparison.',
           'With more than two groups, the effect belongs to the overall comparison, not to one pair.'
         ],
         [

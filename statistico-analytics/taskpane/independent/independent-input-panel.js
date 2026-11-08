@@ -318,7 +318,7 @@ function detectTwoVarsDesign(rows, aIdx, bIdx, n1, n2) {
       pairedCount,
       overlap,
       corr,
-      message: "Warning: this test is intended for independent variables. These columns appear case-aligned from the same dataset; consider switching to the Dependent/Paired module instead."
+      message: "These columns line up by row. Do the same people or items appear in both groups, or were the observations matched?"
     };
   }
 
@@ -339,19 +339,11 @@ function computeWelch(x, y, alt, alpha) {
   return globalThis.StatisticoIndependentContract.computeWelch(x, y, alt, alpha);
 }
 
-function computeStudent(x, y, alt) {
-  const n1 = x.length, n2 = y.length;
-  const m1 = mean(x), m2 = mean(y);
-  const v1 = variance(x), v2 = variance(y);
-  const sp2 = ((((n1 - 1) * v1) + ((n2 - 1) * v2)) / Math.max(1, (n1 + n2 - 2)));
-  const se = Math.sqrt(Math.max(0, sp2) * ((1 / Math.max(1, n1)) + (1 / Math.max(1, n2))));
-  const t = se > 0 ? (m1 - m2) / se : 0;
-  const df = Math.max(1, n1 + n2 - 2);
-  let p = 2 * (1 - normalCdf(Math.abs(t)));
-  if (alt === "greater") p = 1 - normalCdf(t);
-  if (alt === "less") p = normalCdf(t);
-  const zcrit = 1.959964;
-  return { t, df, p: Math.max(0, Math.min(1, p)), diff: m1 - m2, ciLow: (m1 - m2) - zcrit * se, ciHigh: (m1 - m2) + zcrit * se };
+function computeStudent(x, y, alt, alpha) {
+  if (!globalThis.StatisticoIndependentContract) {
+    throw new Error("Load independent-contract.js before independent-input-panel.js");
+  }
+  return globalThis.StatisticoIndependentContract.computeStudent(x, y, alt, alpha);
 }
 
 function shuffleInPlace(arr) {
@@ -910,7 +902,7 @@ function buildIndependentBundle(headers, rows, spec) {
   const alt = spec.hypothesis || "two-sided";
   const alpha = 1 - Number(spec.confidence || 0.95);
   const welch = computeWelch(g1, g2, alt, alpha);
-  const student = computeStudent(g1, g2, alt);
+  const student = computeStudent(g1, g2, alt, alpha);
   const permutation = computePermutationT(g1, g2, alt, spec.permutationIterations || 1200);
   const mw = computeMannWhitney(g1, g2, alt);
   const n1 = g1.length, n2 = g2.length;
@@ -1009,10 +1001,10 @@ function buildIndependentBundle(headers, rows, spec) {
     };
   }
   const recommendation = designValidation.status === "paired-warning"
-    ? "Potential matched-pairs structure detected. Independent Means is for independent variables; consider using the Dependent/Paired module."
+    ? "Row alignment is a reason to ask whether the same people or items appear in both groups. Independent Means compares independent observations."
     : (designValidation.status === "invalid"
       ? "Invalid design selection. Reconfigure variables before interpreting results."
-      : "Welch t-test primary; Mann-Whitney as robustness check.");
+      : "Welch compares means and allows unequal variances. Mann–Whitney answers a separate rank question.");
 
   return {
     setup: {
@@ -1044,8 +1036,8 @@ function buildIndependentBundle(headers, rows, spec) {
       kplusSummary
     },
     assumptions: {
-      normalityA: n1 >= 8 ? "Check QQ / Shapiro in Python service" : "Sample too small",
-      normalityB: n2 >= 8 ? "Check QQ / Shapiro in Python service" : "Sample too small",
+      normalityA: n1 >= 8 ? "View normality diagnostics" : "Sample too small",
+      normalityB: n2 >= 8 ? "View normality diagnostics" : "Sample too small",
       equalVariance: Math.abs((sd(g1) || 0) - (sd(g2) || 0)) < 0.25 * Math.max(sd(g1) || 1, sd(g2) || 1) ? "Likely similar" : "Likely different",
       recommendation
     },
@@ -1075,6 +1067,46 @@ function buildIndependentBundle(headers, rows, spec) {
       consistency: (welch.p < 0.05) === (mw.p < 0.05) ? "Parametric and nonparametric conclusions agree." : "Tests disagree; inspect distributions and outliers."
     }
   };
+}
+
+function openPairedMeansFromIndependent(data) {
+  const groupA = data.groupA || "";
+  const groupB = data.groupB || "";
+  sessionStorage.setItem("dependentModelSpec", JSON.stringify({
+    compareMode: "two-vars",
+    mode: "two-vars",
+    groupA: groupA,
+    groupB: groupB,
+    selectedColumns: [groupA, groupB].filter(Boolean),
+    hypothesis: data.hypothesis || "two-sided",
+    confidence: Number(data.confidence || 0.95),
+    primaryFramework: "parametric"
+  }));
+  const dlg = independentDialog;
+  independentDialog = null;
+  independentFilteredRows = null;
+  try { if (dlg) dlg.close(); } catch (_e) {}
+  setTimeout(function () {
+    if (window.HubResultsBridge && typeof HubResultsBridge.open === "function") {
+      HubResultsBridge.open("dependent", 300);
+      return;
+    }
+    const href = window.location.href;
+    const src = href.indexOf("/independent/") >= 0
+      ? href.split("/independent/")[0] + "/dependent/dependent-input-panel.js?v=20261108paired"
+      : "dependent/dependent-input-panel.js?v=20261108paired";
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = function () {
+      try {
+        if (typeof onRangeDataLoaded === "function") onRangeDataLoaded(independentRangeData, independentRangeAddress);
+        if (typeof openDependentResultsDialog === "function") openDependentResultsDialog();
+      } catch (err) {
+        console.error("openPairedMeansFromIndependent", err);
+      }
+    };
+    document.head.appendChild(script);
+  }, 400);
 }
 
 function openIndependentResultsDialog() {
@@ -1117,6 +1149,8 @@ function openIndependentResultsDialog() {
               // populateBundle() path. No per-module recompute logic, no
               // sessionStorage filter state, no banner state-machine.
               recomputeIndependentFromFilteredRows(message.data.filteredRows);
+            } else if (message.cmd === "openPairedMeans") {
+              openPairedMeansFromIndependent(message.data || {});
             } else {
               sendIndependentBundle();
             }

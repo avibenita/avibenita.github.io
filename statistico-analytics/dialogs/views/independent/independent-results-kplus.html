@@ -4226,7 +4226,60 @@
       try { msg = JSON.parse(raw); } catch (_e) { return false; }
       return applyIndependentMessage(msg);
     }
+    function bundleFromInjected(m) {
+      if (!m || !Array.isArray(m.g) || !m.g.length) return null;
+      var groups = m.g;
+      var cols = Array.isArray(m.cols) && m.cols.length ? m.cols : groups.map(function (g) { return g.name; });
+      return {
+        setup: {
+          compareMode: "k-plus",
+          mode: "k-plus",
+          primaryFramework: m.fw || "parametric",
+          primaryTest: m.test || "anova",
+          confidence: m.conf || 0.95,
+          hypothesis: m.hyp || "two-sided",
+          selectedColumns: cols,
+          headers: cols
+        },
+        explore: {
+          kplusSummary: { variableCount: groups.length, levelsCount: groups.length, totalN: m.N },
+          selectedColumnStats: groups
+        },
+        results: {
+          omnibus: {
+            levels: cols,
+            N: m.N,
+            anovaF: m.F, anovaDf1: m.df1, anovaDf2: m.df2, anovaP: m.p,
+            anovaSSBetween: m.ssb, anovaSSWithin: m.ssw, anovaSSTotal: m.sst,
+            anovaMSBetween: m.msb, anovaMSWithin: m.msw,
+            etaSquared: m.eta,
+            kwH: m.H, kwDf: m.dfH, kwP: m.Hp,
+            groupDescriptives: groups,
+            welchAnova: { f: m.wF, df1: m.wDf1, df2: m.wDf2, p: m.wP }
+          },
+          posthoc: { enabled: false, rows: [] }
+        }
+      };
+    }
+    function applyInjectedResults() {
+      var match = (location.search || "").match(/(?:^|[?&])d=([^&]*)/);
+      if (!match) {
+        console.log("independent results waiting");
+        return false;
+      }
+      try {
+        var injected = bundleFromInjected(JSON.parse(decodeURIComponent(match[1])));
+        if (!injected) return false;
+        console.log("independent results injected");
+        populateBundle(injected);
+        return !!(lastBundle && lastBundle.__painted);
+      } catch (err) {
+        console.error("independent inject failed", err);
+        return false;
+      }
+    }
     document.addEventListener("DOMContentLoaded", function(){
+      applyInjectedResults();
       applyStoredIndependentBundle();
       pullOfficeIndependentBundle();
       var storedTries = 0;

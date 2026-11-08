@@ -912,10 +912,13 @@ function buildIndependentBundle(headers, rows, spec) {
     }
   }
   const alt = spec.hypothesis || "two-sided";
-  const welch = computeWelch(g1, g2, alt);
-  const student = computeStudent(g1, g2, alt);
+  const alpha = 1 - Number(spec.confidence || 0.95);
+  const welchFallback = { t: NaN, df: NaN, p: NaN, se: NaN, diff: (g1.length && g2.length) ? (mean(g1) - mean(g2)) : NaN, ciLow: NaN, ciHigh: NaN };
+  let welch = welchFallback, student = { t: NaN, df: NaN, p: NaN }, mw = { u: NaN, p: NaN };
+  try { welch = computeWelch(g1, g2, alt, alpha) || welchFallback; } catch (err) { console.error(err); }
+  try { student = computeStudent(g1, g2, alt, alpha) || student; } catch (err) { console.error(err); }
   const permutation = computePermutationT(g1, g2, alt, spec.permutationIterations || 1200);
-  const mw = computeMannWhitney(g1, g2, alt);
+  try { mw = computeMannWhitney(g1, g2, alt) || mw; } catch (err) { console.error(err); }
   const n1 = g1.length, n2 = g2.length;
   const sp = Math.sqrt((((Math.max(0, n1 - 1)) * variance(g1)) + ((Math.max(0, n2 - 1)) * variance(g2))) / Math.max(1, n1 + n2 - 2));
   const d = sp > 0 ? (mean(g1) - mean(g2)) / sp : 0;
@@ -990,21 +993,28 @@ function buildIndependentBundle(headers, rows, spec) {
       brownForsythe,
       welchAnova
     };
-    const posthocComputed = computePosthocRows(grouped, levels, primaryFramework, posthocCorrection, {
-      method: posthocMethod,
-      primaryTest,
-      msWithin: anova ? anova.msWithin : NaN,
-      dfError: anova ? anova.df2 : NaN,
-      alpha
-    });
-    posthoc = {
-      enabled: true,
-      method: posthocComputed.method,
-      correction: posthocComputed.correction,
-      familySize: posthocComputed.familySize,
-      estimateLabel: posthocComputed.estimateLabel,
-      rows: posthocComputed.rows
-    };
+    try {
+      const posthocComputed = computePosthocRows(grouped, levels, primaryFramework, posthocCorrection, {
+        method: posthocMethod,
+        primaryTest,
+        msWithin: anova ? anova.msWithin : NaN,
+        dfError: anova ? anova.df2 : NaN,
+        alpha
+      });
+      const groupValues = {};
+      levels.forEach((lv) => { groupValues[lv] = (grouped[lv] || []).slice(); });
+      posthoc = {
+        enabled: true,
+        method: posthocComputed.method,
+        correction: posthocComputed.correction,
+        familySize: posthocComputed.familySize,
+        estimateLabel: posthocComputed.estimateLabel,
+        intervalNote: posthocComputed.intervalNote,
+        treatment: posthocComputed.treatment,
+        groupValues,
+        rows: posthocComputed.rows
+      };
+    } catch (err) { console.error("posthoc", err); }
   }
   const recommendation = designValidation.status === "paired-warning"
     ? "Potential matched-pairs structure detected. Independent Means is for independent variables; consider using the Dependent/Paired module."
@@ -1058,7 +1068,9 @@ function buildIndependentBundle(headers, rows, spec) {
       posthoc
     },
     effects: {
-      hedgesG: g, cliffsDelta: delta, rankBiserial: rrb, probabilitySuperiority: ps
+      hedgesG: g, cliffsDelta: delta, rankBiserial: rrb, probabilitySuperiority: ps,
+      etaSquared: (function () { try { return globalThis.StatisticoIndependentContract ? globalThis.StatisticoIndependentContract.etaSquared(g1, g2) : NaN; } catch (err) { return NaN; } })(),
+      eta2: (function () { try { return globalThis.StatisticoIndependentContract ? globalThis.StatisticoIndependentContract.etaSquared(g1, g2) : NaN; } catch (err) { return NaN; } })()
     },
     power: {
       note: "Python-backed power endpoint can be attached to this panel.",
@@ -1066,8 +1078,8 @@ function buildIndependentBundle(headers, rows, spec) {
       placeholderPower: Math.min(0.99, Math.max(0.05, 0.5 + Math.abs(g) * 0.3))
     },
     report: {
-      apaWelch: `Welch's t-test showed ${welch.p < 0.05 ? "a significant" : "no significant"} difference, t(${welch.df.toFixed(2)})=${welch.t.toFixed(2)}, p=${welch.p.toFixed(4)}.`,
-      apaMW: `Mann-Whitney U indicated ${mw.p < 0.05 ? "a significant" : "no significant"} shift, U=${mw.u.toFixed(2)}, p=${mw.p.toFixed(4)}.`,
+      apaWelch: `Welch's t-test showed ${welch.p < 0.05 ? "a significant" : "no significant"} difference, t(${Number(welch.df).toFixed(2)})=${Number(welch.t).toFixed(2)}, p=${Number(welch.p).toFixed(4)}.`,
+      apaMW: `Mann-Whitney U indicated ${mw.p < 0.05 ? "a significant" : "no significant"} shift, U=${Number(mw.u).toFixed(2)}, p=${Number(mw.p).toFixed(4)}.`,
       consistency: (welch.p < 0.05) === (mw.p < 0.05) ? "Parametric and nonparametric conclusions agree." : "Tests disagree; inspect distributions and outliers."
     }
   };
@@ -1115,7 +1127,7 @@ function injectedResultsQuery() {
     var modelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
     var bundle = buildIndependentBundle(headers, rows, modelSpec);
     var enc = encodeURIComponent(JSON.stringify(miniIndependentResults(bundle)));
-    if (!enc || enc.length > 1800) return "";
+    if (!enc || enc.length > 6000) return "";
     return "&d=" + enc;
   } catch (err) {
     console.error("injectedResultsQuery", err);

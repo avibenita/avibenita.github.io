@@ -1073,6 +1073,56 @@ function buildIndependentBundle(headers, rows, spec) {
   };
 }
 
+function miniIndependentResults(bundle) {
+  var s = bundle.setup || {};
+  var e = bundle.explore || {};
+  var ob = (bundle.results && bundle.results.omnibus) || {};
+  var stats = Array.isArray(e.selectedColumnStats) ? e.selectedColumnStats : [];
+  var groups = stats.map(function (cs) {
+    return { name: cs.name, n: cs.n, mean: cs.mean, sd: cs.sd };
+  });
+  if (!groups.length && Array.isArray(ob.groupDescriptives)) {
+    groups = ob.groupDescriptives.map(function (cs) {
+      return { name: cs.name, n: cs.n, mean: cs.mean, sd: cs.sd };
+    });
+  }
+  var wa = ob.welchAnova || {};
+  return {
+    cols: groups.map(function (g) { return g.name; }),
+    g: groups,
+    N: ob.N,
+    F: ob.anovaF, df1: ob.anovaDf1, df2: ob.anovaDf2, p: ob.anovaP,
+    ssb: ob.anovaSSBetween, ssw: ob.anovaSSWithin, sst: ob.anovaSSTotal,
+    msb: ob.anovaMSBetween, msw: ob.anovaMSWithin,
+    eta: ob.etaSquared,
+    H: ob.kwH, dfH: ob.kwDf, Hp: ob.kwP,
+    wF: wa.f, wDf1: wa.df1, wDf2: wa.df2, wP: wa.p,
+    fw: s.primaryFramework || "parametric",
+    test: s.primaryTest || "anova",
+    conf: s.confidence || 0.95,
+    hyp: s.hypothesis || "two-sided"
+  };
+}
+
+function injectedResultsQuery() {
+  try {
+    ensureIndependentContract();
+    if (!independentRangeData || independentRangeData.length < 2) return "";
+    var headers = independentRangeData[0] || [];
+    var fullRows = independentRangeData.slice(1);
+    var isFiltered = !!(independentFilteredRows && independentFilteredRows.length && independentFilteredRows.length < fullRows.length);
+    var rows = isFiltered ? independentFilteredRows : fullRows;
+    var modelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
+    var bundle = buildIndependentBundle(headers, rows, modelSpec);
+    var enc = encodeURIComponent(JSON.stringify(miniIndependentResults(bundle)));
+    if (!enc || enc.length > 1800) return "";
+    return "&d=" + enc;
+  } catch (err) {
+    console.error("injectedResultsQuery", err);
+    return "";
+  }
+}
+
 function openIndependentResultsDialog() {
   const modelSpec = JSON.parse(sessionStorage.getItem("independentModelSpec") || "{}");
   console.log("=== openIndependentResultsDialog ===");
@@ -1080,9 +1130,10 @@ function openIndependentResultsDialog() {
   const isKPlus = (modelSpec.compareMode || modelSpec.mode) === "k-plus";
   console.log("isKPlus:", isKPlus);
   const resultsPage = isKPlus ? "independent-results-kplus.html" : "independent-results.html";
-  console.log("Opening results page:", resultsPage);
+  const injected = isKPlus ? injectedResultsQuery() : "";
+  console.log("Opening results page:", resultsPage, "injected", injected.length);
   Office.context.ui.displayDialogAsync(
-    `${getDialogsBaseUrl()}independent/${resultsPage}?v=${Date.now()}`,
+    `${getDialogsBaseUrl()}independent/${resultsPage}?v=${Date.now()}${injected}`,
     DIALOG_SIZES.RESULTS,
     (asyncResult) => {
       if (asyncResult.status === Office.AsyncResultStatus.Failed) return;

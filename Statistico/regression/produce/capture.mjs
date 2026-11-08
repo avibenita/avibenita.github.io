@@ -258,6 +258,57 @@ async function filmCamera(page, selector, scale) {
   await page.waitForTimeout(PROBE ? 40 : 540);
 }
 
+async function tagPredictions(page) {
+  const visible = await page.evaluate(() => {
+    const button = document.querySelector('.sb-item[data-tab="predictions"]');
+    if (!button) return false;
+    button.id = 'filmPredictionsNav';
+    const box = button.getBoundingClientRect();
+    return box.width > 40 && box.height > 24 && box.top > 8 && box.bottom < window.innerHeight - 8;
+  });
+  if (!visible) throw new Error('Predictions is not on screen in the sidebar');
+}
+
+async function showFilmCaption(page, text) {
+  await page.evaluate((caption) => {
+    let el = document.getElementById('filmCaption');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'filmCaption';
+      el.style.cssText = [
+        'position:fixed',
+        'z-index:100001',
+        'left:50%',
+        'bottom:34px',
+        'transform:translateX(-50%)',
+        'padding:10px 18px',
+        'border-radius:999px',
+        'background:rgba(14,20,27,.9)',
+        'border:1px solid rgba(226,232,240,.28)',
+        'color:#f8fafc',
+        'font:650 22px/1.2 "Segoe UI",sans-serif',
+        'letter-spacing:.01em',
+        'opacity:0',
+        'transition:opacity 220ms ease',
+        'pointer-events:none',
+        'white-space:nowrap'
+      ].join(';');
+      document.body.appendChild(el);
+    }
+    el.textContent = caption;
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+  }, text);
+  await page.waitForTimeout(PROBE ? 20 : 220);
+}
+
+async function hideFilmCaption(page) {
+  await page.evaluate(() => {
+    const el = document.getElementById('filmCaption');
+    if (el) el.style.opacity = '0';
+  });
+  await page.waitForTimeout(PROBE ? 20 : 220);
+}
+
 async function toggleStoreSize(page) {
   const clicked = await page.evaluate(() => {
     const box = document.getElementById('filmStoreSizeCheck');
@@ -317,8 +368,6 @@ async function results(page, { mark, note }) {
   await page.waitForTimeout(PROBE ? 40 : 180);
   mark();
   const line1 = dur('results-1');
-  const line2 = dur('results-2');
-  const line3 = dur('results-3');
   // Word times are seconds into each stem: R-squared 3.07, removed 1.04, "The value" 5.79.
   await page.waitForTimeout(PROBE ? 40 : 280);
   note('results-1');
@@ -409,16 +458,23 @@ async function results(page, { mark, note }) {
       && box && box.checked;
   }, null, { timeout: 8000 });
   await clearFilmHighlight(page);
-  await filmCamera(page, '#filmRSquared', 2.25);
-  await hot(page, '#filmRSquared', 1);
-  await page.waitForTimeout(PROBE ? 40 : await since(say2, line2));
-  note('results-3');
-  const say3 = Date.now();
-  await page.waitForTimeout(PROBE ? 40 : 1050);
-  await clearFilmHighlight(page);
   await filmCamera(page, null, 1);
-  await page.waitForTimeout(PROBE ? 40 : await since(say3, line3));
-  await page.waitForTimeout(PROBE ? 40 : 160);
+  const wide = await page.evaluate(() => {
+    const cam = window.__filmCam || { scale: 1 };
+    const r2 = (document.getElementById('kpiRSquared')?.textContent || '').trim();
+    return cam.scale === 1 && /^65\.63%/.test(r2);
+  });
+  if (!wide) throw new Error('The restored model is not back on the full view at 65.63%');
+  await page.waitForTimeout(PROBE ? 40 : 1000);
+  await tagPredictions(page);
+  await hot(page, '#filmPredictionsNav', 1);
+  note('results-3');
+  await page.waitForTimeout(PROBE ? 40 : 620);
+  await page.evaluate(() => {
+    document.querySelectorAll('.sb-item.active').forEach((el) => el.classList.remove('active'));
+    document.getElementById('filmPredictionsNav')?.classList.add('active');
+  });
+  await page.waitForTimeout(PROBE ? 40 : 480);
 }
 
 async function scenario(page, { mark, note }) {
@@ -449,11 +505,13 @@ async function scenario(page, { mark, note }) {
   await page.evaluate(() => new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(resolve));
   }));
-  await page.waitForTimeout(PROBE ? 40 : 250);
+  await page.waitForTimeout(PROBE ? 40 : 180);
   mark();
   const before = await page.locator('#predictedValue').innerText();
   const beforeTitle = await page.locator('#predProfileTitle').innerText();
-  const openMs = PROBE ? 40 : 700;
+  if (!/116\.37/.test(before)) throw new Error(`Scenario did not open at 116.37: ${before}`);
+  await showFilmCaption(page, 'Scenario Engine · What-if predictions');
+  const openMs = PROBE ? 40 : 1450;
   const afterHotMs = PROBE ? 40 : 450;
   const steps = PROBE ? 2 : 12;
   const stepMs = PROBE ? 20 : 450;
@@ -461,9 +519,11 @@ async function scenario(page, { mark, note }) {
   const fadeMs = 200;
   const resultInMs = PROBE ? 40 : 220;
   const settleHoldMs = PROBE ? 40 : 3700;
+  const handoffRoomMs = PROBE ? 0 : 2400;
   const hotMs = PROBE ? 40 : 320;
-  const resultAt = openMs + hotMs + afterHotMs + steps * stepMs + afterDragMs + fadeMs + resultInMs;
-  const voiceAt = resultAt + settleHoldMs - dur('scenario-1') * 1000 - 150;
+  const captionFadeMs = PROBE ? 20 : 220;
+  const resultAt = openMs + captionFadeMs + hotMs + afterHotMs + steps * stepMs + afterDragMs + fadeMs + resultInMs;
+  const voiceAt = Math.max(5750, resultAt + settleHoldMs - dur('scenario-1') * 1000 - 150);
   let voiced = false;
   let elapsed = 0;
   const voice = () => {
@@ -473,6 +533,8 @@ async function scenario(page, { mark, note }) {
   };
   await page.waitForTimeout(openMs);
   elapsed += openMs;
+  await hideFilmCaption(page);
+  elapsed += captionFadeMs;
   await hot(page, '#filmAdSpend', 1);
   elapsed += hotMs;
   await page.waitForTimeout(afterHotMs);
@@ -524,7 +586,7 @@ async function scenario(page, { mark, note }) {
   elapsed += fadeMs + resultInMs;
   voice();
   if (!voiced) note('scenario-1');
-  await page.waitForTimeout(settleHoldMs);
+  await page.waitForTimeout(settleHoldMs + handoffRoomMs);
   await clearFilmHighlight(page);
 }
 
@@ -664,43 +726,69 @@ function mixSpeech(cues, duration, dest) {
   return leveledVoice(raw, dest);
 }
 
-function encodeResultsPreview(scene) {
-  const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');
-  fs.mkdirSync(outDir, { recursive: true });
-  const picture = path.join(WORK, 'results-picture.mp4');
-  const chapter = path.join(outDir, 'results-chapter.mp4');
-  const scenarioClip = path.join(outDir, 'scenario-highlight.mp4');
-  const combined = path.join(outDir, 'results-scenario.mp4');
-  if (!fs.existsSync(scenarioClip)) throw new Error('The Scenario Engine clip is missing.');
+function trimPicture(scene, dest) {
   const trimmed = spawnSync(FFMPEG, [
     '-y', '-ss', String(scene.trim), '-i', scene.src,
     '-vf', 'scale=1728:1080:flags=lanczos,fps=30,format=yuv420p',
     '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
-    picture
+    dest
   ], { encoding: 'utf8' });
-  if (trimmed.status !== 0) throw new Error((trimmed.stderr || 'results picture failed').slice(-800));
-  const duration = mediaDuration(picture);
-  if (duration < 20 || duration > 25) {
-    throw new Error(`Model Results chapter is ${duration.toFixed(2)}s, outside 20–25 seconds.`);
-  }
-  const voice = mixSpeech(scene.cues || [], duration, path.join(WORK, 'results-level.wav'));
+  if (trimmed.status !== 0) throw new Error((trimmed.stderr || `picture failed for ${scene.id}`).slice(-800));
+  return mediaDuration(dest);
+}
+
+function muxVoice(picture, voice, dest) {
   const muxed = spawnSync(FFMPEG, [
     '-y', '-i', picture, '-i', voice,
     '-map', '0:v:0', '-map', '1:a:0',
     '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '1',
-    '-movflags', '+faststart', chapter
+    '-movflags', '+faststart', dest
   ], { encoding: 'utf8' });
-  if (muxed.status !== 0) throw new Error((muxed.stderr || 'results mux failed').slice(-800));
-  const joined = spawnSync(FFMPEG, [
-    '-y', '-i', chapter, '-i', scenarioClip,
-    '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]',
-    '-map', '[v]', '-map', '[a]',
+  if (muxed.status !== 0) throw new Error((muxed.stderr || 'mux failed').slice(-800));
+}
+
+function encodeResultsPreview(resultsScene, scenarioScene) {
+  const fade = 0.48;
+  const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');
+  fs.mkdirSync(outDir, { recursive: true });
+  const resultsPicture = path.join(WORK, 'results-picture.mp4');
+  const scenarioPicture = path.join(WORK, 'scenario-picture.mp4');
+  const dissolved = path.join(WORK, 'results-scenario-picture.mp4');
+  const chapter = path.join(outDir, 'results-chapter.mp4');
+  const scenarioClip = path.join(outDir, 'scenario-highlight.mp4');
+  const combined = path.join(outDir, 'results-scenario.mp4');
+  const resultsDur = trimPicture(resultsScene, resultsPicture);
+  const scenarioDur = trimPicture(scenarioScene, scenarioPicture);
+  if (resultsDur < 18 || resultsDur > 30) {
+    throw new Error(`Model Results chapter is ${resultsDur.toFixed(2)}s, outside 18–30 seconds.`);
+  }
+  const offset = resultsDur - fade;
+  const dissolvedRun = spawnSync(FFMPEG, [
+    '-y', '-i', resultsPicture, '-i', scenarioPicture,
+    '-filter_complex', `[0:v][1:v]xfade=transition=fade:duration=${fade}:offset=${offset.toFixed(3)}[v]`,
+    '-map', '[v]',
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', '30',
-    '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '1',
-    '-movflags', '+faststart', combined
+    dissolved
   ], { encoding: 'utf8' });
-  if (joined.status !== 0) throw new Error((joined.stderr || 'preview join failed').slice(-800));
+  if (dissolvedRun.status !== 0) throw new Error((dissolvedRun.stderr || 'handoff dissolve failed').slice(-800));
+  const combinedDur = mediaDuration(dissolved);
+  const handoff = (resultsScene.cues || []).find((cue) => cue.id === 'results-3');
+  const handoffEnd = handoff ? handoff.at + mediaDuration(path.join(AUDIO, 'results-3.mp3')) : 0;
+  const cues = (resultsScene.cues || []).map((cue) => ({ ...cue }));
+  for (const cue of scenarioScene.cues || []) {
+    let at = offset + Number(cue.at);
+    if (cue.id === 'scenario-1' && at < handoffEnd + 0.18) at = handoffEnd + 0.18;
+    cues.push({ id: cue.id, at });
+  }
+  const voice = mixSpeech(cues, combinedDur, path.join(WORK, 'handoff-level.wav'));
+  muxVoice(dissolved, voice, combined);
+  const chapterVoice = mixSpeech(resultsScene.cues || [], resultsDur, path.join(WORK, 'results-level.wav'));
+  muxVoice(resultsPicture, chapterVoice, chapter);
+  const scenarioCue = (scenarioScene.cues || []).find((cue) => cue.id === 'scenario-1');
+  const scenarioVoice = mixSpeech(scenarioCue ? [scenarioCue] : [], scenarioDur, path.join(WORK, 'scenario-level.wav'));
+  muxVoice(scenarioPicture, scenarioVoice, scenarioClip);
   console.log(chapter);
+  console.log(scenarioClip);
   console.log(combined);
 }
 
@@ -715,7 +803,7 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const scenes = [];
   try {
-    const jobs = previewResults ? [['results', results]] : preview ? [['scenario', scenario]] : [
+    const jobs = previewResults ? [['results', results], ['scenario', scenario]] : preview ? [['scenario', scenario]] : [
       ['overview', overview],
       ['enter', (page, api) => brand(page, 'enter.html', 2.4, api)],
       ['effects', effects],
@@ -758,7 +846,7 @@ async function main() {
     fs.writeFileSync(sceneFile, JSON.stringify(scenes, null, 2));
     console.log(JSON.stringify(scenes.map((scene) => ({ id: scene.id, trim: scene.trim, cues: scene.cues })), null, 2));
     if (previewResults) {
-      encodeResultsPreview(scenes[0]);
+      encodeResultsPreview(scenes[0], scenes[1]);
     } else if (preview) {
       const scene = scenes[0];
       const outDir = path.join(ROOT, 'Statistico/regression/04_review/preview');

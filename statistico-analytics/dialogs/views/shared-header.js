@@ -7897,8 +7897,7 @@ REPORT: [one polished paragraph suitable for a report]`;
 
     let toolsOpen = false;
     const extraTools = surveySidebar ? '' : (
-      '<div class="sb-theme-switch-wrap">' + this._renderThemeSwitcherHtml('hc-theme-switch--sidebar') + '</div>'
-      + '<button class="sb-bottom-btn sb-bottom-btn--json ' + (hasJson ? '' : 'sb-bottom-btn--disabled') + '" id="sbExportJsonBtn" '
+      '<button class="sb-bottom-btn sb-bottom-btn--json ' + (hasJson ? '' : 'sb-bottom-btn--disabled') + '" id="sbExportJsonBtn" '
       + (hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled')
       + ' title="' + (hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet') + '">'
       + '<i class="fa-solid fa-download"></i><span class="sb-item-label">Download JSON</span></button>'
@@ -7910,7 +7909,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     utilities.innerHTML = `
       <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
               aria-expanded="${toolsOpen ? 'true' : 'false'}"
-              title="${surveySidebar ? 'View Data and Save PNG' : 'View Data, Save PNG, Color theme, Download JSON'}">
+              title="${surveySidebar ? 'View Data and Save PNG' : 'View Data, Save PNG, Download JSON'}">
         <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
         <span class="sb-bottom-label">Output &amp; Tools</span>
         <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>

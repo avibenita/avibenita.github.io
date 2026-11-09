@@ -27,7 +27,7 @@
   
   <!-- Regression computation library -->
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
-  <script src="../../shared/regression-case-trace.js?v=20261108case"></script>
+  <script src="../../shared/regression-case-trace.js?v=20261109multi"></script>
   <script src="../../shared/regression-effect-plot.js?v=20261105factor"></script>
   
   <!-- Saved analyses manager -->
@@ -37,7 +37,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261108case" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261108case"></script>
+  <script src="../shared-header.js?v=20261109multi"></script>
   <script src="../shared-workspace-tabs.js?v=20260828viewcta"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -1485,6 +1485,9 @@
     .reg-sens-values em { display: block; font-style: normal; font-size: 10px; color: var(--text-muted); }
     .res-outliers-table tr.reg-case-selected td { background: rgba(34, 211, 238, .14); box-shadow: inset 0 0 0 1.5px #22d3ee; }
     .reg-case-pick { background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; padding: 0; }
+    .reg-case-check { width: 15px; height: 15px; margin: 0; accent-color: #22d3ee; cursor: pointer; vertical-align: middle; }
+    .reg-case-count { font-size: 12px; color: var(--text-secondary); }
+    .res-outliers-table th.reg-case-check-col, .res-outliers-table td.reg-case-check-col { width: 36px; text-align: center; padding-left: 8px; padding-right: 8px; }
     .reg-case-pick .reg-case-mark { color: #22d3ee; margin-right: 4px; }
     html[data-theme="light"] .res-outliers-table tr.reg-case-selected td { background: rgba(14, 116, 144, .12); box-shadow: inset 0 0 0 1.5px #0e7490; }
     .res-stat-improved, .res-stat-worse { color: var(--text-primary); font-weight: 600; }
@@ -6520,6 +6523,7 @@
     if (typeof StatisticoHeader !== 'undefined') {
       StatisticoHeader._caseTrace = {
         selectedKey: function () { return window._regCaseSession ? window._regCaseSession.selectedKey() : null; },
+        selectedKeys: function () { return window._regCaseSession && window._regCaseSession.selectedKeys ? window._regCaseSession.selectedKeys() : []; },
         onSelect: function (key) { if (typeof selectRegCase === 'function') selectRegCase(key); }
       };
     }
@@ -9917,6 +9921,37 @@ ${sectionsHtml}
       if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
     }
     window.selectRegCase = selectRegCase;
+    function regSelectedKeys() {
+      const session = window._regCaseSession;
+      if (!session) return [];
+      return session.selectedKeys ? session.selectedKeys() : (session.selectedKey() ? [session.selectedKey()] : []);
+    }
+    function regSelectionPhrase() {
+      const labels = regSelectedKeys().map(function (key) {
+        const found = window._regCaseCatalog && StatisticoCaseTrace.caseInCatalog(window._regCaseCatalog, key);
+        return found ? found.displayLabel : key;
+      });
+      return StatisticoCaseTrace.casePhrase(labels);
+    }
+    function syncRegCompareChrome(phrase) {
+      const spoken = phrase || regSelectionPhrase();
+      const countEl = document.getElementById('regSelectionCount');
+      if (countEl) countEl.textContent = spoken.count >= 2 ? spoken.status : '';
+      document.querySelectorAll('.reg-case-compare').forEach(function (btn) { btn.textContent = spoken.compare; });
+    }
+    function toggleRegCase(caseKey, checked) {
+      if (_resOriginalResults) {
+        renderRegCaseDock();
+        renderRegInfluenceChrome();
+        applyRegCaseHighlight();
+        return;
+      }
+      if (!window._regCaseSession || !caseKey) return;
+      window._regCaseSession.toggle(caseKey, checked);
+      renderRegCaseDock();
+      applyRegCaseHighlight();
+    }
+    window.toggleRegCase = toggleRegCase;
     window.clearRegCase = function () {
       if (!window._regCaseSession) return;
       window._regCaseSession.clearSelection();
@@ -9946,7 +9981,7 @@ ${sectionsHtml}
         }
         let payload;
         try {
-          payload = StatisticoCaseTrace.buildComparison(captureRegFitSnapshot(), token.caseKey);
+          payload = StatisticoCaseTrace.buildComparison(captureRegFitSnapshot(), token.caseKeys || token.caseKey);
         } catch (err) {
           payload = { status: 'error', reason: 'The refit failed. The original fit is unchanged.', retryable: true };
         }
@@ -10075,45 +10110,52 @@ ${sectionsHtml}
       if (!dock || typeof StatisticoCaseTrace === 'undefined' || !window._regCaseSession) return;
       const session = window._regCaseSession;
       const catalog = window._regCaseCatalog;
-      const key = session.selectedKey();
-      const found = catalog ? StatisticoCaseTrace.caseInCatalog(catalog, key) : null;
+      const keys = regSelectedKeys();
+      const records = keys.map(function (item) { return catalog ? StatisticoCaseTrace.caseInCatalog(catalog, item) : null; });
+      const phrase = regSelectionPhrase();
       const comparison = session.state().comparison;
       const mappingProblem = catalog && catalog.mappingSafe === false;
       const compareBtnEarly = document.getElementById('regCompareCaseBtn');
-      if (_resOriginalResults && !key && !comparison) {
+      if (_resOriginalResults && !keys.length && !comparison) {
         dock.hidden = false;
         dock.innerHTML = '<div class="reg-case-status" role="status"><span>Restore the original fit to inspect individual cases.</span>'
           + '<button type="button" class="reg-case-btn reg-case-btn--primary" onclick="_resRestoreModel()">Restore original</button></div>';
         if (compareBtnEarly) compareBtnEarly.disabled = true;
+        syncRegCompareChrome(phrase);
         return;
       }
-      if (!key && !comparison && !mappingProblem) {
+      if (!keys.length && !comparison && !mappingProblem) {
         dock.hidden = true;
         dock.innerHTML = '';
         if (compareBtnEarly) compareBtnEarly.disabled = true;
+        syncRegCompareChrome(phrase);
         return;
       }
       dock.hidden = false;
-      const label = found ? found.displayLabel : (key || '');
-      const eligible = !!(found && found.analyzed !== false && catalog && catalog.mappingSafe !== false);
+      const eligible = records.length > 0 && records.every(function (found) { return found && found.analyzed !== false; }) && catalog && catalog.mappingSafe !== false;
       const loading = !!(comparison && comparison.status === 'loading');
-      let note = 'Selection only highlights this case. The fitted model, sample, and worksheet stay as they are.';
+      let note = records.length > 1
+        ? 'Selection only highlights these cases. The fitted model, sample, and worksheet stay as they are.'
+        : 'Selection only highlights this case. The fitted model, sample, and worksheet stay as they are.';
       if (mappingProblem) note = catalog.mappingReason;
-      else if (found && found.analyzed === false) note = 'This row is outside the analyzed sample, so it cannot be omitted from the fit.';
-      else if (!found && key) note = 'That case is no longer in the analyzed sample.';
+      else if (records.some(function (found) { return found && found.analyzed === false; })) note = 'A selected row is outside the analyzed sample, so it cannot be omitted from the fit.';
+      else if (records.some(function (found) { return !found; })) note = 'A selected case is no longer in the analyzed sample.';
       const compareDisabled = !eligible || loading;
+      const statusHtml = records.length > 1
+        ? ('<strong>' + records.length + ' cases selected</strong> · ' + escapeHtmlText(phrase.list))
+        : ('Selected case <strong>' + escapeHtmlText(phrase.andList || '—') + '</strong>');
       let body = '';
       body += '<div class="reg-case-status" role="status">'
-        + '<span>Selected case <strong>' + escapeHtmlText(label || '—') + '</strong></span>'
+        + '<span>' + statusHtml + '</span>'
         + '<span class="reg-case-actions">'
         + (eligible && !loading && !(comparison && comparison.payload && comparison.payload.status === 'ready')
-          ? '<button type="button" class="reg-case-btn reg-case-btn--primary" onclick="compareWithoutSelectedCase()">Compare without this case</button>'
+          ? '<button type="button" class="reg-case-btn reg-case-btn--primary reg-case-compare" onclick="compareWithoutSelectedCase()">' + escapeHtmlText(phrase.compare) + '</button>'
           : '')
         + '<button type="button" class="reg-case-btn" onclick="clearRegCase()">Clear selection</button>'
         + '</span></div>'
         + '<p class="reg-case-note">' + escapeHtmlText(note) + '</p>';
       if (comparison && comparison.status === 'loading') {
-        body += '<p class="reg-case-note">Fitting a temporary model without ' + escapeHtmlText(label) + '. The original fit stays in place.</p>';
+        body += '<p class="reg-case-note">Fitting a temporary model without ' + escapeHtmlText(phrase.andList || 'this case') + '. The original fit stays in place.</p>';
       } else if (comparison && comparison.payload && comparison.payload.status === 'error') {
         body += '<div class="reg-sens"><p class="reg-case-note">' + escapeHtmlText(comparison.payload.reason || 'The refit failed.') + '</p>'
           + '<button type="button" class="reg-case-btn reg-case-btn--primary" onclick="retryRegComparison()">Retry</button></div>';
@@ -10127,6 +10169,7 @@ ${sectionsHtml}
       dock.dataset.compareDisabled = compareDisabled ? '1' : '0';
       const compareBtn = document.getElementById('regCompareCaseBtn');
       if (compareBtn) compareBtn.disabled = !!compareDisabled;
+      syncRegCompareChrome(phrase);
     }
 
     function renderRegSensitivity(payload) {
@@ -10163,7 +10206,7 @@ ${sectionsHtml}
       }
       return '<div class="reg-sens" id="regSensitivity">'
         + '<div class="reg-sens-head"><h3>Influence sensitivity</h3><button type="button" class="reg-case-btn" onclick="closeRegComparison()">Close comparison</button></div>'
-        + '<p class="reg-case-note">' + escapeHtmlText(payload.note || '') + ' Omitted case <strong>' + escapeHtmlText(omitted) + '</strong>. '
+        + '<p class="reg-case-note">' + escapeHtmlText(payload.note || '') + ' ' + ((payload.omittedCount || 1) > 1 ? 'Omitted cases' : 'Omitted case') + ' <strong>' + escapeHtmlText(omitted) + '</strong>. '
         + escapeHtmlText(String(payload.nOriginal)) + ' → ' + escapeHtmlText(String(payload.nTemporary)) + ' analyzed observations.</p>'
         + '<div class="reg-sens-block"><h4>Model fit</h4>' + rows.join('') + '</div>'
         + '<div class="reg-sens-block"><h4>Coefficients</h4>' + coefRows + '</div>'
@@ -10173,7 +10216,9 @@ ${sectionsHtml}
     }
 
     function applyRegCaseHighlight() {
-      const selected = window._regCaseSession ? window._regCaseSession.selectedKey() : null;
+      const selectedKeys = regSelectedKeys();
+      const selectedSet = {};
+      selectedKeys.forEach(function (key) { selectedSet[key] = true; });
       (Highcharts.charts || []).forEach(function (chart) {
         if (!chart || !chart.series) return;
         let dirty = false;
@@ -10181,7 +10226,7 @@ ${sectionsHtml}
           (series.points || []).forEach(function (pt) {
             const key = pt.options && pt.options.caseKey;
             if (!key) return;
-            const on = key === selected;
+            const on = !!selectedSet[key];
             if (pt._regCaseOn === on) return;
             pt._regCaseOn = on;
             const column = series.type === 'column' || (chart.options.chart && chart.options.chart.type === 'column');
@@ -10204,11 +10249,13 @@ ${sectionsHtml}
         }
       });
       document.querySelectorAll('.res-outliers-table tr[data-case-key]').forEach(function (row) {
-        const on = row.getAttribute('data-case-key') === selected;
+        const on = !!selectedSet[row.getAttribute('data-case-key')];
         row.classList.toggle('reg-case-selected', on);
         row.setAttribute('aria-selected', on ? 'true' : 'false');
         const mark = row.querySelector('.reg-case-mark');
         if (mark) mark.hidden = !on;
+        const box = row.querySelector('.reg-case-check');
+        if (box) box.checked = on;
       });
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.syncCaseSelection) StatisticoHeader.syncCaseSelection();
     }
@@ -10225,7 +10272,7 @@ ${sectionsHtml}
       const tracedRows = d.residuals.map((r,i)=>({i,r,s:d.standardized[i],l:d.leverage[i],c:d.cooksD[i],key:regCaseKeyAt(i),label:regCaseLabelAt(i)}))
         .sort((a,b)=>b.c-a.c);
       window._resInfluentialIndices = influentialRows.map(o=>o.i);
-      const selectedKey = window._regCaseSession ? window._regCaseSession.selectedKey() : null;
+      const selectedKeys = regSelectedKeys();
       const cooksOverHalf = d.cooksD.filter(v=>v>0.5).length;
       const cooksOverOne = d.cooksD.filter(v=>v>1).length;
       const residualOutliers = d.standardized.filter(s=>Math.abs(s)>2).length;
@@ -10254,7 +10301,7 @@ ${sectionsHtml}
             <div id="resComparisonPanel" class="res-comparison-panel" style="display:none;"></div>
             <div style="max-height:400px;overflow-y:auto;">
               <table class="res-outliers-table">
-                <thead><tr><th>Obs</th><th>Residual</th><th>Std</th><th>Leverage</th><th>Cook's D</th><th>Status</th><th>Action</th></tr></thead>
+                <thead><tr><th class="reg-case-check-col" aria-label="Include in comparison"></th><th>Obs</th><th>Residual</th><th>Std</th><th>Leverage</th><th>Cook's D</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>${tracedRows.map(o=>{
                     const hl=o.l>leverageCut, hi=o.c>0.5, residual=Math.abs(o.s)>2;
                     const flags=[];
@@ -10265,9 +10312,10 @@ ${sectionsHtml}
                     const cls=hi?'res-high-influence':hl?'res-high-leverage':'';
                     const status=flags.length?flags.join(', '):'—';
                     const action=hi?'Consider exclusion':hl?'Validate data':residual?'Review data':'—';
-                    const on = o.key && o.key === selectedKey;
+                    const on = !!(o.key && selectedKeys.indexOf(o.key) >= 0);
                     const keyAttr = o.key ? ` data-case-key="${escapeHtmlText(o.key)}" tabindex="0" aria-selected="${on?'true':'false'}"` : '';
-                    return `<tr class="${on?'reg-case-selected':''}"${keyAttr}><td><button type="button" class="reg-case-pick">${on?'<span class="reg-case-mark">◆</span>':''}${escapeHtmlText(o.label)}</button></td><td>${o.r.toFixed(3)}</td><td>${o.s.toFixed(3)}</td><td>${o.l.toFixed(4)}</td><td>${o.c.toFixed(4)}</td><td class="${cls}">${status}</td><td style="font-size:12px;color:var(--text-muted);">${action}</td></tr>`;
+                    const check = o.key ? `<input type="checkbox" class="reg-case-check" data-case-key="${escapeHtmlText(o.key)}"${on?' checked':''} aria-label="Include ${escapeHtmlText(o.label)} in the comparison">` : '';
+                    return `<tr class="${on?'reg-case-selected':''}"${keyAttr}><td class="reg-case-check-col">${check}</td><td><button type="button" class="reg-case-pick">${on?'<span class="reg-case-mark">◆</span>':''}${escapeHtmlText(o.label)}</button></td><td>${o.r.toFixed(3)}</td><td>${o.s.toFixed(3)}</td><td>${o.l.toFixed(4)}</td><td>${o.c.toFixed(4)}</td><td class="${cls}">${status}</td><td style="font-size:12px;color:var(--text-muted);">${action}</td></tr>`;
                   }).join('')
                 }</tbody>
               </table>
@@ -10277,12 +10325,18 @@ ${sectionsHtml}
       if (influencePanel && influencePanel.dataset.caseBound !== '1') {
         influencePanel.dataset.caseBound = '1';
         influencePanel.addEventListener('click', function (event) {
+          const box = event.target.closest('.reg-case-check');
+          if (box) {
+            toggleRegCase(box.getAttribute('data-case-key'), box.checked);
+            return;
+          }
           if (event.target.closest('#regCompareCaseBtn, .res-refit-btn, #resComparisonPanel, .reg-case-menu, #regInfluenceActions')) return;
           const row = event.target.closest('tr[data-case-key]');
           if (!row) return;
           selectRegCase(row.getAttribute('data-case-key'));
         });
         influencePanel.addEventListener('keydown', function (event) {
+          if (event.target.classList && event.target.classList.contains('reg-case-check')) return;
           const row = event.target.closest('tr[data-case-key]');
           if (!row || (event.key !== 'Enter' && event.key !== ' ')) return;
           event.preventDefault();
@@ -10376,7 +10430,7 @@ ${sectionsHtml}
       if (note) {
         note.textContent = _resOriginalResults
           ? 'Restore the original fit to inspect individual cases.'
-          : ("Cook's D > 0.5: " + meta.cooksOverHalf + '. Residual outliers (|standardized residual| > 2): ' + meta.residualOutliers + '. Select one analyzed row, then compare the fit without that case.');
+          : ("Cook's D > 0.5: " + meta.cooksOverHalf + '. Residual outliers (|standardized residual| > 2): ' + meta.residualOutliers + '. Click a row to select one case. Check rows to compare those cases together.');
       }
       if (!actions) return;
       if (_resOriginalResults) {
@@ -10386,7 +10440,7 @@ ${sectionsHtml}
       const more = meta.flagged > 0
         ? '<details class="reg-case-menu"><summary>More</summary><div class="reg-case-menu-panel"><button type="button" class="res-refit-btn" onclick="_resRefitWithout()">Refit excluding flagged</button></div></details>'
         : '';
-      actions.innerHTML = '<button type="button" class="reg-case-btn reg-case-btn--primary" id="regCompareCaseBtn" onclick="compareWithoutSelectedCase()">Compare without this case</button>' + more;
+      actions.innerHTML = '<span id="regSelectionCount" class="reg-case-count"></span><button type="button" class="reg-case-btn reg-case-btn--primary reg-case-compare" id="regCompareCaseBtn" onclick="compareWithoutSelectedCase()">Compare without this case</button>' + more;
     }
     function _resFitCell(value) {
       return Number.isFinite(value) ? regDisplayNumber(value) : '—';

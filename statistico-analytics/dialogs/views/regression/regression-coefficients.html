@@ -34,10 +34,10 @@
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20261108case" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261109place" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261109multi"></script>
+  <script src="../shared-header.js?v=20261109place"></script>
   <script src="../shared-workspace-tabs.js?v=20260828viewcta"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -1459,6 +1459,10 @@
     .res-comparison-label { font-size:12px; color:var(--text-muted); margin-bottom:10px; font-weight:600; }
     .reg-case-dock { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1); }
     .reg-case-dock[hidden] { display: none !important; }
+    .reg-case-dock--mark { padding: 6px 12px; }
+    .reg-case-mark-label { margin: 0; font-size: 12px; color: var(--text-secondary); }
+    .reg-sens-samples { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 2px 0 0; font-size: 13px; color: var(--text-primary); }
+    .reg-sens-samples span { font-weight: 650; }
     .reg-case-status { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
     .reg-case-status strong { color: var(--text-primary); }
     .reg-case-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -6524,7 +6528,8 @@
       StatisticoHeader._caseTrace = {
         selectedKey: function () { return window._regCaseSession ? window._regCaseSession.selectedKey() : null; },
         selectedKeys: function () { return window._regCaseSession && window._regCaseSession.selectedKeys ? window._regCaseSession.selectedKeys() : []; },
-        onSelect: function (key) { if (typeof selectRegCase === 'function') selectRegCase(key); }
+        onSelect: function (key) { if (typeof selectRegCase === 'function') selectRegCase(key); },
+        highlightLabel: function () { return typeof regCaseHighlightLabel === 'function' ? regCaseHighlightLabel() : ''; }
       };
     }
     window.addEventListener('pagehide', function () {
@@ -6904,6 +6909,8 @@
       }
       syncModelScopeBanners();
       if (tabName === 'power') annotatePowerFullModel();
+      if (typeof renderRegCaseDock === 'function') renderRegCaseDock();
+      if (typeof applyRegCaseHighlight === 'function') applyRegCaseHighlight();
     }
 
     function beginViewHandoff(fromEl, tabName) {
@@ -9933,6 +9940,18 @@ ${sectionsHtml}
       });
       return StatisticoCaseTrace.casePhrase(labels);
     }
+    function regCaseHighlightLabel() {
+      const phrase = regSelectionPhrase();
+      if (!phrase.count) return '';
+      return (phrase.count > 1 ? phrase.list : phrase.andList) + ' highlighted';
+    }
+    function regCaseSurface() {
+      const active = document.querySelector('.tab-content.active');
+      const id = active && active.id;
+      if (id === 'tab-res-influential') return 'action';
+      if (id === 'tab-res-plots' || id === 'tab-pred-overview') return 'mark';
+      return 'quiet';
+    }
     function syncRegCompareChrome(phrase) {
       const spoken = phrase || regSelectionPhrase();
       const countEl = document.getElementById('regSelectionCount');
@@ -10116,6 +10135,22 @@ ${sectionsHtml}
       const comparison = session.state().comparison;
       const mappingProblem = catalog && catalog.mappingSafe === false;
       const compareBtnEarly = document.getElementById('regCompareCaseBtn');
+      const surface = regCaseSurface();
+      if (surface !== 'action') {
+        dock.classList.toggle('reg-case-dock--mark', surface === 'mark' && keys.length > 0);
+        if (surface === 'mark' && keys.length) {
+          dock.hidden = false;
+          dock.innerHTML = '<p class="reg-case-mark-label" role="status">' + escapeHtmlText(regCaseHighlightLabel()) + '</p>';
+        } else {
+          dock.hidden = true;
+          dock.innerHTML = '';
+        }
+        if (compareBtnEarly && !keys.length) compareBtnEarly.disabled = true;
+        syncRegCompareChrome(phrase);
+        if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.syncCaseSelection) StatisticoHeader.syncCaseSelection();
+        return;
+      }
+      dock.classList.remove('reg-case-dock--mark');
       if (_resOriginalResults && !keys.length && !comparison) {
         dock.hidden = false;
         dock.innerHTML = '<div class="reg-case-status" role="status"><span>Restore the original fit to inspect individual cases.</span>'
@@ -10206,8 +10241,8 @@ ${sectionsHtml}
       }
       return '<div class="reg-sens" id="regSensitivity">'
         + '<div class="reg-sens-head"><h3>Influence sensitivity</h3><button type="button" class="reg-case-btn" onclick="closeRegComparison()">Close comparison</button></div>'
-        + '<p class="reg-case-note">' + escapeHtmlText(payload.note || '') + ' ' + ((payload.omittedCount || 1) > 1 ? 'Omitted cases' : 'Omitted case') + ' <strong>' + escapeHtmlText(omitted) + '</strong>. '
-        + escapeHtmlText(String(payload.nOriginal)) + ' → ' + escapeHtmlText(String(payload.nTemporary)) + ' analyzed observations.</p>'
+        + '<p class="reg-sens-samples"><span>Original fit · n = ' + escapeHtmlText(String(payload.nOriginal)) + '</span><span>Without ' + escapeHtmlText(omitted) + ' · n = ' + escapeHtmlText(String(payload.nTemporary)) + '</span></p>'
+        + '<p class="reg-case-note">' + escapeHtmlText(payload.note || '') + '</p>'
         + '<div class="reg-sens-block"><h4>Model fit</h4>' + rows.join('') + '</div>'
         + '<div class="reg-sens-block"><h4>Coefficients</h4>' + coefRows + '</div>'
         + '<div class="reg-sens-block"><h4>Prediction</h4>' + prediction + '</div>'
@@ -10458,9 +10493,9 @@ ${sectionsHtml}
           <button type="button" class="reg-case-btn" onclick="_resRestoreModel()">Restore original</button>
         </div>
         <div class="res-comparison-grid">
-          <div class="res-comparison-card"><div class="res-comparison-label">Original fit (N=${orig.n})</div><div style="font-size:13px;color:var(--text-primary);"><div><b>R²:</b> ${_resFitCell(orig.R2)}</div><div><b>Adj R²:</b> ${_resFitCell(orig.R2_adj)}</div><div><b>RMSE:</b> ${_resFitCell(orig.RMSE)}</div></div></div>
+          <div class="res-comparison-card"><div class="res-comparison-label">Original fit · n = ${orig.n}</div><div style="font-size:13px;color:var(--text-primary);"><div><b>R²:</b> ${_resFitCell(orig.R2)}</div><div><b>Adj R²:</b> ${_resFitCell(orig.R2_adj)}</div><div><b>RMSE:</b> ${_resFitCell(orig.RMSE)}</div></div></div>
           <div style="font-size:28px;color:var(--text-muted);font-weight:bold;text-align:center;">→</div>
-          <div class="res-comparison-card"><div class="res-comparison-label">Without flagged rows (N=${refitted.n})</div><div style="font-size:13px;color:var(--text-primary);"><div><b>R²:</b> ${_resFitCell(refitted.R2)}</div><div><b>Adj R²:</b> ${_resFitCell(refitted.R2_adj)}</div><div><b>RMSE:</b> ${_resFitCell(refitted.RMSE)}</div></div></div>
+          <div class="res-comparison-card"><div class="res-comparison-label">Without flagged rows · n = ${refitted.n}</div><div style="font-size:13px;color:var(--text-primary);"><div><b>R²:</b> ${_resFitCell(refitted.R2)}</div><div><b>Adj R²:</b> ${_resFitCell(refitted.R2_adj)}</div><div><b>RMSE:</b> ${_resFitCell(refitted.RMSE)}</div></div></div>
         </div>`;
     }
     function _resRefitWithout() {

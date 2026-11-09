@@ -3543,6 +3543,11 @@ function openPrepareDatasetFromHub() {
   return openPrepareDataFromHub("prepare-dataset");
 }
 
+var hubProcessSettingsModel = null;
+var hubProcessSettingsTable = null;
+var hubProcessSettingsKind = "input";
+var hubProcessSettingsHandoff = false;
+
 function processSettingsPayload(gr) {
   var values = gr && gr.values;
   if (!values || values.length < 2) {
@@ -3558,24 +3563,39 @@ function processSettingsPayload(gr) {
 
 function sendProcessSettingsPayload(dlg) {
   if (!dlg) return;
-  var gr = getGlobalRangePayload();
+  var payload;
+  if (hubProcessSettingsTable && hubProcessSettingsTable.headers && hubProcessSettingsTable.headers.length) {
+    payload = {
+      headers: hubProcessSettingsTable.headers,
+      rows: hubProcessSettingsTable.rows || [],
+      address: hubProcessSettingsTable.address || "",
+      source: "excel"
+    };
+  } else {
+    payload = processSettingsPayload(getGlobalRangePayload());
+  }
+  if (hubProcessSettingsKind === "input" && hubProcessSettingsModel) payload.savedModelSpec = hubProcessSettingsModel;
+  if (hubProcessSettingsKind === "results" && hubProcessSettingsModel) payload.modelSpec = hubProcessSettingsModel;
   try {
     dlg.messageChild(JSON.stringify({
       type: "PROCESS_SETTINGS_DATA",
-      payload: processSettingsPayload(gr)
+      payload: payload
     }));
   } catch (e) {}
 }
 
-function openProcessSettingsFromHub() {
+function openProcessSettingsDialog(kind) {
+  hubProcessSettingsKind = kind;
+  var file = kind === "results" ? "process-settings/process-settings.html" : "process-settings/process-settings-input.html";
+  var size = kind === "results" ? DIALOG_SIZES.RESULTS : DIALOG_SIZES.REGRESSION_BUILDER;
+  var base = getDialogsBaseUrl() + file + "?v=" + Date.now();
   setSelectedModuleCard("process-settings", true);
-  var base = getDialogsBaseUrl() + "process-settings/process-settings.html?v=" + Date.now();
   if (!Office || !Office.context || !Office.context.ui || typeof Office.context.ui.displayDialogAsync !== "function") {
-    window.open(base + "&demo=1", "_blank");
+    if (kind === "input") window.open(base + "&demo=1", "_blank");
     setSelectedModuleCard("process-settings", false);
     return true;
   }
-  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
+  Office.context.ui.displayDialogAsync(base, size, function (res) {
     if (res.status === Office.AsyncResultStatus.Failed) {
       setSelectedModuleCard("process-settings", false);
       var err = res.error || {};
@@ -3585,6 +3605,7 @@ function openProcessSettingsFromHub() {
     hubBuilderDialog = res.value;
     var dlg = hubBuilderDialog;
     setTimeout(function () { sendProcessSettingsPayload(dlg); }, 550);
+    setTimeout(function () { sendProcessSettingsPayload(dlg); }, 1400);
     dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
       var msg;
       try { msg = JSON.parse(arg.message || "{}"); } catch (e) { return; }
@@ -3595,6 +3616,7 @@ function openProcessSettingsFromHub() {
       if (msg.action === "refreshData") {
         var refresh = window.hubRefreshGlobalRange;
         Promise.resolve(typeof refresh === "function" ? refresh() : null).then(function () {
+          hubProcessSettingsTable = null;
           sendProcessSettingsPayload(dlg);
         }, function () {
           sendProcessSettingsPayload(dlg);
@@ -3615,6 +3637,7 @@ function openProcessSettingsFromHub() {
             }
             return;
           }
+          hubProcessSettingsTable = null;
           sendProcessSettingsPayload(dlg);
         }, function (err) {
           if (dlg) {
@@ -3626,21 +3649,54 @@ function openProcessSettingsFromHub() {
         });
         return;
       }
+      if (msg.action === "processSettingsModel") {
+        hubProcessSettingsModel = msg.payload || null;
+        if (msg.payload && msg.payload.table && msg.payload.table.headers) hubProcessSettingsTable = msg.payload.table;
+        hubProcessSettingsHandoff = true;
+        try { dlg.close(); } catch (e) {}
+        dlg = null;
+        hubBuilderDialog = null;
+        setTimeout(function () { openProcessSettingsDialog("results"); }, 450);
+        return;
+      }
+      if (msg.action === "editInput") {
+        if (msg.payload) hubProcessSettingsModel = msg.payload;
+        hubProcessSettingsHandoff = true;
+        try { dlg.close(); } catch (e) {}
+        dlg = null;
+        hubBuilderDialog = null;
+        setTimeout(function () { openProcessSettingsDialog("input"); }, 450);
+        return;
+      }
       if (msg.action === "close") {
         try { dlg.close(); } catch (e) {}
         dlg = null;
         hubBuilderDialog = null;
+        hubProcessSettingsModel = null;
+        hubProcessSettingsTable = null;
         setSelectedModuleCard("process-settings", false);
       }
     });
     dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
       dlg = null;
       hubBuilderDialog = null;
+      if (hubProcessSettingsHandoff) {
+        hubProcessSettingsHandoff = false;
+        return;
+      }
+      hubProcessSettingsModel = null;
+      hubProcessSettingsTable = null;
       setSelectedModuleCard("process-settings", false);
       if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
     });
   });
   return true;
+}
+
+function openProcessSettingsFromHub() {
+  hubProcessSettingsModel = null;
+  hubProcessSettingsTable = null;
+  return openProcessSettingsDialog("input");
 }
 
 function navigateToModuleCore(id) {

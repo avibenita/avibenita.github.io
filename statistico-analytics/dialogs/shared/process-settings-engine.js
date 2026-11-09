@@ -1044,42 +1044,54 @@
     }
 
     function read() {
-      var candidateSettings = state.pin ? mergedCandidate() : null;
-      var boundErrors = candidateSettings ? boundsAllow(candidateSettings).errors : [];
-      var fixedErrors = state.pin && candidateSettings ? fixedMatch(state.candidateDraft, state.pin.settings) : [];
-      if (fixedErrors.length) {
-        Object.keys(state.candidateDraft || {}).forEach(function (name) {
-          if (state.config.roles[name] !== 'fixed') return;
-          if (String(state.candidateDraft[name]) !== String(state.pin.settings[name])) boundErrors.push(fixedErrors[0]);
-        });
+      var pinned = !!state.pin;
+      var exploreSettings = copy(state.currentDraft);
+      var exploreErrors = state.model ? completeSettings(exploreSettings).concat(boundsAllow(exploreSettings).errors) : [];
+      var candidateSettings = pinned ? mergedCandidate() : (state.model ? exploreSettings : null);
+      var boundErrors = [];
+      if (pinned) {
+        boundErrors = candidateSettings ? boundsAllow(candidateSettings).errors : [];
+        var fixedErrors = candidateSettings ? fixedMatch(state.candidateDraft, state.pin.settings) : [];
+        if (fixedErrors.length) {
+          Object.keys(state.candidateDraft || {}).forEach(function (name) {
+            if (state.config.roles[name] !== 'fixed') return;
+            if (String(state.candidateDraft[name]) !== String(state.pin.settings[name])) boundErrors.push(fixedErrors[0]);
+          });
+        }
+      } else if (state.model) {
+        boundErrors = exploreErrors;
       }
-      var candidateValid = !!(state.pin && candidateSettings && !boundErrors.length);
-      var currentCard = state.pin ? cardFor(state.pin.settings) : null;
-      var candidateCard = candidateValid ? cardFor(candidateSettings) : null;
-      if (candidateCard && candidateCard.available === false) {
-        candidateValid = false;
-        boundErrors = [{ name: '', message: candidateCard.reason }];
-        candidateCard = null;
+      var scenarioValid = !!(state.model && candidateSettings && !boundErrors.length && (pinned || exploreErrors.length === 0));
+      var currentCard = pinned ? cardFor(state.pin.settings) : null;
+      var scenarioCard = scenarioValid ? cardFor(candidateSettings) : null;
+      if (scenarioCard && scenarioCard.available === false) {
+        scenarioValid = false;
+        boundErrors = [{ name: '', message: scenarioCard.reason }];
+        scenarioCard = null;
       }
+      var candidateCard = pinned ? scenarioCard : null;
+      var exploreCard = pinned ? null : scenarioCard;
       var profiles = [];
-      if (candidateValid && state.model && state.model.id === (state.pin && state.pin.modelId)) {
+      if (scenarioValid && state.model && (!pinned || state.model.id === state.pin.modelId)) {
         (state.config.numeric || []).concat(state.config.categorical || []).forEach(function (name) {
           if (state.config.roles[name] === 'fixed') return;
           profiles.push(profileFor(name, candidateSettings));
         });
       }
-      var cards = [currentCard, candidateCard].filter(Boolean);
-      if (state.pin && currentCard && currentCard.available) expandScale(profiles, cards);
+      var cards = [currentCard, scenarioCard].filter(Boolean);
+      if (scenarioCard && scenarioCard.available) expandScale(profiles, cards);
       var delta = currentCard && candidateCard && currentCard.available && candidateCard.available
         ? candidateCard.mean - currentCard.mean
         : null;
       var phase = 'setup';
       if (!state.table.headers.length) phase = 'empty';
-      else if (candidateSettings && !candidateValid && state.pin) phase = 'withheld';
-      else if (state.pin) phase = 'pinned';
-      else if (state.model) phase = 'fitted';
+      else if (pinned && candidateSettings && !scenarioValid) phase = 'withheld';
+      else if (pinned) phase = 'pinned';
+      else if (state.model && scenarioValid) phase = 'exploring';
+      else if (state.model) phase = 'needs-input';
       var withheld = '';
       if (phase === 'withheld') withheld = boundErrors.length ? boundErrors[0].message : 'The candidate is outside the allowed inputs, so the comparison is withheld.';
+      else if (phase === 'needs-input') withheld = boundErrors.length ? boundErrors[0].message : 'Enter the remaining settings to predict.';
       return {
         phase: phase,
         message: state.previewError || '',
@@ -1137,6 +1149,7 @@
         candidateDraft: copy(state.candidateDraft),
         candidateErrors: boundErrors,
         currentCard: currentCard,
+        exploreCard: exploreCard,
         candidateCard: candidateCard,
         withheldReason: withheld,
         deltaMean: delta,

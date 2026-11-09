@@ -22,6 +22,36 @@ function sessionFromPreset() {
 }
 
 describe('process settings numerical fixture', () => {
+  test('predicts a starting scenario before the recipe is pinned', () => {
+    const session = Engine.createSession();
+    const demo = Engine.demoPreset();
+    session.loadData(demo.table);
+    session.configure(demo.config);
+    session.setSpecifications(demo.specifications);
+    session.setCurrentSettings(demo.current);
+    expect(session.finishFit(session.beginFit()).applied).toBe(true);
+    const start = session.read();
+    expect(start.phase).toBe('exploring');
+    expect(start.pin).toBeNull();
+    expect(start.exploreCard.mean).toBeCloseTo(66, 6);
+    expect(start.exploreCard.ci[0]).toBeCloseTo(64.176944, 6);
+    expect(start.exploreCard.ci[1]).toBeCloseTo(67.823056, 6);
+    expect(start.exploreCard.margin.value).toBeCloseTo(-2, 6);
+    expect(start.profiles.some(function (profile) { return profile.name === 'Temperature'; })).toBe(true);
+    session.setCurrentSettings({ Temperature: 100, Recipe: 'B' });
+    const moved = session.read();
+    expect(moved.fitCount).toBe(1);
+    expect(moved.exploreCard.mean).toBeCloseTo(72, 6);
+    expect(moved.exploreCard.margin.value).toBeCloseTo(3, 6);
+    const cool = pointNear(moved.profiles.filter(function (profile) { return profile.name === 'Temperature'; })[0], 90);
+    const hot = pointNear(moved.profiles.filter(function (profile) { return profile.name === 'Temperature'; })[0], 110);
+    expect((hot.mean - cool.mean) / (hot.x - cool.x)).toBeCloseTo(0.6, 6);
+    expect(session.pin().ok).toBe(true);
+    expect(session.read().phase).toBe('pinned');
+    expect(session.read().currentCard.mean).toBeCloseTo(72, 6);
+    expect(session.fitCount()).toBe(1);
+  });
+
   test('matches the independent OLS reference and does not refit while exploring', () => {
     const session = sessionFromPreset();
     const fitted = session.read();

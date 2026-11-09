@@ -1474,15 +1474,20 @@
     .reg-sens-row { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 0; border-top: 1px solid var(--border); }
     .reg-sens-row:first-of-type { border-top: 0; }
     .reg-sens-metric { flex: 1 1 140px; font-size: 12px; font-weight: 650; color: var(--text-primary); }
-    .reg-sens-values { flex: 2 1 280px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
-    .reg-sens-values span { min-width: 120px; font-size: 12px; color: var(--text-secondary); }
+    .reg-sens-values { flex: 2 1 280px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 14px; }
+    @media (max-width: 800px) { .reg-sens-values { grid-template-columns: 1fr; } }
+    .reg-sens-values span { min-width: 0; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+    .reg-case-menu { position: relative; }
+    .reg-case-menu > summary { list-style: none; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 500; }
+    .reg-case-menu > summary::-webkit-details-marker { display: none; }
+    .reg-case-menu-panel { position: absolute; right: 0; z-index: 6; margin-top: 6px; min-width: 230px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.28); }
+    .reg-case-menu-panel .res-refit-btn { width: 100%; text-align: left; }
     .reg-sens-values em { display: block; font-style: normal; font-size: 10px; color: var(--text-muted); }
     .res-outliers-table tr.reg-case-selected td { background: rgba(34, 211, 238, .14); box-shadow: inset 0 0 0 1.5px #22d3ee; }
     .reg-case-pick { background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; padding: 0; }
     .reg-case-pick .reg-case-mark { color: #22d3ee; margin-right: 4px; }
     html[data-theme="light"] .res-outliers-table tr.reg-case-selected td { background: rgba(14, 116, 144, .12); box-shadow: inset 0 0 0 1.5px #0e7490; }
-    .res-stat-improved { color:var(--success); font-weight:600; }
-    .res-stat-worse    { color:var(--danger);  font-weight:600; }
+    .res-stat-improved, .res-stat-worse { color: var(--text-primary); font-weight: 600; }
     }
     
     @keyframes fadeIn {
@@ -5196,8 +5201,8 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
     }
-    .res-workspace .res-stat-improved { color: #6ee7b7 !important; }
-    .res-workspace .res-stat-worse    { color: rgba(251,113,133,.95) !important; }
+    .res-workspace .res-stat-improved,
+    .res-workspace .res-stat-worse { color: var(--text-primary) !important; }
 
     /* Badge: muted outlined chip instead of warning-toned fill */
     .res-workspace .res-badge {
@@ -9899,6 +9904,11 @@ ${sectionsHtml}
     }
 
     function selectRegCase(caseKey) {
+      if (_resOriginalResults) {
+        renderRegCaseDock();
+        renderRegInfluenceChrome();
+        return;
+      }
       if (!window._regCaseSession || !caseKey) return;
       window._regCaseSession.select(caseKey);
       renderRegCaseDock();
@@ -10000,7 +10010,11 @@ ${sectionsHtml}
         ok: true,
         inputs: Object.assign({}, inputs),
         xVector: xVector,
-        settingsLabel: wanted.map(function (item) { return item.name + ' = ' + inputs[item.name]; }).join(', ')
+        settingsLabel: wanted.map(function (item) {
+          const value = inputs[item.name];
+          const shown = typeof value === 'number' && isFinite(value) ? formatNumber(value) : value;
+          return item.name + ' = ' + shown;
+        }).join(', ')
       };
     }
 
@@ -10030,14 +10044,29 @@ ${sectionsHtml}
       };
     }
 
-    function regSensValues(original, temporary, change, digits, count, omittedLabel) {
-      const fmt = count ? StatisticoCaseTrace.formatCount : function (value) { return StatisticoCaseTrace.formatFixed(value, digits); };
-      const signed = count ? function (value) { return StatisticoCaseTrace.formatSigned(value, 0); } : function (value) { return StatisticoCaseTrace.formatSigned(value, digits); };
+    function regDisplayNumber(value) {
+      if (!isFinite(value)) return '—';
+      return formatNumber(value);
+    }
+    function regDisplaySigned(value, count) {
+      if (!isFinite(value)) return '—';
+      if (count) return StatisticoCaseTrace.formatSigned(value, 0);
+      const body = formatNumber(Math.abs(value));
+      if (value > 0) return '+' + body;
+      if (value < 0) return '\u2212' + body;
+      return formatNumber(0);
+    }
+    function regDisplayInterval(pair) {
+      if (!pair || !isFinite(pair[0]) || !isFinite(pair[1])) return 'Unavailable';
+      return '[' + formatNumber(pair[0]) + ', ' + formatNumber(pair[1]) + ']';
+    }
+    function regSensValues(original, temporary, change, count, omittedLabel) {
+      const fmt = count ? StatisticoCaseTrace.formatCount : regDisplayNumber;
       const without = omittedLabel || 'this case';
       return '<div class="reg-sens-values">'
         + '<span><em>Original fit</em>' + fmt(original) + '</span>'
         + '<span><em>Without ' + escapeHtmlText(without) + '</em>' + fmt(temporary) + '</span>'
-        + '<span><em>Change</em>' + (signed(change) || '—') + '</span>'
+        + '<span><em>Change</em>' + (regDisplaySigned(change, count) || '—') + '</span>'
         + '</div>';
     }
 
@@ -10051,6 +10080,13 @@ ${sectionsHtml}
       const comparison = session.state().comparison;
       const mappingProblem = catalog && catalog.mappingSafe === false;
       const compareBtnEarly = document.getElementById('regCompareCaseBtn');
+      if (_resOriginalResults && !key && !comparison) {
+        dock.hidden = false;
+        dock.innerHTML = '<div class="reg-case-status" role="status"><span>Restore the original fit to inspect individual cases.</span>'
+          + '<button type="button" class="reg-case-btn reg-case-btn--primary" onclick="_resRestoreModel()">Restore original</button></div>';
+        if (compareBtnEarly) compareBtnEarly.disabled = true;
+        return;
+      }
       if (!key && !comparison && !mappingProblem) {
         dock.hidden = true;
         dock.innerHTML = '';
@@ -10070,6 +10106,9 @@ ${sectionsHtml}
       body += '<div class="reg-case-status" role="status">'
         + '<span>Selected case <strong>' + escapeHtmlText(label || '—') + '</strong></span>'
         + '<span class="reg-case-actions">'
+        + (eligible && !loading && !(comparison && comparison.payload && comparison.payload.status === 'ready')
+          ? '<button type="button" class="reg-case-btn reg-case-btn--primary" onclick="compareWithoutSelectedCase()">Compare without this case</button>'
+          : '')
         + '<button type="button" class="reg-case-btn" onclick="clearRegCase()">Clear selection</button>'
         + '</span></div>'
         + '<p class="reg-case-note">' + escapeHtmlText(note) + '</p>';
@@ -10091,22 +10130,21 @@ ${sectionsHtml}
     }
 
     function renderRegSensitivity(payload) {
-      const digits = 6;
       const omitted = payload.omittedLabel || 'this case';
       const rows = [];
       (payload.modelFit || []).forEach(function (row) {
         const count = row.key === 'n';
         const values = (row.original == null || row.temporary == null)
           ? '<div class="reg-sens-values"><span><em>Unavailable</em>' + escapeHtmlText(row.unavailableReason || 'Unavailable') + '</span></div>'
-          : regSensValues(row.original, row.temporary, row.change, digits, count, omitted);
+          : regSensValues(row.original, row.temporary, row.change, count, omitted);
         rows.push('<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(row.label) + '</div>' + values + '</div>');
       });
       const coefRows = (payload.coefficients || []).map(function (row) {
-        const est = regSensValues(row.estimate.original, row.estimate.temporary, row.estimate.change, digits, false, omitted);
+        const est = regSensValues(row.estimate.original, row.estimate.temporary, row.estimate.change, false, omitted);
         const ciLabel = (row.ci && row.ci.label) || 'CI';
         const ciText = '<div class="reg-sens-values">'
-          + '<span><em>Original fit ' + escapeHtmlText(ciLabel) + '</em>' + StatisticoCaseTrace.formatInterval(row.ci.original, digits) + '</span>'
-          + '<span><em>Without ' + escapeHtmlText(omitted) + ' ' + escapeHtmlText(ciLabel) + '</em>' + StatisticoCaseTrace.formatInterval(row.ci.temporary, digits) + '</span>'
+          + '<span><em>Original fit ' + escapeHtmlText(ciLabel) + '</em>' + regDisplayInterval(row.ci.original) + '</span>'
+          + '<span><em>Without ' + escapeHtmlText(omitted) + ' ' + escapeHtmlText(ciLabel) + '</em>' + regDisplayInterval(row.ci.temporary) + '</span>'
           + '</div>';
         return '<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(row.label) + '</div>' + est + '</div>'
           + '<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(row.label + ' ' + ciLabel) + '</div>' + ciText + '</div>';
@@ -10116,10 +10154,10 @@ ${sectionsHtml}
         const pred = payload.prediction;
         const ci = pred.ci || {};
         prediction = '<div class="reg-sens-row"><div class="reg-sens-metric">Scenario</div><div class="reg-sens-values"><span>' + escapeHtmlText(pred.settingsLabel || '') + '</span></div></div>'
-          + '<div class="reg-sens-row"><div class="reg-sens-metric">Fitted mean</div>' + regSensValues(pred.estimate.original, pred.estimate.temporary, pred.estimate.change, digits, false, omitted) + '</div>'
+          + '<div class="reg-sens-row"><div class="reg-sens-metric">Fitted mean</div>' + regSensValues(pred.estimate.original, pred.estimate.temporary, pred.estimate.change, false, omitted) + '</div>'
           + '<div class="reg-sens-row"><div class="reg-sens-metric">' + escapeHtmlText(ci.label || 'Fitted mean CI') + '</div><div class="reg-sens-values">'
-          + '<span><em>Original fit</em>' + StatisticoCaseTrace.formatInterval(ci.original, digits) + '</span>'
-          + '<span><em>Without ' + escapeHtmlText(omitted) + '</em>' + (ci.temporary ? StatisticoCaseTrace.formatInterval(ci.temporary, digits) : 'Unavailable') + '</span>'
+          + '<span><em>Original fit</em>' + regDisplayInterval(ci.original) + '</span>'
+          + '<span><em>Without ' + escapeHtmlText(omitted) + '</em>' + (ci.temporary ? regDisplayInterval(ci.temporary) : 'Unavailable') + '</span>'
           + (ci.reason ? '<span><em>Note</em>' + escapeHtmlText(ci.reason) + '</span>' : '')
           + '</div></div>';
       }
@@ -10188,40 +10226,45 @@ ${sectionsHtml}
         .sort((a,b)=>b.c-a.c);
       window._resInfluentialIndices = influentialRows.map(o=>o.i);
       const selectedKey = window._regCaseSession ? window._regCaseSession.selectedKey() : null;
-      const influentialCount = d.cooksD.filter(v=>v>0.5).length;
-      const highCount = d.cooksD.filter(v=>v>1).length;
+      const cooksOverHalf = d.cooksD.filter(v=>v>0.5).length;
+      const cooksOverOne = d.cooksD.filter(v=>v>1).length;
+      const residualOutliers = d.standardized.filter(s=>Math.abs(s)>2).length;
+      window._regInfluenceMeta = { cooksOverHalf: cooksOverHalf, cooksOverOne: cooksOverOne, residualOutliers: residualOutliers, flagged: influentialRows.length };
       const th = _resChartTheme();
+      const leverageCut = 3 * d.k / d.n;
 
       document.getElementById('resInfluentialPanel').innerHTML = `
           <div class="chart-panel chart-panel--solo res-hist-panel">
             <div class="chart-panel-h">
               <i class="fa-solid fa-chart-simple"></i> Cook's Distance by Observation
-              <div class="res-badge">Influential: ${influentialCount} (D&gt;0.5) | High: ${highCount} (D&gt;1.0)</div>
+              <div class="res-badge" id="regCooksBadge">Cook's D &gt; 0.5: ${cooksOverHalf} · Cook's D &gt; 1: ${cooksOverOne}</div>
             </div>
             <div class="chart-panel-b">
               <div id="resCooksChart" style="height:380px;width:100%;min-height:280px;"></div>
             </div>
           </div>
           <div class="res-outliers-panel">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;gap:8px;">
               <h2 style="font-size:16px;color:var(--accent-2);margin-bottom:0;display:flex;align-items:center;gap:8px;">
                 <i class="fa-solid fa-triangle-exclamation"></i> Influential Observations
               </h2>
-              <span style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button type="button" class="reg-case-btn reg-case-btn--primary" id="regCompareCaseBtn" onclick="compareWithoutSelectedCase()">Compare without this case</button>
-                ${influentialRows.length>0?`<button class="res-refit-btn" onclick="_resRefitWithout()"><i class="fa-solid fa-rotate"></i> Refit Excluding Flagged</button>`:''}
-              </span>
+              <span id="regInfluenceActions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></span>
             </div>
-            <p class="reg-case-note">${influentialRows.length===0?'No influential observations are flagged. Every analyzed row below can still be selected.':'Flagged rows stay marked by status. Select any analyzed row to follow that case.'}</p>
+            <p class="reg-case-note" id="regInfluenceNote"></p>
             <div id="resComparisonPanel" class="res-comparison-panel" style="display:none;"></div>
             <div style="max-height:400px;overflow-y:auto;">
               <table class="res-outliers-table">
                 <thead><tr><th>Obs</th><th>Residual</th><th>Std</th><th>Leverage</th><th>Cook's D</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>${tracedRows.map(o=>{
-                    const hl=o.l>(3*d.k/d.n),hi=o.c>0.5;
+                    const hl=o.l>leverageCut, hi=o.c>0.5, residual=Math.abs(o.s)>2;
+                    const flags=[];
+                    if (o.c>1) flags.push("Cook's D &gt; 1");
+                    else if (hi) flags.push("Cook's D &gt; 0.5");
+                    if (hl) flags.push('High leverage');
+                    if (residual) flags.push('Residual outlier');
                     const cls=hi?'res-high-influence':hl?'res-high-leverage':'';
-                    const status=hi?'High Influence':hl?'High Leverage':(Math.abs(o.s)>2?'Outlier':'—');
-                    const action=hi?'Consider exclusion':hl?'Validate data':(Math.abs(o.s)>2?'Review data':'—');
+                    const status=flags.length?flags.join(', '):'—';
+                    const action=hi?'Consider exclusion':hl?'Validate data':residual?'Review data':'—';
                     const on = o.key && o.key === selectedKey;
                     const keyAttr = o.key ? ` data-case-key="${escapeHtmlText(o.key)}" tabindex="0" aria-selected="${on?'true':'false'}"` : '';
                     return `<tr class="${on?'reg-case-selected':''}"${keyAttr}><td><button type="button" class="reg-case-pick">${on?'<span class="reg-case-mark">◆</span>':''}${escapeHtmlText(o.label)}</button></td><td>${o.r.toFixed(3)}</td><td>${o.s.toFixed(3)}</td><td>${o.l.toFixed(4)}</td><td>${o.c.toFixed(4)}</td><td class="${cls}">${status}</td><td style="font-size:12px;color:var(--text-muted);">${action}</td></tr>`;
@@ -10234,7 +10277,7 @@ ${sectionsHtml}
       if (influencePanel && influencePanel.dataset.caseBound !== '1') {
         influencePanel.dataset.caseBound = '1';
         influencePanel.addEventListener('click', function (event) {
-          if (event.target.closest('#regCompareCaseBtn, .res-refit-btn, #resComparisonPanel')) return;
+          if (event.target.closest('#regCompareCaseBtn, .res-refit-btn, #resComparisonPanel, .reg-case-menu, #regInfluenceActions')) return;
           const row = event.target.closest('tr[data-case-key]');
           if (!row) return;
           selectRegCase(row.getAttribute('data-case-key'));
@@ -10247,6 +10290,8 @@ ${sectionsHtml}
         });
       }
       Highcharts.chart('resCooksChart',{chart:{type:'column',backgroundColor:'transparent',style:{fontFamily:'inherit'}},title:{text:null},xAxis:{title:{text:'Observation',style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:'#aaa'},enabled:d.n<=100}},yAxis:{title:{text:"Cook's Distance",style:{color:th.textColor}},gridLineColor:th.gridLine,labels:{style:{color:th.axisText}},min:0,max:yAxis.max,tickInterval:yAxis.tickInterval,plotLines:[{value:0.5,color:'#f59e0b',width:2,dashStyle:'Solid',label:{text:'0.5',align:'right',style:{color:'#f59e0b',fontSize:'10px',fontWeight:'bold'}},zIndex:5},{value:1.0,color:'#ef4444',width:2,dashStyle:'Solid',label:{text:'1.0',align:'right',style:{color:'#ef4444',fontSize:'10px',fontWeight:'bold'}},zIndex:5}]},legend:{enabled:false},plotOptions:{column:{pointPadding:0,borderWidth:0,groupPadding:0,shadow:false,pointWidth:d.n>100?2:null,cursor:'pointer',point:{events:{click:regCaseClick}}}},series:[{name:"Cook's Distance",data:cooksBarData,dataLabels:{style:{color:'#fff',textOutline:'none',fontSize:'10px'}}}],tooltip:{backgroundColor:th.bgTooltip,style:{color:th.textColor},borderColor:th.borderTooltip,formatter:function(){const name=this.point&&this.point.options&&this.point.options.name;return`<b>${name||('Obs '+this.x)}</b><br>Cook's D: <b>${this.y.toFixed(4)}</b>`;}},credits:{enabled:false}});
+      renderRegInfluenceChrome();
+      if (_resOriginalResults) _resShowBulkComparison();
       renderRegCaseDock();
       applyRegCaseHighlight();
       window.resInfluentialLoaded = true;
@@ -10324,39 +10369,74 @@ ${sectionsHtml}
 
     // ── Refit without influential obs ─────────────────────────────
     let _resOriginalResults = null;
-    function _resRefitWithout() {
-      window._regCaseTraceHold = true;
-      if (window._regCaseSession) window._regCaseSession.clearSelection();
-      renderRegCaseDock();
-      applyRegCaseHighlight();
-      if (!window._resInfluentialIndices?.length || !window.regressionData) return;
-      const { yVector, xMatrix } = window.regressionData;
-      if (!_resOriginalResults) _resOriginalResults = JSON.parse(JSON.stringify(window.regressionResults));
-      const excl = new Set(window._resInfluentialIndices);
-      const newY=[], newX=[];
-      yVector.forEach((y,i)=>{ if(!excl.has(i)){newY.push(y);newX.push(xMatrix[i]);} });
-      const refitted = computeOLS(newX, newY, window.regressionResults.includeIntercept, false);
-      const orig = _resOriginalResults;
+    function renderRegInfluenceChrome() {
+      const actions = document.getElementById('regInfluenceActions');
+      const note = document.getElementById('regInfluenceNote');
+      const meta = window._regInfluenceMeta || { cooksOverHalf: 0, residualOutliers: 0, flagged: 0 };
+      if (note) {
+        note.textContent = _resOriginalResults
+          ? 'Restore the original fit to inspect individual cases.'
+          : ("Cook's D > 0.5: " + meta.cooksOverHalf + '. Residual outliers (|standardized residual| > 2): ' + meta.residualOutliers + '. Select one analyzed row, then compare the fit without that case.');
+      }
+      if (!actions) return;
+      if (_resOriginalResults) {
+        actions.innerHTML = '<button type="button" class="reg-case-btn reg-case-btn--primary" onclick="_resRestoreModel()">Restore original</button>';
+        return;
+      }
+      const more = meta.flagged > 0
+        ? '<details class="reg-case-menu"><summary>More</summary><div class="reg-case-menu-panel"><button type="button" class="res-refit-btn" onclick="_resRefitWithout()">Refit excluding flagged</button></div></details>'
+        : '';
+      actions.innerHTML = '<button type="button" class="reg-case-btn reg-case-btn--primary" id="regCompareCaseBtn" onclick="compareWithoutSelectedCase()">Compare without this case</button>' + more;
+    }
+    function _resFitCell(value) {
+      return Number.isFinite(value) ? regDisplayNumber(value) : '—';
+    }
+    function _resShowBulkComparison() {
       const panel = document.getElementById('resComparisonPanel');
+      const orig = _resOriginalResults;
+      const refitted = window._resBulkFit;
+      if (!panel || !orig || !refitted) return;
       panel.style.display = 'block';
       panel.innerHTML = `
-        <div style="font-size:13px;font-weight:600;color:var(--accent-2);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
-          <span><i class="fa-solid fa-chart-line"></i> Model Comparison</span>
-          <button onclick="_resRestoreModel()" style="background:rgba(255,255,255,.1);color:var(--text-primary);border:1px solid var(--border);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;"><i class="fa-solid fa-undo"></i> Restore Original</button>
+        <p class="reg-case-note">Restore the original fit to inspect individual cases.</p>
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span>Flagged-row refit</span>
+          <button type="button" class="reg-case-btn" onclick="_resRestoreModel()">Restore original</button>
         </div>
         <div class="res-comparison-grid">
-          <div class="res-comparison-card"><div class="res-comparison-label">Original Model (n=${orig.n})</div><div style="font-size:13px;color:var(--text-secondary);"><div><b>R²:</b> ${orig.R2.toFixed(4)}</div><div><b>Adj R²:</b> ${orig.R2_adj.toFixed(4)}</div><div><b>RMSE:</b> ${orig.RMSE.toFixed(4)}</div></div></div>
-          <div style="font-size:28px;color:var(--accent-1);font-weight:bold;text-align:center;">→</div>
-          <div class="res-comparison-card"><div class="res-comparison-label">Refitted Model (n=${refitted.n})</div><div style="font-size:13px;color:var(--text-secondary);"><div><b>R²:</b> <span class="${refitted.R2>orig.R2?'res-stat-improved':'res-stat-worse'}">${refitted.R2.toFixed(4)}</span></div><div><b>Adj R²:</b> <span class="${refitted.R2_adj>orig.R2_adj?'res-stat-improved':'res-stat-worse'}">${refitted.R2_adj.toFixed(4)}</span></div><div><b>RMSE:</b> <span class="${refitted.RMSE<orig.RMSE?'res-stat-improved':'res-stat-worse'}">${refitted.RMSE.toFixed(4)}</span></div></div></div>
+          <div class="res-comparison-card"><div class="res-comparison-label">Original fit (N=${orig.n})</div><div style="font-size:13px;color:var(--text-primary);"><div><b>R²:</b> ${_resFitCell(orig.R2)}</div><div><b>Adj R²:</b> ${_resFitCell(orig.R2_adj)}</div><div><b>RMSE:</b> ${_resFitCell(orig.RMSE)}</div></div></div>
+          <div style="font-size:28px;color:var(--text-muted);font-weight:bold;text-align:center;">→</div>
+          <div class="res-comparison-card"><div class="res-comparison-label">Without flagged rows (N=${refitted.n})</div><div style="font-size:13px;color:var(--text-primary);"><div><b>R²:</b> ${_resFitCell(refitted.R2)}</div><div><b>Adj R²:</b> ${_resFitCell(refitted.R2_adj)}</div><div><b>RMSE:</b> ${_resFitCell(refitted.RMSE)}</div></div></div>
         </div>`;
+    }
+    function _resRefitWithout() {
+      if (!window._resInfluentialIndices?.length || !window.regressionData || !window.regressionResults) return;
+      const { yVector, xMatrix } = window.regressionData;
+      const snapshot = _resOriginalResults || JSON.parse(JSON.stringify(window.regressionResults));
+      const excl = new Set(window._resInfluentialIndices);
+      const newY = [], newX = [];
+      yVector.forEach((y, i) => { if (!excl.has(i)) { newY.push(y); newX.push(xMatrix[i]); } });
+      const refitted = computeOLS(newX, newY, snapshot.includeIntercept, false);
+      _resOriginalResults = snapshot;
+      window._resBulkFit = refitted;
+      window._regCaseTraceHold = true;
+      if (window._regCaseSession) window._regCaseSession.clearSelection();
+      _resShowBulkComparison();
+      renderRegInfluenceChrome();
+      renderRegCaseDock();
+      applyRegCaseHighlight();
     }
     function _resRestoreModel() {
       if (!_resOriginalResults) return;
       window._regCaseTraceHold = false;
       window.regressionResults = _resOriginalResults;
       _resOriginalResults = null;
+      window._resBulkFit = null;
       _resData = _resCalc();
-      document.getElementById('resComparisonPanel').style.display = 'none';
+      const panel = document.getElementById('resComparisonPanel');
+      if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
+      renderRegInfluenceChrome();
+      renderRegCaseDock();
       applyRegCaseHighlight();
     }
     

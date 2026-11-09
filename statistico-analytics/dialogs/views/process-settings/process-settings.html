@@ -14,12 +14,12 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261109ps" />
   <script src="../shared-config.js?v=20261109ps"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261109ps"></script>
+  <script src="../shared-header.js?v=20261109ps5"></script>
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
   <script src="../../shared/column-type.js"></script>
   <script src="../../shared/regression-case-trace.js"></script>
   <script src="../../shared/regression-effect-plot.js"></script>
-  <script src="../../shared/process-settings-engine.js"></script>
+  <script src="../../shared/process-settings-engine.js?v=20261109ps5"></script>
   <style>
     :root {
       --ps-mean: #0f766e;
@@ -96,6 +96,36 @@
     th:nth-child(n+2), td.num { text-align: right; font-variant-numeric: tabular-nums; }
     tr.changed td { background: color-mix(in srgb, var(--ps-mark) 16%, transparent); font-weight: 700; }
     .pred { display: grid; grid-template-columns: minmax(88px, 1.2fr) auto minmax(140px, 1fr) minmax(72px, .7fr); gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--border, rgba(255,255,255,.09)); }
+    .statistico-header.statistico-header--with-views {
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1fr) minmax(168px, 1.15fr);
+    }
+    .statistico-header--with-views .header-left,
+    .statistico-header--with-views .header-center,
+    .statistico-header--with-views .header-right { min-width: 0; }
+    .statistico-header--with-views .header-view-name {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .statistico-header--with-views .header-right { flex-wrap: wrap; justify-content: flex-end; row-gap: 4px; }
+    .ps-sr {
+      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    .ps-band { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: flex-end; }
+    .ps-pred { font-size: 22px; line-height: 1.1; font-weight: 700; }
+    .ps-pred-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted, #9aabbd); }
+    .ps-spec-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: var(--text-muted, #9aabbd); }
+    .ps-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; align-items: start; }
+    .ps-profile-card {
+      margin: 0; padding: 8px 10px; min-width: 0;
+      border: 1px solid var(--border, rgba(255,255,255,.09));
+      border-radius: 10px; background: var(--surface-1, #242c37);
+    }
+    .ps-profile-card svg.profile { height: 168px; cursor: ew-resize; }
+    .ps-profile-card .control { border-top: 0; padding: 4px 0 0; }
+    .ps-profile-card[hidden] { display: none !important; }
     .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
     .metric { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,.09)); background: var(--surface-2, transparent); min-width: 0; }
     .metric span { display: block; color: var(--text-muted, #9aabbd); font-size: 11px; }
@@ -344,44 +374,26 @@
 
         <section id="view-profiler" class="ps-view" hidden aria-labelledby="profiler-title">
           <div class="ps-top">
-            <h2 id="profiler-title" tabindex="-1">Prediction Profiler</h2>
-            <div class="reg-equation-strip" id="profiler-equation"></div>
-            <div id="strip" class="metrics" aria-live="polite"></div>
-            <div id="live-spec" class="spec-editor">
-              <p class="hint">Specification limits on this fit. A change updates the profiles and margins without fitting again.</p>
-              <div class="spec-live">
-                <label class="field" id="live-lsl-label">Lower limit<input id="live-lsl" data-live-spec="lsl" type="number" step="any" aria-label="Lower limit" /></label>
-                <label class="field" id="live-usl-label">Upper limit<input id="live-usl" data-live-spec="usl" type="number" step="any" aria-label="Upper limit" /></label>
-                <label class="field" id="live-target-label">Target<input id="live-target" data-live-spec="target" type="number" step="any" aria-label="Target" /></label>
-              </div>
-              <p id="live-spec-msg" class="status" data-spec-msg role="status"></p>
-            </div>
-            <div id="pin-box">
-              <p class="hint">Enter the current settings and pin them. The candidate starts as a copy of that snapshot. Fixed conditions use the values from Input &amp; Setup.</p>
-              <label class="field" style="margin:6px 0;">Populate from an analyzed row
-                <select id="row-picker"></select>
+            <h2 id="profiler-title" class="ps-sr" tabindex="-1">Prediction Profiler</h2>
+            <div id="strip" class="ps-band" aria-live="polite"></div>
+            <div id="spec-strip" class="ps-spec-strip"></div>
+            <div class="ps-actions">
+              <button type="button" class="ps-btn primary" id="pin-btn">Use these settings as current</button>
+              <button type="button" class="ps-btn" id="edit-current" hidden>Edit current settings</button>
+              <button type="button" class="ps-btn" id="reset-candidate" hidden>Reset candidate</button>
+              <label class="field" style="min-width:140px;">Use analyzed row
+                <select id="row-picker" aria-label="Use analyzed row"></select>
               </label>
-              <div id="pin-fields" class="ps-grid"></div>
-              <div class="ps-actions" style="margin-top:8px;">
-                <button type="button" class="ps-btn primary" id="pin-btn">Pin current settings</button>
-              </div>
-              <p id="pin-status" class="status" role="status"></p>
+              <label class="field" style="min-width:120px;">Confidence
+                <select id="confidence" aria-label="Confidence level">
+                  <option value="0.9">90%</option>
+                  <option value="0.95" selected>95%</option>
+                  <option value="0.99">99%</option>
+                </select>
+              </label>
             </div>
-            <div id="candidate-box" hidden>
-              <div class="ps-actions">
-                <button type="button" class="ps-btn" id="edit-current">Edit current settings</button>
-                <button type="button" class="ps-btn" id="reset-candidate">Reset candidate</button>
-                <label class="field" style="min-width:160px;">Confidence
-                  <select id="confidence" aria-label="Confidence level">
-                    <option value="0.9">90%</option>
-                    <option value="0.95" selected>95%</option>
-                    <option value="0.99">99%</option>
-                  </select>
-                </label>
-              </div>
-              <p id="fixed-summary" class="hint"></p>
-              <div id="controls"></div>
-            </div>
+            <p id="fixed-summary" class="hint"></p>
+            <p id="pin-status" class="status" role="status"></p>
             <p id="withheld" class="status error" hidden></p>
             <div class="legend" id="legend"></div>
           </div>
@@ -403,6 +415,8 @@
   var committedTable = { headers: [], rows: [], address: '' };
   var stagedTable = null;
   var lockedResponse = '';
+  var selectedDiag = -1;
+  var movedExplore = false;
   var assign = { response: '', numeric: [], categorical: [], roles: {}, units: {}, interactions: [] };
   var draggedName = '';
   var TITLES = {
@@ -436,6 +450,49 @@
     var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
     var text = toFixed.call(Math.abs(rounded), 6).replace(/\.?0+$/, '');
     return (rounded < 0 ? '\u2212' : '') + text;
+  }
+  function fmtResponse(value) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) return 'Unavailable';
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    return (n < 0 ? '\u2212' : '') + toFixed.call(Math.abs(n), 2);
+  }
+  function fmtSigned(value) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    if (Math.abs(n) < 0.005) return '0.00';
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    return (n > 0 ? '+' : '\u2212') + toFixed.call(Math.abs(n), 2);
+  }
+  function fmtR2(value) {
+    var n = Number(value);
+    if (!Number.isFinite(n)) return '—';
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    return toFixed.call(n * 100, 1) + '%';
+  }
+  function activeCard(view) {
+    return view.pin ? view.candidateCard : view.exploreCard;
+  }
+  function marginPhrase(card) {
+    if (!card || !card.available) return 'Specification margin unavailable';
+    if (!card.margin || card.margin.unavailable) return 'Specification margin unavailable';
+    var side = card.margin.side || 'limit';
+    var amount = fmtResponse(Math.abs(card.margin.value));
+    if (Math.abs(card.margin.value) < 0.005) return 'At the ' + side;
+    var outside = card.margin.value < 0;
+    if (side.indexOf('upper') >= 0) return amount + (outside ? ' above ' : ' below ') + side;
+    if (side.indexOf('lower') >= 0) return amount + (outside ? ' below ' : ' above ') + side;
+    return amount + (outside ? ' outside ' : ' inside ') + side;
+  }
+  function intervalPhrase(card, spec) {
+    if (!card || !card.available) return '';
+    var pct = (card.ciLabel || '95%').split('%')[0] + '%';
+    if (!card.ci) return pct + ' mean interval unavailable';
+    var text = pct + ' mean interval ' + fmtResponse(card.ci[0]) + '–' + fmtResponse(card.ci[1]);
+    var notes = [];
+    if (spec && spec.lsl != null && card.ci[0] < spec.lsl && card.ci[1] > spec.lsl) notes.push(pct + ' mean interval crosses lower limit');
+    if (spec && spec.usl != null && card.ci[0] < spec.usl && card.ci[1] > spec.usl) notes.push(pct + ' mean interval crosses upper limit');
+    return notes.length ? (text + '. ' + notes.join('. ')) : text;
   }
   function post(action) {
     try {
@@ -975,11 +1032,13 @@
         return;
       }
       lockedResponse = form.config.response;
+      movedExplore = false;
+      profileStamp = '';
       if (Object.keys(form.fixed).length) session.setCurrentSettings(form.fixed);
       editing = false;
-      lastResults = 'overview';
-      setStatus('Fitted. N = ' + fitted.n + '. Pin the current settings in the Prediction Profiler before comparing a candidate.', false);
-      showView('overview', { focus: true, rebuild: false });
+      lastResults = 'profiler';
+      setStatus('Fitted. N = ' + fitted.n + '. The profiler starts from these settings. Use them as current when this is the operating recipe.', false);
+      showView('profiler', { focus: true, rebuild: false });
       return;
     }
     var snapshot = live.pin ? live.pin.settings : live.currentDraft;
@@ -1128,6 +1187,7 @@
 
   function renderOverview() {
     var view = session.read();
+    var model = view.model || {};
     var unit = view.config.responseScale && view.config.responseScale.unit;
     var adjustable = [];
     var fixed = [];
@@ -1137,24 +1197,19 @@
       if (view.config.roles[name] === 'fixed') fixed.push(text);
       else adjustable.push(text);
     });
-    var pinText = view.pin ? 'Current settings are pinned.' : 'Current settings are not pinned yet.';
     el('view-overview').innerHTML =
-      '<h2 id="overview-title" tabindex="-1">Overview</h2>' +
-      resultsLead(view) +
+      '<h2 id="overview-title" class="ps-sr" tabindex="-1">Overview</h2>' +
+      '<section class="ps-panel"><p class="ps-pred-label">' + esc(view.config.response || 'Response') + '</p>' +
+        '<p class="ps-pred">' + esc(view.config.response || 'Response') + '</p>' +
+        '<p>Fitted sample n = ' + esc(model.n == null ? '—' : String(model.n)) + ' · R² ' + esc(fmtR2(model.r2)) + '</p></section>' +
       '<div class="ps-panels">' +
         '<section class="ps-panel"><h3>Adjustable settings</h3><p>' + esc(adjustable.join(' · ') || 'None') + '</p>' +
           '<h3 style="margin-top:8px;">Fixed conditions</h3><p>' + esc(fixed.join(' · ') || 'None') + '</p></section>' +
-        '<section class="ps-panel"><h3>Specifications</h3>' + specEditor(view.spec) +
-          '<p id="overview-spec-summary" class="hint">' + esc(specSummary(view.spec, unit)) + '</p>' +
-          '<p class="hint">' + esc(pinText) + ' Open the profiler to pin this recipe and move a candidate on the same fit.</p></section>' +
+        '<section class="ps-panel"><h3>Specifications</h3><p>' + esc(specSummary(view.spec, unit)) + '</p>' +
+          '<p class="hint">Specification changes stay on this fit. Edit them from the profiler.</p></section>' +
       '</div>' +
       '<div class="ps-actions"><button type="button" class="ps-btn primary" id="open-profiler">Open Prediction Profiler</button></div>';
     el('open-profiler').addEventListener('click', function () { showView('profiler', { focus: true }); });
-    bindLiveSpec(el('view-overview'), function () {
-      var next = session.read();
-      var summary = el('overview-spec-summary');
-      if (summary) summary.textContent = specSummary(next.spec, next.config.responseScale && next.config.responseScale.unit);
-    });
   }
 
   function renderEffects() {
@@ -1174,14 +1229,12 @@
     }).join('. ');
     var unit = view.config.responseScale && view.config.responseScale.unit;
     el('view-effects').innerHTML =
-      '<h2 id="effects-title" tabindex="-1">Effects &amp; Interactions</h2>' +
-      resultsLead(view) +
+      '<h2 id="effects-title" class="ps-sr" tabindex="-1">Effects &amp; Interactions</h2>' +
       '<p class="hint">Dummy coding. The reference level is the first level in alphabetical order and is omitted from the coefficient list. An interaction column is the product of the coded predictors. Estimates are on the response scale' +
       (unit ? (' (' + esc(unit) + ')') : '') + '. The ' + level + '% coefficient intervals are from the fit. The profiler confidence level changes only the mean-response interval.</p>' +
       (refs ? ('<p class="hint">' + esc(refs) + '.</p>') : '') +
       '<div class="ps-panel" style="overflow:auto;"><table><thead><tr><th>Term</th><th>Estimate</th><th>Std. error</th><th>t</th><th>p</th><th>' + level + '% interval</th></tr></thead><tbody>' +
       rows + '</tbody></table></div>' +
-      '<p class="hint">Ordinary least squares has been run ' + view.fitCount + ' time(s) this session.</p>' +
       interactionBlock(view);
   }
 
@@ -1207,7 +1260,7 @@
   function interactionBlock(view) {
     var interactions = view.config.interactions || [];
     if (!interactions.length) {
-      return '<section class="ps-panel"><h3>Interactions</h3><p>This model has no interaction terms.</p></section>';
+      return '<p class="hint">This fit has no interaction terms.</p>';
     }
     return '<section class="ps-panel"><h3>Interaction plot</h3>' + interactions.map(function (ix, index) {
       return interactionFigure(view, ix, index);
@@ -1308,23 +1361,36 @@
     var fitted = model.fitted || [];
     var residuals = model.residuals || [];
     var observed = view.analyzedRows.map(function (row) { return row.response; });
+    var rows = view.analyzedRows || [];
     el('view-diagnostics').innerHTML =
-      '<h2 id="diagnostics-title" tabindex="-1">Diagnostics</h2>' +
-      resultsLead(view) +
-      '<p class="hint">Analyzed sample N = ' + model.n + '. These charts use the fitted rows. Candidate settings do not change them. No separate lack-of-fit warning is stored beyond the residual pattern below.</p>' +
+      '<h2 id="diagnostics-title" class="ps-sr" tabindex="-1">Diagnostics</h2>' +
+      '<p class="hint">Analyzed sample n = ' + model.n + '. These charts use the fitted rows. Candidate settings do not change them.</p>' +
       '<div class="ps-panels">' +
-        '<figure class="ps-panel"><figcaption><strong>Observed vs fitted</strong></figcaption>' + scatterSvg(fitted, observed, 'Fitted', 'Observed', true) + '</figure>' +
-        '<figure class="ps-panel"><figcaption><strong>Residuals vs fitted</strong></figcaption>' + scatterSvg(fitted, residuals, 'Fitted', 'Residual', false) + '</figure>' +
+        '<figure class="ps-panel"><figcaption><strong>Observed vs fitted</strong></figcaption>' + scatterSvg(fitted, observed, 'Fitted', 'Observed', true, rows, 'obs') + '</figure>' +
+        '<figure class="ps-panel"><figcaption><strong>Residuals vs fitted</strong></figcaption>' + scatterSvg(fitted, residuals, 'Fitted', 'Residual', false, rows, 'res') + '</figure>' +
       '</div>' +
       '<figure class="ps-panel"><figcaption><strong>Normal quantile plot of residuals</strong></figcaption>' + qqSvg(residuals) + '</figure>';
+    el('view-diagnostics').querySelectorAll('[data-case]').forEach(function (dot) {
+      dot.addEventListener('click', function () {
+        var index = Number(dot.getAttribute('data-case'));
+        selectedDiag = selectedDiag === index ? -1 : index;
+        renderDiagnostics();
+      });
+    });
   }
 
-  function scatterSvg(xs, ys, xLabel, yLabel, identity) {
-    var width = 420;
-    var height = 220;
+  function axisTicks(lo, hi, count) {
+    var ticks = [];
+    var steps = Math.max(count, 1);
+    for (var i = 0; i <= steps; i++) ticks.push(lo + (hi - lo) * (i / steps));
+    return ticks;
+  }
+  function scatterSvg(xs, ys, xLabel, yLabel, identity, rows, chartId) {
+    var width = 460;
+    var height = 260;
     var pairs = [];
     for (var i = 0; i < xs.length && i < ys.length; i++) {
-      if (Number.isFinite(xs[i]) && Number.isFinite(ys[i])) pairs.push({ x: xs[i], y: ys[i] });
+      if (Number.isFinite(xs[i]) && Number.isFinite(ys[i])) pairs.push({ i: i, x: xs[i], y: ys[i], row: rows ? rows[i] : null });
     }
     if (!pairs.length) return '<p class="hint">This chart is unavailable for the current fit.</p>';
     var xlo = Math.min.apply(null, pairs.map(function (p) { return p.x; }));
@@ -1337,21 +1403,31 @@
     var xpad = (xhi - xlo) * 0.08;
     var ypad = (yhi - ylo) * 0.08;
     xlo -= xpad; xhi += xpad; ylo -= ypad; yhi += ypad;
-    function xOf(x) { return 42 + ((x - xlo) / (xhi - xlo)) * (width - 58); }
-    function yOf(y) { return 16 + (1 - (y - ylo) / (yhi - ylo)) * (height - 46); }
+    function xOf(x) { return 58 + ((x - xlo) / (xhi - xlo)) * (width - 74); }
+    function yOf(y) { return 14 + (1 - (y - ylo) / (yhi - ylo)) * (height - 58); }
     var dots = pairs.map(function (p) {
-      return '<circle cx="' + xOf(p.x) + '" cy="' + yOf(p.y) + '" r="3.5" fill="var(--ps-mean)" />';
+      var source = p.row ? (p.row.label || ('Row ' + (p.i + 1))) : ('Row ' + (p.i + 1));
+      var observed = p.row && Number.isFinite(p.row.response) ? fmtResponse(p.row.response) : 'Unavailable';
+      var fitted = fmtResponse(p.x);
+      var residual = p.row && Number.isFinite(p.row.response) ? fmtResponse(p.row.response - p.x) : 'Unavailable';
+      var tip = source + '. Observed ' + observed + '. Fitted ' + fitted + '. Residual ' + residual + '.';
+      var on = !!(rows && selectedDiag === p.i);
+      return '<circle data-case="' + p.i + '" cx="' + xOf(p.x) + '" cy="' + yOf(p.y) + '" r="' + (on ? 6 : 3.5) +
+        '" fill="' + (on ? 'var(--ps-mark)' : 'var(--ps-mean)') + '" stroke="' + (on ? 'var(--ps-mark)' : 'transparent') + '" stroke-width="6" style="cursor:pointer"><title>' +
+        esc(tip) + '</title></circle>';
     }).join('');
-    var guide = '';
-    if (identity) {
-      guide = '<line x1="' + xOf(xlo) + '" y1="' + yOf(xlo) + '" x2="' + xOf(xhi) + '" y2="' + yOf(xhi) + '" stroke="var(--ps-limit)" stroke-dasharray="5 4" />';
-    } else {
-      guide = '<line x1="' + xOf(xlo) + '" y1="' + yOf(0) + '" x2="' + xOf(xhi) + '" y2="' + yOf(0) + '" stroke="var(--ps-limit)" stroke-dasharray="5 4" />';
-    }
-    return '<svg class="diag" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(yLabel + ' versus ' + xLabel) + '">' +
-      guide + dots +
-      '<text x="42" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(xLabel) + '</text>' +
-      '<text x="8" y="20" fill="currentColor" font-size="11">' + esc(yLabel) + '</text></svg>';
+    var guide = identity
+      ? '<line x1="' + xOf(Math.max(xlo, ylo)) + '" y1="' + yOf(Math.max(xlo, ylo)) + '" x2="' + xOf(Math.min(xhi, yhi)) + '" y2="' + yOf(Math.min(xhi, yhi)) + '" stroke="var(--ps-limit)" stroke-dasharray="5 4" />'
+      : '<line x1="' + xOf(xlo) + '" y1="' + yOf(0) + '" x2="' + xOf(xhi) + '" y2="' + yOf(0) + '" stroke="var(--ps-limit)" stroke-dasharray="5 4" />';
+    var ticks = axisTicks(xlo, xhi, 3).map(function (tick) {
+      return '<text x="' + xOf(tick) + '" y="' + (height - 16) + '" fill="currentColor" font-size="10" text-anchor="middle">' + esc(fmtResponse(tick)) + '</text>';
+    }).join('') + axisTicks(ylo, yhi, 3).map(function (tick) {
+      return '<text x="16" y="' + (yOf(tick) + 3) + '" fill="currentColor" font-size="10">' + esc(fmtResponse(tick)) + '</text>';
+    }).join('');
+    return '<svg class="diag" data-diag="' + esc(chartId || '') + '" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(yLabel + ' versus ' + xLabel) + '">' +
+      guide + ticks + dots +
+      '<text x="' + ((58 + width - 16) / 2) + '" y="' + (height - 2) + '" fill="currentColor" font-size="11" text-anchor="middle">' + esc(xLabel) + '</text>' +
+      '<text x="12" y="' + (height / 2) + '" fill="currentColor" font-size="11" text-anchor="middle" transform="rotate(-90 12 ' + (height / 2) + ')">' + esc(yLabel) + '</text></svg>';
   }
 
   function invNorm(p) {
@@ -1381,104 +1457,134 @@
     return scatterSvg(theor, sample, 'Theoretical quantile', 'Residual', true);
   }
 
+  function adjustableNames(view) {
+    return view.config.numeric.concat(view.config.categorical).filter(function (name) {
+      return view.config.roles[name] !== 'fixed';
+    });
+  }
+
+  function applyScenario(patch) {
+    if (el('pin-status')) el('pin-status').textContent = '';
+    if (session.read().pin) session.setCandidate(patch);
+    else {
+      movedExplore = true;
+      session.setCurrentSettings(patch);
+    }
+  }
+
+  function controlHtml(view, name, draft) {
+    var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
+    var value = draft[name] == null ? '' : draft[name];
+    if (view.config.categorical.indexOf(name) >= 0) {
+      var known = view.observed.levels[name] || [];
+      var allowed = (view.limits[name] && view.limits[name].levels) || known;
+      var options = allowed.map(function (level) {
+        return '<option value="' + esc(level) + '"' + (String(level) === String(value) ? ' selected' : '') + '>' + esc(level) + '</option>';
+      }).join('');
+      return '<label class="field">' + esc(name) + '<select data-cand="' + esc(name) + '">' + options + '</select></label>' +
+        '<p class="field-error" data-cand-error="' + esc(name) + '"></p>';
+    }
+    var limit = view.limits[name] || { min: value, max: value };
+    var locked = Math.abs(Number(limit.max) - Number(limit.min)) <= 1e-9;
+    var span = Number(limit.max) - Number(limit.min);
+    var step = (span >= 10 && Math.abs(limit.min - Math.round(limit.min)) < 1e-9 && Math.abs(limit.max - Math.round(limit.max)) < 1e-9) ? '1' : 'any';
+    var slider = locked ? '' : '<input data-cand="' + esc(name) + '" data-numeric="1" type="range" min="' + esc(limit.min) + '" max="' + esc(limit.max) +
+      '" step="' + step + '" value="' + esc(value) + '" aria-label="' + esc(name) + ' slider" />';
+    return '<label class="field">' + esc(name) + esc(unit) + slider +
+      '<input data-cand="' + esc(name) + '" data-numeric="1" type="number" step="any" value="' + esc(value) + '" aria-label="' + esc(name) + ' value" /></label>' +
+      '<p class="field-error" data-cand-error="' + esc(name) + '"></p>';
+  }
+
+  function openSpecifications() {
+    editing = true;
+    fillSetup();
+    showView('setup', { focus: false });
+    var node = el('lsl');
+    if (node && node.scrollIntoView) node.scrollIntoView({ block: 'center' });
+    if (node) node.focus();
+  }
+
+  var profileStamp = '';
   function buildProfiler() {
     var view = session.read();
     var pinned = !!view.pin;
-    el('pin-box').hidden = pinned;
-    el('candidate-box').hidden = !pinned;
+    el('pin-btn').hidden = !!pinned;
+    el('edit-current').hidden = !pinned;
+    el('reset-candidate').hidden = !pinned;
     el('confidence').value = String(view.confidence);
-    if (!pinned) {
-      var picker = el('row-picker');
-      picker.innerHTML = '<option value="">Enter settings below</option>' + view.analyzedRows.map(function (row, index) {
-        return '<option value="' + index + '">' + esc(row.label) + '</option>';
-      }).join('');
-      var draft = view.currentDraft || {};
-      el('pin-fields').innerHTML = view.config.numeric.concat(view.config.categorical).map(function (name) {
-        var numeric = view.config.numeric.indexOf(name) >= 0;
-        var value = draft[name] == null ? '' : draft[name];
-        var role = view.config.roles[name] === 'fixed' ? 'Fixed condition' : 'Adjustable setting';
-        if (view.config.roles[name] === 'fixed') {
-          return '<p class="hint"><strong>' + esc(name) + '</strong> ' + esc(value) + (view.config.units[name] ? (' ' + esc(view.config.units[name])) : '') + ' · ' + role + '</p>';
-        }
-        if (numeric) {
-          return '<label class="field">' + esc(name) + ' · ' + role + '<input data-current="' + esc(name) + '" data-numeric="1" type="number" step="any" value="' + esc(value) + '" /></label>';
-        }
-        var levels = view.observed.levels[name] || [];
-        var options = levels.map(function (level) {
-          return '<option value="' + esc(level) + '"' + (String(level) === String(value) ? ' selected' : '') + '>' + esc(level) + '</option>';
-        }).join('');
-        return '<label class="field">' + esc(name) + ' · ' + role + '<select data-current="' + esc(name) + '">' + options + '</select></label>';
-      }).join('');
-      el('pin-status').textContent = '';
-      return;
-    }
-    var draft = view.candidateDraft || {};
-    var fixedBits = [];
-    var html = view.config.numeric.concat(view.config.categorical).map(function (name) {
-      var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
-      if (view.config.roles[name] === 'fixed') {
-        fixedBits.push(name + ' ' + draft[name] + unit);
-        return '';
-      }
-      if (view.config.categorical.indexOf(name) >= 0) {
-        var known = view.observed.levels[name] || [];
-        var allowed = (view.limits[name] && view.limits[name].levels) || known;
-        var options = allowed.map(function (level) {
-          return '<option value="' + esc(level) + '"' + (String(level) === String(draft[name]) ? ' selected' : '') + '>' + esc(level) + '</option>';
-        }).join('');
-        return '<div class="control"><label class="field">' + esc(name) + '<select data-cand="' + esc(name) + '">' + options + '</select></label>' +
-          '<p class="field-error" data-cand-error="' + esc(name) + '"></p></div>';
-      }
-      var limit = view.limits[name] || { min: draft[name], max: draft[name] };
-      var observed = view.observed.ranges[name];
-      var locked = Math.abs(Number(limit.max) - Number(limit.min)) <= 1e-9;
-      var span = Number(limit.max) - Number(limit.min);
-      var step = (span >= 10 && Math.abs(limit.min - Math.round(limit.min)) < 1e-9 && Math.abs(limit.max - Math.round(limit.max)) < 1e-9) ? '1' : 'any';
-      var slider = locked ? '' : '<input data-cand="' + esc(name) + '" data-numeric="1" type="range" min="' + esc(limit.min) + '" max="' + esc(limit.max) +
-        '" step="' + step + '" value="' + esc(draft[name]) + '" aria-label="' + esc(name) + ' slider" />';
-      return '<div class="control"><label class="field">' + esc(name) + esc(unit) + slider +
-        '<span class="row"><input data-cand="' + esc(name) + '" data-numeric="1" type="number" step="any" value="' + esc(draft[name]) + '" aria-label="' + esc(name) + ' value" /></span></label>' +
-        '<p class="hint" data-bound-hint="' + esc(name) + '"></p><p class="field-error" data-cand-error="' + esc(name) + '"></p></div>';
+    var picker = el('row-picker');
+    var selected = picker.value;
+    picker.innerHTML = '<option value="">Exact values</option>' + view.analyzedRows.map(function (row, index) {
+      return '<option value="' + index + '">' + esc(row.label) + '</option>';
     }).join('');
-    el('controls').innerHTML = html;
-    el('fixed-summary').textContent = fixedBits.length ? ('Fixed conditions: ' + fixedBits.join(' · ')) : '';
+    if (selected) picker.value = selected;
+    var names = adjustableNames(view);
+    var stamp = (pinned ? view.pin.id : 'explore') + '|' + names.join('|');
+    var draft = pinned ? (view.candidateDraft || {}) : (view.currentDraft || {});
+    if (stamp !== profileStamp) {
+      profileStamp = stamp;
+      var chooser = names.length > 4
+        ? '<label class="field">Profile<select id="profile-picker">' + names.map(function (name, index) {
+          return '<option value="' + esc(name) + '"' + (index ? '' : ' selected') + '>' + esc(name) + '</option>';
+        }).join('') + '</select></label>'
+        : '';
+      el('profiles').innerHTML = chooser + '<div class="ps-profile-grid">' + names.map(function (name) {
+        return '<figure class="ps-profile-card" data-profile-card="' + esc(name) + '"><figcaption><strong>' + esc(name) +
+          '</strong></figcaption><div data-chart="' + esc(name) + '"></div><div class="control">' + controlHtml(view, name, draft) + '</div></figure>';
+      }).join('') + '</div>';
+      var profilePicker = el('profile-picker');
+      if (profilePicker) profilePicker.addEventListener('change', paintProfiler);
+    }
+    var fixedBits = [];
+    view.config.numeric.concat(view.config.categorical).forEach(function (name) {
+      if (view.config.roles[name] !== 'fixed') return;
+      var shown = draft[name] == null ? view.currentDraft[name] : draft[name];
+      fixedBits.push(name + ' ' + (shown == null ? '' : shown));
+    });
+    el('fixed-summary').textContent = fixedBits.length ? ('Held fixed: ' + fixedBits.join(' · ')) : '';
+    paintProfiler();
   }
 
-  function cardBits(card, suffix) {
-    if (!card || !card.available) return { mean: 'Withheld', detail: '' };
-    var ci = card.ci ? card.ciText : 'Unavailable';
-    return {
-      mean: card.meanText + suffix,
-      detail: card.ciLabel + ' ' + ci + (card.ci ? '' : ('. ' + (card.ciReason || '')))
-    };
+  function chartSlot(name) {
+    var found = null;
+    document.querySelectorAll('[data-chart]').forEach(function (node) {
+      if (node.getAttribute('data-chart') === name) found = node;
+    });
+    return found;
   }
 
   function paintProfiler() {
-    syncLiveSpecFields();
     var view = session.read();
-    if (el('profiler-equation')) {
-      el('profiler-equation').textContent = modelEquation(view.config) + ' · The response stays ' + (view.config.response || 'the fitted outcome') + ' for this analysis.';
+    var card = activeCard(view);
+    var response = view.config.response || 'response';
+    var pinned = !!view.pin;
+    el('pin-btn').hidden = !!pinned || !card;
+    var kicker = pinned ? 'Candidate' : (movedExplore ? 'Exploring settings' : 'Starting settings');
+    var mean = card ? fmtResponse(card.mean) : '—';
+    var change = '';
+    if (pinned && view.currentCard && view.currentCard.available && card) {
+      change = '<p class="hint">Current ' + esc(fmtResponse(view.currentCard.mean)) + ' · change ' + esc(fmtSigned(view.deltaMean)) + '</p>';
+    } else if (!pinned) {
+      change = '<p class="hint">A starting scenario. It becomes the current recipe when you use these settings as current.</p>';
     }
-    var suffix = view.config.responseScale && view.config.responseScale.kind === 'percent' ? '%' : '';
-    var current = cardBits(view.currentCard, suffix);
-    var candidate = view.candidateCard ? cardBits(view.candidateCard, suffix) : { mean: view.pin ? 'Withheld' : 'Not pinned', detail: '' };
+    var notes = '';
+    if (card && card.support && card.support.advisories && card.support.advisories.length) {
+      notes += '<p class="warn">' + esc(card.support.advisories[0]) + ' ' + esc(card.support.caveat || '') + '</p>';
+    }
+    if (card && card.rangeFlag) notes += '<p class="warn">' + esc(card.rangeFlag) + '</p>';
+    var margin = card && card.margin && !card.margin.unavailable
+      ? ('Limiting margin ' + fmtSigned(card.margin.value) + ' · ' + marginPhrase(card))
+      : (card ? marginPhrase(card) : '');
     el('strip').innerHTML =
-      metric('Current predicted mean', current.mean) +
-      metric('Candidate predicted mean', candidate.mean) +
-      metric('Candidate − current', view.deltaText || '—') +
-      metric('Candidate margin', view.candidateCard ? view.candidateCard.marginText : '—');
-    el('withheld').hidden = view.phase !== 'withheld';
-    el('withheld').textContent = view.withheldReason || '';
+      '<div><span class="ps-pred-label">' + esc(kicker) + '</span><span class="ps-pred-label">Predicted ' + esc(response) + '</span><span class="ps-pred">' + esc(mean) + '</span></div>' +
+      '<div><p>' + esc(card ? intervalPhrase(card, view.spec) : (view.withheldReason || 'Enter the remaining settings to predict.')) + '</p><p>' + esc(margin) + '</p>' + change + notes + '</div>';
+    var unit = view.config.responseScale && view.config.responseScale.unit;
+    el('spec-strip').innerHTML = '<span>' + esc(specSummary(view.spec, unit)) + '</span><button type="button" class="ps-btn" id="edit-specs">Edit specifications</button>';
+    el('edit-specs').addEventListener('click', openSpecifications);
+    el('withheld').hidden = view.phase !== 'withheld' && view.phase !== 'needs-input';
+    el('withheld').textContent = (view.phase === 'withheld' || view.phase === 'needs-input') ? (view.withheldReason || '') : '';
     document.querySelectorAll('[data-cand-error]').forEach(function (node) { node.textContent = ''; });
     document.querySelectorAll('[data-cand]').forEach(function (input) { input.setAttribute('aria-invalid', 'false'); });
-    document.querySelectorAll('[data-bound-hint]').forEach(function (node) {
-      var name = node.getAttribute('data-bound-hint');
-      var limit = view.limits[name];
-      var observed = view.observed.ranges[name];
-      if (!limit) return;
-      node.textContent = 'Allowed ' + formatCoef(Number(limit.min)) + ' to ' + formatCoef(Number(limit.max)) +
-        (observed ? ('. Analyzed ' + formatCoef(observed.min) + ' to ' + formatCoef(observed.max) + '.') : '.');
-    });
     (view.candidateErrors || []).forEach(function (err) {
       document.querySelectorAll('[data-cand-error]').forEach(function (node) {
         if (node.getAttribute('data-cand-error') === err.name) node.textContent = err.message;
@@ -1487,51 +1593,78 @@
         if (input.getAttribute('data-cand') === err.name) input.setAttribute('aria-invalid', 'true');
       });
     });
+    var activeName = el('profile-picker') ? el('profile-picker').value : '';
+    var cards = document.querySelectorAll('[data-profile-card]');
+    cards.forEach(function (node) {
+      node.hidden = !!(activeName && cards.length > 4 && node.getAttribute('data-profile-card') !== activeName);
+    });
+    view.profiles.forEach(function (profile, index) {
+      var slot = chartSlot(profile.name);
+      if (!slot) return;
+      var held = (profile.held || []).map(function (item) { return item.name + ' ' + item.text; }).join(', ');
+      var caption = slot.parentNode.querySelector('figcaption');
+      if (caption) {
+        caption.innerHTML = '<strong>' + esc(profile.name) + (profile.unit ? ' (' + esc(profile.unit) + ')' : '') +
+          '</strong>' + (held ? '<span class="hint">Held ' + esc(held) + '</span>' : '');
+      }
+      slot.innerHTML = profileSvg(profile, view, index === 0);
+    });
+    if (!view.profiles.length) {
+      document.querySelectorAll('[data-chart]').forEach(function (slot) { slot.innerHTML = ''; });
+    }
+    var draft = pinned ? (view.candidateDraft || {}) : (view.currentDraft || {});
+    document.querySelectorAll('#profiles [data-cand]').forEach(function (input) {
+      if (document.activeElement === input) return;
+      var name = input.getAttribute('data-cand');
+      if (draft[name] == null || draft[name] === '') return;
+      input.value = draft[name];
+    });
     var legend = ['<span><i class="swatch" style="background:var(--ps-mean)"></i>Predicted mean</span>'];
-    legend.push('<span><i class="swatch" style="background:var(--ps-ci);height:8px"></i>' + Math.round(view.confidence * 100) + '% confidence interval for the mean response</span>');
+    legend.push('<span><i class="swatch" style="background:var(--ps-ci);height:8px"></i>' + Math.round(view.confidence * 100) + '% mean interval</span>');
     if (view.spec.lsl != null) legend.push('<span><i class="swatch" style="background:var(--ps-limit)"></i>LSL</span>');
     if (view.spec.usl != null) legend.push('<span><i class="swatch" style="background:var(--ps-limit)"></i>USL</span>');
     if (view.spec.target != null) legend.push('<span><i class="swatch" style="background:var(--ps-target)"></i>Target</span>');
     el('legend').innerHTML = legend.join('');
-    if (!view.profiles.length) {
-      el('profiles').innerHTML = '<p class="hint">' + esc(view.pin ? (view.withheldReason || 'The candidate profile is withheld until the candidate is valid.') : 'Pin the current settings to draw profiles.') + '</p>';
-      return;
-    }
-    el('profiles').innerHTML = view.profiles.map(function (profile) {
-      var held = (profile.held || []).map(function (item) { return item.name + ' ' + item.text; }).join(', ');
-      return '<figure><figcaption><strong>' + esc(profile.name) + (profile.unit ? ' (' + esc(profile.unit) + ')' : '') +
-        '</strong><span class="hint">Held at candidate: ' + esc(held || 'none') + (profile.locked ? ' Locked.' : '') + '</span></figcaption>' +
-        profileSvg(profile, view) + '</figure>';
-    }).join('');
   }
 
   function yOf(scale, value, height) {
     var span = scale.max - scale.min || 1;
-    return 18 + (1 - (value - scale.min) / span) * (height - 46);
+    return 16 + (1 - (value - scale.min) / span) * (height - 36);
   }
-  function specLines(scale, spec, width, height) {
+  function specLines(scale, spec, width, height, labeled) {
     var lines = [];
+    var placed = [];
     function add(value, label, color, dash, x) {
       if (!Number.isFinite(value)) return;
       var y = yOf(scale, value, height);
-      lines.push('<line x1="46" x2="' + (width - 12) + '" y1="' + y + '" y2="' + y + '" stroke="' + color + '" stroke-dasharray="' + dash + '" />');
-      lines.push('<text x="' + x + '" y="' + (y - 4) + '" fill="' + color + '" font-size="11">' + label + '</text>');
+      lines.push('<line x1="36" x2="' + (width - 8) + '" y1="' + y + '" y2="' + y + '" stroke="' + color + '" stroke-dasharray="' + dash + '" />');
+      if (!labeled) return;
+      var textY = Math.max(y - 3, 11);
+      placed.forEach(function (prev) {
+        if (Math.abs(prev - textY) < 11) textY = prev - 11;
+      });
+      placed.push(textY);
+      lines.push('<text x="' + x + '" y="' + textY + '" fill="' + color + '" font-size="10">' + label + '</text>');
     }
-    add(spec.lsl, 'LSL', 'var(--ps-limit)', '6 4', 50);
-    add(spec.usl, 'USL', 'var(--ps-limit)', '6 4', width - 48);
-    add(spec.target, 'Target', 'var(--ps-target)', '2 4', width / 2 - 18);
+    add(spec.lsl, 'LSL', 'var(--ps-limit)', '6 3', 40);
+    add(spec.target, 'Target', 'var(--ps-target)', '1 3', Math.round(width / 2) - 16);
+    add(spec.usl, 'USL', 'var(--ps-limit)', '2 3', width - 32);
     return lines.join('');
   }
-  function profileSvg(profile, view) {
-    var width = 640;
-    var height = 200;
+  function profileSvg(profile, view, labeled) {
+    var width = 320;
+    var height = 150;
     var scale = view.yScale;
     if (!scale) return '';
-    var body = specLines(scale, view.spec, width, height);
+    var body = specLines(scale, view.spec, width, height, labeled);
+    axisTicks(scale.min, scale.max, 3).forEach(function (tick) {
+      body += '<text x="2" y="' + (yOf(scale, tick, height) + 3) + '" fill="currentColor" font-size="10">' + esc(fmtResponse(tick)) + '</text>';
+    });
+    var card = activeCard(view);
     if (profile.kind === 'numeric' && profile.points.length) {
       var xmin = profile.points[0].x;
       var xmax = profile.points[profile.points.length - 1].x;
-      function xOf(x) { return 46 + ((x - xmin) / (xmax - xmin || 1)) * (width - 58); }
+      function xOf(x) { return 36 + ((x - xmin) / (xmax - xmin || 1)) * (width - 48); }
       var band = profile.points.filter(function (point) { return point.ci; });
       if (band.length) {
         var upper = band.map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.ci[1], height); }).join(' ');
@@ -1540,78 +1673,129 @@
       }
       body += '<polyline fill="none" stroke="var(--ps-mean)" stroke-width="2" points="' +
         profile.points.map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.mean, height); }).join(' ') + '" />';
-      if (view.candidateCard && Number.isFinite(profile.active)) {
-        var ax = xOf(profile.active);
-        var ay = yOf(scale, view.candidateCard.mean, height);
-        body += '<circle cx="' + ax + '" cy="' + ay + '" r="5" fill="var(--ps-mark)" />';
-        body += '<text x="' + Math.min(ax + 8, width - 110) + '" y="' + Math.max(ay - 8, 16) + '" fill="currentColor" font-size="12" font-weight="700">' +
-          esc(view.candidateCard.meanText) + ' at ' + esc(formatCoef(profile.active)) + '</text>';
+      if (card && Number.isFinite(profile.active)) {
+        body += '<circle cx="' + xOf(profile.active) + '" cy="' + yOf(scale, card.mean, height) + '" r="4.5" fill="var(--ps-mark)" />';
       }
-      body += '<text x="46" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(formatCoef(xmin)) + '</text>';
-      body += '<text x="' + (width - 70) + '" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(formatCoef(xmax)) + '</text>';
-    } else if (profile.kind === 'categorical') {
-      (profile.marks || []).forEach(function (mark, index) {
-        var x = 80 + index * ((width - 140) / Math.max((profile.marks || []).length, 1));
-        if (!Number.isFinite(mark.mean)) return;
-        if (mark.ci) {
-          body += '<line x1="' + x + '" x2="' + x + '" y1="' + yOf(scale, mark.ci[0], height) + '" y2="' + yOf(scale, mark.ci[1], height) + '" stroke="var(--ps-ci)" stroke-width="8" />';
-        }
-        var y = yOf(scale, mark.mean, height);
-        body += '<circle cx="' + x + '" cy="' + y + '" r="' + (mark.active ? 6 : 4) + '" fill="' + (mark.active ? 'var(--ps-mark)' : 'var(--ps-mean)') + '" />';
-        body += '<text x="' + (x - 8) + '" y="' + (height - 8) + '" fill="currentColor" font-size="12">' + esc(mark.level) + '</text>';
-        if (mark.active) body += '<text x="' + (x + 10) + '" y="' + Math.max(y - 8, 16) + '" fill="currentColor" font-size="12" font-weight="700">' + esc(formatCoef(mark.mean)) + '</text>';
-      });
+      body += '<text x="36" y="' + (height - 4) + '" fill="currentColor" font-size="10">' + esc(fmtResponse(xmin)) + '</text>';
+      body += '<text x="' + (width - 42) + '" y="' + (height - 4) + '" fill="currentColor" font-size="10">' + esc(fmtResponse(xmax)) + '</text>';
+      return '<svg class="profile" data-profile="' + esc(profile.name) + '" data-min="' + xmin + '" data-max="' + xmax + '" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(profile.name + ' profile') + '">' + body + '</svg>';
     }
-    return '<svg class="profile" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(profile.name + ' profile. Other inputs held at the candidate.') + '">' + body + '</svg>';
+    (profile.marks || []).forEach(function (mark, index) {
+      var x = 64 + index * ((width - 96) / Math.max((profile.marks || []).length, 1));
+      if (!Number.isFinite(mark.mean)) return;
+      if (mark.ci) {
+        body += '<line x1="' + x + '" x2="' + x + '" y1="' + yOf(scale, mark.ci[0], height) + '" y2="' + yOf(scale, mark.ci[1], height) + '" stroke="var(--ps-ci)" stroke-width="8" />';
+      }
+      body += '<circle cx="' + x + '" cy="' + yOf(scale, mark.mean, height) + '" r="' + (mark.active ? 5 : 3.5) + '" fill="' + (mark.active ? 'var(--ps-mark)' : 'var(--ps-mean)') + '" />';
+      body += '<text x="' + (x - 6) + '" y="' + (height - 4) + '" fill="currentColor" font-size="11">' + esc(mark.level) + '</text>';
+    });
+    return '<svg class="profile" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(profile.name + ' profile') + '">' + body + '</svg>';
+  }
+
+  function settingsMatch(view) {
+    return !!(view.pin && view.candidateCard && view.currentCard && Math.abs(view.deltaMean || 0) < 1e-6 && !(view.changed || []).length);
+  }
+
+  function compareScale(view) {
+    var vals = [];
+    [view.currentCard, view.candidateCard].forEach(function (item) {
+      if (!item || !item.available) return;
+      vals.push(item.mean);
+      if (item.ci) { vals.push(item.ci[0]); vals.push(item.ci[1]); }
+    });
+    ['lsl', 'usl', 'target'].forEach(function (key) {
+      if (view.spec[key] != null) vals.push(view.spec[key]);
+    });
+    if (!vals.length) return null;
+    var lo = Math.min.apply(null, vals);
+    var hi = Math.max.apply(null, vals);
+    if (hi - lo < 1e-7) { lo -= 1; hi += 1; }
+    var pad = (hi - lo) * 0.12;
+    return { min: lo - pad, max: hi + pad };
+  }
+
+  function compareSvg(view) {
+    var scale = compareScale(view);
+    if (!scale || !view.currentCard || !view.candidateCard) return '';
+    var width = 640;
+    var height = 128;
+    function xOf(value) { return 92 + ((value - scale.min) / (scale.max - scale.min)) * (width - 114); }
+    function row(y, label, card) {
+      var mean = xOf(card.mean);
+      var band = card.ci
+        ? '<line x1="' + xOf(card.ci[0]) + '" x2="' + xOf(card.ci[1]) + '" y1="' + y + '" y2="' + y + '" stroke="var(--ps-ci)" stroke-width="8" stroke-linecap="round" />'
+        : '';
+      return band + '<circle cx="' + mean + '" cy="' + y + '" r="5" fill="var(--ps-mark)" />' +
+        '<text x="8" y="' + (y + 4) + '" fill="currentColor" font-size="12">' + label + '</text>' +
+        '<text x="' + Math.min(mean + 8, width - 48) + '" y="' + (y - 8) + '" fill="currentColor" font-size="11">' + esc(fmtResponse(card.mean)) + '</text>';
+    }
+    var refs = '';
+    function ref(value, label, color, dash) {
+      if (!Number.isFinite(value)) return;
+      var x = xOf(value);
+      refs += '<line x1="' + x + '" x2="' + x + '" y1="18" y2="100" stroke="' + color + '" stroke-dasharray="' + dash + '" />';
+      refs += '<text x="' + x + '" y="12" fill="' + color + '" font-size="10" text-anchor="middle">' + label + '</text>';
+    }
+    ref(view.spec.lsl, 'LSL', 'var(--ps-limit)', '4 3');
+    ref(view.spec.usl, 'USL', 'var(--ps-limit)', '2 3');
+    ref(view.spec.target, 'Target', 'var(--ps-target)', '1 3');
+    var ticks = axisTicks(scale.min, scale.max, 4).map(function (tick) {
+      return '<text x="' + xOf(tick) + '" y="118" fill="currentColor" font-size="10" text-anchor="middle">' + esc(fmtResponse(tick)) + '</text>';
+    }).join('');
+    return '<svg class="compare-scale" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="Current and candidate predicted means on one response scale">' +
+      refs + row(46, 'Current', view.currentCard) + row(84, 'Candidate', view.candidateCard) + ticks + '</svg>';
+  }
+
+  function specStripHtml(view) {
+    var unit = view.config.responseScale && view.config.responseScale.unit;
+    return '<div class="ps-spec-strip"><span>' + esc(specSummary(view.spec, unit)) + '</span><button type="button" class="ps-btn" id="edit-specs">Edit specifications</button></div>';
   }
 
   function compareReadout(view) {
-    var suffix = view.config.responseScale && view.config.responseScale.kind === 'percent' ? '%' : '';
+    var response = view.config.response || 'response';
     if (!view.pin) {
-      return '<p>Pin the current settings in the Prediction Profiler before comparing.</p>' +
+      var exploring = view.exploreCard;
+      return '<p class="ps-pred-label">Exploring settings</p>' +
+        (exploring ? ('<p class="ps-pred">' + esc(fmtResponse(exploring.mean)) + '</p><p>Predicted ' + esc(response) + '. ' + esc(intervalPhrase(exploring, view.spec)) + '</p>') : '<p>The live scenario is not complete yet.</p>') +
+        '<p>Set the current recipe in the Prediction Profiler before comparing a candidate.</p>' +
         '<button type="button" class="ps-btn primary" id="back-profiler">Open Prediction Profiler</button>';
+    }
+    if (view.phase === 'withheld') {
+      return '<p class="status error">' + esc(view.withheldReason || 'The candidate is outside the allowed inputs.') + '</p>' +
+        '<button type="button" class="ps-btn primary" id="back-profiler">Back to Profiler</button>';
     }
     var names = view.config.numeric.concat(view.config.categorical);
     var changed = {};
-    (view.changed || []).forEach(function (row) { changed[row.name] = true; });
+    (view.changed || []).forEach(function (row) { changed[row.name] = row; });
     var rows = names.map(function (name) {
       var from = view.pin.settings[name];
       var to = view.candidateDraft[name];
+      var numeric = view.config.numeric.indexOf(name) >= 0;
       var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
-      return '<tr class="' + (changed[name] ? 'changed' : '') + '"><td>' + esc(name) + '</td><td>' + esc(from) + esc(unit) + '</td><td>' + esc(to) + esc(unit) + '</td></tr>';
+      var delta = '—';
+      if (changed[name]) delta = numeric ? fmtSigned(Number(to) - Number(from)) : (String(from) + ' → ' + String(to));
+      return '<tr class="' + (changed[name] ? 'changed' : '') + '"><td>' + esc(name) + '</td><td>' + esc(from) + esc(unit) + '</td><td>' + esc(to) + esc(unit) + '</td><td>' + esc(delta) + '</td></tr>';
     }).join('');
-    function block(title, card) {
-      if (!card) return '<article class="ps-panel"><h3>' + esc(title) + '</h3><p>The comparison is withheld until the candidate is valid.</p></article>';
-      var advisories = ((card.support && card.support.advisories) || []).map(function (line) { return '<p class="warn">' + esc(line) + '</p>'; }).join('');
-      return '<article class="ps-panel"><h3>' + esc(title) + '</h3><p class="hint">Predicted mean</p><p class="mean">' + esc(card.meanText) + esc(suffix) + '</p>' +
-        '<p>' + esc(card.ciLabel) + '</p><p>' + esc(card.ciText) + '</p>' +
-        (card.ci ? '' : ('<p class="hint">' + esc(card.ciReason || 'The confidence interval for the mean response is unavailable for this fit.') + '</p>')) +
-        '<p>Margin to specification: ' + esc(card.marginText) + '</p>' +
-        (card.locationLabel ? ('<p><strong>' + esc(card.locationLabel) + '</strong></p>') : '') +
-        (card.targetText ? ('<p>' + esc(card.targetText) + (card.atTarget ? ' (exactly at target)' : '') + '</p>') : '') +
-        (card.rangeFlag ? ('<p class="warn">' + esc(card.rangeFlag) + '</p>') : '') +
-        advisories + '<p class="hint">' + esc(card.support ? card.support.caveat : '') + '</p></article>';
+    var table = '<div class="ps-panel" style="overflow:auto;"><table><thead><tr><th>Setting</th><th>Current</th><th>Candidate</th><th>Change</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    if (settingsMatch(view)) {
+      return '<p><strong>Candidate matches current settings.</strong></p><p>Predicted ' + esc(response) + ' ' + esc(fmtResponse(view.currentCard.mean)) + '.</p>' +
+        table + '<div class="ps-actions"><button type="button" class="ps-btn primary" id="back-profiler">Explore a candidate</button></div>';
     }
-    return '<p class="hint">Model ' + esc(view.model.id) + ' · N = ' + esc(view.model.n) + '. Candidate − current predicted mean: ' + esc(view.deltaText || 'withheld') + '.</p>' +
-      '<div class="ps-panel" style="overflow:auto;"><table><thead><tr><th>Setting</th><th>Current</th><th>Candidate</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-      '<div class="cards">' + block('Current settings', view.currentCard) + block('Candidate settings', view.candidateCard) + '</div>' +
-      (view.withheldReason ? ('<p class="status error">' + esc(view.withheldReason) + '</p>') : '') +
+    return '<p class="ps-pred-label">Current → Candidate</p><p class="ps-pred">' + esc(fmtResponse(view.currentCard.mean)) + ' → ' + esc(fmtResponse(view.candidateCard.mean)) +
+      ' <span class="hint">' + esc(fmtSigned(view.deltaMean)) + '</span></p>' +
+      '<p>' + esc(intervalPhrase(view.candidateCard, view.spec)) + '. ' + esc(marginPhrase(view.candidateCard)) + '</p>' +
+      compareSvg(view) + table +
       '<div class="ps-actions"><button type="button" class="ps-btn primary" id="back-profiler">Back to Profiler</button></div>';
   }
 
   function renderCompare() {
     var view = session.read();
     el('view-compare').innerHTML =
-      '<h2 id="compare-title" tabindex="-1">Compare Settings</h2>' +
-      resultsLead(view) +
-      specEditor(view.spec) +
+      '<h2 id="compare-title" class="ps-sr" tabindex="-1">Compare Settings</h2>' +
+      specStripHtml(view) +
       '<div id="compare-readout">' + compareReadout(view) + '</div>';
-    bindLiveSpec(el('view-compare'), function () {
-      var readout = el('compare-readout');
-      if (readout) readout.innerHTML = compareReadout(session.read());
-      var back = el('back-profiler');
-      if (back) back.addEventListener('click', function () { showView('profiler', { focus: true }); });
-    });
+    var edit = el('edit-specs');
+    if (edit) edit.addEventListener('click', openSpecifications);
     var back = el('back-profiler');
     if (back) back.addEventListener('click', function () { showView('profiler', { focus: true }); });
   }
@@ -1663,8 +1847,10 @@
         showView('setup', { rebuild: true });
         return;
       }
-      setStatus('Fitted. N = ' + fitted.n + '. Pin the current settings in the Prediction Profiler before comparing a candidate.', false);
-      showView('overview', { focus: true, rebuild: false });
+      movedExplore = false;
+      profileStamp = '';
+      setStatus('Fitted. N = ' + fitted.n + '. The profiler starts from these settings. Use them as current when this is the operating recipe.', false);
+      showView('profiler', { focus: true, rebuild: false });
       return;
     }
     stagedTable = null;
@@ -1677,6 +1863,9 @@
   function loadDemo() {
     session = Engine.createSession();
     lockedResponse = '';
+    movedExplore = false;
+    profileStamp = '';
+    selectedDiag = -1;
     stagedTable = null;
     editing = false;
     var demo = Engine.demoPreset();
@@ -1730,50 +1919,82 @@
   el('refresh-data').addEventListener('click', function () { post('refreshData'); });
 
   el('pin-btn').addEventListener('click', function () {
-    var partial = {};
-    document.querySelectorAll('[data-current]').forEach(function (input) {
-      partial[input.getAttribute('data-current')] = input.getAttribute('data-numeric') === '1' ? Number(input.value) : input.value;
-    });
-    session.setCurrentSettings(partial);
     var pinned = session.pin();
-    el('pin-status').textContent = pinned.ok ? 'Current settings pinned.' : pinned.error;
+    el('pin-status').textContent = pinned.ok ? 'These settings are the current recipe.' : pinned.error;
     el('pin-status').className = 'status' + (pinned.ok ? ' ok' : ' error');
     if (!pinned.ok) return;
+    profileStamp = '';
     buildProfiler();
-    paintProfiler();
     syncShell();
   });
   el('row-picker').addEventListener('change', function () {
     if (el('row-picker').value === '') return;
-    var applied = session.applyAnalyzedRow(Number(el('row-picker').value));
-    if (!applied.ok) {
-      el('pin-status').textContent = applied.error;
-      el('pin-status').className = 'status error';
-      return;
+    var index = Number(el('row-picker').value);
+    var view = session.read();
+    if (view.pin) {
+      var row = view.analyzedRows[index];
+      if (!row) return;
+      var patch = {};
+      adjustableNames(view).forEach(function (name) { patch[name] = row.settings[name]; });
+      session.setCandidate(patch);
+    } else {
+      var applied = session.applyAnalyzedRow(index);
+      if (!applied.ok) {
+        el('pin-status').textContent = applied.error;
+        el('pin-status').className = 'status error';
+        return;
+      }
+      movedExplore = false;
     }
     var keep = el('row-picker').value;
+    profileStamp = '';
     buildProfiler();
     el('row-picker').value = keep;
   });
   el('edit-current').addEventListener('click', function () {
     session.editCurrent();
+    movedExplore = false;
+    profileStamp = '';
     buildProfiler();
-    paintProfiler();
     syncShell();
     var heading = el('profiler-title');
     if (heading) heading.focus();
   });
   el('reset-candidate').addEventListener('click', function () {
     session.resetCandidate();
+    profileStamp = '';
     buildProfiler();
-    paintProfiler();
   });
   el('confidence').addEventListener('change', function () {
     session.setConfidence(Number(el('confidence').value));
     paintProfiler();
     if (currentView === 'compare') renderCompare();
   });
-  bindLiveSpec(el('live-spec'), function () { paintProfiler(); });
+  el('profiles').addEventListener('pointerdown', function (event) {
+    var svg = event.target.closest ? event.target.closest('svg[data-profile]') : null;
+    if (!svg) return;
+    function at(clientX) {
+      var rect = svg.getBoundingClientRect();
+      var ratio = (clientX - rect.left) / (rect.width || 1);
+      var pad = 36 / 320;
+      var span = 1 - pad - (8 / 320);
+      var t = Math.max(0, Math.min(1, (ratio - pad) / span));
+      var min = Number(svg.getAttribute('data-min'));
+      var max = Number(svg.getAttribute('data-max'));
+      var patch = {};
+      patch[svg.getAttribute('data-profile')] = min + (max - min) * t;
+      applyScenario(patch);
+      paintProfiler();
+    }
+    at(event.clientX);
+    function move(ev) { at(ev.clientX); }
+    function up() {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+    }
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  });
   el('view-profiler').addEventListener('input', function (event) {
     var target = event.target;
     if (!target.hasAttribute('data-cand')) return;
@@ -1781,7 +2002,7 @@
     var numeric = target.getAttribute('data-numeric') === '1';
     var patch = {};
     patch[key] = numeric ? Number(target.value) : target.value;
-    session.setCandidate(patch);
+    applyScenario(patch);
     if (numeric && target.type === 'range') {
       var number = findCand(key, 'number');
       if (number && document.activeElement !== number) number.value = target.value;
@@ -1789,7 +2010,7 @@
     if (numeric && target.type === 'number') {
       var range = findCand(key, 'range');
       var reading = session.read();
-      if (range && reading.phase !== 'withheld') range.value = target.value;
+      if (range && reading.phase !== 'withheld' && reading.phase !== 'needs-input') range.value = target.value;
     }
     paintProfiler();
   });
@@ -1797,7 +2018,7 @@
     if (event.target.hasAttribute('data-cand') && event.target.tagName === 'SELECT') {
       var patch = {};
       patch[event.target.getAttribute('data-cand')] = event.target.value;
-      session.setCandidate(patch);
+      applyScenario(patch);
       paintProfiler();
     }
   });

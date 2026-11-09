@@ -2164,8 +2164,8 @@ const StatisticoHeader = {
               resultItem('overview', 'fa-chart-pie', 'Overview', 'Fitted response, sample, and specifications.'),
               resultItem('effects', 'fa-arrows-split-up-and-left', 'Effects & Interactions', 'Coefficients and interaction profiles.'),
               resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics', 'Observed versus fitted and residual checks.'),
-              resultItem('profiler', 'fa-sliders', 'Prediction Profiler', 'Pin the current recipe and move a candidate.'),
-              resultItem('compare', 'fa-table-columns', 'Compare Settings', 'Current and candidate side by side.')
+              resultItem('profiler', 'fa-sliders', 'Prediction Profiler', 'Move a setting and read the predicted response.'),
+              resultItem('compare', 'fa-table-columns', 'Compare Settings', 'Current recipe and candidate on one scale.')
             ]
           }
         ],

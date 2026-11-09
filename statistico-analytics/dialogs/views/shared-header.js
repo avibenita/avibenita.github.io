@@ -4622,6 +4622,7 @@ const StatisticoHeader = {
       <div class="hdp-modal-content">
         <div class="hdp-modal-header">
           <span id="hdpModalTitle"><i class="fa-solid fa-table"></i> Data Viewer</span>
+          <span id="hdpCaseMark" class="hdp-case-mark" hidden></span>
           <span class="hdp-modal-close"
                 onclick="document.getElementById('hdpModal').remove(); StatisticoHeader._resetViewBtn();"
                 title="Close">&times;</span>
@@ -4758,6 +4759,7 @@ const StatisticoHeader = {
 
     this._currentModalRows    = rows;
     this._currentModalHeaders = headers;
+    this.syncCaseSelection();
   },
 
   syncCaseSelection() {
@@ -4773,6 +4775,14 @@ const StatisticoHeader = {
     });
     const selectedRow = document.querySelector('#hdpTbody tr.hdp-tr--selected');
     if (selectedRow && selectedRow.scrollIntoView) selectedRow.scrollIntoView({ block: 'nearest' });
+    const mark = document.getElementById('hdpCaseMark');
+    if (mark) {
+      const text = this._caseTrace && typeof this._caseTrace.highlightLabel === 'function'
+        ? this._caseTrace.highlightLabel()
+        : '';
+      mark.textContent = text || '';
+      mark.hidden = !text;
+    }
   },
 
   _copyModalData() {

@@ -208,13 +208,13 @@
     }
   </style>
 </head>
-<body class="ps-config">
+<body>
   <div class="sb-layout">
     <nav class="sb-nav" id="sidebarNav" aria-label="Process Settings Explorer"></nav>
     <div class="right-col">
       <div id="header-container"></div>
       <div class="ps-scroll" id="workspace">
-        <section id="view-setup" class="ps-view cfg-shell" aria-labelledby="setup-title">
+        <section id="view-setup" class="ps-view cfg-shell" hidden aria-labelledby="setup-title">
           <h2 id="setup-title" class="ps-sr" tabindex="-1" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Input &amp; Setup</h2>
           <header class="cfg-header">
             <div class="cfg-header-icon"><i class="fa-solid fa-sliders"></i></div>
@@ -1043,7 +1043,25 @@
       if (heading) heading.focus();
     }
   }
-  window.switchProcessSettingsView = function (view) { showView(view, { fromMenu: true, focus: true }); };
+  window.switchProcessSettingsView = function (view) {
+    if (view === 'setup' && window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+      var live = session.read();
+      Office.context.ui.messageParent(JSON.stringify({
+        action: 'editInput',
+        payload: {
+          config: live.config,
+          spec: live.spec,
+          specifications: live.spec,
+          limits: live.limits,
+          fixed: live.currentDraft,
+          current: live.currentDraft,
+          lockResponse: true
+        }
+      }));
+      return;
+    }
+    showView(view, { fromMenu: true, focus: true });
+  };
 
   function metric(label, value) {
     return '<div class="metric"><span>' + esc(label) + '</span><b>' + esc(value) + '</b></div>';
@@ -1610,6 +1628,7 @@
     booted = true;
     el('host-error').hidden = true;
     if (session.read().model) {
+      if (preset && preset.config) return;
       stagedTable = {
         headers: table.headers.slice(),
         rows: table.rows.map(function (row) { return row.slice(); }),
@@ -1623,10 +1642,30 @@
     }
     session.loadData(table);
     remember(table);
-    if (preset) {
-      session.configure(preset.config);
-      session.setSpecifications(preset.specifications);
-      session.setCurrentSettings(preset.current);
+    if (preset && preset.config) {
+      var configured = session.configure(preset.config);
+      if (!configured.ok) {
+        setStatus(configured.error || 'The mapping cannot be analyzed.', true);
+        editing = false;
+        showView('setup', { rebuild: true });
+        return;
+      }
+      session.setSpecifications(preset.specifications || preset.spec || {});
+      if (preset.limits) session.setOperatingLimits(preset.limits);
+      if (preset.current || preset.fixed) session.setCurrentSettings(preset.current || preset.fixed);
+      var token = session.beginFit();
+      var fitted = session.finishFit(token);
+      lockedResponse = preset.config.response || '';
+      stagedTable = null;
+      editing = false;
+      if (!fitted.applied) {
+        setStatus(fitted.reason || 'The model could not be fit.', true);
+        showView('setup', { rebuild: true });
+        return;
+      }
+      setStatus('Fitted. N = ' + fitted.n + '. Pin the current settings in the Prediction Profiler before comparing a candidate.', false);
+      showView('overview', { focus: true, rebuild: false });
+      return;
     }
     stagedTable = null;
     editing = false;
@@ -1643,8 +1682,8 @@
     var demo = Engine.demoPreset();
     acceptTable(demo.table, 'Built-in demo · ' + demo.table.address + ' · 12 complete rows. Fit the model to open Overview.', demo);
   }
-  function loadTable(table, note) {
-    acceptTable(table, note || (table.address || 'Worksheet data loaded.'), null);
+  function loadTable(table, note, preset) {
+    acceptTable(table, note || (table.address || 'Worksheet data loaded.'), preset || null);
   }
 
   el('view-setup').addEventListener('input', function () { refreshSetupChrome(); });
@@ -1792,7 +1831,8 @@
         return;
       }
       loadTable({ headers: payload.headers, rows: payload.rows || [], address: payload.address || '' },
-        'Worksheet ' + (payload.address || 'range') + ' · ' + (payload.rows || []).length + ' rows.');
+        'Worksheet ' + (payload.address || 'range') + ' · ' + (payload.rows || []).length + ' rows.',
+        payload.modelSpec || null);
       return;
     }
     if (msg.type === 'PROCESS_SETTINGS_ERROR') {
@@ -1801,25 +1841,35 @@
     }
   }
 
+  function consumeLaunch() {
+    var raw = null;
+    try { raw = sessionStorage.getItem('statistico-process-settings-launch'); } catch (e) { return false; }
+    if (!raw) return false;
+    try { sessionStorage.removeItem('statistico-process-settings-launch'); } catch (e) {}
+    var parsed;
+    try { parsed = JSON.parse(raw); } catch (e) { return false; }
+    if (!parsed || !parsed.table || !parsed.config) return false;
+    acceptTable(parsed.table, 'Model loaded.', parsed);
+    return true;
+  }
+
   function boot() {
-    window.__psView = 'setup';
+    window.__psView = 'overview';
     window.__psFitted = false;
     window.setDecimalPrecision = function () {};
     window.switchProcessSettingsView = window.switchProcessSettingsView;
     if (window.StatisticoHeader && typeof StatisticoHeader.init === 'function') {
-      StatisticoHeader.init('setup', 'Response', 0, 'process-settings');
+      StatisticoHeader.init('ps-overview', 'Response', 0, 'process-settings');
       StatisticoHeader.initSidebarPage();
     }
+    if (consumeLaunch()) return;
     if (/(?:^|[?&])demo=1(?:&|$)/.test(window.location.search || '') || typeof Office === 'undefined' || !Office.context || !Office.context.ui) {
       loadDemo();
       return;
     }
     Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage);
     post('ready');
-    showView('setup', { rebuild: false });
-    setTimeout(function () {
-      if (!booted) el('preview-note').textContent = 'No worksheet range arrived. Use the Excel selection, pick a range, or open the demo process.';
-    }, 1800);
+    document.querySelectorAll('.ps-view').forEach(function (node) { node.hidden = true; });
   }
   if (typeof Office !== 'undefined' && Office.onReady) Office.onReady(boot);
   else boot();

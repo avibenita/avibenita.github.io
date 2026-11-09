@@ -4966,6 +4966,44 @@
       background: #ffffff !important;
     }
 
+    .diag-sample-bar {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 2px 10px 16px;
+      align-self: center;
+    }
+    .diag-sample-n {
+      font-size: 14px;
+      font-weight: 750;
+      color: var(--text-primary, #e8eef6);
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+    .diag-sample-n small {
+      display: block;
+      margin-top: 2px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted, #94a3b8);
+    }
+    .diag-redraw-btn {
+      border: 1px solid var(--border, rgba(148,163,184,.35));
+      background: var(--surface-2, #1a2230);
+      color: var(--text-primary, #e8eef6);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .diag-redraw-btn:disabled { opacity: .45; cursor: default; }
+    html[data-theme="light"] .diag-sample-n { color: #0D2137; }
+    html[data-theme="light"] .diag-redraw-btn { background: #fff; color: #0D2137; }
+
     /* ── Diagnostics (Overview / Plots / Influence): minimalistic ── */
     /* Verdict strip, section panels, plot cards: drop frames entirely.
        Visual hierarchy comes from the small uppercase section labels and spacing,
@@ -6514,6 +6552,7 @@
     window._regFitInvocations = 0;
     if (typeof computeOLS === 'function' && !computeOLS._regCounted) {
       var _rawComputeOLS = computeOLS;
+      window._regRawComputeOLS = _rawComputeOLS;
       computeOLS = function () {
         window._regFitInvocations += 1;
         return _rawComputeOLS.apply(this, arguments);
@@ -6911,6 +6950,7 @@
       if (tabName === 'power') annotatePowerFullModel();
       if (typeof renderRegCaseDock === 'function') renderRegCaseDock();
       if (typeof applyRegCaseHighlight === 'function') applyRegCaseHighlight();
+      if (typeof syncDiagSampleBar === 'function') syncDiagSampleBar();
     }
 
     function beginViewHandoff(fromEl, tabName) {
@@ -9673,6 +9713,8 @@ ${sectionsHtml}
     //  RESIDUAL DIAGNOSTICS — inline (no iframe)
     // ══════════════════════════════════════════════════════════════
     let _resData = null;   // { residuals, fitted, standardized, leverage, cooksD, k, n }
+    let _diagOmitInfluential = false;
+    let _diagReduced = null;
 
     function _resChartTheme() {
       const light = document.documentElement.getAttribute('data-theme') === 'light';
@@ -9685,39 +9727,149 @@ ${sectionsHtml}
       };
     }
 
+    function _resHatDiagonals(results, xMatrix) {
+      const n = results.residuals.length;
+      const k = results.k || 2;
+      const inv = results.XtX_inv;
+      const fallback = Array(n).fill(k / n);
+      if (!inv || !xMatrix || xMatrix.length !== n) return fallback;
+      const withIntercept = results.includeIntercept !== false;
+      try {
+        return xMatrix.map(function (row) {
+          const x = withIntercept ? [1].concat(row) : row.slice();
+          if (x.length !== k) return k / n;
+          let h = 0;
+          for (let i = 0; i < k; i++) {
+            let acc = 0;
+            for (let j = 0; j < k; j++) acc += inv[i][j] * x[j];
+            h += x[i] * acc;
+          }
+          return Number.isFinite(h) ? Math.min(0.999, Math.max(0, h)) : k / n;
+        });
+      } catch (_e) {
+        return fallback;
+      }
+    }
+
+    function _resBundle(results, xMatrix, sourceIndex) {
+      if (!results || !Array.isArray(results.residuals)) return null;
+      const residuals = results.residuals;
+      const fitted = results.fitted || results.fittedValues || results.Y_fit;
+      const n = residuals.length;
+      const k = results.k || 2;
+      const MSE = results.MSE || (residuals.reduce(function (s, r) { return s + r * r; }, 0) / Math.max(1, n - k));
+      const scale = Math.sqrt(MSE) || 1;
+      const standardized = residuals.map(function (r) { return r / scale; });
+      const leverage = _resHatDiagonals(results, xMatrix);
+      const cooksD = standardized.map(function (sr, i) {
+        const h = leverage[i];
+        return (sr * sr) / k * (h / Math.pow(1 - h, 2));
+      });
+      const index = sourceIndex || residuals.map(function (_, i) { return i; });
+      return {
+        residuals: residuals,
+        fitted: fitted,
+        standardized: standardized,
+        leverage: leverage,
+        cooksD: cooksD,
+        k: k,
+        n: n,
+        xMatrix: xMatrix || null,
+        includeIntercept: results.includeIntercept !== false,
+        sourceIndex: index
+      };
+    }
+
     function _resCalc() {
+      if (_diagOmitInfluential && _diagReduced) {
+        return _resBundle(_diagReduced.results, _diagReduced.xMatrix, _diagReduced.sourceIndex);
+      }
       const results = window.regressionResults;
       if (!results) return null;
-      const residuals = results.residuals;
-      const fitted    = results.fitted || results.fittedValues;
-      const n  = residuals.length;
-      const k  = results.k || 2;
-      const MSE = results.MSE || (residuals.reduce((s,r)=>s+r*r,0)/(n-k));
-      const standardized = residuals.map(r => r / Math.sqrt(MSE));
-      const leverage = Array(n).fill(k / n);
-      const cooksD   = standardized.map((sr,i) => {
-        const h = leverage[i];
-        return (sr*sr)/k * (h/Math.pow(1-h,2));
-      });
-      return { residuals, fitted, standardized, leverage, cooksD, k, n };
+      const data = window.regressionData;
+      return _resBundle(results, data && data.xMatrix, null);
+    }
+
+    function _resFullBundle() {
+      const results = window.regressionResults;
+      if (!results) return null;
+      const data = window.regressionData;
+      return _resBundle(results, data && data.xMatrix, null);
+    }
+
+    function _resFlaggedIndices(bundle) {
+      if (!bundle) return [];
+      const cut = 3 * bundle.k / bundle.n;
+      const out = [];
+      for (let i = 0; i < bundle.n; i++) {
+        const flagged = Math.abs(bundle.standardized[i]) > 2 || bundle.leverage[i] > cut || bundle.cooksD[i] > 0.5;
+        if (flagged) out.push(bundle.sourceIndex[i]);
+      }
+      return out;
     }
 
     function _resDWTest(residuals) {
-      let sumDiff=0, sumSq=0;
-      for(let i=1;i<residuals.length;i++){
-        sumDiff += Math.pow(residuals[i]-residuals[i-1],2);
-        sumSq   += Math.pow(residuals[i],2);
+      let sumDiff = 0, sumSq = 0;
+      for (let i = 0; i < residuals.length; i++) sumSq += residuals[i] * residuals[i];
+      for (let i = 1; i < residuals.length; i++) {
+        const gap = residuals[i] - residuals[i - 1];
+        sumDiff += gap * gap;
       }
-      return { DW: sumDiff/sumSq };
+      return { DW: sumSq > 0 ? sumDiff / sumSq : NaN };
     }
-    function _resBPTest(residuals) {
-      const chi2 = Math.abs(jStat.normal.sample(0,2));
-      return { chi2, p: 1-jStat.chisquare.cdf(chi2,1) };
+    function _resBPTest(bundle) {
+      const raw = window._regRawComputeOLS;
+      if (!raw || !bundle || !bundle.xMatrix || !bundle.xMatrix.length || bundle.xMatrix.length !== bundle.n) {
+        return { chi2: NaN, p: NaN };
+      }
+      try {
+        const squared = bundle.residuals.map(function (r) { return r * r; });
+        const aux = raw(bundle.xMatrix, squared, bundle.includeIntercept !== false, 0.05);
+        const lm = Math.max(0, bundle.n * aux.R2);
+        const df = Math.max(1, aux.k - (bundle.includeIntercept === false ? 0 : 1));
+        return { chi2: lm, p: 1 - jStat.chisquare.cdf(lm, df) };
+      } catch (_e) {
+        return { chi2: NaN, p: NaN };
+      }
     }
     function _resSWTest(data) {
-      const W = 0.8 + Math.random()*0.15;
-      const p = W>0.9 ? 0.1+Math.random()*0.3 : 0.01+Math.random()*0.04;
-      return { W, p };
+      const n = data && data.length;
+      if (!n || n < 3 || typeof jStat === 'undefined') return { W: NaN, p: NaN };
+      const sorted = data.slice().sort(function (a, b) { return a - b; });
+      const mean = sorted.reduce(function (s, v) { return s + v; }, 0) / n;
+      const ss = sorted.reduce(function (s, v) { return s + (v - mean) * (v - mean); }, 0);
+      if (!(ss > 0)) return { W: NaN, p: NaN };
+      const k = Math.floor(n / 2);
+      const weights = [];
+      for (let i = 1; i <= k; i++) weights.push(-jStat.normal.inv((i - 0.375) / (n + 0.25), 0, 1));
+      const scale = Math.sqrt(2 * weights.reduce(function (s, v) { return s + v * v; }, 0));
+      let b = 0;
+      for (let i = 0; i < k; i++) b += (weights[i] / scale) * (sorted[n - 1 - i] - sorted[i]);
+      const W = Math.min(1, (b * b) / ss);
+      const lnW = Math.log(Math.max(1e-12, 1 - W));
+      const lnN = Math.log(n);
+      let p;
+      if (n <= 11) {
+        const z = (-lnW - 0.8 - 0.15 * lnN) / (0.6 + 0.12 * lnN);
+        p = 1 - jStat.normal.cdf(z, 0, 1);
+      } else {
+        const mu = -1.5861 - 0.31082 * lnN - 0.083751 * lnN * lnN + 0.0038915 * lnN * lnN * lnN;
+        const sig = Math.exp(-0.4803 - 0.082676 * lnN + 0.0030302 * lnN * lnN);
+        p = 1 - jStat.normal.cdf((lnW - mu) / sig, 0, 1);
+      }
+      return { W: W, p: Math.max(0, Math.min(1, p)) };
+    }
+    function _resFmtStat(value) {
+      return Number.isFinite(value) ? value.toFixed(4) : '—';
+    }
+    function _resFmtP(value) {
+      if (!Number.isFinite(value)) return '—';
+      return value < 0.001 ? '< 0.001' : value.toFixed(4);
+    }
+    function _resVerdict(p, passLabel, failLabel, passImpact, failImpact) {
+      if (!Number.isFinite(p)) return { cls: '', result: 'Not available', impact: '' };
+      const ok = p > 0.05;
+      return { cls: ok ? 'pass' : 'fail', result: ok ? passLabel : failLabel, impact: ok ? passImpact : failImpact };
     }
 
     // ── Overview tab ─────────────────────────────────────────────
@@ -9739,7 +9891,7 @@ ${sectionsHtml}
 
     function _resRunTests(d) {
       const sw = _resSWTest(d.residuals);
-      const bp = _resBPTest(d.residuals);
+      const bp = _resBPTest(d);
       const dw = _resDWTest(d.residuals);
       const outlierCount  = d.standardized.filter(s=>Math.abs(s)>2).length;
       const severeCount   = d.standardized.filter(s=>Math.abs(s)>3).length;
@@ -9769,6 +9921,13 @@ ${sectionsHtml}
           ? ['fa-exclamation-triangle','Model has minor assumption violations',     'var(--warning)']
           : ['fa-times-circle',        'Model has significant assumption violations','var(--danger)'];
       const sw=r.tests.sw, bp=r.tests.bp, dw=r.tests.dw;
+      const swMark = _resVerdict(sw.p, '✓ Normality Assumed', '✗ Non-Normal', 'Inference is reliable', 'Inference may be biased');
+      const bpMark = _resVerdict(bp.p, '✓ Homoscedastic', '✗ Heteroscedastic', 'Standard errors are valid', 'Standard errors may be unreliable');
+      const dwClose = Number.isFinite(dw.DW) && Math.abs(dw.DW - 2) < 0.5;
+      const dwFar = Number.isFinite(dw.DW) && (dw.DW < 1.5 || dw.DW > 2.5);
+      const dwMark = !Number.isFinite(dw.DW)
+        ? { cls: '', result: 'Not available', impact: '' }
+        : { cls: dwClose ? 'pass' : (dwFar ? 'fail' : 'warning'), result: dwClose ? '✓ No Autocorrelation' : '⚠ Check Autocorrelation', impact: dwClose ? 'Residuals are independent' : 'Standard errors unreliable' };
       const tooltip = (txt)=>`<span class="res-tooltip"><i class="fa-solid fa-circle-question" style="font-size:9px;color:var(--text-muted);cursor:help;opacity:.6;"></i><span class="res-tooltiptext">${txt}</span></span>`;
 
       document.getElementById('residualsPanel').innerHTML = `
@@ -9798,24 +9957,24 @@ ${sectionsHtml}
             <div class="res-tests-grid">
               <div class="res-test-card">
                 <div class="res-test-name"><i class="fa-solid fa-bell-curve"></i> Shapiro-Wilk</div>
-                <div class="res-test-stat">Statistic: ${sw.W.toFixed(4)}</div>
-                <div class="res-test-stat">p-value: ${sw.p<0.001?'< 0.001':sw.p.toFixed(4)}</div>
-                <div class="res-test-result ${sw.p>0.05?'pass':'fail'}">${sw.p>0.05?'✓ Normality Assumed':'✗ Non-Normal'}</div>
-                <div class="res-test-impact">${sw.p>0.05?'Inference is reliable':'Inference may be biased'}</div>
+                <div class="res-test-stat">Statistic: ${_resFmtStat(sw.W)}</div>
+                <div class="res-test-stat">p-value: ${_resFmtP(sw.p)}</div>
+                <div class="res-test-result ${swMark.cls}">${swMark.result}</div>
+                <div class="res-test-impact">${swMark.impact}</div>
               </div>
               <div class="res-test-card">
                 <div class="res-test-name"><i class="fa-solid fa-wave-square"></i> Breusch-Pagan</div>
-                <div class="res-test-stat">χ²: ${bp.chi2.toFixed(4)}</div>
-                <div class="res-test-stat">p-value: ${bp.p<0.001?'< 0.001':bp.p.toFixed(4)}</div>
-                <div class="res-test-result ${bp.p>0.05?'pass':'fail'}">${bp.p>0.05?'✓ Homoscedastic':'✗ Heteroscedastic'}</div>
-                <div class="res-test-impact">${bp.p>0.05?'Standard errors are valid':'Standard errors may be unreliable'}</div>
+                <div class="res-test-stat">χ²: ${_resFmtStat(bp.chi2)}</div>
+                <div class="res-test-stat">p-value: ${_resFmtP(bp.p)}</div>
+                <div class="res-test-result ${bpMark.cls}">${bpMark.result}</div>
+                <div class="res-test-impact">${bpMark.impact}</div>
               </div>
               <div class="res-test-card">
                 <div class="res-test-name"><i class="fa-solid fa-arrows-left-right"></i> Durbin-Watson</div>
-                <div class="res-test-stat">Statistic: ${dw.DW.toFixed(4)}</div>
+                <div class="res-test-stat">Statistic: ${_resFmtStat(dw.DW)}</div>
                 <div class="res-test-stat">Expected: ≈ 2.0</div>
-                <div class="res-test-result ${Math.abs(dw.DW-2)<0.5?'pass':dw.DW<1.5||dw.DW>2.5?'fail':'warning'}">${Math.abs(dw.DW-2)<0.5?'✓ No Autocorrelation':'⚠ Check Autocorrelation'}</div>
-                <div class="res-test-impact">${Math.abs(dw.DW-2)<0.5?'Residuals are independent':'Standard errors unreliable'}</div>
+                <div class="res-test-result ${dwMark.cls}">${dwMark.result}</div>
+                <div class="res-test-impact">${dwMark.impact}</div>
               </div>
               <div class="res-test-card">
                 <div class="res-test-name"><i class="fa-solid fa-chart-simple"></i> Residual Summary</div>
@@ -9891,16 +10050,22 @@ ${sectionsHtml}
       return catalog;
     }
 
+    function regCaseSourceIndex(index) {
+      const map = _resData && _resData.sourceIndex;
+      return map && map[index] != null ? map[index] : index;
+    }
+
     function regCaseKeyAt(index) {
       const catalog = regCaseCatalogAligned();
-      const entry = catalog && catalog.cases[index];
+      const entry = catalog && catalog.cases[regCaseSourceIndex(index)];
       return entry ? entry.caseKey : null;
     }
 
     function regCaseLabelAt(index) {
       const catalog = regCaseCatalogAligned();
-      const entry = catalog && catalog.cases[index];
-      return entry ? entry.displayLabel : ('Obs ' + (index + 1));
+      const source = regCaseSourceIndex(index);
+      const entry = catalog && catalog.cases[source];
+      return entry ? entry.displayLabel : ('Obs ' + (source + 1));
     }
 
     function regCasePoints(pairs, radius) {
@@ -10306,7 +10471,7 @@ ${sectionsHtml}
         .filter(o=>Math.abs(o.s)>2||o.l>(3*d.k/d.n)||o.c>0.5).sort((a,b)=>b.c-a.c);
       const tracedRows = d.residuals.map((r,i)=>({i,r,s:d.standardized[i],l:d.leverage[i],c:d.cooksD[i],key:regCaseKeyAt(i),label:regCaseLabelAt(i)}))
         .sort((a,b)=>b.c-a.c);
-      window._resInfluentialIndices = influentialRows.map(o=>o.i);
+      if (!_diagOmitInfluential) window._resInfluentialIndices = influentialRows.map(o => regCaseSourceIndex(o.i));
       const selectedKeys = regSelectedKeys();
       const cooksOverHalf = d.cooksD.filter(v=>v>0.5).length;
       const cooksOverOne = d.cooksD.filter(v=>v>1).length;
@@ -10521,13 +10686,115 @@ ${sectionsHtml}
       window.regressionResults = _resOriginalResults;
       _resOriginalResults = null;
       window._resBulkFit = null;
+      _diagOmitInfluential = false;
+      _diagReduced = null;
       _resData = _resCalc();
       const panel = document.getElementById('resComparisonPanel');
       if (panel) { panel.style.display = 'none'; panel.innerHTML = ''; }
       renderRegInfluenceChrome();
       renderRegCaseDock();
       applyRegCaseHighlight();
+      if (typeof syncDiagSampleBar === 'function') syncDiagSampleBar();
     }
+
+    function paintDiagHeaderN() {
+      const nEl = document.getElementById('headerSampleSize');
+      const modelN = window.regressionResults && window.regressionResults.n;
+      if (nEl && Number.isFinite(modelN) && modelN > 0) nEl.textContent = '(n=' + Number(modelN).toLocaleString() + ')';
+    }
+
+    function ensureDiagSampleBars() {
+      document.querySelectorAll('nav[aria-label="Diagnostic views"]').forEach(function (nav) {
+        if (nav.querySelector('.diag-sample-bar')) return;
+        const bar = document.createElement('div');
+        bar.className = 'diag-sample-bar';
+        bar.innerHTML = '<span class="diag-sample-n">n = —</span><button type="button" class="diag-redraw-btn">Redraw without influential cases</button>';
+        bar.querySelector('.diag-redraw-btn').addEventListener('click', redrawDiagWithoutInfluential);
+        nav.appendChild(bar);
+      });
+    }
+
+    function syncDiagSampleBar() {
+      ensureDiagSampleBars();
+      const model = window.regressionResults;
+      const reduced = _diagOmitInfluential && _diagReduced && _diagReduced.results;
+      const n = reduced ? reduced.n : (model ? model.n : null);
+      const flagged = reduced ? _diagReduced.omittedCount : _resFlaggedIndices(_resFullBundle()).length;
+      document.querySelectorAll('.diag-sample-n').forEach(function (el) {
+        if (!Number.isFinite(n)) {
+          el.textContent = 'n = —';
+          return;
+        }
+        el.innerHTML = 'n = ' + n + (reduced
+          ? '<small>without ' + flagged + ' influential case' + (flagged === 1 ? '' : 's') + '</small>'
+          : '');
+      });
+      document.querySelectorAll('.diag-redraw-btn').forEach(function (btn) {
+        btn.textContent = reduced ? 'Show original' : 'Redraw without influential cases';
+        btn.disabled = !reduced && !flagged;
+        btn.title = !reduced && !flagged ? 'No influential cases in this fit' : '';
+      });
+      paintDiagHeaderN();
+    }
+
+    function refreshActiveDiagnostics() {
+      _resData = _resCalc();
+      window._resDiagResults = null;
+      const active = document.querySelector('.tab-content.active');
+      const id = active && active.id;
+      if (id === 'tab-residuals') loadResidualsTab();
+      else if (id === 'tab-res-plots') loadResPlots();
+      else if (id === 'tab-res-influential') loadResInfluential();
+      syncDiagSampleBar();
+    }
+
+    function redrawDiagWithoutInfluential() {
+      if (_diagOmitInfluential) {
+        _diagOmitInfluential = false;
+        _diagReduced = null;
+        refreshActiveDiagnostics();
+        return;
+      }
+      const full = _resFullBundle();
+      const data = window.regressionData;
+      const results = window.regressionResults;
+      const flagged = _resFlaggedIndices(full);
+      if (!full || !data || !Array.isArray(data.yVector) || !results || !flagged.length) {
+        syncDiagSampleBar();
+        return;
+      }
+      const drop = {};
+      flagged.forEach(function (i) { drop[i] = true; });
+      const newY = [];
+      const newX = [];
+      const kept = [];
+      data.yVector.forEach(function (y, i) {
+        if (drop[i]) return;
+        newY.push(y);
+        newX.push(data.xMatrix[i]);
+        kept.push(i);
+      });
+      let refit = null;
+      try {
+        refit = computeOLS(newX, newY, results.includeIntercept !== false, 0.05);
+      } catch (_e) {
+        refit = null;
+      }
+      const unusable = !refit || !Array.isArray(refit.residuals) || !(refit.df >= 1)
+        || !Array.isArray(refit.coefficients) || refit.coefficients.some(function (c) { return !Number.isFinite(c); });
+      if (unusable) {
+        document.querySelectorAll('.diag-sample-n').forEach(function (el) {
+          el.innerHTML = 'n = ' + results.n + '<small>The same model cannot be estimated without those cases</small>';
+        });
+        return;
+      }
+      refit.fitted = Array.isArray(refit.Y_fit) ? refit.Y_fit.slice() : [];
+      _diagOmitInfluential = true;
+      _diagReduced = { results: refit, xMatrix: newX, sourceIndex: kept, omittedCount: flagged.length };
+      refreshActiveDiagnostics();
+    }
+    window.redrawDiagWithoutInfluential = redrawDiagWithoutInfluential;
+    ensureDiagSampleBars();
     
     // Load Correlations Tab Content
     // Helper: determine if a row is "used" (all model-variable cells are non-empty)

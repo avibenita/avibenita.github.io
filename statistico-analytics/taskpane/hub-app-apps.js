@@ -649,6 +649,32 @@ const CALCULATOR_CATEGORY_TILES = [
         dialogUrl: "https://statistico.live/statistico-calculators/process-capability/CpkCalculator.html"
       }
     ]
+  },
+  {
+    id: "process-settings",
+    section: "Operations & Quality",
+    sectionId: "operations",
+    title: "Process settings explorer",
+    icon: "fa-sliders",
+    accent: "#f59e0b",
+    accentDark: "#b45309",
+    color: "#f59e0b",
+    colorDark: "#b45309",
+    subtitle: "Pin the current recipe and compare a candidate on the fitted model",
+    desc: "Fit one continuous response with the regression model, pin the operating settings, and see how a candidate moves the predicted mean and its margin to specification.",
+    info: [
+      "Uses the worksheet Active Range when one is available, or a built-in demo",
+      "Same ordinary least-squares fit, encoding, and mean-response interval as Linear Regression",
+      "Adjustable settings and fixed conditions stay on one fitted model",
+      "Lower and upper specification limits and a separate target"
+    ],
+    modules: [
+      {
+        id: "process-settings",
+        label: "Process Settings Explorer",
+        tip: "Pin current settings and compare a candidate on the fitted regression."
+      }
+    ]
   }
 ];
 const PREPARE_CATEGORY_TILES = [
@@ -804,7 +830,7 @@ var CALC_SECTION_META = {
   }
 };
 var CALC_SECTION_ORDER = ["inference", "planning", "operations"];
-var CALC_BUTTON_ORDER = ["distribution-tools", "two-by-two", "precision-sample", "power-sample", "effect-size-family", "erlang-family", "process-capability"];
+var CALC_BUTTON_ORDER = ["distribution-tools", "two-by-two", "precision-sample", "power-sample", "effect-size-family", "erlang-family", "process-capability", "process-settings"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {
@@ -3509,6 +3535,106 @@ function openPrepareDatasetFromHub() {
   return openPrepareDataFromHub("prepare-dataset");
 }
 
+function processSettingsPayload(gr) {
+  var values = gr && gr.values;
+  if (!values || values.length < 2) {
+    return { headers: [], rows: [], address: "", source: "empty" };
+  }
+  return {
+    headers: values[0] || [],
+    rows: values.slice(1),
+    address: gr.address || "",
+    source: "excel"
+  };
+}
+
+function sendProcessSettingsPayload(dlg) {
+  if (!dlg) return;
+  var gr = getGlobalRangePayload();
+  try {
+    dlg.messageChild(JSON.stringify({
+      type: "PROCESS_SETTINGS_DATA",
+      payload: processSettingsPayload(gr)
+    }));
+  } catch (e) {}
+}
+
+function openProcessSettingsFromHub() {
+  setSelectedModuleCard("process-settings", true);
+  var base = getDialogsBaseUrl() + "process-settings/process-settings.html?v=" + Date.now();
+  if (!Office || !Office.context || !Office.context.ui || typeof Office.context.ui.displayDialogAsync !== "function") {
+    window.open(base + "&demo=1", "_blank");
+    setSelectedModuleCard("process-settings", false);
+    return true;
+  }
+  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
+    if (res.status === Office.AsyncResultStatus.Failed) {
+      setSelectedModuleCard("process-settings", false);
+      var err = res.error || {};
+      window.alert("Could not open Process Settings Explorer.\n\n" + (err.message || "Unknown error"));
+      return;
+    }
+    hubBuilderDialog = res.value;
+    var dlg = hubBuilderDialog;
+    setTimeout(function () { sendProcessSettingsPayload(dlg); }, 550);
+    dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+      var msg;
+      try { msg = JSON.parse(arg.message || "{}"); } catch (e) { return; }
+      if (msg.action === "ready" || msg.action === "requestData") {
+        sendProcessSettingsPayload(dlg);
+        return;
+      }
+      if (msg.action === "refreshData") {
+        var refresh = window.hubRefreshGlobalRange;
+        Promise.resolve(typeof refresh === "function" ? refresh() : null).then(function () {
+          sendProcessSettingsPayload(dlg);
+        }, function () {
+          sendProcessSettingsPayload(dlg);
+        });
+        return;
+      }
+      if (msg.action === "pickRange" || msg.action === "useSelection") {
+        var capture = window.hubCaptureRange;
+        if (typeof capture !== "function") return;
+        var mode = msg.action === "useSelection" ? "selection" : "prompt";
+        Promise.resolve(capture(mode)).then(function (result) {
+          if (!result || !result.values || result.values.length < 2) {
+            if (dlg) {
+              dlg.messageChild(JSON.stringify({
+                type: "PROCESS_SETTINGS_ERROR",
+                message: (result && result.error) || "Could not read that range. Select a header row plus data."
+              }));
+            }
+            return;
+          }
+          sendProcessSettingsPayload(dlg);
+        }, function (err) {
+          if (dlg) {
+            dlg.messageChild(JSON.stringify({
+              type: "PROCESS_SETTINGS_ERROR",
+              message: (err && err.message) || "Could not read that range."
+            }));
+          }
+        });
+        return;
+      }
+      if (msg.action === "close") {
+        try { dlg.close(); } catch (e) {}
+        dlg = null;
+        hubBuilderDialog = null;
+        setSelectedModuleCard("process-settings", false);
+      }
+    });
+    dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
+      dlg = null;
+      hubBuilderDialog = null;
+      setSelectedModuleCard("process-settings", false);
+      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+    });
+  });
+  return true;
+}
+
 function navigateToModuleCore(id) {
   var gr = getGlobalRangePayload();
   if (id === "prepare-data" || id === "prepare-quality" || id === "prepare-dataset") {
@@ -3580,6 +3706,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "publication-tables") {
     if (openPublicationTablesConfigFromHub()) return;
+  }
+  if (id === "process-settings") {
+    if (openProcessSettingsFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";

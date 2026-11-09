@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Process Settings Explorer</title>
+  <script>
+    if (!/(?:^|[?&])(?:embed|demo)=1(?:&|$)/.test(window.location.search || '')) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"><\/scr' + 'ipt>');
+    }
+  </script>
+  <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <script src="../../shared/column-type.js"></script>
+  <script src="../../shared/regression-case-trace.js"></script>
+  <script src="../../shared/process-settings-engine.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10161d;
+      --card: #1b2430;
+      --card-2: #232d3b;
+      --line: rgba(232, 238, 246, .14);
+      --text: #e8eef6;
+      --muted: #9aabbd;
+      --accent: #f0b45a;
+      --accent-ink: #2a1c08;
+      --mean: #3ddec8;
+      --ci: rgba(61, 222, 200, .22);
+      --limit: #fb7185;
+      --target: #7cb7ff;
+      --ok: #86efac;
+      --warn: #f6c453;
+      --danger: #fb7185;
+      --focus: #f0b45a;
+      --shadow: 0 10px 28px rgba(0, 0, 0, .28);
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f3f6fa;
+      --card: #ffffff;
+      --card-2: #f8fafc;
+      --line: #d7e0ea;
+      --text: #142033;
+      --muted: #5d6e82;
+      --accent: #b45309;
+      --accent-ink: #fff8ee;
+      --mean: #0f766e;
+      --ci: rgba(15, 118, 110, .16);
+      --limit: #be123c;
+      --target: #1d4ed8;
+      --ok: #047857;
+      --warn: #a16207;
+      --danger: #be123c;
+      --focus: #b45309;
+      --shadow: 0 8px 22px rgba(20, 32, 51, .06);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+    .app { max-width: 980px; margin: 0 auto; padding: 16px 16px 32px; }
+    header.top {
+      display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    h1 { font-size: 22px; line-height: 1.2; margin: 0; }
+    .eyebrow { margin: 0 0 2px; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .lede { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+    .theme { display: flex; gap: 4px; }
+    .theme button, .btn {
+      border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 10px;
+    }
+    .theme button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+    .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+    .btn.small { padding: 4px 8px; }
+    .bar, .card, .panel {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 12px;
+      box-shadow: var(--shadow);
+    }
+    .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+    .bar p { margin: 0; color: var(--muted); }
+    h2 { font-size: 16px; margin: 0 0 8px; }
+    .step { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .grid { display: grid; gap: 10px; }
+    .cols-2 { grid-template-columns: 1fr 1fr; }
+    .cols-3 { grid-template-columns: repeat(3, 1fr); }
+    label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+    input[type="number"], input[type="text"], select {
+      background: var(--card-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; width: 100%;
+    }
+    input[aria-invalid="true"] { border-color: var(--danger); }
+    .pred, .bound {
+      display: grid; grid-template-columns: minmax(90px, 1.2fr) auto minmax(140px, 1fr) minmax(80px, .6fr);
+      gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line);
+    }
+    .kind { color: var(--muted); font-size: 12px; }
+    .hint, .caveat, .status { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+    .status.error, .field-error { color: var(--danger); }
+    .field-error { min-height: 1em; margin: 2px 0 0; font-size: 12px; }
+    .warn { color: var(--warn); }
+    .ok { color: var(--ok); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .mean { font-size: 28px; font-weight: 700; margin: 4px 0; letter-spacing: -.03em; }
+    .location { font-weight: 700; }
+    .delta { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+    .changed { margin: 0; padding-left: 18px; }
+    figure { margin: 0 0 12px; }
+    figcaption { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    svg.profile { width: 100%; height: auto; background: var(--card-2); border-radius: 10px; border: 1px solid var(--line); }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px 14px; color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+    .swatch { display: inline-block; width: 16px; height: 3px; margin-right: 4px; vertical-align: middle; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    th:nth-child(n+2), td:nth-child(n+2) { text-align: right; font-variant-numeric: tabular-nums; }
+    details summary { cursor: pointer; font-weight: 700; }
+    .control { padding: 8px 0; border-top: 1px solid var(--line); }
+    .control .row { display: grid; grid-template-columns: 1fr 110px; gap: 8px; align-items: center; }
+    input[type="range"] { width: 100%; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+    .chip { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; font-size: 12px; color: var(--muted); }
+    @media (max-width: 800px) {
+      .cols-2, .cols-3, .compare, .pred, .bound, .control .row, .split { grid-template-columns: 1fr; }
+      header.top { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div>
+        <p class="eyebrow">Operations &amp; Quality</p>
+        <h1>Process Settings Explorer</h1>
+        <p class="lede">Pin the current operating settings, then move a candidate on the same fitted regression. The predicted mean and its margin to specification update together. The model is not refit while you explore.</p>
+      </div>
+      <div class="theme" role="group" aria-label="Theme">
+        <button type="button" data-theme-pref="auto" aria-pressed="false">Auto</button>
+        <button type="button" data-theme-pref="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-pref="dark" aria-pressed="false">Dark</button>
+      </div>
+    </header>
+
+    <div class="bar">
+      <p id="data-note">Waiting for worksheet data.</p>
+      <div class="actions" style="margin:0;">
+        <button type="button" class="btn small" id="use-demo">Use demo process</button>
+        <button type="button" class="btn small" id="use-selection">Use Excel selection</button>
+        <button type="button" class="btn small" id="pick-range">Pick a range</button>
+        <button type="button" class="btn small" id="refresh-data">Refresh worksheet data</button>
+      </div>
+    </div>
+    <p id="host-error" class="status error" hidden></p>
+
+    <div id="setup">
+      <section class="panel" aria-labelledby="cfg-title">
+        <p class="step">1 · Configure process</p>
+        <h2 id="cfg-title">Response and predictors</h2>
+        <div class="grid cols-2">
+          <label class="field">Response
+            <select id="response"></select>
+          </label>
+          <label class="field">Response unit
+            <input id="response-unit" type="text" placeholder="Optional, such as g or mm" />
+          </label>
+        </div>
+        <label class="field" style="margin-top:8px;flex-direction:row;align-items:center;gap:8px;color:var(--text);">
+          <input id="as-percent" type="checkbox" /> This response is a percentage
+        </label>
+        <div class="grid cols-2" id="percent-scale">
+          <label class="field">Low end of the percentage scale
+            <input id="pct-min" type="number" value="0" step="any" />
+          </label>
+          <label class="field">High end of the percentage scale
+            <input id="pct-max" type="number" value="100" step="any" />
+          </label>
+        </div>
+        <p class="hint">Training values, specifications, predictions, and intervals stay on this scale. A percentage response reports changes and margins in percentage points.</p>
+        <div id="predictor-list"></div>
+        <div id="interaction-list"></div>
+        <p id="preview-note" class="hint"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="spec-title">
+        <p class="step">2 · Define specifications</p>
+        <h2 id="spec-title">Specification limits and target</h2>
+        <div class="grid cols-3">
+          <label class="field">Lower specification limit
+            <input id="lsl" type="number" step="any" />
+          </label>
+          <label class="field">Upper specification limit
+            <input id="usl" type="number" step="any" />
+          </label>
+          <label class="field">Target
+            <input id="target" type="number" step="any" />
+          </label>
+        </div>
+        <p class="hint">Limits and the target are optional. The target is not a limit. With no limits, predictions still run and the margin is unavailable.</p>
+        <p id="spec-error" class="field-error" role="alert"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="bounds-title">
+        <p class="step">3 · Set allowed inputs</p>
+        <h2 id="bounds-title">Operating bounds</h2>
+        <p class="hint">Numeric bounds start at the analyzed range. You can widen them. Values inside these bounds can still fall outside the fitted data, and that is reported separately from a blocked input.</p>
+        <div id="bounds-list"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="fit-title">
+        <p class="step">4 · Fit and pin</p>
+        <h2 id="fit-title">Current settings</h2>
+        <div class="actions">
+          <button type="button" class="btn primary" id="fit-btn">Fit model</button>
+          <button type="button" class="btn" id="return-compare" hidden>Return to comparison</button>
+        </div>
+        <p id="fit-status" class="status" role="status"></p>
+        <div id="pin-panel" hidden>
+          <p id="model-line"></p>
+          <details id="diagnostics">
+            <summary>Model summary and fit diagnostics</summary>
+            <div id="diagnostics-body"></div>
+          </details>
+          <label class="field" style="margin-top:8px;">Analyzed source row
+            <select id="row-picker"></select>
+          </label>
+          <div id="current-fields" class="grid cols-2" style="margin-top:8px;"></div>
+          <div class="actions">
+            <button type="button" class="btn primary" id="pin-btn">Pin current settings</button>
+          </div>
+          <p id="pin-status" class="status" role="status"></p>
+        </div>
+      </section>
+    </div>
+
+    <div id="explore" hidden>
+      <section class="panel">
+        <p class="step">5 · Explore</p>
+        <div class="actions" style="margin-top:0;">
+          <button type="button" class="btn" id="edit-current">Edit current settings</button>
+          <button type="button" class="btn" id="edit-model">Change the model</button>
+          <button type="button" class="btn" id="reset-candidate">Reset candidate</button>
+        </div>
+        <p id="explore-id" class="chip"></p>
+        <div id="compare" class="compare" aria-live="polite"></div>
+        <p id="delta" class="delta"></p>
+        <ul id="changed" class="changed"></ul>
+        <p id="withheld" class="status error" hidden></p>
+      </section>
+      <section class="panel">
+        <h2>Specifications</h2>
+        <div class="grid cols-3">
+          <label class="field">Lower specification limit
+            <input id="x-lsl" type="number" step="any" />
+          </label>
+          <label class="field">Upper specification limit
+            <input id="x-usl" type="number" step="any" />
+          </label>
+          <label class="field">Target
+            <input id="x-target" type="number" step="any" />
+          </label>
+        </div>
+        <p id="x-spec-error" class="field-error" role="alert"></p>
+        <label class="field" style="margin-top:8px;max-width:220px;">Confidence level
+          <select id="confidence">
+            <option value="0.9">90%</option>
+            <option value="0.95" selected>95%</option>
+            <option value="0.99">99%</option>
+          </select>
+        </label>
+      </section>
+      <section class="panel">
+        <h2>Candidate settings</h2>
+        <p class="hint">Arrow keys move a focused slider. A value outside the allowed bounds is blocked here and is not compared. A permitted value outside the analyzed data stays visible with a range-check advisory.</p>
+        <div id="controls"></div>
+      </section>
+      <section class="panel">
+        <h2>Profiles</h2>
+        <p class="hint">Each profile varies one adjustable input and holds the other inputs, including fixed conditions, at the candidate. Categories are separate marks.</p>
+        <div class="legend" id="legend"></div>
+        <div id="profiles"></div>
+      </section>
+    </div>
+  </div>
+  <script>
+(function () {
+  var Engine = window.StatisticoProcessSettings;
+  var session = Engine.createSession();
+  var booted = false;
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function el(id) { return document.getElementById(id); }
+  function numOrBlank(value) {
+    return value == null || value === '' ? '' : String(value);
+  }
+  function blankToNull(value) {
+    return value == null || String(value).trim() === '' ? null : value;
+  }
+  function formatCoef(value) {
+    if (!Number.isFinite(value)) return 'Unavailable';
+    var rounded = Math.round((value + Number.EPSILON) * 1e6) / 1e6;
+    if (Object.is(rounded, -0)) rounded = 0;
+    return String(rounded).replace('-', '\u2212');
+  }
+  function post(action) {
+    try {
+      if (window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+        Office.context.ui.messageParent(JSON.stringify({ action: action }));
+      }
+    } catch (e) {}
+  }
+  function applyTheme(pref) {
+    var mode = pref || 'dark';
+    var theme = mode;
+    if (mode === 'auto') {
+      theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+    document.documentElement.setAttribute('data-theme-pref', mode);
+    try { localStorage.setItem('statistico-theme', mode); } catch (e) {}
+    document.querySelectorAll('[data-theme-pref]').forEach(function (btn) {
+      btn.setAttribute('aria-pressed', btn.getAttribute('data-theme-pref') === mode ? 'true' : 'false');
+    });
+  }
+  function storedTheme() {
+    try { return localStorage.getItem('statistico-theme') || 'dark'; } catch (e) { return 'dark'; }
+  }
+
+  function readConfig() {
+    var response = el('response').value;
+    var numeric = [];
+    var categorical = [];
+    var roles = {};
+    var units = {};
+    document.querySelectorAll('#predictor-list .pred').forEach(function (row) {
+      var name = row.getAttribute('data-name');
+      var role = row.querySelector('[data-role]').value;
+      if (!name || name === response || role === 'omit') return;
+      if (row.getAttribute('data-kind') === 'numeric') numeric.push(name);
+      else categorical.push(name);
+      roles[name] = role;
+      units[name] = row.querySelector('[data-unit]').value.trim();
+    });
+    var interactions = [];
+    document.querySelectorAll('#interaction-list input:checked').forEach(function (box) {
+      interactions.push({ var1: box.getAttribute('data-v1'), var2: box.getAttribute('data-v2') });
+    });
+    var percent = el('as-percent').checked;
+    return {
+      response: response,
+      numeric: numeric,
+      categorical: categorical,
+      roles: roles,
+      units: units,
+      interactions: interactions,
+      responseScale: {
+        kind: percent ? 'percent' : 'number',
+        min: el('pct-min').value,
+        max: el('pct-max').value,
+        unit: percent ? (el('response-unit').value.trim() || '%') : el('response-unit').value.trim()
+      },
+      includeIntercept: true
+    };
+  }
+  function readSpecsFrom(prefix) {
+    return {
+      lsl: blankToNull(el(prefix + 'lsl').value),
+      usl: blankToNull(el(prefix + 'usl').value),
+      target: blankToNull(el(prefix + 'target').value)
+    };
+  }
+  function applySpecs(prefix, errorId) {
+    var result = session.setSpecifications(readSpecsFrom(prefix));
+    el(errorId).textContent = result.ok ? '' : result.error;
+    ['lsl', 'usl', 'target'].forEach(function (key) {
+      el(prefix + key).setAttribute('aria-invalid', result.ok ? 'false' : 'true');
+    });
+    return result;
+  }
+  function pushConfig() {
+    return session.configure(readConfig());
+  }
+
+  function renderResponse(preferred) {
+    var view = session.read();
+    var select = el('response');
+    var numeric = view.columns.filter(function (col) { return col.kind === 'numeric'; });
+    select.innerHTML = numeric.map(function (col) {
+      return '<option value="' + esc(col.name) + '">' + esc(col.name) + '</option>';
+    }).join('');
+    var name = preferred || view.config.response || (numeric[0] && numeric[0].name) || '';
+    if (name) select.value = name;
+  }
+  function renderPredictors() {
+    var view = session.read();
+    var response = el('response').value;
+    var html = view.columns.filter(function (col) { return col.name !== response; }).map(function (col) {
+      var inNum = view.config.numeric.indexOf(col.name) >= 0;
+      var inCat = view.config.categorical.indexOf(col.name) >= 0;
+      var role = inNum || inCat ? (view.config.roles[col.name] || 'adjustable') : 'omit';
+      var unit = view.config.units[col.name] || '';
+      return '<div class="pred" data-name="' + esc(col.name) + '" data-kind="' + esc(col.kind) + '">' +
+        '<strong>' + esc(col.name) + '</strong>' +
+        '<span class="kind">' + (col.kind === 'numeric' ? 'Numeric' : 'Categorical') + '</span>' +
+        '<select data-role aria-label="Role for ' + esc(col.name) + '">' +
+          '<option value="omit"' + (role === 'omit' ? ' selected' : '') + '>Not in the model</option>' +
+          '<option value="adjustable"' + (role === 'adjustable' ? ' selected' : '') + '>Adjustable setting</option>' +
+          '<option value="fixed"' + (role === 'fixed' ? ' selected' : '') + '>Fixed condition</option>' +
+        '</select>' +
+        '<input data-unit type="text" value="' + esc(unit) + '" aria-label="Unit for ' + esc(col.name) + '" placeholder="Unit" />' +
+      '</div>';
+    }).join('');
+    el('predictor-list').innerHTML = html || '<p class="hint">This table has no predictors besides the response.</p>';
+    renderInteractions();
+    renderBounds();
+    var note = view.previewN
+      ? (view.previewN + ' rows can be analyzed. Rows with a missing response or predictor are omitted.')
+      : (view.message || 'Choose a response and at least one predictor.');
+    el('preview-note').textContent = note;
+  }
+  function renderInteractions() {
+    var names = [];
+    document.querySelectorAll('#predictor-list .pred').forEach(function (row) {
+      if (row.querySelector('[data-role]').value !== 'omit') names.push(row.getAttribute('data-name'));
+    });
+    var existing = {};
+    session.read().config.interactions.forEach(function (ix) {
+      existing[ix.var1 + '\u00d7' + ix.var2] = true;
+      existing[ix.var2 + '\u00d7' + ix.var1] = true;
+    });
+    var boxes = [];
+    for (var i = 0; i < names.length; i++) {
+      for (var j = i + 1; j < names.length; j++) {
+        var key = names[i] + '\u00d7' + names[j];
+        boxes.push('<label class="field" style="flex-direction:row;align-items:center;gap:8px;color:var(--text);margin-top:6px;">' +
+          '<input type="checkbox" data-ix="1" data-v1="' + esc(names[i]) + '" data-v2="' + esc(names[j]) + '"' +
+          (existing[key] ? ' checked' : '') + ' /> ' + esc(names[i] + ' \u00d7 ' + names[j]) + '</label>');
+      }
+    }
+    el('interaction-list').innerHTML = boxes.length ? ('<p class="hint">Interactions</p>' + boxes.join('')) : '';
+  }
+  function renderBounds() {
+    var view = session.read();
+    var names = view.config.numeric.concat(view.config.categorical);
+    if (!names.length) {
+      el('bounds-list').innerHTML = '<p class="hint">Choose predictors to set their allowed inputs.</p>';
+      return;
+    }
+    el('bounds-list').innerHTML = names.map(function (name) {
+      if (view.config.numeric.indexOf(name) >= 0) {
+        var limit = view.limits[name] || { min: '', max: '' };
+        var observed = view.observed.ranges[name];
+        var hint = observed ? ('Analyzed range ' + formatCoef(observed.min) + ' to ' + formatCoef(observed.max) + '.') : '';
+        return '<div class="bound" data-bound-for="' + esc(name) + '">' +
+          '<strong>' + esc(name) + '</strong><span class="kind">Numeric</span>' +
+          '<label class="field">Lower bound<input data-bmin="' + esc(name) + '" type="number" step="any" value="' + esc(numOrBlank(limit.min)) + '" /></label>' +
+          '<label class="field">Upper bound<input data-bmax="' + esc(name) + '" type="number" step="any" value="' + esc(numOrBlank(limit.max)) + '" /></label>' +
+          '<span class="hint" style="grid-column:1/-1;">' + esc(hint) + ' Equal bounds lock the candidate at that value.</span></div>';
+      }
+      var levels = (view.observed.levels && view.observed.levels[name]) || [];
+      var allowed = (view.limits[name] && view.limits[name].levels) || levels;
+      var checks = levels.map(function (level) {
+        var on = allowed.map(String).indexOf(String(level)) >= 0;
+        return '<label style="margin-right:10px;"><input type="checkbox" data-blevel="' + esc(name) + '" value="' + esc(level) + '"' +
+          (on ? ' checked' : '') + ' /> ' + esc(level) + '</label>';
+      }).join('');
+      return '<div class="bound" data-bound-for="' + esc(name) + '"><strong>' + esc(name) + '</strong><span class="kind">Categorical</span><div>' +
+        checks + '</div><span></span></div>';
+    }).join('');
+  }
+  function collectBounds() {
+    var limits = {};
+    document.querySelectorAll('[data-bmin]').forEach(function (input) {
+      var name = input.getAttribute('data-bmin');
+      var maxInput = document.querySelector('[data-bmax="' + name.replace(/"/g, '') + '"]');
+      if (!maxInput) {
+        document.querySelectorAll('[data-bmax]').forEach(function (other) {
+          if (other.getAttribute('data-bmax') === name) maxInput = other;
+        });
+      }
+      limits[name] = { min: input.value, max: maxInput ? maxInput.value : input.value };
+    });
+    var levels = {};
+    document.querySelectorAll('[data-blevel]').forEach(function (box) {
+      var name = box.getAttribute('data-blevel');
+      levels[name] = levels[name] || [];
+      if (box.checked) levels[name].push(box.value);
+    });
+    Object.keys(levels).forEach(function (name) { limits[name] = { levels: levels[name] }; });
+    return limits;
+  }
+  function pushBounds() {
+    var result = session.setOperatingLimits(collectBounds());
+    el('fit-status').textContent = result.ok ? el('fit-status').textContent : result.error;
+    if (!result.ok) el('fit-status').className = 'status error';
+    return result;
+  }
+
+  function renderPin() {
+    var view = session.read();
+    var panel = el('pin-panel');
+    if (!view.model) {
+      panel.hidden = true;
+      el('return-compare').hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    el('return-compare').hidden = !view.pin;
+    el('model-line').innerHTML = '<span class="chip">Model ' + esc(view.model.id) + ' · N = ' + esc(view.model.n) + '</span>';
+    var rows = view.model.coefficients.map(function (row) {
+      return '<tr><td>' + esc(row.name) + '</td><td>' + esc(formatCoef(row.estimate)) + '</td><td>' + esc(formatCoef(row.se)) + '</td></tr>';
+    }).join('');
+    var fp = Number.isFinite(view.model.fp) ? formatCoef(view.model.fp) : 'Unavailable';
+    el('diagnostics-body').innerHTML =
+      '<p class="hint">Ordinary least squares has been run ' + view.fitCount + ' time(s) this session. Slider moves and specification edits do not run it again. Residual plots and influence diagnostics stay in Linear Regression; the coefficients here are that same unweighted fit.</p>' +
+      '<p class="hint">R² ' + formatCoef(view.model.r2) + ' · Adjusted R² ' + formatCoef(view.model.adjR2) +
+      ' · RMSE ' + formatCoef(view.model.rmse) + ' · F ' + formatCoef(view.model.f) + ' · p ' + fp + '</p>' +
+      '<table><thead><tr><th>Term</th><th>Estimate</th><th>Std. error</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    var picker = el('row-picker');
+    picker.innerHTML = '<option value="">Enter settings below</option>' + view.analyzedRows.map(function (row, index) {
+      return '<option value="' + index + '">' + esc(row.label) + '</option>';
+    }).join('');
+    var draft = view.currentDraft || {};
+    el('current-fields').innerHTML = view.config.numeric.concat(view.config.categorical).map(function (name) {
+      var numeric = view.config.numeric.indexOf(name) >= 0;
+      var value = draft[name] == null ? '' : draft[name];
+      var role = view.config.roles[name] === 'fixed' ? 'Fixed condition' : 'Adjustable setting';
+      if (numeric) {
+        return '<label class="field">' + esc(name) + ' · ' + role +
+          '<input data-current="' + esc(name) + '" data-numeric="1" type="number" step="any" value="' + esc(value) + '" /></label>';
+      }
+      var levels = (view.observed.levels[name] || []);
+      var options = levels.map(function (level) {
+        return '<option value="' + esc(level) + '"' + (String(level) === String(value) ? ' selected' : '') + '>' + esc(level) + '</option>';
+      }).join('');
+      return '<label class="field">' + esc(name) + ' · ' + role +
+        '<select data-current="' + esc(name) + '">' + options + '</select></label>';
+    }).join('');
+  }
+
+  function showSetup(repin) {
+    if (repin) session.editCurrent();
+    el('explore').hidden = true;
+    el('setup').hidden = false;
+    var view = session.read();
+    el('lsl').value = numOrBlank(view.spec.lsl);
+    el('usl').value = numOrBlank(view.spec.usl);
+    el('target').value = numOrBlank(view.spec.target);
+    renderPin();
+    var pin = el('pin-panel');
+    if (repin && pin && !pin.hidden) pin.scrollIntoView({ block: 'nearest' });
+  }
+  function showExplore() {
+    var view = session.read();
+    if (!view.pin) return;
+    el('setup').hidden = true;
+    el('explore').hidden = false;
+    el('x-lsl').value = numOrBlank(view.spec.lsl);
+    el('x-usl').value = numOrBlank(view.spec.usl);
+    el('x-target').value = numOrBlank(view.spec.target);
+    el('confidence').value = String(view.confidence);
+    buildControls();
+    paint();
+    var heading = el('explore').querySelector('h2');
+    if (heading) heading.setAttribute('tabindex', '-1');
+  }
+
+  function cardHtml(title, card, suffix) {
+    if (!card || !card.available) {
+      return '<article class="card"><h3>' + esc(title) + '</h3><p class="hint">No prediction.</p></article>';
+    }
+    var advisories = (card.support && card.support.advisories || []).map(function (line) {
+      return '<p class="warn">' + esc(line) + '</p>';
+    }).join('');
+    var ciNote = card.ci ? '' : ('<p class="hint">' + esc(card.ciReason || 'The confidence interval for the mean response is unavailable for this fit.') + '</p>');
+    return '<article class="card"><h3>' + esc(title) + '</h3>' +
+      '<p class="hint">Predicted mean</p><p class="mean">' + esc(card.meanText) + esc(suffix) + '</p>' +
+      '<p>' + esc(card.ciLabel) + '</p><p>' + esc(card.ciText) + '</p>' + ciNote +
+      '<p>Margin to specification: ' + esc(card.marginText) + '</p>' +
+      (card.locationLabel ? '<p class="location">' + esc(card.locationLabel) + '</p>' : '') +
+      (card.targetText ? '<p>' + esc(card.targetText) + (card.atTarget ? ' (exactly at target)' : '') + '</p>' : '') +
+      (card.rangeFlag ? '<p class="warn">' + esc(card.rangeFlag) + '</p>' : '') +
+      advisories +
+      '<p class="caveat">' + esc(card.support ? card.support.caveat : '') + '</p></article>';
+  }
+  function paint() {
+    var view = session.read();
+    var suffix = view.config.responseScale && view.config.responseScale.kind === 'percent' ? '%' : '';
+    el('explore-id').textContent = view.model ? ('Model ' + view.model.id + ' · N = ' + view.model.n) : '';
+    el('compare').innerHTML = cardHtml('Current settings', view.currentCard, suffix) +
+      (view.candidateCard ? cardHtml('Candidate settings', view.candidateCard, suffix) :
+        '<article class="card"><h3>Candidate settings</h3><p>The comparison is withheld until the candidate is valid.</p></article>');
+    el('delta').textContent = view.deltaText ? ('Candidate − current predicted mean: ' + view.deltaText) : '';
+    el('changed').innerHTML = (view.changed || []).map(function (row) {
+      var unit = row.unit ? (' ' + row.unit) : '';
+      return '<li>' + esc(row.name) + ': ' + esc(row.fromText) + unit + ' → ' + esc(row.toText) + unit + '</li>';
+    }).join('');
+    el('withheld').hidden = view.phase !== 'withheld';
+    el('withheld').textContent = view.withheldReason || '';
+    document.querySelectorAll('[data-cand]').forEach(function (input) {
+      input.setAttribute('aria-invalid', 'false');
+    });
+    document.querySelectorAll('.field-error').forEach(function (node) {
+      if (node.id === 'spec-error' || node.id === 'x-spec-error') return;
+      if (node.hasAttribute('data-cand-error')) node.textContent = '';
+    });
+    document.querySelectorAll('[data-bound-hint]').forEach(function (node) {
+      var name = node.getAttribute('data-bound-hint');
+      var limit = view.limits[name];
+      var observed = view.observed.ranges[name];
+      if (!limit) return;
+      node.textContent = 'Allowed ' + formatCoef(Number(limit.min)) + ' to ' + formatCoef(Number(limit.max)) +
+        (observed ? ('. Analyzed ' + formatCoef(observed.min) + ' to ' + formatCoef(observed.max) + '.') : '.');
+    });
+    (view.candidateErrors || []).forEach(function (err) {
+      var nodes = document.querySelectorAll('[data-cand-error]');
+      Array.prototype.forEach.call(nodes, function (node) {
+        if (node.getAttribute('data-cand-error') === err.name) node.textContent = err.message;
+      });
+      document.querySelectorAll('[data-cand]').forEach(function (input) {
+        if (input.getAttribute('data-cand') === err.name) input.setAttribute('aria-invalid', 'true');
+      });
+    });
+    renderProfiles(view, suffix);
+  }
+  function yOf(scale, value, height) {
+    var span = scale.max - scale.min || 1;
+    var t = (value - scale.min) / span;
+    return 18 + (1 - t) * (height - 46);
+  }
+  function specLines(scale, spec, width, height) {
+    var lines = [];
+    function add(value, label, cls, x) {
+      if (!Number.isFinite(value)) return;
+      var y = yOf(scale, value, height);
+      lines.push('<line x1="46" x2="' + (width - 12) + '" y1="' + y + '" y2="' + y + '" stroke="var(--' + cls + ')" stroke-dasharray="' +
+        (cls === 'target' ? '2 4' : '6 4') + '" />');
+      lines.push('<text x="' + x + '" y="' + (y - 4) + '" fill="var(--' + cls + ')" font-size="11">' + label + '</text>');
+    }
+    add(spec.lsl, 'LSL', 'limit', 50);
+    add(spec.usl, 'USL', 'limit', width - 48);
+    add(spec.target, 'Target', 'target', width / 2 - 16);
+    return lines.join('');
+  }
+  function profileSvg(profile, view) {
+    var width = 640;
+    var height = 210;
+    var scale = view.yScale;
+    if (!scale) return '';
+    var body = specLines(scale, view.spec, width, height);
+    if (profile.kind === 'numeric' && profile.points.length) {
+      var xmin = profile.points[0].x;
+      var xmax = profile.points[profile.points.length - 1].x;
+      function xOf(x) {
+        var span = xmax - xmin || 1;
+        return 46 + ((x - xmin) / span) * (width - 58);
+      }
+      var band = profile.points.filter(function (point) { return point.ci; });
+      if (band.length) {
+        var upper = band.map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.ci[1], height); }).join(' ');
+        var lower = band.slice().reverse().map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.ci[0], height); }).join(' ');
+        body += '<polygon points="' + upper + ' ' + lower + '" fill="var(--ci)" />';
+      }
+      body += '<polyline fill="none" stroke="var(--mean)" stroke-width="2" points="' +
+        profile.points.map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.mean, height); }).join(' ') + '" />';
+      var active = view.candidateCard;
+      if (active && Number.isFinite(profile.active)) {
+        var ax = xOf(profile.active);
+        var ay = yOf(scale, active.mean, height);
+        body += '<circle cx="' + ax + '" cy="' + ay + '" r="5" fill="var(--accent)" stroke="#fff" stroke-width="1.5" />';
+        body += '<text x="' + Math.min(ax + 8, width - 90) + '" y="' + Math.max(ay - 8, 16) + '" fill="var(--text)" font-size="12" font-weight="700">' +
+          esc(active.meanText) + ' at ' + esc(formatCoef(profile.active)) + '</text>';
+      }
+      body += '<text x="46" y="' + (height - 8) + '" fill="var(--muted)" font-size="11">' + esc(formatCoef(xmin)) + '</text>';
+      body += '<text x="' + (width - 70) + '" y="' + (height - 8) + '" fill="var(--muted)" font-size="11">' + esc(formatCoef(xmax)) + '</text>';
+    } else if (profile.kind === 'categorical') {
+      var marks = profile.marks || [];
+      marks.forEach(function (mark, index) {
+        var x = 70 + index * ((width - 100) / Math.max(marks.length, 1));
+        if (!Number.isFinite(mark.mean)) return;
+        if (mark.ci) {
+          body += '<line x1="' + x + '" x2="' + x + '" y1="' + yOf(scale, mark.ci[0], height) + '" y2="' + yOf(scale, mark.ci[1], height) +
+            '" stroke="var(--ci)" stroke-width="8" />';
+        }
+        var y = yOf(scale, mark.mean, height);
+        body += '<circle cx="' + x + '" cy="' + y + '" r="' + (mark.active ? 6 : 4) + '" fill="' + (mark.active ? 'var(--accent)' : 'var(--mean)') + '" />';
+        body += '<text x="' + (x - 8) + '" y="' + (height - 8) + '" fill="var(--text)" font-size="12">' + esc(mark.level) + '</text>';
+        if (mark.active) {
+          body += '<text x="' + (x + 10) + '" y="' + Math.max(y - 8, 16) + '" fill="var(--text)" font-size="12" font-weight="700">' + esc(formatCoef(mark.mean)) + '</text>';
+        }
+      });
+    }
+    var label = profile.name + ' profile. Other inputs held at the candidate.';
+    return '<svg class="profile" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(label) + '">' + body + '</svg>';
+  }
+  function renderProfiles(view, suffix) {
+    var legend = [];
+    legend.push('<span><i class="swatch" style="background:var(--mean)"></i>Predicted mean</span>');
+    legend.push('<span><i class="swatch" style="background:var(--ci);height:8px"></i>' + esc(Math.round(view.confidence * 100)) + '% confidence interval for the mean response</span>');
+    if (view.spec.lsl != null) legend.push('<span><i class="swatch" style="background:var(--limit)"></i>LSL</span>');
+    if (view.spec.usl != null) legend.push('<span><i class="swatch" style="background:var(--limit)"></i>USL</span>');
+    if (view.spec.target != null) legend.push('<span><i class="swatch" style="background:var(--target)"></i>Target</span>');
+    el('legend').innerHTML = legend.join('');
+    if (!view.profiles.length) {
+      el('profiles').innerHTML = '<p class="hint">' + esc(view.withheldReason || 'Pin a valid candidate to draw profiles.') + '</p>';
+      return;
+    }
+    el('profiles').innerHTML = view.profiles.map(function (profile) {
+      var held = (profile.held || []).map(function (item) { return item.name + ' ' + item.text; }).join(', ');
+      var locked = profile.locked ? ' Locked.' : '';
+      return '<figure><figcaption><strong>' + esc(profile.name) + (profile.unit ? ' (' + esc(profile.unit) + ')' : '') +
+        '</strong><span class="hint">Held at candidate: ' + esc(held || 'none') + locked + '</span></figcaption>' +
+        profileSvg(profile, view) + '</figure>';
+    }).join('') + (suffix ? '<p class="hint">Response suffix % is the percentage scale. Changes above are in percentage points.</p>' : '');
+  }
+
+  function buildControls() {
+    var view = session.read();
+    var draft = view.candidateDraft || {};
+    var html = view.config.numeric.concat(view.config.categorical).map(function (name) {
+      var fixed = view.config.roles[name] === 'fixed';
+      var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
+      if (fixed) {
+        return '<div class="control"><strong>' + esc(name) + '</strong> ' + esc(draft[name]) + esc(unit) +
+          ' <span class="hint">Fixed condition. It is the same in the current settings and the candidate.</span></div>';
+      }
+      if (view.config.categorical.indexOf(name) >= 0) {
+        var known = view.observed.levels[name] || [];
+        var options = known.map(function (level) {
+          return '<option value="' + esc(level) + '"' + (String(level) === String(draft[name]) ? ' selected' : '') + '>' + esc(level) + '</option>';
+        }).join('');
+        var allowed = (view.limits[name] && view.limits[name].levels) || known;
+        var checks = known.map(function (level) {
+          var on = allowed.map(String).indexOf(String(level)) >= 0;
+          return '<label style="margin-right:8px;"><input type="checkbox" data-allow="' + esc(name) + '" value="' + esc(level) + '"' +
+            (on ? ' checked' : '') + ' /> ' + esc(level) + '</label>';
+        }).join('');
+        return '<div class="control"><label class="field">' + esc(name) +
+          '<select data-cand="' + esc(name) + '">' + options + '</select></label>' +
+          '<p class="hint">Allowed choices</p><div>' + checks + '</div>' +
+          '<p class="field-error" data-cand-error="' + esc(name) + '"></p></div>';
+      }
+      var limit = view.limits[name] || { min: draft[name], max: draft[name] };
+      var observed = view.observed.ranges[name];
+      var locked = Math.abs(Number(limit.max) - Number(limit.min)) <= 1e-9;
+      var value = draft[name];
+      var span = Number(limit.max) - Number(limit.min);
+      var step = (span >= 10 && Math.abs(limit.min - Math.round(limit.min)) < 1e-9 && Math.abs(limit.max - Math.round(limit.max)) < 1e-9) ? '1' : 'any';
+      var slider = locked ? '' : '<input data-cand="' + esc(name) + '" data-numeric="1" type="range" min="' + esc(limit.min) +
+        '" max="' + esc(limit.max) + '" step="' + step + '" value="' + esc(value) + '" aria-label="' + esc(name) + ' slider" />';
+      return '<div class="control"><label class="field">' + esc(name) + esc(unit) +
+        slider +
+        '<input data-cand="' + esc(name) + '" data-numeric="1" type="number" step="any" value="' + esc(value) + '" aria-label="' + esc(name) + ' value" /></label>' +
+        '<p class="hint" data-bound-hint="' + esc(name) + '">Allowed ' + esc(formatCoef(Number(limit.min))) + ' to ' + esc(formatCoef(Number(limit.max))) +
+        (observed ? ('. Analyzed ' + esc(formatCoef(observed.min)) + ' to ' + esc(formatCoef(observed.max))) : '') + '.</p>' +
+        '<div class="split"><label class="field">Allowed lower<input data-live-min="' + esc(name) + '" type="number" step="any" value="' + esc(limit.min) + '" /></label>' +
+        '<label class="field">Allowed upper<input data-live-max="' + esc(name) + '" type="number" step="any" value="' + esc(limit.max) + '" /></label></div>' +
+        '<p class="field-error" data-cand-error="' + esc(name) + '"></p></div>';
+    }).join('');
+    el('controls').innerHTML = html;
+  }
+  function findCand(name, type) {
+    var found = null;
+    document.querySelectorAll('[data-cand]').forEach(function (node) {
+      if (node.getAttribute('data-cand') === name && node.type === type) found = node;
+    });
+    return found;
+  }
+
+  function loadTable(table, note) {
+    booted = true;
+    session.loadData(table);
+    el('data-note').textContent = note || table.address || 'Worksheet data loaded.';
+    el('host-error').hidden = true;
+    el('as-percent').checked = false;
+    el('response-unit').value = '';
+    renderResponse();
+    session.configure({
+      response: el('response').value,
+      numeric: [],
+      categorical: [],
+      roles: {},
+      units: {},
+      interactions: [],
+      responseScale: { kind: 'number' },
+      includeIntercept: true
+    });
+    renderPredictors();
+    el('lsl').value = '';
+    el('usl').value = '';
+    el('target').value = '';
+    applySpecs('', 'spec-error');
+    showSetup(false);
+    el('fit-status').textContent = 'Worksheet data replaced the previous table. Map the response and predictors, fit again, then pin before comparing.';
+    el('fit-status').className = 'status';
+  }
+  function loadDemo() {
+    var demo = Engine.demoPreset();
+    booted = true;
+    session.loadData(demo.table);
+    el('data-note').textContent = 'Built-in demo · ' + demo.table.address + ' · 12 complete rows.';
+    el('host-error').hidden = true;
+    el('as-percent').checked = false;
+    el('pct-min').value = '0';
+    el('pct-max').value = '100';
+    el('response-unit').value = '';
+    renderResponse(demo.config.response);
+    session.configure(demo.config);
+    renderPredictors();
+    el('lsl').value = demo.specifications.lsl;
+    el('usl').value = demo.specifications.usl;
+    el('target').value = demo.specifications.target;
+    applySpecs('', 'spec-error');
+    pushBounds();
+    showSetup(false);
+    el('fit-status').textContent = 'Demo is ready. Fit the model, review the current settings, then pin them.';
+    el('fit-status').className = 'status';
+    renderPin();
+  }
+
+  el('setup').addEventListener('change', function (event) {
+    var target = event.target;
+    if (target.id === 'response') {
+      pushConfig();
+      renderPredictors();
+      el('fit-status').textContent = 'The model specification changed. Fit again, then pin.';
+      return;
+    }
+    if (target.hasAttribute('data-role') || target.hasAttribute('data-ix') || target.id === 'as-percent') {
+      var result = pushConfig();
+      renderInteractions();
+      renderBounds();
+      el('preview-note').textContent = session.read().previewN
+        ? (session.read().previewN + ' rows can be analyzed. Rows with a missing response or predictor are omitted.')
+        : (result.error || '');
+      if (result.modelCleared) {
+        el('fit-status').textContent = 'The model specification changed. Fit again, then pin.';
+        renderPin();
+      } else if (result.pinCleared) {
+        el('fit-status').textContent = 'Fixed conditions changed. The fitted model is unchanged. Pin the current settings again.';
+        renderPin();
+      }
+      return;
+    }
+    if (target.hasAttribute('data-bmin') || target.hasAttribute('data-bmax') || target.hasAttribute('data-blevel')) {
+      pushBounds();
+    }
+    if (target.id === 'row-picker' && target.value !== '') {
+      var applied = session.applyAnalyzedRow(Number(target.value));
+      if (applied.ok) renderPin();
+      el('row-picker').value = target.value;
+    }
+    if (target.hasAttribute('data-current')) {
+      var partial = {};
+      partial[target.getAttribute('data-current')] = target.value;
+      session.setCurrentSettings(partial);
+    }
+  });
+  el('setup').addEventListener('input', function (event) {
+    var target = event.target;
+    if (target.id === 'lsl' || target.id === 'usl' || target.id === 'target' || target.id === 'pct-min' || target.id === 'pct-max' || target.id === 'response-unit' || target.hasAttribute('data-unit')) {
+      if (target.id === 'pct-min' || target.id === 'pct-max' || target.id === 'response-unit' || target.hasAttribute('data-unit')) pushConfig();
+      if (target.id === 'lsl' || target.id === 'usl' || target.id === 'target') applySpecs('', 'spec-error');
+    }
+    if (target.hasAttribute('data-bmin') || target.hasAttribute('data-bmax')) pushBounds();
+    if (target.hasAttribute('data-current')) {
+      var partial = {};
+      var raw = target.getAttribute('data-numeric') === '1' ? Number(target.value) : target.value;
+      partial[target.getAttribute('data-current')] = raw;
+      session.setCurrentSettings(partial);
+    }
+  });
+
+  el('fit-btn').addEventListener('click', function () {
+    var config = pushConfig();
+    renderBounds();
+    var specs = applySpecs('', 'spec-error');
+    if (!specs.ok) {
+      el('fit-status').textContent = specs.error;
+      el('fit-status').className = 'status error';
+      return;
+    }
+    var bounds = pushBounds();
+    if (!bounds.ok) {
+      el('fit-status').textContent = bounds.error;
+      el('fit-status').className = 'status error';
+      return;
+    }
+    if (config && config.error) {
+      el('fit-status').textContent = config.error;
+      el('fit-status').className = 'status error';
+      return;
+    }
+    var token = session.beginFit();
+    var fitted = session.finishFit(token);
+    if (!fitted.applied) {
+      el('fit-status').textContent = fitted.reason || 'The model could not be fit.';
+      el('fit-status').className = 'status error';
+      renderPin();
+      return;
+    }
+    el('fit-status').textContent = 'Fitted. Review the current settings, then pin them. N = ' + fitted.n + '.';
+    el('fit-status').className = 'status ok';
+    renderPin();
+  });
+  el('pin-btn').addEventListener('click', function () {
+    var partial = {};
+    document.querySelectorAll('[data-current]').forEach(function (input) {
+      partial[input.getAttribute('data-current')] = input.getAttribute('data-numeric') === '1' ? Number(input.value) : input.value;
+    });
+    session.setCurrentSettings(partial);
+    var pinned = session.pin();
+    if (!pinned.ok) {
+      el('pin-status').textContent = pinned.error;
+      el('pin-status').className = 'status error';
+      return;
+    }
+    el('pin-status').textContent = 'Current settings pinned.';
+    el('pin-status').className = 'status ok';
+    showExplore();
+  });
+  el('return-compare').addEventListener('click', showExplore);
+  el('edit-current').addEventListener('click', function () { showSetup(true); });
+  el('edit-model').addEventListener('click', function () { showSetup(false); });
+  el('reset-candidate').addEventListener('click', function () {
+    session.resetCandidate();
+    buildControls();
+    paint();
+  });
+  el('use-demo').addEventListener('click', loadDemo);
+  el('use-selection').addEventListener('click', function () { post('useSelection'); });
+  el('pick-range').addEventListener('click', function () { post('pickRange'); });
+  el('refresh-data').addEventListener('click', function () { post('refreshData'); });
+  document.querySelector('.theme').addEventListener('click', function (event) {
+    var pref = event.target.getAttribute && event.target.getAttribute('data-theme-pref');
+    if (pref) applyTheme(pref);
+  });
+
+  el('explore').addEventListener('input', function (event) {
+    var target = event.target;
+    if (target.id === 'x-lsl' || target.id === 'x-usl' || target.id === 'x-target') {
+      applySpecs('x-', 'x-spec-error');
+      paint();
+      return;
+    }
+    if (target.id === 'confidence') {
+      session.setConfidence(Number(target.value));
+      paint();
+      return;
+    }
+    if (target.hasAttribute('data-live-min') || target.hasAttribute('data-live-max')) {
+      var name = target.getAttribute('data-live-min') || target.getAttribute('data-live-max');
+      var minInput = null;
+      var maxInput = null;
+      document.querySelectorAll('[data-live-min]').forEach(function (node) {
+        if (node.getAttribute('data-live-min') === name) minInput = node;
+      });
+      document.querySelectorAll('[data-live-max]').forEach(function (node) {
+        if (node.getAttribute('data-live-max') === name) maxInput = node;
+      });
+      var updated = session.setOperatingLimits((function () {
+        var spec = {};
+        spec[name] = { min: minInput.value, max: maxInput.value };
+        return spec;
+      })());
+      if (!updated.ok) {
+        el('withheld').hidden = false;
+        el('withheld').textContent = updated.error;
+        return;
+      }
+      var slider = findCand(name, 'range');
+      if (slider) {
+        slider.min = minInput.value;
+        slider.max = maxInput.value;
+      }
+      paint();
+      return;
+    }
+    if (target.hasAttribute('data-allow')) {
+      var factor = target.getAttribute('data-allow');
+      var levels = [];
+      document.querySelectorAll('[data-allow]').forEach(function (box) {
+        if (box.getAttribute('data-allow') === factor && box.checked) levels.push(box.value);
+      });
+      var allow = {};
+      allow[factor] = { levels: levels };
+      var allowed = session.setOperatingLimits(allow);
+      if (!allowed.ok) {
+        target.checked = true;
+        el('withheld').hidden = false;
+        el('withheld').textContent = allowed.error;
+        return;
+      }
+      paint();
+      return;
+    }
+    if (!target.hasAttribute('data-cand')) return;
+    var key = target.getAttribute('data-cand');
+    var numeric = target.getAttribute('data-numeric') === '1';
+    var value = numeric ? Number(target.value) : target.value;
+    var patch = {};
+    patch[key] = value;
+    session.setCandidate(patch);
+    if (numeric && target.type === 'range') {
+      var number = findCand(key, 'number');
+      if (number && document.activeElement !== number) number.value = target.value;
+    }
+    if (numeric && target.type === 'number') {
+      var range = findCand(key, 'range');
+      var view = session.read();
+      if (range && view.phase !== 'withheld') range.value = target.value;
+    }
+    paint();
+  });
+  el('explore').addEventListener('change', function (event) {
+    if (event.target.hasAttribute('data-cand') && event.target.tagName === 'SELECT') {
+      var patch = {};
+      patch[event.target.getAttribute('data-cand')] = event.target.value;
+      session.setCandidate(patch);
+      paint();
+    }
+  });
+
+  function onParentMessage(arg) {
+    var msg;
+    try { msg = JSON.parse(arg.message || '{}'); } catch (e) { return; }
+    if (msg.type === 'PROCESS_SETTINGS_DATA') {
+      var payload = msg.payload || {};
+      if (!payload.headers || !payload.headers.length || payload.source === 'empty') {
+        booted = true;
+        el('data-note').textContent = 'No worksheet range is loaded. Use the Excel selection, pick a range, or open the demo process.';
+        return;
+      }
+      loadTable({ headers: payload.headers, rows: payload.rows || [], address: payload.address || '' },
+        'Worksheet ' + (payload.address || 'range') + ' · ' + (payload.rows || []).length + ' rows.');
+      return;
+    }
+    if (msg.type === 'PROCESS_SETTINGS_ERROR') {
+      el('host-error').hidden = false;
+      el('host-error').textContent = msg.message || 'The worksheet range could not be read.';
+    }
+  }
+  function boot() {
+    applyTheme(storedTheme());
+    if (/(?:^|[?&])demo=1(?:&|$)/.test(window.location.search || '') || typeof Office === 'undefined' || !Office.context || !Office.context.ui) {
+      loadDemo();
+      return;
+    }
+    Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage);
+    post('ready');
+    setTimeout(function () {
+      if (!booted) {
+        el('data-note').textContent = 'No worksheet range arrived. Use the Excel selection, pick a range, or open the demo process.';
+      }
+    }, 1800);
+  }
+  if (typeof Office !== 'undefined' && Office.onReady) Office.onReady(boot);
+  else boot();
+})();
+  </script>
+</body>
+</html>

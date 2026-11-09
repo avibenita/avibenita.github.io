@@ -552,7 +552,8 @@
         'Shows the association between each pair of numeric variables.',
         [
           'Each cell is one pair. The method on the page is Pearson, Spearman, or Kendall, and it applies to the cells you are reading.',
-          'Open a cell’s scatter when the page offers it, so a single number is not the only view of that pair.'
+          'Open a cell’s scatter when the page offers it, so a single number is not the only view of that pair.',
+          'Scatters draws every pair at once. The number on each plot is that pair’s correlation.'
         ],
         [
           'The sign is the direction. The absolute value is the strength on that coefficient’s scale. The p-value is about that pair alone.',

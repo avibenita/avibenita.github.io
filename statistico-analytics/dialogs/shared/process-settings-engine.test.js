@@ -33,6 +33,9 @@ describe('process settings numerical fixture', () => {
     expect(coef.Temperature).toBeCloseTo(0.4, 6);
     expect(coef.Recipe_B).toBeCloseTo(-18, 6);
     expect(coef['Temperature \u00d7 Recipe_B']).toBeCloseTo(0.2, 6);
+    expect(fitted.model.residuals).toHaveLength(12);
+    expect(fitted.model.fitted).toHaveLength(12);
+    expect(fitted.model.references[0]).toEqual({ name: 'Recipe', reference: 'A', levels: ['A', 'B'] });
 
     const current = fitted.currentCard;
     expect(current.mean).toBeCloseTo(66, 6);
@@ -263,6 +266,17 @@ describe('data support', () => {
 });
 
 describe('session identity', () => {
+  test('unpin keeps the fitted model and the current draft', () => {
+    const session = sessionFromPreset();
+    const draft = session.read().currentDraft;
+    expect(session.unpin().ok).toBe(true);
+    expect(session.read().pin).toBeNull();
+    expect(session.read().model.n).toBe(12);
+    expect(session.read().currentDraft).toEqual(draft);
+    expect(session.fitCount()).toBe(1);
+    expect(session.predict({ Temperature: 100, Recipe: 'B' }).estimate).toBeCloseTo(72, 6);
+  });
+
   test('pins, resets, edits fixed conditions, and ignores a stale fit', () => {
     const session = sessionFromPreset();
     const modelId = session.read().model.id;

@@ -49,7 +49,8 @@
     var rounded = roundDisplay(value, digits);
     if (Object.is(rounded, -0) || rounded === 0) return '0';
     var neg = rounded < 0;
-    var text = Math.abs(rounded).toFixed(digits).replace(/\.?0+$/, '');
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    var text = toFixed.call(Math.abs(rounded), digits).replace(/\.?0+$/, '');
     return (neg ? '\u2212' : '') + text;
   }
 
@@ -549,6 +550,11 @@
       state.scaleEpoch = '';
     }
 
+    function unpin() {
+      clearComparison();
+      return { ok: true };
+    }
+
     function clearModel() {
       state.model = null;
       clearComparison();
@@ -797,11 +803,18 @@
         categoricalInfo: prepared.categoricalInfo,
         n: results.n,
         fitCountAtFit: state.fitCount,
+        fitConfidence: state.confidence,
+        fitted: results.Y_fit ? results.Y_fit.slice() : [],
+        residuals: results.residuals ? results.residuals.slice() : [],
         coefficients: results.coefficients.map(function (estimate, i) {
           return {
             name: names[i] || ('Term ' + (i + 1)),
             estimate: estimate,
-            se: results.std_errors[i]
+            se: results.std_errors[i],
+            t: results.t_values ? results.t_values[i] : null,
+            p: results.p_values ? results.p_values[i] : null,
+            ciLow: results.CI_lower ? results.CI_lower[i] : null,
+            ciHigh: results.CI_upper ? results.CI_upper[i] : null
           };
         })
       };
@@ -1093,8 +1106,28 @@
           rmse: state.model.results.RMSE,
           f: state.model.results.F_stat,
           fp: state.model.results.F_pvalue,
-          coefficients: state.model.coefficients.map(function (row) { return { name: row.name, estimate: row.estimate, se: row.se }; }),
-          fitCountAtFit: state.model.fitCountAtFit
+          coefficients: state.model.coefficients.map(function (row) {
+            return {
+              name: row.name,
+              estimate: row.estimate,
+              se: row.se,
+              t: row.t,
+              p: row.p,
+              ciLow: row.ciLow,
+              ciHigh: row.ciHigh
+            };
+          }),
+          fitCountAtFit: state.model.fitCountAtFit,
+          fitConfidence: state.model.fitConfidence,
+          fitted: state.model.fitted.slice(),
+          residuals: state.model.residuals.slice(),
+          references: (state.model.categoricalInfo || []).map(function (cat) {
+            return {
+              name: cat.name,
+              reference: (cat.categories && cat.categories[0]) || '',
+              levels: (cat.categories || []).slice()
+            };
+          })
         } : null,
         analyzedRows: state.model ? state.model.analyzed.map(function (row) {
           return { label: row.label, settings: copy(row.settings), response: row.response, caseKey: row.caseKey };
@@ -1127,6 +1160,8 @@
       beginFit: beginFit,
       finishFit: finishFit,
       pin: pin,
+      unpin: unpin,
+      predict: predict,
       editCurrent: editCurrent,
       setCandidate: setCandidate,
       resetCandidate: resetCandidate,

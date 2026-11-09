@@ -921,7 +921,8 @@ const StatisticoHeader = {
       'meta-analysis': 'Meta-Analysis',
       'contingency': 'Contingency Tables',
       'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
-      'pareto': 'Pareto Analysis'
+      'pareto': 'Pareto Analysis',
+      'process-settings': 'Process Settings Explorer'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -1016,6 +1017,12 @@ const StatisticoHeader = {
       'regression-results': 'Regression Results',
       'regression-residuals': 'Residual Diagnostics',
       'regression-by-group': 'By-Group Analysis',
+      'setup': 'Input & Setup',
+      'ps-overview': 'Overview',
+      'ps-effects': 'Effects & Interactions',
+      'ps-diagnostics': 'Diagnostics',
+      'ps-profiler': 'Prediction Profiler',
+      'ps-compare': 'Compare Settings',
       // Logistic regression views
       'logistic-results': 'Logistic Regression',
 
@@ -1070,7 +1077,8 @@ const StatisticoHeader = {
       'meta-analysis': 'Meta-Analysis',
       'contingency': 'Contingency Tables',
       'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
-      'pareto': 'Pareto Analysis'
+      'pareto': 'Pareto Analysis',
+      'process-settings': 'Process Settings Explorer'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -1079,7 +1087,7 @@ const StatisticoHeader = {
     const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation' || this.module === 'process-settings');
 
     const groupName = String(this.groupLabel || '').trim()
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1744,7 +1752,7 @@ const StatisticoHeader = {
   },
 
   _isSharedSidebarModule() {
-    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency', 'segmentation'].includes(this.module);
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency', 'segmentation', 'process-settings'].includes(this.module);
   },
 
   _sidebarGroupKey(title) {
@@ -2132,6 +2140,49 @@ const StatisticoHeader = {
           view: 'regression-by-group',
           file: 'regression/regression-by-group.html'
         })
+      };
+    }
+
+    if (this.module === 'process-settings') {
+      const fitted = !!globalThis.__psFitted;
+      const active = globalThis.__psView || 'setup';
+      const resultItem = (view, icon, label, description) => ({
+        type: 'js',
+        onclick: "switchProcessSettingsView('" + view + "')",
+        icon: icon,
+        label: label,
+        description: fitted ? description : 'Available after the model is fit.',
+        active: fitted && active === view
+      });
+      return {
+        logoIcon: 'fa-sliders',
+        logoSub: 'Process Settings',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Results',
+            items: [
+              resultItem('overview', 'fa-chart-pie', 'Overview', 'Fitted response, sample, and specifications.'),
+              resultItem('effects', 'fa-arrows-split-up-and-left', 'Effects & Interactions', 'Coefficients and interaction profiles.'),
+              resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics', 'Observed versus fitted and residual checks.'),
+              resultItem('profiler', 'fa-sliders', 'Prediction Profiler', 'Pin the current recipe and move a candidate.'),
+              resultItem('compare', 'fa-table-columns', 'Compare Settings', 'Current and candidate side by side.')
+            ]
+          }
+        ],
+        pinnedNav: {
+          title: 'Setup',
+          items: [
+            {
+              type: 'js',
+              onclick: "switchProcessSettingsView('setup')",
+              icon: 'fa-pen-to-square',
+              label: fitted ? 'Edit input' : 'Input & Setup',
+              description: fitted ? 'Change the data, model, or specifications.' : 'Data, model, specifications, and operating ranges.',
+              active: active === 'setup'
+            }
+          ]
+        }
       };
     }
 
@@ -4900,7 +4951,7 @@ const StatisticoHeader = {
   },
 
   _isHeaderRowFilterSuppressed() {
-    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis' || this.module === 'contingency';
+    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'process-settings';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -9267,6 +9318,12 @@ REPORT: [one polished paragraph suitable for a report]`;
       'contingency-by-group-chart': 'Charts by Group',
       'contingency-by-group-similarity': 'Similarity Profile™',
       'regression-by-group': 'By-Group Analysis',
+      'setup': 'Input & Setup',
+      'ps-overview': 'Overview',
+      'ps-effects': 'Effects & Interactions',
+      'ps-diagnostics': 'Diagnostics',
+      'ps-profiler': 'Prediction Profiler',
+      'ps-compare': 'Compare Settings',
       'regression-by-group-coefficients': 'Coefficients',
       'regression-by-group-similarity': 'Similarity Profile™',
       'segmentation-overview': 'Overview',

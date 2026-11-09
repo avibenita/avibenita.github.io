@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Process Settings Explorer</title>
+  <script>
+    if (!/(?:^|[?&])(?:embed|demo)=1(?:&|$)/.test(window.location.search || '')) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"><\/scr' + 'ipt>');
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261109ps" />
+  <script src="../shared-brand-logo.js?v=20261005light1"></script>
+  <script src="../shared-header.js?v=20261109ps"></script>
+  <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <script src="../../shared/column-type.js"></script>
+  <script src="../../shared/regression-case-trace.js"></script>
+  <script src="../../shared/regression-effect-plot.js"></script>
+  <script src="../../shared/process-settings-engine.js"></script>
+  <style>
+    :root {
+      --ps-mean: #0f766e;
+      --ps-ci: rgba(15, 118, 110, .2);
+      --ps-limit: #be123c;
+      --ps-target: #1d4ed8;
+      --ps-mark: #c2410c;
+      --ps-warn: #a16207;
+      --ps-ok: #047857;
+      --ps-danger: #be123c;
+    }
+    html:not([data-theme="light"]) {
+      --ps-mean: #5eead4;
+      --ps-ci: rgba(94, 234, 212, .22);
+      --ps-limit: #fb7185;
+      --ps-target: #93c5fd;
+      --ps-mark: #fdba74;
+      --ps-warn: #f6c453;
+      --ps-ok: #86efac;
+      --ps-danger: #fb7185;
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 2px solid var(--accent-1, #18d38b); outline-offset: 2px; }
+    .ps-scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .ps-view[hidden] { display: none !important; }
+    #view-profiler:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+    #view-overview:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+    .ps-top { flex: 0 0 auto; }
+    #profiles { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    h2 { font-size: 16px; margin: 0 0 6px; }
+    h3 { font-size: 14px; margin: 0 0 4px; }
+    .ps-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ps-panel {
+      background: var(--surface-1, #242c37);
+      border: 1px solid var(--border, rgba(255,255,255,.09));
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .ps-kicker { margin: 0 0 4px; color: var(--text-muted, #9aabbd); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .ps-note, .hint { color: var(--text-muted, #9aabbd); font-size: 12px; margin: 4px 0 0; }
+    .status { font-size: 13px; margin: 6px 0 0; }
+    .status.error, .field-error { color: var(--ps-danger); }
+    .status.ok { color: var(--ps-ok); }
+    .warn { color: var(--ps-warn); }
+    .field-error { min-height: 1em; font-size: 12px; margin: 2px 0 0; }
+    .ps-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .ps-btn, .ps-inline {
+      border: 1px solid var(--border, rgba(255,255,255,.16));
+      background: var(--surface-2, #1b2430);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+    .ps-btn.primary { background: var(--accent-1, #18d38b); color: #06281c; border-color: transparent; font-weight: 700; }
+    .ps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .ps-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    #percent-scale[hidden] { display: none !important; }
+    .bound-pair { display: flex; gap: 8px; align-items: end; }
+    .bound-pair .field { width: 108px; flex: 0 0 108px; }
+    .bound-pair input[type="number"] { width: 100%; }
+    #bounds-list th, #bounds-list td { text-align: left; }
+    label.field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-muted, #9aabbd); }
+    input[type="number"], input[type="text"], select {
+      background: var(--surface-0, #0e141b);
+      border: 1px solid var(--border, rgba(255,255,255,.16));
+      border-radius: 8px;
+      padding: 6px 8px;
+      width: 100%;
+      color: var(--text-primary, inherit);
+    }
+    input[aria-invalid="true"] { border-color: var(--ps-danger); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border, rgba(255,255,255,.09)); vertical-align: top; }
+    th:nth-child(n+2), td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.changed td { background: color-mix(in srgb, var(--ps-mark) 16%, transparent); font-weight: 700; }
+    .pred { display: grid; grid-template-columns: minmax(88px, 1.2fr) auto minmax(140px, 1fr) minmax(72px, .7fr); gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--border, rgba(255,255,255,.09)); }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .metric { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,.09)); background: var(--surface-2, transparent); min-width: 0; }
+    .metric span { display: block; color: var(--text-muted, #9aabbd); font-size: 11px; }
+    .metric b { display: block; font-size: 18px; line-height: 1.2; margin-top: 2px; }
+    .control { padding: 6px 0; border-top: 1px solid var(--border, rgba(255,255,255,.09)); }
+    .control .row { display: grid; grid-template-columns: 1fr 108px; gap: 8px; align-items: center; }
+    input[type="range"] { width: 100%; }
+    figure { margin: 0 0 8px; }
+    figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+    svg.profile, svg.diag { width: 100%; height: auto; background: var(--surface-0, #0e141b); border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,.09)); }
+    .spec-live { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+    .spec-live .field { width: 112px; flex: 0 0 112px; }
+    .spec-live input[type="number"] { width: 100%; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 12px; color: var(--text-muted, #9aabbd); font-size: 12px; }
+    .swatch { display: inline-block; width: 16px; height: 3px; margin-right: 4px; vertical-align: middle; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mean { font-size: 26px; font-weight: 700; margin: 2px 0; }
+    @media (max-width: 860px) {
+      .ps-panels, .cards, .pred, .ps-grid, .ps-grid.cols-3, .metrics, .control .row { grid-template-columns: 1fr 1fr; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sb-layout">
+    <nav class="sb-nav" id="sidebarNav" aria-label="Process Settings Explorer"></nav>
+    <div class="right-col">
+      <div id="header-container"></div>
+      <div class="ps-scroll" id="workspace">
+        <section id="view-setup" class="ps-view" aria-labelledby="setup-title">
+          <div class="ps-top">
+            <h2 id="setup-title" tabindex="-1">Input &amp; Setup</h2>
+          </div>
+          <div class="ps-panels">
+            <section class="ps-panel" aria-labelledby="data-title">
+              <p class="ps-kicker">Data source</p>
+              <h3 id="data-title">Worksheet or demo</h3>
+              <p id="data-note" class="ps-note">Waiting for worksheet data.</p>
+              <p id="preview-note" class="ps-note"></p>
+              <p id="host-error" class="status error" hidden></p>
+              <div class="ps-actions" style="margin-top:8px;">
+                <button type="button" class="ps-btn" id="use-demo">Use demo process</button>
+                <button type="button" class="ps-btn" id="use-selection">Use Excel selection</button>
+                <button type="button" class="ps-btn" id="pick-range">Pick a range</button>
+                <button type="button" class="ps-btn" id="refresh-data">Refresh worksheet data</button>
+              </div>
+            </section>
+            <section class="ps-panel" aria-labelledby="spec-title">
+              <p class="ps-kicker">Specifications</p>
+              <h3 id="spec-title">Limits and target</h3>
+              <div class="ps-grid cols-3">
+                <label class="field" id="lsl-label">Lower limit<input id="lsl" type="number" step="any" /></label>
+                <label class="field" id="usl-label">Upper limit<input id="usl" type="number" step="any" /></label>
+                <label class="field" id="target-label">Target<input id="target" type="number" step="any" /></label>
+              </div>
+              <p id="spec-error" class="field-error" role="alert"></p>
+              <p class="hint">These are the starting limits for the fit. After the model is fit, Overview, the profiler, and Compare can change them without fitting again.</p>
+            </section>
+          </div>
+          <section class="ps-panel" aria-labelledby="model-title">
+            <p class="ps-kicker">Response and model</p>
+            <h3 id="model-title">Response, roles, and terms</h3>
+            <div class="ps-grid">
+              <label class="field">Response<select id="response"></select></label>
+              <label class="field">Display unit<input id="response-unit" type="text" placeholder="Optional, such as g or mm" /></label>
+            </div>
+            <label class="field" style="flex-direction:row;align-items:center;gap:8px;margin-top:8px;color:inherit;">
+              <input id="as-percent" type="checkbox" /> This response is a percentage
+            </label>
+            <div class="ps-grid" id="percent-scale" hidden>
+              <label class="field">Meaningful minimum<input id="pct-min" type="number" value="0" step="any" /></label>
+              <label class="field">Meaningful maximum<input id="pct-max" type="number" value="100" step="any" /></label>
+            </div>
+            <div id="predictor-list"></div>
+            <div id="interaction-list"></div>
+            <p class="hint">Model terms are the checked predictors and interactions. Fixed-condition values are entered once in the table below and stay the same in both scenarios.</p>
+          </section>
+          <section class="ps-panel" aria-labelledby="bounds-title">
+            <p class="ps-kicker">Operating ranges and fixed values</p>
+            <h3 id="bounds-title">Allowed inputs</h3>
+            <p class="hint">Operating bounds are the values a candidate may use. The analyzed range is what the fit observed. A permitted value outside that range can still be predicted, with a range-check advisory.</p>
+            <div id="bounds-list"></div>
+          </section>
+          <p id="fit-status" class="status" role="status"></p>
+          <div class="ps-actions">
+            <button type="button" class="ps-btn primary" id="primary-action">Fit model &amp; open results</button>
+            <button type="button" class="ps-btn" id="cancel-edit" hidden>Cancel</button>
+          </div>
+        </section>
+
+        <section id="view-overview" class="ps-view" hidden aria-labelledby="overview-title"></section>
+        <section id="view-effects" class="ps-view" hidden aria-labelledby="effects-title"></section>
+        <section id="view-diagnostics" class="ps-view" hidden aria-labelledby="diagnostics-title"></section>
+
+        <section id="view-profiler" class="ps-view" hidden aria-labelledby="profiler-title">
+          <div class="ps-top">
+            <h2 id="profiler-title" tabindex="-1">Prediction Profiler</h2>
+            <div id="strip" class="metrics" aria-live="polite"></div>
+            <div id="live-spec" class="spec-editor">
+              <p class="hint">Specification limits on this fit. A change updates the profiles and margins without fitting again.</p>
+              <div class="spec-live">
+                <label class="field" id="live-lsl-label">Lower limit<input id="live-lsl" data-live-spec="lsl" type="number" step="any" aria-label="Lower limit" /></label>
+                <label class="field" id="live-usl-label">Upper limit<input id="live-usl" data-live-spec="usl" type="number" step="any" aria-label="Upper limit" /></label>
+                <label class="field" id="live-target-label">Target<input id="live-target" data-live-spec="target" type="number" step="any" aria-label="Target" /></label>
+              </div>
+              <p id="live-spec-msg" class="status" data-spec-msg role="status"></p>
+            </div>
+            <div id="pin-box">
+              <p class="hint">Enter the current settings and pin them. The candidate starts as a copy of that snapshot. Fixed conditions use the values from Input &amp; Setup.</p>
+              <label class="field" style="margin:6px 0;">Populate from an analyzed row
+                <select id="row-picker"></select>
+              </label>
+              <div id="pin-fields" class="ps-grid"></div>
+              <div class="ps-actions" style="margin-top:8px;">
+                <button type="button" class="ps-btn primary" id="pin-btn">Pin current settings</button>
+              </div>
+              <p id="pin-status" class="status" role="status"></p>
+            </div>
+            <div id="candidate-box" hidden>
+              <div class="ps-actions">
+                <button type="button" class="ps-btn" id="edit-current">Edit current settings</button>
+                <button type="button" class="ps-btn" id="reset-candidate">Reset candidate</button>
+                <label class="field" style="min-width:160px;">Confidence
+                  <select id="confidence" aria-label="Confidence level">
+                    <option value="0.9">90%</option>
+                    <option value="0.95" selected>95%</option>
+                    <option value="0.99">99%</option>
+                  </select>
+                </label>
+              </div>
+              <p id="fixed-summary" class="hint"></p>
+              <div id="controls"></div>
+            </div>
+            <p id="withheld" class="status error" hidden></p>
+            <div class="legend" id="legend"></div>
+          </div>
+          <div id="profiles"></div>
+        </section>
+
+        <section id="view-compare" class="ps-view" hidden aria-labelledby="compare-title"></section>
+      </div>
+    </div>
+  </div>
+  <script>
+(function () {
+  var Engine = window.StatisticoProcessSettings;
+  var session = Engine.createSession();
+  var booted = false;
+  var currentView = 'setup';
+  var lastResults = 'overview';
+  var editing = false;
+  var committedTable = { headers: [], rows: [], address: '' };
+  var stagedTable = null;
+  var TITLES = {
+    setup: 'Input & Setup',
+    overview: 'Overview',
+    effects: 'Effects & Interactions',
+    diagnostics: 'Diagnostics',
+    profiler: 'Prediction Profiler',
+    compare: 'Compare Settings'
+  };
+  var HEADER_VIEWS = {
+    setup: 'setup',
+    overview: 'ps-overview',
+    effects: 'ps-effects',
+    diagnostics: 'ps-diagnostics',
+    profiler: 'ps-profiler',
+    compare: 'ps-compare'
+  };
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function el(id) { return document.getElementById(id); }
+  function numOrBlank(value) { return value == null || value === '' ? '' : String(value); }
+  function blankToNull(value) { return value == null || String(value).trim() === '' ? null : value; }
+  function formatCoef(value) {
+    if (!Number.isFinite(Number(value))) return 'Unavailable';
+    var rounded = Math.round((Number(value) + Number.EPSILON) * 1e6) / 1e6;
+    if (Object.is(rounded, -0) || rounded === 0) return '0';
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    var text = toFixed.call(Math.abs(rounded), 6).replace(/\.?0+$/, '');
+    return (rounded < 0 ? '\u2212' : '') + text;
+  }
+  function post(action) {
+    try {
+      if (window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+        Office.context.ui.messageParent(JSON.stringify({ action: action }));
+      }
+    } catch (e) {}
+  }
+  function remember(table) {
+    committedTable = {
+      headers: (table.headers || []).slice(),
+      rows: (table.rows || []).map(function (row) { return row.slice(); }),
+      address: table.address || ''
+    };
+  }
+  function activeTable() { return stagedTable || committedTable; }
+  function setStatus(text, isError) {
+    var node = el('fit-status');
+    node.textContent = text || '';
+    node.className = 'status' + (isError ? ' error' : text ? ' ok' : '');
+  }
+
+  function scrape() {
+    var response = el('response') ? el('response').value : '';
+    var numeric = [];
+    var categorical = [];
+    var roles = {};
+    var units = {};
+    var fixed = {};
+    document.querySelectorAll('#predictor-list .pred').forEach(function (row) {
+      var name = row.getAttribute('data-name');
+      var role = row.querySelector('[data-role]').value;
+      if (!name || name === response || role === 'omit') return;
+      if (row.getAttribute('data-kind') === 'numeric') numeric.push(name);
+      else categorical.push(name);
+      roles[name] = role;
+      units[name] = row.querySelector('[data-unit]').value.trim();
+    });
+    var interactions = [];
+    document.querySelectorAll('#interaction-list input:checked').forEach(function (box) {
+      interactions.push({ var1: box.getAttribute('data-v1'), var2: box.getAttribute('data-v2') });
+    });
+    var percent = el('as-percent').checked;
+    document.querySelectorAll('[data-fixed]').forEach(function (input) {
+      var name = input.getAttribute('data-fixed');
+      fixed[name] = input.getAttribute('data-numeric') === '1' ? Number(input.value) : input.value;
+    });
+    var limits = {};
+    document.querySelectorAll('[data-bmin]').forEach(function (input) {
+      var name = input.getAttribute('data-bmin');
+      var maxInput = null;
+      document.querySelectorAll('[data-bmax]').forEach(function (other) {
+        if (other.getAttribute('data-bmax') === name) maxInput = other;
+      });
+      limits[name] = { min: input.value, max: maxInput ? maxInput.value : input.value };
+    });
+    var levels = {};
+    document.querySelectorAll('[data-blevel]').forEach(function (box) {
+      var name = box.getAttribute('data-blevel');
+      levels[name] = levels[name] || [];
+      if (box.checked) levels[name].push(box.value);
+    });
+    Object.keys(levels).forEach(function (name) { limits[name] = { levels: levels[name] }; });
+    return {
+      config: {
+        response: response,
+        numeric: numeric,
+        categorical: categorical,
+        roles: roles,
+        units: units,
+        interactions: interactions,
+        responseScale: {
+          kind: percent ? 'percent' : 'number',
+          min: el('pct-min').value,
+          max: el('pct-max').value,
+          unit: percent ? (el('response-unit').value.trim() || '%') : el('response-unit').value.trim()
+        },
+        includeIntercept: true
+      },
+      spec: { lsl: blankToNull(el('lsl').value), usl: blankToNull(el('usl').value), target: blankToNull(el('target').value) },
+      limits: limits,
+      fixed: fixed
+    };
+  }
+
+  function probe(table, config, baseConfig) {
+    var probeSession = Engine.createSession();
+    probeSession.loadData(table);
+    if (baseConfig) probeSession.configure(baseConfig);
+    var configured = probeSession.configure(config);
+    return { configured: configured, view: probeSession.read() };
+  }
+
+  function needsFit(form) {
+    var live = session.read();
+    if (!live.model || stagedTable) return true;
+    var looked = probe(committedTable, form.config, live.config);
+    return !!looked.configured.modelCleared;
+  }
+
+  function refreshSetupChrome() {
+    if (!el('response')) return;
+    var form = scrape();
+    var table = activeTable();
+    var looked = probe(table, form.config, (!stagedTable && session.read().model) ? session.read().config : null);
+    var view = looked.view;
+    el('percent-scale').hidden = !el('as-percent').checked;
+    var unit = form.config.responseScale.unit ? (' (' + form.config.responseScale.unit + ')') : '';
+    el('lsl-label').firstChild.textContent = 'Lower limit' + unit;
+    el('usl-label').firstChild.textContent = 'Upper limit' + unit;
+    el('target-label').firstChild.textContent = 'Target' + unit;
+    var rows = table.rows ? table.rows.length : 0;
+    var source = stagedTable ? 'Staged source' : 'Source';
+    el('data-note').textContent = source + ': ' + (table.address || 'not selected') + ' · ' + rows + ' rows.' +
+      (stagedTable ? ' This range replaces the fitted data when you fit.' : '');
+    el('preview-note').textContent = view.previewN
+      ? (view.previewN + ' rows can be analyzed with this mapping. Rows with a missing response or predictor are omitted.')
+      : (looked.configured.error || 'Choose a response and at least one predictor.');
+    var fit = needsFit(form);
+    el('primary-action').textContent = fit ? 'Fit model & open results' : 'Apply & return to results';
+    el('cancel-edit').hidden = !(editing && session.read().model);
+  }
+
+  function renderResponse(columns, selected) {
+    var numeric = columns.filter(function (col) { return col.kind === 'numeric'; });
+    el('response').innerHTML = numeric.map(function (col) {
+      return '<option value="' + esc(col.name) + '">' + esc(col.name) + '</option>';
+    }).join('');
+    if (selected) el('response').value = selected;
+  }
+
+  function renderPredictors(columns, config) {
+    var response = el('response').value;
+    el('predictor-list').innerHTML = columns.filter(function (col) { return col.name !== response; }).map(function (col) {
+      var included = config.numeric.indexOf(col.name) >= 0 || config.categorical.indexOf(col.name) >= 0;
+      var role = included ? (config.roles[col.name] || 'adjustable') : 'omit';
+      var unit = config.units[col.name] || '';
+      return '<div class="pred" data-name="' + esc(col.name) + '" data-kind="' + esc(col.kind) + '">' +
+        '<strong>' + esc(col.name) + '</strong>' +
+        '<span class="hint">' + (col.kind === 'numeric' ? 'Numeric' : 'Categorical') + '</span>' +
+        '<select data-role aria-label="Role for ' + esc(col.name) + '">' +
+          '<option value="adjustable"' + (role === 'adjustable' ? ' selected' : '') + '>Adjustable setting</option>' +
+          '<option value="fixed"' + (role === 'fixed' ? ' selected' : '') + '>Fixed condition</option>' +
+          '<option value="omit"' + (role === 'omit' ? ' selected' : '') + '>Exclude</option>' +
+        '</select>' +
+        '<input data-unit type="text" value="' + esc(unit) + '" aria-label="Unit for ' + esc(col.name) + '" placeholder="Unit" />' +
+      '</div>';
+    }).join('') || '<p class="hint">This table has no predictors besides the response.</p>';
+    renderInteractions(config);
+  }
+
+  function renderInteractions(config) {
+    var names = [];
+    document.querySelectorAll('#predictor-list .pred').forEach(function (row) {
+      if (row.querySelector('[data-role]').value !== 'omit') names.push(row.getAttribute('data-name'));
+    });
+    var existing = {};
+    (config.interactions || []).forEach(function (ix) {
+      existing[ix.var1 + '\u00d7' + ix.var2] = true;
+      existing[ix.var2 + '\u00d7' + ix.var1] = true;
+    });
+    var boxes = [];
+    for (var i = 0; i < names.length; i++) {
+      for (var j = i + 1; j < names.length; j++) {
+        var key = names[i] + '\u00d7' + names[j];
+        boxes.push('<label class="field" style="flex-direction:row;align-items:center;gap:8px;color:inherit;margin-top:6px;">' +
+          '<input type="checkbox" data-ix="1" data-v1="' + esc(names[i]) + '" data-v2="' + esc(names[j]) + '"' +
+          (existing[key] ? ' checked' : '') + ' /> ' + esc(names[i] + ' \u00d7 ' + names[j]) + '</label>');
+      }
+    }
+    el('interaction-list').innerHTML = boxes.join('');
+  }
+
+  function renderBounds(config, limits, observed, fixed) {
+    var names = config.numeric.concat(config.categorical);
+    if (!names.length) {
+      el('bounds-list').innerHTML = '<p class="hint">Choose predictors to set their allowed inputs.</p>';
+      return;
+    }
+    var head = '<table><thead><tr><th>Input</th><th>Role</th><th>Allowed value</th><th>Analyzed</th></tr></thead><tbody>';
+    var body = names.map(function (name) {
+      var role = config.roles[name] === 'fixed' ? 'Fixed condition' : 'Adjustable setting';
+      if (config.numeric.indexOf(name) >= 0) {
+        var range = observed.ranges[name];
+        var analyzed = range ? (formatCoef(range.min) + ' to ' + formatCoef(range.max)) : 'Unavailable';
+        if (config.roles[name] === 'fixed') {
+          var value = fixed[name] == null ? (range ? range.min : '') : fixed[name];
+          return '<tr><td>' + esc(name) + '</td><td>Fixed condition</td><td><input data-fixed="' + esc(name) +
+            '" data-numeric="1" type="number" step="any" value="' + esc(numOrBlank(value)) + '" aria-label="Fixed value for ' + esc(name) + '" /></td><td>' + esc(analyzed) + '</td></tr>';
+        }
+        var limit = limits[name] || range || { min: '', max: '' };
+        return '<tr><td>' + esc(name) + '</td><td>' + role + '</td><td><div class="bound-pair"><label class="field">Lower<input data-bmin="' +
+          esc(name) + '" type="number" step="any" value="' + esc(numOrBlank(limit.min)) + '" /></label><label class="field">Upper<input data-bmax="' +
+          esc(name) + '" type="number" step="any" value="' + esc(numOrBlank(limit.max)) + '" /></label></div></td><td>' + esc(analyzed) + '</td></tr>';
+      }
+      var levels = (observed.levels && observed.levels[name]) || [];
+      var allowed = (limits[name] && limits[name].levels) || levels;
+      if (config.roles[name] === 'fixed') {
+        var current = fixed[name] == null ? (levels[0] || '') : fixed[name];
+        var options = levels.map(function (level) {
+          return '<option value="' + esc(level) + '"' + (String(level) === String(current) ? ' selected' : '') + '>' + esc(level) + '</option>';
+        }).join('');
+        return '<tr><td>' + esc(name) + '</td><td>Fixed condition</td><td><select data-fixed="' + esc(name) + '" aria-label="Fixed value for ' + esc(name) + '">' +
+          options + '</select></td><td>' + esc(levels.join(', ')) + '</td></tr>';
+      }
+      var checks = levels.map(function (level) {
+        var on = allowed.map(String).indexOf(String(level)) >= 0;
+        return '<label style="margin-right:8px;"><input type="checkbox" data-blevel="' + esc(name) + '" value="' + esc(level) + '"' +
+          (on ? ' checked' : '') + ' /> ' + esc(level) + '</label>';
+      }).join('');
+      return '<tr><td>' + esc(name) + '</td><td>' + role + '</td><td>' + checks + '</td><td>' + esc(levels.join(', ')) + '</td></tr>';
+    }).join('');
+    el('bounds-list').innerHTML = head + body + '</tbody></table>';
+  }
+
+  function fillSetup() {
+    var table = activeTable();
+    var columns = Engine.columnChoices(table.headers, table.rows);
+    var live = session.read();
+    var config = {
+      response: live.config.response,
+      numeric: live.config.numeric.slice(),
+      categorical: live.config.categorical.slice(),
+      roles: Object.assign({}, live.config.roles),
+      units: Object.assign({}, live.config.units),
+      interactions: (live.config.interactions || []).map(function (ix) { return { var1: ix.var1, var2: ix.var2 }; }),
+      responseScale: live.config.responseScale || { kind: 'number', unit: '' }
+    };
+    var limits = live.limits || {};
+    var observed = live.observed || { ranges: {}, levels: {} };
+    var fixed = {};
+    if (stagedTable) {
+      var numericCols = columns.filter(function (col) { return col.kind === 'numeric'; });
+      config.response = numericCols.some(function (col) { return col.name === live.config.response; })
+        ? live.config.response
+        : ((numericCols[0] && numericCols[0].name) || '');
+      config.numeric = columns.filter(function (col) { return col.kind === 'numeric' && col.name !== config.response; }).map(function (col) { return col.name; });
+      config.categorical = columns.filter(function (col) { return col.kind !== 'numeric' && col.name !== config.response; }).map(function (col) { return col.name; });
+      config.roles = {};
+      config.numeric.concat(config.categorical).forEach(function (name) { config.roles[name] = 'adjustable'; });
+      config.interactions = [];
+      var suggested = probe(table, config, null).view;
+      limits = suggested.limits || {};
+      observed = suggested.observed || { ranges: {}, levels: {} };
+    } else {
+      config.numeric.concat(config.categorical).forEach(function (name) {
+        if (config.roles[name] === 'fixed') fixed[name] = live.currentDraft[name];
+      });
+    }
+    renderResponse(columns, config.response);
+    el('response-unit').value = (config.responseScale && config.responseScale.unit) || '';
+    el('as-percent').checked = !!(config.responseScale && config.responseScale.kind === 'percent');
+    if (config.responseScale && config.responseScale.kind === 'percent') {
+      el('pct-min').value = numOrBlank(config.responseScale.min);
+      el('pct-max').value = numOrBlank(config.responseScale.max);
+    }
+    renderPredictors(columns, config);
+    renderBounds(config, limits, observed, fixed);
+    el('lsl').value = stagedTable ? '' : numOrBlank(live.spec.lsl);
+    el('usl').value = stagedTable ? '' : numOrBlank(live.spec.usl);
+    el('target').value = stagedTable ? '' : numOrBlank(live.spec.target);
+    el('spec-error').textContent = '';
+    ['lsl', 'usl', 'target'].forEach(function (id) { el(id).setAttribute('aria-invalid', 'false'); });
+    refreshSetupChrome();
+  }
+
+  function markSpec(ok) {
+    el('spec-error').textContent = ok ? '' : el('spec-error').textContent;
+    ['lsl', 'usl', 'target'].forEach(function (id) { el(id).setAttribute('aria-invalid', ok ? 'false' : 'true'); });
+  }
+
+  function fixedChanged(form, settings) {
+    var names = Object.keys(form.fixed || {});
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      var left = form.fixed[name];
+      var right = settings ? settings[name] : undefined;
+      var numeric = form.config.numeric.indexOf(name) >= 0;
+      var same = numeric ? Math.abs(Number(left) - Number(right)) <= 1e-7 : String(left) === String(right == null ? '' : right);
+      if (!same) return true;
+    }
+    return false;
+  }
+
+  function commitDraft() {
+    var form = scrape();
+    var table = activeTable();
+    if (!table.headers.length) {
+      setStatus('Choose a worksheet range or the demo process before fitting.', true);
+      return;
+    }
+    var live = session.read();
+    var looked = probe(table, form.config, (!stagedTable && live.model) ? live.config : null);
+    if (!looked.configured.ok) {
+      setStatus(looked.configured.error || 'The mapping cannot be analyzed.', true);
+      return;
+    }
+    var specProbe = Engine.createSession();
+    var specs = specProbe.setSpecifications(form.spec);
+    if (!specs.ok) {
+      el('spec-error').textContent = specs.error;
+      markSpec(false);
+      setStatus(specs.error, true);
+      return;
+    }
+    markSpec(true);
+    var boundProbe = Engine.createSession();
+    boundProbe.loadData(table);
+    boundProbe.configure(form.config);
+    var bounds = boundProbe.setOperatingLimits(form.limits);
+    if (!bounds.ok) {
+      setStatus(bounds.error, true);
+      return;
+    }
+    var structureChanged = !live.model || !!stagedTable || !!looked.configured.modelCleared;
+    if (stagedTable) {
+      session.loadData(stagedTable);
+      remember(stagedTable);
+      stagedTable = null;
+    }
+    var applied = session.configure(form.config);
+    if (!applied.ok) {
+      setStatus(applied.error || 'The mapping cannot be analyzed.', true);
+      fillSetup();
+      return;
+    }
+    session.setSpecifications(form.spec);
+    var boundResult = session.setOperatingLimits(form.limits);
+    if (!boundResult.ok) {
+      setStatus(boundResult.error, true);
+      return;
+    }
+    if (structureChanged) {
+      var token = session.beginFit();
+      var fitted = session.finishFit(token);
+      if (!fitted.applied) {
+        setStatus(fitted.reason || 'The model could not be fit.', true);
+        editing = false;
+        syncShell();
+        return;
+      }
+      if (Object.keys(form.fixed).length) session.setCurrentSettings(form.fixed);
+      editing = false;
+      lastResults = 'overview';
+      setStatus('Fitted. N = ' + fitted.n + '. Pin the current settings in the Prediction Profiler before comparing a candidate.', false);
+      showView('overview', { focus: true, rebuild: false });
+      return;
+    }
+    var snapshot = live.pin ? live.pin.settings : live.currentDraft;
+    if (applied.pinCleared || fixedChanged(form, snapshot)) {
+      if (session.read().pin) session.unpin();
+    }
+    if (Object.keys(form.fixed).length) session.setCurrentSettings(form.fixed);
+    editing = false;
+    setStatus('', false);
+    showView(lastResults, { focus: true, rebuild: false });
+  }
+
+  function syncShell() {
+    var view = session.read();
+    window.__psView = currentView;
+    window.__psFitted = !!view.model;
+    if (!window.StatisticoHeader) return;
+    StatisticoHeader.currentView = HEADER_VIEWS[currentView] || currentView;
+    StatisticoHeader.updateTitle(TITLES[currentView] || 'Process Settings Explorer');
+    StatisticoHeader.updateVariable(view.config.response || 'Response', view.model ? view.model.n : 0);
+    if (typeof StatisticoHeader._renderSharedSidebar === 'function') StatisticoHeader._renderSharedSidebar();
+    if (typeof StatisticoHeader._mountSidebarUtilities === 'function') StatisticoHeader._mountSidebarUtilities();
+    document.querySelectorAll('#sidebarNav .sb-item').forEach(function (btn) {
+      if (btn.classList.contains('active')) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+  }
+
+  function showView(view, options) {
+    options = options || {};
+    if (view !== 'setup' && editing) {
+      setStatus('Apply or cancel this draft before opening a results view.', true);
+      if (el('cancel-edit')) el('cancel-edit').focus();
+      return;
+    }
+    if (view !== 'setup' && !session.read().model) {
+      setStatus('Fit the model to open results.', true);
+      return;
+    }
+    if (view === 'setup' && session.read().model && currentView !== 'setup') {
+      editing = true;
+      fillSetup();
+    } else if (view === 'setup' && options.rebuild) {
+      fillSetup();
+    }
+    document.querySelectorAll('.ps-view').forEach(function (node) {
+      node.hidden = node.id !== 'view-' + view;
+    });
+    currentView = view;
+    if (view !== 'setup') lastResults = view;
+    syncShell();
+    if (view === 'overview') renderOverview();
+    if (view === 'effects') renderEffects();
+    if (view === 'diagnostics') renderDiagnostics();
+    if (view === 'profiler') { buildProfiler(); paintProfiler(); }
+    if (view === 'compare') renderCompare();
+    el('cancel-edit').hidden = !(editing && session.read().model);
+    if (options.focus) {
+      var heading = document.querySelector('#view-' + view + ' h2');
+      if (heading) heading.focus();
+    }
+  }
+  window.switchProcessSettingsView = function (view) { showView(view, { fromMenu: true, focus: true }); };
+
+  function metric(label, value) {
+    return '<div class="metric"><span>' + esc(label) + '</span><b>' + esc(value) + '</b></div>';
+  }
+  function specSummary(spec, unit) {
+    var suffix = unit ? (' ' + unit) : '';
+    var parts = [];
+    if (spec.lsl != null) parts.push('LSL ' + formatCoef(spec.lsl) + suffix);
+    if (spec.usl != null) parts.push('USL ' + formatCoef(spec.usl) + suffix);
+    if (spec.target != null) parts.push('Target ' + formatCoef(spec.target) + suffix);
+    return parts.length ? parts.join(' · ') : 'No specification limits or target.';
+  }
+
+  function specEditor(spec) {
+    function field(key, label, value) {
+      return '<label class="field">' + esc(label) +
+        '<input data-live-spec="' + key + '" type="number" step="any" value="' + esc(numOrBlank(value)) + '" aria-label="' + esc(label) + '" /></label>';
+    }
+    return '<div class="spec-editor"><p class="hint">Specification limits on this fit. A change updates the profiles and margins without fitting again.</p><div class="spec-live">' +
+      field('lsl', 'Lower limit', spec.lsl) +
+      field('usl', 'Upper limit', spec.usl) +
+      field('target', 'Target', spec.target) +
+      '</div><p class="status" data-spec-msg role="status"></p></div>';
+  }
+
+  function applyLiveSpec(root, onApplied) {
+    var spec = {
+      lsl: blankToNull(root.querySelector('[data-live-spec="lsl"]').value),
+      usl: blankToNull(root.querySelector('[data-live-spec="usl"]').value),
+      target: blankToNull(root.querySelector('[data-live-spec="target"]').value)
+    };
+    var result = session.setSpecifications(spec);
+    var msg = root.querySelector('[data-spec-msg]');
+    root.querySelectorAll('[data-live-spec]').forEach(function (node) {
+      node.setAttribute('aria-invalid', result.ok ? 'false' : 'true');
+    });
+    if (msg) {
+      msg.textContent = result.ok ? '' : result.error;
+      msg.className = 'status' + (result.ok ? '' : ' error');
+    }
+    if (result.ok && onApplied) onApplied();
+  }
+
+  function bindLiveSpec(root, onApplied) {
+    if (!root) return;
+    root.querySelectorAll('[data-live-spec]').forEach(function (input) {
+      input.addEventListener('input', function () { applyLiveSpec(root, onApplied); });
+    });
+  }
+
+  function syncLiveSpecFields() {
+    var view = session.read();
+    var unit = view.config && view.config.responseScale && view.config.responseScale.unit;
+    var suffix = unit ? (' (' + unit + ')') : '';
+    [['lsl', 'Lower limit'], ['usl', 'Upper limit'], ['target', 'Target']].forEach(function (pair) {
+      var label = el('live-' + pair[0] + '-label');
+      var input = el('live-' + pair[0]);
+      if (label && label.firstChild) label.firstChild.textContent = pair[1] + suffix;
+      if (!input || document.activeElement === input) return;
+      input.value = numOrBlank(view.spec[pair[0]]);
+      input.setAttribute('aria-invalid', 'false');
+    });
+  }
+
+  function renderOverview() {
+    var view = session.read();
+    var model = view.model;
+    var unit = view.config.responseScale && view.config.responseScale.unit;
+    var adjustable = [];
+    var fixed = [];
+    view.config.numeric.concat(view.config.categorical).forEach(function (name) {
+      var value = (view.pin && view.pin.settings[name] != null) ? view.pin.settings[name] : view.currentDraft[name];
+      var text = name + (value == null || value === '' ? '' : (': ' + value)) + (view.config.units[name] ? (' ' + view.config.units[name]) : '');
+      if (view.config.roles[name] === 'fixed') fixed.push(text);
+      else adjustable.push(text);
+    });
+    var pinText = view.pin ? 'Current settings are pinned.' : 'Current settings are not pinned yet.';
+    el('view-overview').innerHTML =
+      '<h2 id="overview-title" tabindex="-1">Overview</h2>' +
+      '<div class="metrics">' +
+        metric('Analyzed N', String(model.n)) +
+        metric('R²', Number.isFinite(model.r2) ? formatCoef(model.r2) : 'Unavailable') +
+        metric('Response', view.config.response || '') +
+        metric('Baseline', view.pin ? 'Pinned' : 'Awaiting pin') +
+      '</div>' +
+      '<div class="ps-panels">' +
+        '<section class="ps-panel"><h3>Adjustable settings</h3><p>' + esc(adjustable.join(' · ') || 'None') + '</p>' +
+          '<h3 style="margin-top:8px;">Fixed conditions</h3><p>' + esc(fixed.join(' · ') || 'None') + '</p></section>' +
+        '<section class="ps-panel"><h3>Specifications</h3>' + specEditor(view.spec) +
+          '<p id="overview-spec-summary" class="hint">' + esc(specSummary(view.spec, unit)) + '</p>' +
+          '<p class="hint">' + esc(pinText) + ' Open the profiler to pin this recipe and move a candidate on the same fit.</p></section>' +
+      '</div>' +
+      '<div class="ps-actions"><button type="button" class="ps-btn primary" id="open-profiler">Open Prediction Profiler</button></div>';
+    el('open-profiler').addEventListener('click', function () { showView('profiler', { focus: true }); });
+    bindLiveSpec(el('view-overview'), function () {
+      var next = session.read();
+      var summary = el('overview-spec-summary');
+      if (summary) summary.textContent = specSummary(next.spec, next.config.responseScale && next.config.responseScale.unit);
+    });
+  }
+
+  function renderEffects() {
+    var view = session.read();
+    var model = view.model;
+    var level = Math.round((model.fitConfidence || 0.95) * 100);
+    var rows = model.coefficients.map(function (row) {
+      var ci = Number.isFinite(row.ciLow) && Number.isFinite(row.ciHigh)
+        ? ('[' + formatCoef(row.ciLow) + ', ' + formatCoef(row.ciHigh) + ']')
+        : 'Unavailable';
+      return '<tr><td>' + esc(row.name) + '</td><td class="num">' + esc(formatCoef(row.estimate)) + '</td><td class="num">' +
+        esc(formatCoef(row.se)) + '</td><td class="num">' + esc(formatCoef(row.t)) + '</td><td class="num">' +
+        esc(formatCoef(row.p)) + '</td><td class="num">' + esc(ci) + '</td></tr>';
+    }).join('');
+    var refs = (model.references || []).map(function (ref) {
+      return ref.name + ' reference level ' + ref.reference + ' (levels ' + ref.levels.join(', ') + ')';
+    }).join('. ');
+    var unit = view.config.responseScale && view.config.responseScale.unit;
+    el('view-effects').innerHTML =
+      '<h2 id="effects-title" tabindex="-1">Effects &amp; Interactions</h2>' +
+      '<p class="hint">Dummy coding. The reference level is the first level in alphabetical order and is omitted from the coefficient list. An interaction column is the product of the coded predictors. Estimates are on the response scale' +
+      (unit ? (' (' + esc(unit) + ')') : '') + '. The ' + level + '% coefficient intervals are from the fit. The profiler confidence level changes only the mean-response interval.</p>' +
+      (refs ? ('<p class="hint">' + esc(refs) + '.</p>') : '') +
+      '<div class="ps-panel" style="overflow:auto;"><table><thead><tr><th>Term</th><th>Estimate</th><th>Std. error</th><th>t</th><th>p</th><th>' + level + '% interval</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div>' +
+      '<p class="hint">Ordinary least squares has been run ' + view.fitCount + ' time(s) this session.</p>' +
+      interactionBlock(view);
+  }
+
+  function heldBaseline(view, skip) {
+    var settings = {};
+    var heldNumerics = [];
+    var heldFactors = [];
+    view.config.numeric.forEach(function (name) {
+      if (skip[name]) return;
+      var vals = view.analyzedRows.map(function (row) { return Number(row.settings[name]); }).filter(Number.isFinite);
+      var mean = vals.reduce(function (sum, value) { return sum + value; }, 0) / (vals.length || 1);
+      settings[name] = mean;
+      heldNumerics.push({ name: name, value: mean });
+    });
+    (view.model.references || []).forEach(function (ref) {
+      if (skip[ref.name]) return;
+      settings[ref.name] = ref.reference;
+      heldFactors.push({ name: ref.name, level: ref.reference });
+    });
+    return { settings: settings, heldNumerics: heldNumerics, heldFactors: heldFactors };
+  }
+
+  function interactionBlock(view) {
+    var interactions = view.config.interactions || [];
+    if (!interactions.length) {
+      return '<section class="ps-panel"><h3>Interactions</h3><p>This model has no interaction terms.</p></section>';
+    }
+    return '<section class="ps-panel"><h3>Interaction plot</h3>' + interactions.map(function (ix, index) {
+      return interactionFigure(view, ix, index);
+    }).join('') + '</section>';
+  }
+
+  function interactionFigure(view, ix) {
+    var numeric = {};
+    view.config.numeric.forEach(function (name) { numeric[name] = true; });
+    var v1Num = !!numeric[ix.var1];
+    var v2Num = !!numeric[ix.var2];
+    var focal = v1Num ? ix.var1 : (v2Num ? ix.var2 : ix.var1);
+    var other = focal === ix.var1 ? ix.var2 : ix.var1;
+    var otherNum = !!numeric[other];
+    var skip = {};
+    skip[focal] = true;
+    skip[other] = true;
+    var held = heldBaseline(view, skip);
+    var fx = window.StatisticoRegressionEffectPlot;
+    var copy = fx && fx.chartCopy ? fx.chartCopy({
+      mode: otherNum ? 'numeric' : 'factor',
+      focalName: focal,
+      yName: view.config.response,
+      heldNumerics: held.heldNumerics,
+      heldFactors: held.heldFactors
+    }) : null;
+    var range = view.observed.ranges[focal] || { min: 0, max: 1 };
+    var unit = view.config.units[focal] ? (' ' + view.config.units[focal]) : '';
+    var series = [];
+    if (!v1Num && !v2Num) {
+      var aLevels = (view.observed.levels[ix.var1] || []);
+      var bLevels = (view.observed.levels[ix.var2] || []);
+      var cells = [];
+      aLevels.forEach(function (a) {
+        bLevels.forEach(function (b) {
+          var settings = Object.assign({}, held.settings);
+          settings[ix.var1] = a;
+          settings[ix.var2] = b;
+          var pred = session.predict(settings);
+          cells.push('<tr><td>' + esc(a) + '</td><td>' + esc(b) + '</td><td class="num">' + esc(pred.ok ? formatCoef(pred.estimate) : 'Unavailable') + '</td></tr>');
+        });
+      });
+      return '<p>' + esc(ix.var1 + ' × ' + ix.var2) + '. Predicted means at the factor levels' +
+        (copy && copy.subtitle ? ('. ' + copy.subtitle) : '') + '</p><table><thead><tr><th>' + esc(ix.var1) + '</th><th>' + esc(ix.var2) +
+        '</th><th>Predicted mean</th></tr></thead><tbody>' + cells.join('') + '</tbody></table>';
+    }
+    var levels = otherNum
+      ? [view.observed.ranges[other].min, view.observed.ranges[other].max]
+      : ((view.observed.levels[other] || []).slice());
+    levels.forEach(function (level) {
+      var points = [];
+      var steps = 10;
+      for (var i = 0; i <= steps; i++) {
+        var x = range.min + (range.max - range.min) * (i / steps);
+        var settings = Object.assign({}, held.settings);
+        settings[focal] = x;
+        settings[other] = level;
+        var pred = session.predict(settings);
+        if (pred.ok) points.push({ x: x, mean: pred.estimate });
+      }
+      series.push({ level: otherNum ? formatCoef(Number(level)) : String(level), points: points });
+    });
+    var colors = ['var(--ps-mean)', 'var(--ps-mark)', 'var(--ps-target)', 'var(--ps-limit)'];
+    var width = 640;
+    var height = 220;
+    var ys = [];
+    series.forEach(function (line) { line.points.forEach(function (point) { ys.push(point.mean); }); });
+    var lo = Math.min.apply(null, ys.concat([view.spec.lsl, view.spec.usl, view.spec.target].filter(Number.isFinite)));
+    var hi = Math.max.apply(null, ys.concat([view.spec.lsl, view.spec.usl, view.spec.target].filter(Number.isFinite)));
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return '';
+    if (hi - lo < 1e-7) { lo -= 1; hi += 1; }
+    var pad = (hi - lo) * 0.12;
+    lo -= pad; hi += pad;
+    function yOf(value) { return 16 + (1 - (value - lo) / (hi - lo)) * (height - 42); }
+    function xOf(x) {
+      var span = range.max - range.min || 1;
+      return 46 + ((x - range.min) / span) * (width - 62);
+    }
+    var body = '';
+    series.forEach(function (line, index) {
+      body += '<polyline fill="none" stroke="' + colors[index % colors.length] + '" stroke-width="2" points="' +
+        line.points.map(function (point) { return xOf(point.x) + ',' + yOf(point.mean); }).join(' ') + '" />';
+    });
+    body += '<text x="46" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(formatCoef(range.min) + unit) + '</text>';
+    body += '<text x="' + (width - 90) + '" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(formatCoef(range.max) + unit) + '</text>';
+    var legend = series.map(function (line, index) {
+      return '<span><i class="swatch" style="background:' + colors[index % colors.length] + '"></i>' + esc(other + ' ' + line.level) + '</span>';
+    }).join('');
+    var caption = (copy && copy.title) ? copy.title : (view.config.response + ' by ' + focal + ', across ' + other);
+    var subtitle = (copy && copy.subtitle) ? copy.subtitle : 'Other inputs stay at the analyzed mean or the reference level.';
+    return '<p><strong>' + esc(caption) + '</strong> ' + esc(subtitle) + ' Levels of ' + esc(other) + ' are plotted separately. The horizontal axis is the analyzed range of ' +
+      esc(focal) + unit + '.</p><div class="legend">' + legend + '</div><svg class="profile" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(caption) + '">' + body + '</svg>';
+  }
+
+  function renderDiagnostics() {
+    var view = session.read();
+    var model = view.model;
+    var fitted = model.fitted || [];
+    var residuals = model.residuals || [];
+    var observed = view.analyzedRows.map(function (row) { return row.response; });
+    el('view-diagnostics').innerHTML =
+      '<h2 id="diagnostics-title" tabindex="-1">Diagnostics</h2>' +
+      '<p class="hint">Analyzed sample N = ' + model.n + '. These charts use the fitted rows. Candidate settings do not change them. No separate lack-of-fit warning is stored beyond the residual pattern below.</p>' +
+      '<div class="ps-panels">' +
+        '<figure class="ps-panel"><figcaption><strong>Observed vs fitted</strong></figcaption>' + scatterSvg(fitted, observed, 'Fitted', 'Observed', true) + '</figure>' +
+        '<figure class="ps-panel"><figcaption><strong>Residuals vs fitted</strong></figcaption>' + scatterSvg(fitted, residuals, 'Fitted', 'Residual', false) + '</figure>' +
+      '</div>' +
+      '<figure class="ps-panel"><figcaption><strong>Normal quantile plot of residuals</strong></figcaption>' + qqSvg(residuals) + '</figure>';
+  }
+
+  function scatterSvg(xs, ys, xLabel, yLabel, identity) {
+    var width = 420;
+    var height = 220;
+    var pairs = [];
+    for (var i = 0; i < xs.length && i < ys.length; i++) {
+      if (Number.isFinite(xs[i]) && Number.isFinite(ys[i])) pairs.push({ x: xs[i], y: ys[i] });
+    }
+    if (!pairs.length) return '<p class="hint">This chart is unavailable for the current fit.</p>';
+    var xlo = Math.min.apply(null, pairs.map(function (p) { return p.x; }));
+    var xhi = Math.max.apply(null, pairs.map(function (p) { return p.x; }));
+    var ylo = Math.min.apply(null, pairs.map(function (p) { return p.y; }));
+    var yhi = Math.max.apply(null, pairs.map(function (p) { return p.y; }));
+    if (identity) { xlo = ylo = Math.min(xlo, ylo); xhi = yhi = Math.max(xhi, yhi); }
+    if (xhi - xlo < 1e-7) { xlo -= 1; xhi += 1; }
+    if (yhi - ylo < 1e-7) { ylo -= 1; yhi += 1; }
+    var xpad = (xhi - xlo) * 0.08;
+    var ypad = (yhi - ylo) * 0.08;
+    xlo -= xpad; xhi += xpad; ylo -= ypad; yhi += ypad;
+    function xOf(x) { return 42 + ((x - xlo) / (xhi - xlo)) * (width - 58); }
+    function yOf(y) { return 16 + (1 - (y - ylo) / (yhi - ylo)) * (height - 46); }
+    var dots = pairs.map(function (p) {
+      return '<circle cx="' + xOf(p.x) + '" cy="' + yOf(p.y) + '" r="3.5" fill="var(--ps-mean)" />';
+    }).join('');
+    var guide = '';
+    if (identity) {
+      guide = '<line x1="' + xOf(xlo) + '" y1="' + yOf(xlo) + '" x2="' + xOf(xhi) + '" y2="' + yOf(xhi) + '" stroke="var(--ps-limit)" stroke-dasharray="5 4" />';
+    } else {
+      guide = '<line x1="' + xOf(xlo) + '" y1="' + yOf(0) + '" x2="' + xOf(xhi) + '" y2="' + yOf(0) + '" stroke="var(--ps-limit)" stroke-dasharray="5 4" />';
+    }
+    return '<svg class="diag" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(yLabel + ' versus ' + xLabel) + '">' +
+      guide + dots +
+      '<text x="42" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(xLabel) + '</text>' +
+      '<text x="8" y="20" fill="currentColor" font-size="11">' + esc(yLabel) + '</text></svg>';
+  }
+
+  function invNorm(p) {
+    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+    var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+    var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+    var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+    var plow = 0.02425;
+    var q, r;
+    if (p < plow) {
+      q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    }
+    if (p > 1 - plow) {
+      q = Math.sqrt(-2 * Math.log(1 - p));
+      return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    }
+    q = p - 0.5;
+    r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+
+  function qqSvg(residuals) {
+    var sample = residuals.filter(Number.isFinite).slice().sort(function (a, b) { return a - b; });
+    if (sample.length < 3) return '<p class="hint">A normal quantile plot needs at least three residuals.</p>';
+    var theor = sample.map(function (_, i) { return invNorm((i + 0.5) / sample.length); });
+    return scatterSvg(theor, sample, 'Theoretical quantile', 'Residual', true);
+  }
+
+  function buildProfiler() {
+    var view = session.read();
+    var pinned = !!view.pin;
+    el('pin-box').hidden = pinned;
+    el('candidate-box').hidden = !pinned;
+    el('confidence').value = String(view.confidence);
+    if (!pinned) {
+      var picker = el('row-picker');
+      picker.innerHTML = '<option value="">Enter settings below</option>' + view.analyzedRows.map(function (row, index) {
+        return '<option value="' + index + '">' + esc(row.label) + '</option>';
+      }).join('');
+      var draft = view.currentDraft || {};
+      el('pin-fields').innerHTML = view.config.numeric.concat(view.config.categorical).map(function (name) {
+        var numeric = view.config.numeric.indexOf(name) >= 0;
+        var value = draft[name] == null ? '' : draft[name];
+        var role = view.config.roles[name] === 'fixed' ? 'Fixed condition' : 'Adjustable setting';
+        if (view.config.roles[name] === 'fixed') {
+          return '<p class="hint"><strong>' + esc(name) + '</strong> ' + esc(value) + (view.config.units[name] ? (' ' + esc(view.config.units[name])) : '') + ' · ' + role + '</p>';
+        }
+        if (numeric) {
+          return '<label class="field">' + esc(name) + ' · ' + role + '<input data-current="' + esc(name) + '" data-numeric="1" type="number" step="any" value="' + esc(value) + '" /></label>';
+        }
+        var levels = view.observed.levels[name] || [];
+        var options = levels.map(function (level) {
+          return '<option value="' + esc(level) + '"' + (String(level) === String(value) ? ' selected' : '') + '>' + esc(level) + '</option>';
+        }).join('');
+        return '<label class="field">' + esc(name) + ' · ' + role + '<select data-current="' + esc(name) + '">' + options + '</select></label>';
+      }).join('');
+      el('pin-status').textContent = '';
+      return;
+    }
+    var draft = view.candidateDraft || {};
+    var fixedBits = [];
+    var html = view.config.numeric.concat(view.config.categorical).map(function (name) {
+      var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
+      if (view.config.roles[name] === 'fixed') {
+        fixedBits.push(name + ' ' + draft[name] + unit);
+        return '';
+      }
+      if (view.config.categorical.indexOf(name) >= 0) {
+        var known = view.observed.levels[name] || [];
+        var allowed = (view.limits[name] && view.limits[name].levels) || known;
+        var options = allowed.map(function (level) {
+          return '<option value="' + esc(level) + '"' + (String(level) === String(draft[name]) ? ' selected' : '') + '>' + esc(level) + '</option>';
+        }).join('');
+        return '<div class="control"><label class="field">' + esc(name) + '<select data-cand="' + esc(name) + '">' + options + '</select></label>' +
+          '<p class="field-error" data-cand-error="' + esc(name) + '"></p></div>';
+      }
+      var limit = view.limits[name] || { min: draft[name], max: draft[name] };
+      var observed = view.observed.ranges[name];
+      var locked = Math.abs(Number(limit.max) - Number(limit.min)) <= 1e-9;
+      var span = Number(limit.max) - Number(limit.min);
+      var step = (span >= 10 && Math.abs(limit.min - Math.round(limit.min)) < 1e-9 && Math.abs(limit.max - Math.round(limit.max)) < 1e-9) ? '1' : 'any';
+      var slider = locked ? '' : '<input data-cand="' + esc(name) + '" data-numeric="1" type="range" min="' + esc(limit.min) + '" max="' + esc(limit.max) +
+        '" step="' + step + '" value="' + esc(draft[name]) + '" aria-label="' + esc(name) + ' slider" />';
+      return '<div class="control"><label class="field">' + esc(name) + esc(unit) + slider +
+        '<span class="row"><input data-cand="' + esc(name) + '" data-numeric="1" type="number" step="any" value="' + esc(draft[name]) + '" aria-label="' + esc(name) + ' value" /></span></label>' +
+        '<p class="hint" data-bound-hint="' + esc(name) + '"></p><p class="field-error" data-cand-error="' + esc(name) + '"></p></div>';
+    }).join('');
+    el('controls').innerHTML = html;
+    el('fixed-summary').textContent = fixedBits.length ? ('Fixed conditions: ' + fixedBits.join(' · ')) : '';
+  }
+
+  function cardBits(card, suffix) {
+    if (!card || !card.available) return { mean: 'Withheld', detail: '' };
+    var ci = card.ci ? card.ciText : 'Unavailable';
+    return {
+      mean: card.meanText + suffix,
+      detail: card.ciLabel + ' ' + ci + (card.ci ? '' : ('. ' + (card.ciReason || '')))
+    };
+  }
+
+  function paintProfiler() {
+    syncLiveSpecFields();
+    var view = session.read();
+    var suffix = view.config.responseScale && view.config.responseScale.kind === 'percent' ? '%' : '';
+    var current = cardBits(view.currentCard, suffix);
+    var candidate = view.candidateCard ? cardBits(view.candidateCard, suffix) : { mean: view.pin ? 'Withheld' : 'Not pinned', detail: '' };
+    el('strip').innerHTML =
+      metric('Current predicted mean', current.mean) +
+      metric('Candidate predicted mean', candidate.mean) +
+      metric('Candidate − current', view.deltaText || '—') +
+      metric('Candidate margin', view.candidateCard ? view.candidateCard.marginText : '—');
+    el('withheld').hidden = view.phase !== 'withheld';
+    el('withheld').textContent = view.withheldReason || '';
+    document.querySelectorAll('[data-cand-error]').forEach(function (node) { node.textContent = ''; });
+    document.querySelectorAll('[data-cand]').forEach(function (input) { input.setAttribute('aria-invalid', 'false'); });
+    document.querySelectorAll('[data-bound-hint]').forEach(function (node) {
+      var name = node.getAttribute('data-bound-hint');
+      var limit = view.limits[name];
+      var observed = view.observed.ranges[name];
+      if (!limit) return;
+      node.textContent = 'Allowed ' + formatCoef(Number(limit.min)) + ' to ' + formatCoef(Number(limit.max)) +
+        (observed ? ('. Analyzed ' + formatCoef(observed.min) + ' to ' + formatCoef(observed.max) + '.') : '.');
+    });
+    (view.candidateErrors || []).forEach(function (err) {
+      document.querySelectorAll('[data-cand-error]').forEach(function (node) {
+        if (node.getAttribute('data-cand-error') === err.name) node.textContent = err.message;
+      });
+      document.querySelectorAll('[data-cand]').forEach(function (input) {
+        if (input.getAttribute('data-cand') === err.name) input.setAttribute('aria-invalid', 'true');
+      });
+    });
+    var legend = ['<span><i class="swatch" style="background:var(--ps-mean)"></i>Predicted mean</span>'];
+    legend.push('<span><i class="swatch" style="background:var(--ps-ci);height:8px"></i>' + Math.round(view.confidence * 100) + '% confidence interval for the mean response</span>');
+    if (view.spec.lsl != null) legend.push('<span><i class="swatch" style="background:var(--ps-limit)"></i>LSL</span>');
+    if (view.spec.usl != null) legend.push('<span><i class="swatch" style="background:var(--ps-limit)"></i>USL</span>');
+    if (view.spec.target != null) legend.push('<span><i class="swatch" style="background:var(--ps-target)"></i>Target</span>');
+    el('legend').innerHTML = legend.join('');
+    if (!view.profiles.length) {
+      el('profiles').innerHTML = '<p class="hint">' + esc(view.pin ? (view.withheldReason || 'The candidate profile is withheld until the candidate is valid.') : 'Pin the current settings to draw profiles.') + '</p>';
+      return;
+    }
+    el('profiles').innerHTML = view.profiles.map(function (profile) {
+      var held = (profile.held || []).map(function (item) { return item.name + ' ' + item.text; }).join(', ');
+      return '<figure><figcaption><strong>' + esc(profile.name) + (profile.unit ? ' (' + esc(profile.unit) + ')' : '') +
+        '</strong><span class="hint">Held at candidate: ' + esc(held || 'none') + (profile.locked ? ' Locked.' : '') + '</span></figcaption>' +
+        profileSvg(profile, view) + '</figure>';
+    }).join('');
+  }
+
+  function yOf(scale, value, height) {
+    var span = scale.max - scale.min || 1;
+    return 18 + (1 - (value - scale.min) / span) * (height - 46);
+  }
+  function specLines(scale, spec, width, height) {
+    var lines = [];
+    function add(value, label, color, dash, x) {
+      if (!Number.isFinite(value)) return;
+      var y = yOf(scale, value, height);
+      lines.push('<line x1="46" x2="' + (width - 12) + '" y1="' + y + '" y2="' + y + '" stroke="' + color + '" stroke-dasharray="' + dash + '" />');
+      lines.push('<text x="' + x + '" y="' + (y - 4) + '" fill="' + color + '" font-size="11">' + label + '</text>');
+    }
+    add(spec.lsl, 'LSL', 'var(--ps-limit)', '6 4', 50);
+    add(spec.usl, 'USL', 'var(--ps-limit)', '6 4', width - 48);
+    add(spec.target, 'Target', 'var(--ps-target)', '2 4', width / 2 - 18);
+    return lines.join('');
+  }
+  function profileSvg(profile, view) {
+    var width = 640;
+    var height = 200;
+    var scale = view.yScale;
+    if (!scale) return '';
+    var body = specLines(scale, view.spec, width, height);
+    if (profile.kind === 'numeric' && profile.points.length) {
+      var xmin = profile.points[0].x;
+      var xmax = profile.points[profile.points.length - 1].x;
+      function xOf(x) { return 46 + ((x - xmin) / (xmax - xmin || 1)) * (width - 58); }
+      var band = profile.points.filter(function (point) { return point.ci; });
+      if (band.length) {
+        var upper = band.map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.ci[1], height); }).join(' ');
+        var lower = band.slice().reverse().map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.ci[0], height); }).join(' ');
+        body += '<polygon points="' + upper + ' ' + lower + '" fill="var(--ps-ci)" />';
+      }
+      body += '<polyline fill="none" stroke="var(--ps-mean)" stroke-width="2" points="' +
+        profile.points.map(function (point) { return xOf(point.x) + ',' + yOf(scale, point.mean, height); }).join(' ') + '" />';
+      if (view.candidateCard && Number.isFinite(profile.active)) {
+        var ax = xOf(profile.active);
+        var ay = yOf(scale, view.candidateCard.mean, height);
+        body += '<circle cx="' + ax + '" cy="' + ay + '" r="5" fill="var(--ps-mark)" />';
+        body += '<text x="' + Math.min(ax + 8, width - 110) + '" y="' + Math.max(ay - 8, 16) + '" fill="currentColor" font-size="12" font-weight="700">' +
+          esc(view.candidateCard.meanText) + ' at ' + esc(formatCoef(profile.active)) + '</text>';
+      }
+      body += '<text x="46" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(formatCoef(xmin)) + '</text>';
+      body += '<text x="' + (width - 70) + '" y="' + (height - 8) + '" fill="currentColor" font-size="11">' + esc(formatCoef(xmax)) + '</text>';
+    } else if (profile.kind === 'categorical') {
+      (profile.marks || []).forEach(function (mark, index) {
+        var x = 80 + index * ((width - 140) / Math.max((profile.marks || []).length, 1));
+        if (!Number.isFinite(mark.mean)) return;
+        if (mark.ci) {
+          body += '<line x1="' + x + '" x2="' + x + '" y1="' + yOf(scale, mark.ci[0], height) + '" y2="' + yOf(scale, mark.ci[1], height) + '" stroke="var(--ps-ci)" stroke-width="8" />';
+        }
+        var y = yOf(scale, mark.mean, height);
+        body += '<circle cx="' + x + '" cy="' + y + '" r="' + (mark.active ? 6 : 4) + '" fill="' + (mark.active ? 'var(--ps-mark)' : 'var(--ps-mean)') + '" />';
+        body += '<text x="' + (x - 8) + '" y="' + (height - 8) + '" fill="currentColor" font-size="12">' + esc(mark.level) + '</text>';
+        if (mark.active) body += '<text x="' + (x + 10) + '" y="' + Math.max(y - 8, 16) + '" fill="currentColor" font-size="12" font-weight="700">' + esc(formatCoef(mark.mean)) + '</text>';
+      });
+    }
+    return '<svg class="profile" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(profile.name + ' profile. Other inputs held at the candidate.') + '">' + body + '</svg>';
+  }
+
+  function compareReadout(view) {
+    var suffix = view.config.responseScale && view.config.responseScale.kind === 'percent' ? '%' : '';
+    if (!view.pin) {
+      return '<p>Pin the current settings in the Prediction Profiler before comparing.</p>' +
+        '<button type="button" class="ps-btn primary" id="back-profiler">Open Prediction Profiler</button>';
+    }
+    var names = view.config.numeric.concat(view.config.categorical);
+    var changed = {};
+    (view.changed || []).forEach(function (row) { changed[row.name] = true; });
+    var rows = names.map(function (name) {
+      var from = view.pin.settings[name];
+      var to = view.candidateDraft[name];
+      var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
+      return '<tr class="' + (changed[name] ? 'changed' : '') + '"><td>' + esc(name) + '</td><td>' + esc(from) + esc(unit) + '</td><td>' + esc(to) + esc(unit) + '</td></tr>';
+    }).join('');
+    function block(title, card) {
+      if (!card) return '<article class="ps-panel"><h3>' + esc(title) + '</h3><p>The comparison is withheld until the candidate is valid.</p></article>';
+      var advisories = ((card.support && card.support.advisories) || []).map(function (line) { return '<p class="warn">' + esc(line) + '</p>'; }).join('');
+      return '<article class="ps-panel"><h3>' + esc(title) + '</h3><p class="hint">Predicted mean</p><p class="mean">' + esc(card.meanText) + esc(suffix) + '</p>' +
+        '<p>' + esc(card.ciLabel) + '</p><p>' + esc(card.ciText) + '</p>' +
+        (card.ci ? '' : ('<p class="hint">' + esc(card.ciReason || 'The confidence interval for the mean response is unavailable for this fit.') + '</p>')) +
+        '<p>Margin to specification: ' + esc(card.marginText) + '</p>' +
+        (card.locationLabel ? ('<p><strong>' + esc(card.locationLabel) + '</strong></p>') : '') +
+        (card.targetText ? ('<p>' + esc(card.targetText) + (card.atTarget ? ' (exactly at target)' : '') + '</p>') : '') +
+        (card.rangeFlag ? ('<p class="warn">' + esc(card.rangeFlag) + '</p>') : '') +
+        advisories + '<p class="hint">' + esc(card.support ? card.support.caveat : '') + '</p></article>';
+    }
+    return '<p class="hint">Model ' + esc(view.model.id) + ' · N = ' + esc(view.model.n) + '. Candidate − current predicted mean: ' + esc(view.deltaText || 'withheld') + '.</p>' +
+      '<div class="ps-panel" style="overflow:auto;"><table><thead><tr><th>Setting</th><th>Current</th><th>Candidate</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="cards">' + block('Current settings', view.currentCard) + block('Candidate settings', view.candidateCard) + '</div>' +
+      (view.withheldReason ? ('<p class="status error">' + esc(view.withheldReason) + '</p>') : '') +
+      '<div class="ps-actions"><button type="button" class="ps-btn primary" id="back-profiler">Back to Profiler</button></div>';
+  }
+
+  function renderCompare() {
+    var view = session.read();
+    el('view-compare').innerHTML =
+      '<h2 id="compare-title" tabindex="-1">Compare Settings</h2>' +
+      specEditor(view.spec) +
+      '<div id="compare-readout">' + compareReadout(view) + '</div>';
+    bindLiveSpec(el('view-compare'), function () {
+      var readout = el('compare-readout');
+      if (readout) readout.innerHTML = compareReadout(session.read());
+      var back = el('back-profiler');
+      if (back) back.addEventListener('click', function () { showView('profiler', { focus: true }); });
+    });
+    var back = el('back-profiler');
+    if (back) back.addEventListener('click', function () { showView('profiler', { focus: true }); });
+  }
+
+  function findCand(name, type) {
+    var found = null;
+    document.querySelectorAll('[data-cand]').forEach(function (node) {
+      if (node.getAttribute('data-cand') === name && node.type === type) found = node;
+    });
+    return found;
+  }
+
+  function acceptTable(table, note, preset) {
+    booted = true;
+    el('host-error').hidden = true;
+    if (session.read().model) {
+      stagedTable = {
+        headers: table.headers.slice(),
+        rows: table.rows.map(function (row) { return row.slice(); }),
+        address: table.address || ''
+      };
+      editing = true;
+      if (currentView !== 'setup') showView('setup', { focus: true });
+      else fillSetup();
+      setStatus(note + ' The new data is staged. Fit the model to replace the current analysis.', false);
+      return;
+    }
+    session.loadData(table);
+    remember(table);
+    if (preset) {
+      session.configure(preset.config);
+      session.setSpecifications(preset.specifications);
+      session.setCurrentSettings(preset.current);
+    }
+    stagedTable = null;
+    editing = false;
+    fillSetup();
+    showView('setup', { rebuild: false });
+    setStatus(note, false);
+  }
+
+  function loadDemo() {
+    var demo = Engine.demoPreset();
+    acceptTable(demo.table, 'Built-in demo · ' + demo.table.address + ' · 12 complete rows. Fit the model to open Overview.', demo);
+  }
+  function loadTable(table, note) {
+    acceptTable(table, note || (table.address || 'Worksheet data loaded.'), null);
+  }
+
+  el('view-setup').addEventListener('input', function () { refreshSetupChrome(); });
+  el('view-setup').addEventListener('change', function (event) {
+    if (event.target.id === 'response' || event.target.hasAttribute('data-role')) {
+      var columns = Engine.columnChoices(activeTable().headers, activeTable().rows);
+      var form = scrape();
+      if (event.target.id === 'response') {
+        var seen = {};
+        form.config.numeric.concat(form.config.categorical).forEach(function (name) { seen[name] = true; });
+        columns.forEach(function (col) {
+          if (col.name === form.config.response || seen[col.name]) return;
+          if (col.kind === 'numeric') form.config.numeric.push(col.name);
+          else form.config.categorical.push(col.name);
+          form.config.roles[col.name] = form.config.roles[col.name] || 'adjustable';
+        });
+        form.config.numeric = form.config.numeric.filter(function (name) { return name !== form.config.response; });
+        form.config.categorical = form.config.categorical.filter(function (name) { return name !== form.config.response; });
+      }
+      renderPredictors(columns, form.config);
+      var looked = probe(activeTable(), scrape().config, null);
+      var limits = Object.assign({}, looked.view.limits, form.limits);
+      renderBounds(scrape().config, limits, looked.view.observed, form.fixed);
+    }
+    refreshSetupChrome();
+  });
+  el('primary-action').addEventListener('click', commitDraft);
+  el('cancel-edit').addEventListener('click', function () {
+    stagedTable = null;
+    editing = false;
+    setStatus('', false);
+    showView(lastResults, { focus: true });
+  });
+  el('use-demo').addEventListener('click', loadDemo);
+  el('use-selection').addEventListener('click', function () { post('useSelection'); });
+  el('pick-range').addEventListener('click', function () { post('pickRange'); });
+  el('refresh-data').addEventListener('click', function () { post('refreshData'); });
+
+  el('pin-btn').addEventListener('click', function () {
+    var partial = {};
+    document.querySelectorAll('[data-current]').forEach(function (input) {
+      partial[input.getAttribute('data-current')] = input.getAttribute('data-numeric') === '1' ? Number(input.value) : input.value;
+    });
+    session.setCurrentSettings(partial);
+    var pinned = session.pin();
+    el('pin-status').textContent = pinned.ok ? 'Current settings pinned.' : pinned.error;
+    el('pin-status').className = 'status' + (pinned.ok ? ' ok' : ' error');
+    if (!pinned.ok) return;
+    buildProfiler();
+    paintProfiler();
+    syncShell();
+  });
+  el('row-picker').addEventListener('change', function () {
+    if (el('row-picker').value === '') return;
+    var applied = session.applyAnalyzedRow(Number(el('row-picker').value));
+    if (!applied.ok) {
+      el('pin-status').textContent = applied.error;
+      el('pin-status').className = 'status error';
+      return;
+    }
+    var keep = el('row-picker').value;
+    buildProfiler();
+    el('row-picker').value = keep;
+  });
+  el('edit-current').addEventListener('click', function () {
+    session.editCurrent();
+    buildProfiler();
+    paintProfiler();
+    syncShell();
+    var heading = el('profiler-title');
+    if (heading) heading.focus();
+  });
+  el('reset-candidate').addEventListener('click', function () {
+    session.resetCandidate();
+    buildProfiler();
+    paintProfiler();
+  });
+  el('confidence').addEventListener('change', function () {
+    session.setConfidence(Number(el('confidence').value));
+    paintProfiler();
+    if (currentView === 'compare') renderCompare();
+  });
+  bindLiveSpec(el('live-spec'), function () { paintProfiler(); });
+  el('view-profiler').addEventListener('input', function (event) {
+    var target = event.target;
+    if (!target.hasAttribute('data-cand')) return;
+    var key = target.getAttribute('data-cand');
+    var numeric = target.getAttribute('data-numeric') === '1';
+    var patch = {};
+    patch[key] = numeric ? Number(target.value) : target.value;
+    session.setCandidate(patch);
+    if (numeric && target.type === 'range') {
+      var number = findCand(key, 'number');
+      if (number && document.activeElement !== number) number.value = target.value;
+    }
+    if (numeric && target.type === 'number') {
+      var range = findCand(key, 'range');
+      var reading = session.read();
+      if (range && reading.phase !== 'withheld') range.value = target.value;
+    }
+    paintProfiler();
+  });
+  el('view-profiler').addEventListener('change', function (event) {
+    if (event.target.hasAttribute('data-cand') && event.target.tagName === 'SELECT') {
+      var patch = {};
+      patch[event.target.getAttribute('data-cand')] = event.target.value;
+      session.setCandidate(patch);
+      paintProfiler();
+    }
+  });
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
+    var nav = el('sidebarNav');
+    if (!nav || !nav.contains(document.activeElement)) return;
+    var items = Array.prototype.slice.call(nav.querySelectorAll('.sb-item'));
+    var index = items.indexOf(document.activeElement);
+    if (index < 0) return;
+    event.preventDefault();
+    var next = index;
+    if (event.key === 'ArrowDown') next = Math.min(items.length - 1, index + 1);
+    if (event.key === 'ArrowUp') next = Math.max(0, index - 1);
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = items.length - 1;
+    items[next].focus();
+  });
+
+  function onParentMessage(arg) {
+    var msg;
+    try { msg = JSON.parse(arg.message || '{}'); } catch (e) { return; }
+    if (msg.type === 'PROCESS_SETTINGS_DATA') {
+      var payload = msg.payload || {};
+      if (!payload.headers || !payload.headers.length || payload.source === 'empty') {
+        booted = true;
+        el('data-note').textContent = 'No worksheet range is loaded. Use the Excel selection, pick a range, or open the demo process.';
+        el('preview-note').textContent = '';
+        showView('setup', { rebuild: false });
+        return;
+      }
+      loadTable({ headers: payload.headers, rows: payload.rows || [], address: payload.address || '' },
+        'Worksheet ' + (payload.address || 'range') + ' · ' + (payload.rows || []).length + ' rows.');
+      return;
+    }
+    if (msg.type === 'PROCESS_SETTINGS_ERROR') {
+      el('host-error').hidden = false;
+      el('host-error').textContent = msg.message || 'The worksheet range could not be read.';
+    }
+  }
+
+  function boot() {
+    window.__psView = 'setup';
+    window.__psFitted = false;
+    window.setDecimalPrecision = function () {};
+    window.switchProcessSettingsView = window.switchProcessSettingsView;
+    if (window.StatisticoHeader && typeof StatisticoHeader.init === 'function') {
+      StatisticoHeader.init('setup', 'Response', 0, 'process-settings');
+      StatisticoHeader.initSidebarPage();
+    }
+    if (/(?:^|[?&])demo=1(?:&|$)/.test(window.location.search || '') || typeof Office === 'undefined' || !Office.context || !Office.context.ui) {
+      loadDemo();
+      return;
+    }
+    Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage);
+    post('ready');
+    showView('setup', { rebuild: false });
+    setTimeout(function () {
+      if (!booted) el('data-note').textContent = 'No worksheet range arrived. Use the Excel selection, pick a range, or open the demo process.';
+    }, 1800);
+  }
+  if (typeof Office !== 'undefined' && Office.onReady) Office.onReady(boot);
+  else boot();
+})();
+  </script>
+</body>
+</html>

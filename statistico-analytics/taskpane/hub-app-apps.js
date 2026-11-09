@@ -375,6 +375,32 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
+    id: "process-settings",
+    section: "Process Improvement",
+    sectionId: "improvement",
+    title: "Process settings explorer",
+    icon: "fa-sliders",
+    accent: "#38bdf8",
+    accentDark: "#0284c7",
+    color: "#38bdf8",
+    colorDark: "#0284c7",
+    subtitle: "Pin the current recipe and compare a candidate on the fitted model",
+    desc: "Fit one continuous response from the working range, pin the operating settings, and see how a candidate moves the predicted mean and its margin to specification.",
+    info: [
+      "Uses the worksheet working range, or a built-in demo",
+      "Same ordinary least-squares fit, encoding, and mean-response interval as Linear Regression",
+      "Data and starting specification limits are set in Input & Setup",
+      "Limits and the target can be changed in the results views without a new fit"
+    ],
+    modules: [
+      {
+        id: "process-settings",
+        label: "Process Settings Explorer",
+        tip: "Pin current settings and compare a candidate on the fitted regression."
+      }
+    ]
+  },
+  {
     id: "survey-tools",
     section: "Survey Tools",
     sectionId: "survey",
@@ -649,32 +675,6 @@ const CALCULATOR_CATEGORY_TILES = [
         dialogUrl: "https://statistico.live/statistico-calculators/process-capability/CpkCalculator.html"
       }
     ]
-  },
-  {
-    id: "process-settings",
-    section: "Operations & Quality",
-    sectionId: "operations",
-    title: "Process settings explorer",
-    icon: "fa-sliders",
-    accent: "#f59e0b",
-    accentDark: "#b45309",
-    color: "#f59e0b",
-    colorDark: "#b45309",
-    subtitle: "Pin the current recipe and compare a candidate on the fitted model",
-    desc: "Fit one continuous response with the regression model, pin the operating settings, and see how a candidate moves the predicted mean and its margin to specification.",
-    info: [
-      "Uses the worksheet Active Range when one is available, or a built-in demo",
-      "Same ordinary least-squares fit, encoding, and mean-response interval as Linear Regression",
-      "Adjustable settings and fixed conditions stay on one fitted model",
-      "Lower and upper specification limits and a separate target"
-    ],
-    modules: [
-      {
-        id: "process-settings",
-        label: "Process Settings Explorer",
-        tip: "Pin current settings and compare a candidate on the fitted regression."
-      }
-    ]
   }
 ];
 const PREPARE_CATEGORY_TILES = [
@@ -783,6 +783,14 @@ var TOOLS_SECTION_META = {
     color: "#f97316",
     colorDark: "#c2410c"
   },
+  improvement: {
+    id: "improvement",
+    label: "Process Improvement",
+    subtitle: "Compare a candidate recipe with the current settings on one fitted model.",
+    icon: "fa-sliders",
+    color: "#38bdf8",
+    colorDark: "#0284c7"
+  },
   survey: {
     id: "survey",
     label: "Survey Tools",
@@ -801,8 +809,8 @@ var TOOLS_SECTION_META = {
     colorDark: "#059669"
   }
 };
-var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "delivery", "survey"];
-var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "survey"];
+var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "improvement", "delivery", "survey"];
+var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "improvement", "survey"];
 var CALC_SECTION_META = {
   inference: {
     id: "inference",
@@ -830,7 +838,7 @@ var CALC_SECTION_META = {
   }
 };
 var CALC_SECTION_ORDER = ["inference", "planning", "operations"];
-var CALC_BUTTON_ORDER = ["distribution-tools", "two-by-two", "precision-sample", "power-sample", "effect-size-family", "erlang-family", "process-capability", "process-settings"];
+var CALC_BUTTON_ORDER = ["distribution-tools", "two-by-two", "precision-sample", "power-sample", "effect-size-family", "erlang-family", "process-capability"];
 var ANALYTICS_SECTION_STORAGE_KEY = "statistico.hub.analyticsSection";
 var ANALYTICS_SECTION_META = {
   explore: {

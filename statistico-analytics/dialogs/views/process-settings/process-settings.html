@@ -104,6 +104,9 @@
     figure { margin: 0 0 8px; }
     figcaption { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
     svg.profile, svg.diag { width: 100%; height: auto; background: var(--surface-0, #0e141b); border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,.09)); }
+    .spec-live { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+    .spec-live .field { width: 112px; flex: 0 0 112px; }
+    .spec-live input[type="number"] { width: 100%; }
     .legend { display: flex; flex-wrap: wrap; gap: 8px 12px; color: var(--text-muted, #9aabbd); font-size: 12px; }
     .swatch { display: inline-block; width: 16px; height: 3px; margin-right: 4px; vertical-align: middle; }
     .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -147,6 +150,7 @@
                 <label class="field" id="target-label">Target<input id="target" type="number" step="any" /></label>
               </div>
               <p id="spec-error" class="field-error" role="alert"></p>
+              <p class="hint">These are the starting limits for the fit. After the model is fit, Overview, the profiler, and Compare can change them without fitting again.</p>
             </section>
           </div>
           <section class="ps-panel" aria-labelledby="model-title">
@@ -188,6 +192,15 @@
           <div class="ps-top">
             <h2 id="profiler-title" tabindex="-1">Prediction Profiler</h2>
             <div id="strip" class="metrics" aria-live="polite"></div>
+            <div id="live-spec" class="spec-editor">
+              <p class="hint">Specification limits on this fit. A change updates the profiles and margins without fitting again.</p>
+              <div class="spec-live">
+                <label class="field" id="live-lsl-label">Lower limit<input id="live-lsl" data-live-spec="lsl" type="number" step="any" aria-label="Lower limit" /></label>
+                <label class="field" id="live-usl-label">Upper limit<input id="live-usl" data-live-spec="usl" type="number" step="any" aria-label="Upper limit" /></label>
+                <label class="field" id="live-target-label">Target<input id="live-target" data-live-spec="target" type="number" step="any" aria-label="Target" /></label>
+              </div>
+              <p id="live-spec-msg" class="status" data-spec-msg role="status"></p>
+            </div>
             <div id="pin-box">
               <p class="hint">Enter the current settings and pin them. The candidate starts as a copy of that snapshot. Fixed conditions use the values from Input &amp; Setup.</p>
               <label class="field" style="margin:6px 0;">Populate from an analyzed row
@@ -687,6 +700,57 @@
     return parts.length ? parts.join(' · ') : 'No specification limits or target.';
   }
 
+  function specEditor(spec) {
+    function field(key, label, value) {
+      return '<label class="field">' + esc(label) +
+        '<input data-live-spec="' + key + '" type="number" step="any" value="' + esc(numOrBlank(value)) + '" aria-label="' + esc(label) + '" /></label>';
+    }
+    return '<div class="spec-editor"><p class="hint">Specification limits on this fit. A change updates the profiles and margins without fitting again.</p><div class="spec-live">' +
+      field('lsl', 'Lower limit', spec.lsl) +
+      field('usl', 'Upper limit', spec.usl) +
+      field('target', 'Target', spec.target) +
+      '</div><p class="status" data-spec-msg role="status"></p></div>';
+  }
+
+  function applyLiveSpec(root, onApplied) {
+    var spec = {
+      lsl: blankToNull(root.querySelector('[data-live-spec="lsl"]').value),
+      usl: blankToNull(root.querySelector('[data-live-spec="usl"]').value),
+      target: blankToNull(root.querySelector('[data-live-spec="target"]').value)
+    };
+    var result = session.setSpecifications(spec);
+    var msg = root.querySelector('[data-spec-msg]');
+    root.querySelectorAll('[data-live-spec]').forEach(function (node) {
+      node.setAttribute('aria-invalid', result.ok ? 'false' : 'true');
+    });
+    if (msg) {
+      msg.textContent = result.ok ? '' : result.error;
+      msg.className = 'status' + (result.ok ? '' : ' error');
+    }
+    if (result.ok && onApplied) onApplied();
+  }
+
+  function bindLiveSpec(root, onApplied) {
+    if (!root) return;
+    root.querySelectorAll('[data-live-spec]').forEach(function (input) {
+      input.addEventListener('input', function () { applyLiveSpec(root, onApplied); });
+    });
+  }
+
+  function syncLiveSpecFields() {
+    var view = session.read();
+    var unit = view.config && view.config.responseScale && view.config.responseScale.unit;
+    var suffix = unit ? (' (' + unit + ')') : '';
+    [['lsl', 'Lower limit'], ['usl', 'Upper limit'], ['target', 'Target']].forEach(function (pair) {
+      var label = el('live-' + pair[0] + '-label');
+      var input = el('live-' + pair[0]);
+      if (label && label.firstChild) label.firstChild.textContent = pair[1] + suffix;
+      if (!input || document.activeElement === input) return;
+      input.value = numOrBlank(view.spec[pair[0]]);
+      input.setAttribute('aria-invalid', 'false');
+    });
+  }
+
   function renderOverview() {
     var view = session.read();
     var model = view.model;
@@ -711,11 +775,17 @@
       '<div class="ps-panels">' +
         '<section class="ps-panel"><h3>Adjustable settings</h3><p>' + esc(adjustable.join(' · ') || 'None') + '</p>' +
           '<h3 style="margin-top:8px;">Fixed conditions</h3><p>' + esc(fixed.join(' · ') || 'None') + '</p></section>' +
-        '<section class="ps-panel"><h3>Specifications</h3><p>' + esc(specSummary(view.spec, unit)) + '</p>' +
+        '<section class="ps-panel"><h3>Specifications</h3>' + specEditor(view.spec) +
+          '<p id="overview-spec-summary" class="hint">' + esc(specSummary(view.spec, unit)) + '</p>' +
           '<p class="hint">' + esc(pinText) + ' Open the profiler to pin this recipe and move a candidate on the same fit.</p></section>' +
       '</div>' +
       '<div class="ps-actions"><button type="button" class="ps-btn primary" id="open-profiler">Open Prediction Profiler</button></div>';
     el('open-profiler').addEventListener('click', function () { showView('profiler', { focus: true }); });
+    bindLiveSpec(el('view-overview'), function () {
+      var next = session.read();
+      var summary = el('overview-spec-summary');
+      if (summary) summary.textContent = specSummary(next.spec, next.config.responseScale && next.config.responseScale.unit);
+    });
   }
 
   function renderEffects() {
@@ -1013,6 +1083,7 @@
   }
 
   function paintProfiler() {
+    syncLiveSpecFields();
     var view = session.read();
     var suffix = view.config.responseScale && view.config.responseScale.kind === 'percent' ? '%' : '';
     var current = cardBits(view.currentCard, suffix);
@@ -1120,14 +1191,11 @@
     return '<svg class="profile" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(profile.name + ' profile. Other inputs held at the candidate.') + '">' + body + '</svg>';
   }
 
-  function renderCompare() {
-    var view = session.read();
+  function compareReadout(view) {
     var suffix = view.config.responseScale && view.config.responseScale.kind === 'percent' ? '%' : '';
     if (!view.pin) {
-      el('view-compare').innerHTML = '<h2 id="compare-title" tabindex="-1">Compare Settings</h2><p>Pin the current settings in the Prediction Profiler before comparing.</p>' +
+      return '<p>Pin the current settings in the Prediction Profiler before comparing.</p>' +
         '<button type="button" class="ps-btn primary" id="back-profiler">Open Prediction Profiler</button>';
-      el('back-profiler').addEventListener('click', function () { showView('profiler', { focus: true }); });
-      return;
     }
     var names = view.config.numeric.concat(view.config.categorical);
     var changed = {};
@@ -1150,14 +1218,27 @@
         (card.rangeFlag ? ('<p class="warn">' + esc(card.rangeFlag) + '</p>') : '') +
         advisories + '<p class="hint">' + esc(card.support ? card.support.caveat : '') + '</p></article>';
     }
-    el('view-compare').innerHTML =
-      '<h2 id="compare-title" tabindex="-1">Compare Settings</h2>' +
-      '<p class="hint">Model ' + esc(view.model.id) + ' · N = ' + esc(view.model.n) + '. Candidate − current predicted mean: ' + esc(view.deltaText || 'withheld') + '.</p>' +
+    return '<p class="hint">Model ' + esc(view.model.id) + ' · N = ' + esc(view.model.n) + '. Candidate − current predicted mean: ' + esc(view.deltaText || 'withheld') + '.</p>' +
       '<div class="ps-panel" style="overflow:auto;"><table><thead><tr><th>Setting</th><th>Current</th><th>Candidate</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<div class="cards">' + block('Current settings', view.currentCard) + block('Candidate settings', view.candidateCard) + '</div>' +
       (view.withheldReason ? ('<p class="status error">' + esc(view.withheldReason) + '</p>') : '') +
       '<div class="ps-actions"><button type="button" class="ps-btn primary" id="back-profiler">Back to Profiler</button></div>';
-    el('back-profiler').addEventListener('click', function () { showView('profiler', { focus: true }); });
+  }
+
+  function renderCompare() {
+    var view = session.read();
+    el('view-compare').innerHTML =
+      '<h2 id="compare-title" tabindex="-1">Compare Settings</h2>' +
+      specEditor(view.spec) +
+      '<div id="compare-readout">' + compareReadout(view) + '</div>';
+    bindLiveSpec(el('view-compare'), function () {
+      var readout = el('compare-readout');
+      if (readout) readout.innerHTML = compareReadout(session.read());
+      var back = el('back-profiler');
+      if (back) back.addEventListener('click', function () { showView('profiler', { focus: true }); });
+    });
+    var back = el('back-profiler');
+    if (back) back.addEventListener('click', function () { showView('profiler', { focus: true }); });
   }
 
   function findCand(name, type) {
@@ -1285,6 +1366,7 @@
     paintProfiler();
     if (currentView === 'compare') renderCompare();
   });
+  bindLiveSpec(el('live-spec'), function () { paintProfiler(); });
   el('view-profiler').addEventListener('input', function (event) {
     var target = event.target;
     if (!target.hasAttribute('data-cand')) return;

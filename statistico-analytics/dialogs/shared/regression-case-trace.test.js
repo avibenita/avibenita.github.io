@@ -254,6 +254,61 @@ describe('ANCOVA estimability', () => {
   });
 });
 
+describe('joint omission', () => {
+  test('one temporary fit drops every selected case and names the rows together', () => {
+    const phrase = Trace.casePhrase(['Row 25', 'Row 2']);
+    expect(phrase.status).toBe('2 cases selected · Rows 2, 25');
+    expect(phrase.andList).toBe('Rows 2 and 25');
+    expect(phrase.compare).toBe('Compare without these 2 cases');
+    expect(Trace.casePhrase(['Row 2']).compare).toBe('Compare without this case');
+
+    const design = simpleSpec(PAIRS.map(function (row) { return row.slice(); }));
+    const spec = fitSpec(design, 3);
+    const calls = [];
+    spec.computeOLS = function () {
+      calls.push(1);
+      return computeOLS.apply(null, arguments);
+    };
+    const e = design.cases[4];
+    const f = design.cases[5];
+    const comparison = Trace.buildComparison(spec, [f.caseKey, e.caseKey]);
+    const reduced = computeOLS(design.xMatrix.slice(0, 4), design.yVector.slice(0, 4), true, 0.05);
+    expect(calls.length).toBe(1);
+    expect(comparison.status).toBe('ready');
+    expect(comparison.omittedLabel).toBe('F and E');
+    expect(comparison.nOriginal).toBe(6);
+    expect(comparison.nTemporary).toBe(4);
+    expect(comparison.modelFit[0].change).toBe(-2);
+    expect(coeff(comparison, 'x').estimate.temporary).toBeCloseTo(reduced.coefficients[1], 8);
+    expect(spec.originalResults.n).toBe(6);
+    expect(comparison.prediction.estimate.temporary).toBeCloseTo(
+      reduced.coefficients[0] + reduced.coefficients[1] * 3, 8
+    );
+  });
+
+  test('changing the checked cases discards the previous temporary fit', async () => {
+    const design = simpleSpec(PAIRS.map(function (row) { return row.slice(); }));
+    const spec = fitSpec(design, 3);
+    const session = Trace.createCaseSession();
+    session.datasetReplaced(design);
+    const e = design.cases[4];
+    const f = design.cases[5];
+    session.select(e.caseKey);
+    session.toggle(f.caseKey, true);
+    expect(session.selectedKeys()).toEqual([e.caseKey, f.caseKey]);
+    const pending = session.runCompare(function () { return spec; });
+    session.toggle(e.caseKey, false);
+    const stale = await pending;
+    expect(stale.applied).toBe(false);
+    expect(session.selectedKeys()).toEqual([f.caseKey]);
+    expect(session.state().comparison).toBe(null);
+    const alone = await session.runCompare(function () { return spec; });
+    expect(alone.applied).toBe(true);
+    expect(alone.payload.nTemporary).toBe(5);
+    expect(alone.payload.omittedLabel).toBe('F');
+  });
+});
+
 describe('failure and stale responses', () => {
   test('a failed refit can be retried, and a stale response is discarded', async () => {
     const design = simpleSpec(PAIRS.map(function (row) { return row.slice(); }));

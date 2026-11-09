@@ -317,6 +317,9 @@
   }
 
   function lostLevel(cases, omittedIndex, columns, categoricalInfo) {
+    var skip = Object.create(null);
+    if (Array.isArray(omittedIndex)) omittedIndex.forEach(function (i) { skip[i] = true; });
+    else skip[omittedIndex] = true;
     var used = factorsUsed(columns, categoricalInfo);
     var before = Object.create(null);
     var after = Object.create(null);
@@ -327,7 +330,7 @@
         var level = String(factors[name]);
         before[name] = before[name] || Object.create(null);
         before[name][level] = (before[name][level] || 0) + 1;
-        if (idx === omittedIndex) return;
+        if (skip[idx]) return;
         after[name] = after[name] || Object.create(null);
         after[name][level] = (after[name][level] || 0) + 1;
       });
@@ -358,55 +361,116 @@
     return { ci: [lo, hi], reason: '' };
   }
 
+  function joinAnd(bits) {
+    if (bits.length <= 1) return bits[0] || '';
+    if (bits.length === 2) return bits[0] + ' and ' + bits[1];
+    return bits.slice(0, -1).join(', ') + ', and ' + bits[bits.length - 1];
+  }
+
+  function casePhrase(labels) {
+    var clean = (labels || []).map(function (label) { return label == null ? '' : String(label); }).filter(Boolean);
+    if (!clean.length) {
+      return { count: 0, list: '', andList: '', compare: 'Compare without this case', status: '' };
+    }
+    var parsed = clean.map(function (label) {
+      var match = /^(Row|Obs)\s+(\d+)$/.exec(label);
+      return match ? { kind: match[1], n: Number(match[2]), rest: match[2] } : null;
+    });
+    var sameKind = parsed.every(function (item) { return item && item.kind === parsed[0].kind; });
+    var list = clean.join(', ');
+    var andList = joinAnd(clean);
+    if (clean.length === 1) {
+      list = clean[0];
+      andList = clean[0];
+    } else if (sameKind) {
+      var ordered = parsed.map(function (item, index) { return { n: item.n, rest: item.rest, label: clean[index] }; });
+      ordered.sort(function (a, b) { return a.n - b.n; });
+      var noun = parsed[0].kind === 'Row' ? 'Rows' : 'Obs';
+      var bits = ordered.map(function (item) { return item.rest; });
+      list = noun + ' ' + bits.join(', ');
+      andList = noun + ' ' + joinAnd(bits);
+    }
+    return {
+      count: clean.length,
+      list: list,
+      andList: andList,
+      compare: clean.length > 1 ? ('Compare without these ' + clean.length + ' cases') : 'Compare without this case',
+      status: clean.length > 1 ? (clean.length + ' cases selected · ' + list) : ('Selected case ' + andList)
+    };
+  }
+
   function buildComparison(spec, caseKey) {
     spec = spec || {};
     var cases = spec.cases || [];
-    var idx = -1;
-    for (var i = 0; i < cases.length; i++) if (cases[i].caseKey === caseKey) { idx = i; break; }
-    if (idx < 0) {
-      return { status: 'unavailable', reason: 'That case is not in the analyzed sample, so it cannot be omitted from the fit.' };
-    }
+    var seenKey = Object.create(null);
+    var keys = (Array.isArray(caseKey) ? caseKey : (caseKey ? [caseKey] : [])).filter(function (key) {
+      if (!key || seenKey[key]) return false;
+      seenKey[key] = true;
+      return true;
+    });
+    if (!keys.length) return { status: 'unavailable', reason: 'Select an analyzed case first.' };
     if (spec.weights && (Array.isArray(spec.weights) ? spec.weights.length : true)) {
       return {
         status: 'unavailable',
         reason: 'This fit uses weights, and the regression engine does not apply weights, so a comparable temporary fit is unavailable.'
       };
     }
-    var omitted = cases[idx];
+    var indices = [];
+    var omittedCases = [];
+    for (var k = 0; k < keys.length; k++) {
+      var foundAt = -1;
+      for (var i = 0; i < cases.length; i++) if (cases[i].caseKey === keys[k]) { foundAt = i; break; }
+      if (foundAt < 0) {
+        return { status: 'unavailable', reason: 'A selected case is not in the analyzed sample, so it cannot be omitted from the fit.' };
+      }
+      indices.push(foundAt);
+      omittedCases.push(cases[foundAt]);
+    }
+    var many = indices.length > 1;
+    var phrase = casePhrase(omittedCases.map(function (c) { return c.displayLabel; }));
+    var omittedLabel = phrase.andList;
+    var without = many ? 'these cases' : 'this case';
     var xMatrix = spec.xMatrix || [];
     var yVector = spec.yVector || [];
     var includeIntercept = !!spec.includeIntercept;
     var columns = spec.columns || [];
-    var k = columns.length + (includeIntercept ? 1 : 0);
+    var kCols = columns.length + (includeIntercept ? 1 : 0);
     if (xMatrix.length !== cases.length || yVector.length !== cases.length) {
       return { status: 'unavailable', reason: 'The analyzed rows no longer match this fit, so the case cannot be traced.' };
     }
-    var lost = lostLevel(cases, idx, columns, spec.categoricalInfo || []);
+    var lost = lostLevel(cases, indices, columns, spec.categoricalInfo || []);
     if (lost.length) {
       var picked = lost[0];
       for (var L = 0; L < lost.length; L++) {
-        if (String((omitted.factors || {})[lost[L].factor]) === String(lost[L].level)) { picked = lost[L]; break; }
+        var onOmitted = omittedCases.some(function (omitted) {
+          return String((omitted.factors || {})[lost[L].factor]) === String(lost[L].level);
+        });
+        if (onOmitted) { picked = lost[L]; break; }
       }
       return {
         status: 'unavailable',
-        reason: 'Without this case, ' + picked.factor + ' ' + picked.level + ' has no observations and the same model cannot be estimated.',
-        omittedLabel: omitted.displayLabel,
+        reason: 'Without ' + without + ', ' + picked.factor + ' ' + picked.level + ' has no observations and the same model cannot be estimated.',
+        omittedLabel: omittedLabel,
+        omittedCount: indices.length,
         keptCase: true
       };
     }
-    var reducedN = cases.length - 1;
-    if (reducedN - k < 1) {
+    var reducedN = cases.length - indices.length;
+    if (reducedN - kCols < 1) {
       return {
         status: 'unavailable',
-        reason: 'Without this case, the model has no residual degrees of freedom and the same model cannot be estimated.',
-        omittedLabel: omitted.displayLabel,
+        reason: 'Without ' + without + ', the model has no residual degrees of freedom and the same model cannot be estimated.',
+        omittedLabel: omittedLabel,
+        omittedCount: indices.length,
         keptCase: true
       };
     }
+    var skip = Object.create(null);
+    indices.forEach(function (index) { skip[index] = true; });
     var newX = [];
     var newY = [];
     for (var r = 0; r < xMatrix.length; r++) {
-      if (r === idx) continue;
+      if (skip[r]) continue;
       newX.push(xMatrix[r]);
       newY.push(yVector[r]);
     }
@@ -420,8 +484,9 @@
       if (/singular|rank/i.test(message)) {
         return {
           status: 'unavailable',
-          reason: 'Without this case, the same model is rank deficient and cannot be estimated.',
-          omittedLabel: omitted.displayLabel,
+          reason: 'Without ' + without + ', the same model is rank deficient and cannot be estimated.',
+          omittedLabel: omittedLabel,
+          omittedCount: indices.length,
           keptCase: true
         };
       }
@@ -434,7 +499,9 @@
     if (!original || !Array.isArray(original.coefficients) || original.coefficients.length !== temporary.coefficients.length) {
       return {
         status: 'unavailable',
-        reason: 'Without this case, the coefficient definitions are not comparable to the original fit.'
+        reason: 'Without ' + without + ', the coefficient definitions are not comparable to the original fit.',
+        omittedLabel: omittedLabel,
+        omittedCount: indices.length
       };
     }
     var level = 1 - alpha;
@@ -443,7 +510,9 @@
     if (terms.length !== original.coefficients.length) {
       return {
         status: 'unavailable',
-        reason: 'Without this case, the coefficient definitions are not comparable to the original fit.'
+        reason: 'Without ' + without + ', the coefficient definitions are not comparable to the original fit.',
+        omittedLabel: omittedLabel,
+        omittedCount: indices.length
       };
     }
     var sensitivity = false;
@@ -533,12 +602,16 @@
     return {
       status: 'ready',
       exploratory: true,
-      note: 'This comparison shows how sensitive the model is to this observation.',
+      note: many
+        ? 'This comparison shows how sensitive the model is to these observations.'
+        : 'This comparison shows how sensitive the model is to this observation.',
       sensitivityNote: sensitivity
         ? 'Exploratory only: an estimate changed, or a confidence interval crosses zero.'
         : 'Exploratory only. This comparison does not replace the fitted model.',
-      omittedLabel: omitted.displayLabel,
-      caseKey: omitted.caseKey,
+      omittedLabel: omittedLabel,
+      omittedCount: indices.length,
+      caseKey: omittedCases[0].caseKey,
+      caseKeys: omittedCases.map(function (c) { return c.caseKey; }),
       nOriginal: original.n,
       nTemporary: temporary.n,
       modelFit: modelFit,
@@ -561,7 +634,7 @@
     var state = {
       analysisVersion: 0,
       specVersion: 0,
-      selectedKey: null,
+      selectedKeys: [],
       serial: 0,
       disposed: false,
       comparison: null,
@@ -569,9 +642,17 @@
       catalog: null
     };
     function bump() { state.serial += 1; }
+    function keySignature(keys) { return (keys || []).join('\u0001'); }
+    function keepAnalyzed(keys) {
+      return (keys || []).filter(function (key) {
+        var found = caseInCatalog(state.catalog, key);
+        return found && found.analyzed !== false;
+      });
+    }
     return {
       state: function () { return state; },
-      selectedKey: function () { return state.selectedKey; },
+      selectedKey: function () { return state.selectedKeys[0] || null; },
+      selectedKeys: function () { return state.selectedKeys.slice(); },
       dispose: function () {
         state.disposed = true;
         state.comparison = null;
@@ -581,7 +662,7 @@
         state.analysisVersion += 1;
         state.specVersion += 1;
         state.catalog = catalog || null;
-        state.selectedKey = null;
+        state.selectedKeys = [];
         state.comparison = null;
         bump();
       },
@@ -589,25 +670,35 @@
         state.specVersion += 1;
         state.comparison = null;
         bump();
-        if (state.selectedKey && !caseInCatalog(state.catalog, state.selectedKey)) state.selectedKey = null;
-        else if (state.selectedKey) {
-          var found = caseInCatalog(state.catalog, state.selectedKey);
-          if (found && found.analyzed === false) state.selectedKey = null;
-        }
+        state.selectedKeys = keepAnalyzed(state.selectedKeys);
       },
       select: function (caseKey) {
         if (state.disposed) return { ok: false, reason: 'The results dialog has closed.' };
         if (!caseKey) return this.clearSelection();
-        var same = state.selectedKey === caseKey;
-        state.selectedKey = caseKey;
+        var same = state.selectedKeys.length === 1 && state.selectedKeys[0] === caseKey;
+        state.selectedKeys = [caseKey];
         if (!same) {
           state.comparison = null;
           bump();
         }
         return { ok: true, caseKey: caseKey };
       },
+      toggle: function (caseKey, checked) {
+        if (state.disposed) return { ok: false, reason: 'The results dialog has closed.' };
+        if (!caseKey) return { ok: false };
+        var keys = state.selectedKeys.slice();
+        var at = keys.indexOf(caseKey);
+        var want = checked == null ? at < 0 : !!checked;
+        if (want && at < 0) keys.push(caseKey);
+        else if (!want && at >= 0) keys.splice(at, 1);
+        else return { ok: true, unchanged: true };
+        state.selectedKeys = keys;
+        state.comparison = null;
+        bump();
+        return { ok: true, caseKeys: keys.slice() };
+      },
       clearSelection: function () {
-        state.selectedKey = null;
+        state.selectedKeys = [];
         state.comparison = null;
         bump();
         return { ok: true };
@@ -620,10 +711,18 @@
       armFailure: function () { state.failNext = true; },
       beginCompare: function () {
         if (state.disposed) return { ok: false, reason: 'The results dialog has closed.' };
-        if (!state.selectedKey) return { ok: false, reason: 'Select an analyzed case first.' };
-        var found = caseInCatalog(state.catalog, state.selectedKey);
-        if (!found || found.analyzed === false) {
-          return { ok: false, reason: 'This row is outside the analyzed sample, so it cannot be omitted from the fit.' };
+        var keys = state.selectedKeys.slice();
+        if (!keys.length) return { ok: false, reason: 'Select an analyzed case first.' };
+        for (var s = 0; s < keys.length; s++) {
+          var found = caseInCatalog(state.catalog, keys[s]);
+          if (!found || found.analyzed === false) {
+            return {
+              ok: false,
+              reason: keys.length > 1
+                ? 'One of these rows is outside the analyzed sample, so the same model cannot omit them.'
+                : 'This row is outside the analyzed sample, so it cannot be omitted from the fit.'
+            };
+          }
         }
         if (state.catalog && state.catalog.mappingSafe === false) {
           return { ok: false, reason: state.catalog.mappingReason || 'This payload cannot map a case safely.' };
@@ -632,16 +731,18 @@
         var token = {
           ok: true,
           serial: state.serial,
-          caseKey: state.selectedKey,
+          caseKey: keys[0],
+          caseKeys: keys,
           analysisVersion: state.analysisVersion,
           specVersion: state.specVersion
         };
-        state.comparison = { status: 'loading', caseKey: token.caseKey, serial: token.serial, payload: null };
+        state.comparison = { status: 'loading', caseKey: token.caseKey, caseKeys: keys.slice(), serial: token.serial, payload: null };
         return token;
       },
       completeCompare: function (token, payload) {
         if (!token || state.disposed || token.serial !== state.serial) return { applied: false, reason: 'stale' };
-        if (token.caseKey !== state.selectedKey) return { applied: false, reason: 'stale' };
+        var tokenKeys = token.caseKeys || (token.caseKey ? [token.caseKey] : []);
+        if (keySignature(tokenKeys) !== keySignature(state.selectedKeys)) return { applied: false, reason: 'stale' };
         if (token.analysisVersion !== state.analysisVersion || token.specVersion !== state.specVersion) {
           return { applied: false, reason: 'stale' };
         }
@@ -672,7 +773,7 @@
           }
           var payload;
           try {
-            payload = buildComparison(spec, token.caseKey);
+            payload = buildComparison(spec, token.caseKeys || token.caseKey);
           } catch (err2) {
             payload = { status: 'error', reason: 'The refit failed. The original fit is unchanged.', retryable: true, detail: String(err2 && err2.message || err2) };
           }
@@ -712,6 +813,7 @@
     designRowFromInputs: designRowFromInputs,
     meanResponse: meanResponse,
     buildComparison: buildComparison,
+    casePhrase: casePhrase,
     createCaseSession: createCaseSession,
     caseInCatalog: caseInCatalog,
     formatCount: formatCount,

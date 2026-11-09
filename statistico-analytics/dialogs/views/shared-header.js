@@ -4718,9 +4718,11 @@ const StatisticoHeader = {
       const cap = 500;
       const display = rows.slice(0, cap);
       const rowKeys = isUsed ? (result.usedCaseKeys || []) : (result.caseKeys || []);
-      const selectedKey = this._caseTrace && typeof this._caseTrace.selectedKey === 'function'
-        ? this._caseTrace.selectedKey()
-        : null;
+      const selectedKeys = this._caseTrace && typeof this._caseTrace.selectedKeys === 'function'
+        ? this._caseTrace.selectedKeys()
+        : (this._caseTrace && typeof this._caseTrace.selectedKey === 'function' && this._caseTrace.selectedKey()
+          ? [this._caseTrace.selectedKey()]
+          : []);
       tbody.innerHTML = display.map((row, ri) => {
         const tds = row.map((v, ci) => {
           const role = columnRoles ? columnRoles[ci] : null;
@@ -4729,7 +4731,7 @@ const StatisticoHeader = {
           return `<td class="hdp-td${cls}">${val}</td>`;
         }).join('');
         const caseKey = rowKeys[ri] || '';
-        const selected = !!(caseKey && selectedKey && caseKey === selectedKey);
+        const selected = !!(caseKey && selectedKeys.indexOf(caseKey) >= 0);
         const attrs = caseKey
           ? ` data-case-key="${String(caseKey).replace(/"/g, '&quot;')}" tabindex="0" aria-selected="${selected ? 'true' : 'false'}"`
           : '';
@@ -4759,11 +4761,13 @@ const StatisticoHeader = {
   },
 
   syncCaseSelection() {
-    const selected = this._caseTrace && typeof this._caseTrace.selectedKey === 'function'
-      ? this._caseTrace.selectedKey()
-      : null;
+    const selectedKeys = this._caseTrace && typeof this._caseTrace.selectedKeys === 'function'
+      ? this._caseTrace.selectedKeys()
+      : (this._caseTrace && typeof this._caseTrace.selectedKey === 'function' && this._caseTrace.selectedKey()
+        ? [this._caseTrace.selectedKey()]
+        : []);
     document.querySelectorAll('#hdpTbody tr[data-case-key]').forEach((tr) => {
-      const on = !!(selected && tr.dataset.caseKey === selected);
+      const on = !!(tr.dataset.caseKey && selectedKeys.indexOf(tr.dataset.caseKey) >= 0);
       tr.classList.toggle('hdp-tr--selected', on);
       tr.setAttribute('aria-selected', on ? 'true' : 'false');
     });

@@ -27,10 +27,12 @@ materialize_tool() {
   fi
 }
 
-for name in pareto prepare publication-tables multivariable segmentation; do
+for name in pareto prepare publication-tables multivariable segmentation process-settings; do
   materialize_tool "$name"
 done
 
 test -f statistico-calculators/power-sample-size-calculator/PowerCalculator.html
 test -f statistico-analytics/dialogs/views/pareto/pareto-input.html
+test -f statistico-analytics/dialogs/views/process-settings/process-settings.html
+test -f statistico-analytics/dialogs/views/process-settings/process-settings-engine.js
 test -f statistico-analytics/taskpane/prepare/prepare-intent.js

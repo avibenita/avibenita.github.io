@@ -15,10 +15,10 @@
   var ols = typeof (root && root.computeOLS) === 'function' ? root.computeOLS : null;
   var columnsApi = root && root.StatisticoColumnType;
   if (!Trace || !ols || !columnsApi) {
-    var lib = require('../../src/shared/js/core/regression-compute.js');
+    var lib = require('../../../statistico-analytics/src/shared/js/core/regression-compute.js');
     ols = lib.computeOLS;
-    Trace = require('./regression-case-trace.js');
-    columnsApi = require('./column-type.js');
+    Trace = require('../../../statistico-analytics/dialogs/shared/regression-case-trace.js');
+    columnsApi = require('../../../statistico-analytics/dialogs/shared/column-type.js');
   }
   var api = factory(Trace, ols, columnsApi);
   if (typeof module === 'object' && module.exports) module.exports = api;

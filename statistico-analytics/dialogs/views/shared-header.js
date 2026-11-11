@@ -1021,6 +1021,7 @@ const StatisticoHeader = {
       'ps-overview': 'Overview',
       'ps-effects': 'Effects & Interactions',
       'ps-diagnostics': 'Diagnostics',
+      'ps-scatters': 'Predictor Scatters',
       'ps-profiler': 'Prediction Profiler',
       'ps-compare': 'Compare Settings',
       // Logistic regression views
@@ -2164,6 +2165,7 @@ const StatisticoHeader = {
               resultItem('overview', 'fa-chart-pie', 'Overview', 'Fitted response, sample, and specifications.'),
               resultItem('effects', 'fa-arrows-split-up-and-left', 'Effects & Interactions', 'Coefficients and interaction profiles.'),
               resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics', 'Observed versus fitted and residual checks.'),
+              resultItem('scatters', 'fa-chart-scatter', 'Predictor Scatters', 'Response versus every predictor, with scatter controls.'),
               resultItem('profiler', 'fa-sliders', 'Prediction Profiler', 'Move a setting and read the predicted response.'),
               resultItem('compare', 'fa-table-columns', 'Compare Settings', 'Current recipe and candidate on one scale.')
             ]
@@ -9399,6 +9401,8 @@ REPORT: [one polished paragraph suitable for a report]`;
       'regression-pred-scenario':    'Predictions — Scenario Engine',
       'regression-viz-partial':      'Visualization — Predictor Effects',
       'regression-viz-unique':       'Visualization — Unique Contribution',
+      'ps-scatters': 'Predictor Scatters',
+      'process-settings-ps-scatters': 'Predictor Scatters',
       'regression-diag-overview':    'Diagnostics — Overview',
       'regression-diag-plots':       'Diagnostics — Residual Plots',
       'regression-diag-influence':   'Diagnostics — Influence',
@@ -9527,6 +9531,8 @@ REPORT: [one polished paragraph suitable for a report]`;
         'Read the selected-predictor strip (β, standardised β, SE, t, p, 95% CI), the coefficient table (click a row to switch predictors), and the partial-effect chart (observed data, adjusted prediction line, 95% confidence band). Global fit metrics (R², RMSE) live on Predictions → Overview — interpret the effect of the chosen predictor here.',
       'regression-viz-unique':
         'Each small chart is a partial regression (added-variable) plot: the x-axis shows the predictor after removing the linear influence of all other predictors (e(x | others)), and the y-axis shows the outcome with the same adjustment (e(y | others)). The slope is exactly the multiple-regression coefficient for that predictor. Read whether the line is clearly tilted (unique contribution), whether it is flat (no effect after controlling), and whether points hug the line tightly or scatter widely (how much remains unexplained).',
+      'process-settings-ps-scatters':
+        'A grid of scatter plots, one for each predictor against the response. Shared controls set the axis window, curve fit, and axis transforms for every chart. The statistics on a card are that pair’s N, correlation, p-value, and R². Describe the clouds and the chosen fit, not the multiple-regression coefficients.',
       'regression-diag-overview':
         'Read the assumption verdict strip, the residual histogram with normal overlay, and the high-level test summary. Use this view to decide if the model is trustworthy before interpreting coefficients.',
       'regression-diag-plots':
@@ -9669,6 +9675,8 @@ REPORT: [one polished paragraph suitable for a report]`;
         'This is a partial-effect plot for one selected predictor: observed data, an adjusted prediction line (others at mean), and a 95% confidence band. The strip above shows that predictor\'s β, SE, t, p, and CI. Describe the slope, band width, and scatter — global R² / RMSE belong on Overview.',
       'regression-viz-unique':
         'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient. Describe slopes and scatter, not coefficients / SE / p-values.',
+      'process-settings-ps-scatters':
+        'This is a grid of raw scatters, one predictor against the response. Axis window, curve fit, and transforms apply to every chart. Describe each cloud and the fit on that card. Do not read these as partial-regression coefficients.',
       'regression-pred-overview':
         'This is an observed-vs-predicted scatter with overall fit metrics (RMSE, MAE, R^2). Describe the diagonal alignment, scatter, and any systematic curvature — not coefficient values.',
       'regression-pred-scenario':

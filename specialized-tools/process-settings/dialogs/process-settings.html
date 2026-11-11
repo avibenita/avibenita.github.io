@@ -20,6 +20,7 @@
   <script src="../../shared/regression-case-trace.js"></script>
   <script src="../../shared/regression-effect-plot.js"></script>
   <script src="process-settings-engine.js?v=20261109ps5"></script>
+  <script src="../../../../statistico-calculators/process-capability/cpk-math.js?v=20261111ps1"></script>
   <style>
     :root {
       --ps-mean: #0f766e;
@@ -198,6 +199,71 @@
     .ps-effect-outside.is-warn { color: var(--ps-warn); }
     .ps-effect-outside.is-bad { color: var(--ps-danger); }
     .ps-effect-assume { margin: 4px 0 0; font-size: 12px; line-height: 1.45; color: var(--text-muted, #9aabbd); }
+    .ps-projected { margin-top: 12px; }
+    .ps-projected-title {
+      display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
+      font-size: 13px; font-weight: 800; color: var(--accent-1, #7eb6ff);
+    }
+    .ps-cap-top {
+      display: grid; grid-template-columns: minmax(168px, 220px) minmax(0, 1fr);
+      gap: 10px; align-items: start;
+    }
+    .ps-cap-gauge {
+      border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 10px;
+      background: rgba(14, 20, 27, 0.35); padding: 4px 8px 8px; min-width: 0;
+    }
+    html[data-theme="light"] .ps-cap-gauge { background: #f8fafc; }
+    .ps-cap-gauge svg { display: block; width: 100%; height: auto; }
+    .ps-cap-legend {
+      list-style: none; margin: 2px 0 0; padding: 0;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px;
+    }
+    .ps-cap-legend li {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; font-weight: 700; color: var(--text-secondary, #cbd5e1); line-height: 1.2;
+    }
+    .ps-cap-legend i { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+    .ps-cap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .ps-cap-metric {
+      border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 8px;
+      padding: 8px 10px; background: rgba(14, 20, 27, 0.35); min-width: 0;
+    }
+    html[data-theme="light"] .ps-cap-metric { background: #f8fafc; }
+    .ps-cap-metric.is-primary { border-left: 3px solid #ea580c; background: rgba(234, 88, 12, 0.16); }
+    html[data-theme="light"] .ps-cap-metric.is-primary { background: rgba(234, 88, 12, 0.12); }
+    .ps-cap-metric.is-primary .ps-cap-value { font-size: 1.05rem; }
+    .ps-cap-label {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700; color: var(--text-muted, #9aabbd);
+    }
+    .ps-cap-value { margin-top: 2px; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .ps-cap-tip {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; border-radius: 50%; font-size: 9px; font-weight: 800;
+      color: rgba(226, 232, 240, 0.92); background: rgba(148, 163, 184, 0.18);
+      border: 1px solid rgba(148, 163, 184, 0.35); cursor: help; position: relative; flex: 0 0 auto;
+    }
+    .ps-cap-tip::after {
+      content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 8px);
+      width: 220px; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid rgba(120, 200, 255, 0.28); background: #0b1b33;
+      color: #eaf2ff; font-size: 11px; font-weight: 600; line-height: 1.35;
+      white-space: normal; opacity: 0; pointer-events: none; z-index: 40;
+    }
+    .ps-cap-tip:hover::after, .ps-cap-tip:focus-visible::after { opacity: 1; }
+    html[data-theme="light"] .ps-cap-tip { color: #1e3a5f; background: #e8f1fb; border-color: #93c5fd; }
+    html[data-theme="light"] .ps-cap-tip::after { background: #fff; color: #1f2937; border-color: #93c5fd; }
+    .ps-cap-rating {
+      display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px;
+      font-size: 11px; font-weight: 800; vertical-align: 1px;
+    }
+    .ps-cap-rating.rating-excellent { background: #16a34a; color: #fff; }
+    .ps-cap-rating.rating-good { background: #0284c7; color: #fff; }
+    .ps-cap-rating.rating-adequate { background: #eab308; color: #1f2937; }
+    .ps-cap-rating.rating-poor { background: #ea580c; color: #fff; }
+    .ps-cap-rating.rating-inadequate { background: #dc2626; color: #fff; }
+    .ps-cap-note { margin: 8px 0 0; font-size: 12px; line-height: 1.45; color: var(--text-muted, #9aabbd); }
+    @media (max-width: 720px) { .ps-cap-top { grid-template-columns: 1fr; } }
     .ps-effect-scale svg { width: 100%; height: auto; display: block; }
     .ps-effect-recipe { margin: 8px 0 0; font-size: 13px; color: var(--text-secondary, #cbd5e1); }
     .ps-effect-recipe span { margin-left: 10px; color: var(--text-muted, #9aabbd); }
@@ -1915,6 +1981,160 @@
     return '<svg class="effect-scale" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(aria) + '">' + body + '</svg>';
   }
 
+  function fixedDigits(value, digits) {
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    return toFixed.call(value, digits);
+  }
+
+  function capabilityRating(cpk) {
+    if (window.CpkMath) return window.CpkMath.rating(cpk);
+    if (cpk >= 2) return { text: 'Excellent', className: 'rating-excellent' };
+    if (cpk >= 1.67) return { text: 'Good', className: 'rating-good' };
+    if (cpk >= 1.33) return { text: 'Adequate', className: 'rating-adequate' };
+    if (cpk >= 1) return { text: 'Poor', className: 'rating-poor' };
+    return { text: 'Inadequate', className: 'rating-inadequate' };
+  }
+
+  function analyzeCapability(lsl, usl, mean, sd, target) {
+    if (window.CpkMath) {
+      return window.CpkMath.analyze({
+        lsl: lsl,
+        usl: usl,
+        mean: mean,
+        sd: sd,
+        target: target == null ? '' : target
+      });
+    }
+    var hasTarget = target != null && Number.isFinite(Number(target));
+    var targetValue = hasTarget ? Number(target) : (lsl + usl) / 2;
+    var cp = (usl - lsl) / (6 * sd);
+    var cpu = (usl - mean) / (3 * sd);
+    var cpl = (mean - lsl) / (3 * sd);
+    var cpk = Math.min(cpu, cpl);
+    var shift = mean - targetValue;
+    var cpm = (usl - lsl) / (6 * Math.sqrt(sd * sd + shift * shift));
+    return {
+      ok: true,
+      cp: cp,
+      cpu: cpu,
+      cpl: cpl,
+      cpk: cpk,
+      cpm: cpm,
+      hasTarget: hasTarget,
+      target: targetValue,
+      rating: capabilityRating(cpk)
+    };
+  }
+
+  function cpkGaugeSvg(cpk) {
+    var light = document.documentElement.getAttribute('data-theme') === 'light';
+    var ink = light ? '#1f2937' : '#e8eef8';
+    var muted = light ? '#4b5563' : 'rgba(232,238,248,0.78)';
+    var tickInk = light ? '#334155' : 'rgba(255,255,255,0.72)';
+    var scaleMax = 3;
+    var cx = 120;
+    var cy = 92;
+    var r = 68;
+    function arcPoint(deg) {
+      var rad = deg * Math.PI / 180;
+      return [cx + r * Math.cos(rad), cy - r * Math.sin(rad)];
+    }
+    function arcPath(startDeg, endDeg) {
+      var sRad = startDeg * Math.PI / 180;
+      var eRad = endDeg * Math.PI / 180;
+      var sx = cx + r * Math.cos(sRad);
+      var sy = cy - r * Math.sin(sRad);
+      var ex = cx + r * Math.cos(eRad);
+      var ey = cy - r * Math.sin(eRad);
+      var large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+      return 'M ' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + ex.toFixed(2) + ' ' + ey.toFixed(2);
+    }
+    function valueAngle(value) {
+      var clamped = Math.max(0, Math.min(scaleMax, value));
+      return 180 - (clamped / scaleMax) * 180;
+    }
+    var body = '';
+    [[0, 1, '#dc2626'], [1, 1.33, '#ea580c'], [1.33, 1.67, '#eab308'], [1.67, 2, '#0284c7'], [2, 3, '#16a34a']].forEach(function (zone) {
+      var a0 = Math.min(180, valueAngle(zone[0]) + 0.4);
+      var a1 = Math.max(0, valueAngle(zone[1]) - 0.4);
+      body += '<path d="' + arcPath(a0, a1) + '" fill="none" stroke="' + zone[2] + '" stroke-width="12" />';
+    });
+    [0, 1, 1.33, 1.67, 2, 3].forEach(function (tick) {
+      var ang = valueAngle(tick) * Math.PI / 180;
+      var cos = Math.cos(ang);
+      var sin = Math.sin(ang);
+      body += '<line x1="' + (cx + (r - 10) * cos).toFixed(2) + '" y1="' + (cy - (r - 10) * sin).toFixed(2) + '" x2="' + (cx + (r + 10) * cos).toFixed(2) + '" y2="' + (cy - (r + 10) * sin).toFixed(2) + '" stroke="' + tickInk + '" stroke-width="1.4" />';
+      if (tick === 1.67) return;
+      var labelAt = [cx + (r + 16) * cos, cy - (r + 16) * sin];
+      body += '<text x="' + labelAt[0].toFixed(2) + '" y="' + (labelAt[1] + 3).toFixed(2) + '" text-anchor="middle" fill="' + muted + '" font-size="9">' + tick + '</text>';
+    });
+    var needle = valueAngle(Math.max(0, cpk)) * Math.PI / 180;
+    var tip = [cx + (r - 16) * Math.cos(needle), cy - (r - 16) * Math.sin(needle)];
+    var gaugeColor = cpk >= 1.67 ? '#14b8a6' : (cpk >= 1.33 ? '#eab308' : (cpk >= 1 ? '#ea580c' : '#dc2626'));
+    body += '<line x1="' + cx + '" y1="' + cy + '" x2="' + tip[0].toFixed(2) + '" y2="' + tip[1].toFixed(2) + '" stroke="' + ink + '" stroke-width="2.5" stroke-linecap="round" />';
+    body += '<circle cx="' + cx + '" cy="' + cy + '" r="4.5" fill="' + gaugeColor + '" stroke="' + ink + '" stroke-width="1.5" />';
+    body += '<text x="' + cx + '" y="122" text-anchor="middle" fill="' + ink + '" font-size="16" font-weight="800">' + esc(fixedDigits(cpk, 2)) + '</text>';
+    return '<svg viewBox="0 -8 240 136" role="img" aria-label="Projected Cpk ' + esc(fixedDigits(cpk, 3)) + '">' + body + '</svg>';
+  }
+
+  function capMetric(label, value, tip, primary) {
+    return '<div class="ps-cap-metric' + (primary || '') + '"><div class="ps-cap-label">' + label +
+      ' <span class="ps-cap-tip" tabindex="0" data-tip="' + esc(tip) + '">i</span></div><div class="ps-cap-value">' + value + '</div></div>';
+  }
+
+  function projectedCapabilityHtml(view, card, sd, spread) {
+    if (!card || !card.available || !sd) return '';
+    var spec = view.spec || {};
+    var lsl = spec.lsl == null ? null : Number(spec.lsl);
+    var usl = spec.usl == null ? null : Number(spec.usl);
+    var hasLsl = lsl != null && Number.isFinite(lsl);
+    var hasUsl = usl != null && Number.isFinite(usl);
+    if (!hasLsl || !hasUsl || !(usl > lsl)) {
+      if (hasLsl || hasUsl) {
+        return '<p class="ps-cap-note">Projected Cp and Cpk need both a lower and an upper specification limit.</p>';
+      }
+      return '';
+    }
+    var result = analyzeCapability(lsl, usl, card.mean, sd, spec.target);
+    if (!result || !result.ok) return '';
+    var rating = result.rating || capabilityRating(result.cpk);
+    var tone = {
+      'rating-excellent': '#16a34a',
+      'rating-good': '#0284c7',
+      'rating-adequate': '#eab308',
+      'rating-poor': '#ea580c',
+      'rating-inadequate': '#dc2626'
+    }[rating.className] || '#ea580c';
+    var yieldPct = spread ? (1 - spread.total) * 100 : null;
+    var ppm = spread ? spread.total * 1000000 : null;
+    var midpoint = (lsl + usl) / 2;
+    var cpkValue = esc(fixedDigits(result.cpk, 3)) + ' <span class="ps-cap-rating ' + rating.className + '">' + esc(rating.text) + '</span>';
+    var grid = capMetric('Projected Cp', esc(fixedDigits(result.cp, 3)), 'Cp = (USL − LSL) / (6σ). With these limits and this residual standard deviation, Cp stays fixed as the settings move. It is the best Cpk if the mean is centered at the specification midpoint.', '') +
+      capMetric('Projected Cpk', cpkValue, 'Cpk = min(Cpu, Cpl). The gauge follows the predicted mean toward or away from the nearer specification limit.', ' is-primary" style="border-left-color:' + tone + ';background:color-mix(in srgb, ' + tone + ' 16%, transparent)') +
+      capMetric('Cpu', esc(fixedDigits(result.cpu, 3)), 'Cpu = (USL − mean) / (3σ). Room from the predicted mean to the upper limit.', '') +
+      capMetric('Cpl', esc(fixedDigits(result.cpl, 3)), 'Cpl = (mean − LSL) / (3σ). Room from the predicted mean to the lower limit.', '') +
+      capMetric('Cpm', esc(fixedDigits(result.cpm, 3)), 'Cpm = (USL − LSL) / (6 √(σ² + (mean − target)²)). Cpk rewards the specification midpoint. Cpm reflects distance from the target.', '') +
+      capMetric('Expected PPM', ppm == null ? '—' : esc(Math.round(ppm).toLocaleString()), 'Expected parts per million outside the limits, from the same normal curve as the shaded tails.', '') +
+      capMetric('Estimated yield', yieldPct == null ? '—' : esc(fixedDigits(yieldPct, 2) + '%'), 'Percentage of individual outputs expected inside the specification limits. It updates with the shaded tails.', '');
+    var note = 'Projected from the predicted mean and the residual standard deviation of ' + formatCoef(sd) + '. These are not a capability study of a stable process. ';
+    note += 'Projected Cp is the Cpk the model would reach if the mean sat at the specification midpoint, ' + formatCoef(midpoint) + '.';
+    if (spec.target != null && Number.isFinite(Number(spec.target)) && Math.abs(Number(spec.target) - midpoint) > 1e-9) {
+      note += ' The target is ' + formatCoef(Number(spec.target)) + ', so Cpm is not the same as that best Cpk.';
+    }
+    return '<section class="ps-projected" data-projected-cp="' + esc(String(result.cp)) + '" data-projected-cpk="' + esc(String(result.cpk)) + '" data-estimated-yield="' + (yieldPct == null ? '' : esc(String(yieldPct))) + '">' +
+      '<h3 class="ps-projected-title"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> Projected capability</h3>' +
+      '<div class="ps-cap-top"><div class="ps-cap-gauge">' + cpkGaugeSvg(result.cpk) +
+      '<ul class="ps-cap-legend" aria-label="Cpk scale">' +
+      '<li><i style="background:#dc2626"></i> &lt; 1.00 Inadequate</li>' +
+      '<li><i style="background:#ea580c"></i> 1.00–1.33 Poor</li>' +
+      '<li><i style="background:#eab308"></i> 1.33–1.67 Adequate</li>' +
+      '<li><i style="background:#0284c7"></i> 1.67–2.00 Good</li>' +
+      '<li><i style="background:#16a34a"></i> ≥ 2.00 Excellent</li>' +
+      '</ul></div><div class="ps-cap-grid">' + grid + '</div></div>' +
+      (spread ? ('<p class="ps-effect-outside is-' + (spread.total >= 0.05 ? 'bad' : (spread.total >= 0.005 ? 'warn' : 'ok')) + '">' + esc(outsideSpecPhrase(spread)) + '</p>') : '') +
+      '<p class="ps-cap-note">' + esc(note) + '</p></section>';
+  }
+
   function paintProfiler() {
     var view = session.read();
     var card = activeCard(view);
@@ -1941,8 +2161,9 @@
       var outsideTone = spread.total >= 0.05 ? 'bad' : (spread.total >= 0.005 ? 'warn' : 'ok');
       outsideLine = '<p class="ps-effect-outside is-' + outsideTone + '">' + esc(outsideSpecPhrase(spread)) + '</p>';
     }
+    var projected = projectedCapabilityHtml(view, card, sd, spread);
     var assumption = sd
-      ? '<p class="ps-effect-assume">The curve is the modeled spread of individual outputs at these settings, using the residual standard deviation and assuming approximately normal residuals with constant variance. The whisker below the axis is the uncertainty of the average. Estimated outside spec is not a measured Cp or Cpk.</p>'
+      ? '<p class="ps-effect-assume">The curve is the modeled spread of individual outputs at these settings, assuming approximately normal residuals with constant variance. The whisker below the axis is the uncertainty of the average. The curve, the projected indices, and estimated yield share that residual standard deviation.</p>'
       : '';
     var status = effectStatus(card, view.spec);
     var targetLine = targetDistancePhrase(card);
@@ -1964,7 +2185,8 @@
         (unit ? ('<span class="ps-effect-unit">' + esc(unit) + '</span>') : '') +
         '<span class="ps-effect-kicker">' + esc(kicker) + '</span></div>' +
         (ciLine ? ('<p class="ps-effect-ci">' + esc(ciLine) + '</p>') : '') +
-        '<div class="ps-effect-scale">' + effectSvg(view, card) + '</div>' + outsideLine + assumption + recipe + verdict + notes)
+        '<div class="ps-effect-scale">' + effectSvg(view, card) + '</div>' + projected +
+        (projected.indexOf('ps-projected') === -1 ? outsideLine : '') + assumption + recipe + verdict + notes)
       : ('<p class="ps-effect-ci">' + esc(view.withheldReason || 'Enter the remaining settings to predict.') + '</p>');
     if (el('effect-readout')) el('effect-readout').innerHTML = hero;
     el('withheld').hidden = view.phase !== 'withheld' && view.phase !== 'needs-input';

@@ -418,15 +418,24 @@
     #view-scatters .psc-btn { border: 1px solid var(--border, rgba(255,255,255,.09)); background: transparent; color: var(--text-secondary, #cbd5e1); border-radius: 8px; padding: 4px 8px; font: 700 12px/1.2 inherit; cursor: pointer; }
     #view-scatters .psc-btn.active { background: #5b6cff; border-color: #5b6cff; color: #fff; }
     #view-scatters .psc-eq, #view-scatters .psc-axis-note, #view-scatters .psc-card-eq { margin: 6px 0 0; font-size: 12px; color: var(--text-muted, #9aabbd); }
-    #view-scatters .psc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 12px; align-items: start; }
+    #view-scatters .psc-stage { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 12px; align-items: start; }
     #view-scatters .psc-card { min-width: 0; }
+    #view-scatters .psc-pick { border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 12px; background: rgba(14, 20, 27, 0.45); padding: 10px; display: flex; flex-direction: column; gap: 4px; }
+    html[data-theme="light"] #view-scatters .psc-pick { background: #f8fafc; }
+    #view-scatters .psc-pick-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 13px; font-weight: 800; color: var(--accent-1, #fb923c); }
+    #view-scatters .psc-radio { display: flex; align-items: center; gap: 8px; margin: 0; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-secondary, #cbd5e1); }
+    #view-scatters .psc-radio.is-on { background: rgba(91, 108, 255, 0.22); color: #fff; }
+    html[data-theme="light"] #view-scatters .psc-radio.is-on { background: rgba(91, 108, 255, 0.12); color: #1e293b; }
+    #view-scatters .psc-radio input { accent-color: #5b6cff; margin: 0; }
     #view-scatters .psc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 8px 10px 0; }
     #view-scatters .psc-stat { border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 8px; padding: 6px 8px; text-align: center; background: rgba(14, 20, 27, 0.28); }
     html[data-theme="light"] #view-scatters .psc-stat { background: #fff; }
     #view-scatters .psc-stat b { display: block; color: var(--accent-1, #fb923c); font-size: 14px; font-variant-numeric: tabular-nums; }
     #view-scatters .psc-stat span { font-size: 10px; color: var(--text-muted, #9aabbd); font-weight: 700; }
-    #view-scatters .psc-plot { height: 300px; }
-    @media (max-width: 980px) { #view-scatters .psc-controls { grid-template-columns: 1fr; } }
+    #view-scatters .psc-plot { height: 380px; }
+    @media (max-width: 980px) {
+      #view-scatters .psc-controls, #view-scatters .psc-stage { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -609,7 +618,7 @@
         <section id="view-scatters" class="ps-view" hidden aria-labelledby="scatters-title">
           <h2 id="scatters-title" class="ps-sr" tabindex="-1">Predictor Scatters</h2>
           <div class="psc-wrap">
-            <p class="psc-lead" id="pscLead">Each chart has its own axis window, curve fit, and transforms. Lines mark LSL, target, and USL. The band is the 95% confidence interval of the fitted curve.</p>
+            <p class="psc-lead" id="pscLead">One predictor at a time. Numeric predictors keep axis, fit, and transform controls. Lines mark LSL, target, and USL.</p>
             <div id="pscEmpty" hidden></div>
             <div id="pscBody">
               <div class="psc-grid" id="pscGrid"></div>
@@ -1679,6 +1688,10 @@ function pscDefaultCtrl() {
       const job = pscJob(index);
       if (!job) return;
       const ctrl = job.ctrl;
+      const categorical = !!job.categories;
+      const drawCtrl = categorical
+        ? { fit: 'none', xTransform: 'none', yTransform: 'none', axis: 'x', xMin: 0, xMax: 100, yMin: 0, yMax: 100 }
+        : ctrl;
       const themeLight = document.documentElement.getAttribute('data-theme') === 'light';
       const text = themeLight ? '#334155' : 'rgba(226,232,240,0.85)';
       const grid = themeLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.08)';
@@ -1686,13 +1699,13 @@ function pscDefaultCtrl() {
       const target = themeLight ? '#1d4ed8' : '#93c5fd';
       const fitColor = themeLight ? '#0f172a' : '#f8fafc';
       const rawSpec = pscRawSpec();
-      const levels = pscSpecLevels(ctrl);
-      const points = pscTransformed(job.raw, ctrl);
+      const levels = pscSpecLevels(drawCtrl);
+      const points = pscTransformed(job.raw, drawCtrl);
       job.xExt = pscExtent(points, 0);
       job.yExt = pscExtent(points, 1, [levels.lsl, levels.usl, levels.target]);
-      const visible = pscVisible(points, job.xExt, job.yExt, ctrl);
+      const visible = pscVisible(points, job.xExt, job.yExt, drawCtrl);
       const stats = pscPearson(visible);
-      const fit = pscFitLine(visible, ctrl.fit);
+      const fit = categorical ? { data: [], band: [], equation: null } : pscFitLine(visible, drawCtrl.fit);
       const statHost = document.getElementById('pscStats' + index);
       if (statHost) {
         statHost.innerHTML =
@@ -1702,9 +1715,12 @@ function pscDefaultCtrl() {
           '<div class="psc-stat"><b>' + pscFmt(stats.r2, 4) + '</b><span>R²</span></div>';
       }
       const eq = document.getElementById('pscEq' + index);
-      if (eq) eq.textContent = fit.equation ? ('Equation: ' + fit.equation) : 'Equation: —';
-      const xw = pscWindow(job.xExt, ctrl.xMin, ctrl.xMax);
-      const yw = pscWindow(job.yExt, ctrl.yMin, ctrl.yMax);
+      if (eq) {
+        eq.hidden = categorical;
+        eq.textContent = fit.equation ? ('Equation: ' + fit.equation) : 'Equation: —';
+      }
+      const xw = pscWindow(job.xExt, drawCtrl.xMin, drawCtrl.xMax);
+      const yw = pscWindow(job.yExt, drawCtrl.yMin, drawCtrl.yMax);
       const host = document.getElementById('pscChart' + index);
       pscPaintAxisLabels(index);
       if (!host || typeof Highcharts === 'undefined') return;
@@ -1718,7 +1734,7 @@ function pscDefaultCtrl() {
         const out = (rawSpec.lsl != null && pair[2] < rawSpec.lsl) || (rawSpec.usl != null && pair[2] > rawSpec.usl);
         (out ? outside : inside).push([pair[0], pair[1]]);
       });
-      const increasing = ctrl.yTransform !== 'inverse';
+      const increasing = drawCtrl.yTransform !== 'inverse';
       const plotLines = [];
       const plotBands = [];
       function addLimit(value, name, color, dash) {
@@ -1731,7 +1747,7 @@ function pscDefaultCtrl() {
       addLimit(levels.lsl, 'LSL', limit, 'Solid');
       addLimit(levels.usl, 'USL', limit, 'Solid');
       addLimit(levels.target, 'Target', target, 'ShortDash');
-      const monotone = ctrl.yTransform !== 'square';
+      const monotone = drawCtrl.yTransform !== 'square';
       if (monotone && levels.lsl != null) {
         plotBands.push(increasing
           ? { from: -1e9, to: levels.lsl, color: 'rgba(251,113,133,0.14)' }
@@ -1762,15 +1778,18 @@ function pscDefaultCtrl() {
         title: { text: null },
         credits: { enabled: false },
         legend: { itemStyle: { color: text, fontWeight: '600', fontSize: '11px' } },
-        xAxis: {
-          title: { text: pscAxisTitle(job.name, ctrl.xTransform), style: { color: text } },
-          categories: (job.categories && ctrl.xTransform === 'none') ? job.categories : undefined,
-          min: xw.min, max: xw.max,
-          gridLineColor: grid, lineColor: grid, tickColor: grid,
-          labels: { style: { color: text } }
-        },
+        xAxis: (function () {
+          var axis = {
+            title: { text: pscAxisTitle(job.name, drawCtrl.xTransform), style: { color: text } },
+            gridLineColor: grid, lineColor: grid, tickColor: grid,
+            labels: { style: { color: text } }
+          };
+          if (categorical) axis.categories = job.categories;
+          else { axis.min = xw.min; axis.max = xw.max; }
+          return axis;
+        })(),
         yAxis: {
-          title: { text: pscAxisTitle(job.yName, ctrl.yTransform), style: { color: text } },
+          title: { text: pscAxisTitle(job.yName, drawCtrl.yTransform), style: { color: text } },
           min: yw.min, max: yw.max,
           gridLineColor: grid,
           labels: { style: { color: text } },
@@ -1782,8 +1801,34 @@ function pscDefaultCtrl() {
       });
     }
 
-    function pscDrawJobs() {
-      (window._pscJobs || []).forEach(function (_job, index) { pscDrawJob(index); });
+    function pscRenderStage() {
+      const grid = document.getElementById('pscGrid');
+      const jobs = window._pscJobs || [];
+      if (!grid || !jobs.length) return;
+      let index = window._pscFocus || 0;
+      if (index < 0 || index >= jobs.length) index = 0;
+      window._pscFocus = index;
+      const job = jobs[index];
+      const radios = jobs.map(function (item, i) {
+        return '<label class="psc-radio' + (i === index ? ' is-on' : '') + '">' +
+          '<input type="radio" name="pscPredictor" ' + (i === index ? 'checked' : '') + ' onchange="pscSelectPredictor(' + i + ')"> ' +
+          '<span>' + esc(item.name) + '</span></label>';
+      }).join('');
+      grid.innerHTML =
+        '<div class="psc-stage">' +
+          '<article class="chart-panel psc-card">' +
+            '<div class="chart-panel-h"><i class="fa-solid fa-chart-scatter"></i> ' + esc(job.yName) + ' vs ' + esc(job.name) + '</div>' +
+            '<div class="psc-stats" id="pscStats' + index + '"></div>' +
+            (job.categories ? '' : '<p class="psc-card-eq" id="pscEq' + index + '">Equation: —</p>') +
+            '<div class="chart-panel-b"><div class="psc-plot" id="pscChart' + index + '"></div></div>' +
+            (job.categories ? '' : pscControlsHtml(index, job.ctrl)) +
+          '</article>' +
+          '<div class="psc-pick" role="radiogroup" aria-label="Predictors">' +
+            '<div class="psc-pick-title"><i class="fa-solid fa-list"></i> Predictors</div>' +
+            radios +
+          '</div>' +
+        '</div>';
+      pscDrawJob(index);
     }
 
     function renderPredictorScatters() {
@@ -1794,7 +1839,7 @@ function pscDefaultCtrl() {
       if (!grid) return;
       const pack = pscNumericJobs();
       if (lead) {
-        lead.textContent = 'Each chart plots ' + pack.yName + ' against one predictor and keeps its own controls. Lines mark LSL, target, and USL. The band is the 95% confidence interval of the fitted curve.';
+        lead.textContent = 'Choose one predictor for ' + pack.yName + '. Numeric predictors keep their own axis, fit, and transform controls. Lines mark LSL, target, and USL.';
       }
       if (!pack.jobs.length) {
         if (body) body.hidden = true;
@@ -1807,6 +1852,7 @@ function pscDefaultCtrl() {
       if (body) body.hidden = false;
       if (empty) empty.hidden = true;
       const previous = {};
+      const previousName = (window._pscJobs || [])[window._pscFocus || 0] && window._pscJobs[window._pscFocus || 0].name;
       (window._pscJobs || []).forEach(function (job) {
         if (job.chart) { try { job.chart.destroy(); } catch (_e) {} }
         if (job.ctrl) previous[job.name] = job.ctrl;
@@ -1814,16 +1860,18 @@ function pscDefaultCtrl() {
       window._pscJobs = pack.jobs.map(function (job) {
         return { name: job.name, raw: job.raw, categories: job.categories || null, yName: pack.yName, chart: null, ctrl: previous[job.name] || pscDefaultCtrl() };
       });
-      grid.innerHTML = window._pscJobs.map(function (job, index) {
-        return '<article class="chart-panel psc-card">' +
-          '<div class="chart-panel-h"><i class="fa-solid fa-chart-scatter"></i> ' + esc(pack.yName) + ' vs ' + esc(job.name) + '</div>' +
-          '<div class="psc-stats" id="pscStats' + index + '"></div>' +
-          '<p class="psc-card-eq" id="pscEq' + index + '">Equation: —</p>' +
-          '<div class="chart-panel-b"><div class="psc-plot" id="pscChart' + index + '"></div></div>' +
-          pscControlsHtml(index, job.ctrl) +
-          '</article>';
-      }).join('');
-      pscDrawJobs();
+      const focus = window._pscJobs.findIndex(function (job) { return job.name === previousName; });
+      window._pscFocus = focus >= 0 ? focus : 0;
+      pscRenderStage();
+    }
+
+    function pscSelectPredictor(index) {
+      if (index === window._pscFocus) return;
+      (window._pscJobs || []).forEach(function (job) {
+        if (job.chart) { try { job.chart.destroy(); } catch (_e) {} job.chart = null; }
+      });
+      window._pscFocus = index;
+      pscRenderStage();
     }
 
     function pscPreviewAxis(index, axis, which, value) {
@@ -1870,6 +1918,7 @@ function pscDefaultCtrl() {
     window.pscApplyFit = pscApplyFit;
     window.pscSetTransformAxis = pscSetTransformAxis;
     window.pscApplyTransform = pscApplyTransform;
+    window.pscSelectPredictor = pscSelectPredictor;
 
   function showView(view, options) {
     options = options || {};

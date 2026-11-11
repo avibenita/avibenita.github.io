@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261109ps" />
   <script src="../shared-config.js?v=20261109ps"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261111ps6"></script>
+  <script src="../shared-header.js?v=20261111ps7"></script>
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
   <script src="../../shared/column-type.js"></script>
   <script src="../../shared/regression-case-trace.js"></script>
@@ -22,6 +22,7 @@
   <script src="process-settings-engine.js?v=20261109ps5"></script>
   <script src="../../../../statistico-calculators/process-capability/cpk-math.js?v=20261111ps1"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <style>
     :root {
       --ps-mean: #0f766e;
@@ -401,10 +402,10 @@
       .ps-panels, .cards, .pred, .ps-grid, .ps-grid.cols-3, .metrics, .control .row { grid-template-columns: 1fr 1fr; }
       .metrics { grid-template-columns: 1fr 1fr; }
     }
-    #view-scatters:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-    #view-scatters .psc-wrap { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    #view-scatters:not([hidden]) { flex: 1; min-height: 0; overflow: auto; display: block; }
+    #view-scatters .psc-wrap { display: flex; flex-direction: column; gap: 10px; }
     #view-scatters .psc-lead { margin: 0; font-size: 13px; line-height: 1.45; color: var(--text-secondary, #cbd5e1); }
-    #view-scatters .psc-controls { display: grid; grid-template-columns: minmax(220px, 1.15fr) minmax(200px, 1fr) minmax(200px, 1fr); gap: 10px; }
+    #view-scatters .psc-controls { display: grid; grid-template-columns: minmax(180px, 1.15fr) minmax(160px, 1fr) minmax(170px, 1fr); gap: 8px; padding: 0 10px 10px; }
     #view-scatters .psc-panel { border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 10px; background: rgba(14, 20, 27, 0.45); padding: 8px 10px; }
     html[data-theme="light"] #view-scatters .psc-panel { background: #f8fafc; }
     #view-scatters .psc-panel-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--accent-1, #fb923c); }
@@ -417,15 +418,14 @@
     #view-scatters .psc-btn { border: 1px solid var(--border, rgba(255,255,255,.09)); background: transparent; color: var(--text-secondary, #cbd5e1); border-radius: 8px; padding: 4px 8px; font: 700 12px/1.2 inherit; cursor: pointer; }
     #view-scatters .psc-btn.active { background: #5b6cff; border-color: #5b6cff; color: #fff; }
     #view-scatters .psc-eq, #view-scatters .psc-axis-note, #view-scatters .psc-card-eq { margin: 6px 0 0; font-size: 12px; color: var(--text-muted, #9aabbd); }
-    #view-scatters .psc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; align-content: start; }
-    #view-scatters .psc-card { min-width: 0; cursor: pointer; }
-    #view-scatters .psc-card.is-focus { outline: 2px solid var(--accent-1, #fb923c); outline-offset: 1px; }
+    #view-scatters .psc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 12px; align-items: start; }
+    #view-scatters .psc-card { min-width: 0; }
     #view-scatters .psc-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 8px 10px 0; }
     #view-scatters .psc-stat { border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 8px; padding: 6px 8px; text-align: center; background: rgba(14, 20, 27, 0.28); }
     html[data-theme="light"] #view-scatters .psc-stat { background: #fff; }
     #view-scatters .psc-stat b { display: block; color: var(--accent-1, #fb923c); font-size: 14px; font-variant-numeric: tabular-nums; }
     #view-scatters .psc-stat span { font-size: 10px; color: var(--text-muted, #9aabbd); font-weight: 700; }
-    #view-scatters .psc-plot { height: 250px; }
+    #view-scatters .psc-plot { height: 300px; }
     @media (max-width: 980px) { #view-scatters .psc-controls { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -609,51 +609,9 @@
         <section id="view-scatters" class="ps-view" hidden aria-labelledby="scatters-title">
           <h2 id="scatters-title" class="ps-sr" tabindex="-1">Predictor Scatters</h2>
           <div class="psc-wrap">
-            <p class="psc-lead" id="pscLead">Each chart plots the response against one predictor. The controls apply to every chart.</p>
+            <p class="psc-lead" id="pscLead">Each chart has its own axis window, curve fit, and transforms. Lines mark LSL, target, and USL. The band is the 95% confidence interval of the fitted curve.</p>
             <div id="pscEmpty" hidden></div>
             <div id="pscBody">
-              <div class="psc-controls">
-                <div class="psc-panel">
-                  <div class="psc-panel-title"><i class="fa-solid fa-sliders"></i> Axis Controls</div>
-                  <div class="psc-axis-grid">
-                    <div class="psc-axis-row">
-                      <label class="psc-slider"><span class="psc-slider-head"><span>X Min</span><strong id="pscXMinVal">—</strong></span><input type="range" id="pscXMin" min="0" max="100" value="0" oninput="pscPreviewAxis('x','min', this.value)" onchange="pscCommitAxis()"></label>
-                      <label class="psc-slider"><span class="psc-slider-head"><span>X Max</span><strong id="pscXMaxVal">—</strong></span><input type="range" id="pscXMax" min="0" max="100" value="100" oninput="pscPreviewAxis('x','max', this.value)" onchange="pscCommitAxis()"></label>
-                    </div>
-                    <div class="psc-axis-row">
-                      <label class="psc-slider"><span class="psc-slider-head"><span>Y Min</span><strong id="pscYMinVal">—</strong></span><input type="range" id="pscYMin" min="0" max="100" value="0" oninput="pscPreviewAxis('y','min', this.value)" onchange="pscCommitAxis()"></label>
-                      <label class="psc-slider"><span class="psc-slider-head"><span>Y Max</span><strong id="pscYMaxVal">—</strong></span><input type="range" id="pscYMax" min="0" max="100" value="100" oninput="pscPreviewAxis('y','max', this.value)" onchange="pscCommitAxis()"></label>
-                    </div>
-                  </div>
-                  <p class="psc-axis-note" id="pscAxisNote">Values shown for the selected chart. The same window is applied to every predictor.</p>
-                </div>
-                <div class="psc-panel">
-                  <div class="psc-panel-title"><i class="fa-solid fa-wave-square"></i> Curve Fitting</div>
-                  <div class="psc-buttons">
-                    <button type="button" class="psc-btn active" id="psc-fit-none" onclick="pscApplyFit('none')">None</button>
-                    <button type="button" class="psc-btn" id="psc-fit-linear" onclick="pscApplyFit('linear')">Linear</button>
-                    <button type="button" class="psc-btn" id="psc-fit-polynomial" onclick="pscApplyFit('polynomial')">Polynomial</button>
-                    <button type="button" class="psc-btn" id="psc-fit-exponential" onclick="pscApplyFit('exponential')">Exponential</button>
-                    <button type="button" class="psc-btn" id="psc-fit-logarithmic" onclick="pscApplyFit('logarithmic')">Logarithmic</button>
-                    <button type="button" class="psc-btn" id="psc-fit-power" onclick="pscApplyFit('power')">Power</button>
-                  </div>
-                  <div class="psc-eq" id="pscEquation">Equation: —</div>
-                </div>
-                <div class="psc-panel">
-                  <div class="psc-panel-title"><i class="fa-solid fa-right-left"></i> Axis Transformations</div>
-                  <div class="psc-buttons" style="margin-bottom:8px;">
-                    <button type="button" class="psc-btn active" id="psc-axis-x" onclick="pscSetTransformAxis('x')">X-Axis</button>
-                    <button type="button" class="psc-btn" id="psc-axis-y" onclick="pscSetTransformAxis('y')">Y-Axis</button>
-                  </div>
-                  <div class="psc-buttons">
-                    <button type="button" class="psc-btn active" id="psc-transform-none" onclick="pscApplyTransform('none')">None</button>
-                    <button type="button" class="psc-btn" id="psc-transform-ln" onclick="pscApplyTransform('ln')">ln</button>
-                    <button type="button" class="psc-btn" id="psc-transform-inverse" onclick="pscApplyTransform('inverse')">1/x</button>
-                    <button type="button" class="psc-btn" id="psc-transform-sqrt" onclick="pscApplyTransform('sqrt')">√</button>
-                    <button type="button" class="psc-btn" id="psc-transform-square" onclick="pscApplyTransform('square')">x²</button>
-                  </div>
-                </div>
-              </div>
               <div class="psc-grid" id="pscGrid"></div>
             </div>
           </div>
@@ -1328,21 +1286,12 @@
     });
   }
 
-    function pscState() {
-      if (!window._psc) {
-        window._psc = {
-          fit: 'none',
-          xTransform: 'none',
-          yTransform: 'none',
-          axis: 'x',
-          xMin: 0,
-          xMax: 100,
-          yMin: 0,
-          yMax: 100,
-          focus: 0
-        };
-      }
-      return window._psc;
+function pscDefaultCtrl() {
+      return { fit: 'linear', xTransform: 'none', yTransform: 'none', axis: 'x', xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
+    }
+
+    function pscJob(index) {
+      return (window._pscJobs || [])[index] || null;
     }
 
     function pscTransformValue(value, type) {
@@ -1353,18 +1302,17 @@
       return value;
     }
 
-    function pscTransformed(raw) {
-      const state = pscState();
+    function pscTransformed(raw, ctrl) {
       const out = [];
       raw.forEach(function (pair) {
-        const x = pscTransformValue(pair[0], state.xTransform);
-        const y = pscTransformValue(pair[1], state.yTransform);
-        if (x != null && y != null && Number.isFinite(x) && Number.isFinite(y)) out.push([x, y]);
+        const x = pscTransformValue(pair[0], ctrl.xTransform);
+        const y = pscTransformValue(pair[1], ctrl.yTransform);
+        if (x != null && y != null && Number.isFinite(x) && Number.isFinite(y)) out.push([x, y, pair[1]]);
       });
       return out;
     }
 
-    function pscExtent(points, index) {
+    function pscExtent(points, index, extra) {
       let min = Infinity;
       let max = -Infinity;
       points.forEach(function (pair) {
@@ -1372,9 +1320,15 @@
         if (value < min) min = value;
         if (value > max) max = value;
       });
+      (extra || []).forEach(function (value) {
+        if (!Number.isFinite(value)) return;
+        if (value < min) min = value;
+        if (value > max) max = value;
+      });
       if (!Number.isFinite(min) || !Number.isFinite(max)) return { min: 0, max: 1 };
       if (max - min < 1e-9) { min -= 1; max += 1; }
-      return { min: min, max: max };
+      const pad = (max - min) * 0.08;
+      return { min: min - pad, max: max + pad };
     }
 
     function pscWindow(extent, minPct, maxPct) {
@@ -1386,13 +1340,31 @@
       };
     }
 
-    function pscVisible(points, xExt, yExt) {
-      const state = pscState();
-      const xw = pscWindow(xExt, state.xMin, state.xMax);
-      const yw = pscWindow(yExt, state.yMin, state.yMax);
+    function pscVisible(points, xExt, yExt, ctrl) {
+      const xw = pscWindow(xExt, ctrl.xMin, ctrl.xMax);
+      const yw = pscWindow(yExt, ctrl.yMin, ctrl.yMax);
       return points.filter(function (pair) {
         return pair[0] >= xw.min && pair[0] <= xw.max && pair[1] >= yw.min && pair[1] <= yw.max;
       });
+    }
+
+    function pscRawSpec() {
+      const spec = (session.read().spec) || {};
+      function num(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : null;
+      }
+      return { lsl: num(spec.lsl), usl: num(spec.usl), target: num(spec.target) };
+    }
+
+    function pscSpecLevels(ctrl) {
+      const spec = pscRawSpec();
+      function level(value) {
+        if (value == null) return null;
+        const t = pscTransformValue(value, ctrl.yTransform);
+        return (t != null && Number.isFinite(t)) ? t : null;
+      }
+      return { lsl: level(spec.lsl), usl: level(spec.usl), target: level(spec.target) };
     }
 
     function pscPearson(points) {
@@ -1454,95 +1426,141 @@
       return m.map(function (row) { return row[n]; });
     }
 
+    function pscDesignBand(rows, paramCount) {
+      const n = rows.length;
+      if (n < paramCount + 1) return null;
+      const xtx = [];
+      const xty = [];
+      for (let i = 0; i < paramCount; i++) {
+        xtx[i] = [];
+        xty[i] = 0;
+        for (let j = 0; j < paramCount; j++) xtx[i][j] = 0;
+      }
+      rows.forEach(function (row) {
+        for (let i = 0; i < paramCount; i++) {
+          xty[i] += row.c[i] * row.y;
+          for (let j = 0; j < paramCount; j++) xtx[i][j] += row.c[i] * row.c[j];
+        }
+      });
+      const coef = pscSolve(xtx.map(function (row) { return row.slice(); }), xty.slice());
+      if (!coef) return null;
+      const invCols = [];
+      for (let k = 0; k < paramCount; k++) {
+        const basis = new Array(paramCount).fill(0);
+        basis[k] = 1;
+        const col = pscSolve(xtx.map(function (row) { return row.slice(); }), basis);
+        if (!col) return null;
+        invCols.push(col);
+      }
+      let sse = 0;
+      rows.forEach(function (row) {
+        let yhat = 0;
+        for (let i = 0; i < paramCount; i++) yhat += coef[i] * row.c[i];
+        const err = row.y - yhat;
+        sse += err * err;
+      });
+      const df = n - paramCount;
+      if (df <= 0) return null;
+      const sigma = Math.sqrt(sse / df);
+      let tcrit = (typeof tInverse === 'function') ? tInverse(0.025, df) : 1.96;
+      if (!Number.isFinite(tcrit) || tcrit <= 0) tcrit = 1.96;
+      return {
+        coef: coef,
+        interval: function (c) {
+          let yhat = 0;
+          let quad = 0;
+          for (let i = 0; i < paramCount; i++) {
+            yhat += coef[i] * c[i];
+            for (let j = 0; j < paramCount; j++) quad += c[i] * invCols[j][i] * c[j];
+          }
+          if (!(quad > 0)) quad = 0;
+          const half = tcrit * sigma * Math.sqrt(quad);
+          return [yhat - half, yhat + half];
+        }
+      };
+    }
+
     function pscFitModel(points, type) {
       if (type === 'none' || points.length < 3) return null;
-      const xs = points.map(function (p) { return p[0]; });
-      const ys = points.map(function (p) { return p[1]; });
-      function linearOn(xVals, yVals) {
-        const n = xVals.length;
-        let sx = 0, sy = 0, sxx = 0, sxy = 0;
-        for (let i = 0; i < n; i++) {
-          sx += xVals[i]; sy += yVals[i]; sxx += xVals[i] * xVals[i]; sxy += xVals[i] * yVals[i];
-        }
-        const den = n * sxx - sx * sx;
-        if (Math.abs(den) < 1e-12) return null;
-        const b = (n * sxy - sx * sy) / den;
-        const a = (sy - b * sx) / n;
-        return { a: a, b: b };
+      function chartRows(select) {
+        const rows = [];
+        points.forEach(function (pair) {
+          const row = select(pair[0], pair[1]);
+          if (row) rows.push(row);
+        });
+        return rows;
+      }
+      function fromDesign(rows, paramCount, equation, designAt, toChart) {
+        const band = pscDesignBand(rows, paramCount);
+        if (!band) return null;
+        return {
+          equation: equation(band.coef),
+          predict: function (x) {
+            const c = designAt(x);
+            if (!c) return NaN;
+            let yhat = 0;
+            for (let i = 0; i < c.length; i++) yhat += band.coef[i] * c[i];
+            return toChart(yhat);
+          },
+          band: function (x) {
+            const c = designAt(x);
+            if (!c) return null;
+            const iv = band.interval(c);
+            const lo = toChart(iv[0]);
+            const hi = toChart(iv[1]);
+            if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+            return lo <= hi ? [lo, hi] : [hi, lo];
+          }
+        };
       }
       if (type === 'linear') {
-        const fit = linearOn(xs, ys);
-        if (!fit) return null;
-        return {
-          equation: 'y = ' + pscCoef(fit.a) + ' + ' + pscCoef(fit.b) + 'x',
-          predict: function (x) { return fit.a + fit.b * x; }
-        };
+        return fromDesign(chartRows(function (x, y) { return { c: [1, x], y: y }; }), 2, function (coef) {
+          return 'y = ' + pscCoef(coef[0]) + ' + ' + pscCoef(coef[1]) + 'x';
+        }, function (x) { return [1, x]; }, function (y) { return y; });
       }
       if (type === 'polynomial') {
-        let s1 = 0, s2 = 0, s3 = 0, s4 = 0, sy = 0, sxy = 0, sx2y = 0;
-        points.forEach(function (pair) {
-          const x = pair[0], y = pair[1], x2 = x * x;
-          s1 += x; s2 += x2; s3 += x2 * x; s4 += x2 * x2;
-          sy += y; sxy += x * y; sx2y += x2 * y;
-        });
-        const n = points.length;
-        const coef = pscSolve([[n, s1, s2], [s1, s2, s3], [s2, s3, s4]], [sy, sxy, sx2y]);
-        if (!coef) return null;
-        return {
-          equation: 'y = ' + pscCoef(coef[0]) + ' + ' + pscCoef(coef[1]) + 'x + ' + pscCoef(coef[2]) + 'x²',
-          predict: function (x) { return coef[0] + coef[1] * x + coef[2] * x * x; }
-        };
+        return fromDesign(chartRows(function (x, y) { return { c: [1, x, x * x], y: y }; }), 3, function (coef) {
+          return 'y = ' + pscCoef(coef[0]) + ' + ' + pscCoef(coef[1]) + 'x + ' + pscCoef(coef[2]) + 'x²';
+        }, function (x) { return [1, x, x * x]; }, function (y) { return y; });
       }
       if (type === 'logarithmic') {
-        const xVals = [], yVals = [];
-        points.forEach(function (pair) {
-          if (pair[0] > 0) { xVals.push(Math.log(pair[0])); yVals.push(pair[1]); }
-        });
-        const fit = linearOn(xVals, yVals);
-        if (!fit) return null;
-        return {
-          equation: 'y = ' + pscCoef(fit.a) + ' + ' + pscCoef(fit.b) + ' ln(x)',
-          predict: function (x) { return x > 0 ? fit.a + fit.b * Math.log(x) : NaN; }
-        };
+        return fromDesign(chartRows(function (x, y) {
+          return x > 0 ? { c: [1, Math.log(x)], y: y } : null;
+        }), 2, function (coef) {
+          return 'y = ' + pscCoef(coef[0]) + ' + ' + pscCoef(coef[1]) + ' ln(x)';
+        }, function (x) { return x > 0 ? [1, Math.log(x)] : null; }, function (y) { return y; });
       }
       if (type === 'exponential') {
-        const xVals = [], yVals = [];
-        points.forEach(function (pair) {
-          if (pair[1] > 0) { xVals.push(pair[0]); yVals.push(Math.log(pair[1])); }
-        });
-        const fit = linearOn(xVals, yVals);
-        if (!fit) return null;
-        return {
-          equation: 'y = ' + pscCoef(Math.exp(fit.a)) + ' e^(' + pscCoef(fit.b) + 'x)',
-          predict: function (x) { return Math.exp(fit.a + fit.b * x); }
-        };
+        return fromDesign(chartRows(function (x, y) {
+          return y > 0 ? { c: [1, x], y: Math.log(y) } : null;
+        }), 2, function (coef) {
+          return 'y = ' + pscCoef(Math.exp(coef[0])) + ' e^(' + pscCoef(coef[1]) + 'x)';
+        }, function (x) { return [1, x]; }, function (y) { return Math.exp(y); });
       }
       if (type === 'power') {
-        const xVals = [], yVals = [];
-        points.forEach(function (pair) {
-          if (pair[0] > 0 && pair[1] > 0) { xVals.push(Math.log(pair[0])); yVals.push(Math.log(pair[1])); }
-        });
-        const fit = linearOn(xVals, yVals);
-        if (!fit) return null;
-        return {
-          equation: 'y = ' + pscCoef(Math.exp(fit.a)) + ' x^(' + pscCoef(fit.b) + ')',
-          predict: function (x) { return x > 0 ? Math.exp(fit.a) * Math.pow(x, fit.b) : NaN; }
-        };
+        return fromDesign(chartRows(function (x, y) {
+          return (x > 0 && y > 0) ? { c: [1, Math.log(x)], y: Math.log(y) } : null;
+        }), 2, function (coef) {
+          return 'y = ' + pscCoef(Math.exp(coef[0])) + ' x^(' + pscCoef(coef[1]) + ')';
+        }, function (x) { return x > 0 ? [1, Math.log(x)] : null; }, function (y) { return Math.exp(y); });
       }
       return null;
     }
 
     function pscFitLine(points, type) {
       const model = pscFitModel(points, type);
-      if (!model) return { data: [], equation: null };
+      if (!model) return { data: [], band: [], equation: null };
       const extent = pscExtent(points, 0);
       const data = [];
+      const band = [];
       for (let i = 0; i <= 40; i++) {
         const x = extent.min + (extent.max - extent.min) * (i / 40);
         const y = model.predict(x);
+        const iv = model.band(x);
         if (Number.isFinite(y)) data.push([x, y]);
+        if (iv) band.push([x, iv[0], iv[1]]);
       }
-      return { data: data, equation: model.equation };
+      return { data: data, band: band, equation: model.equation };
     }
 
     function pscNumericJobs() {
@@ -1576,110 +1594,196 @@
       return { yName: yName, jobs: jobs };
     }
 
-    function pscSyncTransformButtons() {
-      const state = pscState();
-      const active = state.axis === 'x' ? state.xTransform : state.yTransform;
+    function pscAxisTitle(name, transform) {
+      if (transform === 'ln') return 'ln(' + name + ')';
+      if (transform === 'inverse') return '1/(' + name + ')';
+      if (transform === 'sqrt') return '√(' + name + ')';
+      if (transform === 'square') return name + '²';
+      return name;
+    }
+
+    function pscSyncCard(index) {
+      const job = pscJob(index);
+      if (!job) return;
+      const ctrl = job.ctrl;
+      const activeTransform = ctrl.axis === 'x' ? ctrl.xTransform : ctrl.yTransform;
       ['none', 'ln', 'inverse', 'sqrt', 'square'].forEach(function (type) {
-        const button = document.getElementById('psc-transform-' + type);
-        if (button) button.classList.toggle('active', type === active);
+        const button = document.getElementById('psc-' + index + '-transform-' + type);
+        if (button) button.classList.toggle('active', type === activeTransform);
       });
-      const xBtn = document.getElementById('psc-axis-x');
-      const yBtn = document.getElementById('psc-axis-y');
-      if (xBtn) xBtn.classList.toggle('active', state.axis === 'x');
-      if (yBtn) yBtn.classList.toggle('active', state.axis === 'y');
+      const xBtn = document.getElementById('psc-' + index + '-axis-x');
+      const yBtn = document.getElementById('psc-' + index + '-axis-y');
+      if (xBtn) xBtn.classList.toggle('active', ctrl.axis === 'x');
+      if (yBtn) yBtn.classList.toggle('active', ctrl.axis === 'y');
       ['none', 'linear', 'polynomial', 'exponential', 'logarithmic', 'power'].forEach(function (type) {
-        const button = document.getElementById('psc-fit-' + type);
-        if (button) button.classList.toggle('active', type === state.fit);
+        const button = document.getElementById('psc-' + index + '-fit-' + type);
+        if (button) button.classList.toggle('active', type === ctrl.fit);
       });
     }
 
-    function pscAxisLabel(job, axis, pct) {
-      if (!job) return '—';
-      const extent = axis === 'x' ? job.xExt : job.yExt;
-      const value = extent.min + (extent.max - extent.min) * (pct / 100);
-      return pscFmt(value, 2);
+    function pscAxisLabel(extent, pct) {
+      if (!extent) return '—';
+      return pscFmt(extent.min + (extent.max - extent.min) * (pct / 100), 2);
     }
 
-    function pscPaintAxisLabels() {
-      const state = pscState();
-      const job = (window._pscJobs || [])[state.focus] || (window._pscJobs || [])[0];
-      const note = document.getElementById('pscAxisNote');
-      if (note) {
-        note.textContent = job
-          ? ('Values shown for ' + job.name + '. The same window is applied to every predictor.')
-          : 'The same window is applied to every predictor.';
+    function pscPaintAxisLabels(index) {
+      const job = pscJob(index);
+      if (!job || !job.ctrl) return;
+      const ctrl = job.ctrl;
+      const map = [
+        ['pscXMinVal' + index, job.xExt, ctrl.xMin],
+        ['pscXMaxVal' + index, job.xExt, ctrl.xMax],
+        ['pscYMinVal' + index, job.yExt, ctrl.yMin],
+        ['pscYMaxVal' + index, job.yExt, ctrl.yMax]
+      ];
+      map.forEach(function (item) {
+        const node = document.getElementById(item[0]);
+        if (node) node.textContent = pscAxisLabel(item[1], item[2]);
+      });
+    }
+
+    function pscControlsHtml(index, ctrl) {
+      function fitBtn(type, label) {
+        return '<button type="button" class="psc-btn' + (ctrl.fit === type ? ' active' : '') + '" id="psc-' + index + '-fit-' + type + '" onclick="pscApplyFit(' + index + ', \'' + type + '\')">' + label + '</button>';
       }
-      const map = { xMin: ['pscXMinVal', 'x', state.xMin], xMax: ['pscXMaxVal', 'x', state.xMax], yMin: ['pscYMinVal', 'y', state.yMin], yMax: ['pscYMaxVal', 'y', state.yMax] };
-      Object.keys(map).forEach(function (key) {
-        const el = document.getElementById(map[key][0]);
-        if (el) el.textContent = pscAxisLabel(job, map[key][1], map[key][2]);
+      function axisBtn(axis, label) {
+        return '<button type="button" class="psc-btn' + (ctrl.axis === axis ? ' active' : '') + '" id="psc-' + index + '-axis-' + axis + '" onclick="pscSetTransformAxis(' + index + ', \'' + axis + '\')">' + label + '</button>';
+      }
+      function transformBtn(type, label) {
+        const active = (ctrl.axis === 'x' ? ctrl.xTransform : ctrl.yTransform) === type;
+        return '<button type="button" class="psc-btn' + (active ? ' active' : '') + '" id="psc-' + index + '-transform-' + type + '" onclick="pscApplyTransform(' + index + ', \'' + type + '\')">' + label + '</button>';
+      }
+      function slider(axis, which, value) {
+        const stem = axis === 'x' ? (which === 'min' ? 'pscXMin' : 'pscXMax') : (which === 'min' ? 'pscYMin' : 'pscYMax');
+        const id = stem + index;
+        const valId = stem + 'Val' + index;
+        const title = (axis === 'x' ? 'X ' : 'Y ') + (which === 'min' ? 'Min' : 'Max');
+        return '<label class="psc-slider"><span class="psc-slider-head"><span>' + title + '</span><strong id="' + valId + '">—</strong></span><input type="range" id="' + id + '" min="0" max="100" value="' + value + '" oninput="pscPreviewAxis(' + index + ', \'' + axis + '\', \'' + which + '\', this.value)" onchange="pscCommitAxis(' + index + ')"></label>';
+      }
+      return '<div class="psc-controls">' +
+        '<div class="psc-panel"><div class="psc-panel-title"><i class="fa-solid fa-sliders"></i> Axis Controls</div><div class="psc-axis-grid">' +
+          '<div class="psc-axis-row">' + slider('x', 'min', ctrl.xMin) + slider('x', 'max', ctrl.xMax) + '</div>' +
+          '<div class="psc-axis-row">' + slider('y', 'min', ctrl.yMin) + slider('y', 'max', ctrl.yMax) + '</div>' +
+        '</div></div>' +
+        '<div class="psc-panel"><div class="psc-panel-title"><i class="fa-solid fa-wave-square"></i> Curve Fitting</div><div class="psc-buttons">' +
+          fitBtn('none', 'None') + fitBtn('linear', 'Linear') + fitBtn('polynomial', 'Polynomial') +
+          fitBtn('exponential', 'Exponential') + fitBtn('logarithmic', 'Logarithmic') + fitBtn('power', 'Power') +
+        '</div></div>' +
+        '<div class="psc-panel"><div class="psc-panel-title"><i class="fa-solid fa-right-left"></i> Axis Transformations</div>' +
+          '<div class="psc-buttons" style="margin-bottom:8px;">' + axisBtn('x', 'X-Axis') + axisBtn('y', 'Y-Axis') + '</div>' +
+          '<div class="psc-buttons">' + transformBtn('none', 'None') + transformBtn('ln', 'ln') + transformBtn('inverse', '1/x') + transformBtn('sqrt', '√') + transformBtn('square', 'x²') + '</div>' +
+        '</div></div>';
+    }
+
+    function pscDrawJob(index) {
+      const job = pscJob(index);
+      if (!job) return;
+      const ctrl = job.ctrl;
+      const themeLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const text = themeLight ? '#334155' : 'rgba(226,232,240,0.85)';
+      const grid = themeLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.08)';
+      const limit = themeLight ? '#be123c' : '#fb7185';
+      const target = themeLight ? '#1d4ed8' : '#93c5fd';
+      const fitColor = themeLight ? '#0f172a' : '#f8fafc';
+      const rawSpec = pscRawSpec();
+      const levels = pscSpecLevels(ctrl);
+      const points = pscTransformed(job.raw, ctrl);
+      job.xExt = pscExtent(points, 0);
+      job.yExt = pscExtent(points, 1, [levels.lsl, levels.usl, levels.target]);
+      const visible = pscVisible(points, job.xExt, job.yExt, ctrl);
+      const stats = pscPearson(visible);
+      const fit = pscFitLine(visible, ctrl.fit);
+      const statHost = document.getElementById('pscStats' + index);
+      if (statHost) {
+        statHost.innerHTML =
+          '<div class="psc-stat"><b>' + stats.n + '</b><span>Observations</span></div>' +
+          '<div class="psc-stat"><b>' + pscFmt(stats.r, 4) + '</b><span>Correlation (R)</span></div>' +
+          '<div class="psc-stat"><b>' + pscFmtP(stats.p) + '</b><span>p-value</span></div>' +
+          '<div class="psc-stat"><b>' + pscFmt(stats.r2, 4) + '</b><span>R²</span></div>';
+      }
+      const eq = document.getElementById('pscEq' + index);
+      if (eq) eq.textContent = fit.equation ? ('Equation: ' + fit.equation) : 'Equation: —';
+      const xw = pscWindow(job.xExt, ctrl.xMin, ctrl.xMax);
+      const yw = pscWindow(job.yExt, ctrl.yMin, ctrl.yMax);
+      const host = document.getElementById('pscChart' + index);
+      pscPaintAxisLabels(index);
+      if (!host || typeof Highcharts === 'undefined') return;
+      if (job.chart) {
+        try { job.chart.destroy(); } catch (_e) {}
+      }
+      const hasLimits = rawSpec.lsl != null || rawSpec.usl != null;
+      const inside = [];
+      const outside = [];
+      visible.forEach(function (pair) {
+        const out = (rawSpec.lsl != null && pair[2] < rawSpec.lsl) || (rawSpec.usl != null && pair[2] > rawSpec.usl);
+        (out ? outside : inside).push([pair[0], pair[1]]);
+      });
+      const increasing = ctrl.yTransform !== 'inverse';
+      const plotLines = [];
+      const plotBands = [];
+      function addLimit(value, name, color, dash) {
+        if (value == null) return;
+        plotLines.push({
+          value: value, color: color, width: 1.5, dashStyle: dash, zIndex: 4,
+          label: { text: name, align: name === 'Target' ? 'right' : 'left', x: name === 'Target' ? -4 : 4, style: { color: color, fontSize: '10px', fontWeight: '700' } }
+        });
+      }
+      addLimit(levels.lsl, 'LSL', limit, 'Solid');
+      addLimit(levels.usl, 'USL', limit, 'Solid');
+      addLimit(levels.target, 'Target', target, 'ShortDash');
+      const monotone = ctrl.yTransform !== 'square';
+      if (monotone && levels.lsl != null) {
+        plotBands.push(increasing
+          ? { from: -1e9, to: levels.lsl, color: 'rgba(251,113,133,0.14)' }
+          : { from: levels.lsl, to: 1e9, color: 'rgba(251,113,133,0.14)' });
+      }
+      if (monotone && levels.usl != null) {
+        plotBands.push(increasing
+          ? { from: levels.usl, to: 1e9, color: 'rgba(251,113,133,0.14)' }
+          : { from: -1e9, to: levels.usl, color: 'rgba(251,113,133,0.14)' });
+      }
+      if (monotone && levels.lsl != null && levels.usl != null) {
+        plotBands.push({ from: Math.min(levels.lsl, levels.usl), to: Math.max(levels.lsl, levels.usl), color: 'rgba(134,239,172,0.10)' });
+      }
+      const series = [];
+      if (fit.band.length && Highcharts.seriesTypes && Highcharts.seriesTypes.arearange) {
+        series.push({ name: '95% band', type: 'arearange', data: fit.band, color: themeLight ? 'rgba(71,85,105,0.18)' : 'rgba(226,232,240,0.18)', lineWidth: 0, marker: { enabled: false }, zIndex: 0, enableMouseTracking: false });
+      } else if (fit.band.length) {
+        series.push({ name: '95% band', type: 'line', data: fit.band.map(function (row) { return [row[0], row[1]]; }), color: 'rgba(148,163,184,0.7)', dashStyle: 'ShortDot', marker: { enabled: false }, lineWidth: 1, zIndex: 0, showInLegend: true });
+        series.push({ name: '95% band', type: 'line', data: fit.band.map(function (row) { return [row[0], row[2]]; }), color: 'rgba(148,163,184,0.7)', dashStyle: 'ShortDot', marker: { enabled: false }, lineWidth: 1, zIndex: 0, showInLegend: false });
+      }
+      series.push({ name: 'Fit', type: 'line', data: fit.data, color: fitColor, marker: { enabled: false }, lineWidth: 2, zIndex: 2, showInLegend: fit.data.length > 0 });
+      series.push({ name: hasLimits ? 'In spec' : 'Observations', type: 'scatter', data: inside, color: 'rgba(255,165,120,0.9)', marker: { radius: inside.length > 400 ? 2 : 4 }, zIndex: 3 });
+      if (hasLimits && outside.length) {
+        series.push({ name: 'Outside spec', type: 'scatter', data: outside, color: limit, marker: { radius: outside.length > 400 ? 2 : 4 }, zIndex: 3 });
+      }
+      job.chart = Highcharts.chart(host, {
+        chart: { type: 'scatter', backgroundColor: 'transparent', animation: false, spacing: [8, 8, 8, 8] },
+        title: { text: null },
+        credits: { enabled: false },
+        legend: { itemStyle: { color: text, fontWeight: '600', fontSize: '11px' } },
+        xAxis: {
+          title: { text: pscAxisTitle(job.name, ctrl.xTransform), style: { color: text } },
+          categories: (job.categories && ctrl.xTransform === 'none') ? job.categories : undefined,
+          min: xw.min, max: xw.max,
+          gridLineColor: grid, lineColor: grid, tickColor: grid,
+          labels: { style: { color: text } }
+        },
+        yAxis: {
+          title: { text: pscAxisTitle(job.yName, ctrl.yTransform), style: { color: text } },
+          min: yw.min, max: yw.max,
+          gridLineColor: grid,
+          labels: { style: { color: text } },
+          plotLines: plotLines,
+          plotBands: plotBands
+        },
+        tooltip: { pointFormat: '<b>{point.x:.3f}</b>, {point.y:.3f}' },
+        series: series
       });
     }
 
     function pscDrawJobs() {
-      const state = pscState();
-      const themeLight = document.documentElement.getAttribute('data-theme') === 'light';
-      const text = themeLight ? '#334155' : 'rgba(226,232,240,0.85)';
-      const grid = themeLight ? 'rgba(15,23,42,0.08)' : 'rgba(255,255,255,0.08)';
-      let focusEquation = null;
-      (window._pscJobs || []).forEach(function (job, index) {
-        const points = pscTransformed(job.raw);
-        job.xExt = pscExtent(points, 0);
-        job.yExt = pscExtent(points, 1);
-        const visible = pscVisible(points, job.xExt, job.yExt);
-        const stats = pscPearson(visible);
-        const fit = pscFitLine(visible, state.fit);
-        if (index === state.focus) focusEquation = fit.equation;
-        const statHost = document.getElementById('pscStats' + index);
-        if (statHost) {
-          statHost.innerHTML =
-            '<div class="psc-stat"><b>' + stats.n + '</b><span>Observations</span></div>' +
-            '<div class="psc-stat"><b>' + pscFmt(stats.r, 4) + '</b><span>Correlation (R)</span></div>' +
-            '<div class="psc-stat"><b>' + pscFmtP(stats.p) + '</b><span>p-value</span></div>' +
-            '<div class="psc-stat"><b>' + pscFmt(stats.r2, 4) + '</b><span>R²</span></div>';
-        }
-        const eq = document.getElementById('pscEq' + index);
-        if (eq) eq.textContent = fit.equation ? ('Equation: ' + fit.equation) : 'Equation: —';
-        const xw = pscWindow(job.xExt, state.xMin, state.xMax);
-        const yw = pscWindow(job.yExt, state.yMin, state.yMax);
-        const host = document.getElementById('pscChart' + index);
-        if (!host || typeof Highcharts === 'undefined') return;
-        if (job.chart) {
-          try { job.chart.destroy(); } catch (_e) {}
-        }
-        job.chart = Highcharts.chart(host, {
-          chart: { type: 'scatter', backgroundColor: 'transparent', animation: false, spacing: [8, 8, 8, 8] },
-          title: { text: null },
-          credits: { enabled: false },
-          legend: { itemStyle: { color: text, fontWeight: '600', fontSize: '11px' } },
-          xAxis: {
-            title: { text: job.name, style: { color: text } },
-            categories: (job.categories && state.xTransform === 'none') ? job.categories : undefined,
-            min: xw.min, max: xw.max,
-            gridLineColor: grid, lineColor: grid, tickColor: grid,
-            labels: { style: { color: text } }
-          },
-          yAxis: {
-            title: { text: job.yName, style: { color: text } },
-            min: yw.min, max: yw.max,
-            gridLineColor: grid,
-            labels: { style: { color: text } }
-          },
-          tooltip: { pointFormat: '<b>{point.x:.3f}</b>, {point.y:.3f}' },
-          series: [
-            { name: 'Observations', type: 'scatter', data: visible, color: 'rgba(255,165,120,0.8)', marker: { radius: visible.length > 400 ? 2 : 4 } },
-            { name: 'Fit', type: 'line', data: fit.data, color: 'rgba(120,200,255,0.95)', marker: { enabled: false }, lineWidth: 2, showInLegend: fit.data.length > 0 }
-          ]
-        });
-      });
-      const eqLine = document.getElementById('pscEquation');
-      const focus = (window._pscJobs || [])[state.focus];
-      if (eqLine) {
-        eqLine.textContent = focusEquation
-          ? ('Equation (' + (focus ? focus.name : '') + '): ' + focusEquation)
-          : 'Equation: —';
-      }
-      pscPaintAxisLabels();
+      (window._pscJobs || []).forEach(function (_job, index) { pscDrawJob(index); });
     }
 
     function renderPredictorScatters() {
@@ -1690,77 +1794,75 @@
       if (!grid) return;
       const pack = pscNumericJobs();
       if (lead) {
-        lead.textContent = 'Each chart plots ' + pack.yName + ' against one predictor. Axis window, curve fit, and transforms apply to every chart.';
+        lead.textContent = 'Each chart plots ' + pack.yName + ' against one predictor and keeps its own controls. Lines mark LSL, target, and USL. The band is the 95% confidence interval of the fitted curve.';
       }
       if (!pack.jobs.length) {
         if (body) body.hidden = true;
         if (empty) {
           empty.hidden = false;
-          empty.innerHTML = '<p class="psc-lead">Predictor scatters need at least one numeric predictor in the fitted model.</p>';
+          empty.innerHTML = '<p class="psc-lead">Predictor scatters need at least one predictor in the fitted model.</p>';
         }
         return;
       }
       if (body) body.hidden = false;
       if (empty) empty.hidden = true;
+      const previous = {};
       (window._pscJobs || []).forEach(function (job) {
         if (job.chart) { try { job.chart.destroy(); } catch (_e) {} }
+        if (job.ctrl) previous[job.name] = job.ctrl;
       });
-      const state = pscState();
-      if (state.focus >= pack.jobs.length) state.focus = 0;
-      window._pscJobs = pack.jobs.map(function (job) { return { name: job.name, raw: job.raw, categories: job.categories || null, yName: pack.yName, chart: null }; });
+      window._pscJobs = pack.jobs.map(function (job) {
+        return { name: job.name, raw: job.raw, categories: job.categories || null, yName: pack.yName, chart: null, ctrl: previous[job.name] || pscDefaultCtrl() };
+      });
       grid.innerHTML = window._pscJobs.map(function (job, index) {
-        return '<article class="chart-panel psc-card' + (index === state.focus ? ' is-focus' : '') + '" data-psc="' + index + '">' +
+        return '<article class="chart-panel psc-card">' +
           '<div class="chart-panel-h"><i class="fa-solid fa-chart-scatter"></i> ' + esc(pack.yName) + ' vs ' + esc(job.name) + '</div>' +
           '<div class="psc-stats" id="pscStats' + index + '"></div>' +
           '<p class="psc-card-eq" id="pscEq' + index + '">Equation: —</p>' +
-          '<div class="chart-panel-b"><div class="psc-plot" id="pscChart' + index + '"></div></div></article>';
+          '<div class="chart-panel-b"><div class="psc-plot" id="pscChart' + index + '"></div></div>' +
+          pscControlsHtml(index, job.ctrl) +
+          '</article>';
       }).join('');
-      grid.querySelectorAll('.psc-card').forEach(function (card) {
-        card.addEventListener('click', function () {
-          const next = Number(card.getAttribute('data-psc')) || 0;
-          if (pscState().focus === next) return;
-          pscState().focus = next;
-          grid.querySelectorAll('.psc-card').forEach(function (node) {
-            node.classList.toggle('is-focus', node === card);
-          });
-          pscDrawJobs();
-        });
-      });
-      pscSyncTransformButtons();
       pscDrawJobs();
     }
 
-    function pscPreviewAxis(axis, which, value) {
-      const state = pscState();
+    function pscPreviewAxis(index, axis, which, value) {
+      const job = pscJob(index);
+      if (!job) return;
       const key = axis === 'x' ? (which === 'min' ? 'xMin' : 'xMax') : (which === 'min' ? 'yMin' : 'yMax');
-      state[key] = Number(value);
-      pscPaintAxisLabels();
+      job.ctrl[key] = Number(value);
+      pscPaintAxisLabels(index);
     }
 
-    function pscCommitAxis() {
-      pscDrawJobs();
+    function pscCommitAxis(index) {
+      pscDrawJob(index);
     }
 
-    function pscApplyFit(type) {
-      pscState().fit = type;
-      pscSyncTransformButtons();
-      pscDrawJobs();
+    function pscApplyFit(index, type) {
+      const job = pscJob(index);
+      if (!job) return;
+      job.ctrl.fit = type;
+      pscSyncCard(index);
+      pscDrawJob(index);
     }
 
-    function pscSetTransformAxis(axis) {
-      pscState().axis = axis === 'y' ? 'y' : 'x';
-      pscSyncTransformButtons();
+    function pscSetTransformAxis(index, axis) {
+      const job = pscJob(index);
+      if (!job) return;
+      job.ctrl.axis = axis === 'y' ? 'y' : 'x';
+      pscSyncCard(index);
     }
 
-    function pscApplyTransform(type) {
-      const state = pscState();
-      if (state.axis === 'y') state.yTransform = type;
-      else state.xTransform = type;
-      state.xMin = 0; state.xMax = 100; state.yMin = 0; state.yMax = 100;
-      ['pscXMin', 'pscYMin'].forEach(function (id) { const el = document.getElementById(id); if (el) el.value = '0'; });
-      ['pscXMax', 'pscYMax'].forEach(function (id) { const el = document.getElementById(id); if (el) el.value = '100'; });
-      pscSyncTransformButtons();
-      pscDrawJobs();
+    function pscApplyTransform(index, type) {
+      const job = pscJob(index);
+      if (!job) return;
+      if (job.ctrl.axis === 'y') job.ctrl.yTransform = type;
+      else job.ctrl.xTransform = type;
+      job.ctrl.xMin = 0; job.ctrl.xMax = 100; job.ctrl.yMin = 0; job.ctrl.yMax = 100;
+      ['pscXMin' + index, 'pscYMin' + index].forEach(function (id) { const node = document.getElementById(id); if (node) node.value = '0'; });
+      ['pscXMax' + index, 'pscYMax' + index].forEach(function (id) { const node = document.getElementById(id); if (node) node.value = '100'; });
+      pscSyncCard(index);
+      pscDrawJob(index);
     }
 
     window.pscPreviewAxis = pscPreviewAxis;

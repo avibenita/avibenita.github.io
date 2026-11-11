@@ -31,6 +31,7 @@
       --ps-ok: #047857;
       --ps-danger: #be123c;
       --ps-track: #e7eef5;
+      --ps-tail: rgba(190, 18, 60, .28);
     }
     html:not([data-theme="light"]) {
       --ps-mean: #5eead4;
@@ -42,6 +43,7 @@
       --ps-ok: #86efac;
       --ps-danger: #fb7185;
       --ps-track: rgba(0, 0, 0, .35);
+      --ps-tail: rgba(251, 113, 133, .38);
     }
     button, input, select { font: inherit; color: inherit; }
     button { cursor: pointer; }
@@ -191,6 +193,11 @@
     .ps-effect-kicker { font-size: 15px; font-weight: 650; color: var(--text-secondary, #cbd5e1); }
     .ps-effect-unit { font-size: 14px; font-weight: 650; color: var(--text-muted, #9aabbd); }
     .ps-effect-ci { margin: 4px 0 2px; font-size: 13px; color: var(--text-muted, #9aabbd); }
+    .ps-effect-outside { margin: 6px 0 0; font-size: 13px; font-weight: 750; }
+    .ps-effect-outside.is-ok { color: var(--ps-ok); }
+    .ps-effect-outside.is-warn { color: var(--ps-warn); }
+    .ps-effect-outside.is-bad { color: var(--ps-danger); }
+    .ps-effect-assume { margin: 4px 0 0; font-size: 12px; line-height: 1.45; color: var(--text-muted, #9aabbd); }
     .ps-effect-scale svg { width: 100%; height: auto; display: block; }
     .ps-effect-recipe { margin: 8px 0 0; font-size: 13px; color: var(--text-secondary, #cbd5e1); }
     .ps-effect-recipe span { margin-left: 10px; color: var(--text-muted, #9aabbd); }
@@ -1736,11 +1743,56 @@
     return ticks;
   }
 
+  function residualSd(view) {
+    var sd = view.model && Number(view.model.rmse);
+    return Number.isFinite(sd) && sd > 0 ? sd : null;
+  }
+
+  function stdNormCdf(z) {
+    var sign = z < 0 ? -1 : 1;
+    var x = Math.abs(z) / Math.SQRT2;
+    var a1 = 0.254829592;
+    var a2 = -0.284496736;
+    var a3 = 1.421413741;
+    var a4 = -1.453152027;
+    var a5 = 1.061405429;
+    var p = 0.3275911;
+    var t = 1 / (1 + p * x);
+    var y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    return 0.5 * (1 + sign * y);
+  }
+
+  function fmtPct(probability) {
+    var pct = probability * 100;
+    if (!Number.isFinite(pct) || pct < 0.05) return '<0.1%';
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    return toFixed.call(pct, pct >= 10 ? 0 : 1) + '%';
+  }
+
+  function outsideSpec(mean, sd, spec) {
+    if (!Number.isFinite(mean) || !Number.isFinite(sd) || sd <= 0) return null;
+    var below = spec.lsl == null ? 0 : stdNormCdf((Number(spec.lsl) - mean) / sd);
+    var above = spec.usl == null ? 0 : (1 - stdNormCdf((Number(spec.usl) - mean) / sd));
+    if (spec.lsl == null && spec.usl == null) return null;
+    return { below: below, above: above, total: below + above };
+  }
+
+  function outsideSpecPhrase(spread) {
+    if (!spread) return '';
+    var parts = [];
+    if (spread.below >= 0.0005) parts.push(fmtPct(spread.below) + ' below LSL');
+    if (spread.above >= 0.0005) parts.push(fmtPct(spread.above) + ' above USL');
+    var total = parts.length ? ('Estimated outside spec ' + fmtPct(spread.total)) : 'Estimated outside spec <0.1%';
+    return parts.length ? (total + ' · ' + parts.join(' · ')) : total;
+  }
+
   function effectScale(view, card) {
     var vals = [];
+    var sd = residualSd(view);
     if (card && card.available) {
       vals.push(card.mean);
       if (card.ci) { vals.push(card.ci[0]); vals.push(card.ci[1]); }
+      if (sd) { vals.push(card.mean - 3.5 * sd); vals.push(card.mean + 3.5 * sd); }
     }
     if (view.currentCard && view.currentCard.available) vals.push(view.currentCard.mean);
     ['lsl', 'usl', 'target'].forEach(function (key) {
@@ -1750,71 +1802,116 @@
     var lo = Math.min.apply(null, vals);
     var hi = Math.max.apply(null, vals);
     if (hi - lo < 1e-7) { lo -= 1; hi += 1; }
-    var pad = (hi - lo) * 0.12;
+    var pad = (hi - lo) * 0.08;
     return { min: lo - pad, max: hi + pad };
   }
 
   function effectSvg(view, card) {
     var scale = effectScale(view, card);
     if (!scale || !card || !card.available) return '';
+    var sd = residualSd(view);
     var width = 640;
-    var left = 18;
-    var plotW = width - 36;
+    var left = 16;
+    var plotW = width - 32;
     function xOf(value) {
       return left + ((Number(value) - scale.min) / (scale.max - scale.min)) * plotW;
     }
-    var showCurrent = !!(view.pin && view.currentCard && view.currentCard.available && Math.abs(view.currentCard.mean - card.mean) >= 0.005);
+    function round1(value) { return Math.round(value * 10) / 10; }
     var labels = [];
     function addLabel(value, text, color) {
       if (value == null || !Number.isFinite(Number(value))) return;
       var x = xOf(value);
-      var y = 16;
+      var y = 14;
       labels.forEach(function (prev) {
-        if (Math.abs(prev.x - x) < 64) y = Math.max(y, prev.y + 13);
+        if (Math.abs(prev.x - x) < 72) y = Math.max(y, prev.y + 13);
       });
-      var anchor = x < 46 ? 'start' : (x > width - 46 ? 'end' : 'middle');
+      var anchor = x < 48 ? 'start' : (x > width - 48 ? 'end' : 'middle');
       labels.push({ x: x, y: y, text: text, color: color, anchor: anchor, value: Number(value) });
     }
     addLabel(view.spec.lsl, 'LSL ' + formatCoef(Number(view.spec.lsl)), 'var(--ps-limit)');
     addLabel(view.spec.target, 'Target ' + formatCoef(Number(view.spec.target)), 'var(--ps-target)');
     addLabel(view.spec.usl, 'USL ' + formatCoef(Number(view.spec.usl)), 'var(--ps-limit)');
-    var labelBottom = 4;
+    var labelBottom = 8;
     labels.forEach(function (label) { labelBottom = Math.max(labelBottom, label.y); });
-    var trackTop = labels.length ? labelBottom + 8 : 12;
-    var trackH = showCurrent ? 64 : 48;
-    var meanY = trackTop + (showCurrent ? 22 : Math.round(trackH / 2));
-    var currentY = meanY + 20;
-    var trackBottom = trackTop + trackH;
-    var tickY = trackBottom + 16;
-    var height = tickY + 6;
-    var body = '<rect x="8" y="' + trackTop + '" width="' + (width - 16) + '" height="' + trackH + '" rx="8" fill="var(--ps-track)" />';
-    if (view.spec.lsl != null && view.spec.usl != null) {
-      var bandL = xOf(view.spec.lsl);
-      var bandR = xOf(view.spec.usl);
-      body += '<rect x="' + bandL + '" y="' + trackTop + '" width="' + Math.max(bandR - bandL, 0) + '" height="' + trackH + '" fill="var(--ps-ci)" />';
-    }
+    var curveTop = labelBottom + 8;
+    var curveH = 108;
+    var axisY = curveTop + curveH;
+    var tickY = axisY + 16;
+    var whiskerY = tickY + 22;
+    var height = card.ci ? whiskerY + 22 : tickY + 8;
+    var body = '';
     labels.forEach(function (label) {
       var x = xOf(label.value);
-      body += '<line x1="' + x + '" x2="' + x + '" y1="' + (label.y + 3) + '" y2="' + trackBottom + '" stroke="' + label.color + '" stroke-dasharray="4 3" />';
-      body += '<text x="' + label.x + '" y="' + label.y + '" fill="' + label.color + '" font-size="11" font-weight="700" text-anchor="' + label.anchor + '">' + esc(label.text) + '</text>';
+      body += '<line x1="' + round1(x) + '" x2="' + round1(x) + '" y1="' + (label.y + 3) + '" y2="' + axisY + '" stroke="' + label.color + '" stroke-dasharray="4 3" />';
+      body += '<text x="' + round1(label.x) + '" y="' + label.y + '" fill="' + label.color + '" font-size="11" font-weight="700" text-anchor="' + label.anchor + '">' + esc(label.text) + '</text>';
+    });
+    if (sd) {
+      var steps = 96;
+      var pts = [];
+      for (var i = 0; i <= steps; i++) {
+        var value = scale.min + (scale.max - scale.min) * (i / steps);
+        var z = (value - card.mean) / sd;
+        pts.push({ value: value, dens: Math.exp(-0.5 * z * z) });
+      }
+      pts.push({ value: card.mean, dens: 1 });
+      pts.sort(function (a, b) { return a.value - b.value; });
+      function at(value) {
+        var z = (value - card.mean) / sd;
+        return { value: value, dens: Math.exp(-0.5 * z * z) };
+      }
+      function yOfDens(dens) { return axisY - dens * curveH; }
+      function region(from, to) {
+        var slice = [];
+        if (pts[0].value > from) slice.push(at(from));
+        pts.forEach(function (point) {
+          if (point.value >= from && point.value <= to) slice.push(point);
+        });
+        if (!slice.length || slice[slice.length - 1].value < to) slice.push(at(to));
+        if (slice.length < 2) return '';
+        var d = 'M' + round1(xOf(slice[0].value)) + ' ' + axisY;
+        slice.forEach(function (point) {
+          d += ' L' + round1(xOf(point.value)) + ' ' + round1(yOfDens(point.dens));
+        });
+        d += ' L' + round1(xOf(slice[slice.length - 1].value)) + ' ' + axisY + ' Z';
+        return d;
+      }
+      var lo = scale.min;
+      var hi = scale.max;
+      var lsl = view.spec.lsl == null ? null : Number(view.spec.lsl);
+      var usl = view.spec.usl == null ? null : Number(view.spec.usl);
+      var inFrom = lsl == null ? lo : Math.max(lo, lsl);
+      var inTo = usl == null ? hi : Math.min(hi, usl);
+      if (inFrom < inTo) body += '<path d="' + region(inFrom, inTo) + '" fill="var(--ps-ci)" stroke="none" />';
+      if (lsl != null && lsl > lo) body += '<path d="' + region(lo, Math.min(hi, lsl)) + '" fill="var(--ps-tail)" stroke="none" />';
+      if (usl != null && usl < hi) body += '<path d="' + region(Math.max(lo, usl), hi) + '" fill="var(--ps-tail)" stroke="none" />';
+      var curve = pts.map(function (point, index) {
+        return (index ? 'L' : 'M') + round1(xOf(point.value)) + ' ' + round1(yOfDens(point.dens));
+      }).join(' ');
+      body += '<path d="' + curve + '" fill="none" stroke="var(--ps-mean)" stroke-width="2.2" stroke-linejoin="round" />';
+      var peak = at(card.mean);
+      body += '<circle cx="' + round1(xOf(card.mean)) + '" cy="' + round1(yOfDens(peak.dens)) + '" r="3.5" fill="var(--ps-mean)" />';
+    }
+    body += '<line x1="' + left + '" x2="' + (width - left) + '" y1="' + axisY + '" y2="' + axisY + '" stroke="currentColor" stroke-opacity="0.45" />';
+    body += '<circle cx="' + round1(xOf(card.mean)) + '" cy="' + axisY + '" r="4.5" fill="var(--ps-mean)" />';
+    niceTicks(scale.min, scale.max, 4).forEach(function (tick) {
+      body += '<text x="' + round1(xOf(tick)) + '" y="' + tickY + '" fill="currentColor" font-size="10" text-anchor="middle">' + esc(formatCoef(tick)) + '</text>';
     });
     if (card.ci) {
       var x1 = xOf(card.ci[0]);
       var x2 = xOf(card.ci[1]);
-      body += '<line x1="' + x1 + '" x2="' + x2 + '" y1="' + meanY + '" y2="' + meanY + '" stroke="var(--ps-mean)" stroke-width="3" stroke-linecap="round" />';
-      body += '<line x1="' + x1 + '" x2="' + x1 + '" y1="' + (meanY - 6) + '" y2="' + (meanY + 6) + '" stroke="var(--ps-mean)" stroke-width="2" />';
-      body += '<line x1="' + x2 + '" x2="' + x2 + '" y1="' + (meanY - 6) + '" y2="' + (meanY + 6) + '" stroke="var(--ps-mean)" stroke-width="2" />';
+      var pct = Math.round(view.confidence * 100);
+      body += '<line x1="' + round1(x1) + '" x2="' + round1(x2) + '" y1="' + whiskerY + '" y2="' + whiskerY + '" stroke="var(--ps-mean)" stroke-width="3" stroke-linecap="round" />';
+      body += '<line x1="' + round1(x1) + '" x2="' + round1(x1) + '" y1="' + (whiskerY - 6) + '" y2="' + (whiskerY + 6) + '" stroke="var(--ps-mean)" stroke-width="2" />';
+      body += '<line x1="' + round1(x2) + '" x2="' + round1(x2) + '" y1="' + (whiskerY - 6) + '" y2="' + (whiskerY + 6) + '" stroke="var(--ps-mean)" stroke-width="2" />';
+      var label = pct + '% confidence interval for the mean';
+      var labelX = Math.max(86, Math.min(width - 86, (x1 + x2) / 2));
+      body += '<text x="' + round1(labelX) + '" y="' + (whiskerY + 16) + '" fill="currentColor" font-size="11" text-anchor="middle">' + esc(label) + '</text>';
     }
-    body += '<circle cx="' + xOf(card.mean) + '" cy="' + meanY + '" r="6" fill="var(--ps-mean)" />';
-    if (showCurrent) {
-      body += '<circle cx="' + xOf(view.currentCard.mean) + '" cy="' + currentY + '" r="5" fill="none" stroke="currentColor" stroke-width="1.6" />';
-    }
-    niceTicks(scale.min, scale.max, 4).forEach(function (tick) {
-      body += '<text x="' + xOf(tick) + '" y="' + tickY + '" fill="currentColor" font-size="10" text-anchor="middle">' + esc(formatCoef(tick)) + '</text>';
-    });
-    var pct = Math.round(view.confidence * 100);
-    var aria = 'Predicted mean ' + fmtResponse(card.mean);
-    if (card.ci) aria += '. ' + pct + '% confidence interval ' + fmtResponse(card.ci[0]) + ' to ' + fmtResponse(card.ci[1]);
+    var aria = 'Predicted process output. Mean ' + fmtResponse(card.mean);
+    if (sd) aria += '. Residual standard deviation ' + formatCoef(sd);
+    if (card.ci) aria += '. ' + Math.round(view.confidence * 100) + '% confidence interval for the mean ' + fmtResponse(card.ci[0]) + ' to ' + fmtResponse(card.ci[1]);
+    var spread = outsideSpec(card.mean, sd, view.spec);
+    if (spread) aria += '. ' + outsideSpecPhrase(spread);
     return '<svg class="effect-scale" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="' + esc(aria) + '">' + body + '</svg>';
   }
 
@@ -1826,7 +1923,7 @@
     el('pin-btn').hidden = !!pinned || !card;
     var kicker = pinned ? 'Candidate mean' : (movedExplore ? 'Exploring' : 'Predicted mean');
     var unit = view.config.responseScale && view.config.responseScale.unit;
-    if (el('effect-title')) el('effect-title').textContent = 'Effect · ' + response;
+    if (el('effect-title')) el('effect-title').textContent = 'Predicted Process Output · ' + response;
     var notes = '';
     if (card && card.support && card.support.advisories && card.support.advisories.length) {
       notes += '<p class="warn">' + esc(card.support.advisories[0]) + ' ' + esc(card.support.caveat || '') + '</p>';
@@ -1834,11 +1931,19 @@
     if (card && card.rangeFlag) notes += '<p class="warn">' + esc(card.rangeFlag) + '</p>';
     var pct = Math.round(view.confidence * 100);
     var ciLine = '';
-    if (card && card.available) {
-      ciLine = card.ci
-        ? (pct + '% confidence interval for the mean ' + fmtResponse(card.ci[0]) + '–' + fmtResponse(card.ci[1]))
-        : (card.ciReason || (pct + '% confidence interval for the mean is unavailable'));
+    if (card && card.available && !card.ci) {
+      ciLine = card.ciReason || (pct + '% confidence interval for the mean is unavailable');
     }
+    var sd = residualSd(view);
+    var spread = card && card.available ? outsideSpec(card.mean, sd, view.spec) : null;
+    var outsideLine = '';
+    if (spread) {
+      var outsideTone = spread.total >= 0.05 ? 'bad' : (spread.total >= 0.005 ? 'warn' : 'ok');
+      outsideLine = '<p class="ps-effect-outside is-' + outsideTone + '">' + esc(outsideSpecPhrase(spread)) + '</p>';
+    }
+    var assumption = sd
+      ? '<p class="ps-effect-assume">The curve is the modeled spread of individual outputs at these settings, using the residual standard deviation and assuming approximately normal residuals with constant variance. The whisker below the axis is the uncertainty of the average. Estimated outside spec is not a measured Cp or Cpk.</p>'
+      : '';
     var status = effectStatus(card, view.spec);
     var targetLine = targetDistancePhrase(card);
     var verdict = '';
@@ -1858,7 +1963,8 @@
       ? ('<div class="ps-effect-hero"><span class="ps-effect-mean">' + esc(fmtResponse(card.mean)) + '</span>' +
         (unit ? ('<span class="ps-effect-unit">' + esc(unit) + '</span>') : '') +
         '<span class="ps-effect-kicker">' + esc(kicker) + '</span></div>' +
-        '<p class="ps-effect-ci">' + esc(ciLine) + '</p><div class="ps-effect-scale">' + effectSvg(view, card) + '</div>' + recipe + verdict + notes)
+        (ciLine ? ('<p class="ps-effect-ci">' + esc(ciLine) + '</p>') : '') +
+        '<div class="ps-effect-scale">' + effectSvg(view, card) + '</div>' + outsideLine + assumption + recipe + verdict + notes)
       : ('<p class="ps-effect-ci">' + esc(view.withheldReason || 'Enter the remaining settings to predict.') + '</p>');
     if (el('effect-readout')) el('effect-readout').innerHTML = hero;
     el('withheld').hidden = view.phase !== 'withheld' && view.phase !== 'needs-input';

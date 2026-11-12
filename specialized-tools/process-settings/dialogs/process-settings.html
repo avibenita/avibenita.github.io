@@ -22,7 +22,7 @@
   <script src="../../shared/regression-effect-plot.js"></script>
   <script src="../../shared/regression-predictor-contribution.js?v=20261112rfr1"></script>
   <script src="../../shared/regression-contribution.js?v=20261112rfr3"></script>
-  <script src="process-settings-engine.js?v=20261112ps14"></script>
+  <script src="process-settings-engine.js?v=20261112find1"></script>
   <script src="../../shared/regression-fit-report.js?v=20261112rfr3"></script>
   <script src="../../../../statistico-calculators/process-capability/cpk-math.js?v=20261111ps1"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
@@ -69,6 +69,30 @@
       #view-overview .ps-results-lead { align-items: flex-start; flex-direction: column; }
     }
     .ps-top { flex: 0 0 auto; }
+    .ps-find {
+      flex: 0 1 auto;
+      max-height: min(46vh, 440px);
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border, rgba(255,255,255,.12));
+      border-radius: 10px;
+      background: var(--surface-1, #242c37);
+    }
+    .ps-find[hidden] { display: none !important; }
+    .ps-find-head, .ps-find-goals, .ps-find-actions, .ps-find-factor-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+    .ps-find-head { justify-content: space-between; }
+    .ps-find-goals { margin: 0; padding: 0; border: 0; }
+    .ps-find-goals label, .ps-find-factor label { font-size: 13px; }
+    .ps-find-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+    .ps-find-factor { border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 8px; padding: 8px; }
+    .ps-find-range { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .ps-find-levels { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+    .ps-find-result { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+    .ps-find-result h3 { font-size: 13px; }
+    html[data-theme="light"] .ps-find { background: #fff; }
     .ps-cause-effect {
       flex: 1 1 auto;
       min-height: 0;
@@ -604,6 +628,7 @@
               <button type="button" class="ps-btn primary" id="pin-btn">Use these settings as current</button>
               <button type="button" class="ps-btn" id="edit-current" hidden>Edit current settings</button>
               <button type="button" class="ps-btn" id="reset-candidate" hidden>Reset candidate</button>
+              <button type="button" class="ps-btn" id="find-candidate">Find candidate settings</button>
               <label class="field" style="min-width:140px;">Use analyzed row
                 <select id="row-picker" aria-label="Use analyzed row"></select>
               </label>
@@ -619,6 +644,7 @@
             <p id="pin-status" class="status" role="status"></p>
             <p id="withheld" class="status error" hidden></p>
           </div>
+          <section id="find-panel" class="ps-find" hidden aria-labelledby="find-title"></section>
           <div class="ps-cause-effect">
             <article class="chart-panel ps-causes-card" aria-label="Causes">
               <div class="chart-panel-h">
@@ -669,6 +695,9 @@
   var lockedResponse = '';
   var selectedDiag = -1;
   var movedExplore = false;
+  var findResult = null;
+  var findRun = 0;
+  var findBusy = false;
   var assign = { response: '', numeric: [], categorical: [], roles: {}, units: {}, interactions: [] };
   var draggedName = '';
   var TITLES = {
@@ -717,6 +746,11 @@
     if (Math.abs(n) < 0.005) return '0.00';
     var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
     return (n > 0 ? '+' : '\u2212') + toFixed.call(Math.abs(n), 2);
+  }
+  function fmtYield(probability) {
+    if (!Number.isFinite(probability)) return 'Unavailable';
+    var toFixed = Number.prototype.__statisticoToFixedOriginal || Number.prototype.toFixed;
+    return toFixed.call(probability * 100, 2) + '%';
   }
   function fmtR2(value) {
     var n = Number(value);
@@ -3139,6 +3173,7 @@ function pscDefaultCtrl() {
     if (!view.profiles.length) {
       document.querySelectorAll('[data-chart]').forEach(function (slot) { slot.innerHTML = ''; });
     }
+    noteFindFreshness();
     document.querySelectorAll('#profiles [data-cand]').forEach(function (input) {
       if (document.activeElement === input) return;
       var name = input.getAttribute('data-cand');
@@ -3418,7 +3453,310 @@ function pscDefaultCtrl() {
   el('pick-range').addEventListener('click', function () { post('pickRange'); });
   el('refresh-data').addEventListener('click', function () { post('refreshData'); });
 
+  function settingText(view, name, value) {
+    var numeric = view.config.numeric.indexOf(name) >= 0;
+    var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
+    if (value == null || value === '') return '—';
+    return (numeric ? formatCoef(Number(value)) : String(value)) + unit;
+  }
+
+  function responseText(view, value) {
+    var unit = view.config.responseScale && view.config.responseScale.unit;
+    return fmtResponse(value) + (unit ? unit : '');
+  }
+
+  function findField(attr, name) {
+    var found = null;
+    var panel = el('find-panel');
+    if (!panel) return null;
+    panel.querySelectorAll('[' + attr + ']').forEach(function (node) {
+      if (node.getAttribute(attr) === name) found = node;
+    });
+    return found;
+  }
+
+  function noteFindFreshness() {
+    var panel = el('find-panel');
+    if (!panel || panel.hidden) return;
+    var view = session.read();
+    var note = el('find-yield-note');
+    var yieldInput = null;
+    panel.querySelectorAll('input[name="find-goal"]').forEach(function (input) {
+      if (input.value === 'yield') yieldInput = input;
+    });
+    if (note && view.yieldGoal) {
+      if (yieldInput) {
+        yieldInput.disabled = !view.yieldGoal.available;
+        if (!view.yieldGoal.available && yieldInput.checked) {
+          panel.querySelectorAll('input[name="find-goal"]').forEach(function (input) {
+            if (input.value === 'mean') input.checked = true;
+          });
+        }
+      }
+      note.textContent = view.yieldGoal.available ? '' : (view.yieldGoal.reason || '');
+    }
+    var apply = el('find-apply');
+    if (!apply || !findResult || findBusy) return;
+    var live = session.resultApplies(findResult);
+    apply.disabled = !live;
+    var message = el('find-message');
+    if (!live && message) message.textContent = 'The model or specifications changed. This result cannot be applied. Search again.';
+  }
+
+  function closeFindPanel() {
+    findRun += 1;
+    findBusy = false;
+    var panel = el('find-panel');
+    if (panel) panel.hidden = true;
+  }
+
+  function findFactorHtml(view, name, draft) {
+    var unit = view.config.units[name] ? (' (' + view.config.units[name] + ')') : '';
+    var lock = '<label><input type="checkbox" data-find-lock="' + esc(name) + '" /> Lock at ' + esc(settingText(view, name, draft[name])) + '</label>';
+    if (view.config.categorical.indexOf(name) >= 0) {
+      var levels = (view.limits[name] && view.limits[name].levels) || (view.observed.levels && view.observed.levels[name]) || [];
+      var checks = levels.map(function (level) {
+        return '<label><input type="checkbox" data-find-level="' + esc(name) + '" value="' + esc(level) + '" checked /> ' + esc(level) + '</label>';
+      }).join('');
+      return '<div class="ps-find-factor" data-find-factor="' + esc(name) + '"><div class="ps-find-factor-head"><strong>' + esc(name) + '</strong>' + lock + '</div><div class="ps-find-levels" data-find-choices="' + esc(name) + '">' + checks + '</div></div>';
+    }
+    var limit = view.limits[name] || { min: draft[name], max: draft[name] };
+    var span = Number(limit.max) - Number(limit.min);
+    var sliderStep = (span >= 10 && Math.abs(limit.min - Math.round(limit.min)) < 1e-9 && Math.abs(limit.max - Math.round(limit.max)) < 1e-9) ? '1' : 'any';
+    var hint = sliderStep === 'any'
+      ? 'Any value. The search treats this setting as continuous.'
+      : ('Any value, so the search is continuous. Enter ' + sliderStep + ' to use the profiler slider increment.');
+    return '<div class="ps-find-factor" data-find-factor="' + esc(name) + '"><div class="ps-find-factor-head"><strong>' + esc(name) + esc(unit) + '</strong>' + lock + '</div>' +
+      '<div class="ps-find-range" data-find-choices="' + esc(name) + '"><label class="field">Lower<input data-find-min="' + esc(name) + '" type="number" step="any" value="' + esc(numOrBlank(limit.min)) + '" /></label>' +
+      '<label class="field">Upper<input data-find-max="' + esc(name) + '" type="number" step="any" value="' + esc(numOrBlank(limit.max)) + '" /></label>' +
+      '<label class="field">Increment<input data-find-step="' + esc(name) + '" type="number" step="any" placeholder="Continuous" /></label></div>' +
+      '<p class="hint">' + esc(hint) + '</p></div>';
+  }
+
+  function renderFindPanel() {
+    var view = session.read();
+    var draft = view.pin ? (view.candidateDraft || {}) : (view.currentDraft || {});
+    var names = adjustableNames(view);
+    var fixed = [];
+    view.config.numeric.concat(view.config.categorical).forEach(function (name) {
+      if (view.config.roles[name] !== 'fixed') return;
+      fixed.push(name + ' ' + settingText(view, name, draft[name] == null ? view.currentDraft[name] : draft[name]));
+    });
+    var yieldGoal = view.yieldGoal || { available: false, reason: 'Fit the model before estimating in-spec yield.' };
+    el('find-panel').innerHTML =
+      '<div class="ps-find-head"><h2 id="find-title">Find candidate settings</h2><button type="button" class="ps-btn" id="find-close">Close</button></div>' +
+      '<fieldset class="ps-find-goals"><legend class="ps-sr">Goal</legend>' +
+      '<label><input type="radio" name="find-goal" value="mean" checked /> Maximize predicted response</label>' +
+      '<label><input type="radio" name="find-goal" value="yield"' + (yieldGoal.available ? '' : ' disabled') + ' /> Maximize estimated in-spec yield</label>' +
+      '</fieldset>' +
+      '<p id="find-yield-note" class="hint">' + (yieldGoal.available ? '' : esc(yieldGoal.reason)) + '</p>' +
+      (fixed.length ? ('<p class="hint">Held fixed: ' + esc(fixed.join(' · ')) + '</p>') : '') +
+      '<div class="ps-find-grid">' + names.map(function (name) { return findFactorHtml(view, name, draft); }).join('') + '</div>' +
+      '<div class="ps-find-actions"><button type="button" class="ps-btn primary" id="find-run">Find candidate</button></div>' +
+      '<p id="find-message" class="status" role="status"></p><div id="find-result"></div>';
+    findResult = null;
+    findBusy = false;
+  }
+
+  function syncFindLocks(name) {
+    var panel = el('find-panel');
+    var locked = false;
+    panel.querySelectorAll('[data-find-lock]').forEach(function (box) {
+      if (box.getAttribute('data-find-lock') === name) locked = box.checked;
+    });
+    panel.querySelectorAll('[data-find-choices]').forEach(function (group) {
+      if (group.getAttribute('data-find-choices') !== name) return;
+      group.querySelectorAll('input').forEach(function (input) { input.disabled = locked; });
+    });
+  }
+
+  function readFindRequest() {
+    var view = session.read();
+    var draft = view.pin ? (view.candidateDraft || {}) : (view.currentDraft || {});
+    var start = {};
+    view.config.numeric.concat(view.config.categorical).forEach(function (name) {
+      start[name] = draft[name];
+    });
+    var locks = {};
+    var ranges = {};
+    var levels = {};
+    var panel = el('find-panel');
+    panel.querySelectorAll('[data-find-lock]').forEach(function (box) {
+      if (!box.checked) return;
+      locks[box.getAttribute('data-find-lock')] = draft[box.getAttribute('data-find-lock')];
+    });
+    panel.querySelectorAll('[data-find-min]').forEach(function (input) {
+      var name = input.getAttribute('data-find-min');
+      if (Object.prototype.hasOwnProperty.call(locks, name)) return;
+      var maxInput = findField('data-find-max', name);
+      var stepInput = findField('data-find-step', name);
+      var range = { min: input.value, max: maxInput ? maxInput.value : input.value };
+      if (stepInput && String(stepInput.value).trim() !== '') range.step = stepInput.value;
+      ranges[name] = range;
+    });
+    panel.querySelectorAll('[data-find-level]').forEach(function (box) {
+      var name = box.getAttribute('data-find-level');
+      if (Object.prototype.hasOwnProperty.call(locks, name) || !box.checked) return;
+      if (!levels[name]) levels[name] = [];
+      levels[name].push(box.value);
+    });
+    panel.querySelectorAll('[data-find-level]').forEach(function (box) {
+      var name = box.getAttribute('data-find-level');
+      if (Object.prototype.hasOwnProperty.call(locks, name)) return;
+      if (!levels[name]) levels[name] = [];
+    });
+    var goalInput = panel.querySelector('input[name="find-goal"]:checked');
+    return { goal: goalInput ? goalInput.value : 'mean', start: start, locks: locks, ranges: ranges, levels: levels };
+  }
+
+  function recipeColumn(view, title, settings, card) {
+    var names = view.config.numeric.concat(view.config.categorical);
+    var changed = {};
+    if (findResult && findResult.changed) findResult.changed.forEach(function (row) { changed[row.name] = true; });
+    var rows = names.map(function (name) {
+      var mark = title.indexOf('Candidate') === 0 && changed[name] ? ' class="changed"' : '';
+      return '<tr' + mark + '><td>' + esc(name) + '</td><td>' + esc(settingText(view, name, settings ? settings[name] : null)) + '</td></tr>';
+    }).join('');
+    var mean = card && card.available ? responseText(view, card.mean) : 'Unavailable';
+    var ci = card && card.available ? intervalPhrase(card, view.spec) : '';
+    var yieldText = card && card.inSpec && card.inSpec.available ? fmtYield(card.inSpec.probability) : (card && card.inSpec ? card.inSpec.reason : '');
+    return '<div class="ps-panel"><h3>' + esc(title) + '</h3><p class="ps-pred">' + esc(mean) + '</p>' +
+      (ci ? ('<p class="hint">' + esc(ci) + '</p>') : '') +
+      (yieldText ? ('<p>Estimated in-spec yield ' + esc(yieldText) + '</p>') : '') +
+      '<table><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function renderFindResult(result) {
+    var view = session.read();
+    var host = el('find-result');
+    if (!host) return;
+    if (!result || result.ok === false) {
+      host.innerHTML = '';
+      return;
+    }
+    var delta = result.deltaText ? ('<p>Change in predicted response ' + esc(result.deltaText) + '</p>') : '';
+    var yieldDelta = Number.isFinite(result.yieldDelta)
+      ? ('<p>Change in estimated in-spec yield ' + esc(fmtSigned(result.yieldDelta * 100)) + ' percentage points</p>')
+      : '';
+    var warning = result.support && result.support.advisories && result.support.advisories.length
+      ? ('<p class="warn">' + esc(result.support.advisories[0]) + ' ' + esc(result.support.caveat || '') + '</p>')
+      : '';
+    var changed = (result.changed || []).map(function (row) {
+      return row.name + ' ' + row.fromText + ' → ' + row.toText;
+    }).join(' · ');
+    host.innerHTML =
+      (result.modeLabel ? ('<p><strong>' + esc(result.modeLabel) + '</strong></p>') : '') +
+      '<p>Goal: ' + esc(result.goalLabel) + '</p>' +
+      (changed ? ('<p>Changed inputs: ' + esc(changed) + '</p>') : '<p>Changed inputs: none</p>') +
+      delta + yieldDelta + warning +
+      '<div class="ps-find-result">' +
+      recipeColumn(view, 'Candidate for confirmation run', result.settings, result.card) +
+      recipeColumn(view, result.reference.label, result.reference.settings, result.reference.card) +
+      '</div>' +
+      '<div class="ps-find-actions"><button type="button" class="ps-btn primary" id="find-apply"' + (session.resultApplies(result) ? '' : ' disabled') + '>Apply as candidate</button></div>';
+  }
+
+  function runFind() {
+    var run = ++findRun;
+    var request = readFindRequest();
+    var stamp = JSON.stringify(session.searchStamp());
+    findBusy = true;
+    findResult = null;
+    var message = el('find-message');
+    var runButton = el('find-run');
+    if (message) {
+      message.textContent = 'Searching…';
+      message.className = 'status';
+    }
+    if (runButton) runButton.disabled = true;
+    if (el('find-result')) el('find-result').innerHTML = '';
+    setTimeout(function () {
+      if (run !== findRun) return;
+      var result = session.findCandidate(request);
+      findBusy = false;
+      if (runButton) runButton.disabled = false;
+      if (run !== findRun) return;
+      if (JSON.stringify(session.searchStamp()) !== stamp) {
+        findResult = null;
+        if (message) {
+          message.textContent = 'The model or specifications changed before the search finished. This result cannot be applied. Search again.';
+          message.className = 'status error';
+        }
+        return;
+      }
+      if (!result.ok) {
+        findResult = null;
+        if (message) {
+          message.textContent = result.error || 'No feasible candidate is inside the allowed settings.';
+          message.className = 'status error';
+        }
+        return;
+      }
+      findResult = result;
+      if (message) {
+        message.textContent = result.modeLabel || 'Candidate ready.';
+        message.className = 'status ok';
+      }
+      renderFindResult(result);
+    }, 0);
+  }
+
+  function applyFoundCandidate() {
+    if (!findResult || !session.resultApplies(findResult)) {
+      var message = el('find-message');
+      if (message) {
+        message.textContent = 'The model or specifications changed. This result cannot be applied. Search again.';
+        message.className = 'status error';
+      }
+      var apply = el('find-apply');
+      if (apply) apply.disabled = true;
+      return;
+    }
+    var settings = findResult.settings;
+    var pinned = !!session.read().pin;
+    if (pinned) session.setCandidate(settings);
+    else {
+      session.setCurrentSettings(settings);
+      movedExplore = true;
+    }
+    closeFindPanel();
+    profileStamp = '';
+    buildProfiler();
+    if (pinned) showView('compare', { focus: true });
+    else syncShell();
+  }
+
   el('profiler-edit-specs').addEventListener('click', openSpecifications);
+  el('find-candidate').addEventListener('click', function () {
+    var panel = el('find-panel');
+    if (!panel.hidden) {
+      closeFindPanel();
+      return;
+    }
+    renderFindPanel();
+    panel.hidden = false;
+  });
+  el('find-panel').addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target.closest('button') : event.target;
+    if (!target) return;
+    if (target.id === 'find-close') closeFindPanel();
+    if (target.id === 'find-run') runFind();
+    if (target.id === 'find-apply') applyFoundCandidate();
+  });
+  el('find-panel').addEventListener('change', function (event) {
+    var lock = event.target.getAttribute && event.target.getAttribute('data-find-lock');
+    if (lock) syncFindLocks(lock);
+    if (findResult && !findBusy) {
+      findResult = null;
+      var apply = el('find-apply');
+      if (apply) apply.disabled = true;
+      var message = el('find-message');
+      if (message) {
+        message.textContent = 'The search inputs changed. Search again before applying a candidate.';
+        message.className = 'status';
+      }
+    }
+  });
   el('pin-btn').addEventListener('click', function () {
     var pinned = session.pin();
     el('pin-status').textContent = pinned.ok ? 'These settings are the current recipe.' : pinned.error;

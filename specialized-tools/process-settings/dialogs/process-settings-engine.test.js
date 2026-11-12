@@ -446,3 +446,224 @@ describe('session identity', () => {
     expect(fitted.contributions.Missing).toBeUndefined();
   });
 });
+
+const fs = require('fs');
+const path = require('path');
+const zlib = require('zlib');
+
+function readZipEntry(file, entryName) {
+  const buf = fs.readFileSync(file);
+  let offset = 0;
+  while (offset + 30 < buf.length) {
+    if (buf.readUInt32LE(offset) !== 0x04034b50) break;
+    const method = buf.readUInt16LE(offset + 8);
+    const compSize = buf.readUInt32LE(offset + 18);
+    const nameLen = buf.readUInt16LE(offset + 26);
+    const extraLen = buf.readUInt16LE(offset + 28);
+    const name = buf.slice(offset + 30, offset + 30 + nameLen).toString('utf8');
+    const start = offset + 30 + nameLen + extraLen;
+    if (name === entryName) {
+      const data = buf.slice(start, start + compSize);
+      if (method === 0) return data.toString('utf8');
+      if (method === 8) return zlib.inflateRawSync(data).toString('utf8');
+      throw new Error('Unsupported zip method ' + method);
+    }
+    offset = start + compSize;
+  }
+  throw new Error('Missing ' + entryName);
+}
+
+function sharedStrings(xml) {
+  const strings = [];
+  const siRe = /<si>([\s\S]*?)<\/si>/g;
+  let match;
+  while ((match = siRe.exec(xml))) {
+    strings.push([...match[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(function (part) { return part[1]; }).join(''));
+  }
+  return strings;
+}
+
+function sheetRows(xml, strings) {
+  return [...xml.matchAll(/<row r="(\d+)"[^>]*>([\s\S]*?)<\/row>/g)].map(function (row) {
+    const map = {};
+    [...row[2].matchAll(/<c r="([A-Z]+)\d+"([^>]*)>(?:<v>([\s\S]*?)<\/v>)?/g)].forEach(function (cell) {
+      const text = /t="s"/.test(cell[2]);
+      map[cell[1]] = cell[3] == null ? '' : (text ? strings[Number(cell[3])] : Number(cell[3]));
+    });
+    return ['A', 'B', 'C', 'D', 'E'].map(function (col) { return map[col]; });
+  });
+}
+
+function waferSession() {
+  const file = path.join(__dirname, '../../../DataTesting/Statistico_Process_Settings_Test.xlsx');
+  const strings = sharedStrings(readZipEntry(file, 'xl/sharedStrings.xml'));
+  const rows = sheetRows(readZipEntry(file, 'xl/worksheets/sheet2.xml'), strings);
+  const session = Engine.createSession();
+  session.loadData({ headers: rows[0], rows: rows.slice(1), address: 'Wafer Runs!A1:E121' });
+  session.configure({
+    response: 'Wafer Yield (%)',
+    numeric: ['Temperature (°C)', 'Etch Time (s)'],
+    categorical: ['Recipe'],
+    roles: {
+      'Temperature (°C)': 'adjustable',
+      'Etch Time (s)': 'adjustable',
+      Recipe: 'adjustable'
+    },
+    units: { 'Temperature (°C)': '°C', 'Etch Time (s)': 's', Recipe: '' },
+    interactions: [],
+    responseScale: { kind: 'percent', unit: '%', min: 0, max: 100 },
+    includeIntercept: true
+  });
+  session.setOperatingLimits({
+    'Temperature (°C)': { min: 160, max: 200 },
+    'Etch Time (s)': { min: 45, max: 55 },
+    Recipe: { levels: ['Enhanced', 'Standard'] }
+  });
+  session.setSpecifications({ lsl: 72, usl: 86, target: 78 });
+  expect(session.finishFit(session.beginFit()).applied).toBe(true);
+  expect(session.read().model.n).toBe(120);
+  return session;
+}
+
+function percentText(probability) {
+  return (probability * 100).toFixed(2);
+}
+
+describe('find candidate settings', () => {
+  test('maximizes the predicted response and the in-spec yield on the wafer fit', () => {
+    const session = waferSession();
+    const start = {
+      'Temperature (°C)': 170,
+      'Etch Time (s)': 50,
+      Recipe: 'Standard'
+    };
+    const mean = session.findCandidate({ goal: 'mean', start: start });
+    expect(mean.ok).toBe(true);
+    expect(mean.mode).toBe('exact');
+    expect(mean.modeLabel).toBe('');
+    expect(mean.settings).toMatchObject({ 'Temperature (°C)': 200, 'Etch Time (s)': 55, Recipe: 'Enhanced' });
+    expect(Number(mean.card.mean.toFixed(2))).toBe(82.5);
+    expect(percentText(mean.card.inSpec.probability)).toBe('83.44');
+    expect(mean.reference.label).toBe('Starting settings');
+    expect(session.fitCount()).toBe(1);
+
+    const yieldSearch = session.findCandidate({ goal: 'yield', start: start });
+    expect(yieldSearch.ok).toBe(true);
+    expect(yieldSearch.mode).toBe('exact');
+    expect(Number(yieldSearch.card.mean.toFixed(2))).toBe(79);
+    expect(percentText(yieldSearch.card.inSpec.probability)).toBe('94.96');
+    expect(yieldSearch.card.inSpec.probability).toBeGreaterThan(mean.card.inSpec.probability);
+  });
+
+  test('honors locks and a 1 degree temperature increment', () => {
+    const session = waferSession();
+    const start = { 'Temperature (°C)': 170, 'Etch Time (s)': 50, Recipe: 'Enhanced' };
+    const continuous = session.findCandidate({
+      goal: 'yield',
+      start: start,
+      locks: { 'Etch Time (s)': 50, Recipe: 'Enhanced' }
+    });
+    expect(continuous.ok).toBe(true);
+    expect(continuous.mode).toBe('exact');
+    expect(continuous.settings['Etch Time (s)']).toBe(50);
+    expect(continuous.settings.Recipe).toBe('Enhanced');
+    expect(continuous.settings['Temperature (°C)']).toBeCloseTo(191.5419, 3);
+    expect(Number(continuous.card.mean.toFixed(2))).toBe(79);
+    expect(percentText(continuous.card.inSpec.probability)).toBe('94.96');
+
+    const stepped = session.findCandidate({
+      goal: 'yield',
+      start: start,
+      locks: { 'Etch Time (s)': 50, Recipe: 'Enhanced' },
+      ranges: { 'Temperature (°C)': { min: 160, max: 200, step: 1 } }
+    });
+    expect(stepped.settings['Temperature (°C)']).toBe(192);
+    const at191 = session.predict(Object.assign({}, stepped.settings, { 'Temperature (°C)': 191 }));
+    const at192 = session.predict(stepped.settings);
+    const spec = session.read().spec;
+    const sigma = session.read().model.rmse;
+    expect(Engine.inSpecProbability(at192.estimate, sigma, spec).probability)
+      .toBeGreaterThan(Engine.inSpecProbability(at191.estimate, sigma, spec).probability);
+    expect(stepped.card.mean).toBeCloseTo(at192.estimate, 10);
+    expect(stepped.card.inSpec.probability).toBeCloseTo(Engine.inSpecProbability(at192.estimate, sigma, spec).probability, 12);
+
+    session.setCurrentSettings(start);
+    expect(session.pin().ok).toBe(true);
+    session.setCandidate(stepped.settings);
+    const applied = session.read();
+    expect(applied.candidateCard.mean).toBeCloseTo(stepped.card.mean, 10);
+    expect(applied.candidateCard.inSpec.probability).toBeCloseTo(stepped.card.inSpec.probability, 12);
+    expect(applied.candidateCard.ci).toEqual(session.predict(stepped.settings).ci);
+  });
+
+  test('follows one-sided yield, explains a missing limit, and rejects an empty search', () => {
+    const session = waferSession();
+    const start = { 'Temperature (°C)': 180, 'Etch Time (s)': 50, Recipe: 'Standard' };
+    expect(session.setSpecifications({ lsl: 72, usl: null, target: null }).ok).toBe(true);
+    const lower = session.findCandidate({ goal: 'yield', start: start });
+    expect(lower.settings).toMatchObject({ 'Temperature (°C)': 200, 'Etch Time (s)': 55, Recipe: 'Enhanced' });
+
+    expect(session.setSpecifications({ lsl: null, usl: 86, target: null }).ok).toBe(true);
+    const upper = session.findCandidate({ goal: 'yield', start: start });
+    expect(upper.settings).toMatchObject({ 'Temperature (°C)': 160, 'Etch Time (s)': 45, Recipe: 'Standard' });
+    expect(upper.card.mean).toBeLessThan(lower.card.mean);
+
+    expect(session.setSpecifications({ lsl: null, usl: null, target: 78 }).ok).toBe(true);
+    const blocked = session.findCandidate({ goal: 'yield', start: start });
+    expect(blocked.ok).toBe(false);
+    expect(blocked.error).toMatch(/specification limit/);
+    const mean = session.findCandidate({ goal: 'mean', start: start });
+    expect(mean.ok).toBe(true);
+    expect(session.read().yieldGoal.available).toBe(false);
+
+    expect(session.setSpecifications({ lsl: 72, usl: 86, target: 78 }).ok).toBe(true);
+    const empty = session.findCandidate({ goal: 'mean', start: start, levels: { Recipe: [] } });
+    expect(empty.ok).toBe(false);
+    expect(empty.error).toMatch(/at least one Recipe level/);
+    const outside = session.findCandidate({
+      goal: 'mean',
+      start: start,
+      ranges: { 'Temperature (°C)': { min: 210, max: 220 } }
+    });
+    expect(outside.ok).toBe(false);
+    expect(outside.error).toMatch(/must stay inside/);
+  });
+
+  test('applies a candidate against the pinned recipe and drops a stale result', () => {
+    const session = waferSession();
+    const current = { 'Temperature (°C)': 170, 'Etch Time (s)': 50, Recipe: 'Standard' };
+    session.setCurrentSettings(current);
+    expect(session.pin().ok).toBe(true);
+    const found = session.findCandidate({ goal: 'mean', start: session.read().candidateDraft });
+    expect(found.reference.label).toBe('Current recipe');
+    expect(found.reference.settings).toMatchObject(current);
+    expect(session.resultApplies(found)).toBe(true);
+    session.setCandidate(found.settings);
+    const compared = session.read();
+    expect(compared.currentCard.mean).toBeCloseTo(found.reference.card.mean, 10);
+    expect(compared.candidateCard.mean).toBeCloseTo(found.card.mean, 10);
+    expect(compared.candidateCard.ci[0]).toBeCloseTo(found.card.ci[0], 10);
+    expect(compared.candidateCard.ci[1]).toBeCloseTo(found.card.ci[1], 10);
+
+    session.setSpecifications({ lsl: 70, usl: 90, target: 80 });
+    expect(session.resultApplies(found)).toBe(false);
+    const again = session.findCandidate({ goal: 'mean', start: current });
+    expect(session.resultApplies(again)).toBe(true);
+    session.finishFit(session.beginFit());
+    expect(session.resultApplies(again)).toBe(false);
+
+    const unpinned = Engine.createSession();
+    const demo = Engine.demoPreset();
+    unpinned.loadData(demo.table);
+    unpinned.configure(demo.config);
+    unpinned.setSpecifications(demo.specifications);
+    expect(unpinned.finishFit(unpinned.beginFit()).applied).toBe(true);
+    unpinned.setCurrentSettings(demo.current);
+    const starting = unpinned.findCandidate({ goal: 'mean', start: demo.current });
+    expect(starting.reference.label).toBe('Starting settings');
+    expect(starting.mode).toBe('exact');
+    unpinned.setCurrentSettings(starting.settings);
+    expect(unpinned.read().exploreCard.mean).toBeCloseTo(starting.card.mean, 10);
+    expect(unpinned.read().pin).toBeNull();
+  });
+});

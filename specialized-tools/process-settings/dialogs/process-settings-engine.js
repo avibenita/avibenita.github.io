@@ -252,6 +252,47 @@
     return '';
   }
 
+  // Standard normal CDF. The rational piece is the Abramowitz and Stegun 7.1.26 erf
+  // approximation; dividing by sqrt(2) turns erf into Φ.
+  function standardNormalCdf(z) {
+    if (!Number.isFinite(z)) return NaN;
+    var sign = z < 0 ? -1 : 1;
+    var ax = Math.abs(z) / Math.SQRT2;
+    var t = 1 / (1 + 0.3275911 * ax);
+    var y = 1 - (((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-ax * ax));
+    var p = 0.5 * (1 + sign * y);
+    if (p < 0) return 0;
+    if (p > 1) return 1;
+    return p;
+  }
+
+  function inSpecProbability(mean, sigma, spec) {
+    var src = spec || {};
+    var lsl = src.lsl != null && Number.isFinite(src.lsl) ? src.lsl : null;
+    var usl = src.usl != null && Number.isFinite(src.usl) ? src.usl : null;
+    if (!Number.isFinite(mean)) return { available: false, probability: null, reason: 'The fitted mean is unavailable.' };
+    if (!(Number(sigma) > 0)) {
+      return { available: false, probability: null, reason: 'Estimated in-spec yield needs a positive residual standard deviation.' };
+    }
+    if (lsl == null && usl == null) {
+      return { available: false, probability: null, reason: 'Add a lower or upper specification limit to estimate in-spec yield.' };
+    }
+    if (lsl != null && usl != null && !(lsl < usl)) {
+      return { available: false, probability: null, reason: 'The lower specification limit must be less than the upper specification limit.' };
+    }
+    var probability;
+    if (lsl != null && usl != null) {
+      probability = standardNormalCdf((usl - mean) / sigma) - standardNormalCdf((lsl - mean) / sigma);
+    } else if (lsl != null) {
+      probability = 1 - standardNormalCdf((lsl - mean) / sigma);
+    } else {
+      probability = standardNormalCdf((usl - mean) / sigma);
+    }
+    if (probability < 0) probability = 0;
+    if (probability > 1) probability = 1;
+    return { available: true, probability: probability, sigma: Number(sigma), reason: '' };
+  }
+
   function buildColumns(numeric, categoricalInfo, interactionInfo) {
     var columns = [];
     function push(spec) {
@@ -580,6 +621,7 @@
       configId: 0,
       pinSerial: 0,
       fitCount: 0,
+      searchRev: 0,
       table: { headers: [], rows: [], address: '' },
       config: normalizeConfig({}),
       spec: { lsl: null, usl: null, target: null },
@@ -601,6 +643,10 @@
       state.serial += 1;
     }
 
+    function touchSearch() {
+      state.searchRev += 1;
+    }
+
     function clearComparison() {
       state.pin = null;
       state.candidateDraft = {};
@@ -616,6 +662,7 @@
     function clearModel() {
       state.model = null;
       clearComparison();
+      touchSearch();
     }
 
     function refreshPreview() {
@@ -710,6 +757,7 @@
       });
       if (error) return { ok: false, error: error };
       state.limits = next;
+      touchSearch();
       if (state.pin && !boundsAllow(state.pin.settings).ok) clearComparison();
       return { ok: true };
     }
@@ -788,6 +836,7 @@
       }
       state.spec = next;
       state.specError = '';
+      touchSearch();
       return { ok: true };
     }
 
@@ -796,6 +845,7 @@
       if (!(value > 0 && value < 1)) return { ok: false, error: 'Choose a confidence level between 0 and 1.' };
       state.confidence = value;
       if (state.model && state.model.results) state.model.results.alpha = 1 - value;
+      touchSearch();
       return { ok: true };
     }
 
@@ -998,7 +1048,416 @@
         targetText: targetDelta == null ? '' : ('Difference from target: ' + withUnitPhrase(formatSignedTrim(targetDelta, 4), scale)),
         atTarget: targetDelta != null && Math.abs(targetDelta) <= EPS,
         support: support,
-        rangeFlag: rangeFlag(pred.estimate, scale)
+        rangeFlag: rangeFlag(pred.estimate, scale),
+        inSpec: inSpecProbability(pred.estimate, state.model.results.RMSE, state.spec)
+      };
+    }
+
+    function yieldAvailability() {
+      if (!state.model) return { available: false, reason: 'Fit the model before estimating in-spec yield.', sigma: null };
+      var info = inSpecProbability(0, state.model.results.RMSE, state.spec);
+      return { available: info.available, reason: info.available ? '' : info.reason, sigma: info.sigma || null };
+    }
+
+    function searchStamp() {
+      return {
+        modelId: state.model ? state.model.id : '',
+        searchRev: state.searchRev,
+        confidence: state.confidence,
+        spec: copy(state.spec)
+      };
+    }
+
+    function resultApplies(result) {
+      if (!result || result.ok !== true || !result.settings || !result.stamp) return false;
+      return JSON.stringify(result.stamp) === JSON.stringify(searchStamp());
+    }
+
+    function clampRange(value, range) {
+      var n = Number(value);
+      if (!Number.isFinite(n) || n < range.min) return range.min;
+      if (n > range.max) return range.max;
+      return n;
+    }
+
+    function snapStep(value) {
+      if (Math.abs(value - Math.round(value)) < 1e-8) return Math.round(value);
+      return value;
+    }
+
+    function stepGrid(min, max, step) {
+      var count = Math.floor(((max - min) / step) + 1e-9);
+      if (count > 5000) {
+        return { ok: false, error: 'That increment creates too many values. Use a larger increment, or leave the setting continuous.' };
+      }
+      var values = [];
+      for (var i = 0; i <= count; i++) {
+        var value = snapStep(min + (i * step));
+        if (value > max + 1e-9) break;
+        values.push(value);
+      }
+      if (!values.length) return { ok: false, error: 'The increment does not land inside the search range.' };
+      return { ok: true, values: values };
+    }
+
+    function freeInteraction(names) {
+      var free = Object.create(null);
+      names.forEach(function (name) { free[name] = true; });
+      return (state.model.columns || []).some(function (col) {
+        if (col.kind !== 'interaction' || !col.factors) return false;
+        var count = 0;
+        col.factors.forEach(function (factor) {
+          if (factor.kind === 'numeric' && free[factor.name]) count += 1;
+        });
+        return count >= 2;
+      });
+    }
+
+    function settingsPass(settings) {
+      if (completeSettings(settings).length) return false;
+      if (!boundsAllow(settings).ok) return false;
+      var pred = predict(settings);
+      return !!(pred && pred.ok && Number.isFinite(pred.estimate));
+    }
+
+    function buildSearchDomain(request, start) {
+      var src = request || {};
+      var locks = src.locks || {};
+      var ranges = src.ranges || {};
+      var levelSets = src.levels || {};
+      var base = copy(start);
+      var discrete = [];
+      var continuous = [];
+      var names = (state.config.numeric || []).concat(state.config.categorical || []);
+      var error = '';
+      names.forEach(function (name) {
+        if (error) return;
+        var numeric = state.config.numeric.indexOf(name) >= 0;
+        if (state.config.roles[name] === 'fixed') {
+          if (numeric && !Number.isFinite(finiteOrNull(base[name]))) error = 'Enter a finite number for fixed ' + name + '.';
+          if (!numeric && (base[name] == null || base[name] === '')) error = 'Choose a fixed level for ' + name + '.';
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(locks, name)) {
+          if (numeric) {
+            var locked = finiteOrNull(locks[name]);
+            var op = state.limits[name];
+            if (!Number.isFinite(locked)) error = 'Enter a finite locked value for ' + name + '.';
+            else if (op && (locked < op.min - EPS || locked > op.max + EPS)) {
+              error = 'Unlock ' + name + ' or move it inside ' + formatTrim(op.min, 4) + ' to ' + formatTrim(op.max, 4) + ' before searching.';
+            } else base[name] = locked;
+          } else {
+            var level = String(locks[name]);
+            var allowed = (state.limits[name] && state.limits[name].levels) || [];
+            if (allowed.map(String).indexOf(level) < 0) error = name + ' is locked at a level the operating bounds do not allow.';
+            else base[name] = level;
+          }
+          return;
+        }
+        if (numeric) {
+          var operating = state.limits[name] || { min: finiteOrNull(base[name]), max: finiteOrNull(base[name]) };
+          var asked = ranges[name] || {};
+          var min = asked.min == null || asked.min === '' ? operating.min : finiteOrNull(asked.min);
+          var max = asked.max == null || asked.max === '' ? operating.max : finiteOrNull(asked.max);
+          if (!Number.isFinite(min) || !Number.isFinite(max)) error = name + ' needs a finite lower bound and upper bound.';
+          else if (min > max) error = name + ' needs a lower bound at or below its upper bound.';
+          else if (min < operating.min - EPS || max > operating.max + EPS) {
+            error = name + ' search range must stay inside ' + formatTrim(operating.min, 4) + ' to ' + formatTrim(operating.max, 4) + '.';
+          } else if (Math.abs(max - min) <= EPS) base[name] = min;
+          else if (asked.step != null && asked.step !== '') {
+            var step = finiteOrNull(asked.step);
+            if (!(step > 0)) error = 'Enter a positive increment for ' + name + ', or leave it continuous.';
+            else {
+              var grid = stepGrid(min, max, step);
+              if (!grid.ok) error = name + ': ' + grid.error;
+              else discrete.push({ name: name, values: grid.values });
+            }
+          } else continuous.push({ name: name, range: { min: min, max: max } });
+        } else {
+          var known = ((state.limits[name] && state.limits[name].levels) || []).map(String);
+          var picked = levelSets[name] ? levelSets[name].map(String) : known.slice();
+          picked = picked.filter(function (level) { return known.indexOf(level) >= 0; });
+          if (!picked.length) error = 'Choose at least one ' + name + ' level.';
+          else discrete.push({ name: name, values: picked });
+        }
+      });
+      if (error) return { ok: false, error: error };
+      (state.config.numeric || []).concat(state.config.categorical || []).forEach(function (name) {
+        if (base[name] == null || base[name] === '') {
+          if (state.config.numeric.indexOf(name) >= 0 && state.limits[name]) base[name] = state.limits[name].min;
+        }
+      });
+      return { ok: true, base: base, discrete: discrete, continuous: continuous };
+    }
+
+    function consider(best, settings, goal, sigma) {
+      if (!settingsPass(settings)) return best;
+      var pred = predict(settings);
+      var score = pred.estimate;
+      if (goal === 'yield') {
+        var yieldScore = inSpecProbability(pred.estimate, sigma, state.spec);
+        if (!yieldScore.available) return best;
+        score = yieldScore.probability;
+      }
+      var row = { settings: copy(settings), score: score, mean: pred.estimate };
+      if (!best) return row;
+      if (row.score > best.score + 1e-12) return row;
+      return best;
+    }
+
+    function affineSolve(base, continuous, goal) {
+      var origin = copy(base);
+      continuous.forEach(function (factor) {
+        origin[factor.name] = clampRange(origin[factor.name], factor.range);
+      });
+      var pred0 = predict(origin);
+      if (!pred0.ok) return null;
+      var slope = {};
+      continuous.forEach(function (factor) {
+        var trial = copy(origin);
+        trial[factor.name] = origin[factor.name] + 1;
+        var shifted = predict(trial);
+        slope[factor.name] = shifted.ok ? shifted.estimate - pred0.estimate : 0;
+      });
+      function vertex(sign) {
+        var next = copy(origin);
+        continuous.forEach(function (factor) {
+          var g = slope[factor.name];
+          if (!(Math.abs(g) > 1e-12)) next[factor.name] = clampRange(origin[factor.name], factor.range);
+          else if (g * sign > 0) next[factor.name] = factor.range.max;
+          else next[factor.name] = factor.range.min;
+        });
+        return next;
+      }
+      if (goal === 'mean') return { settings: vertex(1), exact: true };
+      var lower = state.spec.lsl != null && Number.isFinite(state.spec.lsl);
+      var upper = state.spec.usl != null && Number.isFinite(state.spec.usl);
+      if (lower && !upper) return { settings: vertex(1), exact: true };
+      if (upper && !lower) return { settings: vertex(-1), exact: true };
+      var lowPoint = vertex(-1);
+      var highPoint = vertex(1);
+      var lowMean = predict(lowPoint).estimate;
+      var highMean = predict(highPoint).estimate;
+      if (lowMean > highMean) {
+        var swapPoint = lowPoint;
+        lowPoint = highPoint;
+        highPoint = swapPoint;
+        var swapMean = lowMean;
+        lowMean = highMean;
+        highMean = swapMean;
+      }
+      var target = (state.spec.lsl + state.spec.usl) / 2;
+      var want = Math.min(highMean, Math.max(lowMean, target));
+      if (Math.abs(want - lowMean) <= 1e-8) return { settings: lowPoint, exact: true };
+      if (Math.abs(want - highMean) <= 1e-8) return { settings: highPoint, exact: true };
+      var next = copy(origin);
+      var deficit = want - pred0.estimate;
+      continuous.forEach(function (factor) {
+        var g = slope[factor.name];
+        if (!(Math.abs(g) > 1e-12) || Math.abs(deficit) <= 1e-10) return;
+        var unclamped = next[factor.name] + (deficit / g);
+        var clamped = clampRange(unclamped, factor.range);
+        deficit -= g * (clamped - next[factor.name]);
+        next[factor.name] = clamped;
+      });
+      var got = predict(next);
+      if (!got.ok || Math.abs(got.estimate - want) > 1e-5) {
+        return { settings: Math.abs(want - lowMean) <= Math.abs(want - highMean) ? lowPoint : highPoint, exact: false };
+      }
+      return { settings: next, exact: true };
+    }
+
+    function vertexSettings(base, continuous) {
+      var points = [copy(base)];
+      var masks = 1;
+      for (var i = 0; i < continuous.length; i++) masks *= 2;
+      if (masks > 4096) return null;
+      for (var mask = 0; mask < masks; mask++) {
+        var next = copy(base);
+        continuous.forEach(function (factor, index) {
+          next[factor.name] = (mask & (1 << index)) ? factor.range.max : factor.range.min;
+        });
+        points.push(next);
+      }
+      var center = copy(base);
+      continuous.forEach(function (factor) {
+        center[factor.name] = (factor.range.min + factor.range.max) / 2;
+      });
+      points.push(center);
+      return points;
+    }
+
+    function relaxToMean(base, continuous, target) {
+      var next = copy(base);
+      continuous.forEach(function (factor) {
+        next[factor.name] = clampRange(next[factor.name], factor.range);
+      });
+      for (var pass = 0; pass < 8; pass++) {
+        var current = predict(next);
+        if (!current.ok) return next;
+        if (Math.abs(current.estimate - target) < 1e-6) return next;
+        var moved = false;
+        continuous.forEach(function (factor) {
+          var low = copy(next);
+          var high = copy(next);
+          low[factor.name] = factor.range.min;
+          high[factor.name] = factor.range.max;
+          var yLow = predict(low);
+          var yHigh = predict(high);
+          if (!yLow.ok || !yHigh.ok) return;
+          var span = yHigh.estimate - yLow.estimate;
+          var value;
+          if (Math.abs(span) < 1e-12) value = Math.abs(target - yLow.estimate) <= Math.abs(target - yHigh.estimate) ? factor.range.min : factor.range.max;
+          else {
+            var t = (target - yLow.estimate) / span;
+            if (t < 0) t = 0;
+            if (t > 1) t = 1;
+            value = factor.range.min + (t * (factor.range.max - factor.range.min));
+          }
+          if (Math.abs(value - next[factor.name]) > 1e-8) moved = true;
+          next[factor.name] = value;
+        });
+        if (!moved) break;
+      }
+      return next;
+    }
+
+    function findCandidate(request) {
+      if (!state.model) return { ok: false, error: 'Fit the model before searching for candidate settings.' };
+      var goal = request && request.goal === 'yield' ? 'yield' : 'mean';
+      var yieldInfo = yieldAvailability();
+      if (goal === 'yield' && !yieldInfo.available) return { ok: false, error: yieldInfo.reason, yieldGoal: yieldInfo };
+      var shown = copy((request && request.start) || (state.pin ? state.pin.settings : state.currentDraft));
+      (state.config.numeric || []).concat(state.config.categorical || []).forEach(function (name) {
+        if (shown[name] == null || shown[name] === '') {
+          var fallback = state.pin ? state.pin.settings[name] : state.currentDraft[name];
+          if (fallback != null) shown[name] = fallback;
+        }
+      });
+      var domain = buildSearchDomain(request, shown);
+      if (!domain.ok) return domain;
+      var referenceSettings = state.pin ? copy(state.pin.settings) : copy(shown);
+      if (request && request.reference) referenceSettings = copy(request.reference);
+      var sigma = yieldInfo.sigma;
+      var affine = !freeInteraction(domain.continuous.map(function (factor) { return factor.name; }));
+      var exact = affine;
+      var best = null;
+      if (settingsPass(shown)) {
+        var continuousNames = Object.create(null);
+        var discreteNames = Object.create(null);
+        domain.continuous.forEach(function (factor) { continuousNames[factor.name] = factor; });
+        domain.discrete.forEach(function (factor) { discreteNames[factor.name] = factor; });
+        var shownOk = (state.config.numeric || []).concat(state.config.categorical || []).every(function (name) {
+          if (continuousNames[name]) {
+            var value = Number(shown[name]);
+            return value >= continuousNames[name].range.min - EPS && value <= continuousNames[name].range.max + EPS;
+          }
+          if (discreteNames[name]) return discreteNames[name].values.map(String).indexOf(String(shown[name])) >= 0;
+          var numeric = state.config.numeric.indexOf(name) >= 0;
+          return numeric ? sameNumber(Number(shown[name]), Number(domain.base[name])) : String(shown[name]) === String(domain.base[name]);
+        });
+        if (shownOk) best = consider(best, shown, goal, sigma);
+      }
+      var lists = domain.discrete.map(function (factor) { return factor.values; });
+      var product = lists.reduce(function (acc, values) { return acc * values.length; }, 1);
+      var stride = 1;
+      if (product > 20000) {
+        stride = Math.ceil(product / 20000);
+        exact = false;
+      }
+      var index = 0;
+      function visit(choice) {
+        var settings = copy(domain.base);
+        domain.discrete.forEach(function (factor, i) { settings[factor.name] = choice[i]; });
+        var solved = settings;
+        var solvedExact = true;
+        if (domain.continuous.length) {
+          if (affine) {
+            var affinePick = affineSolve(settings, domain.continuous, goal);
+            solved = affinePick && affinePick.settings;
+            solvedExact = !!(affinePick && affinePick.exact);
+          } else {
+            var pool = vertexSettings(settings, domain.continuous);
+            if (!pool) {
+              solvedExact = false;
+              pool = [settings, relaxToMean(settings, domain.continuous, goal === 'yield' && state.spec.lsl != null && state.spec.usl != null ? (state.spec.lsl + state.spec.usl) / 2 : predict(settings).estimate)];
+            }
+            var local = null;
+            pool.forEach(function (point) {
+              var relaxed = point;
+              if (goal === 'yield' && state.spec.lsl != null && state.spec.usl != null) {
+                relaxed = relaxToMean(point, domain.continuous, (state.spec.lsl + state.spec.usl) / 2);
+              }
+              local = consider(local, relaxed, goal, sigma);
+              local = consider(local, point, goal, sigma);
+            });
+            if (!local) return;
+            solved = local.settings;
+            if (goal === 'mean' || !(state.spec.lsl != null && state.spec.usl != null)) solvedExact = !!pool && pool.length > 2;
+            else {
+              var mid = (state.spec.lsl + state.spec.usl) / 2;
+              var got = predict(solved);
+              solvedExact = !!(got.ok && Math.abs(got.estimate - mid) < 1e-5);
+              if (!solvedExact && pool && pool.length > 2) {
+                var means = pool.map(function (point) { var pred = predict(point); return pred.ok ? pred.estimate : NaN; }).filter(Number.isFinite);
+                var lo = Math.min.apply(null, means);
+                var hi = Math.max.apply(null, means);
+                var want = Math.min(hi, Math.max(lo, mid));
+                solvedExact = !!(got.ok && Math.abs(got.estimate - want) < 1e-5);
+              }
+            }
+          }
+        }
+        if (!solved) return;
+        if (!solvedExact) exact = false;
+        best = consider(best, solved, goal, sigma);
+      }
+      if (!lists.length) visit([]);
+      else {
+        var cursor = new Array(lists.length).fill(0);
+        var done = false;
+        while (!done) {
+          if (index % stride === 0) visit(cursor.map(function (at, i) { return lists[i][at]; }));
+          index += 1;
+          var digit = lists.length - 1;
+          while (digit >= 0) {
+            cursor[digit] += 1;
+            if (cursor[digit] < lists[digit].length) break;
+            cursor[digit] = 0;
+            digit -= 1;
+          }
+          if (digit < 0) done = true;
+        }
+      }
+      if (!best) return { ok: false, error: 'No feasible candidate is inside the allowed settings.' };
+      var validated = predict(best.settings);
+      if (!validated.ok || !settingsPass(best.settings)) return { ok: false, error: 'No feasible candidate is inside the allowed settings.' };
+      var card = cardFor(best.settings);
+      var referenceCard = settingsPass(referenceSettings) ? cardFor(referenceSettings) : null;
+      var yieldDelta = card.inSpec && card.inSpec.available && referenceCard && referenceCard.inSpec && referenceCard.inSpec.available
+        ? card.inSpec.probability - referenceCard.inSpec.probability
+        : null;
+      return {
+        ok: true,
+        goal: goal,
+        goalLabel: goal === 'yield' ? 'Maximize estimated in-spec yield' : 'Maximize predicted response',
+        mode: exact ? 'exact' : 'heuristic',
+        modeLabel: exact ? '' : 'Best candidate found',
+        settings: copy(best.settings),
+        card: card,
+        reference: {
+          label: state.pin ? 'Current recipe' : 'Starting settings',
+          settings: copy(referenceSettings),
+          card: referenceCard
+        },
+        changed: referenceCard ? changedInputs(referenceSettings, best.settings) : [],
+        deltaMean: referenceCard && referenceCard.available ? card.mean - referenceCard.mean : null,
+        deltaText: referenceCard && referenceCard.available
+          ? withUnitPhrase(formatSignedTrim(card.mean - referenceCard.mean, 4), state.config.responseScale)
+          : '',
+        yieldDelta: yieldDelta,
+        stamp: searchStamp(),
+        support: card.support || { advisories: [], caveat: '' }
       };
     }
 
@@ -1247,7 +1706,8 @@
         changed: delta == null ? [] : changedInputs(state.pin.settings, candidateSettings),
         profiles: profiles,
         yScale: state.yScale ? { min: state.yScale.min, max: state.yScale.max } : null,
-        caveat: 'An in-range result alone does not establish joint support.'
+        caveat: 'An in-range result alone does not establish joint support.',
+        yieldGoal: yieldAvailability()
       };
     }
 
@@ -1267,6 +1727,9 @@
       editCurrent: editCurrent,
       setCandidate: setCandidate,
       resetCandidate: resetCandidate,
+      findCandidate: findCandidate,
+      searchStamp: searchStamp,
+      resultApplies: resultApplies,
       fitCount: function () { return state.fitCount; },
       read: read
     };
@@ -1274,6 +1737,8 @@
 
   return {
     createSession: createSession,
+    standardNormalCdf: standardNormalCdf,
+    inSpecProbability: inSpecProbability,
     demoTable: demoTable,
     demoPreset: demoPreset,
     columnChoices: columnChoices,

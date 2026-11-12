@@ -1018,7 +1018,7 @@ const StatisticoHeader = {
       'regression-residuals': 'Residual Diagnostics',
       'regression-by-group': 'By-Group Analysis',
       'setup': 'Input & Setup',
-      'ps-overview': 'Overview',
+      'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
       'ps-diagnostics': 'Diagnostics',
       'ps-scatters': 'Predictor Scatters',
@@ -2162,7 +2162,7 @@ const StatisticoHeader = {
           {
             title: 'Results',
             items: [
-              resultItem('overview', 'fa-chart-pie', 'Overview', 'Fitted response, sample, and specifications.'),
+              resultItem('overview', 'fa-chart-pie', 'Process Results', 'Overview of the fit, and the model on Technical.'),
               resultItem('effects', 'fa-arrows-split-up-and-left', 'Effects & Interactions', 'Coefficients and interaction profiles.'),
               resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics', 'Observed versus fitted and residual checks.'),
               resultItem('scatters', 'fa-chart-scatter', 'Predictor Scatters', 'Response versus one predictor, with a fit toggle and chart options.'),
@@ -9248,6 +9248,10 @@ REPORT: [one polished paragraph suitable for a report]`;
     const activeSidebar = document.querySelector('.sb-item.active[data-tab], .sb-item.active[id]');
     const tab = activeSidebar?.dataset?.tab || activeSidebar?.id || this._getIndependentActiveTab();
 
+    if (this.module === 'process-settings' && this.currentView === 'ps-overview') {
+      const inner = document.querySelector('#view-overview:not([hidden]) .ws-mode-tab.active[data-ps-tab]');
+      if (inner && inner.dataset.psTab) return 'process-settings-ps-' + inner.dataset.psTab;
+    }
     // For modules that host an in-page workspace tab bar (regression, etc.),
     // prefer the active inner tab so the Insight Guide can describe the
     // specific chart the user is looking at (e.g. Predictor Effects vs
@@ -9402,6 +9406,8 @@ REPORT: [one polished paragraph suitable for a report]`;
       'regression-viz-partial':      'Visualization — Predictor Effects',
       'regression-viz-unique':       'Visualization — Unique Contribution',
       'ps-scatters': 'Predictor Scatters',
+      'process-settings-ps-overview': 'Process Results — Overview',
+      'process-settings-ps-technical': 'Process Results — Technical',
       'process-settings-ps-scatters': 'Predictor Scatters',
       'regression-diag-overview':    'Diagnostics — Overview',
       'regression-diag-plots':       'Diagnostics — Residual Plots',
@@ -9531,6 +9537,10 @@ REPORT: [one polished paragraph suitable for a report]`;
         'Read the selected-predictor strip (β, standardised β, SE, t, p, 95% CI), the coefficient table (click a row to switch predictors), and the partial-effect chart (observed data, adjusted prediction line, 95% confidence band). Global fit metrics (R², RMSE) live on Predictions → Overview — interpret the effect of the chosen predictor here.',
       'regression-viz-unique':
         'Each small chart is a partial regression (added-variable) plot: the x-axis shows the predictor after removing the linear influence of all other predictors (e(x | others)), and the y-axis shows the outcome with the same adjustment (e(y | others)). The slope is exactly the multiple-regression coefficient for that predictor. Read whether the line is clearly tilted (unique contribution), whether it is flat (no effect after controlling), and whether points hug the line tightly or scatter widely (how much remains unexplained).',
+      'process-settings-ps-overview':
+        'Read the response, the analyzed-run count, and R². The recipe card is Starting settings until a recipe is pinned, then Current recipe. Specifications sit beside it as LSL, target, and USL. Open Prediction Profiler is the next step.',
+      'process-settings-ps-technical':
+        'Read the fitted equation and term estimates, factor reference levels, analyzed and excluded row counts, adjusted R², and the residual standard deviation. That residual standard deviation is the spread of the profiler\u2019s projected output curve. Effects & Interactions and Diagnostics hold the detailed tests.',
       'process-settings-ps-scatters':
         'One predictor is shown at a time, chosen from the radio list. The cards report the rows used by the selected curve, Pearson r for a linear fit or observed-versus-fitted r for another curve, curve R² as a percentage on the original response scale, and the predictor’s drop in full-model R² in percentage points. The p-value of the linear Pearson t test sits with the equation. Show fit only hides or shows the trend. Chart options changes the window, curve, and X-axis transform without refitting the process model. A categorical predictor shows the observed points and the same specification lines, with no curve.',
       'regression-diag-overview':

@@ -27,6 +27,9 @@
   
   <!-- Regression computation library -->
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
+  <script src="../../shared/regression-contribution.js?v=20261112rfr1"></script>
+  <script src="../../shared/regression-fit-report.js?v=20261112rfr1"></script>
+  <link rel="stylesheet" href="../../shared/regression-fit-report.css?v=20261112rfr2" />
   <script src="../../shared/regression-case-trace.js?v=20261109multi"></script>
   <script src="../../shared/regression-effect-plot.js?v=20261105factor"></script>
   
@@ -37,7 +40,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261109place" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261109place"></script>
+  <script src="../shared-header.js?v=20261112ps13"></script>
   <script src="../shared-workspace-tabs.js?v=20260828viewcta"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -5376,6 +5379,12 @@
         </div>
         </div>
 
+        <div class="stat-panel rfr-contrib-panel" id="regContributionPanel">
+          <div class="stat-panel-body" id="regContributionBody">
+            <p class="rfr-note">Awaiting regression results…</p>
+          </div>
+        </div>
+
         <!-- Stats Panels -->
         <div class="stats-container">
           <div class="stat-panel" data-show-from="analyst">
@@ -9421,6 +9430,46 @@ ${sectionsHtml}
       });
     }
 
+    function renderRegPredictorContribution(results) {
+      const host = document.getElementById('regContributionBody');
+      const Report = window.StatisticoRegressionFitReport;
+      const Contrib = window.StatisticoRegressionContribution;
+      if (!host || !Report || !Contrib) return;
+      const design = window._regFullDesign;
+      if (!design || !design.xMatrix || !design.columns) {
+        host.innerHTML = Report.contributionChart({}, []);
+        return;
+      }
+      const view = currentIncludedView();
+      const columns = view && view.columns ? view.columns : design.columns;
+      const includeIntercept = view ? view.includeIntercept : design.includeIntercept;
+      const predictors = [];
+      ((view && view.xn) || design.xn || []).forEach(function (name) {
+        if (predictors.indexOf(name) < 0) predictors.push(name);
+      });
+      ((view && view.xc) || design.xc || []).forEach(function (name) {
+        if (predictors.indexOf(name) < 0) predictors.push(name);
+      });
+      const xMatrix = design.xMatrix.map(function (row) {
+        return columns.map(function (col) { return row[col.sourceIndex]; });
+      });
+      let contributions = {};
+      try {
+        contributions = Contrib.predictorContributions(
+          computeOLS,
+          xMatrix,
+          design.yVector,
+          columns,
+          predictors,
+          includeIntercept !== false,
+          results
+        );
+      } catch (err) {
+        contributions = {};
+      }
+      host.innerHTML = Report.contributionChart(contributions, predictors);
+    }
+
     // Display regression results in the UI
     function displayRegressionResults(results, yVarName, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo) {
       console.log('📊 Displaying regression results...');
@@ -9580,6 +9629,7 @@ ${sectionsHtml}
 
       // Build the Insight-mode conclusion card, then apply current depth
       buildConclusionCard(results);
+      renderRegPredictorContribution(results);
       applyDepth(window._analysisDepth || 'insight');
       if (typeof calculateRegressionPower === 'function') calculateRegressionPower(results);
       syncModelScopeBanners();

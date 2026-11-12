@@ -12,14 +12,17 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="../shared-config.css?v=20261109ps" />
   <link rel="stylesheet" href="../shared-header.css?v=20261109ps" />
+  <link rel="stylesheet" href="../../shared/regression-fit-report.css?v=20261112rfr2" />
   <script src="../shared-config.js?v=20261109ps"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261112ps12"></script>
+  <script src="../shared-header.js?v=20261112ps13"></script>
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
   <script src="../../shared/column-type.js"></script>
   <script src="../../shared/regression-case-trace.js"></script>
   <script src="../../shared/regression-effect-plot.js"></script>
-  <script src="../../shared/process-settings-engine.js?v=20261112ps10"></script>
+  <script src="../../shared/regression-contribution.js?v=20261112rfr1"></script>
+  <script src="../../shared/process-settings-engine.js?v=20261112ps11"></script>
+  <script src="../../shared/regression-fit-report.js?v=20261112rfr1"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <style>
@@ -97,7 +100,7 @@
       #view-scatters .psc-stage { grid-template-columns: 1fr; }
     }
     #view-profiler:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-    #view-overview:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+    #view-overview:not([hidden]) { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
     #view-overview [hidden] { display: none !important; }
     #view-overview .ps-results-lead { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
     #view-overview .ps-results-lead .ps-pred { margin: 0; }
@@ -1540,20 +1543,10 @@ function pscDefaultCtrl() {
       return pscFmt(fraction * 100, 2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + '%';
     }
 
-    function pscReportedPercent(fraction) {
-      if (!Number.isFinite(fraction)) return NaN;
-      return Number(pscFmt(fraction * 100, 2));
-    }
-
     function pscContribution(fullR2, reducedR2) {
-      const full = pscReportedPercent(fullR2);
-      const reduced = pscReportedPercent(reducedR2);
-      if (!Number.isFinite(full) || !Number.isFinite(reduced)) return null;
-      return {
-        value: pscFmt(full - reduced, 2) + ' pp',
-        full: pscFmt(full, 2) + '%',
-        reduced: pscFmt(reduced, 2) + '%'
-      };
+      const reported = window.StatisticoRegressionContribution && StatisticoRegressionContribution.reportedDrop(fullR2, reducedR2);
+      if (!reported) return null;
+      return { value: reported.pointsText, full: reported.fullText, reduced: reported.reducedText };
     }
 
     function pscCurveLabel(type) {
@@ -2132,9 +2125,6 @@ function pscDefaultCtrl() {
     showView(view, { fromMenu: true, focus: true });
   };
 
-  function metric(label, value) {
-    return '<div class="metric"><span>' + esc(label) + '</span><b>' + esc(value) + '</b></div>';
-  }
   function specSummary(spec, unit) {
     var suffix = unit ? (' ' + unit) : '';
     var parts = [];
@@ -2195,63 +2185,20 @@ function pscDefaultCtrl() {
     });
   }
 
-  function settingText(view, name) {
-    var source = view.pin ? view.pin.settings : view.currentDraft;
-    var value = source ? source[name] : null;
-    var unit = view.config.units[name] ? (' ' + view.config.units[name]) : '';
-    return name + (value == null || value === '' ? '' : (': ' + value)) + unit;
-  }
-
-  function modelEquation(view) {
-    var coefs = (view.model && view.model.coefficients) || [];
-    var response = view.config.response || 'Response';
-    var pieces = [];
-    coefs.forEach(function (row, index) {
-      var est = Number(row.estimate);
-      if (!Number.isFinite(est)) return;
-      var name = row.name || ('Term ' + (index + 1));
-      if (name === 'Intercept') {
-        pieces.push(formatCoef(est));
-        return;
-      }
-      var magnitude = formatCoef(Math.abs(est)) + '\u00b7' + name;
-      if (!pieces.length) pieces.push((est < 0 ? '\u2212' : '') + magnitude);
-      else pieces.push((est < 0 ? ' \u2212 ' : ' + ') + magnitude);
-    });
-    return pieces.length ? (response + ' = ' + pieces.join('')) : 'The fitted equation is unavailable.';
-  }
-
   function renderOverview() {
     var view = session.read();
-    var model = view.model || {};
-    var unit = view.config.responseScale && view.config.responseScale.unit;
-    var response = view.config.response || 'Response';
-    var adjustable = [];
-    var fixed = [];
-    view.config.numeric.concat(view.config.categorical).forEach(function (name) {
-      var text = settingText(view, name);
-      if (view.config.roles[name] === 'fixed') fixed.push(text);
-      else adjustable.push(text);
-    });
-    var analyzed = model.n == null ? null : Number(model.n);
-    var sourceRows = view.table && typeof view.table.nRows === 'number' ? view.table.nRows : null;
-    var excluded = sourceRows != null && analyzed != null && sourceRows >= analyzed ? sourceRows - analyzed : null;
-    var runText = analyzed == null ? 'Analyzed runs unavailable' : (analyzed + ' analyzed ' + (analyzed === 1 ? 'run' : 'runs'));
-    var refs = model.references || [];
-    var refText = refs.length
-      ? refs.map(function (ref) {
-          return ref.name + ' reference level ' + ref.reference + ' (levels ' + (ref.levels || []).join(', ') + ')';
-        }).join('. ') + '.'
-      : 'This model has no categorical factor.';
-    var termRows = (model.coefficients || []).map(function (row) {
-      return '<tr><td>' + esc(row.name) + '</td><td class="num">' + esc(formatCoef(row.estimate)) + '</td></tr>';
-    }).join('');
-    var sdUnit = unit ? (' ' + unit) : '';
+    var Report = window.StatisticoRegressionFitReport;
     function tabButton(id, icon, label) {
       var on = overviewTab === id;
       return '<button type="button" class="ws-mode-tab' + (on ? ' active' : '') + '" data-ps-tab="' + id + '" aria-selected="' + (on ? 'true' : 'false') + '">' +
         '<i class="fa-solid ' + icon + '" aria-hidden="true"></i><span class="ws-tab-label">' + label + '</span></button>';
     }
+    var overviewBody = Report
+      ? Report.processOverview(view)
+      : '<p class="hint">The regression report did not load.</p>';
+    var technicalBody = Report
+      ? Report.processTechnical(view)
+      : '';
     el('view-overview').innerHTML =
       '<h2 id="overview-title" class="ps-sr" tabindex="-1">Process Results</h2>' +
       '<div class="ws-shell"><div class="ws-chrome ws-chrome--attached ws-chrome--compact">' +
@@ -2259,35 +2206,8 @@ function pscDefaultCtrl() {
           tabButton('overview', 'fa-chart-pie', 'Overview') +
           tabButton('technical', 'fa-chart-column', 'Technical') +
         '</nav></div><div class="ws-body">' +
-        '<div id="psOverviewPane"' + (overviewTab === 'technical' ? ' hidden' : '') + '>' +
-          '<section class="ps-panel ps-results-lead"><div><p class="ps-pred">' + esc(response) + '</p>' +
-            '<p class="ps-results-meta">' + esc(runText) + ' \u00b7 R\u00b2 = ' + esc(fmtR2(model.r2)) + '</p></div>' +
-            '<button type="button" class="ps-btn primary" id="open-profiler">Open Prediction Profiler</button></section>' +
-          '<div class="ps-panels">' +
-            '<section class="ps-panel"><h3>' + (view.pin ? 'Current recipe' : 'Starting settings') + '</h3>' +
-              '<p>' + esc(adjustable.join(' \u00b7 ') || 'None') + '</p>' +
-              (fixed.length ? ('<h3 style="margin-top:8px;">Fixed conditions</h3><p>' + esc(fixed.join(' \u00b7 ')) + '</p>') : '') +
-            '</section>' +
-            '<section class="ps-panel"><h3>Specifications</h3><p>' + esc(specSummary(view.spec, unit)) + '</p>' +
-              '<p class="hint">Specification changes stay on this fit. Edit them from the profiler.</p></section>' +
-          '</div></div>' +
-        '<div id="psTechnicalPane"' + (overviewTab === 'technical' ? '' : ' hidden') + '>' +
-          '<section class="ps-panel"><h3>Fitted model</h3><p class="ps-eq">' + esc(modelEquation(view)) + '</p>' +
-            (termRows ? '<table><thead><tr><th>Term</th><th>Estimate</th></tr></thead><tbody>' + termRows + '</tbody></table>' : '') +
-          '</section>' +
-          '<section class="ps-panel"><h3>Reference levels</h3><p>' + esc(refText) + '</p></section>' +
-          '<div class="metrics">' +
-            metric('Analyzed rows', analyzed == null ? '—' : String(analyzed)) +
-            (excluded == null ? '' : metric('Excluded rows', String(excluded))) +
-            metric('Adjusted R\u00b2', fmtR2(model.adjR2)) +
-            metric('Residual standard deviation', (Number.isFinite(Number(model.rmse)) ? fmtResponse(model.rmse) : '—') + sdUnit) +
-          '</div>' +
-          '<p class="hint">The prediction profiler uses this residual standard deviation for the spread of its projected output curve.</p>' +
-          '<p class="hint">Coefficient tests and interaction profiles are on Effects &amp; Interactions. Observed-versus-fitted and residual checks are on Diagnostics.</p>' +
-          '<div class="ps-linkrow">' +
-            '<button type="button" class="ps-btn" id="open-effects">Effects &amp; Interactions</button>' +
-            '<button type="button" class="ps-btn" id="open-diagnostics">Diagnostics</button>' +
-          '</div></div>' +
+        '<div id="psOverviewPane"' + (overviewTab === 'technical' ? ' hidden' : '') + '>' + overviewBody + '</div>' +
+        '<div id="psTechnicalPane"' + (overviewTab === 'technical' ? '' : ' hidden') + '>' + technicalBody + '</div>' +
         '</div></div>';
     var openProfiler = el('open-profiler');
     if (openProfiler) openProfiler.addEventListener('click', function () { showView('profiler', { focus: true }); });

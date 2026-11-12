@@ -16,14 +16,20 @@
   var columnsApi = root && root.StatisticoColumnType;
   var Contrib = root && root.StatisticoRegressionContribution;
   var PredictorContribution = root && root.StatisticoPredictorContribution;
-  if (!Trace || !ols || !columnsApi) {
-    var lib = require('../../../statistico-analytics/src/shared/js/core/regression-compute.js');
-    ols = lib.computeOLS;
-    Trace = require('../../../statistico-analytics/dialogs/shared/regression-case-trace.js');
-    columnsApi = require('../../../statistico-analytics/dialogs/shared/column-type.js');
+  function optionalRequire(path) {
+    if (typeof require !== 'function') return null;
+    return require(path);
   }
-  if (!Contrib) Contrib = require('../../../statistico-analytics/dialogs/shared/regression-contribution.js');
-  if (!PredictorContribution) PredictorContribution = require('../../../statistico-analytics/dialogs/shared/regression-predictor-contribution.js');
+  if (!Trace || !ols || !columnsApi) {
+    var lib = optionalRequire('../../../statistico-analytics/src/shared/js/core/regression-compute.js');
+    if (lib) {
+      ols = lib.computeOLS;
+      Trace = optionalRequire('../../../statistico-analytics/dialogs/shared/regression-case-trace.js');
+      columnsApi = optionalRequire('../../../statistico-analytics/dialogs/shared/column-type.js');
+    }
+  }
+  if (!Contrib) Contrib = optionalRequire('../../../statistico-analytics/dialogs/shared/regression-contribution.js');
+  if (!PredictorContribution) PredictorContribution = optionalRequire('../../../statistico-analytics/dialogs/shared/regression-predictor-contribution.js');
   var api = factory(Trace, ols, columnsApi, Contrib, PredictorContribution);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.StatisticoProcessSettings = api;
@@ -822,11 +828,12 @@
             fullResults: results,
             computeOLS: computeOLS
           });
-          if (result && result.status !== 'omit') return Contrib.fromPredictorResult(result, predictors);
+          if (result && result.status !== 'omit' && Contrib) return Contrib.fromPredictorResult(result, predictors);
         } catch (err) {
           /* The local drop-one path below still reports a contribution. */
         }
       }
+      if (!Contrib) return [];
       return Contrib.predictorContributions(
         computeOLS, matrix, y, prepared.columns, predictors, includeIntercept !== false, results
       );

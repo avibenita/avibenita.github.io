@@ -14,16 +14,20 @@
   var Trace = root && root.StatisticoCaseTrace;
   var ols = typeof (root && root.computeOLS) === 'function' ? root.computeOLS : null;
   var columnsApi = root && root.StatisticoColumnType;
+  var Contrib = root && root.StatisticoRegressionContribution;
+  var PredictorContribution = root && root.StatisticoPredictorContribution;
   if (!Trace || !ols || !columnsApi) {
     var lib = require('../../../statistico-analytics/src/shared/js/core/regression-compute.js');
     ols = lib.computeOLS;
     Trace = require('../../../statistico-analytics/dialogs/shared/regression-case-trace.js');
     columnsApi = require('../../../statistico-analytics/dialogs/shared/column-type.js');
   }
-  var api = factory(Trace, ols, columnsApi);
+  if (!Contrib) Contrib = require('../../../statistico-analytics/dialogs/shared/regression-contribution.js');
+  if (!PredictorContribution) PredictorContribution = require('../../../statistico-analytics/dialogs/shared/regression-predictor-contribution.js');
+  var api = factory(Trace, ols, columnsApi, Contrib, PredictorContribution);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.StatisticoProcessSettings = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (Trace, computeOLS, ColumnType) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Trace, computeOLS, ColumnType, Contrib, PredictorContribution) {
   'use strict';
 
   var EPS = 1e-7;
@@ -313,74 +317,6 @@
       }
     });
     return columns;
-  }
-
-  function columnDependsOn(col, predictor) {
-    if (!col || predictor == null) return false;
-    if (col.kind === 'numeric') return col.name === predictor;
-    if (col.kind === 'dummy') return col.factor === predictor;
-    if (col.kind === 'interaction') {
-      return (col.factors || []).some(function (factor) {
-        if (factor.kind === 'numeric') return factor.name === predictor;
-        if (factor.kind === 'dummy') return factor.factor === predictor;
-        return false;
-      });
-    }
-    return false;
-  }
-
-  function predictorContributions(xMatrix, yVector, columns, predictors, includeIntercept, fitted) {
-    var full = null;
-    if (fitted && Number.isFinite(fitted.R2) && Number.isFinite(fitted.n)) {
-      full = fitted;
-    } else {
-      try {
-        full = computeOLS(xMatrix.map(function (row) { return row.slice(); }), yVector.slice(), includeIntercept !== false, 0.05);
-      } catch (err) {
-        full = null;
-      }
-    }
-    var out = {};
-    (predictors || []).forEach(function (name) {
-      if (!columns.some(function (col) { return columnDependsOn(col, name); })) {
-        out[name] = { ok: false, reason: 'This predictor is not in the active model.' };
-        return;
-      }
-      if (!full || !Number.isFinite(full.R2)) {
-        out[name] = { ok: false, reason: 'The full model does not report an ordinary R².' };
-        return;
-      }
-      var keep = [];
-      columns.forEach(function (col, index) {
-        if (!columnDependsOn(col, name)) keep.push(index);
-      });
-      var reducedX = xMatrix.map(function (row) {
-        return keep.map(function (index) { return row[index]; });
-      });
-      if (!reducedX.length || (!reducedX[0].length && includeIntercept === false)) {
-        out[name] = { ok: false, reason: 'The model without this predictor could not be estimated.' };
-        return;
-      }
-      var reduced = null;
-      try {
-        reduced = computeOLS(reducedX, yVector.slice(), includeIntercept !== false, 0.05);
-      } catch (err) {
-        reduced = null;
-      }
-      if (!reduced || !Number.isFinite(reduced.R2)) {
-        out[name] = { ok: false, reason: 'The model without this predictor could not be estimated.' };
-        return;
-      }
-      out[name] = {
-        ok: true,
-        fullR2: full.R2,
-        reducedR2: reduced.R2,
-        drop: full.R2 - reduced.R2,
-        n: full.n,
-        reason: ''
-      };
-    });
-    return out;
   }
 
   function pearson(xs, ys) {
@@ -872,6 +808,30 @@
       return { ok: true, settings: copy(row.settings), label: row.label };
     }
 
+    function activeContributions(prepared, results, includeIntercept) {
+      var predictors = prepared.numeric.concat(prepared.categorical);
+      var matrix = prepared.traced.xMatrix;
+      var y = prepared.traced.yVector;
+      if (PredictorContribution && includeIntercept !== false) {
+        try {
+          var result = PredictorContribution.compute({
+            xMatrix: matrix,
+            yVector: y,
+            columns: prepared.columns,
+            includeIntercept: true,
+            fullResults: results,
+            computeOLS: computeOLS
+          });
+          if (result && result.status !== 'omit') return Contrib.fromPredictorResult(result, predictors);
+        } catch (err) {
+          /* The local drop-one path below still reports a contribution. */
+        }
+      }
+      return Contrib.predictorContributions(
+        computeOLS, matrix, y, prepared.columns, predictors, includeIntercept !== false, results
+      );
+    }
+
     function beginFit() {
       bumpSerial();
       clearModel();
@@ -922,14 +882,7 @@
         fitConfidence: state.confidence,
         fitted: results.Y_fit ? results.Y_fit.slice() : [],
         residuals: results.residuals ? results.residuals.slice() : [],
-        contributions: predictorContributions(
-          prepared.traced.xMatrix,
-          prepared.traced.yVector,
-          prepared.columns,
-          prepared.numeric.concat(prepared.categorical),
-          state.config.includeIntercept !== false,
-          results
-        ),
+        contributions: activeContributions(prepared, results, state.config.includeIntercept !== false),
         coefficients: results.coefficients.map(function (estimate, i) {
           return {
             name: names[i] || ('Term ' + (i + 1)),
@@ -1242,6 +1195,10 @@
           rmse: state.model.results.RMSE,
           f: state.model.results.F_stat,
           fp: state.model.results.F_pvalue,
+          k: state.model.results.k,
+          ssModel: state.model.results.SSE,
+          ssResidual: state.model.results.SSR,
+          ssTotal: state.model.results.TSS,
           coefficients: state.model.coefficients.map(function (row) {
             return {
               name: row.name,

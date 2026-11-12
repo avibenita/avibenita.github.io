@@ -378,4 +378,70 @@ describe('session identity', () => {
     expect(empty.applied).toBe(false);
     expect(empty.reason).toMatch(/No valid observations|no worksheet data|Choose/i);
   });
+
+  test('reports signed linear association, curve R², and a negative R²', () => {
+    const ols = require('../../src/shared/js/core/regression-compute.js').computeOLS;
+    const fallingX = [1, 2, 3, 4, 5];
+    const fallingY = [10, 8, 6, 4, 2];
+    expect(Engine.pearson(fallingX, fallingY).r).toBeCloseTo(-1, 12);
+    const linear = ols(fallingX.map(function (x) { return [x]; }), fallingY, true);
+    expect(Engine.curveRSquared(fallingY, linear.Y_fit)).toBeCloseTo(1, 12);
+
+    const bowlX = [-2, -1, 0, 1, 2];
+    const bowlY = [7, 4, 3, 4, 7];
+    const flat = ols(bowlX.map(function (x) { return [x]; }), bowlY, true);
+    expect(Engine.pearson(bowlX, bowlY).r).toBeCloseTo(0, 12);
+    expect(Engine.curveRSquared(bowlY, flat.Y_fit)).toBeCloseTo(0, 12);
+    const quadratic = ols(bowlX.map(function (x) { return [x, x * x]; }), bowlY, true);
+    expect(Engine.pearson(bowlY, quadratic.Y_fit).r).toBeCloseTo(1, 12);
+    expect(Engine.curveRSquared(bowlY, quadratic.Y_fit)).toBeCloseTo(1, 12);
+
+    expect(Engine.pearson([1, 2, 3], [2, 4, 6]).r).toBeCloseTo(1, 12);
+    expect(Engine.curveRSquared([1, 2, 3], [2, 4, 6])).toBeCloseTo(-6, 12);
+    expect(Engine.curveRSquared([5, 5, 5], [1, 2, 3])).toBeNaN();
+  });
+
+  test('drops a predictor and its dependent terms from the frozen analyzed rows', () => {
+    const ols = require('../../src/shared/js/core/regression-compute.js').computeOLS;
+    const session = Engine.createSession();
+    session.loadData({
+      headers: ['Y', 'X', 'Z'],
+      rows: [[7.5, -1, -1], [8.5, -1, 1], [10.5, 1, -1], [13.5, 1, 1], [null, 0, 0]],
+      address: 'Drop!A1:C6'
+    });
+    session.configure({
+      response: 'Y',
+      numeric: ['X', 'Z'],
+      categorical: [],
+      roles: { X: 'adjustable', Z: 'adjustable' },
+      interactions: []
+    });
+    expect(session.finishFit(session.beginFit()).applied).toBe(true);
+    const model = session.read().model;
+    expect(model.n).toBe(4);
+    const dropX = model.contributions.X;
+    expect(dropX.ok).toBe(true);
+    expect(dropX.n).toBe(4);
+    expect(dropX.fullR2).toBeCloseTo(20 / 21, 10);
+    expect(dropX.reducedR2).toBeCloseTo(4 / 21, 10);
+    expect(dropX.drop * 100).toBeCloseTo(1600 / 21, 8);
+
+    const demo = sessionFromPreset();
+    const fitted = demo.read().model;
+    const rows = demo.read().analyzedRows;
+    const design = rows.map(function (row) {
+      const temperature = row.settings.Temperature;
+      const recipeB = row.settings.Recipe === 'B' ? 1 : 0;
+      return [temperature, recipeB, temperature * recipeB];
+    });
+    const response = rows.map(function (row) { return row.response; });
+    const full = ols(design, response, true);
+    const withoutRecipe = ols(design.map(function (row) { return [row[0]]; }), response, true);
+    expect(fitted.contributions.Recipe.ok).toBe(true);
+    expect(fitted.contributions.Recipe.n).toBe(rows.length);
+    expect(fitted.contributions.Recipe.fullR2).toBeCloseTo(full.R2, 10);
+    expect(fitted.contributions.Recipe.reducedR2).toBeCloseTo(withoutRecipe.R2, 10);
+    expect(fitted.contributions.Temperature.reducedR2).toBeLessThan(fitted.contributions.Temperature.fullR2);
+    expect(fitted.contributions.Missing).toBeUndefined();
+  });
 });

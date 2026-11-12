@@ -14,12 +14,12 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261109ps" />
   <script src="../shared-config.js?v=20261109ps"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261112ps8"></script>
+  <script src="../shared-header.js?v=20261112ps10"></script>
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
   <script src="../../shared/column-type.js"></script>
   <script src="../../shared/regression-case-trace.js"></script>
   <script src="../../shared/regression-effect-plot.js"></script>
-  <script src="../../shared/process-settings-engine.js?v=20261109ps5"></script>
+  <script src="../../shared/process-settings-engine.js?v=20261112ps9"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <style>
@@ -90,7 +90,8 @@
     #view-scatters .psc-stat { border: 1px solid var(--border, rgba(255,255,255,.09)); border-radius: 8px; padding: 6px 8px; text-align: center; background: rgba(14, 20, 27, 0.28); }
     html[data-theme="light"] #view-scatters .psc-stat { background: #fff; }
     #view-scatters .psc-stat b { display: block; color: var(--accent-1, #fb923c); font-size: 20px; font-variant-numeric: tabular-nums; }
-    #view-scatters .psc-stat span { font-size: 14px; color: var(--text-muted, #9aabbd); font-weight: 700; }
+    #view-scatters .psc-stat span { display: block; font-size: 13px; line-height: 1.25; color: var(--text-muted, #9aabbd); font-weight: 700; }
+    #view-scatters .psc-fit-note { margin: 4px 12px 0; font-size: 14px; line-height: 1.35; color: var(--text-muted, #9aabbd); }
     #view-scatters .psc-plot { flex: 1; height: auto; min-height: 480px; }
     @media (max-width: 980px) {
       #view-scatters .psc-stage { grid-template-columns: 1fr; }
@@ -1319,22 +1320,18 @@ function pscDefaultCtrl() {
     }
 
     function pscPearson(points) {
-      const n = points.length;
-      if (n < 3) return { n: n, r: NaN, p: NaN, r2: NaN };
-      let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
-      points.forEach(function (pair) {
-        sx += pair[0]; sy += pair[1];
-        sxx += pair[0] * pair[0]; syy += pair[1] * pair[1]; sxy += pair[0] * pair[1];
-      });
-      const num = n * sxy - sx * sy;
-      const den = Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
-      if (!(den > 0)) return { n: n, r: NaN, p: NaN, r2: NaN };
-      const r = Math.max(-1, Math.min(1, num / den));
-      const r2 = r * r;
+      const xs = [];
+      const ys = [];
+      points.forEach(function (pair) { xs.push(pair[0]); ys.push(pair[1]); });
+      const base = Engine.pearson(xs, ys);
+      const n = base.n;
+      const r = base.r;
+      if (!Number.isFinite(r) || n < 3) return { n: n, r: r, p: NaN };
+      if (Math.abs(r) >= 1) return { n: n, r: r, p: 0 };
       const df = n - 2;
-      const t = Math.abs(r) * Math.sqrt(df / Math.max(1e-15, 1 - r2));
+      const t = Math.abs(r) * Math.sqrt(df / Math.max(1e-15, 1 - r * r));
       const p = (typeof tCDF === 'function') ? (2 * (1 - tCDF(t, df))) : NaN;
-      return { n: n, r: r, p: p, r2: r2 };
+      return { n: n, r: r, p: p };
     }
 
     function pscFmt(value, digits) {
@@ -1432,27 +1429,40 @@ function pscDefaultCtrl() {
     }
 
     function pscFitModel(points, type) {
-      if (type === 'none' || points.length < 3) return null;
+      const empty = { ok: false, used: [], equation: null, reason: 'No curve is selected.', predict: function () { return NaN; }, band: function () { return null; } };
+      if (type === 'none') return empty;
       function chartRows(select) {
         const rows = [];
-        points.forEach(function (pair) {
+        const used = [];
+        points.forEach(function (pair, index) {
           const row = select(pair[0], pair[1]);
-          if (row) rows.push(row);
+          if (row) { rows.push(row); used.push(index); }
         });
-        return rows;
+        return { rows: rows, used: used };
       }
-      function fromDesign(rows, paramCount, equation, designAt, toChart) {
-        const band = pscDesignBand(rows, paramCount);
-        if (!band) return null;
+      function fromDesign(selected, paramCount, equation, designAt, toChart) {
+        const failed = {
+          ok: false, used: selected.used, equation: null, predict: function () { return NaN; }, band: function () { return null; },
+          reason: selected.rows.length < paramCount + 1
+            ? ('The curve needs at least ' + (paramCount + 1) + ' eligible rows.')
+            : 'The curve could not be estimated.'
+        };
+        if (selected.rows.length < paramCount + 1) return failed;
+        const band = pscDesignBand(selected.rows, paramCount);
+        if (!band) return failed;
+        function predict(x) {
+          const c = designAt(x);
+          if (!c) return NaN;
+          let yhat = 0;
+          for (let i = 0; i < c.length; i++) yhat += band.coef[i] * c[i];
+          return toChart(yhat);
+        }
         return {
+          ok: true,
+          used: selected.used,
           equation: equation(band.coef),
-          predict: function (x) {
-            const c = designAt(x);
-            if (!c) return NaN;
-            let yhat = 0;
-            for (let i = 0; i < c.length; i++) yhat += band.coef[i] * c[i];
-            return toChart(yhat);
-          },
+          reason: '',
+          predict: predict,
           band: function (x) {
             const c = designAt(x);
             if (!c) return null;
@@ -1495,12 +1505,11 @@ function pscDefaultCtrl() {
           return 'y = ' + pscCoef(Math.exp(coef[0])) + ' x^(' + pscCoef(coef[1]) + ')';
         }, function (x) { return x > 0 ? [1, Math.log(x)] : null; }, function (y) { return Math.exp(y); });
       }
-      return null;
+      return empty;
     }
 
-    function pscFitLine(points, type) {
-      const model = pscFitModel(points, type);
-      if (!model) return { data: [], band: [], equation: null };
+    function pscCurvePath(model, points) {
+      if (!model || !model.ok) return { data: [], band: [], equation: model && model.equation };
       const extent = pscExtent(points, 0);
       const data = [];
       const band = [];
@@ -1512,6 +1521,29 @@ function pscDefaultCtrl() {
         if (iv) band.push([x, iv[0], iv[1]]);
       }
       return { data: data, band: band, equation: model.equation };
+    }
+
+    function pscPercent(fraction) {
+      if (!Number.isFinite(fraction)) return 'Unavailable';
+      return pscFmt(fraction * 100, 2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + '%';
+    }
+
+    function pscPoints(fraction) {
+      if (!Number.isFinite(fraction)) return 'Unavailable';
+      return pscFmt(fraction * 100, 2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    }
+
+    function pscCurveLabel(type) {
+      if (type === 'polynomial') return 'Polynomial';
+      if (type === 'exponential') return 'Exponential';
+      if (type === 'logarithmic') return 'Logarithmic';
+      if (type === 'power') return 'Power';
+      return 'Linear';
+    }
+
+    function pscStatCard(value, label, tip) {
+      const title = tip ? ' title="' + esc(tip) + '"' : '';
+      return '<div class="psc-stat"' + title + '><b>' + esc(String(value)) + '</b><span>' + esc(label) + '</span></div>';
     }
 
     function pscNumericJobs() {
@@ -1634,14 +1666,113 @@ function pscDefaultCtrl() {
       '</div>';
     }
 
+    function pscPaintSummary(index, job, points, model, curveType, categorical) {
+      const statHost = document.getElementById('pscStats' + index);
+      const eq = document.getElementById('pscEq' + index);
+      const note = document.getElementById('pscNote' + index);
+      const plotted = points.length;
+      const contribution = ((session.read().model || {}).contributions || {})[job.name];
+      const contribTip = contribution && contribution.ok
+        ? ('Drop in ordinary R², in percentage points. Full-model R² ' + pscPercent(contribution.fullR2) + '. Reduced-model R² ' + pscPercent(contribution.reducedR2) + '. n = ' + contribution.n + '.')
+        : ((contribution && contribution.reason) || 'The active model does not report this predictor’s contribution.');
+      const contribValue = contribution && contribution.ok ? pscPoints(contribution.drop) : 'Unavailable';
+      let obsValue = 'Unavailable';
+      let corrValue = 'Unavailable';
+      let corrLabel = 'Correlation';
+      let corrTip = 'Unavailable';
+      let r2Value = 'Unavailable';
+      let r2Tip = 'Curve R² is 1 − SSE/SST on the original response scale, shown as a percentage.';
+      const notes = [];
+      if (categorical) {
+        obsValue = String(plotted);
+        corrTip = 'No curve is fit for a categorical predictor.';
+        r2Tip = corrTip;
+        notes.push('No curve is fit for a categorical predictor. The points are the observed ' + job.yName + ' values.');
+      } else if (!model || !model.ok) {
+        notes.push((model && model.reason) || 'The curve could not be estimated.');
+      } else {
+        const observed = [];
+        const predicted = [];
+        const xs = [];
+        model.used.forEach(function (rowIndex) {
+          const pair = points[rowIndex];
+          const yHat = model.predict(pair[0]);
+          const yObs = pair[2];
+          if (!Number.isFinite(yHat) || !Number.isFinite(yObs)) return;
+          observed.push(yObs);
+          predicted.push(yHat);
+          xs.push(pair[0]);
+        });
+        const fitted = observed.length;
+        obsValue = fitted === plotted ? String(fitted) : (fitted + ' fitted / ' + plotted + ' plotted');
+        if (fitted !== plotted) {
+          const skipped = plotted - fitted;
+          if (curveType === 'logarithmic') notes.push('The logarithmic fit skips ' + skipped + ' plotted ' + (skipped === 1 ? 'row' : 'rows') + ' whose ' + job.name + ' is not positive.');
+          else if (curveType === 'exponential') notes.push('The exponential fit skips ' + skipped + ' plotted ' + (skipped === 1 ? 'row' : 'rows') + ' whose ' + job.yName + ' is not positive.');
+          else if (curveType === 'power') notes.push('The power fit skips ' + skipped + ' plotted ' + (skipped === 1 ? 'row' : 'rows') + ' whose ' + job.name + ' or ' + job.yName + ' is not positive.');
+          else notes.push('The fit skips ' + skipped + ' plotted ' + (skipped === 1 ? 'row' : 'rows') + ' outside its domain.');
+        }
+        if (job.raw.length > plotted && drawCtrlSafe(job)) {
+          notes.push(pscAxisTitle(job.name, job.ctrl.xTransform) + ' skips ' + (job.raw.length - plotted) + ' rows outside its domain.');
+        }
+        const r2 = Engine.curveRSquared(observed, predicted);
+        r2Value = pscPercent(r2);
+        if (curveType === 'linear') {
+          const axis = pscAxisTitle(job.name, job.ctrl.xTransform);
+          const assoc = pscPearson(xs.map(function (x, i) { return [x, observed[i]]; }));
+          corrValue = Number.isFinite(assoc.r) ? pscFmt(assoc.r, 4) : 'Unavailable';
+          corrLabel = job.ctrl.xTransform && job.ctrl.xTransform !== 'none' ? ('Pearson r · ' + job.yName + ' vs ' + axis) : 'Pearson r';
+          corrTip = 'Signed Pearson r between ' + job.yName + ' and ' + axis + ', for the rows used by the linear fit.';
+          if (eq) {
+            eq.hidden = false;
+            eq.textContent = 'Linear · Equation: ' + model.equation + (Number.isFinite(assoc.p) ? (' · Two-sided t test of Pearson r, linear fit of ' + axis + ', p = ' + pscFmtP(assoc.p)) : '');
+          }
+        } else {
+          const assoc = Engine.pearson(observed, predicted);
+          corrValue = Number.isFinite(assoc.r) ? pscFmt(assoc.r, 4) : 'Unavailable';
+          corrLabel = 'Observed vs. fitted r';
+          corrTip = 'Correlation between observed ' + job.yName + ' and the ' + pscCurveLabel(curveType).toLowerCase() + ' curve’s predictions, on the original response scale.';
+          if (eq) {
+            eq.hidden = false;
+            eq.textContent = pscCurveLabel(curveType) + ' · Equation: ' + model.equation;
+          }
+        }
+      }
+      if (categorical && eq) eq.hidden = true;
+      if ((!model || !model.ok) && eq && !categorical) {
+        eq.hidden = false;
+        eq.textContent = pscCurveLabel(curveType) + ' · Equation: Unavailable';
+      }
+      if (note) {
+        note.hidden = !notes.length;
+        note.textContent = notes.join(' ');
+      }
+      if (statHost) {
+        statHost.innerHTML =
+          pscStatCard(obsValue, 'Observations', fittedTip(obsValue, plotted)) +
+          pscStatCard(corrValue, corrLabel, corrTip) +
+          pscStatCard(r2Value, 'Curve R²', r2Tip) +
+          pscStatCard(contribValue, 'Drop in R² without ' + job.name, contribTip);
+      }
+      function fittedTip(value, plottedCount) {
+        if (value === 'Unavailable') return 'The selected curve does not have an eligible sample.';
+        if (String(value).indexOf('fitted') >= 0) return 'Rows used by the curve, and rows drawn on the plot.';
+        return 'Paired rows used by the selected curve. ' + plottedCount + ' are drawn.';
+      }
+      function drawCtrlSafe(item) {
+        return item && item.ctrl && item.ctrl.xTransform && item.ctrl.xTransform !== 'none';
+      }
+    }
+
     function pscDrawJob(index) {
       const job = pscJob(index);
       if (!job) return;
       const ctrl = job.ctrl;
       const categorical = !!job.categories;
       const showFit = !categorical && ctrl.showFit !== false;
+      const curveType = categorical ? 'none' : ((ctrl.fit && ctrl.fit !== 'none') ? ctrl.fit : 'linear');
       const drawCtrl = {
-        fit: showFit ? ((ctrl.fit && ctrl.fit !== 'none') ? ctrl.fit : 'linear') : 'none',
+        fit: curveType,
         xTransform: categorical ? 'none' : (ctrl.xTransform || 'none'),
         yTransform: 'none',
         axis: 'x',
@@ -1662,21 +1793,9 @@ function pscDefaultCtrl() {
       job.xExt = pscExtent(points, 0);
       job.yExt = pscExtent(points, 1, [levels.lsl, levels.usl, levels.target]);
       const visible = pscVisible(points, job.xExt, job.yExt, drawCtrl);
-      const stats = pscPearson(visible);
-      const fit = categorical ? { data: [], band: [], equation: null } : pscFitLine(visible, drawCtrl.fit);
-      const statHost = document.getElementById('pscStats' + index);
-      if (statHost) {
-        statHost.innerHTML =
-          '<div class="psc-stat"><b>' + stats.n + '</b><span>Observations</span></div>' +
-          '<div class="psc-stat"><b>' + pscFmt(stats.r, 4) + '</b><span>Correlation (R)</span></div>' +
-          '<div class="psc-stat"><b>' + pscFmtP(stats.p) + '</b><span>p-value</span></div>' +
-          '<div class="psc-stat"><b>' + pscFmt(stats.r2, 4) + '</b><span>R²</span></div>';
-      }
-      const eq = document.getElementById('pscEq' + index);
-      if (eq) {
-        eq.hidden = !fit.equation;
-        eq.textContent = fit.equation ? ('Equation: ' + fit.equation) : '';
-      }
+      const model = categorical ? null : pscFitModel(points, curveType);
+      const fit = (showFit && model && model.ok) ? pscCurvePath(model, points) : { data: [], band: [], equation: model && model.equation };
+      pscPaintSummary(index, job, points, model, curveType, categorical);
       const reset = document.getElementById('pscReset' + index);
       if (reset) reset.hidden = categorical || !pscZoomed(ctrl);
       const xw = pscWindow(job.xExt, drawCtrl.xMin, drawCtrl.xMax);
@@ -1786,7 +1905,8 @@ function pscDefaultCtrl() {
           '<article class="chart-panel psc-card">' +
             pscHeaderHtml(index, job) +
             '<div class="psc-stats" id="pscStats' + index + '"></div>' +
-            (job.categories ? '' : '<p class="psc-card-eq" id="pscEq' + index + '" hidden>Equation: —</p>') +
+            '<p class="psc-card-eq" id="pscEq' + index + '" hidden></p>' +
+            '<p class="psc-fit-note" id="pscNote' + index + '" hidden></p>' +
             '<div class="chart-panel-b"><div class="psc-plot" id="pscChart' + index + '"></div></div>' +
             (job.categories ? '' : pscOptionsHtml(index, job.ctrl, job.yName)) +
           '</article>' +

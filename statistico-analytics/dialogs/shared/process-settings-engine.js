@@ -315,6 +315,118 @@
     return columns;
   }
 
+  function columnDependsOn(col, predictor) {
+    if (!col || predictor == null) return false;
+    if (col.kind === 'numeric') return col.name === predictor;
+    if (col.kind === 'dummy') return col.factor === predictor;
+    if (col.kind === 'interaction') {
+      return (col.factors || []).some(function (factor) {
+        if (factor.kind === 'numeric') return factor.name === predictor;
+        if (factor.kind === 'dummy') return factor.factor === predictor;
+        return false;
+      });
+    }
+    return false;
+  }
+
+  function predictorContributions(xMatrix, yVector, columns, predictors, includeIntercept) {
+    var full = null;
+    try {
+      full = computeOLS(xMatrix.map(function (row) { return row.slice(); }), yVector.slice(), includeIntercept !== false, 0.05);
+    } catch (err) {
+      full = null;
+    }
+    var out = {};
+    (predictors || []).forEach(function (name) {
+      if (!columns.some(function (col) { return columnDependsOn(col, name); })) {
+        out[name] = { ok: false, reason: 'This predictor is not in the active model.' };
+        return;
+      }
+      if (!full || !Number.isFinite(full.R2)) {
+        out[name] = { ok: false, reason: 'The full model does not report an ordinary R².' };
+        return;
+      }
+      var keep = [];
+      columns.forEach(function (col, index) {
+        if (!columnDependsOn(col, name)) keep.push(index);
+      });
+      var reducedX = xMatrix.map(function (row) {
+        return keep.map(function (index) { return row[index]; });
+      });
+      if (!reducedX.length || (!reducedX[0].length && includeIntercept === false)) {
+        out[name] = { ok: false, reason: 'The model without this predictor could not be estimated.' };
+        return;
+      }
+      var reduced = null;
+      try {
+        reduced = computeOLS(reducedX, yVector.slice(), includeIntercept !== false, 0.05);
+      } catch (err) {
+        reduced = null;
+      }
+      if (!reduced || !Number.isFinite(reduced.R2)) {
+        out[name] = { ok: false, reason: 'The model without this predictor could not be estimated.' };
+        return;
+      }
+      out[name] = {
+        ok: true,
+        fullR2: full.R2,
+        reducedR2: reduced.R2,
+        drop: full.R2 - reduced.R2,
+        n: full.n,
+        reason: ''
+      };
+    });
+    return out;
+  }
+
+  function pearson(xs, ys) {
+    var n = xs && ys && xs.length === ys.length ? xs.length : 0;
+    if (n < 2) return { n: n, r: NaN };
+    var sx = 0;
+    var sy = 0;
+    var sxx = 0;
+    var syy = 0;
+    var sxy = 0;
+    for (var i = 0; i < n; i++) {
+      var x = Number(xs[i]);
+      var y = Number(ys[i]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return { n: n, r: NaN };
+      sx += x;
+      sy += y;
+      sxx += x * x;
+      syy += y * y;
+      sxy += x * y;
+    }
+    var num = n * sxy - sx * sy;
+    var den = Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
+    if (!(den > 0)) return { n: n, r: NaN };
+    var r = num / den;
+    if (r > 1) r = 1;
+    if (r < -1) r = -1;
+    return { n: n, r: r };
+  }
+
+  function curveRSquared(observed, predicted) {
+    var n = observed && predicted && observed.length === predicted.length ? observed.length : 0;
+    if (n < 2) return NaN;
+    var mean = 0;
+    for (var i = 0; i < n; i++) {
+      if (!Number.isFinite(observed[i]) || !Number.isFinite(predicted[i])) return NaN;
+      mean += observed[i];
+    }
+    mean /= n;
+    var sst = 0;
+    var sse = 0;
+    for (var j = 0; j < n; j++) {
+      var centered = observed[j] - mean;
+      var error = observed[j] - predicted[j];
+      sst += centered * centered;
+      sse += error * error;
+    }
+    if (!(sst > 0)) return NaN;
+    return 1 - sse / sst;
+  }
+
   function prepareDesign(table, config) {
     var headers = table.headers || [];
     var rows = table.rows || [];
@@ -806,6 +918,13 @@
         fitConfidence: state.confidence,
         fitted: results.Y_fit ? results.Y_fit.slice() : [],
         residuals: results.residuals ? results.residuals.slice() : [],
+        contributions: predictorContributions(
+          prepared.traced.xMatrix,
+          prepared.traced.yVector,
+          prepared.columns,
+          prepared.numeric.concat(prepared.categorical),
+          state.config.includeIntercept !== false
+        ),
         coefficients: results.coefficients.map(function (estimate, i) {
           return {
             name: names[i] || ('Term ' + (i + 1)),
@@ -1133,6 +1252,7 @@
           fitConfidence: state.model.fitConfidence,
           fitted: state.model.fitted.slice(),
           residuals: state.model.residuals.slice(),
+          contributions: copy(state.model.contributions || {}),
           references: (state.model.categoricalInfo || []).map(function (cat) {
             return {
               name: cat.name,
@@ -1187,6 +1307,8 @@
     createSession: createSession,
     demoTable: demoTable,
     demoPreset: demoPreset,
-    columnChoices: columnChoices
+    columnChoices: columnChoices,
+    pearson: pearson,
+    curveRSquared: curveRSquared
   };
 });

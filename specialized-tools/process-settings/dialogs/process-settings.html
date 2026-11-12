@@ -69,19 +69,36 @@
       #view-overview .ps-results-lead { align-items: flex-start; flex-direction: column; }
     }
     .ps-top { flex: 0 0 auto; }
+    .ps-profiler-tabs { display: flex; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; }
+    .ps-profiler-tab {
+      border: 1px solid var(--border, rgba(255,255,255,.16));
+      background: var(--surface-2, #1b2430);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-weight: 650;
+    }
+    .ps-profiler-tab[aria-selected="true"] {
+      background: var(--accent-1, #18d38b);
+      color: #06281c;
+      border-color: transparent;
+    }
+    #profiler-explore:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    #profiler-explore[hidden], #profiler-optimize[hidden] { display: none !important; }
+    #profiler-optimize:not([hidden]) { flex: 1 1 auto; min-height: 0; overflow: auto; }
     .ps-find {
-      flex: 0 1 auto;
-      max-height: min(46vh, 440px);
-      overflow: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+      display: grid;
+      grid-template-columns: minmax(280px, 1.15fr) minmax(240px, 0.85fr);
+      gap: 12px;
+      align-items: start;
       padding: 10px 12px;
       border: 1px solid var(--border, rgba(255,255,255,.12));
       border-radius: 10px;
       background: var(--surface-1, #242c37);
     }
-    .ps-find[hidden] { display: none !important; }
+    .ps-optimize-form, .ps-optimize-result { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    @media (max-width: 860px) {
+      .ps-find { grid-template-columns: 1fr; }
+    }
     .ps-find-head, .ps-find-goals, .ps-find-actions, .ps-find-factor-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
     .ps-find-head { justify-content: space-between; }
     .ps-find-goals { margin: 0; padding: 0; border: 0; }
@@ -628,7 +645,7 @@
               <button type="button" class="ps-btn primary" id="pin-btn">Use these settings as current</button>
               <button type="button" class="ps-btn" id="edit-current" hidden>Edit current settings</button>
               <button type="button" class="ps-btn" id="reset-candidate" hidden>Reset candidate</button>
-              <button type="button" class="ps-btn" id="find-candidate">Find candidate settings</button>
+              <button type="button" class="ps-btn" id="find-candidate">Optimize</button>
               <label class="field" style="min-width:140px;">Use analyzed row
                 <select id="row-picker" aria-label="Use analyzed row"></select>
               </label>
@@ -644,7 +661,11 @@
             <p id="pin-status" class="status" role="status"></p>
             <p id="withheld" class="status error" hidden></p>
           </div>
-          <section id="find-panel" class="ps-find" hidden aria-labelledby="find-title"></section>
+          <div class="ps-profiler-tabs" role="tablist" aria-label="Prediction Profiler">
+            <button type="button" class="ps-profiler-tab" id="profiler-tab-explore" role="tab" aria-selected="true" aria-controls="profiler-explore">Explore</button>
+            <button type="button" class="ps-profiler-tab" id="profiler-tab-optimize" role="tab" aria-selected="false" aria-controls="profiler-optimize">Optimize</button>
+          </div>
+          <div id="profiler-explore">
           <div class="ps-cause-effect">
             <article class="chart-panel ps-causes-card" aria-label="Causes">
               <div class="chart-panel-h">
@@ -663,6 +684,10 @@
               </div>
               <div class="chart-panel-b" id="effect-readout" aria-live="polite"></div>
             </article>
+          </div>
+          </div>
+          <div id="profiler-optimize" hidden>
+            <section id="find-panel" class="ps-find" aria-labelledby="find-title"></section>
           </div>
         </section>
 
@@ -2194,6 +2219,7 @@ function pscDefaultCtrl() {
     } else if (view === 'setup' && options.rebuild) {
       fillSetup();
     }
+    var entering = view !== currentView;
     document.querySelectorAll('.ps-view').forEach(function (node) {
       node.hidden = node.id !== 'view-' + view;
     });
@@ -2205,7 +2231,11 @@ function pscDefaultCtrl() {
     if (view === 'overview') renderOverview();
     if (view === 'effects') renderEffects();
     if (view === 'diagnostics') renderDiagnostics();
-    if (view === 'profiler') { buildProfiler(); paintProfiler(); }
+    if (view === 'profiler') {
+      buildProfiler();
+      paintProfiler();
+      if (entering) showProfilerTab('explore');
+    }
     if (view === 'scatters') renderPredictorScatters();
     if (view === 'compare') renderCompare();
     el('cancel-edit').hidden = !(editing && session.read().model);
@@ -3503,11 +3533,27 @@ function pscDefaultCtrl() {
     if (!live && message) message.textContent = 'The model or specifications changed. This result cannot be applied. Search again.';
   }
 
+  function showProfilerTab(tab) {
+    var explore = el('profiler-explore');
+    var optimize = el('profiler-optimize');
+    if (!explore || !optimize) return;
+    var openOptimize = tab === 'optimize';
+    explore.hidden = openOptimize;
+    optimize.hidden = !openOptimize;
+    var exploreTab = el('profiler-tab-explore');
+    var optimizeTab = el('profiler-tab-optimize');
+    if (exploreTab) exploreTab.setAttribute('aria-selected', openOptimize ? 'false' : 'true');
+    if (optimizeTab) optimizeTab.setAttribute('aria-selected', openOptimize ? 'true' : 'false');
+    if (!openOptimize) return;
+    var panel = el('find-panel');
+    if (panel && !panel.innerHTML) renderFindPanel();
+    else noteFindFreshness();
+  }
+
   function closeFindPanel() {
     findRun += 1;
     findBusy = false;
-    var panel = el('find-panel');
-    if (panel) panel.hidden = true;
+    showProfilerTab('explore');
   }
 
   function findFactorHtml(view, name, draft) {
@@ -3544,7 +3590,8 @@ function pscDefaultCtrl() {
     });
     var yieldGoal = view.yieldGoal || { available: false, reason: 'Fit the model before estimating in-spec yield.' };
     el('find-panel').innerHTML =
-      '<div class="ps-find-head"><h2 id="find-title">Find candidate settings</h2><button type="button" class="ps-btn" id="find-close">Close</button></div>' +
+      '<div class="ps-optimize-form">' +
+      '<div class="ps-find-head"><h2 id="find-title">Optimize</h2><button type="button" class="ps-btn" id="find-close">Explore</button></div>' +
       '<fieldset class="ps-find-goals"><legend class="ps-sr">Goal</legend>' +
       '<label><input type="radio" name="find-goal" value="mean" checked /> Maximize predicted response</label>' +
       '<label><input type="radio" name="find-goal" value="yield"' + (yieldGoal.available ? '' : ' disabled') + ' /> Maximize estimated in-spec yield</label>' +
@@ -3553,7 +3600,8 @@ function pscDefaultCtrl() {
       (fixed.length ? ('<p class="hint">Held fixed: ' + esc(fixed.join(' · ')) + '</p>') : '') +
       '<div class="ps-find-grid">' + names.map(function (name) { return findFactorHtml(view, name, draft); }).join('') + '</div>' +
       '<div class="ps-find-actions"><button type="button" class="ps-btn primary" id="find-run">Find candidate</button></div>' +
-      '<p id="find-message" class="status" role="status"></p><div id="find-result"></div>';
+      '</div>' +
+      '<div class="ps-optimize-result"><p id="find-message" class="status" role="status"></p><div id="find-result"></div></div>';
     findResult = null;
     findBusy = false;
   }
@@ -3630,7 +3678,7 @@ function pscDefaultCtrl() {
     var view = session.read();
     var host = el('find-result');
     if (!host) return;
-    if (!result || result.ok === false) {
+    if (!result || result.ok === false || !result.changed || !result.changed.length) {
       host.innerHTML = '';
       return;
     }
@@ -3692,6 +3740,15 @@ function pscDefaultCtrl() {
         }
         return;
       }
+      if (!result.changed || !result.changed.length) {
+        findResult = null;
+        if (message) {
+          message.textContent = 'No improvement found for this goal within the selected bounds.';
+          message.className = 'status';
+        }
+        renderFindResult(result);
+        return;
+      }
       findResult = result;
       if (message) {
         message.textContent = result.modeLabel || 'Candidate ready.';
@@ -3727,15 +3784,9 @@ function pscDefaultCtrl() {
   }
 
   el('profiler-edit-specs').addEventListener('click', openSpecifications);
-  el('find-candidate').addEventListener('click', function () {
-    var panel = el('find-panel');
-    if (!panel.hidden) {
-      closeFindPanel();
-      return;
-    }
-    renderFindPanel();
-    panel.hidden = false;
-  });
+  el('profiler-tab-explore').addEventListener('click', function () { showProfilerTab('explore'); });
+  el('profiler-tab-optimize').addEventListener('click', function () { showProfilerTab('optimize'); });
+  el('find-candidate').addEventListener('click', function () { showProfilerTab('optimize'); });
   el('find-panel').addEventListener('click', function (event) {
     var target = event.target && event.target.closest ? event.target.closest('button') : event.target;
     if (!target) return;

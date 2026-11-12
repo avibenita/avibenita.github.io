@@ -2165,7 +2165,7 @@ const StatisticoHeader = {
               resultItem('overview', 'fa-chart-pie', 'Overview', 'Fitted response, sample, and specifications.'),
               resultItem('effects', 'fa-arrows-split-up-and-left', 'Effects & Interactions', 'Coefficients and interaction profiles.'),
               resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics', 'Observed versus fitted and residual checks.'),
-              resultItem('scatters', 'fa-chart-scatter', 'Predictor Scatters', 'Response versus every predictor, with scatter controls.'),
+              resultItem('scatters', 'fa-chart-scatter', 'Predictor Scatters', 'Response versus one predictor, with a fit toggle and chart options.'),
               resultItem('profiler', 'fa-sliders', 'Prediction Profiler', 'Move a setting and read the predicted response.'),
               resultItem('compare', 'fa-table-columns', 'Compare Settings', 'Current recipe and candidate on one scale.')
             ]
@@ -9532,7 +9532,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'regression-viz-unique':
         'Each small chart is a partial regression (added-variable) plot: the x-axis shows the predictor after removing the linear influence of all other predictors (e(x | others)), and the y-axis shows the outcome with the same adjustment (e(y | others)). The slope is exactly the multiple-regression coefficient for that predictor. Read whether the line is clearly tilted (unique contribution), whether it is flat (no effect after controlling), and whether points hug the line tightly or scatter widely (how much remains unexplained).',
       'process-settings-ps-scatters':
-        'One predictor is shown at a time, chosen from the radio list. A numeric predictor keeps its own axis window, curve fit, and transforms. A categorical predictor shows the points and the specification lines without those controls. Horizontal lines mark the lower limit, target, and upper limit. The shaded band is the 95% confidence interval of the fitted curve. Describe the cloud and the chosen fit, not the multiple-regression coefficients.',
+        'One predictor is shown at a time, chosen from the radio list. Show fit is on by default and draws a linear trend with its 95% band; turn it off to inspect the points alone. Chart options holds the axis window, the curve, and an X-axis transform. The response stays in its original units so the target and limits stay readable. Reset zoom appears after the window changes and restores every observation and the specification lines. A categorical predictor shows the observed points and the same specification lines, and the plot uses the space under the chart.',
       'regression-diag-overview':
         'Read the assumption verdict strip, the residual histogram with normal overlay, and the high-level test summary. Use this view to decide if the model is trustworthy before interpreting coefficients.',
       'regression-diag-plots':
@@ -9676,7 +9676,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'regression-viz-unique':
         'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient. Describe slopes and scatter, not coefficients / SE / p-values.',
       'process-settings-ps-scatters':
-        'This view shows one predictor at a time. Numeric predictors have axis, fit, and transform controls. Categorical predictors do not. Horizontal lines are the lower limit, target, and upper limit. The shaded band is the 95% confidence interval of the fitted curve. Describe the cloud, the fit, and where points sit relative to the limits. Do not read this as partial-regression coefficients.',
+        'This view shows one predictor at a time. Show fit draws the trend and its 95% band; with it off, only the points remain. Chart options sets the axis window, curve, and X-axis transform. The response stays in its original units. Categorical predictors show the observed points and the specification lines, with the plot using the space under the chart. Describe the cloud, the fit when it is shown, and where points sit relative to the limits. Do not read this as partial-regression coefficients.',
       'regression-pred-overview':
         'This is an observed-vs-predicted scatter with overall fit metrics (RMSE, MAE, R^2). Describe the diagonal alignment, scatter, and any systematic curvature — not coefficient values.',
       'regression-pred-scenario':

@@ -218,10 +218,13 @@
     return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
   }
 
-  function analyzeByGroup(rows, valueIndex, groupIndex, spec, groupName) {
+  function analyzeByGroup(rows, valueIndex, groupIndex, spec, groupName, allowed) {
     var buckets = Object.create(null);
     var order = [];
+    var allNames = Object.create(null);
+    var allCount = 0;
     var missingN = 0;
+    var excludedN = 0;
     (rows || []).forEach(function (row) {
       var raw = row ? row[valueIndex] : null;
       var n = ColumnType.parseNumericCell(raw);
@@ -232,19 +235,37 @@
         return;
       }
       var name = String(label).trim();
+      if (!allNames[name]) {
+        allNames[name] = true;
+        allCount += 1;
+      }
+      if (allowed && !allowed[name]) {
+        excludedN += 1;
+        return;
+      }
       if (!buckets[name]) {
         buckets[name] = [];
         order.push(name);
       }
       buckets[name].push(n);
     });
-    if (ByGroup.tooManyGroupLevels(order.length)) {
+    if (ByGroup.tooManyGroupLevels(allCount)) {
       return {
         ok: false,
-        error: 'This column has ' + order.length + ' levels. By-group analysis accepts at most ' + ByGroup.MAX_SELECTABLE_GROUP_LEVELS + '.',
+        error: 'This column has ' + allCount + ' levels. By-group analysis accepts at most ' + ByGroup.MAX_SELECTABLE_GROUP_LEVELS + '.',
         groupName: groupName,
         missingN: missingN,
-        levelCount: order.length,
+        levelCount: allCount,
+        groups: []
+      };
+    }
+    if (allowed && !order.length) {
+      return {
+        ok: false,
+        error: 'Include at least one group level.',
+        groupName: groupName,
+        missingN: missingN,
+        levelCount: allCount,
         groups: []
       };
     }
@@ -278,6 +299,9 @@
     var warnings = [];
     if (missingN > 0) {
       warnings.push(plural(missingN, 'measured row') + ' with no group value ' + (missingN === 1 ? 'was' : 'were') + ' left out of the group comparison.');
+    }
+    if (excludedN > 0) {
+      warnings.push(plural(excludedN, 'measured row') + ' in an excluded level ' + (excludedN === 1 ? 'was' : 'were') + ' left out of the group comparison.');
     }
     if (small.length) {
       warnings.push('Small ' + (small.length === 1 ? 'group' : 'groups') + ': '
@@ -351,7 +375,12 @@
       } else if (groupIndex === valueIndex) {
         byGroup = { ok: false, error: 'The grouping column must be different from the measurement.', groupName: groupName, groups: [] };
       } else {
-        byGroup = analyzeByGroup(rows, valueIndex, groupIndex, opts, groupName);
+        var allowed = null;
+        if (Array.isArray(opts.include)) {
+          allowed = Object.create(null);
+          opts.include.forEach(function (name) { allowed[String(name)] = true; });
+        }
+        byGroup = analyzeByGroup(rows, valueIndex, groupIndex, opts, groupName, allowed);
       }
     }
     return {

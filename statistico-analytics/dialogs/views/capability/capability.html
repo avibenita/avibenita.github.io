@@ -10,14 +10,15 @@
     }
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="../shared-header.css?v=20261112cap" />
-  <link rel="stylesheet" href="../shared-by-group.css?v=20261112cap" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261112cap3" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20261112cap3" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261112cap"></script>
-  <script src="../../shared/column-type.js?v=20261112cap"></script>
-  <script src="../../shared/cpk-math.js?v=20261112cap"></script>
-  <script src="../../shared/by-group-standard.js?v=20261112cap"></script>
-  <script src="../../shared/capability-range-engine.js?v=20261112cap"></script>
+  <script src="../shared-header.js?v=20261112cap3"></script>
+  <script src="../../shared/column-type.js?v=20261112cap3"></script>
+  <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
+  <script src="../../shared/by-group-standard.js?v=20261112cap3"></script>
+  <script src="../shared/group-column-suitability.js?v=20261112cap3"></script>
+  <script src="../../shared/capability-range-engine.js?v=20261112cap3"></script>
   <style>
     html, body { height: 100%; margin: 0; }
     body {
@@ -91,6 +92,57 @@
     .bar-fill { height: 100%; background: #14b8a6; }
     .bar-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #eab308; }
     .empty-prompt { padding: 28px 8px; color: var(--text-secondary, rgba(255,255,255,.75)); }
+    .cap-input { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 12px; align-items: start; }
+    .var-list { display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow: auto; }
+    .var-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; font-weight: 650; }
+    .var-row small { color: var(--text-secondary, rgba(255,255,255,.7)); font-weight: 600; font-size: 11px; }
+    .var-row.is-selected { border-color: #14b8a6; box-shadow: 0 0 0 1px #14b8a6; }
+    .var-row.is-disabled { opacity: .45; cursor: not-allowed; }
+    .measure-slot { min-height: 42px; display: flex; align-items: center; padding: 8px 10px; border: 1px dashed var(--border, rgba(255,255,255,.28)); border-radius: 10px; font-weight: 750; }
+    .measure-slot.is-empty { color: var(--text-secondary, rgba(255,255,255,.7)); font-weight: 600; }
+    .grouping-compact { display: flex; align-items: center; gap: 8px; color: var(--text-secondary, rgba(255,255,255,.78)); font-size: 12px; font-weight: 650; }
+    .grouping-compact[hidden], #choose-group[hidden] { display: none !important; }
+    #byGroupNavWait { position: fixed; inset: 0; z-index: 12000; display: none; align-items: center; justify-content: center; background: rgba(6,12,22,.78); }
+    #byGroupNavWait.is-on { display: flex; }
+    #byGroupNavWait .by-group-nav-wait-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 28px; border-radius: 14px; background: #1b2433; color: #f8fafc; border: 1px solid rgba(196,181,253,.45); font: 700 14px/1.3 "Segoe UI", sans-serif; }
+    #byGroupNavWait i { font-size: 28px; color: #c4b5fd; }
+    .group-dialog-overlay { position: fixed; inset: 0; z-index: 13000; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,.48); }
+    .group-dialog-overlay.is-visible { display: flex; }
+    .group-dialog { width: min(920px, 96vw); max-height: 86vh; display: flex; flex-direction: column; background: var(--surface-1, #242C37); border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 14px; overflow: hidden; }
+    .group-dialog-head, .group-dialog-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--border, rgba(255,255,255,.14)); }
+    .group-dialog-foot { justify-content: flex-end; border-bottom: 0; border-top: 1px solid var(--border, rgba(255,255,255,.14)); }
+    .group-dialog-head strong { display: block; color: var(--accent-1, #5eead4); font-size: 15px; margin-bottom: 4px; }
+    .group-dialog-head span, .level-placeholder { color: var(--text-secondary, rgba(255,255,255,.75)); font-size: 12px; line-height: 1.4; }
+    .group-dialog-body { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(280px, 1fr); min-height: 0; overflow: hidden; }
+    .group-dialog-list, .level-preview { padding: 10px; overflow: auto; min-height: 280px; }
+    .group-dialog-list { border-right: 1px solid var(--border, rgba(255,255,255,.14)); }
+    .group-list-heading { color: var(--accent-1, #5eead4); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 10px 6px 4px; }
+    .group-option { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0; text-align: left; }
+    .group-option.is-selected { border-color: #14b8a6; box-shadow: 0 0 0 1px #14b8a6; }
+    .group-option.is-disabled { opacity: .42; cursor: not-allowed; }
+    .group-option small { color: var(--text-secondary, rgba(255,255,255,.72)); font-weight: 650; }
+    .group-option-note.tone-good { color: #34d399; }
+    .group-option-note.tone-caution { color: #fbbf24; }
+    .group-option-note.tone-bad { color: #fb7185; }
+    .level-preview.is-hidden, .level-placeholder.is-hidden { display: none; }
+    .level-placeholder { display: flex; min-height: 260px; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+    .level-preview-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+    .level-preview-head strong { color: var(--accent-1, #5eead4); }
+    .level-preview-head span { display: block; color: var(--text-secondary, rgba(255,255,255,.72)); font-size: 11px; margin-top: 3px; }
+    .level-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
+    .level-keep { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+    .level-keep input { width: 58px; padding: 5px 7px; }
+    .level-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 5px; border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 650; }
+    .level-row:not(.is-included) { opacity: .55; }
+    .level-row.is-included { opacity: 1; border-color: #14b8a6; }
+    .level-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .level-n { font-size: 11px; color: var(--text-secondary, rgba(255,255,255,.72)); }
+    .group-dialog-done-btn { background: #14b8a6; color: #042f2e; border-color: transparent; }
+    .group-dialog-done-btn:disabled { opacity: .45; cursor: not-allowed; }
+    @media (max-width: 860px) {
+      .cap-input, .group-dialog-body { grid-template-columns: 1fr; }
+      .group-dialog-list { border-right: 0; border-bottom: 1px solid var(--border, rgba(255,255,255,.14)); max-height: 240px; }
+    }
     @media (max-width: 860px) {
       .cap-grid, .metrics { grid-template-columns: 1fr 1fr; }
     }
@@ -103,37 +155,40 @@
       <div id="header-container"></div>
       <div class="cap-scroll">
         <section id="view-setup" class="cap-view" aria-labelledby="setup-title">
-          <div class="cap-card">
-            <h2 id="setup-title">Measurement and limits</h2>
-            <div class="cap-actions">
-              <button type="button" id="use-demo">Use demo data</button>
-              <button type="button" id="use-selection">Use Excel selection</button>
-              <button type="button" id="pick-range">Pick a range</button>
-              <button type="button" id="refresh-data">Refresh worksheet data</button>
+          <div class="cap-actions" style="margin-bottom:12px;">
+            <button type="button" id="use-demo">Use demo data</button>
+            <button type="button" id="use-selection">Use Excel selection</button>
+            <button type="button" id="pick-range">Pick a range</button>
+            <button type="button" id="refresh-data">Refresh worksheet data</button>
+          </div>
+          <p id="data-note" class="cap-note">Waiting for a worksheet range.</p>
+          <p id="host-error" class="cap-error" hidden></p>
+          <div class="cap-input">
+            <div class="cap-card">
+              <h2>Available variables</h2>
+              <div id="var-list" class="var-list"><p class="cap-note">Select a worksheet range, or use the demo data.</p></div>
             </div>
-            <p id="data-note" class="cap-note">Waiting for a worksheet range.</p>
-            <p id="host-error" class="cap-error" hidden></p>
-            <div class="spec-row">
-              <label class="field">Measurement
-                <select id="measure-select"></select>
-              </label>
-            </div>
-            <div class="spec-row">
-              <label class="field">Lower limit (LSL)
-                <input id="setup-lsl" type="number" step="any" value="10" />
-              </label>
-              <label class="field">Upper limit (USL)
-                <input id="setup-usl" type="number" step="any" value="20" />
-              </label>
-              <label class="field">Target (optional)
-                <input id="setup-target" type="number" step="any" value="15" />
-              </label>
-            </div>
-            <p class="cap-help">Mean and standard deviation are calculated from the measurement column. The standard deviation is the sample standard deviation (n − 1). Leave the target blank to use the midpoint of the limits. Expected defects assume a normal distribution.</p>
-            <p id="setup-error" class="cap-error" hidden></p>
-            <div class="cap-actions" style="margin-top:12px;">
-              <button type="button" class="primary" id="run-btn">Run capability</button>
-              <button type="button" id="close-btn">Close</button>
+            <div class="cap-card">
+              <h2 id="setup-title">Input &amp; Setup</h2>
+              <p class="cap-help">Choose the numeric variable to analyse, then set the specification limits.</p>
+              <div id="measure-slot" class="measure-slot is-empty">Select a numeric variable</div>
+              <div class="spec-row">
+                <label class="field">Lower limit (LSL)
+                  <input id="setup-lsl" type="number" step="any" />
+                </label>
+                <label class="field">Upper limit (USL)
+                  <input id="setup-usl" type="number" step="any" />
+                </label>
+                <label class="field">Target (optional)
+                  <input id="setup-target" type="number" step="any" />
+                </label>
+              </div>
+              <p class="cap-help">Mean and standard deviation are calculated from the measurement column. The standard deviation is the sample standard deviation (n − 1). Leave the target blank to use the midpoint of the limits. Expected defects assume a normal distribution.</p>
+              <p id="setup-error" class="cap-error" hidden></p>
+              <div class="cap-actions" style="margin-top:12px;">
+                <button type="button" class="primary" id="run-btn">Run capability</button>
+                <button type="button" id="close-btn">Close</button>
+              </div>
             </div>
           </div>
         </section>
@@ -178,29 +233,55 @@
           </div>
           <div id="by-group-body">
             <div class="cap-card">
-              <h2 id="by-group-title">By-Group Analysis</h2>
               <div class="cap-toolbar">
-                <label class="field">Group by
-                  <select id="group-by"></select>
-                </label>
+                <h2 id="by-group-title">By-Group Analysis</h2>
+                <div class="grouping-compact" id="grouping-compact" hidden>
+                  <span id="grouping-compact-text"></span>
+                  <button type="button" id="change-group">Change</button>
+                </div>
+                <button type="button" id="choose-group"><i class="fa-solid fa-layer-group"></i> Group by</button>
               </div>
               <p id="group-help" class="cap-help"></p>
-              <div id="group-finding"></div>
-              <div id="group-bars" class="bars"></div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Group</th><th>n</th><th>Mean</th><th>SD</th><th>Cp</th><th>Cpk</th><th>Cpu</th><th>Cpl</th><th>Limited by</th><th>PPM</th>
-                    </tr>
-                  </thead>
-                  <tbody id="group-table"></tbody>
-                </table>
+              <div id="group-results" hidden>
+                <div id="group-finding"></div>
+                <div id="group-bars" class="bars"></div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Group</th><th>n</th><th>Mean</th><th>SD</th><th>Cp</th><th>Cpk</th><th>Cpu</th><th>Cpl</th><th>Limited by</th><th>PPM</th>
+                      </tr>
+                    </thead>
+                    <tbody id="group-table"></tbody>
+                  </table>
+                </div>
+                <div id="group-method"></div>
               </div>
-              <div id="group-method"></div>
             </div>
           </div>
         </section>
+      </div>
+    </div>
+  </div>
+  <div id="byGroupNavWait" role="status" aria-live="polite"><div class="by-group-nav-wait-card"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i><span>Opening group selection…</span></div></div>
+  <div class="group-dialog-overlay" id="groupDialog" role="dialog" aria-modal="true" aria-labelledby="groupDialogTitle">
+    <div class="group-dialog">
+      <div class="group-dialog-head">
+        <div>
+          <strong id="groupDialogTitle">Group by</strong>
+          <span>Select a categorical variable that defines the groups to compare. Recommended grouping variables are listed first. Unique identifiers and the measurement stay visible but cannot be selected.</span>
+        </div>
+        <button class="group-dialog-close" type="button" id="group-dialog-close" aria-label="Close group selection"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="group-dialog-body">
+        <div class="group-dialog-list" id="groupDialogList"></div>
+        <div>
+          <div class="level-preview is-hidden" id="groupLevelPreview"></div>
+          <div class="level-placeholder" id="groupLevelPlaceholder">Select a grouping column to see its categories and n.</div>
+        </div>
+      </div>
+      <div class="group-dialog-foot">
+        <button type="button" class="group-dialog-done-btn" id="groupDialogConfirmBtn" disabled><i class="fa-solid fa-check"></i> Compare groups</button>
       </div>
     </div>
   </div>
@@ -210,12 +291,17 @@
     var BG = window.StatisticoByGroup;
     var math = window.CpkMath;
     var table = null;
-    var spec = { lsl: '10', usl: '20', target: '15' };
+    var spec = { lsl: '', usl: '', target: '' };
     var measure = '';
     var groupName = '';
     var view = 'setup';
     var hasRun = false;
     var last = null;
+    var levelSelections = {};
+    var previewLevels = [];
+    var previewGroup = '';
+    var DEFAULT_MIN_GROUP_N = 5;
+    var previewKeepMinN = '5';
 
     function el(id) { return document.getElementById(id); }
     function post(action) {
@@ -269,28 +355,84 @@
     }
 
     function fillMeasure() {
-      var select = el('measure-select');
-      var numeric = columnList().filter(function (col) { return col.kind === 'numeric'; });
-      if (!numeric.some(function (col) { return col.name === measure; })) {
-        measure = numeric.some(function (col) { return col.name === 'Diameter'; }) ? 'Diameter' : (numeric[0] ? numeric[0].name : '');
+      var host = el('var-list');
+      var slot = el('measure-slot');
+      var cols = columnList();
+      var numeric = cols.filter(function (col) { return col.kind === 'numeric'; });
+      if (measure && !numeric.some(function (col) { return col.name === measure; })) measure = '';
+      if (!cols.length) {
+        host.innerHTML = '<p class="cap-note">Select a worksheet range, or use the demo data.</p>';
+      } else {
+        host.innerHTML = cols.map(function (col) {
+          var disabled = col.kind !== 'numeric';
+          var selected = col.name === measure;
+          return '<button type="button" class="var-row' + (selected ? ' is-selected' : '') + (disabled ? ' is-disabled' : '') + '" data-name="' + escapeHtml(col.name) + '"' + (disabled ? ' disabled' : '') + '><span>' + escapeHtml(col.name) + '</span><small>' + (disabled ? 'Not numeric' : 'Numeric') + '</small></button>';
+        }).join('');
       }
-      select.innerHTML = numeric.map(function (col) {
-        return '<option value="' + escapeHtml(col.name) + '">' + escapeHtml(col.name) + '</option>';
-      }).join('');
-      if (!numeric.length) select.innerHTML = '<option value="">No numeric column</option>';
-      select.value = measure;
+      slot.textContent = measure || 'Select a numeric variable';
+      slot.classList.toggle('is-empty', !measure);
     }
 
-    function fillGroup() {
-      var select = el('group-by');
-      var cols = columnList().filter(function (col) { return col.name !== measure; });
-      var html = '<option value="">Select a grouping column</option>' + cols.map(function (col) {
-        return '<option value="' + escapeHtml(col.name) + '">' + escapeHtml(col.name) + ' (' + col.levels + ')</option>';
-      }).join('');
-      select.innerHTML = html;
-      if (groupName === measure) groupName = '';
-      if (groupName && !cols.some(function (col) { return col.name === groupName; })) groupName = '';
-      select.value = groupName;
+    function columnIndex(name) {
+      var headers = (table && table.headers) || [];
+      var i;
+      for (i = 0; i < headers.length; i++) {
+        if (String(headers[i] == null ? '' : headers[i]) === String(name)) return i;
+      }
+      return -1;
+    }
+    function currentMinGroupN() {
+      var parsed = parseInt(previewKeepMinN, 10);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MIN_GROUP_N;
+    }
+    function levelCounts(name) {
+      var idx = columnIndex(name);
+      var valueIdx = columnIndex(measure);
+      var counts = Object.create(null);
+      var order = [];
+      if (idx < 0 || !table) return [];
+      (table.rows || []).forEach(function (row) {
+        if (valueIdx >= 0) {
+          var numeric = window.StatisticoColumnType.parseNumericCell(row ? row[valueIdx] : null);
+          if (!Number.isFinite(numeric)) return;
+        }
+        var raw = row ? row[idx] : null;
+        if (raw == null || String(raw).trim() === '') return;
+        var key = String(raw).trim();
+        if (!counts[key]) {
+          counts[key] = 0;
+          order.push(key);
+        }
+        counts[key] += 1;
+      });
+      return order.map(function (level) { return { level: level, n: counts[level] }; });
+    }
+    function ensureLevelSelection(name) {
+      if (!levelSelections[name]) levelSelections[name] = {};
+      var minN = currentMinGroupN();
+      levelCounts(name).forEach(function (item) {
+        if (levelSelections[name][item.level] === undefined) levelSelections[name][item.level] = item.n >= minN;
+      });
+      return levelSelections[name];
+    }
+    function isLevelIncluded(name, level) {
+      var existing = levelSelections[name];
+      if (existing && Object.prototype.hasOwnProperty.call(existing, level)) return existing[level] !== false;
+      return ensureLevelSelection(name)[level] !== false;
+    }
+    function includedLevelNames(name) {
+      return levelCounts(name).filter(function (item) { return isLevelIncluded(name, item.level); }).map(function (item) { return item.level; });
+    }
+    function syncGroupChoice() {
+      var cols = columnList();
+      if (groupName === measure || (groupName && !cols.some(function (col) { return col.name === groupName; }))) groupName = '';
+      var hasGroup = !!groupName;
+      el('choose-group').hidden = hasGroup;
+      el('grouping-compact').hidden = !hasGroup;
+      if (hasGroup) {
+        var n = includedLevelNames(groupName).length;
+        el('grouping-compact-text').textContent = 'Grouped by ' + groupName + ' · ' + n + (n === 1 ? ' level' : ' levels');
+      }
     }
 
     function loadTable(next, note) {
@@ -299,7 +441,7 @@
       el('data-note').textContent = (table.address || 'Range') + ' · ' + rows.length + ' data ' + (rows.length === 1 ? 'row' : 'rows') + (note ? ' · ' + note : '');
       showError('host-error', '');
       fillMeasure();
-      fillGroup();
+      syncGroupChoice();
       if (hasRun) compute();
       showView(hasRun && last && last.ok ? view : 'setup');
     }
@@ -325,6 +467,7 @@
       last = Engine.analyze(table, {
         value: measure,
         group: groupName,
+        include: groupName ? includedLevelNames(groupName) : null,
         lsl: spec.lsl,
         usl: spec.usl,
         target: spec.target
@@ -534,9 +677,12 @@
         globalThis.__byGroupStandardContext = null;
         return;
       }
-      fillGroup();
+      syncGroupChoice();
       el('by-group-title').textContent = BG.PAGE_TITLE;
-      el('group-help').textContent = BG.moduleSentence('capability') + ' ' + BG.GROUP_BY_HELP;
+      el('group-help').textContent = groupName
+        ? (BG.moduleSentence('capability') + ' ' + BG.GROUP_BY_HELP)
+        : 'Choose a grouping column. Recommended variables are listed first, and you can include or leave out individual levels before the comparison.';
+      var results = el('group-results');
       var finding = el('group-finding');
       var bars = el('group-bars');
       var body = el('group-table');
@@ -545,13 +691,19 @@
       bars.innerHTML = '';
       body.innerHTML = '';
       method.innerHTML = '';
+      if (!groupName) {
+        results.hidden = true;
+        globalThis.__byGroupStandardContext = null;
+        return;
+      }
+      results.hidden = false;
       if (!last || !last.ok) {
         finding.innerHTML = '<p class="cap-error">' + escapeHtml((last && last.error) || 'Capability could not be calculated.') + '</p>';
         globalThis.__byGroupStandardContext = null;
         return;
       }
       body.innerHTML = rowCells('Overall', last.overall.n, last.overall, 'overall');
-      if (!groupName || !last.byGroup) {
+      if (!last.byGroup) {
         globalThis.__byGroupStandardContext = null;
         return;
       }
@@ -603,20 +755,35 @@
       if (typeof StatisticoHeader._mountSidebarUtilities === 'function') StatisticoHeader._mountSidebarUtilities();
     }
 
-    function showView(next) {
+    function showView(next, options) {
       view = next;
       ['setup', 'results', 'by-group'].forEach(function (name) {
         el('view-' + name).hidden = view !== name;
       });
       if (view === 'results') paintResults();
-      if (view === 'by-group') paintByGroup();
+      if (view === 'by-group') {
+        paintByGroup();
+        if (hasRun && !(options && options.keepDialog)) {
+          el('byGroupNavWait').classList.add('is-on');
+          setTimeout(openGroupDialog, 30);
+        }
+      }
       syncShell();
     }
     window.switchCapabilityView = showView;
 
     function run() {
       readSpec('setup');
-      measure = el('measure-select').value;
+      if (!measure) {
+        showError('setup-error', 'Choose a measurement column.');
+        showView('setup');
+        return;
+      }
+      if (String(spec.lsl).trim() === '' || String(spec.usl).trim() === '') {
+        showError('setup-error', 'Enter the lower and upper specification limits.');
+        showView('setup');
+        return;
+      }
       hasRun = true;
       compute();
       if (!last.ok) {
@@ -640,20 +807,139 @@
         });
       });
     });
-    el('measure-select').addEventListener('change', function () {
-      measure = el('measure-select').value;
-      fillGroup();
+    el('var-list').addEventListener('click', function (event) {
+      var row = event.target.closest('.var-row');
+      if (!row || row.disabled) return;
+      measure = row.getAttribute('data-name') || '';
+      if (groupName === measure) groupName = '';
+      fillMeasure();
+      syncGroupChoice();
       if (hasRun) {
         compute();
-        syncShell();
+        if (view === 'results') paintResults();
+        if (view === 'by-group') paintByGroup();
       }
+      syncShell();
     });
-    el('group-by').addEventListener('change', function () {
-      groupName = el('group-by').value;
+    function releaseGroupWait() { el('byGroupNavWait').classList.remove('is-on'); }
+    function groupMetas() {
+      var api = window.StatisticoGroupColumnSuitability;
+      return columnList().map(function (col) {
+        var levels = levelCounts(col.name);
+        var result = api && typeof api.classify === 'function'
+          ? api.classify({
+            name: col.name,
+            levels: levels,
+            isAnalysisVariable: col.name === measure,
+            rowCount: table && table.rows ? table.rows.length : 0
+          })
+          : { bucket: col.name === measure ? 'disabled' : 'other', disabled: col.name === measure, indicator: levels.length + ' groups', tone: 'neutral' };
+        return Object.assign({ name: col.name }, result);
+      });
+    }
+    function updateGroupConfirm() {
+      var meta = groupMetas().filter(function (item) { return item.name === previewGroup; })[0];
+      el('groupDialogConfirmBtn').disabled = !previewGroup || !meta || !!meta.disabled || includedLevelNames(previewGroup).length < 1;
+    }
+    function renderGroupChoiceList() {
+      var items = groupMetas();
+      var api = window.StatisticoGroupColumnSuitability;
+      var parts = api && typeof api.partition === 'function' ? api.partition(items) : {
+        recommended: items.filter(function (item) { return item.bucket === 'recommended'; }),
+        other: items.filter(function (item) { return item.bucket !== 'recommended' && item.bucket !== 'disabled'; }),
+        disabled: items.filter(function (item) { return item.bucket === 'disabled'; })
+      };
+      function optionHtml(meta) {
+        var selected = !meta.disabled && meta.name === previewGroup;
+        return '<button type="button" class="group-option' + (meta.disabled ? ' is-disabled' : '') + (selected ? ' is-selected' : '') + '" data-group-name="' + escapeHtml(meta.name) + '"' + (meta.disabled ? ' disabled' : '') + '><span class="group-option-name">' + escapeHtml(meta.name) + '</span><small class="group-option-note tone-' + escapeHtml(meta.tone || 'neutral') + '">' + escapeHtml(meta.indicator || '') + '</small></button>';
+      }
+      function sectionHtml(title, rows) {
+        if (!rows.length) return '';
+        return '<div class="group-list-section"><div class="group-list-heading">' + escapeHtml(title) + '</div>' + rows.map(optionHtml).join('') + '</div>';
+      }
+      el('groupDialogList').innerHTML = [
+        sectionHtml('Recommended grouping variables', parts.recommended),
+        sectionHtml('Other eligible variables', parts.other),
+        sectionHtml('Not recommended', parts.disabled)
+      ].filter(Boolean).join('') || '<div class="group-list-empty">No grouping columns available.</div>';
+      updateGroupConfirm();
+    }
+    function renderLevelPreview(name) {
+      previewGroup = name;
+      ensureLevelSelection(name);
+      previewLevels = levelCounts(name);
+      var included = previewLevels.filter(function (item) { return isLevelIncluded(name, item.level); });
+      var includedN = included.reduce(function (sum, item) { return sum + item.n; }, 0);
+      el('groupLevelPreview').classList.remove('is-hidden');
+      el('groupLevelPlaceholder').classList.add('is-hidden');
+      el('groupLevelPreview').innerHTML = '<div class="level-preview-head"><div><strong>' + escapeHtml(name) + '</strong><span>' + included.length + ' of ' + previewLevels.length + ' levels included, n=' + includedN + '</span></div></div>'
+        + '<div class="level-actions"><label class="level-keep">Minimum group size <input id="min-group-n" type="number" min="1" step="1" value="' + escapeHtml(previewKeepMinN) + '" /></label><button type="button" id="apply-min-n">Apply</button><button type="button" id="include-all">Include all</button><button type="button" id="exclude-all">Exclude all</button></div>'
+        + previewLevels.map(function (item, pos) {
+          var on = isLevelIncluded(name, item.level);
+          return '<div class="level-row' + (on ? ' is-included' : '') + '" data-level-pos="' + pos + '" role="checkbox" tabindex="0" aria-checked="' + (on ? 'true' : 'false') + '"><span class="level-name">' + escapeHtml(item.level) + '</span><span class="level-n">n=' + item.n + '</span></div>';
+        }).join('');
+      el('groupLevelPreview').querySelectorAll('.level-row').forEach(function (row) {
+        row.addEventListener('click', function () {
+          var item = previewLevels[Number(row.getAttribute('data-level-pos'))];
+          if (!item) return;
+          ensureLevelSelection(previewGroup)[item.level] = !isLevelIncluded(previewGroup, item.level);
+          renderLevelPreview(previewGroup);
+        });
+      });
+      el('include-all').addEventListener('click', function () {
+        previewLevels.forEach(function (item) { ensureLevelSelection(previewGroup)[item.level] = true; });
+        renderLevelPreview(previewGroup);
+      });
+      el('exclude-all').addEventListener('click', function () {
+        previewLevels.forEach(function (item) { ensureLevelSelection(previewGroup)[item.level] = false; });
+        renderLevelPreview(previewGroup);
+      });
+      el('apply-min-n').addEventListener('click', function () {
+        var parsed = parseInt(el('min-group-n').value, 10);
+        previewKeepMinN = Number.isFinite(parsed) && parsed > 0 ? String(parsed) : String(DEFAULT_MIN_GROUP_N);
+        var minN = currentMinGroupN();
+        previewLevels.forEach(function (item) { ensureLevelSelection(previewGroup)[item.level] = item.n >= minN; });
+        renderLevelPreview(previewGroup);
+      });
+      renderGroupChoiceList();
+    }
+    function openGroupDialog() {
+      if (!table || !measure) {
+        releaseGroupWait();
+        return;
+      }
+      previewGroup = groupName || '';
+      renderGroupChoiceList();
+      if (previewGroup) renderLevelPreview(previewGroup);
+      else {
+        el('groupLevelPreview').classList.add('is-hidden');
+        el('groupLevelPreview').innerHTML = '';
+        el('groupLevelPlaceholder').classList.remove('is-hidden');
+      }
+      el('groupDialog').classList.add('is-visible');
+      releaseGroupWait();
+    }
+    function closeGroupDialog() {
+      el('groupDialog').classList.remove('is-visible');
+      releaseGroupWait();
+    }
+    function confirmGroupDialog() {
+      if (!previewGroup || el('groupDialogConfirmBtn').disabled) return;
+      groupName = previewGroup;
+      closeGroupDialog();
       if (hasRun) compute();
       paintByGroup();
       syncShell();
+    }
+    el('groupDialogList').addEventListener('click', function (event) {
+      var button = event.target.closest('.group-option');
+      if (!button || button.disabled) return;
+      renderLevelPreview(button.getAttribute('data-group-name'));
     });
+    el('choose-group').addEventListener('click', openGroupDialog);
+    el('change-group').addEventListener('click', openGroupDialog);
+    el('group-dialog-close').addEventListener('click', closeGroupDialog);
+    el('groupDialogConfirmBtn').addEventListener('click', confirmGroupDialog);
     el('run-btn').addEventListener('click', run);
     el('use-demo').addEventListener('click', loadDemo);
     el('use-selection').addEventListener('click', function () { post('useSelection'); });

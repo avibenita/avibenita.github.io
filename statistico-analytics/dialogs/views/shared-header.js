@@ -2214,8 +2214,8 @@ const StatisticoHeader = {
           {
             title: 'Capability',
             items: [
-              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Cp, Cpk, and the distribution against the specification limits.'),
-              resultItem('setup', 'setup', 'fa-pen-to-square', fitted ? 'Edit input' : 'Input & Setup', 'Measurement column, specification limits, and the worksheet range.')
+              resultItem('setup', 'setup', 'fa-pen-to-square', fitted ? 'Edit input' : 'Input & Setup', 'Choose the measurement and set the specification limits.'),
+              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Cp, Cpk, and the distribution against the specification limits.')
             ]
           }
         ],

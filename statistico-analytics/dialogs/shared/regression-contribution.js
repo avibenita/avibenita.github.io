@@ -1,10 +1,11 @@
 /**
- * Drop-one ordinary R² for one fitted model.
- * Process Settings Explorer and Regression Results both call this so a
- * predictor's contribution is the same number on both screens.
+ * Display helpers for one drop-one ordinary R².
+ * The fit itself is StatisticoPredictorContribution, the component Regression
+ * Results uses. Both screens then publish the same full R² and the same
+ * percentage-point drop.
  *
- * The published drop is the difference of the two R² percentages after each
- * is rounded to two decimals. 57.81% minus 11.20% is 46.61 percentage points.
+ * 57.81% minus 11.20% is 46.61 percentage points. The chart prints the drop
+ * the same way Regression Results does: two decimals of (full R² − reduced R²) × 100.
  */
 (function (root, factory) {
   var api = factory();
@@ -36,6 +37,59 @@
       reducedText: fixed(reduced, 2) + '%',
       pointsText: fixed(points, 2) + ' pp'
     };
+  }
+
+  function chartDrop(fullR2, reducedR2) {
+    if (!Number.isFinite(fullR2) || !Number.isFinite(reducedR2)) return null;
+    var full = Number(fixed(fullR2 * 100, 2));
+    var reduced = Number(fixed(reducedR2 * 100, 2));
+    var points = Number(fixed((fullR2 - reducedR2) * 100, 2));
+    return {
+      full: full,
+      reduced: reduced,
+      points: points,
+      fullText: fixed(full, 2) + '%',
+      reducedText: fixed(reduced, 2) + '%',
+      pointsText: fixed(points, 2) + ' pp'
+    };
+  }
+
+  function fromPredictorResult(result, predictors) {
+    var out = {};
+    var names = predictors || [];
+    if (!result || result.status !== 'ready') {
+      var reason = (result && result.reason) || 'Predictor contributions are unavailable.';
+      names.forEach(function (name) {
+        out[name] = { ok: false, reason: reason, n: result && result.n };
+      });
+      return out;
+    }
+    var seen = Object.create(null);
+    (result.bars || []).forEach(function (bar) {
+      seen[bar.name] = true;
+      out[bar.name] = {
+        ok: true,
+        fullR2: result.fullR2,
+        reducedR2: bar.reducedR2,
+        drop: bar.drop,
+        n: result.n,
+        reason: ''
+      };
+    });
+    (result.unavailable || []).forEach(function (item) {
+      seen[item.name] = true;
+      out[item.name] = {
+        ok: false,
+        reason: item.reason || 'The reduced fit did not produce a finite R².',
+        n: result.n
+      };
+    });
+    names.forEach(function (name) {
+      if (!seen[name]) {
+        out[name] = { ok: false, reason: 'This predictor is not in the active model.', n: result.n };
+      }
+    });
+    return out;
   }
 
   function columnDependsOn(col, predictor) {
@@ -110,6 +164,8 @@
     fixed: fixed,
     percentNumber: percentNumber,
     reportedDrop: reportedDrop,
+    chartDrop: chartDrop,
+    fromPredictorResult: fromPredictorResult,
     columnDependsOn: columnDependsOn,
     predictorContributions: predictorContributions
   };

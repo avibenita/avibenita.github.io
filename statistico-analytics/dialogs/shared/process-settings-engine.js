@@ -15,6 +15,7 @@
   var ols = typeof (root && root.computeOLS) === 'function' ? root.computeOLS : null;
   var columnsApi = root && root.StatisticoColumnType;
   var Contrib = root && root.StatisticoRegressionContribution;
+  var PredictorContribution = root && root.StatisticoPredictorContribution;
   if (!Trace || !ols || !columnsApi) {
     var lib = require('../../src/shared/js/core/regression-compute.js');
     ols = lib.computeOLS;
@@ -22,10 +23,11 @@
     columnsApi = require('./column-type.js');
   }
   if (!Contrib) Contrib = require('./regression-contribution.js');
-  var api = factory(Trace, ols, columnsApi, Contrib);
+  if (!PredictorContribution) PredictorContribution = require('./regression-predictor-contribution.js');
+  var api = factory(Trace, ols, columnsApi, Contrib, PredictorContribution);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.StatisticoProcessSettings = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (Trace, computeOLS, ColumnType, Contrib) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Trace, computeOLS, ColumnType, Contrib, PredictorContribution) {
   'use strict';
 
   var EPS = 1e-7;
@@ -806,6 +808,30 @@
       return { ok: true, settings: copy(row.settings), label: row.label };
     }
 
+    function activeContributions(prepared, results, includeIntercept) {
+      var predictors = prepared.numeric.concat(prepared.categorical);
+      var matrix = prepared.traced.xMatrix;
+      var y = prepared.traced.yVector;
+      if (PredictorContribution && includeIntercept !== false) {
+        try {
+          var result = PredictorContribution.compute({
+            xMatrix: matrix,
+            yVector: y,
+            columns: prepared.columns,
+            includeIntercept: true,
+            fullResults: results,
+            computeOLS: computeOLS
+          });
+          if (result && result.status !== 'omit') return Contrib.fromPredictorResult(result, predictors);
+        } catch (err) {
+          /* The local drop-one path below still reports a contribution. */
+        }
+      }
+      return Contrib.predictorContributions(
+        computeOLS, matrix, y, prepared.columns, predictors, includeIntercept !== false, results
+      );
+    }
+
     function beginFit() {
       bumpSerial();
       clearModel();
@@ -856,15 +882,7 @@
         fitConfidence: state.confidence,
         fitted: results.Y_fit ? results.Y_fit.slice() : [],
         residuals: results.residuals ? results.residuals.slice() : [],
-        contributions: Contrib.predictorContributions(
-          computeOLS,
-          prepared.traced.xMatrix,
-          prepared.traced.yVector,
-          prepared.columns,
-          prepared.numeric.concat(prepared.categorical),
-          state.config.includeIntercept !== false,
-          results
-        ),
+        contributions: activeContributions(prepared, results, state.config.includeIntercept !== false),
         coefficients: results.coefficients.map(function (estimate, i) {
           return {
             name: names[i] || ('Term ' + (i + 1)),

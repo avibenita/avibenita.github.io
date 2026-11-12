@@ -29,7 +29,9 @@ test('binds Process Results to the active fit', () => {
   const technical = Report.processTechnical(view);
   const r2 = Contrib.reportedDrop(model.r2, 0).fullText;
   const adj = Contrib.reportedDrop(model.adjR2, 0).fullText;
-  const temperature = Contrib.reportedDrop(model.contributions.Temperature.fullR2, model.contributions.Temperature.reducedR2);
+  const temperature = Contrib.chartDrop(model.contributions.Temperature.fullR2, model.contributions.Temperature.reducedR2);
+  expect(temperature.pointsText).toBe(Contrib.fixed(model.contributions.Temperature.drop * 100, 2) + ' pp');
+  expect(Contrib.chartDrop(57.81 / 100, 11.20 / 100).pointsText).toBe('46.61 pp');
 
   expect(model.ssModel + model.ssResidual).toBeCloseTo(model.ssTotal, 8);
   expect(overview).toContain('Model Conclusion');

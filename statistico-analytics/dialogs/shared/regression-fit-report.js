@@ -146,19 +146,19 @@
       return '<section class="rfr-panel"><h3>Predictor Contribution</h3><p class="rfr-note">This fit has no predictor contribution to report.</p></section>';
     }
     rows.sort(function (a, b) {
-      var ap = a.item.ok ? Contrib.reportedDrop(a.item.fullR2, a.item.reducedR2).points : -1;
-      var bp = b.item.ok ? Contrib.reportedDrop(b.item.fullR2, b.item.reducedR2).points : -1;
+      var ap = a.item.ok ? Contrib.chartDrop(a.item.fullR2, a.item.reducedR2).points : -1;
+      var bp = b.item.ok ? Contrib.chartDrop(b.item.fullR2, b.item.reducedR2).points : -1;
       return bp - ap;
     });
     var fullText = '—';
     rows.some(function (row) {
       if (!row.item.ok) return false;
-      fullText = Contrib.reportedDrop(row.item.fullR2, row.item.reducedR2).fullText;
+      fullText = Contrib.chartDrop(row.item.fullR2, row.item.reducedR2).fullText;
       return true;
     });
     var points = rows.map(function (row) {
       if (!row.item.ok) return 0;
-      return Math.max(0, Contrib.reportedDrop(row.item.fullR2, row.item.reducedR2).points);
+      return Math.max(0, Contrib.chartDrop(row.item.fullR2, row.item.reducedR2).points);
     });
     var max = axisMax(points);
     var ticks = [0, 0.25, 0.5, 0.75, 1].map(function (share) {
@@ -170,7 +170,7 @@
         return '<div class="rfr-bar-row"><span class="rfr-bar-name">' + esc(row.name) + '</span>' +
           '<span class="rfr-bar-track"></span><span class="rfr-bar-val">—</span></div>';
       }
-      var reported = Contrib.reportedDrop(item.fullR2, item.reducedR2);
+      var reported = Contrib.chartDrop(item.fullR2, item.reducedR2);
       var width = Math.max(0, Math.min(100, (reported.points / max) * 100));
       var tip = 'Drop in ordinary R² when ' + row.name + ' is removed, in percentage points. Full-model R² ' +
         reported.fullText + '. Reduced-model R² ' + reported.reducedText + '. n = ' + item.n + '.';

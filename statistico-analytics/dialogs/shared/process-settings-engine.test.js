@@ -422,6 +422,7 @@ describe('session identity', () => {
     const dropX = model.contributions.X;
     expect(dropX.ok).toBe(true);
     expect(dropX.n).toBe(4);
+    expect(dropX.fullR2).toBe(model.r2);
     expect(dropX.fullR2).toBeCloseTo(20 / 21, 10);
     expect(dropX.reducedR2).toBeCloseTo(4 / 21, 10);
     expect(dropX.drop * 100).toBeCloseTo(1600 / 21, 8);

@@ -1018,7 +1018,7 @@ const StatisticoHeader = {
       'regression-residuals': 'Residual Diagnostics',
       'regression-by-group': 'By-Group Analysis',
       'setup': 'Input & Setup',
-      'ps-overview': 'Overview',
+      'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
       'ps-diagnostics': 'Diagnostics',
       'ps-profiler': 'Prediction Profiler',
@@ -2162,7 +2162,7 @@ const StatisticoHeader = {
           {
             title: 'Results',
             items: [
-              resultItem('overview', 'fa-chart-pie', 'Overview', 'Fitted response, sample, and specifications.'),
+              resultItem('overview', 'fa-chart-pie', 'Process Results', 'Overview of the fit, and the model on Technical.'),
               resultItem('effects', 'fa-arrows-split-up-and-left', 'Effects & Interactions', 'Coefficients and interaction profiles.'),
               resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics', 'Observed versus fitted and residual checks.'),
               resultItem('scatters', 'fa-chart-scatter', 'Predictor Scatters', 'Response versus one predictor, with a fit toggle and chart options.'),
@@ -9247,6 +9247,10 @@ REPORT: [one polished paragraph suitable for a report]`;
     const activeSidebar = document.querySelector('.sb-item.active[data-tab], .sb-item.active[id]');
     const tab = activeSidebar?.dataset?.tab || activeSidebar?.id || this._getIndependentActiveTab();
 
+    if (this.module === 'process-settings' && this.currentView === 'ps-overview') {
+      const inner = document.querySelector('#view-overview:not([hidden]) .ws-mode-tab.active[data-ps-tab]');
+      if (inner && inner.dataset.psTab) return 'process-settings-ps-' + inner.dataset.psTab;
+    }
     // For modules that host an in-page workspace tab bar (regression, etc.),
     // prefer the active inner tab so the Insight Guide can describe the
     // specific chart the user is looking at (e.g. Predictor Effects vs
@@ -9320,7 +9324,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'contingency-by-group-similarity': 'Similarity Profile™',
       'regression-by-group': 'By-Group Analysis',
       'setup': 'Input & Setup',
-      'ps-overview': 'Overview',
+      'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
       'ps-diagnostics': 'Diagnostics',
       'ps-profiler': 'Prediction Profiler',
@@ -9406,6 +9410,8 @@ REPORT: [one polished paragraph suitable for a report]`;
       'regression-pred-scenario':    'Predictions — Scenario Engine',
       'regression-viz-partial':      'Visualization — Predictor Effects',
       'regression-viz-unique':       'Visualization — Unique Contribution',
+      'process-settings-ps-overview': 'Process Results — Overview',
+      'process-settings-ps-technical': 'Process Results — Technical',
       'process-settings-ps-scatters':     'Predictor Scatters',
       'regression-diag-overview':    'Diagnostics — Overview',
       'regression-diag-plots':       'Diagnostics — Residual Plots',
@@ -9535,6 +9541,10 @@ REPORT: [one polished paragraph suitable for a report]`;
         'Read the selected-predictor strip (β, standardised β, SE, t, p, 95% CI), the coefficient table (click a row to switch predictors), and the partial-effect chart (observed data, adjusted prediction line, 95% confidence band). Global fit metrics (R², RMSE) live on Predictions → Overview — interpret the effect of the chosen predictor here.',
       'regression-viz-unique':
         'Each chart is an added-variable plot of the adjusted relationship, with a short “How to read this chart” guide and an expandable technical note. Both axes are differences remaining after the other predictors: right of zero means the predictor is higher than expected, and above zero means the outcome is higher (or longer) than expected. Negative axis values are differences from expected values, not negative measurements. The fitted slope equals that predictor’s coefficient in the full regression; the annotation is Slope B and its standard error (SE), not an unspecified ± range. Read the sentence under the title for the adjusted association and its p-value. Hover a point to see whether that observation is above or below what the other predictors expect, and whether it sits above or below the fitted line. This view illustrates the adjusted relationship. It does not display the percentage of variance uniquely explained by the predictor.',
+      'process-settings-ps-overview':
+        'Read the response, the analyzed-run count, and R². The recipe card is Starting settings until a recipe is pinned, then Current recipe. Specifications sit beside it as LSL, target, and USL. Open Prediction Profiler is the next step.',
+      'process-settings-ps-technical':
+        'Read the fitted equation and term estimates, factor reference levels, analyzed and excluded row counts, adjusted R², and the residual standard deviation. That residual standard deviation is the spread of the profiler\u2019s projected output curve. Effects & Interactions and Diagnostics hold the detailed tests.',
       'process-settings-ps-scatters':
         'One predictor is shown at a time, chosen from the radio list. The cards report the rows used by the selected curve, Pearson r for a linear fit or observed-versus-fitted r for another curve, curve R² as a percentage on the original response scale, and the predictor’s drop in full-model R² in percentage points. The p-value of the linear Pearson t test sits with the equation. Show fit only hides or shows the trend. Chart options changes the window, curve, and X-axis transform without refitting the process model. A categorical predictor shows the observed points and the same specification lines, with no curve.',
       'regression-diag-overview':

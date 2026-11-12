@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Process Capability</title>
+  <script>
+    if (!/(?:^|[?&])(?:embed|demo)=1(?:&|$)/.test(window.location.search || '')) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"><\/scr' + 'ipt>');
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261112cap" />
+  <link rel="stylesheet" href="../shared-by-group.css?v=20261112cap" />
+  <script src="../shared-brand-logo.js?v=20261005light1"></script>
+  <script src="../shared-header.js?v=20261112cap"></script>
+  <script src="../../shared/column-type.js?v=20261112cap"></script>
+  <script src="../../shared/cpk-math.js?v=20261112cap"></script>
+  <script src="../../shared/by-group-standard.js?v=20261112cap"></script>
+  <script src="../../shared/capability-range-engine.js?v=20261112cap"></script>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex; flex-direction: column; overflow: hidden;
+      background: var(--surface-0, #0E141B); color: var(--text-primary, #fff);
+      font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+    .sb-layout { flex: 1; min-height: 0; }
+    .cap-scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 20px; }
+    .cap-view[hidden] { display: none !important; }
+    #view-by-group .bg-std-finding { display: block !important; }
+    #view-by-group .bg-std-method { display: block !important; }
+    h2 { margin: 0 0 8px; font-size: 16px; }
+    .cap-card {
+      background: var(--surface-1, #242C37);
+      border: 1px solid var(--border, rgba(255,255,255,.12));
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+    }
+    .cap-note, .cap-help { margin: 8px 0 0; color: var(--text-secondary, rgba(255,255,255,.75)); font-size: 12px; line-height: 1.45; }
+    .cap-error { color: #fb7185; font-size: 13px; font-weight: 650; margin: 8px 0 0; }
+    .cap-error[hidden] { display: none !important; }
+    .cap-actions, .cap-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+    button, select, input { font: inherit; color: inherit; }
+    button {
+      border: 1px solid var(--border, rgba(255,255,255,.16));
+      background: var(--surface-2, #1b2430);
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    button.primary { background: #14b8a6; color: #042f2e; border-color: transparent; }
+    label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary, rgba(255,255,255,.75)); min-width: 140px; }
+    input, select {
+      background: var(--surface-0, #0e141b);
+      border: 1px solid var(--border, rgba(255,255,255,.16));
+      border-radius: 8px;
+      padding: 7px 8px;
+      color: var(--text-primary, #fff);
+    }
+    .spec-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .spec-row .field { width: 140px; }
+    .cap-grid { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 12px; align-items: start; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+    .metric { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,.1)); background: var(--surface-2, transparent); min-width: 0; }
+    .metric span { display: block; color: var(--text-secondary, rgba(255,255,255,.7)); font-size: 11px; }
+    .metric b { display: block; margin-top: 2px; font-size: 18px; font-variant-numeric: tabular-nums; }
+    .readout { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 13px; }
+    .readout b { font-variant-numeric: tabular-nums; }
+    .capability-rating { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; vertical-align: 2px; }
+    .rating-excellent { background: #16a34a; color: #fff; }
+    .rating-good { background: #0284c7; color: #fff; }
+    .rating-adequate { background: #eab308; color: #1f2937; }
+    .rating-poor { background: #ea580c; color: #fff; }
+    .rating-inadequate { background: #dc2626; color: #fff; }
+    #cpkGauge { max-width: 280px; margin: 0 auto; }
+    #cpkGauge svg, #distributionChart svg { width: 100%; height: auto; display: block; }
+    .table-wrap { overflow: auto; border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 760px; }
+    th, td { padding: 7px 8px; border-bottom: 1px solid var(--border, rgba(255,255,255,.1)); text-align: right; font-variant-numeric: tabular-nums; }
+    th:first-child, td:first-child { text-align: left; }
+    th { position: sticky; top: 0; background: var(--surface-1, #242C37); color: var(--accent-1, #5eead4); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+    tr.overall td { font-weight: 750; background: color-mix(in srgb, #14b8a6 10%, transparent); }
+    tr.small td { color: var(--text-secondary, rgba(255,255,255,.72)); }
+    .bars { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
+    .bar-row { display: grid; grid-template-columns: minmax(72px, 140px) 1fr auto; gap: 8px; align-items: center; font-size: 12px; }
+    .bar-track { position: relative; height: 10px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .bar-fill { height: 100%; background: #14b8a6; }
+    .bar-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #eab308; }
+    .empty-prompt { padding: 28px 8px; color: var(--text-secondary, rgba(255,255,255,.75)); }
+    @media (max-width: 860px) {
+      .cap-grid, .metrics { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sb-layout">
+    <nav class="sb-nav" id="sidebarNav" aria-label="Process Capability"></nav>
+    <div class="right-col">
+      <div id="header-container"></div>
+      <div class="cap-scroll">
+        <section id="view-setup" class="cap-view" aria-labelledby="setup-title">
+          <div class="cap-card">
+            <h2 id="setup-title">Measurement and limits</h2>
+            <div class="cap-actions">
+              <button type="button" id="use-demo">Use demo data</button>
+              <button type="button" id="use-selection">Use Excel selection</button>
+              <button type="button" id="pick-range">Pick a range</button>
+              <button type="button" id="refresh-data">Refresh worksheet data</button>
+            </div>
+            <p id="data-note" class="cap-note">Waiting for a worksheet range.</p>
+            <p id="host-error" class="cap-error" hidden></p>
+            <div class="spec-row">
+              <label class="field">Measurement
+                <select id="measure-select"></select>
+              </label>
+            </div>
+            <div class="spec-row">
+              <label class="field">Lower limit (LSL)
+                <input id="setup-lsl" type="number" step="any" value="10" />
+              </label>
+              <label class="field">Upper limit (USL)
+                <input id="setup-usl" type="number" step="any" value="20" />
+              </label>
+              <label class="field">Target (optional)
+                <input id="setup-target" type="number" step="any" value="15" />
+              </label>
+            </div>
+            <p class="cap-help">Mean and standard deviation are calculated from the measurement column. The standard deviation is the sample standard deviation (n − 1). Leave the target blank to use the midpoint of the limits. Expected defects assume a normal distribution.</p>
+            <p id="setup-error" class="cap-error" hidden></p>
+            <div class="cap-actions" style="margin-top:12px;">
+              <button type="button" class="primary" id="run-btn">Run capability</button>
+              <button type="button" id="close-btn">Close</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-results" class="cap-view" hidden aria-labelledby="results-title">
+          <div id="results-empty" class="empty-prompt" hidden>
+            <p>Analyze a measurement column to see Cp and Cpk.</p>
+            <button type="button" id="results-to-setup">Go to input</button>
+          </div>
+          <div id="results-body">
+            <div class="cap-grid">
+              <div class="cap-card">
+                <h2 id="results-title">From the selected values</h2>
+                <div class="spec-row">
+                  <label class="field">LSL
+                    <input id="results-lsl" type="number" step="any" />
+                  </label>
+                  <label class="field">USL
+                    <input id="results-usl" type="number" step="any" />
+                  </label>
+                  <label class="field">Target
+                    <input id="results-target" type="number" step="any" />
+                  </label>
+                </div>
+                <div class="readout" id="results-readout"></div>
+                <p id="results-error" class="cap-error" hidden></p>
+                <p id="assessment" class="cap-help"></p>
+              </div>
+              <div class="cap-card">
+                <div id="cpkGauge"></div>
+                <div class="metrics" id="metric-grid"></div>
+                <div id="distributionChart"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-by-group" class="cap-view" hidden aria-labelledby="by-group-title">
+          <div id="by-group-empty" class="empty-prompt" hidden>
+            <p>Analyze a measurement column, then compare capability across groups.</p>
+            <button type="button" id="group-to-setup">Go to input</button>
+          </div>
+          <div id="by-group-body">
+            <div class="cap-card">
+              <h2 id="by-group-title">By-Group Analysis</h2>
+              <div class="cap-toolbar">
+                <label class="field">Group by
+                  <select id="group-by"></select>
+                </label>
+              </div>
+              <p id="group-help" class="cap-help"></p>
+              <div id="group-finding"></div>
+              <div id="group-bars" class="bars"></div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Group</th><th>n</th><th>Mean</th><th>SD</th><th>Cp</th><th>Cpk</th><th>Cpu</th><th>Cpl</th><th>Limited by</th><th>PPM</th>
+                    </tr>
+                  </thead>
+                  <tbody id="group-table"></tbody>
+                </table>
+              </div>
+              <div id="group-method"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    var Engine = window.StatisticoCapabilityRange;
+    var BG = window.StatisticoByGroup;
+    var math = window.CpkMath;
+    var table = null;
+    var spec = { lsl: '10', usl: '20', target: '15' };
+    var measure = '';
+    var groupName = '';
+    var view = 'setup';
+    var hasRun = false;
+    var last = null;
+
+    function el(id) { return document.getElementById(id); }
+    function post(action) {
+      if (window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+        Office.context.ui.messageParent(JSON.stringify({ action: action }));
+      }
+    }
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+      });
+    }
+    function decimals() {
+      var n = 3;
+      if (window.StatisticoHeader && typeof StatisticoHeader.getDecimalPreference === 'function') {
+        var pref = Number(StatisticoHeader.getDecimalPreference());
+        if (Number.isFinite(pref)) n = pref;
+      }
+      return Math.max(0, Math.min(6, n));
+    }
+    function fmt(n) {
+      return Number.isFinite(n) ? n.toFixed(decimals()) : '—';
+    }
+    function isLight() { return document.documentElement.getAttribute('data-theme') === 'light'; }
+    function ink() { return isLight() ? '#1f2937' : '#e8eef8'; }
+    function muted() { return isLight() ? '#4b5563' : 'rgba(232,238,248,0.78)'; }
+    function gridColor() { return isLight() ? '#e2e8f0' : 'rgba(255,255,255,0.08)'; }
+
+    function showError(id, message) {
+      var node = el(id);
+      node.hidden = !message;
+      node.textContent = message || '';
+    }
+
+    function writeSpec(prefix) {
+      el(prefix + '-lsl').value = spec.lsl;
+      el(prefix + '-usl').value = spec.usl;
+      el(prefix + '-target').value = spec.target;
+    }
+    function readSpec(prefix) {
+      spec.lsl = el(prefix + '-lsl').value;
+      spec.usl = el(prefix + '-usl').value;
+      spec.target = el(prefix + '-target').value;
+      var other = prefix === 'setup' ? 'results' : 'setup';
+      writeSpec(other);
+    }
+
+    function columnList() {
+      if (!table) return [];
+      return Engine.columns(table.headers, table.rows);
+    }
+
+    function fillMeasure() {
+      var select = el('measure-select');
+      var numeric = columnList().filter(function (col) { return col.kind === 'numeric'; });
+      if (!numeric.some(function (col) { return col.name === measure; })) {
+        measure = numeric.some(function (col) { return col.name === 'Diameter'; }) ? 'Diameter' : (numeric[0] ? numeric[0].name : '');
+      }
+      select.innerHTML = numeric.map(function (col) {
+        return '<option value="' + escapeHtml(col.name) + '">' + escapeHtml(col.name) + '</option>';
+      }).join('');
+      if (!numeric.length) select.innerHTML = '<option value="">No numeric column</option>';
+      select.value = measure;
+    }
+
+    function fillGroup() {
+      var select = el('group-by');
+      var cols = columnList().filter(function (col) { return col.name !== measure; });
+      var html = '<option value="">Select a grouping column</option>' + cols.map(function (col) {
+        return '<option value="' + escapeHtml(col.name) + '">' + escapeHtml(col.name) + ' (' + col.levels + ')</option>';
+      }).join('');
+      select.innerHTML = html;
+      if (groupName === measure) groupName = '';
+      if (groupName && !cols.some(function (col) { return col.name === groupName; })) groupName = '';
+      select.value = groupName;
+    }
+
+    function loadTable(next, note) {
+      table = next || { headers: [], rows: [] };
+      var rows = table.rows || [];
+      el('data-note').textContent = (table.address || 'Range') + ' · ' + rows.length + ' data ' + (rows.length === 1 ? 'row' : 'rows') + (note ? ' · ' + note : '');
+      showError('host-error', '');
+      fillMeasure();
+      fillGroup();
+      if (hasRun) compute();
+      showView(hasRun && last && last.ok ? view : 'setup');
+    }
+
+    function loadDemo() {
+      var demo = Engine.demoTable();
+      var demoSpec = Engine.demoSpec();
+      spec.lsl = String(demoSpec.lsl);
+      spec.usl = String(demoSpec.usl);
+      spec.target = String(demoSpec.target);
+      writeSpec('setup');
+      writeSpec('results');
+      measure = 'Diameter';
+      groupName = '';
+      loadTable(demo, 'demo process');
+    }
+
+    function compute() {
+      if (!table || !measure) {
+        last = { ok: false, error: 'Choose a measurement column from the worksheet range.' };
+        return last;
+      }
+      last = Engine.analyze(table, {
+        value: measure,
+        group: groupName,
+        lsl: spec.lsl,
+        usl: spec.usl,
+        target: spec.target
+      });
+      return last;
+    }
+
+    function capabilityLead(cpk) {
+      if (cpk >= 2) return 'Excellent';
+      if (cpk >= 1.67) return 'Capable';
+      if (cpk >= 1.33) return 'Adequate';
+      if (cpk >= 1) return 'Marginally capable';
+      return 'Not capable';
+    }
+    function formatGoal(n) {
+      if (Math.abs(n - 1.33) < 0.001) return '1.33';
+      if (Math.abs(n - 1.67) < 0.001) return '1.67';
+      return n.toFixed(2);
+    }
+    function assessment(result) {
+      var levels = [1, 1.33, 1.67, 2];
+      var goal = null;
+      var i;
+      for (i = 0; i < levels.length; i++) {
+        if (result.cpk < levels[i] - 1e-9) { goal = levels[i]; break; }
+      }
+      var lead = capabilityLead(result.cpk);
+      var wellCentred = result.centeringRatio < 15;
+      var goalText = goal ? ' to at least ' + formatGoal(goal) : '';
+      if (result.cpk >= 2) {
+        if (wellCentred) return 'Excellent: the process is well centred and variation is low. Cpk is ' + fmt(result.cpk) + '.';
+        return 'Excellent: Cpk is ' + fmt(result.cpk) + '. The mean is off centre, but capability is still high.';
+      }
+      if (wellCentred) return lead + ': the process is well centred, but variation is too high. Reduce variation to improve Cpk from ' + fmt(result.cpk) + goalText + '.';
+      if (goal && result.cp + 1e-9 >= goal) return lead + ': the process is off centre. Recentering would improve Cpk from ' + fmt(result.cpk) + goalText + '.';
+      return lead + ': the process is off centre and variation is too high. Recentering and reducing variation would improve Cpk from ' + fmt(result.cpk) + goalText + '.';
+    }
+
+    function svgEl(name, attrs) {
+      var node = document.createElementNS('http://www.w3.org/2000/svg', name);
+      Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, attrs[key]); });
+      return node;
+    }
+    function gaugeColor(cpk) {
+      if (cpk >= 1.67) return '#14b8a6';
+      if (cpk >= 1.33) return '#eab308';
+      if (cpk >= 1) return '#ea580c';
+      return '#dc2626';
+    }
+    function arcPoint(cx, cy, r, deg) {
+      var rad = deg * Math.PI / 180;
+      return [cx + r * Math.cos(rad), cy - r * Math.sin(rad)];
+    }
+    function arcPath(cx, cy, r, startDeg, endDeg) {
+      var s = arcPoint(cx, cy, r, startDeg);
+      var e = arcPoint(cx, cy, r, endDeg);
+      var large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
+      return 'M ' + s[0].toFixed(2) + ' ' + s[1].toFixed(2) + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + e[0].toFixed(2) + ' ' + e[1].toFixed(2);
+    }
+    function valueAngle(value, scaleMax) {
+      var clamped = Math.max(0, Math.min(scaleMax, value));
+      return 180 - (clamped / scaleMax) * 180;
+    }
+    function drawGauge(result) {
+      var scaleMax = 3;
+      var cpk = result.cpk;
+      var cx = 120;
+      var cy = 92;
+      var r = 68;
+      var host = el('cpkGauge');
+      host.textContent = '';
+      var svg = svgEl('svg', { viewBox: '0 -8 240 136', role: 'img', 'aria-label': 'Cpk gauge ' + fmt(cpk) });
+      [[0, 1, '#dc2626'], [1, 1.33, '#ea580c'], [1.33, 1.67, '#eab308'], [1.67, 2, '#0284c7'], [2, 3, '#16a34a']].forEach(function (zone) {
+        var a0 = Math.min(180, valueAngle(zone[0], scaleMax) + 0.4);
+        var a1 = Math.max(0, valueAngle(zone[1], scaleMax) - 0.4);
+        svg.appendChild(svgEl('path', { d: arcPath(cx, cy, r, a0, a1), fill: 'none', stroke: zone[2], 'stroke-width': '12' }));
+      });
+      var needle = valueAngle(Math.max(0, cpk), scaleMax);
+      var tip = arcPoint(cx, cy, r - 16, needle);
+      svg.appendChild(svgEl('line', { x1: cx, y1: cy, x2: tip[0], y2: tip[1], stroke: ink(), 'stroke-width': '2.5', 'stroke-linecap': 'round' }));
+      svg.appendChild(svgEl('circle', { cx: cx, cy: cy, r: '4.5', fill: gaugeColor(cpk), stroke: ink(), 'stroke-width': '1.5' }));
+      var value = svgEl('text', { x: cx, y: 122, 'text-anchor': 'middle', fill: ink(), 'font-size': '16', 'font-weight': '800' });
+      value.textContent = fmt(cpk);
+      svg.appendChild(value);
+      host.appendChild(svg);
+    }
+    function drawDistribution(result) {
+      var xMin = Math.min(result.lsl, result.mean - 4 * result.sd);
+      var xMax = Math.max(result.usl, result.mean + 4 * result.sd);
+      if (xMax <= xMin) xMax = xMin + 1;
+      var step = (xMax - xMin) / 180;
+      var points = [];
+      var maxY = 0;
+      var x;
+      for (x = xMin; x <= xMax + step * 0.5; x += step) {
+        var y = math.normalPDF(x, result.mean, result.sd);
+        if (y > maxY) maxY = y;
+        points.push([x, y]);
+      }
+      maxY = maxY * 1.12 || 1;
+      var W = 640;
+      var H = 220;
+      var L = 16;
+      var R = 16;
+      var T = 28;
+      var B = 16;
+      function px(v) { return L + ((v - xMin) / (xMax - xMin)) * (W - L - R); }
+      function py(v) { return T + (1 - v / maxY) * (H - T - B); }
+      var host = el('distributionChart');
+      host.textContent = '';
+      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Process distribution and specification limits' });
+      function areaBetween(a, b) {
+        var mid = points.filter(function (p) { return p[0] > a && p[0] < b; });
+        var seq = [[a, math.normalPDF(a, result.mean, result.sd)]].concat(mid, [[b, math.normalPDF(b, result.mean, result.sd)]]);
+        var d = 'M ' + px(seq[0][0]) + ' ' + py(0);
+        seq.forEach(function (p) { d += ' L ' + px(p[0]) + ' ' + py(p[1]); });
+        d += ' L ' + px(seq[seq.length - 1][0]) + ' ' + py(0) + ' Z';
+        return d;
+      }
+      svg.appendChild(svgEl('path', { d: areaBetween(xMin, result.lsl), fill: 'rgba(248,113,113,0.85)' }));
+      svg.appendChild(svgEl('path', { d: areaBetween(result.lsl, result.usl), fill: 'rgba(120,200,255,0.28)' }));
+      svg.appendChild(svgEl('path', { d: areaBetween(result.usl, xMax), fill: 'rgba(248,113,113,0.85)' }));
+      function vline(value, color, dash) {
+        var xx = px(value);
+        svg.appendChild(svgEl('line', { x1: xx, y1: py(0), x2: xx, y2: T, stroke: color, 'stroke-width': '2', 'stroke-dasharray': dash || '' }));
+      }
+      vline(result.lsl, '#e74c3c', '5 4');
+      vline(result.usl, '#e74c3c', '5 4');
+      vline(result.mean, '#2ecc71', '');
+      if (result.hasTarget) vline(result.target, 'rgb(255,165,120)', '2 3');
+      var labels = [
+        { name: 'LSL', value: result.lsl, color: '#e74c3c' },
+        { name: 'USL', value: result.usl, color: '#e74c3c' },
+        { name: 'Mean', value: result.mean, color: '#2ecc71' }
+      ];
+      if (result.hasTarget) labels.push({ name: 'Target', value: result.target, color: 'rgb(255,165,120)' });
+      labels.forEach(function (mark, index) {
+        var label = svgEl('text', { x: Math.max(36, Math.min(W - 36, px(mark.value))), y: 14, 'text-anchor': 'middle', fill: mark.color, 'font-size': '11', 'font-weight': '700' });
+        label.textContent = mark.name;
+        if (index > 0 && Math.abs(px(mark.value) - px(labels[index - 1].value)) < 48) label.setAttribute('y', '26');
+        svg.appendChild(label);
+      });
+      svg.appendChild(svgEl('line', { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: gridColor() }));
+      host.appendChild(svg);
+    }
+
+    function metricCell(label, value) {
+      return '<div class="metric"><span>' + label + '</span><b>' + value + '</b></div>';
+    }
+    function ratingHtml(rating) {
+      if (!rating) return '';
+      return ' <span class="capability-rating ' + escapeHtml(rating.className) + '">' + escapeHtml(rating.text) + '</span>';
+    }
+    function paintResults() {
+      var ready = hasRun && last && last.ok;
+      el('results-empty').hidden = hasRun;
+      el('results-body').hidden = !hasRun;
+      if (!hasRun) return;
+      writeSpec('results');
+      if (!last.ok) {
+        showError('results-error', last.error);
+        el('assessment').textContent = '';
+        el('results-readout').textContent = '';
+        el('metric-grid').textContent = '';
+        el('cpkGauge').textContent = '';
+        el('distributionChart').textContent = '';
+        return;
+      }
+      showError('results-error', '');
+      var result = last.overall;
+      el('results-readout').innerHTML = '<span>n <b>' + result.n + '</b></span><span>Mean <b>' + fmt(result.mean) + '</b></span><span>SD <b>' + fmt(result.sd) + '</b></span>'
+        + (last.excluded ? '<span>Excluded <b>' + last.excluded + '</b></span>' : '');
+      el('assessment').textContent = assessment(result) + ' Indices use the sample standard deviation of ' + last.valueName + '.';
+      el('metric-grid').innerHTML = [
+        metricCell('Cp', fmt(result.cp)),
+        metricCell('Cpk', fmt(result.cpk) + ratingHtml(result.rating)),
+        metricCell('Cpu', fmt(result.cpu)),
+        metricCell('Cpl', fmt(result.cpl)),
+        metricCell('Cpm', fmt(result.cpm)),
+        metricCell('PPM', Math.round(result.ppm).toLocaleString()),
+        metricCell('Yield', result.yieldPct.toFixed(2) + '%')
+      ].join('');
+      drawGauge(result);
+      drawDistribution(result);
+    }
+
+    function limitedBy(binding) {
+      if (binding === 'upper') return 'USL';
+      if (binding === 'lower') return 'LSL';
+      if (binding === 'center') return '—';
+      return '—';
+    }
+    function rowCells(name, n, source, extraClass) {
+      var cls = extraClass ? ' class="' + extraClass + '"' : '';
+      if (!source || source.ok === false) {
+        return '<tr' + cls + '><td>' + escapeHtml(name) + '</td><td>' + n + '</td><td colspan="8">' + escapeHtml((source && source.error) || '—') + '</td></tr>';
+      }
+      return '<tr' + cls + '><td>' + escapeHtml(name) + (extraClass === 'small' ? ' · small n' : '') + '</td><td>' + n + '</td><td>'
+        + fmt(source.mean) + '</td><td>' + fmt(source.sd) + '</td><td>' + fmt(source.cp) + '</td><td>' + fmt(source.cpk) + ratingHtml(source.rating)
+        + '</td><td>' + fmt(source.cpu) + '</td><td>' + fmt(source.cpl) + '</td><td>' + limitedBy(source.binding) + '</td><td>'
+        + (Number.isFinite(source.ppm) ? Math.round(source.ppm).toLocaleString() : '—') + '</td></tr>';
+    }
+    function paintByGroup() {
+      el('by-group-empty').hidden = hasRun;
+      el('by-group-body').hidden = !hasRun;
+      if (!hasRun) {
+        globalThis.__byGroupStandardContext = null;
+        return;
+      }
+      fillGroup();
+      el('by-group-title').textContent = BG.PAGE_TITLE;
+      el('group-help').textContent = BG.moduleSentence('capability') + ' ' + BG.GROUP_BY_HELP;
+      var finding = el('group-finding');
+      var bars = el('group-bars');
+      var body = el('group-table');
+      var method = el('group-method');
+      finding.innerHTML = '';
+      bars.innerHTML = '';
+      body.innerHTML = '';
+      method.innerHTML = '';
+      if (!last || !last.ok) {
+        finding.innerHTML = '<p class="cap-error">' + escapeHtml((last && last.error) || 'Capability could not be calculated.') + '</p>';
+        globalThis.__byGroupStandardContext = null;
+        return;
+      }
+      body.innerHTML = rowCells('Overall', last.overall.n, last.overall, 'overall');
+      if (!groupName || !last.byGroup) {
+        globalThis.__byGroupStandardContext = null;
+        return;
+      }
+      var grouped = last.byGroup;
+      if (!grouped.ok) {
+        finding.innerHTML = '<p class="cap-error">' + escapeHtml(grouped.error || 'This grouping cannot be compared.') + '</p>';
+        globalThis.__byGroupStandardContext = null;
+        return;
+      }
+      globalThis.__byGroupStandardContext = grouped.context;
+      var conclusion = grouped.status.id === 'reversal' ? grouped.interpretation.direction
+        : grouped.status.id === 'varies' ? grouped.interpretation.differs
+        : grouped.status.id === 'insufficient' ? grouped.status.hint
+        : grouped.interpretation.consistent;
+      finding.innerHTML = BG.findingHtml({
+        headline: grouped.status.label,
+        conclusion: conclusion,
+        descriptive: true
+      });
+      var scale = 3;
+      grouped.groups.forEach(function (group) {
+        var width = group.ok ? Math.max(0, Math.min(scale, group.cpk)) / scale * 100 : 0;
+        bars.insertAdjacentHTML('beforeend', '<div class="bar-row"><span>' + escapeHtml(group.name) + '</span><div class="bar-track"><div class="bar-fill" style="width:' + width.toFixed(1) + '%"></div><div class="bar-mark" style="left:44.3%"></div></div><b>' + (group.ok ? fmt(group.cpk) : '—') + '</b></div>');
+        body.insertAdjacentHTML('beforeend', rowCells(group.name, group.n, group, group.small ? 'small' : ''));
+      });
+      method.innerHTML = BG.methodDetailsHtml({
+        moduleKey: 'capability',
+        status: grouped.status,
+        groupName: grouped.groupName,
+        consistentText: grouped.interpretation.consistent,
+        differsText: grouped.interpretation.differs,
+        directionText: grouped.interpretation.direction,
+        warningText: grouped.warningText,
+        descriptive: true
+      });
+    }
+
+    function syncShell() {
+      window.__capView = view;
+      window.__capFitted = hasRun;
+      var titles = { setup: 'Input & Setup', results: 'Process Capability', 'by-group': 'By-Group Analysis' };
+      var views = { setup: 'cap-setup', results: 'cap-results', 'by-group': 'cap-by-group' };
+      if (!window.StatisticoHeader) return;
+      StatisticoHeader.currentView = views[view] || view;
+      StatisticoHeader.updateTitle(titles[view] || 'Process Capability');
+      StatisticoHeader.updateVariable(measure || 'Measurement', last && last.ok ? last.overall.n : 0);
+      StatisticoHeader.updateGroupLabel(view === 'by-group' && groupName ? groupName : '');
+      if (typeof StatisticoHeader._renderSharedSidebar === 'function') StatisticoHeader._renderSharedSidebar();
+      if (typeof StatisticoHeader._mountSidebarUtilities === 'function') StatisticoHeader._mountSidebarUtilities();
+    }
+
+    function showView(next) {
+      view = next;
+      ['setup', 'results', 'by-group'].forEach(function (name) {
+        el('view-' + name).hidden = view !== name;
+      });
+      if (view === 'results') paintResults();
+      if (view === 'by-group') paintByGroup();
+      syncShell();
+    }
+    window.switchCapabilityView = showView;
+
+    function run() {
+      readSpec('setup');
+      measure = el('measure-select').value;
+      hasRun = true;
+      compute();
+      if (!last.ok) {
+        showError('setup-error', last.error);
+        showView('setup');
+        return;
+      }
+      showError('setup-error', '');
+      showView('results');
+    }
+
+    ['setup', 'results'].forEach(function (prefix) {
+      ['lsl', 'usl', 'target'].forEach(function (field) {
+        el(prefix + '-' + field).addEventListener('input', function () {
+          readSpec(prefix);
+          if (!hasRun) return;
+          compute();
+          if (view === 'results') paintResults();
+          if (view === 'by-group') paintByGroup();
+          syncShell();
+        });
+      });
+    });
+    el('measure-select').addEventListener('change', function () {
+      measure = el('measure-select').value;
+      fillGroup();
+      if (hasRun) {
+        compute();
+        syncShell();
+      }
+    });
+    el('group-by').addEventListener('change', function () {
+      groupName = el('group-by').value;
+      if (hasRun) compute();
+      paintByGroup();
+      syncShell();
+    });
+    el('run-btn').addEventListener('click', run);
+    el('use-demo').addEventListener('click', loadDemo);
+    el('use-selection').addEventListener('click', function () { post('useSelection'); });
+    el('pick-range').addEventListener('click', function () { post('pickRange'); });
+    el('refresh-data').addEventListener('click', function () { post('refreshData'); });
+    el('close-btn').addEventListener('click', function () {
+      post('close');
+      if (!(window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent)) window.close();
+    });
+    el('results-to-setup').addEventListener('click', function () { showView('setup'); });
+    el('group-to-setup').addEventListener('click', function () { showView('setup'); });
+    window.setDecimalPrecision = function () {
+      if (view === 'results') paintResults();
+      if (view === 'by-group') paintByGroup();
+    };
+
+    function onParentMessage(arg) {
+      var msg;
+      try { msg = JSON.parse(arg.message || '{}'); } catch (e) { return; }
+      if (msg.type === 'CAPABILITY_DATA') {
+        var payload = msg.payload || {};
+        if (!payload.headers || !payload.headers.length || payload.source === 'empty') {
+          el('data-note').textContent = 'No worksheet range is loaded. Use the Excel selection, pick a range, or open the demo data.';
+          return;
+        }
+        loadTable({
+          headers: payload.headers,
+          rows: payload.rows || [],
+          address: payload.address || ''
+        }, 'worksheet');
+        return;
+      }
+      if (msg.type === 'CAPABILITY_ERROR') showError('host-error', msg.message || 'The worksheet range could not be read.');
+    }
+
+    function boot() {
+      window.__capView = 'setup';
+      window.__capFitted = false;
+      writeSpec('setup');
+      writeSpec('results');
+      if (window.StatisticoHeader && typeof StatisticoHeader.init === 'function') {
+        StatisticoHeader.init('cap-setup', 'Measurement', 0, 'capability');
+        StatisticoHeader.initSidebarPage();
+      }
+      syncShell();
+      if (/(?:^|[?&])demo=1(?:&|$)/.test(window.location.search || '') || typeof Office === 'undefined' || !Office.context || !Office.context.ui) {
+        loadDemo();
+        return;
+      }
+      Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage);
+      post('ready');
+    }
+    if (typeof Office !== 'undefined' && Office.onReady) Office.onReady(boot);
+    else boot();
+    new MutationObserver(function () {
+      if (view === 'results' && last && last.ok) paintResults();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+  </script>
+</body>
+</html>

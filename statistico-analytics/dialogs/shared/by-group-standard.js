@@ -38,7 +38,8 @@
     reliability: 'Compare reliability and item performance across groups.',
     factor: 'Examine whether the factor pattern remains similar across groups.',
     logistic: 'Compare discrimination, calibration and classification across groups.',
-    segmentation: 'Examine how cluster membership and profiles differ by group.'
+    segmentation: 'Examine how cluster membership and profiles differ by group.',
+    capability: 'Compare Cp, Cpk, and the limiting specification across groups.'
   };
 
   var NEXT_ANALYSIS = {
@@ -50,7 +51,8 @@
     reliability: 'Review item performance in the weakest group before pooling the scale.',
     factor: 'Consider multi-group confirmatory analysis before concluding that the factor pattern differs.',
     logistic: 'Test a predictor-by-group interaction before treating classification differences as confirmed.',
-    segmentation: 'Compare cluster profiles within each group before treating composition differences as confirmed.'
+    segmentation: 'Compare cluster profiles within each group before treating composition differences as confirmed.',
+    capability: 'A formal comparison of means or variances is needed before treating capability differences as confirmed.'
   };
 
   var STATUSES = {

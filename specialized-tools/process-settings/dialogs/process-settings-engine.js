@@ -329,12 +329,16 @@
     return false;
   }
 
-  function predictorContributions(xMatrix, yVector, columns, predictors, includeIntercept) {
+  function predictorContributions(xMatrix, yVector, columns, predictors, includeIntercept, fitted) {
     var full = null;
-    try {
-      full = computeOLS(xMatrix.map(function (row) { return row.slice(); }), yVector.slice(), includeIntercept !== false, 0.05);
-    } catch (err) {
-      full = null;
+    if (fitted && Number.isFinite(fitted.R2) && Number.isFinite(fitted.n)) {
+      full = fitted;
+    } else {
+      try {
+        full = computeOLS(xMatrix.map(function (row) { return row.slice(); }), yVector.slice(), includeIntercept !== false, 0.05);
+      } catch (err) {
+        full = null;
+      }
     }
     var out = {};
     (predictors || []).forEach(function (name) {
@@ -923,7 +927,8 @@
           prepared.traced.yVector,
           prepared.columns,
           prepared.numeric.concat(prepared.categorical),
-          state.config.includeIntercept !== false
+          state.config.includeIntercept !== false,
+          results
         ),
         coefficients: results.coefficients.map(function (estimate, i) {
           return {

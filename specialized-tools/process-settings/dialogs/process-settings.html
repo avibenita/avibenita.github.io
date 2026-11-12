@@ -14,12 +14,12 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261109ps" />
   <script src="../shared-config.js?v=20261109ps"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261112ps11"></script>
+  <script src="../shared-header.js?v=20261112ps12"></script>
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
   <script src="../../shared/column-type.js"></script>
   <script src="../../shared/regression-case-trace.js"></script>
   <script src="../../shared/regression-effect-plot.js"></script>
-  <script src="process-settings-engine.js?v=20261112ps9"></script>
+  <script src="process-settings-engine.js?v=20261112ps10"></script>
   <script src="../../../../statistico-calculators/process-capability/cpk-math.js?v=20261111ps1"></script>
   <script src="https://code.highcharts.com/highcharts.js"></script>
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
@@ -1425,10 +1425,10 @@ function pscDefaultCtrl() {
       return toFixed.call(value, digits);
     }
 
-    function pscFmtP(p) {
-      if (!Number.isFinite(p)) return '—';
-      if (p < 0.0001) return '<0.0001';
-      return pscFmt(p, 4);
+    function pscPClause(p) {
+      if (!Number.isFinite(p)) return '';
+      if (p < 0.0001) return ', p < 0.0001';
+      return ', p = ' + pscFmt(p, 4);
     }
 
     function pscCoef(value) {
@@ -1613,9 +1613,20 @@ function pscDefaultCtrl() {
       return pscFmt(fraction * 100, 2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + '%';
     }
 
-    function pscPoints(fraction) {
-      if (!Number.isFinite(fraction)) return 'Unavailable';
-      return pscFmt(fraction * 100, 2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    function pscReportedPercent(fraction) {
+      if (!Number.isFinite(fraction)) return NaN;
+      return Number(pscFmt(fraction * 100, 2));
+    }
+
+    function pscContribution(fullR2, reducedR2) {
+      const full = pscReportedPercent(fullR2);
+      const reduced = pscReportedPercent(reducedR2);
+      if (!Number.isFinite(full) || !Number.isFinite(reduced)) return null;
+      return {
+        value: pscFmt(full - reduced, 2) + ' pp',
+        full: pscFmt(full, 2) + '%',
+        reduced: pscFmt(reduced, 2) + '%'
+      };
     }
 
     function pscCurveLabel(type) {
@@ -1757,10 +1768,11 @@ function pscDefaultCtrl() {
       const note = document.getElementById('pscNote' + index);
       const plotted = points.length;
       const contribution = ((session.read().model || {}).contributions || {})[job.name];
-      const contribTip = contribution && contribution.ok
-        ? ('Drop in ordinary R², in percentage points. Full-model R² ' + pscPercent(contribution.fullR2) + '. Reduced-model R² ' + pscPercent(contribution.reducedR2) + '. n = ' + contribution.n + '.')
+      const reported = contribution && contribution.ok ? pscContribution(contribution.fullR2, contribution.reducedR2) : null;
+      const contribTip = reported
+        ? ('How much ordinary R² the full model loses when ' + job.name + ' is removed, in percentage points. Full-model R² ' + reported.full + '. Reduced-model R² ' + reported.reduced + '. n = ' + contribution.n + '.')
         : ((contribution && contribution.reason) || 'The active model does not report this predictor’s contribution.');
-      const contribValue = contribution && contribution.ok ? pscPoints(contribution.drop) : 'Unavailable';
+      const contribValue = reported ? reported.value : 'Unavailable';
       let obsValue = 'Unavailable';
       let corrValue = 'Unavailable';
       let corrLabel = 'Correlation';
@@ -1810,7 +1822,7 @@ function pscDefaultCtrl() {
           corrTip = 'Signed Pearson r between ' + job.yName + ' and ' + axis + ', for the rows used by the linear fit.';
           if (eq) {
             eq.hidden = false;
-            eq.textContent = 'Linear · Equation: ' + model.equation + (Number.isFinite(assoc.p) ? (' · Two-sided t test of Pearson r, linear fit of ' + axis + ', p = ' + pscFmtP(assoc.p)) : '');
+            eq.textContent = 'Linear · Equation: ' + model.equation + (Number.isFinite(assoc.p) ? (' · Two-sided t test of Pearson r, linear fit of ' + axis + pscPClause(assoc.p)) : '');
           }
         } else {
           const assoc = Engine.pearson(observed, predicted);

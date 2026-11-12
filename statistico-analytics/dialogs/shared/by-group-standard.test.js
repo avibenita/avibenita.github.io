@@ -43,6 +43,7 @@ describe('StatisticoByGroup contract', () => {
     expect(BG.moduleSentence('factor')).toBe('Examine whether the factor pattern remains similar across groups.');
     expect(BG.moduleSentence('logistic')).toBe('Compare discrimination, calibration and classification across groups.');
     expect(BG.moduleSentence('segmentation')).toBe('Examine how cluster membership and profiles differ by group.');
+    expect(BG.moduleSentence('capability')).toBe('Compare Cp, Cpk, and the limiting specification across groups.');
   });
 
   test('classifies the four standard consistency statuses', () => {

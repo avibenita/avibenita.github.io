@@ -401,6 +401,32 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
+    id: "capability-range",
+    section: "Process Capability",
+    sectionId: "quality",
+    title: "Capability from data",
+    icon: "fa-gauge-high",
+    accent: "#14b8a6",
+    accentDark: "#0f766e",
+    color: "#14b8a6",
+    colorDark: "#0f766e",
+    subtitle: "Cp and Cpk from a measurement column, overall and by group",
+    desc: "Select a measurement column and enter the specification limits. Mean and standard deviation come from the worksheet range. Compare capability across a grouping column.",
+    info: [
+      "Uses the worksheet working range, or a built-in demo",
+      "Cp, Cpk, Cpu, Cpl, Cpm, and expected defects",
+      "Distribution drawn against LSL, USL, mean, and target",
+      "By Group compares capability across categories"
+    ],
+    modules: [
+      {
+        id: "capability-range",
+        label: "Process Capability (from data)",
+        tip: "Compute Cp and Cpk from a measurement column, then compare groups."
+      }
+    ]
+  },
+  {
     id: "survey-tools",
     section: "Survey Tools",
     sectionId: "survey",
@@ -791,6 +817,14 @@ var TOOLS_SECTION_META = {
     color: "#38bdf8",
     colorDark: "#0284c7"
   },
+  quality: {
+    id: "quality",
+    label: "Process Capability",
+    subtitle: "Cp and Cpk from a worksheet range, overall and by group.",
+    icon: "fa-gauge-high",
+    color: "#14b8a6",
+    colorDark: "#0f766e"
+  },
   survey: {
     id: "survey",
     label: "Survey Tools",
@@ -809,8 +843,8 @@ var TOOLS_SECTION_META = {
     colorDark: "#059669"
   }
 };
-var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "improvement", "delivery", "survey"];
-var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "improvement", "survey"];
+var TOOLS_SECTION_ORDER = ["prepare", "reporting", "visualization", "prioritization", "improvement", "quality", "delivery", "survey"];
+var TOOLS_RANGE_SECTIONS = ["prepare", "reporting", "visualization", "prioritization", "improvement", "quality", "survey"];
 var CALC_SECTION_META = {
   inference: {
     id: "inference",
@@ -3484,7 +3518,8 @@ function dismissAllHubDialogs() {
     hubParetoConfigDialog,
     hubParetoResultsDialog,
     hubBuilderDialog,
-    hubPublicationTablesResultsDialog
+    hubPublicationTablesResultsDialog,
+    hubCapabilityDialog
   ].forEach(function (dlg) {
     if (dlg) {
       hadOpen = true;
@@ -3506,6 +3541,7 @@ function dismissAllHubDialogs() {
   hubParetoResultsDialog = null;
   hubBuilderDialog = null;
   hubPublicationTablesResultsDialog = null;
+  hubCapabilityDialog = null;
   if (window.HubResultsBridge) HubResultsBridge.dismissAll();
   if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
   return hadOpen;
@@ -3699,6 +3735,101 @@ function openProcessSettingsFromHub() {
   return openProcessSettingsDialog("input");
 }
 
+var hubCapabilityDialog = null;
+
+function capabilityPayload(gr) {
+  var values = gr && gr.values;
+  if (!values || values.length < 2) {
+    return { headers: [], rows: [], address: "", source: "empty" };
+  }
+  return {
+    headers: values[0] || [],
+    rows: values.slice(1),
+    address: gr.address || "",
+    source: "excel"
+  };
+}
+
+function sendCapabilityPayload(dlg) {
+  if (!dlg) return;
+  try {
+    dlg.messageChild(JSON.stringify({
+      type: "CAPABILITY_DATA",
+      payload: capabilityPayload(getGlobalRangePayload())
+    }));
+  } catch (e) {}
+}
+
+function openCapabilityFromHub() {
+  var base = getDialogsBaseUrl() + "capability/capability.html?v=" + Date.now();
+  setSelectedModuleCard("capability-range", true);
+  if (!Office || !Office.context || !Office.context.ui || typeof Office.context.ui.displayDialogAsync !== "function") {
+    window.open(base + "&demo=1", "_blank");
+    setSelectedModuleCard("capability-range", false);
+    return true;
+  }
+  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
+    if (res.status === Office.AsyncResultStatus.Failed) {
+      setSelectedModuleCard("capability-range", false);
+      var err = res.error || {};
+      window.alert("Could not open Process Capability.\n\n" + (err.message || "Unknown error"));
+      return;
+    }
+    hubCapabilityDialog = res.value;
+    var dlg = hubCapabilityDialog;
+    setTimeout(function () { sendCapabilityPayload(dlg); }, 550);
+    setTimeout(function () { sendCapabilityPayload(dlg); }, 1400);
+    dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+      var msg;
+      try { msg = JSON.parse(arg.message || "{}"); } catch (e) { return; }
+      if (msg.action === "ready" || msg.action === "requestData") {
+        sendCapabilityPayload(dlg);
+        return;
+      }
+      if (msg.action === "refreshData" || msg.action === "pickRange" || msg.action === "useSelection") {
+        var capture = window.hubCaptureRange;
+        var refresh = window.hubRefreshGlobalRange;
+        var job = msg.action === "refreshData"
+          ? Promise.resolve(typeof refresh === "function" ? refresh() : null)
+          : Promise.resolve(typeof capture === "function" ? capture(msg.action === "useSelection" ? "selection" : "prompt") : null);
+        job.then(function (result) {
+          if (msg.action !== "refreshData" && (!result || !result.values || result.values.length < 2)) {
+            if (dlg) {
+              dlg.messageChild(JSON.stringify({
+                type: "CAPABILITY_ERROR",
+                message: (result && result.error) || "Could not read that range. Select a header row plus data."
+              }));
+            }
+            return;
+          }
+          sendCapabilityPayload(dlg);
+        }, function (err) {
+          if (dlg) {
+            dlg.messageChild(JSON.stringify({
+              type: "CAPABILITY_ERROR",
+              message: (err && err.message) || "Could not read that range."
+            }));
+          }
+        });
+        return;
+      }
+      if (msg.action === "close") {
+        try { dlg.close(); } catch (e) {}
+        dlg = null;
+        hubCapabilityDialog = null;
+        setSelectedModuleCard("capability-range", false);
+      }
+    });
+    dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
+      dlg = null;
+      hubCapabilityDialog = null;
+      setSelectedModuleCard("capability-range", false);
+      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+    });
+  });
+  return true;
+}
+
 function navigateToModuleCore(id) {
   var gr = getGlobalRangePayload();
   if (id === "prepare-data" || id === "prepare-quality" || id === "prepare-dataset") {
@@ -3773,6 +3904,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "process-settings") {
     if (openProcessSettingsFromHub()) return;
+  }
+  if (id === "capability-range") {
+    if (openCapabilityFromHub()) return;
   }
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";

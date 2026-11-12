@@ -922,7 +922,8 @@ const StatisticoHeader = {
       'contingency': 'Contingency Tables',
       'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
       'pareto': 'Pareto Analysis',
-      'process-settings': 'Process Settings Explorer'
+      'process-settings': 'Process Settings Explorer',
+      'capability': 'Process Capability'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -944,7 +945,8 @@ const StatisticoHeader = {
       'mixed-model': 'the linear mixed model',
       'meta-analysis': 'meta-analysis',
       contingency: 'contingency tables',
-      multivariable: 'the multivariable explorer'
+      multivariable: 'the multivariable explorer',
+      capability: 'process capability'
     };
     const name = names[moduleName];
     return name ? ('About ' + name) : 'About this module';
@@ -1018,6 +1020,9 @@ const StatisticoHeader = {
       'regression-residuals': 'Residual Diagnostics',
       'regression-by-group': 'By-Group Analysis',
       'setup': 'Input & Setup',
+      'cap-setup': 'Input & Setup',
+      'cap-results': 'Process Capability',
+      'cap-by-group': 'By-Group Analysis',
       'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
       'ps-diagnostics': 'Diagnostics',
@@ -1079,7 +1084,8 @@ const StatisticoHeader = {
       'contingency': 'Contingency Tables',
       'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
       'pareto': 'Pareto Analysis',
-      'process-settings': 'Process Settings Explorer'
+      'process-settings': 'Process Settings Explorer',
+      'capability': 'Process Capability'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -1088,7 +1094,7 @@ const StatisticoHeader = {
     const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation' || this.module === 'process-settings');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation' || this.module === 'process-settings' || this.module === 'capability');
 
     const groupName = String(this.groupLabel || '').trim()
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1753,7 +1759,7 @@ const StatisticoHeader = {
   },
 
   _isSharedSidebarModule() {
-    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency', 'segmentation', 'process-settings'].includes(this.module);
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency', 'segmentation', 'process-settings', 'capability'].includes(this.module);
   },
 
   _sidebarGroupKey(title) {
@@ -2184,6 +2190,41 @@ const StatisticoHeader = {
             }
           ]
         }
+      };
+    }
+
+    if (this.module === 'capability') {
+      const fitted = !!globalThis.__capFitted;
+      const active = globalThis.__capView || 'setup';
+      const resultItem = (viewName, tab, icon, label, description) => ({
+        type: 'js',
+        onclick: "switchCapabilityView('" + viewName + "')",
+        view: 'cap-' + viewName,
+        tab: tab,
+        icon: icon,
+        label: label,
+        description: fitted || viewName === 'setup' ? description : 'Available after the measurement is analyzed.',
+        active: active === viewName
+      });
+      return {
+        logoIcon: 'fa-gauge-high',
+        logoSub: 'Capability',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Capability',
+            items: [
+              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Cp, Cpk, and the distribution against the specification limits.'),
+              resultItem('setup', 'setup', 'fa-pen-to-square', fitted ? 'Edit input' : 'Input & Setup', 'Measurement column, specification limits, and the worksheet range.')
+            ]
+          }
+        ],
+        pinnedNav: this._byGroupPinnedNav({
+          type: 'js',
+          onclick: "switchCapabilityView('by-group')",
+          view: 'cap-by-group',
+          tab: 'by-group'
+        })
       };
     }
 
@@ -4952,7 +4993,7 @@ const StatisticoHeader = {
   },
 
   _isHeaderRowFilterSuppressed() {
-    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'process-settings';
+    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'process-settings' || this.module === 'capability';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -9324,6 +9365,9 @@ REPORT: [one polished paragraph suitable for a report]`;
       'contingency-by-group-chart': 'Charts by Group',
       'contingency-by-group-similarity': 'Similarity Profile™',
       'regression-by-group': 'By-Group Analysis',
+      'cap-setup': 'Input & Setup',
+      'cap-results': 'Process Capability',
+      'cap-by-group': 'By-Group Analysis',
       'regression-by-group-coefficients': 'Coefficients',
       'regression-by-group-similarity': 'Similarity Profile™',
       'segmentation-overview': 'Overview',
@@ -9409,6 +9453,9 @@ REPORT: [one polished paragraph suitable for a report]`;
       'process-settings-ps-overview': 'Process Results — Overview',
       'process-settings-ps-technical': 'Process Results — Technical',
       'process-settings-ps-scatters': 'Predictor Scatters',
+      'capability-results': 'Process Capability',
+      'capability-setup': 'Input & Setup',
+      'capability-by-group': 'By-Group Analysis',
       'regression-diag-overview':    'Diagnostics — Overview',
       'regression-diag-plots':       'Diagnostics — Residual Plots',
       'regression-diag-influence':   'Diagnostics — Influence',
@@ -9543,6 +9590,10 @@ REPORT: [one polished paragraph suitable for a report]`;
         'Read the model specification, predictor roles, fitted terms, interactions, and categorical reference levels. Sample accounting lists analyzed and excluded rows. The ANOVA table gives sums of squares, degrees of freedom, mean squares, the F-statistic, and its p-value. The residual standard deviation is the spread of the profiler\u2019s projected output curve.',
       'process-settings-ps-scatters':
         'One predictor is shown at a time, chosen from the radio list. The cards report the rows used by the selected curve, Pearson r for a linear fit or observed-versus-fitted r for another curve, curve R² as the percentage of variation that curve explains, and the full model’s loss of R² when that predictor is removed, labeled in percentage points (pp). The linear Pearson t test is written as p < 0.0001 when it is smaller than 0.0001. Show fit only hides or shows the trend. Chart options changes the window, curve, and X-axis transform without refitting the process model. A categorical predictor shows the observed points and the same specification lines, with no curve.',
+      'capability-results':
+        'Cp and Cpk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the sample standard deviation (n − 1). The gauge, yield, and parts per million assume a normal distribution. Edit the specification limits here without returning to input.',
+      'capability-by-group':
+        'Compare Cp and Cpk across the selected grouping column. The status describes whether capability stays in a similar band, varies, or changes which specification limit is binding. Group differences are descriptive and are not a formal test that the groups differ.',
       'regression-diag-overview':
         'Read the assumption verdict strip, the residual histogram with normal overlay, and the high-level test summary. Use this view to decide if the model is trustworthy before interpreting coefficients.',
       'regression-diag-plots':

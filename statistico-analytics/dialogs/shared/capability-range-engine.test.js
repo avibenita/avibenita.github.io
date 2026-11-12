@@ -67,4 +67,12 @@ describe('capability from a range', () => {
     expect(result.byGroup.ok).toBe(false);
     expect(result.byGroup.error).toMatch(/15/);
   });
+
+  test('compares only the group levels the user includes', () => {
+    const demo = Engine.demoTable();
+    const spec = Engine.demoSpec();
+    const result = Engine.analyze(demo, Object.assign({ value: 'Diameter', group: 'Line', include: ['A', 'B'] }, spec));
+    expect(result.byGroup.groups.map(function (group) { return group.name; })).toEqual(['A', 'B']);
+    expect(result.byGroup.warningText).toMatch(/excluded level/);
+  });
 });

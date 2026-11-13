@@ -138,6 +138,75 @@ describe('capability planner', () => {
     expect(found.candidates[0].sd).toBe(2);
   });
 
+  test('etch time keeps the current SD and offers the two mean presets', () => {
+    const etch = { lsl: 50, usl: 93, mean: 50, sd: 4.1, nominal: '' };
+    const base = Planner.metricsOf(50, 93, 50, 4.1, '');
+    expect(base.index).toBeCloseTo(0, 6);
+
+    const found = ask({ baseline: etch });
+    expect(found.status).toBe('reachable');
+    expect(found.atCurrentSd.meets).toBe(true);
+    expect(found.atCurrentSd.lo).toBeCloseTo(66.359, 3);
+    expect(found.atCurrentSd.hi).toBeCloseTo(76.641, 3);
+    expect(Planner.indexOf(found.atCurrentSd.lo, 4.1, 50, 93)).toBeGreaterThanOrEqual(1.33 - Planner.INDEX_TOL);
+    expect(Planner.indexOf(found.atCurrentSd.hi, 4.1, 50, 93)).toBeGreaterThanOrEqual(1.33 - Planner.INDEX_TOL);
+    expect(found.candidates.map(function (item) { return item.id; })).toEqual(['smallest-shift', 'most-margin']);
+    expect(found.candidates[0].mean).toBeCloseTo(66.359, 3);
+    expect(found.candidates[0].sd).toBe(4.1);
+    expect(found.candidates[0].index).toBeCloseTo(1.33, 3);
+    expect(found.candidates[1].mean).toBeCloseTo(71.5, 6);
+    expect(found.candidates[1].sd).toBe(4.1);
+    expect(found.candidates[1].index).toBeCloseTo(1.748, 3);
+    expect(found.candidates[1].ppm).toBeCloseTo(0.16, 2);
+    expect(Planner.answerText(found, { indexLabel: 'Ppk', goal: 1.33, digits: 2, unit: 's' })).toBe(
+      'Ppk 1.33 is reachable at the current SD of 4.10 s. A mean from 66.36 to 76.64 s meets the goal.'
+    );
+
+    const custom = Planner.previewMean(Object.assign({
+      metric: 'index', goal: 1.33, mode: 'process', adjust: 'both', baseline: etch,
+      meanMin: '', meanMax: '', sdMin: ''
+    }), 76.23);
+    expect(custom.mean).toBe(76.23);
+    expect(custom.sd).toBe(4.1);
+    expect(custom.meets).toBe(true);
+    expect(custom.index).toBeCloseTo(1.3634, 3);
+    expect(custom.ppm).toBeCloseTo(21.55, 1);
+    expect(custom.sdGoal).toBeCloseTo(4.203, 3);
+    expect(custom.cappedByCurrent).toBe(true);
+
+    const capped = ask({ baseline: etch, meanMax: 60 });
+    expect(capped.atCurrentSd.meets).toBe(false);
+    expect(capped.candidates.some(function (item) { return item.id === 'smallest-shift' && item.sd === 4.1; })).toBe(false);
+    expect(capped.candidates[0].title).toBe('Least SD reduction');
+    expect(capped.candidates[0].mean).toBeCloseTo(60, 6);
+    expect(capped.candidates[0].sd).toBeCloseTo(2.506, 3);
+    expect(Planner.answerText(capped, { indexLabel: 'Ppk', goal: 1.33, digits: 2, unit: 's' })).toMatch(/has to be reduced/);
+
+    const blocked = ask({ baseline: etch, meanMax: 60, sdMin: 3 });
+    expect(blocked.status).toBe('unreachable');
+    expect(blocked.best.mean).toBeCloseTo(60, 6);
+    expect(blocked.best.sd).toBeCloseTo(3, 6);
+    expect(blocked.best.index).toBeCloseTo(1.111, 3);
+  });
+
+  test('a goal already met at the current SD starts from the current process', () => {
+    const found = ask({ baseline: { lsl: 50, usl: 93, mean: 71.5, sd: 4.1, nominal: '' } });
+    expect(found.status).toBe('already-met');
+    expect(found.candidates[0].id).toBe('current');
+    expect(found.candidates[0].mean).toBe(71.5);
+    expect(found.candidates[0].sd).toBe(4.1);
+    expect(Planner.answerText(found, { indexLabel: 'Ppk', goal: 1.33, digits: 2, unit: 's' })).toMatch(/already meets the goal/);
+  });
+
+  test('a single feasible mean collapses the two current-SD presets', () => {
+    const sd = 43 / (6 * 1.33);
+    const found = ask({ baseline: { lsl: 50, usl: 93, mean: 50, sd: sd, nominal: '' } });
+    expect(found.status).toBe('reachable');
+    expect(found.candidates).toHaveLength(1);
+    expect(found.candidates[0].mean).toBeCloseTo(71.5, 6);
+    expect(found.candidates[0].sd).toBeCloseTo(sd, 8);
+  });
+
   test('yield specification what-if names the equal-widening policy', () => {
     const found = ask({
       metric: 'yield',

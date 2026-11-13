@@ -335,6 +335,34 @@
     var goal = num(req.goal);
     var mid = (bounds.lsl + bounds.usl) / 2;
     var meanKeep = clamp(mid, bounds.lo, bounds.hi);
+    var currentWindow = indexWindow(bounds, goal, bounds.sd);
+    var atCurrentSd = currentWindow
+      ? { meets: true, lo: currentWindow.lo, hi: currentWindow.hi, sd: bounds.sd }
+      : { meets: false, sd: bounds.sd };
+    if (currentWindow) {
+      var marginMean = clamp(mid, currentWindow.lo, currentWindow.hi);
+      if (currentMeets(req, bounds)) {
+        var kept = [candidate('current', 'Current process', 'no change', point(bounds, bounds.mean, bounds.sd), bounds, false)];
+        if (!nearly(marginMean, bounds.mean)) {
+          kept.push(candidate('most-margin', 'Most margin at current SD', 'distance from the specification limits', point(bounds, marginMean, bounds.sd), bounds, false));
+        }
+        return result('already-met', bounds, {
+          candidates: kept,
+          atCurrentSd: atCurrentSd,
+          feasibleMean: currentWindow
+        });
+      }
+      var shiftMean = clamp(bounds.mean, currentWindow.lo, currentWindow.hi);
+      var shifted = [candidate('smallest-shift', 'Smallest mean shift at current SD', 'change in the mean', point(bounds, shiftMean, bounds.sd), bounds, true)];
+      if (!nearly(marginMean, shiftMean)) {
+        shifted.push(candidate('most-margin', 'Most margin at current SD', 'distance from the specification limits', point(bounds, marginMean, bounds.sd), bounds, false));
+      }
+      return result('reachable', bounds, {
+        candidates: shifted,
+        atCurrentSd: atCurrentSd,
+        feasibleMean: currentWindow
+      });
+    }
     var allow = roomAt(meanKeep, bounds.lsl, bounds.usl) / (3 * goal);
     if (!(allow > 0) || allow + INDEX_TOL < bounds.floor) {
       var bestSd = bounds.floor > 0 ? bounds.floor : bounds.sd;
@@ -344,28 +372,31 @@
           ? 'Cannot reach goal with these constraints. Even at the practical minimum standard deviation, the permitted mean cannot reach the goal.'
           : 'Cannot reach goal with these constraints. No permitted mean is inside the specification limits.',
         limiting: inside ? 'practical minimum standard deviation' : 'mean range',
-        best: inside ? bestBlock(point(bounds, meanKeep, bestSd), bounds, true) : bestBlock(null, bounds, false)
+        best: inside ? bestBlock(point(bounds, meanKeep, bestSd), bounds, true) : bestBlock(null, bounds, false),
+        atCurrentSd: atCurrentSd
       });
     }
     if (currentMeets(req, bounds)) {
       return result('already-met', bounds, {
         candidates: [candidate('current', 'Current process', 'no change', point(bounds, bounds.mean, bounds.sd), bounds, false)],
+        atCurrentSd: atCurrentSd,
         feasibleMean: indexWindow(bounds, goal, Math.max(bounds.floor, allow > bounds.sd ? bounds.sd : allow)) || meanDomain(bounds)
       });
     }
     var sdKeep = Math.min(bounds.sd, allow);
-    var list = [candidate('preserve-sd', 'Preserves the most standard deviation', 'standard deviation reduction', point(bounds, meanKeep, sdKeep), bounds, true)];
+    var list = [candidate('preserve-sd', 'Least SD reduction', 'standard deviation reduction', point(bounds, meanKeep, sdKeep), bounds, true)];
     if (bounds.floor > 0) {
       var win = indexWindow(bounds, goal, bounds.floor);
       if (win) {
-        var shifted = clamp(bounds.mean, win.lo, win.hi);
-        if (!nearly(shifted, meanKeep)) {
-          list.push(candidate('smallest-shift', 'Smallest change in the mean', 'change in the mean', point(bounds, shifted, bounds.floor), bounds, true));
+        var shiftedMean = clamp(bounds.mean, win.lo, win.hi);
+        if (!nearly(shiftedMean, meanKeep)) {
+          list.push(candidate('smallest-shift', 'Smallest change in the mean', 'change in the mean', point(bounds, shiftedMean, bounds.floor), bounds, true));
         }
       }
     }
     return result('reachable', bounds, {
       candidates: list,
+      atCurrentSd: atCurrentSd,
       feasibleMean: indexWindow(bounds, goal, Math.max(bounds.floor, 1e-9)) || { lo: meanKeep, hi: meanKeep }
     });
   }
@@ -629,9 +660,10 @@
     if (req.metric === 'index') {
       var gap = roomAt(mean, bounds.lsl, bounds.usl);
       if (!(gap > 0)) return null;
-      var high = Math.min(bounds.sd, gap / (3 * num(req.goal)));
+      var goalSd = gap / (3 * num(req.goal));
+      var high = Math.min(bounds.sd, goalSd);
       if (high < floor - INDEX_TOL || !(high > 0)) return null;
-      return { sdLow: floor, sdHigh: high };
+      return { sdLow: floor, sdHigh: high, sdGoal: goalSd, cappedByCurrent: goalSd > bounds.sd + INDEX_TOL };
     }
     var target = targetFraction(req);
     var found = fractionSdLimit(bounds, mean, target, floor);
@@ -654,7 +686,8 @@
   function previewMean(req, mean) {
     var bounds = boundsAtPreview(req);
     if (!bounds) return null;
-    var region = sdBoundsAtMean(req, mean);
+    var outside = mean < bounds.lo - INDEX_TOL || mean > bounds.hi + INDEX_TOL;
+    var region = outside ? null : sdBoundsAtMean(req, mean);
     var sd = region ? region.sdHigh : (bounds.floor > 0 ? bounds.floor : bounds.sd);
     var scored = metricsOf(bounds.lsl, bounds.usl, mean, sd, bounds.nominal);
     if (!scored) return null;
@@ -662,10 +695,36 @@
       mean: mean,
       sd: sd,
       meets: !!region,
+      reason: outside ? 'outside' : (region ? '' : 'no-sd'),
+      sdGoal: region ? region.sdGoal : null,
+      sdCeiling: bounds.sd,
+      cappedByCurrent: region ? !!region.cappedByCurrent : false,
       index: scored.index,
       ppm: scored.ppm,
       yieldPct: scored.yieldPct
     };
+  }
+
+  function answerText(found, opts) {
+    var digits = opts && Number.isFinite(opts.digits) ? opts.digits : 2;
+    var unit = opts && opts.unit ? ' ' + opts.unit : '';
+    var label = (opts && opts.indexLabel) || 'Ppk';
+    var goal = opts ? opts.goal : NaN;
+    function fixed(n) { return Number.isFinite(n) ? Number(n).toFixed(digits) : '—'; }
+    var band = found && found.atCurrentSd;
+    if (band && band.meets && found.status !== 'unreachable') {
+      var lines = [];
+      if (found.status === 'already-met') lines.push('The current process already meets the goal.');
+      lines.push(label + ' ' + fixed(goal) + ' is reachable at the current SD of ' + fixed(band.sd) + unit + '.');
+      if (band.hi > band.lo + 1e-6) {
+        lines.push('A mean from ' + fixed(band.lo) + ' to ' + fixed(band.hi) + unit + ' meets the goal.');
+      }
+      return lines.join(' ');
+    }
+    if (band && !band.meets && found.status === 'reachable') {
+      return label + ' ' + fixed(goal) + ' is not reachable at the current SD of ' + fixed(band.sd) + unit + '. The standard deviation has to be reduced.';
+    }
+    return '';
   }
 
   function boundsAtPreview(req) {
@@ -682,6 +741,7 @@
     indexOf: indexOf,
     solve: solve,
     sdBoundsAtMean: sdBoundsAtMean,
-    previewMean: previewMean
+    previewMean: previewMean,
+    answerText: answerText
   };
 });

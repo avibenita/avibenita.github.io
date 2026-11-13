@@ -1022,6 +1022,7 @@ const StatisticoHeader = {
       'setup': 'Input & Setup',
       'cap-setup': 'Input & Setup',
       'cap-results': 'Process Capability',
+      'cap-planner': 'Capability Planner',
       'cap-by-group': 'By-Group Analysis',
       'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
@@ -2215,7 +2216,8 @@ const StatisticoHeader = {
             title: 'Capability',
             items: [
               resultItem('setup', 'setup', 'fa-pen-to-square', fitted ? 'Edit input' : 'Input & Setup', 'Choose the measurement and set the specification limits.'),
-              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Cp, Cpk, and the distribution against the specification limits.')
+              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Pp, Ppk, and the distribution against the specification limits.'),
+              resultItem('planner', 'planner', 'fa-bullseye', 'Capability Planner', 'Find a mean, standard deviation, or specification change that reaches a goal.')
             ]
           }
         ],
@@ -9367,6 +9369,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'setup': 'Input & Setup',
       'cap-setup': 'Input & Setup',
       'cap-results': 'Process Capability',
+      'cap-planner': 'Capability Planner',
       'cap-by-group': 'By-Group Analysis',
       'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
@@ -9595,9 +9598,11 @@ REPORT: [one polished paragraph suitable for a report]`;
       'process-settings-ps-scatters':
         'One predictor is shown at a time, chosen from the radio list. The cards report the rows used by the selected curve, Pearson r for a linear fit or observed-versus-fitted r for another curve, curve R² as the percentage of variation that curve explains, and the full model’s loss of R² when that predictor is removed, labeled in percentage points (pp). The linear Pearson t test is written as p < 0.0001 when it is smaller than 0.0001. Show fit only hides or shows the trend. Chart options changes the window, curve, and X-axis transform without refitting the process model. A categorical predictor shows the observed points and the same specification lines, with no curve.',
       'capability-results':
-        'Cp and Cpk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the sample standard deviation (n − 1). The gauge, yield, and parts per million assume a normal distribution. Edit the specification limits here without returning to input.',
+        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Edit the specification limits here without returning to input.',
+      'capability-planner':
+        'Find settings searches for a mean, standard deviation, or outward specification change that reaches a Ppk, modeled-yield, or expected-PPM goal. The scenario stays in this view. The worksheet and the capability results keep the analyzed values.',
       'capability-by-group':
-        'Compare Cp and Cpk across the selected grouping column. The status describes whether capability stays in a similar band, varies, or changes which specification limit is binding. Group differences are descriptive and are not a formal test that the groups differ.',
+        'Compare Pp and Ppk across the selected grouping column. The status describes whether capability stays in a similar band, varies, or changes which specification limit is binding. Group differences are descriptive and are not a formal test that the groups differ.',
       'regression-diag-overview':
         'Read the assumption verdict strip, the residual histogram with normal overlay, and the high-level test summary. Use this view to decide if the model is trustworthy before interpreting coefficients.',
       'regression-diag-plots':

@@ -15,12 +15,13 @@
   <link rel="stylesheet" href="../shared-by-group.css?v=20261112cap3" />
   <script src="../shared-config.js?v=20261112cap4"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261112cap3"></script>
+  <script src="../shared-header.js?v=20261113plan"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
-  <script src="../../shared/by-group-standard.js?v=20261112cap3"></script>
+  <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
   <script src="../shared/group-column-suitability.js?v=20261112cap3"></script>
-  <script src="../../shared/capability-range-engine.js?v=20261112cap3"></script>
+  <script src="../../shared/capability-range-engine.js?v=20261113plan"></script>
+  <script src="../../shared/capability-planner.js?v=20261113plan"></script>
   <style>
     html, body { height: 100%; margin: 0; }
     body {
@@ -47,7 +48,7 @@
     .cap-error[hidden] { display: none !important; }
     .cap-actions, .cap-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
     button, select, input { font: inherit; }
-    #view-results button, #view-by-group button, .group-dialog button {
+    #view-results button, #view-by-group button, #view-planner button, .group-dialog button {
       border: 1px solid var(--border, rgba(255,255,255,.16));
       background: var(--surface-2, #1b2430);
       border-radius: 8px;
@@ -59,7 +60,7 @@
     }
     #view-results button.primary { background: #14b8a6; color: #042f2e; border-color: transparent; }
     label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary, rgba(255,255,255,.75)); min-width: 140px; }
-    #view-results input[type="number"], #view-results select, #view-by-group select, .group-dialog input[type="number"], .group-dialog select {
+    #view-results input[type="number"], #view-results select, #view-planner input[type="number"], #view-planner select, #view-by-group select, .group-dialog input[type="number"], .group-dialog select {
       background: #1b2430;
       border: 1px solid rgba(255,255,255,.32);
       border-radius: 8px;
@@ -161,6 +162,18 @@
     .hist-tools input[type="range"] { width: 128px; accent-color: #f97316; }
     .hist-tools .bin-readout { min-width: 1.4em; color: #7dd3fc; }
     .hist-tools [hidden] { display: none !important; }
+    #open-planner { margin-top: 8px; width: 100%; }
+    .planner-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 8px; }
+    .planner-form .field { min-width: 150px; flex: 1 1 150px; }
+    .candidate-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+    .candidate { text-align: left; width: 100%; }
+    .candidate.is-selected { border-color: #f97316; box-shadow: 0 0 0 1px #f97316; }
+    .candidate small { display: block; font-weight: 650; color: var(--text-secondary, rgba(255,255,255,.72)); }
+    #planner-tradeoff svg, #planner-dist svg { width: 100%; height: auto; display: block; }
+    #view-planner [hidden] { display: none !important; }
+    #planner-mean-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+    #planner-mean-tools[hidden] { display: none !important; }
+    #planner-mean-range { flex: 1 1 180px; accent-color: #f97316; }
     #cpkGauge svg, #distributionChart svg { width: 100%; height: auto; display: block; }
     .table-wrap { overflow: auto; border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 10px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 760px; }
@@ -272,7 +285,7 @@
                 <span>Measurement</span>
                 <span class="reg-model-meta" id="tbRange"></span>
               </div>
-              <div class="reg-equation-strip" id="measureEquation">Cp, Cpk of (assign a measurement)</div>
+              <div class="reg-equation-strip" id="measureEquation">Pp, Ppk of (assign a measurement)</div>
               <div class="reg-zone-card zone-out zone-single">
                 <div class="reg-zone-head">
                   <div class="dot"></div>
@@ -312,7 +325,7 @@
 
         <section id="view-results" class="cap-view" hidden aria-labelledby="results-title">
           <div id="results-empty" class="empty-prompt" hidden>
-            <p>Analyze a measurement column to see Cp and Cpk.</p>
+            <p>Analyze a measurement column to see Pp and Ppk.</p>
             <button type="button" id="results-to-setup">Go to input</button>
           </div>
           <div id="results-body">
@@ -338,7 +351,7 @@
                 <div class="results-top">
                   <div class="gauge-panel">
                     <div id="cpkGauge"></div>
-                    <ul class="gauge-legend" aria-label="Cpk scale">
+                    <ul class="gauge-legend" aria-label="Ppk scale">
                       <li><i style="background:#dc2626"></i> &lt; 1.00 Inadequate</li>
                       <li><i style="background:#ea580c"></i> 1.00–1.33 Poor</li>
                       <li><i style="background:#eab308"></i> 1.33–1.67 Adequate</li>
@@ -366,6 +379,74 @@
           </div>
         </section>
 
+        <section id="view-planner" class="cap-view" hidden aria-labelledby="planner-title">
+          <div class="cap-card">
+            <h2 id="planner-title"><i class="fa-solid fa-bullseye"></i> Capability Planner</h2>
+            <p id="planner-basis" class="cap-help"></p>
+            <div class="readout" id="planner-baseline"></div>
+            <p id="planner-fixed" class="cap-help"></p>
+            <div class="planner-form">
+              <label class="field">Metric
+                <select id="planner-metric">
+                  <option value="index">Ppk</option>
+                  <option value="yield">Modeled yield (%)</option>
+                  <option value="ppm">Expected PPM</option>
+                </select>
+              </label>
+              <label class="field"><span id="planner-goal-label">Goal (at least)</span>
+                <input id="planner-goal" type="number" step="any" value="1.33" />
+              </label>
+              <label class="field">Mode
+                <select id="planner-mode">
+                  <option value="process">Process improvement</option>
+                  <option value="spec">Specification what-if</option>
+                </select>
+              </label>
+              <label class="field" id="planner-adjust-wrap">Change
+                <select id="planner-adjust">
+                  <option value="both">Mean + SD</option>
+                  <option value="mean">Mean only</option>
+                  <option value="sd">SD only</option>
+                </select>
+              </label>
+            </div>
+            <div id="planner-process-bounds">
+              <p class="cap-help">The analyzed specification limits stay fixed. Blank mean bounds add no further constraint. The search can keep the current standard deviation or reduce it.</p>
+              <div class="planner-form">
+                <label class="field">Minimum mean<input id="planner-mean-min" type="number" step="any" /></label>
+                <label class="field">Maximum mean<input id="planner-mean-max" type="number" step="any" /></label>
+                <label class="field">Practical minimum SD<input id="planner-sd-min" type="number" step="any" /></label>
+              </div>
+            </div>
+            <div id="planner-spec-bounds" hidden>
+              <p class="cap-help">The analyzed mean and standard deviation stay fixed. An unlocked limit may move outward. A blank allowance does not cap that move.</p>
+              <div class="planner-form">
+                <label><input type="checkbox" id="planner-unlock-lower" checked /> Unlock lower limit</label>
+                <label class="field">Lower outward allowance<input id="planner-lower-out" type="number" step="any" placeholder="No cap" /></label>
+                <label><input type="checkbox" id="planner-unlock-upper" checked /> Unlock upper limit</label>
+                <label class="field">Upper outward allowance<input id="planner-upper-out" type="number" step="any" placeholder="No cap" /></label>
+              </div>
+            </div>
+            <p id="planner-error" class="cap-error" hidden></p>
+            <p id="planner-stale" class="cap-help" hidden>The scenario is out of date. Choose Find settings to calculate it again.</p>
+            <div class="cap-actions" style="margin-top:12px;">
+              <button type="button" class="primary" id="planner-find">Find settings</button>
+              <button type="button" id="planner-back">Back to results</button>
+            </div>
+          </div>
+          <div class="cap-card" id="planner-output" hidden>
+            <div class="assessment"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="planner-status"></p></div>
+            <div class="candidate-list" id="planner-candidates"></div>
+            <div id="planner-mean-tools" hidden>
+              <label class="field">Scenario mean<input id="planner-mean" type="number" step="any" /></label>
+              <input id="planner-mean-range" type="range" aria-label="Scenario mean" />
+              <p id="planner-preview" class="cap-help"></p>
+            </div>
+            <div id="planner-tradeoff"></div>
+            <div id="planner-dist"></div>
+          </div>
+        </section>
+
         <section id="view-by-group" class="cap-view" hidden aria-labelledby="by-group-title">
           <div id="by-group-empty" class="empty-prompt" hidden>
             <p>Analyze a measurement column, then compare capability across groups.</p>
@@ -389,7 +470,7 @@
                   <table>
                     <thead>
                       <tr>
-                        <th>Group</th><th>n</th><th>Mean</th><th>SD</th><th>Cp</th><th>Cpk</th><th>Cpu</th><th>Cpl</th><th>Limited by</th><th>PPM</th>
+                        <th>Group</th><th>n</th><th>Mean</th><th>SD</th><th>Pp</th><th>Ppk</th><th>Cpu</th><th>Cpl</th><th>Limited by</th><th>PPM</th>
                       </tr>
                     </thead>
                     <tbody id="group-table"></tbody>
@@ -442,6 +523,9 @@
     var previewGroup = '';
     var DEFAULT_MIN_GROUP_N = 5;
     var previewKeepMinN = '5';
+    var plannerSnapshot = null;
+    var plannerResult = null;
+    var plannerPreview = null;
     var draggedName = '';
 
     function el(id) { return document.getElementById(id); }
@@ -559,7 +643,7 @@
       else zone.innerHTML = '<div class="reg-chip"><span>' + escapeHtml(measure) + '</span><button type="button" class="reg-chip-x" id="clear-measure" title="Remove">✕</button></div>';
       var clear = el('clear-measure');
       if (clear) clear.addEventListener('click', function () { assignMeasure('', 'numeric'); });
-      el('measureEquation').textContent = measure ? ('Cp, Cpk of ' + measure) : 'Cp, Cpk of (assign a measurement)';
+      el('measureEquation').textContent = measure ? ('Pp, Ppk of ' + measure) : 'Pp, Ppk of (assign a measurement)';
       el('run-btn').disabled = !measure;
       var rows = table && table.rows ? table.rows.length : 0;
       var badge = rows ? (rows + ' rows · ' + stats.length + ' vars') : '';
@@ -683,6 +767,7 @@
         usl: spec.usl,
         target: spec.target
       });
+      refreshPlannerBaseline();
       return last;
     }
 
@@ -709,12 +794,12 @@
       var wellCentred = result.centeringRatio < 15;
       var goalText = goal ? ' to at least ' + formatGoal(goal) : '';
       if (result.cpk >= 2) {
-        if (wellCentred) return 'Excellent: the process is well centred and variation is low. Cpk is ' + fmt(result.cpk) + '.';
-        return 'Excellent: Cpk is ' + fmt(result.cpk) + '. The mean is off centre, but capability is still high.';
+        if (wellCentred) return 'Excellent: the process is well centred and variation is low. Ppk is ' + fmt(result.cpk) + '.';
+        return 'Excellent: Ppk is ' + fmt(result.cpk) + '. The mean is off centre, but capability is still high.';
       }
-      if (wellCentred) return lead + ': the process is well centred, but variation is too high. Reduce variation to improve Cpk from ' + fmt(result.cpk) + goalText + '.';
-      if (goal && result.cp + 1e-9 >= goal) return lead + ': the process is off centre. Recentering would improve Cpk from ' + fmt(result.cpk) + goalText + '.';
-      return lead + ': the process is off centre and variation is too high. Recentering and reducing variation would improve Cpk from ' + fmt(result.cpk) + goalText + '.';
+      if (wellCentred) return lead + ': the process is well centred, but variation is too high. Reduce variation to improve Ppk from ' + fmt(result.cpk) + goalText + '.';
+      if (goal && result.cp + 1e-9 >= goal) return lead + ': the process is off centre. Recentering would improve Ppk from ' + fmt(result.cpk) + goalText + '.';
+      return lead + ': the process is off centre and variation is too high. Recentering and reducing variation would improve Ppk from ' + fmt(result.cpk) + goalText + '.';
     }
 
     function svgEl(name, attrs) {
@@ -750,7 +835,7 @@
       var r = 68;
       var host = el('cpkGauge');
       host.textContent = '';
-      var svg = svgEl('svg', { viewBox: '0 -8 240 136', role: 'img', 'aria-label': 'Cpk gauge ' + fmt(cpk) });
+      var svg = svgEl('svg', { viewBox: '0 -8 240 136', role: 'img', 'aria-label': 'Ppk gauge ' + fmt(cpk) });
       [[0, 1, '#dc2626'], [1, 1.33, '#ea580c'], [1.33, 1.67, '#eab308'], [1.67, 2, '#0284c7'], [2, 3, '#16a34a']].forEach(function (zone) {
         var a0 = Math.min(180, valueAngle(zone[0], scaleMax) + 0.4);
         var a1 = Math.max(0, valueAngle(zone[1], scaleMax) - 0.4);
@@ -958,9 +1043,9 @@
       host.appendChild(svg);
     }
 
-    function metricCard(label, tip, valueHtml, primary) {
+    function metricCard(label, tip, valueHtml, primary, extra) {
       return '<div class="metric' + (primary ? ' metric-primary' : '') + '"><div class="metric-label">' + escapeHtml(label) +
-        ' <span class="info-dot" tabindex="0" data-tip="' + escapeHtml(tip) + '">i</span></div><div class="metric-value">' + valueHtml + '</div></div>';
+        ' <span class="info-dot" tabindex="0" data-tip="' + escapeHtml(tip) + '">i</span></div><div class="metric-value">' + valueHtml + '</div>' + (extra || '') + '</div>';
     }
     function ratingHtml(rating) {
       if (!rating) return '';
@@ -985,12 +1070,12 @@
       var result = last.overall;
       el('results-readout').innerHTML = '<span>n <b>' + result.n + '</b></span><span>Mean <b>' + fmt(result.mean) + '</b></span><span>SD <b>' + fmt(result.sd) + '</b></span>'
         + (last.excluded ? '<span>Excluded <b>' + last.excluded + '</b></span>' : '');
-      el('assessment').textContent = assessment(result) + ' Indices use the sample standard deviation of ' + last.valueName + '.';
+      el('assessment').textContent = assessment(result) + ' Pp and Ppk use the overall sample standard deviation (n − 1) of ' + last.valueName + '.';
       el('metric-grid').innerHTML = [
-        metricCard('Cp', 'Cp = (USL − LSL) / (6s). Spread only, as if the mean were centered.', fmt(result.cp)),
-        metricCard('Cpk', 'Cpk = min(Cpu, Cpl). The worse one-sided capability.', fmt(result.cpk) + ratingHtml(result.rating), true),
-        metricCard('Cpu', 'Cpu = (USL − mean) / (3s). Room from the mean to the upper limit.', fmt(result.cpu)),
-        metricCard('Cpl', 'Cpl = (mean − LSL) / (3s). Room from the mean to the lower limit.', fmt(result.cpl)),
+        metricCard('Pp', 'Pp = (USL − LSL) / (6s). Spread only, as if the mean were centered. s is the overall sample standard deviation.', fmt(result.cp)),
+        metricCard('Ppk', 'Ppk = min(Cpu, Cpl). The worse one-sided capability from the overall sample standard deviation.', fmt(result.cpk) + ratingHtml(result.rating), true, '<button type="button" class="primary" id="open-planner">Find settings</button>'),
+        metricCard('Cpu', 'Cpu = (USL − mean) / (3s). Room from the mean to the upper limit, using the overall sample standard deviation.', fmt(result.cpu)),
+        metricCard('Cpl', 'Cpl = (mean − LSL) / (3s). Room from the mean to the lower limit, using the overall sample standard deviation.', fmt(result.cpl)),
         metricCard('Cpm', 'Cpm = (USL − LSL) / (6 √(s² + (mean − target)²)). Penalizes distance from the target.', fmt(result.cpm)),
         metricCard('Expected PPM', 'PPM = 1,000,000 × (P(X < LSL) + P(X > USL)), assuming a normal process.', Math.round(result.ppm).toLocaleString()),
         metricCard('Yield', 'Yield = 100% × P(LSL ≤ X ≤ USL).', result.yieldPct.toFixed(2) + '%')
@@ -1086,11 +1171,357 @@
       });
     }
 
+    function unitFromName(name) {
+      var match = /\(([^)]+)\)/.exec(name || '');
+      return match ? match[1].trim() : '';
+    }
+    function unitSuffix() {
+      return plannerSnapshot && plannerSnapshot.unit ? ' ' + plannerSnapshot.unit : '';
+    }
+    function signed(n) {
+      if (!Number.isFinite(n)) return '—';
+      return (n > 0 ? '+' : '') + fmt(n);
+    }
+    function snapshotPlanner() {
+      if (!last || !last.ok) return;
+      var overall = last.overall;
+      var nominal = overall.hasTarget ? overall.target : '';
+      var key = [overall.lsl, overall.usl, overall.mean, overall.sd, nominal].join('|');
+      if (plannerSnapshot && plannerSnapshot.key !== key) {
+        var hadScenario = plannerResult || plannerPreview;
+        plannerResult = null;
+        plannerPreview = null;
+        if (hadScenario && el('planner-stale')) el('planner-stale').hidden = false;
+      }
+      plannerSnapshot = {
+        key: key,
+        lsl: overall.lsl,
+        usl: overall.usl,
+        mean: overall.mean,
+        sd: overall.sd,
+        nominal: nominal,
+        unit: unitFromName(last.valueName),
+        n: overall.n,
+        sdBasis: 'overall'
+      };
+    }
+    function refreshPlannerBaseline() {
+      if (!last || !last.ok) {
+        var hadBaseline = plannerSnapshot || plannerResult || plannerPreview;
+        plannerSnapshot = null;
+        plannerResult = null;
+        plannerPreview = null;
+        if (hadBaseline && view === 'planner') paintPlanner();
+        return;
+      }
+      if (!plannerSnapshot) return;
+      var previous = plannerSnapshot.key;
+      snapshotPlanner();
+      if (plannerSnapshot.key !== previous && view === 'planner') paintPlanner();
+    }
+    function plannerRequest() {
+      snapshotPlanner();
+      return {
+        metric: el('planner-metric').value,
+        goal: el('planner-goal').value,
+        mode: el('planner-mode').value,
+        adjust: el('planner-adjust').value,
+        baseline: plannerSnapshot,
+        meanMin: el('planner-mean-min').value,
+        meanMax: el('planner-mean-max').value,
+        sdMin: el('planner-sd-min').value,
+        unlockLower: el('planner-unlock-lower').checked,
+        unlockUpper: el('planner-unlock-upper').checked,
+        lowerOut: el('planner-lower-out').value,
+        upperOut: el('planner-upper-out').value
+      };
+    }
+    function markPlannerStale() {
+      if (!plannerResult && !plannerPreview) return;
+      plannerResult = null;
+      plannerPreview = null;
+      el('planner-output').hidden = true;
+      el('planner-stale').hidden = false;
+      el('planner-tradeoff').textContent = '';
+      el('planner-dist').textContent = '';
+    }
+    function syncPlannerMode() {
+      var specMode = el('planner-mode').value === 'spec';
+      el('planner-process-bounds').hidden = specMode;
+      el('planner-spec-bounds').hidden = !specMode;
+      el('planner-adjust-wrap').hidden = specMode;
+      var metric = el('planner-metric').value;
+      el('planner-goal-label').textContent = metric === 'ppm' ? 'Goal (at most)' : 'Goal (at least)';
+      if (!plannerSnapshot) return;
+      var snap = plannerSnapshot;
+      el('planner-fixed').textContent = specMode
+        ? 'Fixed: mean ' + fmt(snap.mean) + unitSuffix() + ' and SD ' + fmt(snap.sd) + unitSuffix() + '.'
+        : 'Fixed: LSL ' + fmt(snap.lsl) + unitSuffix() + ' and USL ' + fmt(snap.usl) + unitSuffix() + '.';
+    }
+    function activeScenario() {
+      if (plannerPreview) return plannerPreview;
+      if (plannerResult && plannerResult.candidates && plannerResult.candidates.length) return plannerResult.candidates[0];
+      if (plannerResult && plannerResult.best && plannerResult.best.attained && plannerResult.best.sd > 0) return plannerResult.best;
+      return null;
+    }
+    function paintPlanner() {
+      var labels = window.StatisticoCapabilityPlanner.labels('overall');
+      el('planner-metric').options[0].text = labels.index;
+      if (!last || !last.ok) {
+        el('planner-basis').textContent = hasRun && last && last.error
+          ? last.error
+          : 'Run the measurement before looking for settings. The planner needs two finite specification limits and a positive standard deviation.';
+        el('planner-baseline').textContent = '';
+        el('planner-fixed').textContent = '';
+        el('planner-output').hidden = true;
+        return;
+      }
+      snapshotPlanner();
+      var snap = plannerSnapshot;
+      el('planner-basis').textContent = 'Standard deviation basis: ' + labels.basis + '. The index is ' + labels.index + ' and the spread index is ' + labels.spread + '. Yield and expected PPM are normal-model estimates. Nominal value is separate from the metric goal.';
+      el('planner-baseline').innerHTML = '<span>n <b>' + snap.n + '</b></span><span>LSL <b>' + fmt(snap.lsl) + unitSuffix() + '</b></span><span>USL <b>' + fmt(snap.usl) + unitSuffix() + '</b></span><span>Mean <b>' + fmt(snap.mean) + unitSuffix() + '</b></span><span>SD <b>' + fmt(snap.sd) + unitSuffix() + '</b></span><span>Nominal value <b>' + (snap.nominal === '' ? 'midpoint' : fmt(snap.nominal) + unitSuffix()) + '</b></span><span>' + labels.index + ' <b>' + fmt(last.overall.cpk) + '</b></span>';
+      syncPlannerMode();
+      renderPlannerResult();
+    }
+    function renderPlannerResult() {
+      var output = el('planner-output');
+      if (!plannerResult || !plannerResult.ok) {
+        output.hidden = true;
+        return;
+      }
+      output.hidden = false;
+      el('planner-stale').hidden = true;
+      var labels = window.StatisticoCapabilityPlanner.labels('overall');
+      var found = plannerResult;
+      var status = found.status === 'already-met'
+        ? 'The goal is already met under these constraints.'
+        : found.status === 'reachable'
+          ? 'The goal is reachable under these constraints.'
+          : found.reason || 'Cannot reach goal with these constraints.';
+      if (found.status === 'unreachable' && found.limiting) status += ' Limiting input: ' + found.limiting + '.';
+      if (found.status === 'unreachable' && found.best && found.best.attained && Number.isFinite(found.best.index)) {
+        status += ' Best achievable ' + labels.index + ' is ' + fmt(found.best.index) + '.';
+        if (Number.isFinite(found.best.ppm)) status += ' Normal-model expected PPM is ' + Math.round(found.best.ppm).toLocaleString() + '.';
+      }
+      if (found.policy) status += ' Policy: ' + found.policy + '.';
+      el('planner-status').textContent = status;
+      var host = el('planner-candidates');
+      host.innerHTML = '';
+      (found.candidates || []).forEach(function (item, index) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'candidate' + (index === 0 && !plannerPreview ? ' is-selected' : '');
+        var mark = item.approximate ? '≈ ' : '';
+        var change = el('planner-mode').value === 'spec'
+          ? 'LSL ' + fmt(item.lsl) + ' (' + signed(item.deltaLsl) + '), USL ' + fmt(item.usl) + ' (' + signed(item.deltaUsl) + ')'
+          : 'Mean ' + fmt(item.mean) + unitSuffix() + ' (' + signed(item.deltaMean) + '), SD ' + fmt(item.sd) + unitSuffix() + ' (' + signed(item.deltaSd) + ', ' + fmt(item.sdReductionPct) + '% reduction)';
+        button.innerHTML = '<b>' + escapeHtml(item.title) + '</b><small>' + escapeHtml(item.minimizes) + '. ' + change + '</small><small>'
+          + labels.index + ' ' + mark + fmt(item.index) + ' · Yield ' + item.yieldPct.toFixed(2) + '% · PPM ' + Math.round(item.ppm).toLocaleString() + '</small>';
+        button.addEventListener('click', function () {
+          plannerPreview = { mean: item.mean, sd: item.sd, lsl: item.lsl, usl: item.usl, meets: true };
+          Array.prototype.forEach.call(host.children, function (node) { node.classList.remove('is-selected'); });
+          button.classList.add('is-selected');
+          syncMeanTools(item.mean);
+          drawPlannerCharts();
+        });
+        host.appendChild(button);
+      });
+      var scenario = activeScenario();
+      var showMean = el('planner-mode').value === 'process' && el('planner-adjust').value === 'both' && found.status !== 'unreachable' && found.meanDomain;
+      el('planner-mean-tools').hidden = !showMean;
+      if (!showMean) el('planner-preview').textContent = '';
+      if (showMean && scenario) syncMeanTools(scenario.mean);
+      drawPlannerCharts();
+    }
+    function syncMeanTools(mean) {
+      var domain = plannerResult && plannerResult.meanDomain;
+      if (!domain) return;
+      var range = el('planner-mean-range');
+      range.min = String(domain.lo);
+      range.max = String(domain.hi);
+      range.step = String((domain.hi - domain.lo) / 200 || 0.01);
+      range.value = String(mean);
+      el('planner-mean').value = String(mean);
+    }
+    function applyPlannerMean(mean) {
+      if (!plannerResult || !window.StatisticoCapabilityPlanner) return;
+      var preview = window.StatisticoCapabilityPlanner.previewMean(plannerRequest(), mean);
+      if (!preview) return;
+      plannerPreview = Object.assign({ lsl: plannerSnapshot.lsl, usl: plannerSnapshot.usl }, preview);
+      var labels = window.StatisticoCapabilityPlanner.labels('overall');
+      el('planner-preview').textContent = (preview.meets ? 'Allowable SD ' : 'No allowed SD meets the goal. Showing SD ') + fmt(preview.sd) + unitSuffix() + '. ' + labels.index + ' ' + fmt(preview.index) + ', yield ' + preview.yieldPct.toFixed(2) + '%, PPM ' + Math.round(preview.ppm).toLocaleString() + '.';
+      Array.prototype.forEach.call(el('planner-candidates').children, function (node) { node.classList.remove('is-selected'); });
+      drawPlannerCharts();
+    }
+    function drawPlannerCharts() {
+      drawTradeoff();
+      drawPlannerDistribution();
+    }
+    function drawTradeoff() {
+      var host = el('planner-tradeoff');
+      host.textContent = '';
+      if (!plannerResult || el('planner-mode').value !== 'process' || el('planner-adjust').value !== 'both') return;
+      var domain = plannerResult.meanDomain;
+      if (!domain) return;
+      var req = plannerRequest();
+      var samples = [];
+      var i;
+      var maxSd = plannerSnapshot.sd;
+      for (i = 0; i <= 48; i++) {
+        var mean = domain.lo + (domain.hi - domain.lo) * i / 48;
+        var region = window.StatisticoCapabilityPlanner.sdBoundsAtMean(req, mean);
+        samples.push({ mean: mean, region: region });
+        if (region && region.sdHigh > maxSd) maxSd = region.sdHigh;
+      }
+      var W = 640;
+      var H = 220;
+      var L = 46;
+      var R = 16;
+      var T = 28;
+      var B = 32;
+      function px(mean) { return L + (mean - domain.lo) / (domain.hi - domain.lo || 1) * (W - L - R); }
+      function py(sd) { return T + (1 - sd / (maxSd * 1.08 || 1)) * (H - T - B); }
+      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Mean and standard deviation combinations that meet the goal' });
+      var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
+      title.textContent = 'Goal region: mean across, standard deviation up';
+      svg.appendChild(title);
+      var d = '';
+      samples.forEach(function (sample) {
+        if (!sample.region) return;
+        d += (d ? ' L ' : 'M ') + px(sample.mean).toFixed(2) + ' ' + py(sample.region.sdHigh).toFixed(2);
+      });
+      for (i = samples.length - 1; i >= 0; i--) {
+        if (!samples[i].region) continue;
+        d += ' L ' + px(samples[i].mean).toFixed(2) + ' ' + py(samples[i].region.sdLow).toFixed(2);
+      }
+      if (d) svg.appendChild(svgEl('path', { d: d + ' Z', fill: 'rgba(120,200,255,0.28)', stroke: 'rgb(120,200,255)', 'stroke-width': '1.4' }));
+      function mark(mean, sd, color, name) {
+        svg.appendChild(svgEl('circle', { cx: px(mean), cy: py(sd), r: '4.5', fill: color, stroke: ink(), 'stroke-width': '1.2' }));
+        var label = svgEl('text', { x: px(mean) + 6, y: py(sd) - 6, fill: color, 'font-size': '11', 'font-weight': '700' });
+        label.textContent = name;
+        svg.appendChild(label);
+      }
+      mark(plannerSnapshot.mean, plannerSnapshot.sd, '#2ecc71', 'Current');
+      var scenario = activeScenario();
+      if (scenario) mark(scenario.mean, scenario.sd, '#f97316', 'Scenario');
+      svg.appendChild(svgEl('line', { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: gridColor() }));
+      svg.appendChild(svgEl('line', { x1: L, y1: T, x2: L, y2: H - B, stroke: gridColor() }));
+      host.appendChild(svg);
+    }
+    function drawPlannerDistribution() {
+      var host = el('planner-dist');
+      host.textContent = '';
+      var scenario = activeScenario();
+      if (!plannerSnapshot || !scenario) return;
+      var snap = plannerSnapshot;
+      var scenarioLsl = scenario.lsl == null ? snap.lsl : scenario.lsl;
+      var scenarioUsl = scenario.usl == null ? snap.usl : scenario.usl;
+      var values = el('show-histogram').checked ? measurementValues() : [];
+      var lows = [snap.lsl, scenarioLsl, snap.mean - 4 * snap.sd, scenario.mean - 4 * Math.max(scenario.sd, snap.sd)];
+      var highs = [snap.usl, scenarioUsl, snap.mean + 4 * snap.sd, scenario.mean + 4 * Math.max(scenario.sd, snap.sd)];
+      values.forEach(function (v) { lows.push(v); highs.push(v); });
+      var xMin = Math.min.apply(null, lows);
+      var xMax = Math.max.apply(null, highs);
+      if (!(xMax > xMin)) xMax = xMin + 1;
+      var W = 640;
+      var H = 230;
+      var L = 16;
+      var R = 16;
+      var T = 36;
+      var B = 18;
+      function px(v) { return L + (v - xMin) / (xMax - xMin) * (W - L - R); }
+      var curves = [
+        { mean: snap.mean, sd: snap.sd, color: '#7dd3fc', name: 'Current' },
+        { mean: scenario.mean, sd: scenario.sd, color: '#f97316', name: 'Scenario' }
+      ];
+      var peak = 0;
+      curves.forEach(function (curve) {
+        if (!(curve.sd > 0)) return;
+        var y = math.normalPDF(curve.mean, curve.mean, curve.sd);
+        if (y > peak) peak = y;
+      });
+      var bins = [];
+      if (values.length) {
+        var count = Math.max(4, Math.min(30, Number(el('hist-bins').value) || 12));
+        var width = (xMax - xMin) / count;
+        var i;
+        for (i = 0; i < count; i++) bins.push({ x0: xMin + i * width, x1: xMin + (i + 1) * width, count: 0, width: width });
+        values.forEach(function (v) {
+          var idx = Math.floor((v - xMin) / width);
+          if (idx < 0) idx = 0;
+          if (idx >= count) idx = count - 1;
+          bins[idx].count += 1;
+        });
+        bins.forEach(function (bin) {
+          var density = bin.count / (values.length * bin.width);
+          if (density > peak) peak = density;
+        });
+      }
+      peak = peak * 1.12 || 1;
+      function py(v) { return T + (1 - v / peak) * (H - T - B); }
+      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Current and scenario distributions on the same scale' });
+      var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
+      title.textContent = values.length ? 'Analyzed values, current curve, and scenario curve' : 'Current and scenario distributions';
+      svg.appendChild(title);
+      bins.forEach(function (bin) {
+        var density = bin.count / (values.length * bin.width);
+        svg.appendChild(svgEl('rect', {
+          x: px(bin.x0) + 0.4,
+          y: py(density),
+          width: Math.max(0, px(bin.x1) - px(bin.x0) - 0.8),
+          height: Math.max(0, py(0) - py(density)),
+          fill: 'rgba(120,200,255,0.35)'
+        }));
+      });
+      curves.forEach(function (curve) {
+        if (!(curve.sd > 0)) return;
+        var d = '';
+        var step = (xMax - xMin) / 160;
+        var x;
+        for (x = xMin; x <= xMax; x += step) {
+          d += (d ? ' L ' : 'M ') + px(x).toFixed(2) + ' ' + py(math.normalPDF(x, curve.mean, curve.sd)).toFixed(2);
+        }
+        svg.appendChild(svgEl('path', { d: d, fill: 'none', stroke: curve.color, 'stroke-width': '2.2' }));
+        var label = svgEl('text', { x: px(curve.mean), y: '30', 'text-anchor': 'middle', fill: curve.color, 'font-size': '11', 'font-weight': '700' });
+        label.textContent = curve.name;
+        svg.appendChild(label);
+      });
+      svg.appendChild(svgEl('line', { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: gridColor() }));
+      host.appendChild(svg);
+    }
+    function runPlanner() {
+      if (!window.StatisticoCapabilityPlanner) return;
+      snapshotPlanner();
+      syncPlannerMode();
+      var found = window.StatisticoCapabilityPlanner.solve(plannerRequest());
+      if (!found.ok) {
+        plannerResult = null;
+        plannerPreview = null;
+        showError('planner-error', found.error);
+        el('planner-output').hidden = true;
+        el('planner-stale').hidden = true;
+        return;
+      }
+      showError('planner-error', '');
+      el('planner-stale').hidden = true;
+      plannerPreview = null;
+      plannerResult = found;
+      renderPlannerResult();
+    }
+    function openPlanner() {
+      if (!hasRun || !last || !last.ok) {
+        showView('results');
+        return;
+      }
+      showView('planner');
+      runPlanner();
+    }
+
     function syncShell() {
       window.__capView = view;
       window.__capFitted = hasRun;
-      var titles = { setup: 'Input & Setup', results: 'Process Capability', 'by-group': 'By-Group Analysis' };
-      var views = { setup: 'cap-setup', results: 'cap-results', 'by-group': 'cap-by-group' };
+      var titles = { setup: 'Input & Setup', results: 'Process Capability', planner: 'Capability Planner', 'by-group': 'By-Group Analysis' };
+      var views = { setup: 'cap-setup', results: 'cap-results', planner: 'cap-planner', 'by-group': 'cap-by-group' };
       if (!window.StatisticoHeader) return;
       StatisticoHeader.currentView = views[view] || view;
       StatisticoHeader.updateTitle(titles[view] || 'Process Capability');
@@ -1107,10 +1538,11 @@
       else if (window.StatisticoHeader && typeof StatisticoHeader.applyTheme === 'function' && typeof StatisticoHeader.resolveTheme === 'function') {
         StatisticoHeader.applyTheme(StatisticoHeader.resolveTheme(), { savePreference: false, preference: StatisticoHeader.getThemePreference() });
       }
-      ['setup', 'results', 'by-group'].forEach(function (name) {
+      ['setup', 'results', 'planner', 'by-group'].forEach(function (name) {
         el('view-' + name).hidden = view !== name;
       });
       if (view === 'results') paintResults();
+      if (view === 'planner') paintPlanner();
       if (view === 'by-group') {
         paintByGroup();
         if (hasRun && !(options && options.keepDialog)) {
@@ -1302,6 +1734,38 @@
       if (!(window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent)) window.close();
     });
     el('results-to-setup').addEventListener('click', function () { showView('setup'); });
+    el('metric-grid').addEventListener('click', function (event) {
+      if (event.target.closest && event.target.closest('#open-planner')) openPlanner();
+    });
+    el('planner-find').addEventListener('click', runPlanner);
+    el('planner-back').addEventListener('click', function () { showView('results'); });
+    var plannerGoalDefaults = { index: '1.33', yield: '99.73', ppm: '2700' };
+    var plannerMetric = 'index';
+    function plannerEdited() {
+      syncPlannerMode();
+      markPlannerStale();
+    }
+    ['planner-goal', 'planner-mode', 'planner-adjust', 'planner-mean-min', 'planner-mean-max', 'planner-sd-min', 'planner-lower-out', 'planner-upper-out'].forEach(function (id) {
+      el(id).addEventListener('input', plannerEdited);
+      el(id).addEventListener('change', plannerEdited);
+    });
+    el('planner-metric').addEventListener('change', function () {
+      var next = el('planner-metric').value;
+      if (el('planner-goal').value === plannerGoalDefaults[plannerMetric]) el('planner-goal').value = plannerGoalDefaults[next];
+      plannerMetric = next;
+      plannerEdited();
+    });
+    ['planner-unlock-lower', 'planner-unlock-upper'].forEach(function (id) {
+      el(id).addEventListener('change', plannerEdited);
+    });
+    el('planner-mean-range').addEventListener('input', function () {
+      el('planner-mean').value = el('planner-mean-range').value;
+      applyPlannerMean(Number(el('planner-mean-range').value));
+    });
+    el('planner-mean').addEventListener('change', function () {
+      applyPlannerMean(Number(el('planner-mean').value));
+      if (el('planner-mean-range')) el('planner-mean-range').value = el('planner-mean').value;
+    });
     function redrawDistribution() {
       if (hasRun && last && last.ok && view === 'results') drawDistribution(last.overall);
     }
@@ -1357,6 +1821,7 @@
     else boot();
     new MutationObserver(function () {
       if (view === 'results' && last && last.ok) paintResults();
+      if (view === 'planner') drawPlannerCharts();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   })();
   </script>

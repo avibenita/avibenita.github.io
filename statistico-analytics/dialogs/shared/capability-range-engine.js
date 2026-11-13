@@ -77,7 +77,7 @@
       return { ok: false, error: 'The standard deviation is 0. Capability needs variation in the measured values.' };
     }
     var normalized = normalizeSpec(spec);
-    if (Number.isNaN(normalized.lsl) || Number.isNaN(normalized.usl) || (normalized.hasTarget && Number.isNaN(normalized.target))) {
+    if (normalized.lsl == null || normalized.usl == null || Number.isNaN(normalized.lsl) || Number.isNaN(normalized.usl) || (normalized.hasTarget && Number.isNaN(normalized.target))) {
       return { ok: false, error: 'Enter numeric specification limits. Leave the target blank to use the midpoint.' };
     }
     var result = CpkMath.analyze({
@@ -310,13 +310,13 @@
     }
     var extreme = assessed.extreme;
     var differsText = extreme && assessed.classification.id !== 'consistent'
-      ? extreme.name + ' has the lowest Cpk among reliable groups.'
+      ? extreme.name + ' has the lowest Ppk among reliable groups.'
       : 'No single group stands out from the others.';
     var directionText = assessed.directionChanges
       ? 'The limiting side of the specification is not the same in every reliable group. Some groups are pulled toward the upper limit and others toward the lower limit, or a group mean sits outside the limits.'
       : 'The limiting side of the specification does not reverse among reliable groups.';
     var consistentText = assessed.classification.id === 'consistent'
-      ? 'Cpk stays in a similar band across the included groups.'
+      ? 'Ppk stays in a similar band across the included groups.'
       : 'Some groups still sit in a similar capability band.';
     var interpretation = ByGroup.buildInterpretation({
       moduleKey: 'capability',

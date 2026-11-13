@@ -39,7 +39,7 @@
     factor: 'Examine whether the factor pattern remains similar across groups.',
     logistic: 'Compare discrimination, calibration and classification across groups.',
     segmentation: 'Examine how cluster membership and profiles differ by group.',
-    capability: 'Compare Cp, Cpk, and the limiting specification across groups.'
+    capability: 'Compare Pp, Ppk, and the limiting specification across groups.'
   };
 
   var NEXT_ANALYSIS = {

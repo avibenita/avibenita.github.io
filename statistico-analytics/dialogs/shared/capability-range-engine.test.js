@@ -23,14 +23,15 @@ describe('capability from a range', () => {
     expect(result.n).toBe(3);
   });
 
-  test('rejects a constant measurement and reversed limits', () => {
-    expect(Engine.analyzeValues([5, 5, 5], { lsl: 0, usl: 10 }).ok).toBe(false);
+  test('rejects a constant measurement, reversed limits, and a missing limit', () => {
+    expect(Engine.analyzeValues([5, 5, 5], { lsl: 0, usl: 10 }).error).toMatch(/standard deviation is 0/);
     expect(Engine.analyzeValues([1, 2, 3], { lsl: 8, usl: 4 }).ok).toBe(false);
     expect(Engine.analyzeValues([4], { lsl: 0, usl: 10 }).error).toMatch(/two numeric/);
+    expect(Engine.analyzeValues([1, 2, 3], { lsl: '', usl: 4 }).error).toMatch(/specification limits/);
   });
 
   test('compares capability by group and keeps the by-group contract', () => {
-    expect(BG.moduleSentence('capability')).toBe('Compare Cp, Cpk, and the limiting specification across groups.');
+    expect(BG.moduleSentence('capability')).toBe('Compare Pp, Ppk, and the limiting specification across groups.');
     const demo = Engine.demoTable();
     const spec = Engine.demoSpec();
     const byLine = Engine.analyze(demo, Object.assign({ value: 'Diameter', group: 'Line' }, spec));

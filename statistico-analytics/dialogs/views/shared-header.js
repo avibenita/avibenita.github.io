@@ -9600,7 +9600,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'capability-results':
         'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Edit the specification limits here without returning to input.',
       'capability-planner':
-        'Find settings searches for a mean, standard deviation, or outward specification change that reaches a Ppk, modeled-yield, or expected-PPM goal. The scenario stays in this view. The worksheet and the capability results keep the analyzed values.',
+        'Find settings searches for a mean, standard deviation, or outward specification change that reaches a Ppk, modeled-yield, or expected-PPM goal. When Ppk is reachable at the current standard deviation, the presets are the smallest mean shift and the most margin from centering. Pp and Ppk use the overall sample standard deviation (n − 1). Yield and expected PPM are normal-model estimates. The scenario stays in this view. The worksheet and the capability results keep the analyzed values.',
       'capability-by-group':
         'Compare Pp and Ppk across the selected grouping column. The status describes whether capability stays in a similar band, varies, or changes which specification limit is binding. Group differences are descriptive and are not a formal test that the groups differ.',
       'regression-diag-overview':

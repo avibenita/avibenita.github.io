@@ -15,13 +15,13 @@
   <link rel="stylesheet" href="../shared-by-group.css?v=20261112cap3" />
   <script src="../shared-config.js?v=20261112cap4"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261113plan"></script>
+  <script src="../shared-header.js?v=20261113plan2"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
   <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
   <script src="../shared/group-column-suitability.js?v=20261112cap3"></script>
   <script src="../../shared/capability-range-engine.js?v=20261113plan"></script>
-  <script src="../../shared/capability-planner.js?v=20261113plan"></script>
+  <script src="../../shared/capability-planner.js?v=20261113plan2"></script>
   <style>
     html, body { height: 100%; margin: 0; }
     body {
@@ -170,7 +170,20 @@
     .candidate.is-selected { border-color: #f97316; box-shadow: 0 0 0 1px #f97316; }
     .candidate small { display: block; font-weight: 650; color: var(--text-secondary, rgba(255,255,255,.72)); }
     #planner-tradeoff svg, #planner-dist svg { width: 100%; height: auto; display: block; }
+    #view-planner { overflow-x: hidden; }
     #view-planner [hidden] { display: none !important; }
+    #planner-title .info-dot::after { left: auto; right: 0; }
+    #planner-constraints { margin-top: 8px; }
+    #planner-constraints summary { cursor: pointer; font-weight: 750; }
+    #planner-constraint-summary { font-weight: 650; color: var(--text-secondary, rgba(255,255,255,.72)); }
+    .planner-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0; }
+    .planner-compare article { border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+    .planner-compare b, .planner-compare span, .planner-compare small { display: block; }
+    .planner-compare span { font-variant-numeric: tabular-nums; }
+    .planner-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+    @media (max-width: 860px) {
+      .planner-charts, .planner-compare { grid-template-columns: minmax(0, 1fr); }
+    }
     #planner-mean-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
     #planner-mean-tools[hidden] { display: none !important; }
     #planner-mean-range { flex: 1 1 180px; accent-color: #f97316; }
@@ -381,10 +394,9 @@
 
         <section id="view-planner" class="cap-view" hidden aria-labelledby="planner-title">
           <div class="cap-card">
-            <h2 id="planner-title"><i class="fa-solid fa-bullseye"></i> Capability Planner</h2>
-            <p id="planner-basis" class="cap-help"></p>
+            <h2 id="planner-title"><i class="fa-solid fa-bullseye"></i> Capability Planner <span class="info-dot" tabindex="0" data-tip="Pp and Ppk use the overall sample standard deviation (n − 1). Yield and expected PPM are normal-model estimates, not a claim that the process is stable. The nominal value is separate from the metric goal.">i</span></h2>
+            <p id="planner-basis" class="cap-help" hidden></p>
             <div class="readout" id="planner-baseline"></div>
-            <p id="planner-fixed" class="cap-help"></p>
             <div class="planner-form">
               <label class="field">Metric
                 <select id="planner-metric">
@@ -410,14 +422,15 @@
                 </select>
               </label>
             </div>
-            <div id="planner-process-bounds">
-              <p class="cap-help">The analyzed specification limits stay fixed. Blank mean bounds add no further constraint. The search can keep the current standard deviation or reduce it.</p>
+            <details id="planner-constraints">
+              <summary>Constraints <span id="planner-constraint-summary">No extra constraints</span></summary>
+              <p class="cap-help">Blank mean bounds add no further constraint. The search can keep the current standard deviation or reduce it.</p>
               <div class="planner-form">
                 <label class="field">Minimum mean<input id="planner-mean-min" type="number" step="any" /></label>
                 <label class="field">Maximum mean<input id="planner-mean-max" type="number" step="any" /></label>
                 <label class="field">Practical minimum SD<input id="planner-sd-min" type="number" step="any" /></label>
               </div>
-            </div>
+            </details>
             <div id="planner-spec-bounds" hidden>
               <p class="cap-help">The analyzed mean and standard deviation stay fixed. An unlocked limit may move outward. A blank allowance does not cap that move.</p>
               <div class="planner-form">
@@ -436,14 +449,17 @@
           </div>
           <div class="cap-card" id="planner-output" hidden>
             <div class="assessment"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><p id="planner-status"></p></div>
+            <div class="planner-compare" id="planner-compare"></div>
             <div class="candidate-list" id="planner-candidates"></div>
             <div id="planner-mean-tools" hidden>
               <label class="field">Scenario mean<input id="planner-mean" type="number" step="any" /></label>
               <input id="planner-mean-range" type="range" aria-label="Scenario mean" />
               <p id="planner-preview" class="cap-help"></p>
             </div>
-            <div id="planner-tradeoff"></div>
-            <div id="planner-dist"></div>
+            <div class="planner-charts">
+              <div id="planner-dist"></div>
+              <div id="planner-tradeoff"></div>
+            </div>
           </div>
         </section>
 
@@ -524,6 +540,7 @@
     var DEFAULT_MIN_GROUP_N = 5;
     var previewKeepMinN = '5';
     var plannerSnapshot = null;
+    var plannerMeanLock = false;
     var plannerResult = null;
     var plannerPreview = null;
     var draggedName = '';
@@ -549,6 +566,20 @@
     }
     function fmt(n) {
       return Number.isFinite(n) ? n.toFixed(decimals()) : '—';
+    }
+    function formatPpm(ppm) {
+      if (!Number.isFinite(ppm) || ppm <= 0) return '< 0.01';
+      if (ppm < 100) {
+        var text = ppm.toFixed(2);
+        return Number(text) === 0 ? '< 0.01' : text;
+      }
+      return Math.round(ppm).toLocaleString();
+    }
+    function formatYield(pct) {
+      if (!Number.isFinite(pct)) return '—';
+      if (!(pct < 100)) return '> 99.9999%';
+      var text = pct.toFixed(pct > 99.99 ? 4 : 2);
+      return Number(text) >= 100 ? '> 99.9999%' : text + '%';
     }
     function isLight() { return document.documentElement.getAttribute('data-theme') === 'light'; }
     function ink() { return isLight() ? '#1f2937' : '#e8eef8'; }
@@ -1245,24 +1276,24 @@
       el('planner-tradeoff').textContent = '';
       el('planner-dist').textContent = '';
     }
+    function constraintSummary() {
+      var parts = [];
+      if (String(el('planner-mean-min').value).trim() !== '') parts.push('Minimum mean ' + el('planner-mean-min').value + unitSuffix());
+      if (String(el('planner-mean-max').value).trim() !== '') parts.push('Maximum mean ' + el('planner-mean-max').value + unitSuffix());
+      if (String(el('planner-sd-min').value).trim() !== '') parts.push('Practical minimum SD ' + el('planner-sd-min').value + unitSuffix());
+      el('planner-constraint-summary').textContent = parts.length ? parts.join(' · ') : 'No extra constraints';
+    }
     function syncPlannerMode() {
       var specMode = el('planner-mode').value === 'spec';
-      el('planner-process-bounds').hidden = specMode;
+      el('planner-constraints').hidden = specMode;
       el('planner-spec-bounds').hidden = !specMode;
       el('planner-adjust-wrap').hidden = specMode;
       var metric = el('planner-metric').value;
       el('planner-goal-label').textContent = metric === 'ppm' ? 'Goal (at most)' : 'Goal (at least)';
-      if (!plannerSnapshot) return;
-      var snap = plannerSnapshot;
-      el('planner-fixed').textContent = specMode
-        ? 'Fixed: mean ' + fmt(snap.mean) + unitSuffix() + ' and SD ' + fmt(snap.sd) + unitSuffix() + '.'
-        : 'Fixed: LSL ' + fmt(snap.lsl) + unitSuffix() + ' and USL ' + fmt(snap.usl) + unitSuffix() + '.';
+      constraintSummary();
     }
     function activeScenario() {
-      if (plannerPreview) return plannerPreview;
-      if (plannerResult && plannerResult.candidates && plannerResult.candidates.length) return plannerResult.candidates[0];
-      if (plannerResult && plannerResult.best && plannerResult.best.attained && plannerResult.best.sd > 0) return plannerResult.best;
-      return null;
+      return plannerPreview;
     }
     function paintPlanner() {
       var labels = window.StatisticoCapabilityPlanner.labels('overall');
@@ -1271,17 +1302,139 @@
         el('planner-basis').textContent = hasRun && last && last.error
           ? last.error
           : 'Run the measurement before looking for settings. The planner needs two finite specification limits and a positive standard deviation.';
+        el('planner-basis').hidden = false;
         el('planner-baseline').textContent = '';
-        el('planner-fixed').textContent = '';
         el('planner-output').hidden = true;
         return;
       }
       snapshotPlanner();
       var snap = plannerSnapshot;
-      el('planner-basis').textContent = 'Standard deviation basis: ' + labels.basis + '. The index is ' + labels.index + ' and the spread index is ' + labels.spread + '. Yield and expected PPM are normal-model estimates. Nominal value is separate from the metric goal.';
+      el('planner-basis').hidden = true;
+      el('planner-basis').textContent = '';
       el('planner-baseline').innerHTML = '<span>n <b>' + snap.n + '</b></span><span>LSL <b>' + fmt(snap.lsl) + unitSuffix() + '</b></span><span>USL <b>' + fmt(snap.usl) + unitSuffix() + '</b></span><span>Mean <b>' + fmt(snap.mean) + unitSuffix() + '</b></span><span>SD <b>' + fmt(snap.sd) + unitSuffix() + '</b></span><span>Nominal value <b>' + (snap.nominal === '' ? 'midpoint' : fmt(snap.nominal) + unitSuffix()) + '</b></span><span>' + labels.index + ' <b>' + fmt(last.overall.cpk) + '</b></span>';
       syncPlannerMode();
       renderPlannerResult();
+    }
+    function metricBits(index, ppm) {
+      var labels = window.StatisticoCapabilityPlanner.labels('overall');
+      var metric = el('planner-metric').value;
+      var indexText = labels.index + ' ' + fmt(index);
+      var ppmText = 'Normal-model PPM ' + formatPpm(ppm);
+      if (metric === 'ppm') return ppmText + ' · ' + indexText;
+      return indexText + ' · ' + ppmText;
+    }
+    function scenarioFromCandidate(item) {
+      var next = {
+        id: item.id,
+        title: item.title || 'Best achievable',
+        mean: item.mean,
+        sd: item.sd,
+        lsl: item.lsl,
+        usl: item.usl,
+        index: item.index,
+        ppm: item.ppm,
+        yieldPct: item.yieldPct,
+        meets: true,
+        reason: '',
+        sdGoal: null,
+        sdCeiling: plannerSnapshot ? plannerSnapshot.sd : null,
+        cappedByCurrent: false
+      };
+      if (el('planner-mode').value === 'process' && el('planner-adjust').value === 'both' && window.StatisticoCapabilityPlanner) {
+        var preview = window.StatisticoCapabilityPlanner.previewMean(plannerRequest(), item.mean);
+        if (preview) {
+          next.sdGoal = preview.sdGoal;
+          next.sdCeiling = preview.sdCeiling;
+          next.cappedByCurrent = !!(preview.cappedByCurrent && Math.abs(item.sd - plannerSnapshot.sd) <= 1e-6);
+          next.meets = preview.meets;
+          next.reason = preview.reason || '';
+        }
+      }
+      return next;
+    }
+    function scenarioFromMean(mean) {
+      var preview = window.StatisticoCapabilityPlanner.previewMean(plannerRequest(), mean);
+      if (!preview) return null;
+      var match = null;
+      (plannerResult && plannerResult.candidates || []).forEach(function (item) {
+        if (!match && Math.abs(item.mean - preview.mean) <= 5e-4 && Math.abs(item.sd - preview.sd) <= 5e-4) match = item;
+      });
+      return {
+        id: match ? match.id : 'custom',
+        title: match ? match.title : 'Custom scenario',
+        mean: preview.mean,
+        sd: preview.sd,
+        lsl: match && match.lsl != null ? match.lsl : plannerSnapshot.lsl,
+        usl: match && match.usl != null ? match.usl : plannerSnapshot.usl,
+        index: preview.index,
+        ppm: preview.ppm,
+        yieldPct: preview.yieldPct,
+        meets: preview.meets,
+        reason: preview.reason || '',
+        sdGoal: preview.sdGoal,
+        sdCeiling: preview.sdCeiling,
+        cappedByCurrent: !!preview.cappedByCurrent
+      };
+    }
+    function previewSentence(item) {
+      if (!item) return '';
+      if (!item.meets && item.reason === 'outside') return 'This mean is outside the permitted range.';
+      if (!item.meets) return 'No standard deviation at this mean meets the goal within the entered constraints.';
+      var parts = ['Scenario SD ' + fmt(item.sd) + unitSuffix() + '.'];
+      if (Number.isFinite(item.sdGoal)) parts.push('Maximum SD for the goal at this mean is ' + fmt(item.sdGoal) + unitSuffix() + '.');
+      if (item.cappedByCurrent) parts.push('The current SD of ' + fmt(item.sdCeiling) + unitSuffix() + ' caps the scenario.');
+      parts.push(metricBits(item.index, item.ppm) + '.');
+      return parts.join(' ');
+    }
+    function paintComparison() {
+      var host = el('planner-compare');
+      var snap = plannerSnapshot;
+      var item = plannerPreview;
+      if (!snap || !item) {
+        host.innerHTML = '';
+        return;
+      }
+      var goal = Number(el('planner-goal').value);
+      var below = el('planner-metric').value === 'index' && last && last.overall && last.overall.cpk < goal - 1e-9;
+      var change = el('planner-mode').value === 'spec'
+        ? 'LSL ' + fmt(item.lsl) + ' (' + signed(item.lsl - snap.lsl) + '), USL ' + fmt(item.usl) + ' (' + signed(item.usl - snap.usl) + ')'
+        : 'Mean ' + signed(item.mean - snap.mean) + unitSuffix() + ', SD ' + signed(item.sd - snap.sd) + unitSuffix();
+      function card(title, mean, sd, index, ppm, note, role) {
+        return '<article data-role="' + role + '" data-mean="' + mean + '" data-sd="' + sd + '"><b>' + escapeHtml(title) + '</b><span>Mean ' + fmt(mean) + unitSuffix() + '</span><span>SD ' + fmt(sd) + unitSuffix() + '</span><span>' + escapeHtml(metricBits(index, ppm)) + '</span><small>' + note + '</small></article>';
+      }
+      host.innerHTML = card('Current', snap.mean, snap.sd, last.overall.cpk, last.overall.ppm, below ? 'Below goal' : 'Baseline', 'current')
+        + card(item.title || 'Selected scenario', item.mean, item.sd, item.index, item.ppm, change, 'scenario');
+    }
+    function showSelectedMean(mean) {
+      var domain = plannerResult && plannerResult.meanDomain;
+      plannerMeanLock = true;
+      el('planner-mean').value = fmt(mean);
+      if (domain) {
+        var range = el('planner-mean-range');
+        range.min = String(domain.lo);
+        range.max = String(domain.hi);
+        range.step = String((domain.hi - domain.lo) / 400 || 0.001);
+        range.value = String(mean);
+      }
+      plannerMeanLock = false;
+    }
+    function markSelectedPreset() {
+      Array.prototype.forEach.call(el('planner-candidates').children, function (node) {
+        node.classList.toggle('is-selected', plannerPreview && node.getAttribute('data-id') === plannerPreview.id);
+        node.setAttribute('aria-pressed', node.classList.contains('is-selected') ? 'true' : 'false');
+      });
+    }
+    function paintScenarioChrome() {
+      paintComparison();
+      markSelectedPreset();
+      el('planner-preview').textContent = previewSentence(plannerPreview);
+    }
+    function adoptScenario(next, keepControls) {
+      if (!next) return;
+      plannerPreview = next;
+      paintScenarioChrome();
+      if (!keepControls) showSelectedMean(next.mean);
+      drawPlannerCharts();
     }
     function renderPlannerResult() {
       var output = el('planner-output');
@@ -1293,69 +1446,79 @@
       el('planner-stale').hidden = true;
       var labels = window.StatisticoCapabilityPlanner.labels('overall');
       var found = plannerResult;
-      var status = found.status === 'already-met'
+      var answer = window.StatisticoCapabilityPlanner.answerText(found, {
+        indexLabel: labels.index,
+        goal: Number(el('planner-goal').value),
+        digits: decimals(),
+        unit: plannerSnapshot && plannerSnapshot.unit
+      });
+      var status = answer || (found.status === 'already-met'
         ? 'The goal is already met under these constraints.'
         : found.status === 'reachable'
           ? 'The goal is reachable under these constraints.'
-          : found.reason || 'Cannot reach goal with these constraints.';
-      if (found.status === 'unreachable' && found.limiting) status += ' Limiting input: ' + found.limiting + '.';
+          : found.reason || 'Cannot reach goal with these constraints.');
+      if (!answer && found.status === 'unreachable' && found.limiting) status += ' Limiting input: ' + found.limiting + '.';
       if (found.status === 'unreachable' && found.best && found.best.attained && Number.isFinite(found.best.index)) {
-        status += ' Best achievable ' + labels.index + ' is ' + fmt(found.best.index) + '.';
-        if (Number.isFinite(found.best.ppm)) status += ' Normal-model expected PPM is ' + Math.round(found.best.ppm).toLocaleString() + '.';
+        status += ' Best achievable ' + labels.index + ' is ' + fmt(found.best.index);
+        if (Number.isFinite(found.best.mean)) status += ' at mean ' + fmt(found.best.mean) + unitSuffix();
+        if (Number.isFinite(found.best.sd)) status += ' and SD ' + fmt(found.best.sd) + unitSuffix();
+        status += '.';
+        if (Number.isFinite(found.best.ppm)) status += ' Normal-model expected PPM is ' + formatPpm(found.best.ppm) + '.';
       }
       if (found.policy) status += ' Policy: ' + found.policy + '.';
       el('planner-status').textContent = status;
+      if (!plannerPreview && found.candidates && found.candidates[0]) plannerPreview = scenarioFromCandidate(found.candidates[0]);
+      else if (!plannerPreview && found.best && found.best.attained) plannerPreview = scenarioFromCandidate(found.best);
       var host = el('planner-candidates');
       host.innerHTML = '';
-      (found.candidates || []).forEach(function (item, index) {
+      (found.candidates || []).forEach(function (item) {
         var button = document.createElement('button');
         button.type = 'button';
-        button.className = 'candidate' + (index === 0 && !plannerPreview ? ' is-selected' : '');
+        button.className = 'candidate';
+        button.setAttribute('data-id', item.id);
         var mark = item.approximate ? '≈ ' : '';
         var change = el('planner-mode').value === 'spec'
           ? 'LSL ' + fmt(item.lsl) + ' (' + signed(item.deltaLsl) + '), USL ' + fmt(item.usl) + ' (' + signed(item.deltaUsl) + ')'
           : 'Mean ' + fmt(item.mean) + unitSuffix() + ' (' + signed(item.deltaMean) + '), SD ' + fmt(item.sd) + unitSuffix() + ' (' + signed(item.deltaSd) + ', ' + fmt(item.sdReductionPct) + '% reduction)';
         button.innerHTML = '<b>' + escapeHtml(item.title) + '</b><small>' + escapeHtml(item.minimizes) + '. ' + change + '</small><small>'
-          + labels.index + ' ' + mark + fmt(item.index) + ' · Yield ' + item.yieldPct.toFixed(2) + '% · PPM ' + Math.round(item.ppm).toLocaleString() + '</small>';
-        button.addEventListener('click', function () {
-          plannerPreview = { mean: item.mean, sd: item.sd, lsl: item.lsl, usl: item.usl, meets: true };
-          Array.prototype.forEach.call(host.children, function (node) { node.classList.remove('is-selected'); });
-          button.classList.add('is-selected');
-          syncMeanTools(item.mean);
-          drawPlannerCharts();
-        });
+          + metricBits(item.index, item.ppm).replace('Normal-model PPM', 'PPM') + (mark ? ' · boundary' : '') + '</small>';
+        if (mark) button.lastChild.textContent = labels.index + ' ' + mark + fmt(item.index) + ' · Normal-model yield ' + formatYield(item.yieldPct) + ' · PPM ' + formatPpm(item.ppm);
+        button.addEventListener('click', function () { adoptScenario(scenarioFromCandidate(item)); });
         host.appendChild(button);
       });
-      var scenario = activeScenario();
       var showMean = el('planner-mode').value === 'process' && el('planner-adjust').value === 'both' && found.status !== 'unreachable' && found.meanDomain;
       el('planner-mean-tools').hidden = !showMean;
+      if (showMean && plannerPreview) showSelectedMean(plannerPreview.mean);
       if (!showMean) el('planner-preview').textContent = '';
-      if (showMean && scenario) syncMeanTools(scenario.mean);
+      paintScenarioChrome();
       drawPlannerCharts();
     }
-    function syncMeanTools(mean) {
-      var domain = plannerResult && plannerResult.meanDomain;
-      if (!domain) return;
-      var range = el('planner-mean-range');
-      range.min = String(domain.lo);
-      range.max = String(domain.hi);
-      range.step = String((domain.hi - domain.lo) / 200 || 0.01);
-      range.value = String(mean);
-      el('planner-mean').value = String(mean);
-    }
-    function applyPlannerMean(mean) {
-      if (!plannerResult || !window.StatisticoCapabilityPlanner) return;
-      var preview = window.StatisticoCapabilityPlanner.previewMean(plannerRequest(), mean);
-      if (!preview) return;
-      plannerPreview = Object.assign({ lsl: plannerSnapshot.lsl, usl: plannerSnapshot.usl }, preview);
-      var labels = window.StatisticoCapabilityPlanner.labels('overall');
-      el('planner-preview').textContent = (preview.meets ? 'Allowable SD ' : 'No allowed SD meets the goal. Showing SD ') + fmt(preview.sd) + unitSuffix() + '. ' + labels.index + ' ' + fmt(preview.index) + ', yield ' + preview.yieldPct.toFixed(2) + '%, PPM ' + Math.round(preview.ppm).toLocaleString() + '.';
-      Array.prototype.forEach.call(el('planner-candidates').children, function (node) { node.classList.remove('is-selected'); });
+    function applyPlannerMean(mean, fromSlider) {
+      if (plannerMeanLock || !plannerResult || !window.StatisticoCapabilityPlanner) return;
+      if (!Number.isFinite(mean)) {
+        el('planner-preview').textContent = 'Enter a numeric scenario mean.';
+        return;
+      }
+      var next = scenarioFromMean(mean);
+      if (!next) return;
+      plannerPreview = next;
+      paintScenarioChrome();
+      if (fromSlider) {
+        plannerMeanLock = true;
+        el('planner-mean').value = fmt(next.mean);
+        plannerMeanLock = false;
+      } else showSelectedMean(next.mean);
       drawPlannerCharts();
     }
     function drawPlannerCharts() {
-      drawTradeoff();
       drawPlannerDistribution();
+      drawTradeoff();
+    }
+    function chartTicks(lo, hi, count) {
+      var ticks = [];
+      var i;
+      for (i = 0; i <= count; i++) ticks.push(lo + (hi - lo) * i / count);
+      return ticks;
     }
     function drawTradeoff() {
       var host = el('planner-tradeoff');
@@ -1364,26 +1527,29 @@
       var domain = plannerResult.meanDomain;
       if (!domain) return;
       var req = plannerRequest();
+      var labels = window.StatisticoCapabilityPlanner.labels('overall');
       var samples = [];
       var i;
       var maxSd = plannerSnapshot.sd;
+      var capped = false;
       for (i = 0; i <= 48; i++) {
         var mean = domain.lo + (domain.hi - domain.lo) * i / 48;
         var region = window.StatisticoCapabilityPlanner.sdBoundsAtMean(req, mean);
         samples.push({ mean: mean, region: region });
         if (region && region.sdHigh > maxSd) maxSd = region.sdHigh;
+        if (region && region.cappedByCurrent) capped = true;
       }
       var W = 640;
-      var H = 220;
-      var L = 46;
-      var R = 16;
-      var T = 28;
-      var B = 32;
+      var H = 280;
+      var L = 64;
+      var R = 18;
+      var T = 42;
+      var B = 48;
       function px(mean) { return L + (mean - domain.lo) / (domain.hi - domain.lo || 1) * (W - L - R); }
-      function py(sd) { return T + (1 - sd / (maxSd * 1.08 || 1)) * (H - T - B); }
-      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Mean and standard deviation combinations that meet the goal' });
+      function py(sd) { return T + (1 - sd / (maxSd * 1.18 || 1)) * (H - T - B); }
+      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Settings that meet the goal' });
       var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
-      title.textContent = 'Goal region: mean across, standard deviation up';
+      title.textContent = 'Settings that meet the goal';
       svg.appendChild(title);
       var d = '';
       samples.forEach(function (sample) {
@@ -1394,16 +1560,56 @@
         if (!samples[i].region) continue;
         d += ' L ' + px(samples[i].mean).toFixed(2) + ' ' + py(samples[i].region.sdLow).toFixed(2);
       }
-      if (d) svg.appendChild(svgEl('path', { d: d + ' Z', fill: 'rgba(120,200,255,0.28)', stroke: 'rgb(120,200,255)', 'stroke-width': '1.4' }));
-      function mark(mean, sd, color, name) {
-        svg.appendChild(svgEl('circle', { cx: px(mean), cy: py(sd), r: '4.5', fill: color, stroke: ink(), 'stroke-width': '1.2' }));
-        var label = svgEl('text', { x: px(mean) + 6, y: py(sd) - 6, fill: color, 'font-size': '11', 'font-weight': '700' });
+      if (d) svg.appendChild(svgEl('path', { d: d + ' Z', fill: 'rgba(125,211,252,0.28)', stroke: '#7dd3fc', 'stroke-width': '1.2' }));
+      var shadeLabel = svgEl('text', { x: String((px(domain.lo) + px(domain.hi)) / 2), y: String(T + 16), 'text-anchor': 'middle', fill: ink(), 'font-size': '12', 'font-weight': '700' });
+      shadeLabel.textContent = 'Meets ' + labels.index + ' ≥ ' + fmt(Number(el('planner-goal').value));
+      svg.appendChild(shadeLabel);
+      var ceilingLine = svgEl('line', { x1: L, y1: py(plannerSnapshot.sd), x2: W - R, y2: py(plannerSnapshot.sd), stroke: '#7dd3fc', 'stroke-dasharray': '5 4', 'stroke-width': '1.4' });
+      var ceilingTip = svgEl('title', {});
+      ceilingTip.textContent = 'Current SD ceiling. Process improvement does not increase the standard deviation above the current SD.';
+      ceilingLine.appendChild(ceilingTip);
+      svg.appendChild(ceilingLine);
+      var ceiling = svgEl('text', { x: String(W - R), y: py(plannerSnapshot.sd) - 6, 'text-anchor': 'end', fill: '#7dd3fc', 'font-size': '12', 'font-weight': '700' });
+      ceiling.textContent = capped ? 'Current SD ceiling' : 'Current SD';
+      svg.appendChild(ceiling);
+      var band = plannerResult.atCurrentSd;
+      if (band && band.meets) {
+        svg.appendChild(svgEl('line', {
+          x1: px(band.lo), y1: py(plannerSnapshot.sd), x2: px(band.hi), y2: py(plannerSnapshot.sd),
+          stroke: '#f97316', 'stroke-width': '4', 'stroke-linecap': 'round'
+        }));
+      }
+      function mark(mean, sd, color, name, role) {
+        var dot = svgEl('circle', { cx: px(mean), cy: py(sd), r: '4.5', fill: color, stroke: ink(), 'stroke-width': '1.2', 'data-role': role, 'data-mean': String(mean), 'data-sd': String(sd) });
+        var tip = svgEl('title', {});
+        tip.textContent = name + ': mean ' + fmt(mean) + unitSuffix() + ', SD ' + fmt(sd) + unitSuffix();
+        dot.appendChild(tip);
+        svg.appendChild(dot);
+        var label = svgEl('text', { x: px(mean) + 6, y: py(sd) - 8, fill: color, 'font-size': '12', 'font-weight': '700' });
         label.textContent = name;
         svg.appendChild(label);
       }
-      mark(plannerSnapshot.mean, plannerSnapshot.sd, '#2ecc71', 'Current');
+      var goalValue = Number(el('planner-goal').value);
+      var currentBelow = el('planner-metric').value === 'index' && last.overall.cpk < goalValue - 1e-9;
+      mark(plannerSnapshot.mean, plannerSnapshot.sd, '#7dd3fc', currentBelow ? 'Current, below goal' : 'Current', 'current');
       var scenario = activeScenario();
-      if (scenario) mark(scenario.mean, scenario.sd, '#f97316', 'Scenario');
+      if (scenario) mark(scenario.mean, scenario.sd, '#f97316', 'Selected scenario', 'scenario');
+      chartTicks(domain.lo, domain.hi, 4).forEach(function (tick) {
+        var label = svgEl('text', { x: px(tick), y: H - 28, 'text-anchor': 'middle', fill: muted(), 'font-size': '11' });
+        label.textContent = fmt(tick);
+        svg.appendChild(label);
+      });
+      chartTicks(0, maxSd, 3).forEach(function (tick) {
+        var label = svgEl('text', { x: L - 8, y: py(tick) + 4, 'text-anchor': 'end', fill: muted(), 'font-size': '11' });
+        label.textContent = fmt(tick);
+        svg.appendChild(label);
+      });
+      var xTitle = svgEl('text', { x: String((L + W - R) / 2), y: H - 8, 'text-anchor': 'middle', fill: ink(), 'font-size': '12', 'font-weight': '700' });
+      xTitle.textContent = 'Process mean' + (plannerSnapshot.unit ? ' (' + plannerSnapshot.unit + ')' : '');
+      svg.appendChild(xTitle);
+      var yTitle = svgEl('text', { x: '16', y: String((T + H - B) / 2), 'text-anchor': 'middle', fill: ink(), 'font-size': '12', 'font-weight': '700', transform: 'rotate(-90 16 ' + ((T + H - B) / 2) + ')' });
+      yTitle.textContent = 'Process SD' + (plannerSnapshot.unit ? ' (' + plannerSnapshot.unit + ')' : '');
+      svg.appendChild(yTitle);
       svg.appendChild(svgEl('line', { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: gridColor() }));
       svg.appendChild(svgEl('line', { x1: L, y1: T, x2: L, y2: H - B, stroke: gridColor() }));
       host.appendChild(svg);
@@ -1412,31 +1618,37 @@
       var host = el('planner-dist');
       host.textContent = '';
       var scenario = activeScenario();
-      if (!plannerSnapshot || !scenario) return;
+      if (!plannerSnapshot || !scenario || !(scenario.sd > 0)) return;
       var snap = plannerSnapshot;
       var scenarioLsl = scenario.lsl == null ? snap.lsl : scenario.lsl;
       var scenarioUsl = scenario.usl == null ? snap.usl : scenario.usl;
       var values = el('show-histogram').checked ? measurementValues() : [];
-      var lows = [snap.lsl, scenarioLsl, snap.mean - 4 * snap.sd, scenario.mean - 4 * Math.max(scenario.sd, snap.sd)];
-      var highs = [snap.usl, scenarioUsl, snap.mean + 4 * snap.sd, scenario.mean + 4 * Math.max(scenario.sd, snap.sd)];
+      var lows = [snap.lsl, scenarioLsl, snap.mean - 4 * snap.sd, scenario.mean - 4 * scenario.sd];
+      var highs = [snap.usl, scenarioUsl, snap.mean + 4 * snap.sd, scenario.mean + 4 * scenario.sd];
       values.forEach(function (v) { lows.push(v); highs.push(v); });
       var xMin = Math.min.apply(null, lows);
       var xMax = Math.max.apply(null, highs);
       if (!(xMax > xMin)) xMax = xMin + 1;
       var W = 640;
-      var H = 230;
+      var H = 280;
       var L = 16;
       var R = 16;
-      var T = 36;
-      var B = 18;
+      var T = 52;
+      var B = 46;
       function px(v) { return L + (v - xMin) / (xMax - xMin) * (W - L - R); }
+      function curvePoints(mean, sd, x0, x1) {
+        var pts = [];
+        var step = (xMax - xMin) / 160;
+        var x;
+        for (x = x0; x <= x1 + step * 0.5; x += step) pts.push([Math.min(x, x1), math.normalPDF(Math.min(x, x1), mean, sd)]);
+        return pts;
+      }
       var curves = [
-        { mean: snap.mean, sd: snap.sd, color: '#7dd3fc', name: 'Current' },
-        { mean: scenario.mean, sd: scenario.sd, color: '#f97316', name: 'Scenario' }
+        { mean: snap.mean, sd: snap.sd, color: '#7dd3fc', name: 'Fitted current curve' },
+        { mean: scenario.mean, sd: scenario.sd, color: '#f97316', name: 'Modeled scenario' }
       ];
       var peak = 0;
       curves.forEach(function (curve) {
-        if (!(curve.sd > 0)) return;
         var y = math.normalPDF(curve.mean, curve.mean, curve.sd);
         if (y > peak) peak = y;
       });
@@ -1459,10 +1671,13 @@
       }
       peak = peak * 1.12 || 1;
       function py(v) { return T + (1 - v / peak) * (H - T - B); }
-      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Current and scenario distributions on the same scale' });
+      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Current vs. scenario distribution' });
       var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
-      title.textContent = values.length ? 'Analyzed values, current curve, and scenario curve' : 'Current and scenario distributions';
+      title.textContent = 'Current vs. scenario distribution';
       svg.appendChild(title);
+      var legend = svgEl('text', { x: String(W / 2), y: '34', 'text-anchor': 'middle', fill: muted(), 'font-size': '12' });
+      legend.textContent = (values.length ? 'Observed data · ' : '') + 'Fitted current curve · Modeled scenario';
+      svg.appendChild(legend);
       bins.forEach(function (bin) {
         var density = bin.count / (values.length * bin.width);
         svg.appendChild(svgEl('rect', {
@@ -1470,22 +1685,41 @@
           y: py(density),
           width: Math.max(0, px(bin.x1) - px(bin.x0) - 0.8),
           height: Math.max(0, py(0) - py(density)),
-          fill: 'rgba(120,200,255,0.35)'
+          fill: 'rgba(125,211,252,0.35)'
         }));
       });
-      curves.forEach(function (curve) {
-        if (!(curve.sd > 0)) return;
+      [[xMin, scenarioLsl], [scenarioUsl, xMax]].forEach(function (span) {
+        if (!(span[1] > span[0])) return;
+        var pts = curvePoints(scenario.mean, scenario.sd, span[0], span[1]);
         var d = '';
-        var step = (xMax - xMin) / 160;
-        var x;
-        for (x = xMin; x <= xMax; x += step) {
-          d += (d ? ' L ' : 'M ') + px(x).toFixed(2) + ' ' + py(math.normalPDF(x, curve.mean, curve.sd)).toFixed(2);
-        }
-        svg.appendChild(svgEl('path', { d: d, fill: 'none', stroke: curve.color, 'stroke-width': '2.2' }));
-        var label = svgEl('text', { x: px(curve.mean), y: '30', 'text-anchor': 'middle', fill: curve.color, 'font-size': '11', 'font-weight': '700' });
-        label.textContent = curve.name;
+        pts.forEach(function (pt) { d += (d ? ' L ' : 'M ') + px(pt[0]).toFixed(2) + ' ' + py(pt[1]).toFixed(2); });
+        d += ' L ' + px(span[1]).toFixed(2) + ' ' + py(0).toFixed(2) + ' L ' + px(span[0]).toFixed(2) + ' ' + py(0).toFixed(2) + ' Z';
+        svg.appendChild(svgEl('path', { d: d, fill: 'rgba(249,115,22,0.16)', stroke: 'none' }));
+      });
+      curves.forEach(function (curve) {
+        var pts = curvePoints(curve.mean, curve.sd, xMin, xMax);
+        var d = '';
+        pts.forEach(function (pt) { d += (d ? ' L ' : 'M ') + px(pt[0]).toFixed(2) + ' ' + py(pt[1]).toFixed(2); });
+        var path = svgEl('path', { d: d, fill: 'none', stroke: curve.color, 'stroke-width': '2.2', 'data-role': curve.name === 'Modeled scenario' ? 'scenario' : 'current', 'data-mean': String(curve.mean), 'data-sd': String(curve.sd) });
+        var tip = svgEl('title', {});
+        tip.textContent = curve.name + ': mean ' + fmt(curve.mean) + unitSuffix() + ', SD ' + fmt(curve.sd) + unitSuffix();
+        path.appendChild(tip);
+        svg.appendChild(path);
+      });
+      [[snap.lsl, 'LSL'], [snap.usl, 'USL']].forEach(function (limit) {
+        svg.appendChild(svgEl('line', { x1: px(limit[0]), y1: T, x2: px(limit[0]), y2: H - B, stroke: '#e11d48', 'stroke-width': '1.4' }));
+        var label = svgEl('text', { x: px(limit[0]), y: T + 12, 'text-anchor': 'middle', fill: '#e11d48', 'font-size': '12', 'font-weight': '700' });
+        label.textContent = limit[1] + ' ' + fmt(limit[0]) + unitSuffix();
         svg.appendChild(label);
       });
+      chartTicks(xMin, xMax, 4).forEach(function (tick) {
+        var label = svgEl('text', { x: px(tick), y: H - 26, 'text-anchor': 'middle', fill: muted(), 'font-size': '11' });
+        label.textContent = fmt(tick);
+        svg.appendChild(label);
+      });
+      var xTitle = svgEl('text', { x: String(W / 2), y: H - 8, 'text-anchor': 'middle', fill: ink(), 'font-size': '12', 'font-weight': '700' });
+      xTitle.textContent = (last && last.valueName) || 'Measurement';
+      svg.appendChild(xTitle);
       svg.appendChild(svgEl('line', { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: gridColor() }));
       host.appendChild(svg);
     }
@@ -1759,15 +1993,26 @@
       el(id).addEventListener('change', plannerEdited);
     });
     el('planner-mean-range').addEventListener('input', function () {
-      el('planner-mean').value = el('planner-mean-range').value;
-      applyPlannerMean(Number(el('planner-mean-range').value));
+      if (plannerMeanLock) return;
+      var raw = el('planner-mean-range').value;
+      if (String(raw).trim() === '' || !Number.isFinite(Number(raw))) {
+        el('planner-preview').textContent = 'Enter a numeric scenario mean.';
+        return;
+      }
+      applyPlannerMean(Number(raw), true);
     });
     el('planner-mean').addEventListener('change', function () {
-      applyPlannerMean(Number(el('planner-mean').value));
-      if (el('planner-mean-range')) el('planner-mean-range').value = el('planner-mean').value;
+      if (plannerMeanLock) return;
+      var raw = el('planner-mean').value;
+      if (String(raw).trim() === '' || !Number.isFinite(Number(raw))) {
+        el('planner-preview').textContent = 'Enter a numeric scenario mean.';
+        return;
+      }
+      applyPlannerMean(Number(raw), false);
     });
     function redrawDistribution() {
       if (hasRun && last && last.ok && view === 'results') drawDistribution(last.overall);
+      if (view === 'planner') drawPlannerCharts();
     }
     el('show-histogram').addEventListener('change', redrawDistribution);
     el('show-normal').addEventListener('change', redrawDistribution);

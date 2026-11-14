@@ -195,5 +195,9 @@ describe('Univariate view guide', () => {
     expect(guide.resolve({ module: 'independent', key: 'independent-results' }).title).toMatch(/Test results/);
     expect(guide.resolve({ module: 'power', key: 'power-sbMeans' }).sections[0].paragraphs.join(' ')).toMatch(/not available yet/);
     expect(guide.resolve({ module: 'logistic', key: 'logistic-model-results-overview' }).title).toMatch(/overview/i);
+    ['capability-setup', 'capability-results', 'capability-planner', 'capability-by-group'].forEach((key) => {
+      expect(guide.resolve({ module: 'capability', key: key })).toBeTruthy();
+    });
+    expect(guide.resolve({ module: 'capability', key: 'capability-results' }).sections[3].items.join(' ')).toMatch(/not within-process Cp and Cpk/i);
   });
 });

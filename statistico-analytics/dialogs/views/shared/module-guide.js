@@ -1250,6 +1250,87 @@
     ]
   };
 
+  const capability = {
+    title: 'Process capability',
+    lead: 'Process capability compares one numeric measurement with specification limits you set, such as whether etch times stay between a lower and an upper limit. Pp and Ppk use the overall sample standard deviation. They describe this sample. They do not prove the process is stable.',
+    sections: [
+      section('does', 'What it does', {
+        paragraphs: [
+          'The module summarises the selected column against a lower limit, an upper limit, and an optional target. Pp describes the spread relative to the width of the specification. Ppk describes the worse side, so a centred process and an off-centre process with the same spread do not receive the same Ppk.',
+          'The Capability Planner asks what mean, standard deviation, or outward specification change would reach a Ppk, modeled-yield, or expected-PPM goal. By Group repeats the indices inside categories.'
+        ]
+      }),
+      section('when', 'When to use it', {
+        items: [
+          'You have one numeric measurement and numeric specification limits.',
+          'You want to know whether the current spread and location leave the values inside those limits.',
+          'You want a normal-model yield or an expected parts-per-million figure.',
+          'You want to see how far the mean or the standard deviation would have to move to reach a goal.',
+          'You want the same description split by a grouping column, without a formal test that the groups differ.'
+        ]
+      }),
+      section('data', 'Data requirements', {
+        items: [
+          'One numeric measurement column. Each row is one observation.',
+          'A lower specification limit and an upper specification limit. The target is optional. A blank target uses the midpoint, and that midpoint is used for Cpm.',
+          'A grouping column is separate. It is used only when you open By Group.',
+          'Rows that are not numbers are left out of the measurement.',
+          'The standard deviation is the overall sample standard deviation, with divisor n − 1. This screen has no within-subgroup estimator.'
+        ]
+      }),
+      section('works', 'How it works', {
+        paragraphs: [
+          'Pp is the specification width divided by six standard deviations. Cpu and Cpl measure the room from the mean to each limit. Ppk is the smaller of those two. Cpm also penalises distance from the target.',
+          'Expected PPM and yield use a normal curve with this mean and this standard deviation. They are model estimates, not a count of the defects in the sample. The planner searches inside the constraints you enter. Process improvement can keep the current standard deviation or reduce it. It does not raise it.'
+        ],
+        detail: {
+          title: 'Mathematical background',
+          items: [
+            'The standard deviation uses the sample divisor n − 1.',
+            'Pp = (USL − LSL) / (6s). Cpu = (USL − mean) / (3s). Cpl = (mean − LSL) / (3s). Ppk = min(Cpu, Cpl).',
+            'A Ppk of 1.33 means the nearer specification limit is 3 × 1.33 standard deviations from the mean.',
+            'The normal tail uses the same approximation as the process capability calculator. It is not a high-precision normal integral.',
+            'The By Group status compares reliable groups. It is a description, not a hypothesis test.'
+          ]
+        }
+      }),
+      section('obtain', 'What you obtain', {
+        items: [
+          'Capability shows the gauge, Pp, Ppk, Cpu, Cpl, Cpm, expected PPM, yield, and the distribution against the limits.',
+          'The planner shows whether the goal is reachable at the current standard deviation, the smallest mean shift, the extra margin from centering, or the reduction required when the current standard deviation cannot meet the goal.',
+          'By Group shows each level’s indices and whether the limiting specification stays the same.'
+        ]
+      }),
+      section('cautions', 'Assumptions and cautions', {
+        items: [
+          'Pp and Ppk on this screen are not Cp and Cpk from a within-subgroup standard deviation. Do not report them as within-process capability.',
+          'Yield and expected PPM assume a normal distribution. A skewed measurement can make those tails misleading.',
+          'A high Ppk does not prove the process is stable, and it does not promise that the next lot will match this sample.',
+          'A planner scenario is a calculation. It is not written back to the worksheet, and it is not evidence that the process can be moved there.',
+          'By Group is descriptive. It does not test whether the groups differ.'
+        ]
+      }),
+      section('other', 'When to consider another method', {
+        items: [
+          'A formal comparison of group means or variances: independent samples, or ANOVA when there are more than two groups.',
+          'A model of how settings change a response: regression, or Process Settings Explorer.',
+          'A within-subgroup capability study that uses rational subgroups: not this screen.',
+          'One measurement and no specification limits: univariate analysis.'
+        ]
+      }),
+      section('refs', 'Methods and references', {
+        paragraphs: [
+          'The indices match the process capability calculator. They are the overall, or performance, indices. Within-process Cp and Cpk are not calculated here.'
+        ],
+        items: [
+          'Montgomery, D. C. Introduction to Statistical Quality Control. The overall indices use the standard deviation of all the observations.',
+          'Minitab’s Normal Capability Analysis reports overall capability (Pp, Ppk) separately from within capability. This module reports the overall indices only.',
+          'The normal tail is the calculator’s approximation, not a high-precision evaluation of the normal distribution.'
+        ]
+      })
+    ]
+  };
+
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -1287,7 +1368,8 @@
       reliability: reliability,
       cluster: cluster,
       'meta-analysis': metaAnalysis,
-      power: power
+      power: power,
+      capability: capability
     },
     _moduleOverride: null,
     _activeModule: 'univariate',
@@ -1445,7 +1527,8 @@
         'mixed-model': 'the linear mixed model',
         'meta-analysis': 'meta-analysis',
         contingency: 'contingency tables',
-        multivariable: 'the multivariable explorer'
+        multivariable: 'the multivariable explorer',
+        capability: 'process capability'
       };
       const name = names[moduleName];
       return name ? ('About ' + name) : 'About this module';

@@ -2346,6 +2346,85 @@
           'Standardising does not make factors equally important. It only puts them in comparable units.'
         ]
       )
+    },
+    capability: {
+      'capability-setup': guide(
+        'Input and setup',
+        'Chooses the measurement and the specification limits before Pp and Ppk are calculated.',
+        [
+          'Drag one numeric column into Measurement. The same column is used for the results, the planner, and By Group.',
+          'Enter the lower and upper specification limits. Leave Target blank to use the midpoint. That midpoint is used for Cpm.',
+          'Use demo process, Use Excel selection, Pick a range, and Refresh worksheet data change the rows. They do not change the limits you typed.',
+          'Run analysis opens the capability results. Cancel closes the dialog.'
+        ],
+        [
+          'Nothing on this screen is a capability index. The equation strip names the measurement that will be analysed.',
+          'A category, a date, or free text cannot be the measurement. A grouping column stays in the variable list until you open By Group.'
+        ],
+        [
+          'The limits are the specification you intend to judge. The module does not estimate them from the data.',
+          'Running the analysis does not write the scenario, the limits, or a transformed column back to the worksheet.'
+        ]
+      ),
+      'capability-results': guide(
+        'Process capability',
+        'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
+        [
+          'LSL, USL, and Target can be edited here. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
+          'Find settings opens the Capability Planner for the index on the gauge.',
+          'Histogram draws the observed values. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
+        ],
+        [
+          'The gauge is Ppk. Pp is the spread relative to the specification width, as if the mean were centred. Ppk is the worse of Cpu and Cpl.',
+          'Cpu is the room to the upper limit. Cpl is the room to the lower limit. The smaller one is the binding side.',
+          'Expected PPM and Yield are the tails of a normal curve with this mean and this standard deviation. They are not a count of the points outside the limits.',
+          'Bars outside the specification are the observed values beyond the limits. The orange curve is the normal model, not a second sample.'
+        ],
+        [
+          'Pp and Ppk use the overall sample standard deviation (n − 1). They are not within-process Cp and Cpk.',
+          'The normal yield and expected PPM can mislead when the measurement is skewed or has more than one peak.',
+          'A high Ppk describes this sample. It does not prove that the process is stable.'
+        ]
+      ),
+      'capability-planner': guide(
+        'Capability Planner',
+        'Finds a mean, a standard deviation, or an outward specification change that would reach the goal you enter.',
+        [
+          'Metric chooses Ppk, modeled yield, or expected PPM. Goal is the value to reach. Mode chooses process improvement or a specification what-if. Change chooses whether the mean, the standard deviation, or both may move.',
+          'Constraints holds optional mean bounds and a practical minimum standard deviation. A blank bound adds no further constraint. The summary names the bounds that are active.',
+          'Find settings runs the search. After a result, the two current-SD presets are the smallest mean shift and the most margin from centering, when those settings differ. The slider and the scenario-mean field select a custom mean.',
+          'Changing the metric, the goal, or a constraint clears the solved result until you choose Find settings again.'
+        ],
+        [
+          'The opening sentence says whether the goal is reachable at the current standard deviation, and the mean interval that meets it when that interval exists.',
+          'Current and Selected scenario show the mean, the standard deviation, the metric, and the normal-model yield or expected PPM. Both charts use that same selected mean and standard deviation.',
+          'Scenario SD is the standard deviation of the selected setting. Maximum SD for the goal is how wide the process could be at that mean and still meet the goal. The current SD caps a process-improvement scenario, so the search does not propose a larger standard deviation.',
+          'Settings that meet the goal shades the mean and standard-deviation pairs that satisfy the goal. The current marker is labeled when the analysed process is below the goal.'
+        ],
+        [
+          'Yield and expected PPM are normal-model estimates. A very small expected PPM is not a promise of zero defects.',
+          'The scenario stays in this view. The worksheet and the capability results keep the analysed values.',
+          'An unreachable goal names the binding constraint and the best point the search could reach. That point is not a recommendation that the process can be operated there.'
+        ]
+      ),
+      'capability-by-group': guide(
+        'By-group capability',
+        'Repeats Pp and Ppk inside the categories of a grouping column.',
+        [
+          'Choose the grouping column in the group dialog. Recommended columns are listed first. Include or leave out levels, and set the minimum group size, before Compare groups.',
+          'The table lists Overall and each included level. The bars compare Ppk. The method note under the table states how the status was decided.'
+        ],
+        [
+          'The status says whether Ppk stays in a similar band, varies in magnitude, or changes which specification limit is binding.',
+          'Limited by names the worse side for that row: USL, LSL, or neither when the two sides are close.',
+          'A level marked small is shown and is not used in the consistency status.'
+        ],
+        [
+          'The comparison is descriptive. It is not a test that the groups differ in mean, spread, or capability.',
+          'Each group still uses the overall sample standard deviation of its own rows, not a within-subgroup estimator.',
+          'More than 15 levels is refused. A formal comparison of means or variances belongs in another module.'
+        ]
+      )
     }
   };
 

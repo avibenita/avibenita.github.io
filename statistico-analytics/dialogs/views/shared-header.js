@@ -96,7 +96,7 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
           a.id = 'st-site-return';
           a.className = 'st-site-return';
           const path = (window.location.pathname || '').toLowerCase();
-          const specialized = /\/(publication-tables|multivariable|prepare)\//.test(path);
+          const specialized = /\/(publication-tables|multivariable|prepare|gage-rr|process-settings|capability)\//.test(path);
           a.href = specialized
             ? 'https://statistico.live/Statistico-Website/index-Addins.html'
             : 'https://statistico.live/Statistico-Website/index-Analytics.html';
@@ -923,7 +923,8 @@ const StatisticoHeader = {
       'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
       'pareto': 'Pareto Analysis',
       'process-settings': 'Process Settings Explorer',
-      'capability': 'Process Capability'
+      'capability': 'Process Capability',
+      'gage-rr': 'Gage R&R (Crossed)'
     };
     return moduleNames[this.module] || this.module || 'Analytics';
   },
@@ -946,7 +947,8 @@ const StatisticoHeader = {
       'meta-analysis': 'meta-analysis',
       contingency: 'contingency tables',
       multivariable: 'the multivariable explorer',
-      capability: 'process capability'
+      capability: 'process capability',
+      'gage-rr': 'crossed Gage R&R'
     };
     const name = names[moduleName];
     return name ? ('About ' + name) : 'About this module';
@@ -1024,6 +1026,10 @@ const StatisticoHeader = {
       'cap-results': 'Process Capability',
       'cap-planner': 'Capability Planner',
       'cap-by-group': 'By-Group Analysis',
+      'gage-setup': 'Input & Setup',
+      'gage-overview': 'Overview',
+      'gage-diagnostics': 'Diagnostics',
+      'gage-anova': 'ANOVA',
       'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
       'ps-diagnostics': 'Diagnostics',
@@ -1085,7 +1091,8 @@ const StatisticoHeader = {
       'segmentation': (globalThis.__segmentationTitle || (globalThis.__segmentationProduct === 'split' ? 'Split Index™' : (globalThis.__segmentationProduct === 'loyalty' ? 'Loyalty Matrix' : 'Survey Segmentation Matrix'))),
       'pareto': 'Pareto Analysis',
       'process-settings': 'Process Settings Explorer',
-      'capability': 'Process Capability'
+      'capability': 'Process Capability',
+      'gage-rr': 'Gage R&R (Crossed)'
     };
     const moduleName = moduleNames[this.module] || this._getModuleDisplayName();
     
@@ -1094,7 +1101,7 @@ const StatisticoHeader = {
     const questionsAnsweredHtml = this._renderQuestionsAnsweredControl();
 
     // All sidebar-based modules hide the shared-header navrow to avoid duplicate navigation.
-    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation' || this.module === 'process-settings' || this.module === 'capability');
+    const hideNavrow = (this.module === 'independent' || this.module === 'dependent' || this.module === 'logistic' || this.module === 'factor' || this.module === 'pca' || this.module === 'reliability' || this.module === 'cluster' || this.module === 'anova' || this.module === 'power' || this.module === 'regression' || this.module === 'correlations' || this.module === 'univariate' || this.module === 'mixed-model' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'segmentation' || this.module === 'process-settings' || this.module === 'capability' || this.module === 'gage-rr');
 
     const groupName = String(this.groupLabel || '').trim()
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1759,7 +1766,7 @@ const StatisticoHeader = {
   },
 
   _isSharedSidebarModule() {
-    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency', 'segmentation', 'process-settings', 'capability'].includes(this.module);
+    return ['univariate', 'correlations', 'independent', 'dependent', 'logistic', 'factor', 'pca', 'reliability', 'anova', 'power', 'regression', 'contingency', 'segmentation', 'process-settings', 'capability', 'gage-rr'].includes(this.module);
   },
 
   _sidebarGroupKey(title) {
@@ -2189,6 +2196,42 @@ const StatisticoHeader = {
               description: fitted ? 'Change the data, model, or specifications.' : 'Data, model, specifications, and operating ranges.',
               active: active === 'setup'
             }
+          ]
+        }
+      };
+    }
+
+    if (this.module === 'gage-rr') {
+      const fitted = !!globalThis.__gageFitted;
+      const active = globalThis.__gageView || 'setup';
+      const resultItem = (viewName, icon, label, description) => ({
+        type: 'js',
+        onclick: "switchGageView('" + viewName + "')",
+        view: 'gage-' + viewName,
+        tab: viewName,
+        icon: icon,
+        label: label,
+        description: viewName === 'setup' || fitted ? description : 'Available after the study is fit.',
+        active: active === viewName
+      });
+      return {
+        logoIcon: 'fa-ruler-combined',
+        logoSub: 'Gage R&R',
+        menuTitle: 'Menu',
+        groups: [
+          {
+            title: 'Gage R&R',
+            items: [
+              resultItem('overview', 'fa-chart-pie', 'Overview', 'Total Gage R&R, distinct categories, and the variance components.'),
+              resultItem('diagnostics', 'fa-chart-line', 'Diagnostics', 'R chart, X̄ chart, and the part-by-operator means.'),
+              resultItem('anova', 'fa-table', 'ANOVA', 'Full model, pooling decision, and the report.')
+            ]
+          }
+        ],
+        pinnedNav: {
+          title: 'Setup',
+          items: [
+            resultItem('setup', 'fa-pen-to-square', fitted ? 'Edit input' : 'Input & Setup', 'Part, operator, measurement, and optional specification limits.')
           ]
         }
       };
@@ -4995,7 +5038,7 @@ const StatisticoHeader = {
   },
 
   _isHeaderRowFilterSuppressed() {
-    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'process-settings' || this.module === 'capability';
+    return this.module === 'mixed-model' || this.module === 'independent' || this.module === 'dependent' || this.module === 'regression' || this.module === 'meta-analysis' || this.module === 'contingency' || this.module === 'process-settings' || this.module === 'capability' || this.module === 'gage-rr';
   },
 
   _mergeActionsWithFallback(actions) {
@@ -9372,6 +9415,10 @@ REPORT: [one polished paragraph suitable for a report]`;
       'cap-results': 'Process Capability',
       'cap-planner': 'Capability Planner',
       'cap-by-group': 'By-Group Analysis',
+      'gage-setup': 'Input & Setup',
+      'gage-overview': 'Overview',
+      'gage-diagnostics': 'Diagnostics',
+      'gage-anova': 'ANOVA',
       'ps-overview': 'Process Results \u2013 Overview',
       'ps-effects': 'Effects & Interactions',
       'ps-diagnostics': 'Diagnostics',
@@ -9464,6 +9511,10 @@ REPORT: [one polished paragraph suitable for a report]`;
       'capability-results': 'Process Capability',
       'capability-setup': 'Input & Setup',
       'capability-by-group': 'By-Group Analysis',
+      'gage-rr-setup': 'Input & Setup',
+      'gage-rr-overview': 'Overview',
+      'gage-rr-diagnostics': 'Diagnostics',
+      'gage-rr-anova': 'ANOVA',
       'regression-diag-overview':    'Diagnostics — Overview',
       'regression-diag-plots':       'Diagnostics — Residual Plots',
       'regression-diag-influence':   'Diagnostics — Influence',

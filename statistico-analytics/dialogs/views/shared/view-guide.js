@@ -2425,6 +2425,80 @@
           'More than 15 levels is refused. A formal comparison of means or variances belongs in another module.'
         ]
       )
+    },
+    'gage-rr': {
+      'gage-rr-setup': guide(
+        'Input and setup',
+        'Maps Part, Operator, and Measurement and checks that the crossed study is balanced before any variance is fit.',
+        [
+          'Choose three different columns. Part and Operator are identifiers. Measurement is the numeric reading. One row is one reading.',
+          'The count grid lists every Part × Operator cell. Highlighted cells are empty or do not share the common repeat count.',
+          'Lower and upper specification limits are optional. Use demo data, Use Excel selection, Pick a range, and Refresh worksheet data replace the rows.',
+          'Run analysis opens the overview only when the design is valid. Cancel closes the dialog.'
+        ],
+        [
+          'The status line counts parts, operators, repeats per cell, and complete readings. It is not a variance result.',
+          'A message that names an Excel row is a block. That row is not dropped, so it cannot change the fit quietly.'
+        ],
+        [
+          'Every operator must measure every part the same number of times, at least twice. A nested or unbalanced study is not analyzed here.',
+          'The limits are the specification you enter. The module does not estimate them from the data, and running the analysis does not write back to the worksheet.'
+        ]
+      ),
+      'gage-rr-overview': guide(
+        'Overview',
+        'Shows how much of the study variation comes from the measurement system, then the components that add up to that total.',
+        [
+          'The three cards are Total Gage R&R as a percent of study variation, %Tolerance when both limits are valid, and the number of distinct categories.',
+          'Edit the specification limits here to update %Tolerance only. The ANOVA and the percent of study variation stay on the same fit.',
+          'The bars are the components that add to 100 percent. Total Gage R&R and Reproducibility are sums, so they are not drawn again.'
+        ],
+        [
+          '%Contribution divides each variance by the total variance. %Study variation divides each standard deviation by the total standard deviation. %Tolerance divides 6 × SD by the specification width.',
+          'A zero with a note was a negative estimate set to zero. Unavailable means the denominator was zero, not that the value is zero.',
+          'Distinct categories uses 1.41 × part-to-part SD / Total Gage R&R SD, truncated, and at least 1. The parts should represent the variation you need to distinguish.'
+        ],
+        [
+          'Parent rows repeat the sum of the rows under them. Adding a parent to its components counts that variation twice.',
+          'Percent of study variation is not a confidence interval, and distinct categories is not a capability index.'
+        ]
+      ),
+      'gage-rr-diagnostics': guide(
+        'Diagnostics',
+        'Plots each Part × Operator cell on an R chart, an X-bar chart, and an interaction profile, and opens the repeats behind a point.',
+        [
+          'Each point is one cell. Click it, or focus it and press Enter or Space, to select that Part × Operator pair on all three charts.',
+          'The detail lists the repeat readings, their Excel rows, the mean, and the range. Clear selection restores the unselected view.',
+          'Selection changes highlighting and the detail only. It does not change the fit or the export.'
+        ],
+        [
+          'The R chart is centered at the mean of the cell ranges, with limits D3 and D4 times that mean. The X-bar chart is the grand mean plus or minus A2 times the mean range.',
+          'An X-bar point beyond the limits can show that parts differ relative to repeatability. That is often the pattern a gage study is looking for.',
+          'The interaction profile is the cell mean by part, with one line per operator. Nearly parallel lines agree with a small interaction.'
+        ],
+        [
+          'If factors are not available for the repeat count, the points stay and the limits are omitted. The fitted study is unchanged.',
+          'A selected point is not a separate analysis. The report still contains the full study.'
+        ]
+      ),
+      'gage-rr-anova': guide(
+        'ANOVA',
+        'Shows the full two-way model, the decision to keep or pool the interaction, and the report of the fitted study.',
+        [
+          'Read the decision sentence first. It names the selected model and the mean square used afterward.',
+          'The full table always includes the interaction test. The reduced table appears only when the interaction was pooled.',
+          'The report repeats the study size, the method, the decision, any valid limits, the variance table, and both ANOVA tables. Export uses that report and stays off until a fit succeeds.'
+        ],
+        [
+          'Part and Operator are tested against the interaction mean square while the interaction stays, and against the pooled repeatability mean square after it is pooled.',
+          'A p-value of 0 is the limiting right tail when the numerator is positive and the denominator mean square is zero. Unavailable means zero divided by zero.',
+          'Pooling adds the interaction sum of squares and degrees of freedom to repeatability. The interaction variance is then zero.'
+        ],
+        [
+          'The ANOVA describes this balanced study. It is not a confidence interval for the variance components.',
+          'Refresh or a new column mapping clears the previous fit. The old report cannot be exported until the new fit succeeds.'
+        ]
+      )
     }
   };
 

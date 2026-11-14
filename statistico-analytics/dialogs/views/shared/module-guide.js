@@ -1331,6 +1331,83 @@
     ]
   };
 
+  const gageRr = {
+    title: 'Crossed Gage R&R',
+    lead: 'Crossed Gage R&R separates measurement-system variation from part-to-part variation. Each operator measures every part the same number of times. The parts should represent the variation you need to distinguish. The result describes this study.',
+    sections: [
+      section('does', 'What it does', {
+        paragraphs: [
+          'The module fits a balanced two-way random-effects model: Part, Operator, Part × Operator, and repeatability. It reports variance, standard deviation, study variation (6 × SD), percent contribution, percent study variation, and percent tolerance when both specification limits are valid.',
+          'The number of distinct categories is the truncated value 1.41 × part-to-part SD / Total Gage R&R SD, and at least 1, when the gage standard deviation is positive.'
+        ]
+      }),
+      section('when', 'When to use it', {
+        items: [
+          'You have continuous readings in long form, one reading per row.',
+          'Every operator measured every part the same number of times, at least twice.',
+          'You want to see how much of the observed variation comes from the measurement system.',
+          'You want to trace a chart point back to the repeat readings and their Excel rows.'
+        ]
+      }),
+      section('data', 'Data requirements', {
+        items: [
+          'Three different columns: Part, Operator, and Measurement. Part and Operator keep their display labels, including leading zeroes in text.',
+          'At least two parts, two operators, and two repeats in every Part × Operator cell.',
+          'A blank row is skipped. A partial row, a non-numeric measurement, or a worksheet error blocks the fit and names the Excel row.',
+          'Lower and upper specification limits are optional. Both are required before %Tolerance appears, and the upper limit must be greater.'
+        ]
+      }),
+      section('works', 'How it works', {
+        paragraphs: [
+          'Sums of squares use the grand, part, operator, and cell means, accumulated after centering so a large offset does not hide small within-cell differences. The interaction stays when its right-tail p-value is below 0.05. At 0.05 or above, its sum of squares and degrees of freedom join repeatability.',
+          'A negative variance estimate is kept for diagnosis and reported as zero. Percentages use the reported, non-negative components. Parent rows are sums of the components under them and are not added again.'
+        ],
+        detail: {
+          title: 'Mathematical background',
+          items: [
+            'Degrees of freedom are a−1, b−1, (a−1)(b−1), and ab(r−1) for parts, operators, interaction, and repeatability.',
+            'In the full model, Part and Operator are tested against Part × Operator. The interaction is tested against repeatability.',
+            'Part variance is [MS(Part) − MS(denominator)] / (operators × repeats). Operator variance uses parts × repeats. Interaction variance is [MS(interaction) − MS(error)] / repeats.',
+            'When the interaction is pooled, the pooled mean square replaces the interaction mean square in both main-effect formulas, and the interaction variance is zero.',
+            'Study variation is 6 × SD. %Contribution is 100 × variance / total variance. %Study variation is 100 × SD / total SD. %Tolerance is 100 × study variation / (USL − LSL).',
+            'A positive mean square over a zero mean square has right-tail probability 0. Zero over zero is unavailable. If both interaction and error mean squares are zero, the zero interaction is pooled and the F test is unavailable.'
+          ]
+        }
+      }),
+      section('obtain', 'What you obtain', {
+        items: [
+          'Overview shows Total Gage R&R as a percent of study variation, %Tolerance when the limits are valid, distinct categories, the component chart, and the variance table.',
+          'Diagnostics shows the R chart and the X-bar chart by operator, plus the Part × Operator mean profile. Activating a point lists that cell’s readings, Excel rows, mean, and range.',
+          'ANOVA shows the full model and, when pooling is applied, the reduced model, together with the report.'
+        ]
+      }),
+      section('cautions', 'Assumptions and cautions', {
+        items: [
+          'Version 1 is a balanced crossed study. Nested, unbalanced, and attribute studies are not fit here.',
+          'The parts should span the variation you need the measurement system to distinguish. A narrow set of parts makes the gage look worse.',
+          'Distinct categories below 5 is a warning about discrimination, not a proof that the process is incapable.',
+          'Control limits describe repeatability. An X-bar point outside them can mean the parts differ, which is often what a gage study wants to see.'
+        ]
+      }),
+      section('other', 'When to consider another method', {
+        items: [
+          'A process mean and spread against specification limits, without operators: Process Capability.',
+          'How factor settings move a response: regression, or Process Settings Explorer.',
+          'A nested study, an unbalanced study, or attribute agreement: not this screen.'
+        ]
+      }),
+      section('refs', 'Methods and references', {
+        paragraphs: [
+          'The ANOVA decision, variance components, percentages, and distinct categories follow the crossed Gage R&R ANOVA method. Chart limits use the standard A2, D3, and D4 factors for the repeat count.'
+        ],
+        items: [
+          'Minitab, Methods and formulas for Crossed Gage R&R Study (ANOVA method), variance components, and number of distinct categories.',
+          'AIAG, Measurement Systems Analysis. The control-chart factors are the usual variables-chart constants for the subgroup size.'
+        ]
+      })
+    ]
+  };
+
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -1369,7 +1446,8 @@
       cluster: cluster,
       'meta-analysis': metaAnalysis,
       power: power,
-      capability: capability
+      capability: capability,
+      'gage-rr': gageRr
     },
     _moduleOverride: null,
     _activeModule: 'univariate',
@@ -1528,7 +1606,8 @@
         'meta-analysis': 'meta-analysis',
         contingency: 'contingency tables',
         multivariable: 'the multivariable explorer',
-        capability: 'process capability'
+        capability: 'process capability',
+        'gage-rr': 'crossed Gage R&R'
       };
       const name = names[moduleName];
       return name ? ('About ' + name) : 'About this module';

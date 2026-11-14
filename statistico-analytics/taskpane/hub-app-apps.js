@@ -401,6 +401,32 @@ const TOOLS_CATEGORY_TILES = [
     ]
   },
   {
+    id: "gage-rr",
+    section: "Process Improvement",
+    sectionId: "improvement",
+    title: "Gage R&R (Crossed)",
+    icon: "fa-ruler-combined",
+    accent: "#f59e0b",
+    accentDark: "#b45309",
+    color: "#f59e0b",
+    colorDark: "#b45309",
+    subtitle: "See how much of the variation comes from the measurement system",
+    desc: "Analyze a balanced crossed study. Part, operator, and the part-by-operator interaction are separated from repeatability, with optional specification limits.",
+    info: [
+      "Long data: one reading per row, mapped to Part, Operator, and Measurement",
+      "Requires at least two parts, two operators, and the same number of repeats in every cell",
+      "ANOVA variance components, %Study Var, and %Tolerance when both limits are set",
+      "R chart, X̄ chart, and the interaction plot trace a point back to its Excel rows"
+    ],
+    modules: [
+      {
+        id: "gage-rr",
+        label: "Gage R&R (Crossed)",
+        tip: "Separate measurement-system variation from part-to-part variation in a balanced crossed study."
+      }
+    ]
+  },
+  {
     id: "capability-range",
     section: "Process Capability",
     sectionId: "quality",
@@ -812,7 +838,7 @@ var TOOLS_SECTION_META = {
   improvement: {
     id: "improvement",
     label: "Process Improvement",
-    subtitle: "Compare a candidate recipe with the current settings on one fitted model.",
+    subtitle: "Compare a candidate recipe, or separate measurement-system variation from part variation.",
     icon: "fa-sliders",
     color: "#38bdf8",
     colorDark: "#0284c7"
@@ -3735,6 +3761,101 @@ function openProcessSettingsFromHub() {
   return openProcessSettingsDialog("input");
 }
 
+var hubGageDialog = null;
+
+function gagePayload(gr) {
+  var values = gr && gr.values;
+  if (!values || values.length < 2) {
+    return { headers: [], rows: [], address: "", source: "empty" };
+  }
+  return {
+    headers: values[0] || [],
+    rows: values.slice(1),
+    address: gr.address || "",
+    source: "excel"
+  };
+}
+
+function sendGagePayload(dlg) {
+  if (!dlg) return;
+  try {
+    dlg.messageChild(JSON.stringify({
+      type: "GAGE_RR_DATA",
+      payload: gagePayload(getGlobalRangePayload())
+    }));
+  } catch (e) {}
+}
+
+function openGageRrFromHub() {
+  var base = getDialogsBaseUrl() + "gage-rr/gage-rr.html?v=" + Date.now();
+  setSelectedModuleCard("gage-rr", true);
+  if (!Office || !Office.context || !Office.context.ui || typeof Office.context.ui.displayDialogAsync !== "function") {
+    window.open(base + "&demo=1", "_blank");
+    setSelectedModuleCard("gage-rr", false);
+    return true;
+  }
+  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
+    if (res.status === Office.AsyncResultStatus.Failed) {
+      setSelectedModuleCard("gage-rr", false);
+      var err = res.error || {};
+      window.alert("Could not open Gage R&R.\n\n" + (err.message || "Unknown error"));
+      return;
+    }
+    hubGageDialog = res.value;
+    var dlg = hubGageDialog;
+    setTimeout(function () { sendGagePayload(dlg); }, 550);
+    setTimeout(function () { sendGagePayload(dlg); }, 1400);
+    dlg.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
+      var msg;
+      try { msg = JSON.parse(arg.message || "{}"); } catch (e) { return; }
+      if (msg.action === "ready" || msg.action === "requestData") {
+        sendGagePayload(dlg);
+        return;
+      }
+      if (msg.action === "refreshData" || msg.action === "pickRange" || msg.action === "useSelection") {
+        var capture = window.hubCaptureRange;
+        var refresh = window.hubRefreshGlobalRange;
+        var job = msg.action === "refreshData"
+          ? Promise.resolve(typeof refresh === "function" ? refresh() : null)
+          : Promise.resolve(typeof capture === "function" ? capture(msg.action === "useSelection" ? "selection" : "prompt") : null);
+        job.then(function (result) {
+          if (msg.action !== "refreshData" && (!result || !result.values || result.values.length < 2)) {
+            if (dlg) {
+              dlg.messageChild(JSON.stringify({
+                type: "GAGE_RR_ERROR",
+                message: (result && result.error) || "Could not read that range. Select a header row plus data."
+              }));
+            }
+            return;
+          }
+          sendGagePayload(dlg);
+        }, function (err) {
+          if (dlg) {
+            dlg.messageChild(JSON.stringify({
+              type: "GAGE_RR_ERROR",
+              message: (err && err.message) || "Could not read that range."
+            }));
+          }
+        });
+        return;
+      }
+      if (msg.action === "close") {
+        try { dlg.close(); } catch (e) {}
+        dlg = null;
+        hubGageDialog = null;
+        setSelectedModuleCard("gage-rr", false);
+      }
+    });
+    dlg.addEventHandler(Office.EventType.DialogEventReceived, function () {
+      dlg = null;
+      hubGageDialog = null;
+      setSelectedModuleCard("gage-rr", false);
+      if (window.StatisticoDialogHost) StatisticoDialogHost.releaseTaskpaneAfterDialog();
+    });
+  });
+  return true;
+}
+
 var hubCapabilityDialog = null;
 
 function capabilityPayload(gr) {
@@ -3904,6 +4025,9 @@ function navigateToModuleCore(id) {
   }
   if (id === "process-settings") {
     if (openProcessSettingsFromHub()) return;
+  }
+  if (id === "gage-rr") {
+    if (openGageRrFromHub()) return;
   }
   if (id === "capability-range") {
     if (openCapabilityFromHub()) return;

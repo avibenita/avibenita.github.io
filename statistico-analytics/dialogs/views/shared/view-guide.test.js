@@ -198,6 +198,9 @@ describe('Univariate view guide', () => {
     ['capability-setup', 'capability-results', 'capability-planner', 'capability-by-group'].forEach((key) => {
       expect(guide.resolve({ module: 'capability', key: key })).toBeTruthy();
     });
+    ['gage-rr-setup', 'gage-rr-overview', 'gage-rr-diagnostics', 'gage-rr-anova'].forEach((key) => {
+      expect(guide.resolve({ module: 'gage-rr', key: key })).toBeTruthy();
+    });
     expect(guide.resolve({ module: 'capability', key: 'capability-results' }).sections[3].items.join(' ')).toMatch(/not within-process Cp and Cpk/i);
   });
 });

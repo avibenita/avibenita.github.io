@@ -118,7 +118,7 @@ const REQUIRED = ['does', 'when', 'data', 'works', 'obtain', 'cautions', 'other'
 const MODULES = [
   'univariate', 'correlations', 'contingency', 'independent', 'dependent', 'anova',
   'regression', 'logistic', 'mixed-model', 'factor', 'pca', 'reliability', 'cluster',
-  'meta-analysis', 'power'
+  'meta-analysis', 'power', 'capability'
 ];
 
 describe('Univariate module guide', () => {
@@ -150,6 +150,8 @@ describe('Univariate module guide', () => {
     expect(guide.resolve('univariate').lead).toMatch(/do not establish a cause/i);
     expect(guide.resolve('logistic').lead).toMatch(/do not establish causation/i);
     expect(guide.resolve('power').lead).toMatch(/not the probability that a hypothesis is true/i);
+    expect(guide.resolve('capability').lead).toMatch(/do not prove the process is stable/i);
+    expect(guide.buttonLabel('capability')).toBe('About process capability');
   });
 
   test('stays closed until opened, then shows the lead with collapsed sections', () => {

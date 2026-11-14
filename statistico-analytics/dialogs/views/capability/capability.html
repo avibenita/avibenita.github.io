@@ -12,10 +12,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="../shared-config.css?v=20261112cap4" />
   <link rel="stylesheet" href="../shared-header.css?v=20261112cap3" />
+  <link rel="stylesheet" href="../shared/module-guide.css?v=20261114guides" />
   <link rel="stylesheet" href="../shared-by-group.css?v=20261112cap3" />
   <script src="../shared-config.js?v=20261112cap4"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261113plan2"></script>
+  <script src="../shared-header.js?v=20261114guides"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
   <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
@@ -77,6 +78,7 @@
     #view-setup [hidden] { display: none !important; }
     #view-setup .ps-data-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0; }
     #view-setup .ps-data-actions .cfg-btn { min-width: 0; padding: 4px 8px; font-size: 11px; white-space: nowrap; }
+    #view-setup #aboutModuleSetup { display: inline-flex; margin: 0 0 8px; }
     #view-setup .cfg-footer { gap: 8px; }
     #view-setup .cfg-footer .cap-note { margin: 0; flex: 1; font-size: 12px; color: var(--cfg-text3); }
     #view-setup .cap-error { color: #be123c; }
@@ -298,6 +300,10 @@
                 <span>Measurement</span>
                 <span class="reg-model-meta" id="tbRange"></span>
               </div>
+              <button type="button" class="mg-launch mg-launch--setup" id="aboutModuleSetup" data-module="capability" aria-expanded="false" aria-controls="moduleGuideOverlay" title="About process capability">
+                <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                <span>About process capability</span>
+              </button>
               <div class="reg-equation-strip" id="measureEquation">Pp, Ppk of (assign a measurement)</div>
               <div class="reg-zone-card zone-out zone-single">
                 <div class="reg-zone-head">
@@ -1763,6 +1769,7 @@
       StatisticoHeader.updateGroupLabel(view === 'by-group' && groupName ? groupName : '');
       if (typeof StatisticoHeader._renderSharedSidebar === 'function') StatisticoHeader._renderSharedSidebar();
       if (typeof StatisticoHeader._mountSidebarUtilities === 'function') StatisticoHeader._mountSidebarUtilities();
+      if (typeof StatisticoHeader._syncViewGuide === 'function') StatisticoHeader._syncViewGuide();
     }
 
     function showView(next, options) {
@@ -2044,6 +2051,105 @@
       }
       if (msg.type === 'CAPABILITY_ERROR') showError('host-error', msg.message || 'The worksheet range could not be read.');
     }
+
+    function aiNum(n) {
+      return Number.isFinite(n) ? Number(n.toFixed(6)) : null;
+    }
+    function aiIndex(source) {
+      if (!source) return null;
+      if (source.ok === false) return { ok: false, error: source.error || '' };
+      return {
+        n: source.n,
+        mean: aiNum(source.mean),
+        sd: aiNum(source.sd),
+        lsl: aiNum(source.lsl),
+        usl: aiNum(source.usl),
+        target: source.hasTarget ? aiNum(source.target) : null,
+        pp: aiNum(source.cp),
+        ppk: aiNum(source.cpk),
+        cpu: aiNum(source.cpu),
+        cpl: aiNum(source.cpl),
+        cpm: aiNum(source.cpm),
+        expectedPpm: aiNum(source.ppm),
+        normalModelYieldPct: aiNum(source.yieldPct),
+        rating: source.rating && source.rating.text,
+        limitedBy: source.binding || ''
+      };
+    }
+    function aiCandidate(item) {
+      if (!item) return null;
+      return {
+        id: item.id || '',
+        title: item.title || '',
+        mean: aiNum(item.mean),
+        sd: aiNum(item.sd),
+        lsl: aiNum(item.lsl),
+        usl: aiNum(item.usl),
+        ppk: aiNum(item.index),
+        expectedPpm: aiNum(item.ppm),
+        normalModelYieldPct: aiNum(item.yieldPct)
+      };
+    }
+    window.buildAIPayload = function () {
+      var overall = last && last.ok ? last.overall : null;
+      var grouped = last && last.byGroup && last.byGroup.ok ? last.byGroup : null;
+      var metric = el('planner-metric') ? el('planner-metric').value : '';
+      var payload = {
+        view: view,
+        measurement: (last && last.valueName) || measure || '',
+        analyzed: !!(hasRun && last && last.ok),
+        estimator: 'overall sample standard deviation (n - 1)',
+        indexLabels: 'Pp is the potential index and Ppk is the minimum of Cpu and Cpl. These are not within-process Cp and Cpk.',
+        yieldAndExpectedPpm: 'normal-model estimates, not a count of observed defects and not evidence the process is stable',
+        specification: overall
+          ? { lsl: aiNum(overall.lsl), usl: aiNum(overall.usl), target: overall.hasTarget ? aiNum(overall.target) : null }
+          : { lsl: spec.lsl, usl: spec.usl, target: spec.target },
+        overall: aiIndex(overall),
+        excludedRows: last && last.excluded ? last.excluded : 0,
+        byGroup: grouped ? {
+          groupName: grouped.groupName,
+          status: grouped.status && grouped.status.label,
+          statusId: grouped.status && grouped.status.id,
+          directionChanges: !!grouped.directionChanges,
+          descriptive: true,
+          groups: (grouped.groups || []).map(function (group) {
+            var row = aiIndex(group) || { ok: false };
+            row.name = group.name;
+            row.small = !!group.small;
+            return row;
+          })
+        } : null,
+        planner: plannerResult && plannerResult.ok ? {
+          metric: metric,
+          goal: el('planner-goal').value,
+          mode: el('planner-mode').value,
+          change: el('planner-adjust').value,
+          status: plannerResult.status,
+          answer: (el('planner-status') && el('planner-status').textContent) || '',
+          reachableAtCurrentSd: plannerResult.atCurrentSd || null,
+          selectedScenario: aiCandidate(plannerPreview),
+          presets: (plannerResult.candidates || []).map(aiCandidate),
+          best: aiCandidate(plannerResult.best),
+          scenarioStaysInThisView: true
+        } : null
+      };
+      if (view === 'results' && el('show-histogram')) {
+        payload.histogram = {
+          shown: !!el('show-histogram').checked,
+          bins: Number(el('hist-bins').value),
+          normalCurve: !!el('show-normal').checked
+        };
+      }
+      return payload;
+    };
+    el('aboutModuleSetup').addEventListener('click', function () {
+      var open = function () {
+        if (window.StatisticoModuleGuide) StatisticoModuleGuide.toggle('capability');
+      };
+      if (window.StatisticoHeader && typeof StatisticoHeader._ensureModuleGuideScript === 'function') {
+        StatisticoHeader._ensureModuleGuideScript(open);
+      } else open();
+    });
 
     function boot() {
       window.__capView = 'setup';

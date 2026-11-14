@@ -7898,7 +7898,8 @@ REPORT: [one polished paragraph suitable for a report]`;
       'meta-analysis': 'Prioritize the pooled effect, heterogeneity, influential studies, and publication-bias indicators.',
       'mixed-model': 'Prioritize fixed effects, ICC or variance components, model fit, and convergence.',
       contingency: 'Prioritize association strength, residuals, and whether the pattern is consistent across cells.',
-      power: 'Prioritize achieved power, required sample size, and the smallest detectable effect.'
+      power: 'Prioritize achieved power, required sample size, and the smallest detectable effect.',
+      capability: 'Prioritize Pp and Ppk from the overall sample standard deviation, which specification limit is binding, the normal-model yield and expected PPM, and whether a planner goal is reachable at the current standard deviation. Do not call these indices Cp or Cpk. Do not infer process stability. A planner scenario is not a change to the worksheet.'
     };
     return (map[this.module] || 'Prioritize the main analytical question, evidence strength, diagnostics, and limitations.')
       + ' Include a dedicated Group consistency reading. If a direction reversal or strong subgroup difference appears, mention it prominently and do not treat the pooled result as the whole story.';
@@ -9085,9 +9086,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     script.id = 'statistico-module-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261106aboutlabel')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261114guides')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261106aboutlabel');
+    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261114guides');
     const release = () => {
       const waiters = this._moduleGuideWaiters || [];
       this._moduleGuideWaiters = null;
@@ -9114,9 +9115,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261106guides')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261114guides')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261106guides');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261114guides');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -9597,8 +9598,10 @@ REPORT: [one polished paragraph suitable for a report]`;
         'Read the model specification, predictor roles, fitted terms, interactions, and categorical reference levels. Sample accounting lists analyzed and excluded rows. The ANOVA table gives sums of squares, degrees of freedom, mean squares, the F-statistic, and its p-value. The residual standard deviation is the spread of the profiler\u2019s projected output curve.',
       'process-settings-ps-scatters':
         'One predictor is shown at a time, chosen from the radio list. The cards report the rows used by the selected curve, Pearson r for a linear fit or observed-versus-fitted r for another curve, curve R² as the percentage of variation that curve explains, and the full model’s loss of R² when that predictor is removed, labeled in percentage points (pp). The linear Pearson t test is written as p < 0.0001 when it is smaller than 0.0001. Show fit only hides or shows the trend. Chart options changes the window, curve, and X-axis transform without refitting the process model. A categorical predictor shows the observed points and the same specification lines, with no curve.',
+      'capability-setup':
+        'Choose one numeric measurement and enter the lower and upper specification limits. Leave the target blank to use the midpoint for Cpm. Run analysis opens the capability results. The worksheet is not changed. Do not invent Pp, Ppk, yield, or a planner result on this screen.',
       'capability-results':
-        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Edit the specification limits here without returning to input.',
+        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Histogram and Normal curve change the distribution display. Edit the specification limits here without returning to input.',
       'capability-planner':
         'Find settings searches for a mean, standard deviation, or outward specification change that reaches a Ppk, modeled-yield, or expected-PPM goal. When Ppk is reachable at the current standard deviation, the presets are the smallest mean shift and the most margin from centering. Pp and Ppk use the overall sample standard deviation (n − 1). Yield and expected PPM are normal-model estimates. The scenario stays in this view. The worksheet and the capability results keep the analyzed values.',
       'capability-by-group':
@@ -9745,6 +9748,14 @@ REPORT: [one polished paragraph suitable for a report]`;
         'This is a partial-effect plot for one selected predictor: observed data, an adjusted prediction line (others at mean), and a 95% confidence band. The strip above shows that predictor\'s β, SE, t, p, and CI. Describe the slope, band width, and scatter — global R² / RMSE belong on Overview.',
       'regression-viz-unique':
         'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient. Describe slopes and scatter, not coefficients / SE / p-values.',
+      'capability-setup':
+        'This is the input form. The user chooses one numeric measurement and enters LSL, USL, and an optional target. Do not invent Pp, Ppk, yield, or a planner result. Say what still has to be set before Run analysis.',
+      'capability-results':
+        'This is the capability result for one measurement: a Ppk gauge, cards for Pp, Ppk, Cpu, Cpl, Cpm, expected PPM, and yield, plus the distribution against LSL and USL. Pp and Ppk use the overall sample standard deviation (n − 1). Do not call them Cp or Cpk. Yield and expected PPM assume a normal distribution. The histogram, when it is on, shows the observed values. Describe the gauge, the binding limit, and whether the mean is centered. Do not treat the picture as proof the process is stable.',
+      'capability-planner':
+        'Start from the reachability sentence. When the goal is reachable at the current standard deviation, the presets are the smallest mean shift and the most margin from centering. When it is not, name the required reduction or the best attainable point. Current and the selected scenario share one mean and one standard deviation across the comparison and both charts. Process improvement does not increase the standard deviation. The scenario is not written back to the worksheet or the capability results. Yield and expected PPM are normal-model estimates.',
+      'capability-by-group':
+        'This compares Pp and Ppk across groups. The status says whether capability stays in a similar band, varies, or changes which specification limit is binding. It is descriptive. Do not call it a test that the groups differ. Small groups are shown and are not used in the consistency status.',
       'process-settings-ps-scatters':
         'This view shows one predictor at a time. The four cards are the curve sample, Pearson r or observed-versus-fitted r, curve R² as the percentage of variation that curve explains, and the full model’s loss of R² when that predictor is removed, labeled pp. Curve R² and the pp contribution answer different questions. A linear fit’s two-sided t test is written as p < 0.0001 when it is smaller than 0.0001. Show fit and zoom change the display only. Categorical predictors show the observed points and the specification lines, without a curve. Describe the cloud, the selected fit when it is shown, and where points sit relative to the limits. Do not read the scatter as partial-regression coefficients.',
       'regression-pred-overview':

@@ -26,7 +26,28 @@
     ".hub-accordion-body .category-module-btn{width:100%;display:flex !important;}",
     ".hub-standalone-command{width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:0;}",
     ".hub-standalone-command .category-modules{width:100%;display:flex !important;flex-direction:column !important;flex-wrap:nowrap !important;}",
-    ".hub-standalone-command .category-module-btn{width:100%;max-width:100%;box-sizing:border-box;display:flex !important;}"
+    ".hub-standalone-command .category-module-btn{width:100%;max-width:100%;box-sizing:border-box;display:flex !important;}",
+    "html[data-hub-nav='family'] #hubNavTabs{display:none !important;}",
+    "html[data-hub-nav='family'] #advisorStrip{display:none !important;}",
+    "html[data-hub-nav='family'] .hub-analytics-allbar{display:none !important;}",
+    ".hub-family-heading{margin:2px 2px 8px;font-size:15px;font-weight:700;line-height:1.3;color:#fff;overflow-wrap:anywhere;}",
+    ".hub-family-lead{margin:0 2px 10px;font-size:12px;line-height:1.45;color:#94a3b8;overflow-wrap:anywhere;}",
+    ".hub-family-more{margin:14px 2px 6px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;}",
+    ".hub-family-list{display:flex;flex-direction:column;gap:8px;width:100%;min-width:0;}",
+    ".hub-family-row{display:flex;align-items:flex-start;gap:10px;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:12px;border:1px solid rgba(148,163,184,.22);border-radius:10px;background:#1e344c;color:#f1f5f9;text-align:left;cursor:pointer;font-family:inherit;}",
+    ".hub-family-row:hover{background:#27415c;}",
+    ".hub-family-row:focus-visible,.hub-family-back:focus-visible{outline:2px solid #c4b5fd;outline-offset:2px;}",
+    ".hub-family-icon{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;background:rgba(255,255,255,.08);color:#c4b5fd;font-size:12px;}",
+    ".hub-family-icon svg{width:16px;height:16px;display:block;}",
+    ".hub-family-copy{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;}",
+    ".hub-family-title,.hub-family-desc{display:block;white-space:normal;overflow-wrap:anywhere;}",
+    ".hub-family-title{font-size:13px;font-weight:700;line-height:1.3;color:#fff;}",
+    ".hub-family-desc{font-size:11.5px;font-weight:500;line-height:1.4;color:#94a3b8;}",
+    ".hub-family-chevron{flex:0 0 auto;margin-top:4px;font-size:11px;color:#94a3b8;}",
+    ".hub-family-back{display:inline-flex;align-items:center;margin:0 0 8px;padding:4px 0;border:0;background:transparent;color:#93c5fd;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}",
+    ".hub-family-empty{margin:8px 2px;font-size:12.5px;line-height:1.45;color:#cbd5e1;}",
+    ".hub-family-error{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;padding:8px 10px;border-radius:8px;background:rgba(239,68,68,.12);color:#fecaca;font-size:12px;line-height:1.4;}",
+    ".hub-family-error button{border:0;border-radius:7px;padding:4px 8px;background:#f4c84a;color:#1c1404;font-weight:700;cursor:pointer;}"
   ].join("");
   function apply() {
     var style = document.getElementById(STYLE_ID);
@@ -40,6 +61,14 @@
   if (document.head) apply();
   else document.addEventListener("DOMContentLoaded", apply);
 })();
+
+/* Previous task-pane structure: Statistical Methods, Interactive Calculators,
+   and Specialized Tools, with the accordion lists below. That markup and the
+   renderer further down are unchanged. Set this to true to show them again. */
+var HUB_USE_LEGACY_STRUCTURE = false;
+var HUB_NAV_FAMILY = null;
+var HUB_NAV_EPOCH = 0;
+var HUB_FAMILY_ERROR = null;
 
 let MODULES = [];
 let hubConfigDialog = null;
@@ -1078,6 +1107,178 @@ function placeHubRangeSection() {
   if (holder.parentElement) holder.parentElement.insertBefore(range, holder);
 }
 
+function collectFamilyCatalog() {
+  var catalog = {};
+  ["analytics", "calculators", "tools"].forEach(function (clusterId) {
+    (HUB_CLUSTER_TILES[clusterId] || []).forEach(function (tile) {
+      if (!tile || tile.hidden) return;
+      getCategoryModules(tile).forEach(function (mod) {
+        if (!mod || !mod.id || catalog[mod.id]) return;
+        catalog[mod.id] = {
+          id: mod.id,
+          hidden: false,
+          locked: !!mod.locked,
+          comingSoon: !!mod.comingSoon,
+          label: mod.label || tile.title || mod.id,
+          description: mod.tip || tile.subtitle || "",
+          icon: tile.icon || "fa-table-cells",
+          iconSvg: tile.iconSvg || "",
+          module: mod
+        };
+      });
+    });
+  });
+  return catalog;
+}
+
+function renderFamilyNavigation() {
+  var api = window.StatisticoHubFamily;
+  var holder = document.getElementById("categoryTiles");
+  var noResults = document.getElementById("noResults");
+  if (!holder || !api) return;
+  if (noResults) noResults.style.display = "none";
+  document.documentElement.setAttribute("data-hub-nav", "family");
+  var catalog = collectFamilyCatalog();
+  var model = api.buildNavigationModel(catalog);
+  var html;
+  if (!HUB_NAV_FAMILY) {
+    html = api.renderHomeHtml(model, HUB_FAMILY_ERROR);
+  } else {
+    var spec = api.getFamilySpec(HUB_NAV_FAMILY);
+    var packed = null;
+    [model.families, model.more].forEach(function (list) {
+      (list || []).forEach(function (row) {
+        if (row.id === HUB_NAV_FAMILY) packed = row;
+      });
+    });
+    var modules = packed
+      ? packed.moduleIds.map(function (id) { return catalog[id]; }).filter(Boolean)
+      : [];
+    html = api.renderFamilyHtml(spec || { id: HUB_NAV_FAMILY, label: "Analysis", description: "" }, modules, HUB_FAMILY_ERROR);
+  }
+  holder.innerHTML = html;
+  placeHubRangeSection();
+  syncAnalyticsAllBar();
+  var advisor = document.getElementById("advisorStrip");
+  if (advisor) advisor.style.display = "none";
+}
+
+function hubLaunchStillCurrent(launchEpoch) {
+  if (HUB_USE_LEGACY_STRUCTURE || !window.StatisticoHubFamily || launchEpoch == null) return true;
+  return window.StatisticoHubFamily.shouldApplyLaunchResult(launchEpoch, HUB_NAV_EPOCH);
+}
+
+function openHubFamily(id) {
+  var api = window.StatisticoHubFamily;
+  var spec = api && api.getFamilySpec(id);
+  if (!spec || spec.direct) return;
+  HUB_NAV_FAMILY = spec.id;
+  HUB_NAV_EPOCH += 1;
+  HUB_FAMILY_ERROR = null;
+  renderCategoryTiles("");
+  var back = document.getElementById("hubFamilyBack");
+  if (back && typeof back.focus === "function") back.focus();
+}
+
+function closeHubFamily() {
+  var focusId = HUB_NAV_FAMILY;
+  HUB_NAV_FAMILY = null;
+  HUB_NAV_EPOCH += 1;
+  HUB_FAMILY_ERROR = null;
+  try {
+    if (window.StatisticoHubFamily) sessionStorage.removeItem(window.StatisticoHubFamily.RETURN_FAMILY_KEY);
+  } catch (e) {}
+  renderCategoryTiles("");
+  var btn = focusId ? document.querySelector('.hub-family-row[data-family-id="' + focusId + '"]') : null;
+  if (btn && typeof btn.focus === "function") btn.focus();
+}
+
+function beginHubLaunchWatch(epoch, onFail) {
+  var ui = (typeof Office !== "undefined" && Office.context && Office.context.ui) ? Office.context.ui : null;
+  if (!ui || typeof ui.displayDialogAsync !== "function") return;
+  if (ui.__hubFamilyOrig && ui.displayDialogAsync !== ui.__hubFamilyOrig) {
+    ui.displayDialogAsync = ui.__hubFamilyOrig;
+  }
+  var orig = ui.displayDialogAsync;
+  ui.__hubFamilyOrig = orig;
+  var restored = false;
+  function restore() {
+    if (restored) return;
+    restored = true;
+    if (ui.displayDialogAsync === wrapped) ui.displayDialogAsync = orig;
+    if (ui.__hubFamilyOrig === orig) ui.__hubFamilyOrig = null;
+  }
+  function wrapped(url, options, callback) {
+    restore();
+    return orig.call(ui, url, options, function (res) {
+      var current = hubLaunchStillCurrent(epoch);
+      var failed = !!(res && Office.AsyncResultStatus && res.status === Office.AsyncResultStatus.Failed);
+      if (!current) {
+        if (res && res.value && typeof res.value.close === "function") {
+          try { res.value.close(); } catch (e) {}
+        }
+        return;
+      }
+      if (typeof callback === "function") callback(res);
+      if (failed && typeof onFail === "function") onFail(res);
+    });
+  }
+  ui.displayDialogAsync = wrapped;
+  setTimeout(restore, 8000);
+}
+
+function showFamilyLaunchError(moduleId, label) {
+  HUB_FAMILY_ERROR = { moduleId: moduleId, label: label || moduleId };
+  renderCategoryTiles("");
+}
+
+function launchHubFamilyModule(moduleId) {
+  var catalog = collectFamilyCatalog();
+  var row = catalog[moduleId];
+  if (!row) {
+    showFamilyLaunchError(moduleId, moduleId);
+    return;
+  }
+  HUB_FAMILY_ERROR = null;
+  var epoch = HUB_NAV_EPOCH;
+  renderCategoryTiles("");
+  beginHubLaunchWatch(epoch, function () {
+    if (!hubLaunchStillCurrent(epoch)) return;
+    showFamilyLaunchError(moduleId, row.label);
+  });
+  HUB_ACTIONS["family:" + moduleId] = row.module;
+  try {
+    runHubModuleAction("family:" + moduleId);
+  } catch (err) {
+    if (hubLaunchStillCurrent(epoch)) showFamilyLaunchError(moduleId, row.label);
+  }
+}
+
+function retryHubFamilyModule(moduleId) {
+  launchHubFamilyModule(moduleId);
+}
+
+function openHubPower() {
+  launchHubFamilyModule("calc-power");
+}
+
+function restoreHubFamilyFromNavigation() {
+  if (HUB_USE_LEGACY_STRUCTURE || !window.StatisticoHubFamily) return;
+  var api = window.StatisticoHubFamily;
+  var stored = null;
+  var queryFamily = null;
+  try {
+    stored = sessionStorage.getItem(api.RETURN_FAMILY_KEY);
+    if (stored) sessionStorage.removeItem(api.RETURN_FAMILY_KEY);
+  } catch (e) {}
+  try {
+    queryFamily = new URLSearchParams(window.location.search || "").get("hubFamily");
+  } catch (e2) {}
+  var spec = api.getFamilySpec(queryFamily || stored);
+  if (!spec || spec.direct) return;
+  HUB_NAV_FAMILY = spec.id;
+}
+
 function renderCategoryTiles(query) {
   var holder = document.getElementById("categoryTiles");
   var noResults = document.getElementById("noResults");
@@ -1091,6 +1292,11 @@ function renderCategoryTiles(query) {
     }
   }
   HUB_ACTIONS = {};
+  if (!HUB_USE_LEGACY_STRUCTURE && window.StatisticoHubFamily) {
+    renderFamilyNavigation();
+    return;
+  }
+  document.documentElement.removeAttribute("data-hub-nav");
   var allSource = (HUB_CLUSTER_TILES[ACTIVE_CLUSTER] || []).filter(function (c) {
     return !c.hidden;
   });
@@ -1362,6 +1568,14 @@ function renderHubAccordionPanel(sectionId, tilesHtml, open) {
 function syncAnalyticsAllBar(query) {
   var bar = document.getElementById("hubAnalyticsAllBar");
   var input = document.getElementById("hubSearch");
+  if (!HUB_USE_LEGACY_STRUCTURE && window.StatisticoHubFamily) {
+    if (bar) {
+      bar.classList.remove("is-active");
+      bar.hidden = true;
+    }
+    document.documentElement.setAttribute("data-hub-nav", "family");
+    return;
+  }
   if (bar) {
     bar.classList.add("is-active");
     bar.hidden = false;
@@ -1795,6 +2009,10 @@ function syncClusterHeader() {
   if (HUB_LICENSE && HUB_LICENSE.procedureAdvisor === false) showAdvisor = false;
   if (range) range.style.display = showRange ? "" : "none";
   if (advisor) advisor.style.display = showAdvisor ? "" : "none";
+  if (!HUB_USE_LEGACY_STRUCTURE && window.StatisticoHubFamily) {
+    document.documentElement.setAttribute("data-hub-nav", "family");
+    if (advisor) advisor.style.display = "none";
+  }
   syncHubToolsMenuSelection();
   syncHubAnalyticsMenuSelection();
   syncAnalyticsAllBar();
@@ -3951,7 +4169,8 @@ function openCapabilityFromHub() {
   return true;
 }
 
-function navigateToModuleCore(id) {
+function navigateToModuleCore(id, launchEpoch) {
+  if (launchEpoch != null && !hubLaunchStillCurrent(launchEpoch)) return;
   var gr = getGlobalRangePayload();
   if (id === "prepare-data" || id === "prepare-quality" || id === "prepare-dataset") {
     if (openPrepareDataFromHub(id)) return;
@@ -4032,16 +4251,23 @@ function navigateToModuleCore(id) {
   if (id === "capability-range") {
     if (openCapabilityFromHub()) return;
   }
+  if (launchEpoch != null && !hubLaunchStillCurrent(launchEpoch)) return;
   var url = "./" + id + "/" + id + ".html?v=" + Date.now() + "&fromHub=1";
   if (gr && gr.values && gr.values.length >= 2) url += "&autoConfig=1&directDialog=1";
+  if (!HUB_USE_LEGACY_STRUCTURE && HUB_NAV_FAMILY && window.StatisticoHubFamily) {
+    try { sessionStorage.setItem(window.StatisticoHubFamily.RETURN_FAMILY_KEY, HUB_NAV_FAMILY); } catch (e) {}
+    url += "&hubFamily=" + encodeURIComponent(HUB_NAV_FAMILY);
+  }
   window.location.href = url;
 }
 
-function navigateToModule(id) {
+function navigateToModule(id, launchEpoch) {
+  var epoch = launchEpoch == null ? HUB_NAV_EPOCH : launchEpoch;
   var hadOpenDialog = dismissAllHubDialogs();
   var proceed = function () {
-    if (hadOpenDialog) setTimeout(function () { navigateToModuleCore(id); }, 150);
-    else navigateToModuleCore(id);
+    if (!hubLaunchStillCurrent(epoch)) return;
+    if (hadOpenDialog) setTimeout(function () { navigateToModuleCore(id, epoch); }, 150);
+    else navigateToModuleCore(id, epoch);
   };
   // Re-read the worksheet before launching: the stored range is a snapshot
   // from when the hub loaded, so edits made since (even saved ones) would
@@ -4092,6 +4318,11 @@ window.toggleHubAccordion = toggleHubAccordion;
 window.toggleHubExpandAll = toggleHubExpandAll;
 window.runHubModuleAction = runHubModuleAction;
 window.setSelectedModuleCard = setSelectedModuleCard;
+window.openHubFamily = openHubFamily;
+window.closeHubFamily = closeHubFamily;
+window.openHubPower = openHubPower;
+window.launchHubFamilyModule = launchHubFamilyModule;
+window.retryHubFamilyModule = retryHubFamilyModule;
 
 document.addEventListener("click", function (e) {
   var toolsWrap = document.getElementById("hubNavToolsWrap");
@@ -4304,6 +4535,7 @@ Office.onReady(function(info) {
     if (ACTIVE_ANALYTICS_SECTION !== "all" && available.indexOf(ACTIVE_ANALYTICS_SECTION) < 0) {
       ACTIVE_ANALYTICS_SECTION = available[0] || "all";
     }
+    restoreHubFamilyFromNavigation();
     syncClusterHeader();
     renderCategoryTiles("");
     syncHubLicenseBanner();

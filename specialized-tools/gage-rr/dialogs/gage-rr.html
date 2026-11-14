@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gage R&amp;R (Crossed)</title>
+  <script>
+    if (!/(?:^|[?&])(?:embed|demo)=1(?:&|$)/.test(window.location.search || '')) {
+      document.write('<scr' + 'ipt src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"><\/scr' + 'ipt>');
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="../shared-config.css?v=20261114gage1" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261114gage1" />
+  <link rel="stylesheet" href="../shared/module-guide.css?v=20261114gage1" />
+  <script src="../shared-config.js?v=20261114gage1"></script>
+  <script src="../shared-brand-logo.js?v=20261005light1"></script>
+  <script src="../shared-header.js?v=20261114gage1"></script>
+  <script src="../../shared/column-type.js?v=20261114gage1"></script>
+  <script src="gage-rr-engine.js?v=20261114gage1"></script>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { display: flex; flex-direction: column; overflow: hidden; background: var(--surface-0, #0E141B); color: var(--text-primary, #fff); font-family: "Segoe UI", Tahoma, sans-serif; }
+    .sb-layout { flex: 1; min-height: 0; }
+    .gage-scroll { flex: 1; min-height: 0; overflow: auto; overflow-x: hidden; padding: 12px 14px 16px; }
+    .sb-nav.collapsed .sb-item-copy { display: none; }
+    .sb-nav.collapsed .sb-item { min-height: 0; }
+    .gage-view[hidden] { display: none !important; }
+    #view-setup:not([hidden]) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    h2 { margin: 0 0 8px; font-size: 16px; }
+    .gage-card { background: var(--surface-1, #242C37); border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; min-width: 0; }
+    .gage-note { margin: 8px 0 0; color: var(--text-secondary, rgba(255,255,255,.75)); font-size: 12px; line-height: 1.45; }
+    .gage-error { color: #fb7185; font-size: 13px; font-weight: 650; margin: 8px 0 0; }
+    .gage-error[hidden] { display: none !important; }
+    button, select, input { font: inherit; }
+    .gage-scroll button, #view-diagnostics button, #view-anova button, #view-overview button {
+      border: 1px solid var(--border, rgba(255,255,255,.16)); background: var(--surface-2, #1b2430);
+      border-radius: 8px; padding: 7px 10px; cursor: pointer; font-weight: 700; font-size: 12px; color: inherit;
+    }
+    label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary, rgba(255,255,255,.75)); min-width: 0; flex: 1 1 140px; }
+    select, input[type="number"] { width: 100%; background: #1b2430; border: 1px solid rgba(255,255,255,.32); border-radius: 8px; padding: 7px 8px; color: var(--text-primary, #fff); min-height: 34px; }
+    body.gage-config #view-setup { position: fixed; inset: 0; z-index: 40; display: flex !important; flex-direction: column; height: 100%; background: var(--cfg-bg); color: var(--cfg-text); }
+    body.gage-config .sb-nav, body.gage-config #header-container, body.gage-config .statistico-footer { display: none !important; }
+    #view-setup [hidden] { display: none !important; }
+    #view-setup .ps-data-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0; flex-wrap: wrap; }
+    #view-setup .ps-data-actions .cfg-btn { min-width: 0; padding: 4px 8px; font-size: 11px; }
+    #view-setup #aboutModuleSetup { display: inline-flex; margin: 0 0 8px; }
+    #view-setup .cfg-footer { gap: 8px; }
+    #view-setup .cfg-footer .gage-note { margin: 0; flex: 1; font-size: 12px; color: var(--cfg-text3); }
+    #view-setup .gage-error { color: #be123c; }
+    #view-setup label.field { color: var(--cfg-text3); }
+    #view-setup select, #view-setup input[type="number"] { background: var(--cfg-bg); color: var(--cfg-text); border: 1px solid var(--cfg-border); }
+    .map-row, .spec-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .metric { border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 8px; padding: 8px 10px; min-width: 0; background: rgba(14,20,27,.35); }
+    html[data-theme="light"] .metric { background: #f8fafc; }
+    .metric b { display: block; margin-top: 2px; font-size: 18px; font-variant-numeric: tabular-nums; }
+    .metric span { font-size: 11px; font-weight: 700; color: var(--text-secondary, rgba(255,255,255,.72)); }
+    .info-dot { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; font-weight: 800; color: rgba(226,232,240,.92); background: rgba(148,163,184,.18); border: 1px solid rgba(148,163,184,.35); cursor: help; position: relative; }
+    .info-dot::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 8px); width: min(280px, 70vw); padding: 8px 10px; border-radius: 8px; background: #0b1b33; color: #eaf2ff; border: 1px solid rgba(120,200,255,.28); font-size: 11px; font-weight: 600; line-height: 1.35; white-space: normal; opacity: 0; pointer-events: none; z-index: 40; }
+    .info-dot:hover::after, .info-dot:focus-visible::after { opacity: 1; }
+    html[data-theme="light"] .info-dot { color: #1e3a5f; background: #e8f1fb; border-color: #93c5fd; }
+    html[data-theme="light"] .info-dot::after { background: #fff; color: #1f2937; }
+    .table-wrap { overflow: auto; max-width: 100%; border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 7px 8px; border-bottom: 1px solid var(--border, rgba(255,255,255,.1)); text-align: right; font-variant-numeric: tabular-nums; }
+    th:first-child, td:first-child { text-align: left; }
+    th { position: sticky; top: 0; background: var(--surface-1, #242C37); color: #7dd3fc; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+    tr.parent td { font-weight: 750; }
+    tr.component td:first-child { padding-left: 22px; }
+    td.bad, th.bad { background: rgba(225,29,72,.16); color: #fb7185; }
+    .count-grid { max-height: 220px; }
+    .bars { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .bar-line { display: grid; grid-template-columns: minmax(88px, 120px) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 12px; margin: 4px 0; }
+    .track { height: 8px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+    .fill { display: block; height: 100%; background: #38bdf8; }
+    .fill.part { background: #f59e0b; }
+    .chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .chart-grid .wide { grid-column: 1 / -1; }
+    svg.gage-chart { width: 100%; height: auto; display: block; }
+    .gage-point { cursor: pointer; }
+    .gage-point.is-selected { stroke: #f8fafc; stroke-width: 2.5; }
+    .detail { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; }
+    .detail[hidden] { display: none !important; }
+    pre.report { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 Consolas, "Segoe UI", sans-serif; margin: 0; }
+    @media (max-width: 860px) {
+      .metric-grid, .bars, .chart-grid { grid-template-columns: minmax(0, 1fr); }
+      .chart-grid .wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body class="gage-config">
+  <div class="sb-layout">
+    <nav class="sb-nav" id="sidebarNav" aria-label="Gage R&amp;R"></nav>
+    <div class="right-col">
+      <div id="header-container"></div>
+      <div class="gage-scroll">
+        <section id="view-setup" class="gage-view cfg-shell" aria-labelledby="setup-title">
+          <h2 id="setup-title" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Input &amp; Setup</h2>
+          <header class="cfg-header">
+            <div class="cfg-header-icon"><i class="fa-solid fa-ruler-combined"></i></div>
+            <span class="cfg-header-title">Gage R&amp;R (Crossed)</span>
+            <div class="ps-data-actions">
+              <button type="button" class="cfg-btn" id="use-demo">Use demo data</button>
+              <button type="button" class="cfg-btn" id="use-selection">Use Excel selection</button>
+              <button type="button" class="cfg-btn" id="pick-range">Pick a range</button>
+              <button type="button" class="cfg-btn" id="refresh-data">Refresh worksheet data</button>
+            </div>
+            <span class="cfg-meta-badge" id="metaBadge"></span>
+            <button type="button" class="cfg-theme-toggle" id="cfgThemeToggle" title="Toggle theme">
+              <span class="cfg-toggle-icon">&#x1F319;</span>
+              <div class="cfg-toggle-track"><div class="cfg-toggle-thumb"></div></div>
+              <span class="cfg-toggle-label">Dark</span>
+            </button>
+          </header>
+          <p id="host-error" class="gage-error" hidden></p>
+          <div class="reg-layout" style="display:flex;flex-direction:column;gap:10px;padding:10px 12px 0;min-height:0;overflow:auto;">
+            <button type="button" class="mg-launch mg-launch--setup" id="aboutModuleSetup" data-module="gage-rr" aria-expanded="false" aria-controls="moduleGuideOverlay" title="About crossed Gage R&amp;R">
+              <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+              <span>About crossed Gage R&amp;R</span>
+            </button>
+            <p class="gage-note" id="data-note">One row is one reading. Map Part, Operator, and Measurement. Every operator must measure every part the same number of times.</p>
+            <div class="map-row">
+              <label class="field">Part<select id="map-part"><option value="">Choose a column</option></select></label>
+              <label class="field">Operator<select id="map-operator"><option value="">Choose a column</option></select></label>
+              <label class="field">Measurement<select id="map-measure"><option value="">Choose a column</option></select></label>
+            </div>
+            <div class="spec-row">
+              <label class="field">Lower specification limit<input id="setup-lsl" type="number" step="any" /></label>
+              <label class="field">Upper specification limit<input id="setup-usl" type="number" step="any" /></label>
+            </div>
+            <p id="setup-spec" class="gage-note"></p>
+            <p id="setup-status" class="gage-note"></p>
+            <div id="setup-errors"></div>
+            <div id="setup-grid"></div>
+          </div>
+          <div class="cfg-footer">
+            <p class="gage-note">Limits are optional. A valid pair shows %Tolerance and does not refit the study.</p>
+            <button type="button" class="cfg-btn cancel" id="close-btn"><i class="fa-solid fa-xmark"></i> Cancel</button>
+            <button type="button" class="cfg-btn run" id="run-btn"><i class="fa-solid fa-play"></i> Run analysis</button>
+          </div>
+        </section>
+
+        <section id="view-overview" class="gage-view" hidden aria-labelledby="overview-title">
+          <h2 id="overview-title">Overview <span class="info-dot" tabindex="0" data-tip="Percent contribution is 100 times variance divided by total variance. Percent study variation is 100 times the standard deviation divided by the total standard deviation. Percent tolerance is 100 times 6 times the standard deviation divided by the specification width. Parts should represent the variation you need to distinguish. Parent rows are sums of the components under them and are not added again.">i</span></h2>
+          <div id="overview-empty" class="gage-note">Run a valid study from Input &amp; Setup.</div>
+          <div id="overview-body" hidden>
+            <div class="metric-grid" id="overview-metrics"></div>
+            <div class="spec-row" style="margin:12px 0;">
+              <label class="field">Lower specification limit<input id="overview-lsl" type="number" step="any" /></label>
+              <label class="field">Upper specification limit<input id="overview-usl" type="number" step="any" /></label>
+            </div>
+            <p id="overview-spec" class="gage-note"></p>
+            <div class="gage-card" id="overview-chart"></div>
+            <div id="overview-table"></div>
+            <p id="overview-notes" class="gage-note"></p>
+          </div>
+        </section>
+
+        <section id="view-diagnostics" class="gage-view" hidden aria-labelledby="diag-title">
+          <h2 id="diag-title">Diagnostics <span class="info-dot" tabindex="0" data-tip="Each point is one Part × Operator cell. The R chart uses the mean range. The X-bar chart uses the grand mean plus or minus A2 times that range. A point beyond the X-bar limits can show that parts differ relative to repeatability. Activate a point to list the repeats and their Excel rows. Clear selection restores the unselected view.">i</span></h2>
+          <div id="diag-empty" class="gage-note">Run a valid study from Input &amp; Setup.</div>
+          <div id="diag-body" hidden>
+            <p id="diag-limits" class="gage-note"></p>
+            <div class="chart-grid" id="diag-charts"></div>
+            <div class="gage-card detail" id="diag-detail" hidden></div>
+          </div>
+        </section>
+
+        <section id="view-anova" class="gage-view" hidden aria-labelledby="anova-title">
+          <h2 id="anova-title">ANOVA</h2>
+          <div id="anova-empty" class="gage-note">Run a valid study from Input &amp; Setup. The report stays off until a fit succeeds.</div>
+          <div id="anova-body" hidden>
+            <p id="anova-decision" class="gage-note"></p>
+            <div id="anova-tables"></div>
+            <h3 style="font-size:14px;margin:14px 0 6px;">Report</h3>
+            <div class="gage-card"><pre class="report" id="anova-report"></pre></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var Engine = window.StatisticoGageRR;
+      var view = 'setup';
+      var table = null;
+      var last = null;
+      var hasRun = false;
+      var selection = null;
+      var spec = { lsl: '', usl: '' };
+      var mapping = { part: '', operator: '', measurement: '' };
+
+      function el(id) { return document.getElementById(id); }
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+      }
+      function decimals() {
+        var n = 4;
+        if (window.StatisticoHeader && typeof StatisticoHeader.getDecimalPreference === 'function') {
+          var pref = Number(StatisticoHeader.getDecimalPreference());
+          if (Number.isFinite(pref)) n = pref;
+        }
+        return Math.max(0, Math.min(8, n));
+      }
+      function fmt(n, digits) {
+        if (!Number.isFinite(n)) return 'unavailable';
+        var text = n.toFixed(digits == null ? decimals() : digits);
+        return /NaN|Infinity/.test(text) ? 'unavailable' : text;
+      }
+      function fmtP(row) {
+        if (!row || row.pState === 'unavailable' || row.p == null) return 'unavailable';
+        if (row.pState === 'limit') return '0';
+        return fmt(row.p, Math.max(decimals(), 4));
+      }
+      function post(action) {
+        if (window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
+          Office.context.ui.messageParent(JSON.stringify({ action: action }));
+        }
+      }
+      function download(filename, mime, text) {
+        var blob = new Blob([text], { type: mime });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+      }
+      function ready() { return !!(hasRun && last && last.ok); }
+      function syncExport() {
+        if (!window.StatisticoHeader || typeof StatisticoHeader.registerActions !== 'function') return;
+        StatisticoHeader.registerActions({
+          moduleName: 'Gage R&R',
+          getData: ready() ? function () { return Engine.exportData(last); } : null,
+          exportHtml: ready() ? function () {
+            download('gage-rr-report.html', 'text/html', Engine.reportHtml(last));
+          } : null,
+          exportJson: ready() ? function () {
+            download('gage-rr-study.json', 'application/json', JSON.stringify(Engine.exportData(last), null, 2));
+          } : null
+        });
+        if (typeof StatisticoHeader.setAiReady === 'function') StatisticoHeader.setAiReady(ready());
+        syncShell();
+      }
+      function syncShell() {
+        window.__gageView = view;
+        window.__gageFitted = ready();
+        var titles = { setup: 'Input & Setup', overview: 'Overview', diagnostics: 'Diagnostics', anova: 'ANOVA' };
+        if (!window.StatisticoHeader) return;
+        StatisticoHeader.currentView = 'gage-' + view;
+        StatisticoHeader.updateTitle(titles[view] || 'Gage R&R');
+        StatisticoHeader.updateVariable(mapping.measurement || 'Measurement', ready() ? last.design.readings : 0);
+        if (typeof StatisticoHeader._renderSharedSidebar === 'function') StatisticoHeader._renderSharedSidebar();
+        if (typeof StatisticoHeader._mountSidebarUtilities === 'function') StatisticoHeader._mountSidebarUtilities();
+        if (typeof StatisticoHeader._syncViewGuide === 'function') StatisticoHeader._syncViewGuide();
+      }
+      function showView(next) {
+        view = next;
+        document.body.classList.toggle('gage-config', view === 'setup');
+        if (view === 'setup' && window.CfgTheme) CfgTheme.apply(CfgTheme.get());
+        else if (window.StatisticoHeader && typeof StatisticoHeader.applyTheme === 'function') {
+          StatisticoHeader.applyTheme(StatisticoHeader.resolveTheme(), { savePreference: false, preference: StatisticoHeader.getThemePreference() });
+        }
+        ['setup', 'overview', 'diagnostics', 'anova'].forEach(function (name) {
+          el('view-' + name).hidden = view !== name;
+        });
+        if (view === 'overview') paintOverview();
+        if (view === 'diagnostics') paintDiagnostics();
+        if (view === 'anova') paintAnova();
+        syncShell();
+      }
+      window.switchGageView = showView;
+
+      function readMap() {
+        mapping.part = el('map-part').value;
+        mapping.operator = el('map-operator').value;
+        mapping.measurement = el('map-measure').value;
+      }
+      function readSpec(prefix) {
+        spec.lsl = el(prefix + '-lsl').value;
+        spec.usl = el(prefix + '-usl').value;
+      }
+      function writeSpec(prefix) {
+        ['lsl', 'usl'].forEach(function (field) {
+          var node = el(prefix + '-' + field);
+          if (node && document.activeElement !== node && node.value !== spec[field]) node.value = spec[field];
+        });
+      }
+      function invalidate() {
+        hasRun = false;
+        last = null;
+        selection = null;
+        syncExport();
+      }
+      function fillSelects() {
+        var columns = table ? Engine.listColumns(table) : [];
+        ['map-part', 'map-operator', 'map-measure'].forEach(function (id) {
+          var select = el(id);
+          var current = select.value;
+          select.innerHTML = '<option value="">Choose a column</option>' + columns.map(function (col) {
+            return '<option value="' + escapeHtml(col.name) + '">' + escapeHtml(col.name) + '</option>';
+          }).join('');
+          if (columns.some(function (col) { return col.name === current; })) select.value = current;
+        });
+      }
+      function guessMap() {
+        if (!table) return;
+        var names = (table.headers || []).map(function (header) { return String(header == null ? '' : header); });
+        function pick(label) {
+          var exact = names.filter(function (name) { return name === label; })[0];
+          if (exact) return exact;
+          var lower = label.toLowerCase();
+          return names.filter(function (name) { return name.toLowerCase() === lower; })[0] || '';
+        }
+        if (!el('map-part').value) el('map-part').value = pick('Part');
+        if (!el('map-operator').value) el('map-operator').value = pick('Operator');
+        if (!el('map-measure').value) el('map-measure').value = pick('Measurement');
+      }
+      function loadTable(next, source) {
+        table = next;
+        invalidate();
+        fillSelects();
+        guessMap();
+        el('metaBadge').textContent = source === 'demo' ? 'Demo' : ((next && next.address) || 'Worksheet');
+        el('data-note').textContent = source === 'demo'
+          ? 'Demo study, two parts and two operators. Specification width 40 is filled in so %Tolerance can be read.'
+          : 'Worksheet range loaded. Map Part, Operator, and Measurement if the columns were not named that way.';
+        if (source === 'demo') {
+          spec.lsl = '80';
+          spec.usl = '120';
+          writeSpec('setup');
+        }
+        paintSetup();
+        showView('setup');
+      }
+      function currentSpec() {
+        return { lsl: spec.lsl, usl: spec.usl };
+      }
+      function preview() {
+        if (!table) return null;
+        readMap();
+        return Engine.prepare(table, mapping);
+      }
+      function paintGrid(prepared) {
+        var host = el('setup-grid');
+        if (!prepared || !prepared.grid || !prepared.grid.parts.length) {
+          host.innerHTML = '';
+          return;
+        }
+        var grid = prepared.grid;
+        var bad = {};
+        (grid.problems || []).forEach(function (cell) { bad[cell.part + '\u0000' + cell.operator] = true; });
+        var html = '<div class="table-wrap count-grid"><table><caption class="gage-note">Readings in each Part × Operator cell. Highlighted cells are missing or do not share the common repeat count.</caption><thead><tr><th scope="col">Part</th>';
+        grid.operators.forEach(function (operator) {
+          html += '<th scope="col">' + escapeHtml(operator) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        grid.parts.forEach(function (part) {
+          html += '<tr><th scope="row">' + escapeHtml(part) + '</th>';
+          grid.operators.forEach(function (operator) {
+            var count = 0;
+            grid.cells.some(function (cell) {
+              if (cell.part === part && cell.operator === operator) { count = cell.count; return true; }
+              return false;
+            });
+            var flagged = !!bad[part + '\u0000' + operator];
+            html += '<td class="' + (flagged ? 'bad' : '') + '" aria-label="Part ' + escapeHtml(part) + ', operator ' + escapeHtml(operator) + ', ' + count + ' readings">' + count + '</td>';
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        host.innerHTML = html;
+      }
+      function paintSetup() {
+        writeSpec('setup');
+        var tolerance = Engine.readTolerance(currentSpec());
+        el('setup-spec').textContent = tolerance.message || (tolerance.valid ? 'Tolerance width ' + fmt(tolerance.width) + '.' : 'Leave both limits blank to omit %Tolerance.');
+        if (!table) {
+          el('setup-status').textContent = 'No worksheet range is loaded.';
+          el('setup-errors').innerHTML = '';
+          el('setup-grid').innerHTML = '';
+          return;
+        }
+        var prepared = preview();
+        var bits = [];
+        if (prepared && prepared.grid) {
+          bits.push(prepared.grid.parts.length + ' parts');
+          bits.push(prepared.grid.operators.length + ' operators');
+          bits.push((prepared.grid.repeats == null ? 'uneven' : prepared.grid.repeats) + ' repeats per cell');
+          bits.push((prepared.readings || 0) + ' complete readings');
+        }
+        el('setup-status').textContent = bits.join(', ') + (prepared && prepared.ok ? '. The design is balanced.' : '.');
+        el('setup-errors').innerHTML = (prepared && prepared.errors || []).map(function (issue) {
+          return '<p class="gage-error">' + escapeHtml(issue.message) + '</p>';
+        }).join('');
+        paintGrid(prepared);
+      }
+      function run() {
+        readMap();
+        readSpec('setup');
+        if (!table) {
+          el('host-error').hidden = false;
+          el('host-error').textContent = 'Load a worksheet range or the demo data first.';
+          return;
+        }
+        el('host-error').hidden = true;
+        selection = null;
+        last = Engine.analyze(table, mapping, currentSpec());
+        hasRun = !!(last && last.ok);
+        if (!hasRun) {
+          paintSetup();
+          syncExport();
+          showView('setup');
+          return;
+        }
+        syncExport();
+        showView('overview');
+      }
+      function componentRows(role) {
+        return (last.components || []).filter(function (row) { return row.role === role; });
+      }
+      function paintOverview() {
+        var empty = el('overview-empty');
+        var body = el('overview-body');
+        if (!ready()) {
+          empty.hidden = false;
+          body.hidden = true;
+          return;
+        }
+        empty.hidden = true;
+        body.hidden = false;
+        writeSpec('overview');
+        var tolerance = last.tolerance;
+        el('overview-spec').textContent = tolerance.message || (tolerance.valid ? '%Tolerance uses width ' + fmt(tolerance.width) + '. Editing the limits does not refit the ANOVA.' : '');
+        var gage = Engine.component(last, 'gage');
+        el('overview-metrics').innerHTML = [
+          ['Total Gage R&R, % study variation', fmt(gage.pctStudy)],
+          ['%Tolerance', tolerance.valid ? fmt(gage.pctTolerance) : 'unavailable'],
+          ['Distinct categories', last.distinctCategories.value == null ? 'unavailable' : String(last.distinctCategories.value)]
+        ].map(function (pair) {
+          return '<article class="metric"><span>' + pair[0] + '</span><b>' + escapeHtml(pair[1]) + '</b></article>';
+        }).join('');
+        var leaves = componentRows('component');
+        function bars(title, field) {
+          var html = '<h3 style="font-size:13px;margin:0 0 6px;">' + title + '</h3>';
+          leaves.forEach(function (row) {
+            var value = row[field];
+            var width = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+            html += '<div class="bar-line"><span>' + escapeHtml(row.label) + '</span><span class="track"><span class="fill ' + (row.id === 'part' ? 'part' : '') + '" style="width:' + width + '%"></span></span><span>' + (Number.isFinite(value) ? fmt(value) : 'unavailable') + '</span></div>';
+          });
+          return html;
+        }
+        el('overview-chart').innerHTML = '<div class="bars">' + bars('%Contribution of variance', 'pctContribution') + bars('%Study variation', 'pctStudy') + '</div><p class="gage-note">Bars are the components that add to total variation. Total Gage R&amp;R and Reproducibility are sums, so they are not drawn again.</p>';
+        var showTol = tolerance.valid;
+        var head = '<tr><th scope="col">Source</th><th scope="col">Variance</th><th scope="col">SD</th><th scope="col">Study variation (6 × SD)</th><th scope="col">%Contribution</th><th scope="col">%Study variation</th>' + (showTol ? '<th scope="col">%Tolerance</th>' : '') + '</tr>';
+        var bodyRows = last.components.map(function (row) {
+          var cls = row.role === 'component' ? 'component' : 'parent';
+          return '<tr class="' + cls + '"><th scope="row">' + escapeHtml(row.label) + (row.note ? ' <span class="info-dot" tabindex="0" data-tip="' + escapeHtml(row.note) + '">i</span>' : '') + '</th><td>' + fmt(row.variance) + '</td><td>' + fmt(row.sd) + '</td><td>' + fmt(row.studyVar) + '</td><td>' + fmt(row.pctContribution) + '</td><td>' + fmt(row.pctStudy) + '</td>' + (showTol ? '<td>' + fmt(row.pctTolerance) + '</td>' : '') + '</tr>';
+        }).join('');
+        el('overview-table').innerHTML = '<div class="table-wrap"><table><caption class="gage-note">Variance components. Indented rows are the parts of the bold sum above them.</caption><thead>' + head + '</thead><tbody>' + bodyRows + '</tbody></table></div>';
+        el('overview-notes').textContent = [].concat(last.notes || [], last.distinctCategories.reason ? [last.distinctCategories.reason] : []).filter(function (note, index, all) {
+          return note && all.indexOf(note) === index;
+        }).join(' ');
+      }
+      function selectionKey(part, operator) { return encodeURIComponent(part) + '|' + encodeURIComponent(operator); }
+      function chartSvg(title, panels, yOf, yLimits, yTitle) {
+        var width = 640;
+        var height = 220;
+        var left = 48;
+        var right = 12;
+        var top = 16;
+        var bottom = 36;
+        var values = [];
+        panels.forEach(function (panel) { panel.points.forEach(function (point) { values.push(yOf(point)); }); });
+        if (yLimits) values.push(yLimits.lcl, yLimits.center, yLimits.ucl);
+        var min = Math.min.apply(null, values);
+        var max = Math.max.apply(null, values);
+        if (!(max > min)) { max = min + 1; }
+        var pad = (max - min) * 0.12;
+        min -= pad;
+        max += pad;
+        function y(value) { return top + (max - value) / (max - min) * (height - top - bottom); }
+        var svg = '<svg class="gage-chart" viewBox="0 0 ' + width + ' ' + height + '" role="group" aria-label="' + escapeHtml(title) + '">';
+        svg += '<text x="' + left + '" y="12" fill="currentColor" font-size="12" font-weight="700">' + escapeHtml(title) + '</text>';
+        if (yLimits) {
+          [yLimits.lcl, yLimits.center, yLimits.ucl].forEach(function (limit, index) {
+            svg += '<line x1="' + left + '" y1="' + y(limit) + '" x2="' + (width - right) + '" y2="' + y(limit) + '" stroke="' + (index === 1 ? '#94a3b8' : '#f43f5e') + '" stroke-dasharray="' + (index === 1 ? '0' : '4 3') + '" />';
+          });
+        }
+        panels.forEach(function (panel, panelIndex) {
+          var slot = (width - left - right) / panels.length;
+          var x0 = left + panelIndex * slot;
+          svg += '<text x="' + (x0 + 8) + '" y="28" fill="currentColor" font-size="11" font-weight="700">' + escapeHtml(panel.label) + '</text>';
+          panel.points.forEach(function (point, index) {
+            var x = x0 + 16 + (panel.points.length === 1 ? slot / 2 : index * ((slot - 28) / Math.max(1, panel.points.length - 1)));
+            var key = selectionKey(point.part, point.operator);
+            var selected = selection && selection.part === point.part && selection.operator === point.operator;
+            var label = 'Part ' + point.part + ', operator ' + point.operator + ', ' + yTitle + ' ' + fmt(yOf(point));
+            svg += '<circle class="gage-point' + (selected ? ' is-selected' : '') + '" data-key="' + key + '" data-part="' + escapeHtml(point.part) + '" data-operator="' + escapeHtml(point.operator) + '" cx="' + x + '" cy="' + y(yOf(point)) + '" r="' + (selected ? 6 : 4.5) + '" fill="' + (point.beyond ? '#f43f5e' : '#38bdf8') + '" tabindex="0" role="button" aria-label="' + escapeHtml(label) + '" aria-pressed="' + (selected ? 'true' : 'false') + '"><title>' + escapeHtml(label) + '</title></circle>';
+            svg += '<text x="' + x + '" y="' + (height - 14) + '" text-anchor="middle" fill="currentColor" font-size="9">' + escapeHtml(point.part) + '</text>';
+          });
+        });
+        svg += '</svg>';
+        return svg;
+      }
+      function paintDetail() {
+        var host = el('diag-detail');
+        if (!selection || !ready()) {
+          host.hidden = true;
+          host.innerHTML = '';
+          return;
+        }
+        var cell = Engine.cellDetail(last, selection.part, selection.operator);
+        if (!cell) {
+          host.hidden = true;
+          return;
+        }
+        var readings = cell.values.map(function (value, index) {
+          return fmt(value) + ' (row ' + cell.sourceRows[index] + ')';
+        }).join(', ');
+        host.hidden = false;
+        host.innerHTML = '<div><b>Part ' + escapeHtml(cell.part) + ' × Operator ' + escapeHtml(cell.operator) + '</b><div>Readings ' + escapeHtml(readings) + '</div><div>Mean ' + fmt(cell.mean) + ', range ' + fmt(cell.range) + '</div></div><button type="button" id="clear-selection">Clear selection</button>';
+        el('clear-selection').addEventListener('click', function () {
+          selection = null;
+          paintDiagnostics();
+        });
+      }
+      function paintDiagnostics() {
+        var empty = el('diag-empty');
+        var body = el('diag-body');
+        if (!ready()) {
+          empty.hidden = false;
+          body.hidden = true;
+          return;
+        }
+        empty.hidden = true;
+        body.hidden = false;
+        var factors = last.charts.constants;
+        el('diag-limits').textContent = factors.available
+          ? 'R̄ = ' + fmt(last.charts.rBar) + '. R limits ' + fmt(last.charts.rLimits.lcl) + ' to ' + fmt(last.charts.rLimits.ucl) + '. X̄ center ' + fmt(last.charts.xBarCenter) + ', limits ' + fmt(last.charts.xLimits.lcl) + ' to ' + fmt(last.charts.xLimits.ucl) + '.'
+          : factors.message;
+        var operators = last.design.operatorLabels;
+        function panels(beyondName) {
+          return operators.map(function (operator) {
+            return {
+              label: operator,
+              points: last.charts.points.filter(function (point) { return point.operator === operator; }).map(function (point) {
+                return { part: point.part, operator: point.operator, mean: point.mean, range: point.range, beyond: point[beyondName] };
+              })
+            };
+          });
+        }
+        var interaction = '<svg class="gage-chart" viewBox="0 0 640 220" role="group" aria-label="Part by operator interaction">';
+        var parts = last.design.partLabels;
+        var means = last.charts.points.map(function (point) { return point.mean; });
+        var min = Math.min.apply(null, means);
+        var max = Math.max.apply(null, means);
+        if (!(max > min)) max = min + 1;
+        var pad = (max - min) * 0.12;
+        min -= pad;
+        max += pad;
+        function x(index) { return 48 + (parts.length === 1 ? 280 : index * (560 / (parts.length - 1))); }
+        function y(value) { return 16 + (max - value) / (max - min) * 160; }
+        var colors = ['#38bdf8', '#f59e0b', '#a78bfa', '#34d399', '#fb7185', '#facc15'];
+        operators.forEach(function (operator, series) {
+          var path = '';
+          parts.forEach(function (part, index) {
+            var point = last.charts.points.filter(function (item) { return item.part === part && item.operator === operator; })[0];
+            if (!point) return;
+            path += (path ? ' L ' : 'M ') + x(index) + ' ' + y(point.mean);
+          });
+          interaction += '<path d="' + path + '" fill="none" stroke="' + colors[series % colors.length] + '" stroke-width="2" />';
+          parts.forEach(function (part, index) {
+            var point = last.charts.points.filter(function (item) { return item.part === part && item.operator === operator; })[0];
+            if (!point) return;
+            var selected = selection && selection.part === part && selection.operator === operator;
+            var label = 'Part ' + part + ', operator ' + operator + ', mean ' + fmt(point.mean);
+            interaction += '<circle class="gage-point' + (selected ? ' is-selected' : '') + '" data-part="' + escapeHtml(part) + '" data-operator="' + escapeHtml(operator) + '" cx="' + x(index) + '" cy="' + y(point.mean) + '" r="' + (selected ? 6 : 4.5) + '" fill="' + colors[series % colors.length] + '" tabindex="0" role="button" aria-label="' + escapeHtml(label) + '" aria-pressed="' + (selected ? 'true' : 'false') + '"></circle>';
+          });
+        });
+        parts.forEach(function (part, index) {
+          interaction += '<text x="' + x(index) + '" y="208" text-anchor="middle" fill="currentColor" font-size="11">' + escapeHtml(part) + '</text>';
+        });
+        interaction += '<text x="48" y="12" fill="currentColor" font-size="12" font-weight="700">Part × Operator</text></svg>';
+        el('diag-charts').innerHTML =
+          '<div class="gage-card">' + chartSvg('R chart by operator', panels('beyondR'), function (point) { return point.range; }, last.charts.rLimits, 'range') + '</div>' +
+          '<div class="gage-card">' + chartSvg('X̄ chart by operator', panels('beyondX'), function (point) { return point.mean; }, last.charts.xLimits, 'mean') + '</div>' +
+          '<div class="gage-card wide">' + interaction + '</div>';
+        paintDetail();
+      }
+      function selectPoint(part, operator) {
+        selection = { part: part, operator: operator };
+        paintDiagnostics();
+      }
+      function anovaTable(title, tableModel) {
+        var rows = tableModel.rows.map(function (row) {
+          var f = row.pState === 'limit' ? 'limit' : fmt(row.f);
+          return '<tr><th scope="row">' + escapeHtml(row.source) + '</th><td>' + row.df + '</td><td>' + fmt(row.ss) + '</td><td>' + fmt(row.ms) + '</td><td title="' + escapeHtml(row.reason || '') + '">' + f + '</td><td title="' + escapeHtml(row.reason || '') + '">' + fmtP(row) + '</td><td>' + escapeHtml(row.denominator || '') + '</td></tr>';
+        }).join('');
+        return '<h3 style="font-size:13px;margin:12px 0 6px;">' + title + '</h3><div class="table-wrap"><table><thead><tr><th scope="col">Source</th><th scope="col">DF</th><th scope="col">SS</th><th scope="col">MS</th><th scope="col">F</th><th scope="col">p</th><th scope="col">Denominator</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+      }
+      function paintAnova() {
+        var empty = el('anova-empty');
+        var body = el('anova-body');
+        if (!ready()) {
+          empty.hidden = false;
+          body.hidden = true;
+          return;
+        }
+        empty.hidden = true;
+        body.hidden = false;
+        el('anova-decision').textContent = 'Selected model: ' + (last.anova.selected === 'pooled' ? 'interaction pooled with repeatability' : 'interaction retained') + '. ' + last.anova.decision;
+        var html = anovaTable('Full model, with interaction', last.anova.full);
+        if (last.anova.reduced) html += anovaTable('Reduced model, interaction pooled', last.anova.reduced);
+        el('anova-tables').innerHTML = html;
+        el('anova-report').textContent = Engine.reportText(last);
+      }
+      function onPointEvent(event) {
+        var node = event.target && event.target.closest ? event.target.closest('.gage-point') : null;
+        if (!node) return;
+        if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.type === 'keydown') event.preventDefault();
+        selectPoint(node.getAttribute('data-part'), node.getAttribute('data-operator'));
+      }
+      el('diag-charts').addEventListener('click', onPointEvent);
+      el('diag-charts').addEventListener('keydown', onPointEvent);
+
+      ['map-part', 'map-operator', 'map-measure'].forEach(function (id) {
+        el(id).addEventListener('change', function () {
+          invalidate();
+          paintSetup();
+        });
+      });
+      ['setup', 'overview'].forEach(function (prefix) {
+        ['lsl', 'usl'].forEach(function (field) {
+          el(prefix + '-' + field).addEventListener('input', function () {
+            readSpec(prefix);
+            writeSpec(prefix === 'setup' ? 'overview' : 'setup');
+            if (prefix === 'setup') paintSetup();
+            if (!ready()) return;
+            last = Engine.withTolerance(last, currentSpec());
+            if (view === 'overview') paintOverview();
+            if (view === 'anova') paintAnova();
+          });
+        });
+      });
+      el('run-btn').addEventListener('click', run);
+      el('close-btn').addEventListener('click', function () { post('close'); });
+      el('use-demo').addEventListener('click', function () { loadTable(Engine.demoTable(), 'demo'); });
+      el('use-selection').addEventListener('click', function () { post('useSelection'); });
+      el('pick-range').addEventListener('click', function () { post('pickRange'); });
+      el('refresh-data').addEventListener('click', function () { post('refreshData'); });
+      el('aboutModuleSetup').addEventListener('click', function () {
+        var open = function () {
+          if (window.StatisticoModuleGuide) StatisticoModuleGuide.toggle('gage-rr');
+        };
+        if (window.StatisticoHeader && typeof StatisticoHeader._ensureModuleGuideScript === 'function') {
+          StatisticoHeader._ensureModuleGuideScript(open);
+        } else open();
+      });
+      window.setDecimalPrecision = function () {
+        if (view === 'overview') paintOverview();
+        if (view === 'diagnostics') paintDiagnostics();
+        if (view === 'anova') paintAnova();
+      };
+      window.buildAIPayload = function () {
+        if (!ready()) return { view: view, analyzed: false };
+        return {
+          view: view,
+          analyzed: true,
+          method: last.method,
+          design: last.design,
+          decision: last.anova.decision,
+          selectedModel: last.anova.selected,
+          summary: {
+            pctStudy: last.summary.pctStudy,
+            pctTolerance: last.summary.pctTolerance,
+            distinctCategories: last.summary.distinctCategories
+          },
+          tolerance: last.tolerance,
+          notes: last.notes
+        };
+      };
+
+      function onParentMessage(arg) {
+        var msg;
+        try { msg = JSON.parse(arg.message || '{}'); } catch (e) { return; }
+        if (msg.type === 'GAGE_RR_DATA') {
+          var payload = msg.payload || {};
+          if (!payload.headers || !payload.headers.length || payload.source === 'empty') {
+            el('data-note').textContent = 'No worksheet range is loaded. Use the Excel selection, pick a range, or open the demo data.';
+            return;
+          }
+          loadTable({ headers: payload.headers, rows: payload.rows || [], address: payload.address || '' }, 'worksheet');
+          return;
+        }
+        if (msg.type === 'GAGE_RR_ERROR') {
+          el('host-error').hidden = false;
+          el('host-error').textContent = msg.message || 'The worksheet range could not be read.';
+        }
+      }
+      function boot() {
+        window.__gageView = 'setup';
+        window.__gageFitted = false;
+        if (window.StatisticoHeader && typeof StatisticoHeader.init === 'function') {
+          StatisticoHeader.init('gage-setup', 'Measurement', 0, 'gage-rr');
+          StatisticoHeader.initSidebarPage();
+        }
+        syncExport();
+        showView('setup');
+        if (/(?:^|[?&])demo=1(?:&|$)/.test(window.location.search || '') || typeof Office === 'undefined' || !Office.context || !Office.context.ui) {
+          loadTable(Engine.demoTable(), 'demo');
+          return;
+        }
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage);
+        post('ready');
+      }
+      if (typeof Office !== 'undefined' && Office.onReady) Office.onReady(boot);
+      else boot();
+    })();
+  </script>
+</body>
+</html>

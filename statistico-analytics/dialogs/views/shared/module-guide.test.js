@@ -118,7 +118,7 @@ const REQUIRED = ['does', 'when', 'data', 'works', 'obtain', 'cautions', 'other'
 const MODULES = [
   'univariate', 'correlations', 'contingency', 'independent', 'dependent', 'anova',
   'regression', 'logistic', 'mixed-model', 'factor', 'pca', 'reliability', 'cluster',
-  'meta-analysis', 'power', 'capability'
+  'meta-analysis', 'power', 'capability', 'gage-rr'
 ];
 
 describe('Univariate module guide', () => {

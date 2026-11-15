@@ -1197,6 +1197,24 @@ function hubLaunchStillCurrent(launchEpoch) {
   return window.StatisticoHubFamily.shouldApplyLaunchResult(launchEpoch, HUB_NAV_EPOCH);
 }
 
+function revealHubFamilyCard(id) {
+  var body = document.getElementById("hub-family-body-" + id);
+  var card = body && body.closest(".hub-family-card");
+  var scroller = document.getElementById("hubScrollBody");
+  if (!card || !scroller) return;
+  var cardRect = card.getBoundingClientRect();
+  var viewRect = scroller.getBoundingClientRect();
+  var pad = 8;
+  if (cardRect.height <= viewRect.height - pad) {
+    var below = cardRect.bottom - (viewRect.bottom - pad);
+    var above = viewRect.top - cardRect.top;
+    if (below > 0) scroller.scrollTop += below;
+    else if (above > 0) scroller.scrollTop -= above;
+    return;
+  }
+  scroller.scrollTop += cardRect.top - viewRect.top;
+}
+
 function toggleHubFamilyCard(id) {
   var body = document.getElementById("hub-family-body-" + id);
   var btn = document.querySelector('.hub-family-toggle[aria-controls="hub-family-body-' + id + '"]');
@@ -1215,6 +1233,7 @@ function toggleHubFamilyCard(id) {
       if (helpBtn) helpBtn.setAttribute("aria-expanded", "false");
     });
     body.removeAttribute("hidden");
+    requestAnimationFrame(function () { revealHubFamilyCard(id); });
   } else {
     body.setAttribute("hidden", "");
   }

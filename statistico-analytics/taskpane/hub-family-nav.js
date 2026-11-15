@@ -17,43 +17,109 @@
   var HOME_FAMILIES = [
     {
       id: "explore",
-      label: "Explore data",
-      description: "Summarize variables and find patterns and relationships.",
+      label: "Explore & summarize",
+      tagline: "See what’s in your data.",
+      help: "Start with Univariate for one variable or Correlations for associations. Use PCA or Factor Analysis to study patterns across variables, and clustering to group similar observations.",
       icon: "fa-chart-bar",
-      moduleIds: ["univariate", "correlations", "pca", "factor"]
+      accent: "explore",
+      modules: [
+        { id: "univariate", label: "Univariate" },
+        { id: "correlations", label: "Correlations" },
+        { id: "pca", label: "PCA" },
+        { id: "factor", label: "Factor Analysis" },
+        { id: "hierarchical", label: "Hierarchical Clustering" },
+        { id: "kmeans", label: "K-means" }
+      ]
     },
     {
       id: "compare",
       label: "Compare groups & conditions",
-      description: "Compare independent groups, paired data, or repeated measurements.",
+      tagline: "Check whether groups or measurements differ.",
+      help: "Use independent groups for different people or units, and paired or repeated measures for the same subjects. Use contingency tables for categorical counts.",
       icon: "fa-scale-balanced",
-      moduleIds: ["independent", "anova", "dependent"]
+      accent: "compare",
+      modules: [
+        { id: "independent", label: "Independent Groups" },
+        { id: "dependent", label: "Paired / Repeated Measures" },
+        { id: "anova", label: "ANOVA" },
+        { id: "contingency", label: "Contingency Tables" }
+      ]
     },
     {
       id: "model",
       label: "Model outcomes",
-      description: "Estimate effects and predict numeric or binary outcomes.",
+      tagline: "Estimate effects and make predictions.",
+      help: "Choose linear regression for a numeric outcome and logistic regression for a binary outcome. Choose a mixed model when numeric observations are grouped or repeated.",
       icon: "fa-chart-line",
-      moduleIds: ["regression", "logistic", "mixed"]
+      accent: "model",
+      modules: [
+        { id: "regression", label: "Linear Regression" },
+        { id: "logistic", label: "Logistic Regression" },
+        { id: "mixed", label: "Mixed Models" }
+      ]
     }
   ];
 
   var MORE_TOOLS = [
     {
-      id: "power",
-      label: "Power & Sample Size",
-      description: "Plan a study or check its power.",
-      icon: "fa-bolt",
-      direct: true,
-      moduleIds: ["calc-power"]
+      id: "planning",
+      label: "Calculators & study planning",
+      tagline: "Plan a study, explore probability, or size staffing.",
+      help: "Power planning, precision, and probability calculators can begin with assumptions. Use the call-center calculator for staffing and service-level questions.",
+      icon: "fa-calculator",
+      accent: "planning",
+      modules: [
+        { id: "calc-power", label: "Power & Sample Size" },
+        { id: "calc-precision", label: "Precision Planning" },
+        { id: "calc-distribution-hub", label: "Probability Distributions" },
+        { id: "calc-erlang", label: "Call Center Staffing" }
+      ]
     },
     {
       id: "quality",
-      label: "Quality & Process Improvement",
-      description: "Prioritize issues and assess process or measurement performance.",
-      icon: "fa-industry",
-      moduleIds: ["pareto2080", "process-settings", "capability-range", "gage-rr"]
+      label: "Quality & process improvement",
+      tagline: "Prioritize problems and assess process performance.",
+      help: "Start with Pareto to identify the largest contributors. Use Gage R&R to assess the measurement system, capability to compare a process with specifications, and optimization to compare candidate settings.",
+      icon: "fa-sliders",
+      accent: "quality",
+      modules: [
+        { id: "pareto2080", label: "Pareto Analysis" },
+        { id: "process-settings", label: "Process Optimization" },
+        { id: "gage-rr", label: "Gage R&R" },
+        { id: "capability-range", label: "Process Capability" }
+      ]
+    },
+    {
+      id: "survey",
+      label: "Survey analysis",
+      tagline: "See what separates groups and check multi-item scales.",
+      help: "Use Split Index to see which factors differentiate two respondent groups. Use scale reliability to assess consistency among items intended to measure the same construct.",
+      icon: "fa-list-check",
+      accent: "survey",
+      modules: [
+        { id: "split-index", label: "Split Index" },
+        { id: "reliability", label: "Scale Reliability" }
+      ]
+    },
+    {
+      id: "utilities",
+      label: "Data & reporting tools",
+      tagline: "Prepare data, make charts, and share results.",
+      help: "Use Prepare Data before analysis, 3D Charts to visualize data, and Publication Tables or EzPaste to share outputs.",
+      icon: "fa-wrench",
+      accent: "utilities",
+      modules: [
+        { id: "prepare-data", label: "Prepare Data" },
+        { id: "multivariable", label: "3D Charts" },
+        { id: "publication-tables", label: "Publication Tables" },
+        { id: "ezpaste-open", label: "EzPaste" }
+      ]
     }
+  ];
+
+  var LAUNCHER_SECTIONS = [
+    { id: "analysis", label: "Statistical analysis", familyIds: ["explore", "compare", "model"] },
+    { id: "tools", label: "Planning, quality & utilities", familyIds: ["planning", "quality", "survey", "utilities"] }
   ];
 
   function escapeHtml(value) {
@@ -68,43 +134,73 @@
     return String(value || "").replace(/[^a-zA-Z0-9_-]/g, "");
   }
 
+  function allFamilySpecs() {
+    return HOME_FAMILIES.concat(MORE_TOOLS);
+  }
+
   function getFamilySpec(id) {
-    var all = HOME_FAMILIES.concat(MORE_TOOLS);
+    var all = allFamilySpecs();
     for (var i = 0; i < all.length; i++) {
       if (all[i].id === id) return all[i];
     }
     return null;
   }
 
-  function visibleModuleIds(spec, catalog) {
-    var ids = [];
-    (spec.moduleIds || []).forEach(function (id) {
-      var row = catalog && catalog[id];
-      if (!row || row.hidden) return;
-      ids.push(id);
+  function specModules(spec) {
+    return (spec.modules || []).map(function (entry) {
+      if (typeof entry === "string") return { id: entry, label: entry };
+      return { id: entry.id, label: entry.label || entry.id };
     });
-    return ids;
+  }
+
+  function visibleModules(spec, catalog) {
+    var modules = [];
+    specModules(spec).forEach(function (entry) {
+      var row = catalog && catalog[entry.id];
+      if (!row || row.hidden) return;
+      modules.push({
+        id: entry.id,
+        label: entry.label,
+        locked: !!row.locked,
+        comingSoon: !!row.comingSoon
+      });
+    });
+    return modules;
   }
 
   function packFamily(spec, catalog) {
+    var modules = visibleModules(spec, catalog);
     return {
       id: spec.id,
       label: spec.label,
-      description: spec.description,
+      description: spec.tagline || "",
+      tagline: spec.tagline || "",
+      help: spec.help || "",
       icon: spec.icon,
+      accent: spec.accent || spec.id,
       direct: !!spec.direct,
-      moduleIds: visibleModuleIds(spec, catalog)
+      moduleIds: modules.map(function (mod) { return mod.id; }),
+      modules: modules
     };
   }
 
   function buildNavigationModel(catalog) {
+    var packed = {};
+    allFamilySpecs().forEach(function (spec) {
+      var family = packFamily(spec, catalog);
+      if (family.moduleIds.length) packed[family.id] = family;
+    });
+    var sections = LAUNCHER_SECTIONS.map(function (section) {
+      return {
+        id: section.id,
+        label: section.label,
+        families: section.familyIds.map(function (id) { return packed[id]; }).filter(Boolean)
+      };
+    }).filter(function (section) { return section.families.length > 0; });
     return {
-      families: HOME_FAMILIES.map(function (spec) {
-        return packFamily(spec, catalog);
-      }).filter(function (family) { return family.moduleIds.length > 0; }),
-      more: MORE_TOOLS.map(function (spec) {
-        return packFamily(spec, catalog);
-      }).filter(function (family) { return family.moduleIds.length > 0; })
+      sections: sections,
+      families: HOME_FAMILIES.map(function (spec) { return packed[spec.id]; }).filter(Boolean),
+      more: MORE_TOOLS.map(function (spec) { return packed[spec.id]; }).filter(Boolean)
     };
   }
 
@@ -154,38 +250,45 @@
     );
   }
 
-  function renderHomeHtml(model, error) {
-    var families = (model && model.families) || [];
-    var more = (model && model.more) || [];
-    var html = '<h2 class="hub-family-heading" id="hubFamilyHeading">Choose an analysis</h2>';
-    html += errorHtml(error);
-    html += '<div class="hub-family-list">';
-    families.forEach(function (family) {
-      html += rowHtml({
-        familyId: family.id,
-        label: family.label,
-        description: family.description,
-        icon: family.icon,
-        onclick: "openHubFamily('" + jsId(family.id) + "')"
-      });
-    });
+  function cardHtml(family) {
+    var id = jsId(family.id);
+    var helpId = "hub-family-help-" + id;
+    var html = '<section class="hub-family-card" data-family="' + escapeHtml(family.accent || family.id) + '">';
+    html += '<div class="hub-family-card-head">';
+    html += '<span class="hub-family-icon">' + iconHtml(family.icon) + "</span>";
+    html += '<span class="hub-family-copy">';
+    html += '<span class="hub-family-title">' + escapeHtml(family.label) + "</span>";
+    html += '<span class="hub-family-desc">' + escapeHtml(family.tagline || "") + "</span>";
+    html += "</span>";
+    html += '<button type="button" class="hub-family-info" aria-label="About ' + escapeHtml(family.label) + '" aria-controls="' + helpId + '" aria-expanded="false" onclick="toggleHubFamilyHelp(\'' + id + '\')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>';
     html += "</div>";
-    if (more.length) {
-      html += '<div class="hub-family-more">More tools</div><div class="hub-family-list">';
-      more.forEach(function (family) {
-        var onclick = family.direct
-          ? "openHubPower()"
-          : "openHubFamily('" + jsId(family.id) + "')";
-        html += rowHtml({
-          familyId: family.id,
-          label: family.label,
-          description: family.description,
-          icon: family.icon,
-          onclick: onclick
-        });
+    html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(family.help || "") + "</p>";
+    html += '<div class="hub-family-modules">';
+    (family.modules || []).forEach(function (mod) {
+      var badges = "";
+      if (mod.comingSoon) badges += ' <span class="soon-badge">Soon</span>';
+      if (mod.locked) badges += ' <span class="plan-badge">Professional</span>';
+      html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '" onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
+      html += "<span>" + escapeHtml(mod.label) + badges + "</span>";
+      html += '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
+      html += "</button>";
+    });
+    html += "</div></section>";
+    return html;
+  }
+
+  function renderHomeHtml(model, error) {
+    var sections = (model && model.sections) || [];
+    var html = '<h2 class="hub-family-heading" id="hubFamilyHeading">Choose an analysis or tool</h2>';
+    html += errorHtml(error);
+    sections.forEach(function (section) {
+      html += '<h3 class="hub-launcher-section">' + escapeHtml(section.label) + "</h3>";
+      html += '<div class="hub-launcher-stack">';
+      (section.families || []).forEach(function (family) {
+        html += cardHtml(family);
       });
       html += "</div>";
-    }
+    });
     return html;
   }
 
@@ -195,7 +298,7 @@
     var html =
       '<button type="button" class="hub-family-back" id="hubFamilyBack" onclick="closeHubFamily()">← All families</button>' +
       '<h2 class="hub-family-heading" id="hubFamilyHeading">' + escapeHtml(meta.label) + "</h2>" +
-      (meta.description ? '<p class="hub-family-lead">' + escapeHtml(meta.description) + "</p>" : "") +
+      ((meta.tagline || meta.description) ? '<p class="hub-family-lead">' + escapeHtml(meta.tagline || meta.description) + "</p>" : "") +
       errorHtml(error);
     if (!list.length) {
       html += '<p class="hub-family-empty">No modules are available in this family</p>';

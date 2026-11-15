@@ -9,50 +9,67 @@ function catalog(ids, extra) {
 }
 
 const ALL = [
-  "univariate", "correlations", "pca", "factor",
-  "independent", "anova", "dependent",
+  "univariate", "correlations", "pca", "factor", "hierarchical", "kmeans",
+  "independent", "dependent", "anova", "contingency",
   "regression", "logistic", "mixed",
-  "calc-power", "pareto2080", "process-settings", "capability-range", "gage-rr"
+  "calc-power", "calc-precision", "calc-distribution-hub", "calc-erlang",
+  "pareto2080", "process-settings", "gage-rr", "capability-range",
+  "split-index", "reliability",
+  "prepare-data", "multivariable", "publication-tables", "ezpaste-open"
 ];
 
 describe("family home catalog", () => {
-  test("shows the three analysis families, then Power and Quality", () => {
+  test("groups analysis first, then planning, quality, survey, and reporting", () => {
     const model = family.buildNavigationModel(catalog(ALL));
-    expect(model.families.map(function (row) { return row.label; })).toEqual([
-      "Explore data",
-      "Compare groups & conditions",
-      "Model outcomes"
+    expect(model.sections.map(function (section) { return section.label; })).toEqual([
+      "Statistical analysis",
+      "Planning, quality & utilities"
     ]);
-    expect(model.more.map(function (row) { return row.id; })).toEqual(["power", "quality"]);
-    expect(model.families[0].moduleIds).toEqual(["univariate", "correlations", "pca", "factor"]);
-    expect(model.families[1].moduleIds).toEqual(["independent", "anova", "dependent"]);
-    expect(model.families[2].moduleIds).toEqual(["regression", "logistic", "mixed"]);
-    expect(model.more[1].moduleIds).toEqual(["pareto2080", "process-settings", "capability-range", "gage-rr"]);
+    expect(model.sections[0].families.map(function (row) { return row.id; })).toEqual([
+      "explore", "compare", "model"
+    ]);
+    expect(model.sections[1].families.map(function (row) { return row.id; })).toEqual([
+      "planning", "quality", "survey", "utilities"
+    ]);
+    expect(model.sections[0].families[0].moduleIds).toEqual([
+      "univariate", "correlations", "pca", "factor", "hierarchical", "kmeans"
+    ]);
+    expect(model.sections[0].families[1].moduleIds).toEqual([
+      "independent", "dependent", "anova", "contingency"
+    ]);
+    expect(model.sections[0].families[2].moduleIds).toEqual(["regression", "logistic", "mixed"]);
+    expect(model.sections[1].families[1].moduleIds).toEqual([
+      "pareto2080", "process-settings", "gage-rr", "capability-range"
+    ]);
+    expect(model.sections[1].families[2].moduleIds).toEqual(["split-index", "reliability"]);
   });
 
   test("omits a family that has no displayable modules", () => {
     const source = catalog(ALL);
-    ["univariate", "correlations", "pca", "factor"].forEach(function (id) {
+    ["univariate", "correlations", "pca", "factor", "hierarchical", "kmeans"].forEach(function (id) {
       source[id].hidden = true;
     });
     const model = family.buildNavigationModel(source);
-    expect(model.families.map(function (row) { return row.id; })).toEqual(["compare", "model"]);
+    expect(model.sections[0].families.map(function (row) { return row.id; })).toEqual(["compare", "model"]);
   });
 
-  test("keeps a locked module and drops Quality when none of its modules are in the catalog", () => {
+  test("keeps a locked module and drops Survey when none of its modules are in the catalog", () => {
     const source = catalog(["univariate", "independent", "regression", "calc-power"], {
       regression: { locked: true }
     });
     const model = family.buildNavigationModel(source);
-    expect(model.families.map(function (row) { return row.id; })).toEqual(["explore", "compare", "model"]);
-    expect(model.families[2].moduleIds).toEqual(["regression"]);
-    expect(model.more.map(function (row) { return row.id; })).toEqual(["power"]);
+    expect(model.sections[0].families.map(function (row) { return row.id; })).toEqual(["explore", "compare", "model"]);
+    expect(model.sections[0].families[2].moduleIds).toEqual(["regression"]);
+    expect(model.sections[0].families[2].modules[0].locked).toBe(true);
+    expect(model.sections[1].families.map(function (row) { return row.id; })).toEqual(["planning"]);
   });
 
-  test("Quality stays when only one of its modules is available", () => {
-    const model = family.buildNavigationModel(catalog(["univariate", "gage-rr"]));
-    expect(model.more.map(function (row) { return row.id; })).toEqual(["quality"]);
-    expect(model.more[0].moduleIds).toEqual(["gage-rr"]);
+  test("Survey stays when only Split Index is available", () => {
+    const model = family.buildNavigationModel(catalog(["univariate", "split-index"]));
+    const tools = model.sections[1].families;
+    expect(tools.map(function (row) { return row.id; })).toEqual(["survey"]);
+    expect(tools[0].moduleIds).toEqual(["split-index"]);
+    expect(tools[0].modules[0].label).toBe("Split Index");
   });
 
   test("a late launch result is ignored after navigation moves on", () => {
@@ -64,19 +81,21 @@ describe("family home catalog", () => {
 describe("family home markup", () => {
   const model = family.buildNavigationModel(catalog(ALL));
 
-  test("home is a stack of full-row buttons under Choose an analysis", () => {
+  test("home shows family cards with module buttons and collapsed help", () => {
     const html = family.renderHomeHtml(model, null);
-    expect(html).toContain("Choose an analysis");
-    expect(html).toContain("More tools");
-    expect(html).toContain("Plan a study or check its power.");
-    expect(html).toContain('onclick="openHubPower()"');
-    expect(html.match(/<button type="button"/g)).toHaveLength(5);
-    expect(html).toContain("hub-family-title");
-    expect(html).toContain("hub-family-desc");
-    expect(html).not.toContain("white-space:nowrap");
-    expect(html.indexOf("Explore data")).toBeLessThan(html.indexOf("Compare groups"));
-    expect(html.indexOf("Compare groups")).toBeLessThan(html.indexOf("Model outcomes"));
-    expect(html.indexOf("Model outcomes")).toBeLessThan(html.indexOf("Power &amp; Sample Size"));
+    expect(html).toContain("Choose an analysis or tool");
+    expect(html).toContain("Statistical analysis");
+    expect(html).toContain("Planning, quality &amp; utilities");
+    expect(html).toContain("Explore &amp; summarize");
+    expect(html).toContain('onclick="launchHubFamilyModule(\'univariate\')"');
+    expect(html).toContain('onclick="launchHubFamilyModule(\'split-index\')"');
+    expect(html).toContain(">Split Index<");
+    expect(html).not.toContain("Survey Summaries");
+    expect(html).toContain('class="hub-family-help" id="hub-family-help-explore" hidden');
+    expect(html).toContain('onclick="toggleHubFamilyHelp(\'explore\')"');
+    expect(html.indexOf("Explore &amp; summarize")).toBeLessThan(html.indexOf("Compare groups"));
+    expect(html.indexOf("Model outcomes")).toBeLessThan(html.indexOf("Calculators &amp; study planning"));
+    expect(html.indexOf("Survey analysis")).toBeLessThan(html.indexOf("Data &amp; reporting tools"));
   });
 
   test("a family page lists only that family's catalog rows and can return home", () => {
@@ -87,11 +106,10 @@ describe("family home markup", () => {
     ], null);
     expect(html).toContain("← All families");
     expect(html).toContain("Model outcomes");
-    expect(html).toContain("Estimate effects and predict numeric or binary outcomes.");
+    expect(html).toContain("Estimate effects and make predictions.");
     expect(html).toContain("Linear Regression");
     expect(html).toContain('onclick="launchHubFamilyModule(\'regression\')"');
     expect(html).not.toContain("Univariate");
-    expect(html).toContain('type="button"');
   });
 
   test("an empty open family keeps All families and explains that nothing is available", () => {

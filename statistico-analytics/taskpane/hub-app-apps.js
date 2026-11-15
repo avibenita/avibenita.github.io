@@ -47,7 +47,27 @@
     ".hub-family-back{display:inline-flex;align-items:center;margin:0 0 8px;padding:4px 0;border:0;background:transparent;color:#93c5fd;font:inherit;font-size:12px;font-weight:700;cursor:pointer;}",
     ".hub-family-empty{margin:8px 2px;font-size:12.5px;line-height:1.45;color:#cbd5e1;}",
     ".hub-family-error{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;padding:8px 10px;border-radius:8px;background:rgba(239,68,68,.12);color:#fecaca;font-size:12px;line-height:1.4;}",
-    ".hub-family-error button{border:0;border-radius:7px;padding:4px 8px;background:#f4c84a;color:#1c1404;font-weight:700;cursor:pointer;}"
+    ".hub-family-error button{border:0;border-radius:7px;padding:4px 8px;background:#f4c84a;color:#1c1404;font-weight:700;cursor:pointer;}",
+    ".hub-launcher-section{margin:14px 2px 8px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;}",
+    ".hub-launcher-stack{display:flex;flex-direction:column;gap:10px;width:100%;min-width:0;}",
+    ".hub-family-card{--hub-family-accent:#94a3b8;border:1px solid color-mix(in srgb, var(--hub-family-accent) 42%, #334963);border-inline-start:3px solid var(--hub-family-accent);border-radius:10px;background:color-mix(in srgb, var(--hub-family-accent) 10%, #152033);padding:10px;min-width:0;}",
+    ".hub-family-card[data-family='explore']{--hub-family-accent:#2dd4bf;}",
+    ".hub-family-card[data-family='compare']{--hub-family-accent:#c4b5fd;}",
+    ".hub-family-card[data-family='model']{--hub-family-accent:#60a5fa;}",
+    ".hub-family-card[data-family='planning']{--hub-family-accent:#fbbf24;}",
+    ".hub-family-card[data-family='quality']{--hub-family-accent:#fb7185;}",
+    ".hub-family-card[data-family='survey']{--hub-family-accent:#fda4af;}",
+    ".hub-family-card[data-family='utilities']{--hub-family-accent:#cbd5e1;}",
+    ".hub-family-card-head{display:flex;align-items:flex-start;gap:8px;min-width:0;}",
+    ".hub-family-card .hub-family-icon{background:color-mix(in srgb, var(--hub-family-accent) 18%, transparent);color:var(--hub-family-accent);}",
+    ".hub-family-info{flex:0 0 auto;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--hub-family-accent);cursor:pointer;}",
+    ".hub-family-help{margin:8px 0 0;font-size:12px;line-height:1.45;color:#cbd5e1;}",
+    ".hub-family-help[hidden]{display:none !important;}",
+    ".hub-family-modules{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}",
+    ".hub-family-module{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;min-height:34px;padding:6px 8px;border:1px solid #334963;border-radius:6px;background:#1b2838;color:#f8fafc;text-align:left;cursor:pointer;font:inherit;font-size:12px;font-weight:650;line-height:1.25;}",
+    ".hub-family-module:hover{border-color:var(--hub-family-accent);background:color-mix(in srgb, var(--hub-family-accent) 14%, #1b2838);}",
+    ".hub-family-module span{min-width:0;overflow-wrap:anywhere;}",
+    ".hub-family-module i{flex:0 0 auto;font-size:10px;color:var(--hub-family-accent);}"
   ].join("");
   function apply() {
     var style = document.getElementById(STYLE_ID);
@@ -1166,6 +1186,16 @@ function renderFamilyNavigation() {
 function hubLaunchStillCurrent(launchEpoch) {
   if (HUB_USE_LEGACY_STRUCTURE || !window.StatisticoHubFamily || launchEpoch == null) return true;
   return window.StatisticoHubFamily.shouldApplyLaunchResult(launchEpoch, HUB_NAV_EPOCH);
+}
+
+function toggleHubFamilyHelp(id) {
+  var help = document.getElementById("hub-family-help-" + id);
+  var btn = document.querySelector('[aria-controls="hub-family-help-' + id + '"]');
+  if (!help) return;
+  var open = help.hasAttribute("hidden");
+  if (open) help.removeAttribute("hidden");
+  else help.setAttribute("hidden", "");
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
 function openHubFamily(id) {
@@ -4318,6 +4348,7 @@ window.toggleHubAccordion = toggleHubAccordion;
 window.toggleHubExpandAll = toggleHubExpandAll;
 window.runHubModuleAction = runHubModuleAction;
 window.setSelectedModuleCard = setSelectedModuleCard;
+window.toggleHubFamilyHelp = toggleHubFamilyHelp;
 window.openHubFamily = openHubFamily;
 window.closeHubFamily = closeHubFamily;
 window.openHubPower = openHubPower;

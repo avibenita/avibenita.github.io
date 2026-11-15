@@ -58,7 +58,11 @@
     ".hub-family-card[data-family='quality']{--hub-family-accent:#fb7185;}",
     ".hub-family-card[data-family='survey']{--hub-family-accent:#fda4af;}",
     ".hub-family-card[data-family='utilities']{--hub-family-accent:#cbd5e1;}",
-    ".hub-family-card-head{display:flex;align-items:flex-start;gap:8px;min-width:0;}",
+    ".hub-family-card-head{display:flex;align-items:center;gap:8px;min-width:0;}",
+    ".hub-family-toggle{flex:1 1 auto;display:flex;align-items:center;gap:8px;min-width:0;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;font:inherit;}",
+    ".hub-family-caret{flex:0 0 auto;font-size:11px;color:#94a3b8;transition:transform .16s ease;}",
+    ".hub-family-toggle[aria-expanded='true'] .hub-family-caret{transform:rotate(180deg);}",
+    ".hub-family-body[hidden]{display:none !important;}",
     ".hub-family-card .hub-family-icon{background:color-mix(in srgb, var(--hub-family-accent) 18%, transparent);color:var(--hub-family-accent);}",
     ".hub-family-info{flex:0 0 auto;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--hub-family-accent);cursor:pointer;}",
     ".hub-family-help{margin:8px 0 0;font-size:12px;line-height:1.45;color:#cbd5e1;}",
@@ -1189,9 +1193,21 @@ function hubLaunchStillCurrent(launchEpoch) {
   return window.StatisticoHubFamily.shouldApplyLaunchResult(launchEpoch, HUB_NAV_EPOCH);
 }
 
+function toggleHubFamilyCard(id) {
+  var body = document.getElementById("hub-family-body-" + id);
+  var btn = document.querySelector('[aria-controls="hub-family-body-' + id + '"]');
+  if (!body) return;
+  var open = body.hasAttribute("hidden");
+  if (open) body.removeAttribute("hidden");
+  else body.setAttribute("hidden", "");
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
 function toggleHubFamilyHelp(id) {
   var help = document.getElementById("hub-family-help-" + id);
   var btn = document.querySelector('[aria-controls="hub-family-help-' + id + '"]');
+  var body = document.getElementById("hub-family-body-" + id);
+  if (body && body.hasAttribute("hidden")) toggleHubFamilyCard(id);
   if (!help) return;
   var open = help.hasAttribute("hidden");
   if (open) help.removeAttribute("hidden");
@@ -4350,6 +4366,7 @@ window.toggleHubExpandAll = toggleHubExpandAll;
 window.runHubModuleAction = runHubModuleAction;
 window.setSelectedModuleCard = setSelectedModuleCard;
 window.toggleHubFamilyHelp = toggleHubFamilyHelp;
+window.toggleHubFamilyCard = toggleHubFamilyCard;
 window.openHubFamily = openHubFamily;
 window.closeHubFamily = closeHubFamily;
 window.openHubPower = openHubPower;

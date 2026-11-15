@@ -253,17 +253,20 @@
   function cardHtml(family) {
     var id = jsId(family.id);
     var helpId = "hub-family-help-" + id;
+    var bodyId = "hub-family-body-" + id;
     var html = '<section class="hub-family-card" data-family="' + escapeHtml(family.accent || family.id) + '">';
     html += '<div class="hub-family-card-head">';
+    html += '<button type="button" class="hub-family-toggle" aria-expanded="false" aria-controls="' + bodyId + '" onclick="toggleHubFamilyCard(\'' + id + '\')">';
     html += '<span class="hub-family-icon">' + iconHtml(family.icon) + "</span>";
-    html += '<span class="hub-family-copy">';
-    html += '<span class="hub-family-title">' + escapeHtml(family.label) + "</span>";
-    html += "</span>";
+    html += '<span class="hub-family-copy"><span class="hub-family-title">' + escapeHtml(family.label) + "</span></span>";
+    html += '<i class="fa-solid fa-chevron-down hub-family-caret" aria-hidden="true"></i>';
+    html += "</button>";
     html += '<button type="button" class="hub-family-info" aria-label="About ' + escapeHtml(family.label) + '" aria-controls="' + helpId + '" aria-expanded="false" onclick="toggleHubFamilyHelp(\'' + id + '\')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>';
     html += "</div>";
     var helpText = [family.tagline, family.help].filter(function (part, index, list) {
       return part && list.indexOf(part) === index;
     }).join(" ");
+    html += '<div class="hub-family-body" id="' + bodyId + '" hidden>';
     html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(helpText) + "</p>";
     html += '<div class="hub-family-modules">';
     (family.modules || []).forEach(function (mod) {
@@ -275,7 +278,7 @@
       html += '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
       html += "</button>";
     });
-    html += "</div></section>";
+    html += "</div></div></section>";
     return html;
   }
 

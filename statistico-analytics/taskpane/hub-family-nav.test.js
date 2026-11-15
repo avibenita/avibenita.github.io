@@ -95,7 +95,8 @@ describe("family home markup", () => {
     expect(html).toContain("See what’s in your data.");
     expect(html.indexOf("hub-family-title")).toBeLessThan(html.indexOf("See what’s in your data."));
     expect(html).toContain('title="Paired / Repeated Measures"');
-    expect(html).toContain('onclick="toggleHubFamilyHelp(\'explore\')"');
+    expect(html).toContain('aria-expanded="false" aria-controls="hub-family-body-explore"');
+    expect(html).toContain('class="hub-family-body" id="hub-family-body-explore" hidden');
     expect(html.indexOf("Explore &amp; summarize")).toBeLessThan(html.indexOf("Compare groups"));
     expect(html.indexOf("Model outcomes")).toBeLessThan(html.indexOf("Calculators &amp; study planning"));
     expect(html.indexOf("Survey analysis")).toBeLessThan(html.indexOf("Data &amp; reporting tools"));

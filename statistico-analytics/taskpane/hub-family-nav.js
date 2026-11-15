@@ -161,6 +161,7 @@
       modules.push({
         id: entry.id,
         label: entry.label,
+        description: row.description || "",
         locked: !!row.locked,
         comingSoon: !!row.comingSoon
       });
@@ -273,7 +274,10 @@
       var badges = "";
       if (mod.comingSoon) badges += ' <span class="soon-badge">Soon</span>';
       if (mod.locked) badges += ' <span class="plan-badge">Professional</span>';
-      html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '" title="' + escapeHtml(mod.label) + '" onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
+      var purpose = mod.description && mod.description !== mod.label
+        ? mod.label + " — " + mod.description
+        : mod.label;
+      html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '" title="' + escapeHtml(purpose) + '" onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
       html += "<span>" + escapeHtml(mod.label) + badges + "</span>";
       html += '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
       html += "</button>";

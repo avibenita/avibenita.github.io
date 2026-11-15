@@ -70,11 +70,11 @@
     ".hub-family-info{flex:0 0 auto;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--hub-family-accent);cursor:pointer;}",
     ".hub-family-help{margin:0 0 8px;font-size:12px;line-height:1.45;color:#cbd5e1;}",
     ".hub-family-help[hidden]{display:none !important;}",
-    ".hub-family-modules{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:0;}",
-    ".hub-family-module{position:relative;display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;min-height:34px;padding:6px 8px;border:1px solid #334963;border-radius:6px;background:#1b2838;color:#f8fafc;text-align:left;cursor:pointer;font:inherit;font-size:12px;font-weight:650;line-height:1.25;}",
-    ".hub-family-module:hover::after,.hub-family-module:focus-visible::after{content:attr(title);position:absolute;left:0;bottom:calc(100% + 4px);z-index:4;max-width:220px;padding:4px 6px;border-radius:6px;background:#0f172a;color:#f8fafc;font-size:11px;font-weight:650;line-height:1.3;white-space:normal;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;}",
+    ".hub-family-modules{display:flex;flex-direction:column;gap:6px;margin-top:0;}",
+    ".hub-family-module{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;min-height:34px;padding:8px 10px;border:1px solid #334963;border-radius:6px;background:#1b2838;color:#f8fafc;text-align:left;cursor:pointer;font:inherit;font-size:13px;font-weight:650;line-height:1.3;}",
+    ".hub-family-module:hover::after,.hub-family-module:focus-visible::after{content:attr(title);position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:4;padding:6px 8px;border-radius:6px;background:#0f172a;color:#f8fafc;font-size:12px;font-weight:500;line-height:1.35;white-space:normal;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;}",
     ".hub-family-module:hover{border-color:var(--hub-family-accent);background:color-mix(in srgb, var(--hub-family-accent) 14%, #1b2838);}",
-    ".hub-family-module span{display:block;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}",
+    ".hub-family-module span{display:block;min-width:0;white-space:normal;overflow-wrap:anywhere;}",
     ".hub-family-module i{flex:0 0 auto;font-size:10px;color:var(--hub-family-accent);}"
   ].join("");
   function apply() {
@@ -1198,11 +1198,25 @@ function hubLaunchStillCurrent(launchEpoch) {
 
 function toggleHubFamilyCard(id) {
   var body = document.getElementById("hub-family-body-" + id);
-  var btn = document.querySelector('[aria-controls="hub-family-body-' + id + '"]');
+  var btn = document.querySelector('.hub-family-toggle[aria-controls="hub-family-body-' + id + '"]');
   if (!body) return;
   var open = body.hasAttribute("hidden");
-  if (open) body.removeAttribute("hidden");
-  else body.setAttribute("hidden", "");
+  if (open) {
+    document.querySelectorAll(".hub-family-body").forEach(function (other) {
+      if (other === body) return;
+      other.setAttribute("hidden", "");
+      var otherBtn = document.querySelector('.hub-family-toggle[aria-controls="' + other.id + '"]');
+      if (otherBtn) otherBtn.setAttribute("aria-expanded", "false");
+      var otherHelp = other.querySelector(".hub-family-help");
+      if (!otherHelp) return;
+      otherHelp.setAttribute("hidden", "");
+      var helpBtn = document.querySelector('.hub-family-info[aria-controls="' + otherHelp.id + '"]');
+      if (helpBtn) helpBtn.setAttribute("aria-expanded", "false");
+    });
+    body.removeAttribute("hidden");
+  } else {
+    body.setAttribute("hidden", "");
+  }
   if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
 }
 

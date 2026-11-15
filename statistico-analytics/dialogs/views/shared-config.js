@@ -399,3 +399,230 @@
   }
 
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Input-view range picker
+   The worksheet used range is the default. Select range, the current
+   selection, or a named range replaces it from inside the module.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  function postParent(payload) {
+    try {
+      if (window.Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+        Office.context.ui.messageParent(JSON.stringify(payload));
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function setActive(root, mode) {
+    if (!root) return;
+    var buttons = root.querySelectorAll('[data-range-mode]');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle('is-active', buttons[i].getAttribute('data-range-mode') === mode);
+    }
+  }
+
+  function injectStyles() {
+    if (document.getElementById('cfg-input-range-style')) return;
+    var style = document.createElement('style');
+    style.id = 'cfg-input-range-style';
+    style.textContent =
+      '.cfg-input-range{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--cfg-border);background:var(--cfg-surface);flex-shrink:0}' +
+      '.cfg-input-range-copy{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap}' +
+      '.cfg-input-range-kicker{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--cfg-text3)}' +
+      '.cfg-input-range-addr{font-size:12px;font-weight:700;color:var(--cfg-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px}' +
+      '.cfg-input-range-note{font-size:11px;color:#c2410c}' +
+      '.cfg-input-range-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto}' +
+      '.cfg-input-range .cfg-btn-small{background:var(--cfg-surface2);border:1px solid var(--cfg-border);color:var(--cfg-text)}' +
+      '.cfg-input-range .cfg-btn-small.is-active,.ps-data-actions .cfg-btn.is-active,.cfg-btn-small.is-active{box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316);border-color:var(--cfg-run-from,#f97316)}' +
+      '.cfg-input-range select{height:28px;max-width:190px;border-radius:6px;border:1px solid var(--cfg-border);background:var(--cfg-surface2);color:var(--cfg-text);font-size:11px}';
+    document.head.appendChild(style);
+  }
+
+  function rowCount(body) {
+    if (!body || typeof body !== 'object') return null;
+    if (Array.isArray(body.rows)) return body.rows.length;
+    if (Array.isArray(body.values) && body.values.length) return Math.max(0, body.values.length - 1);
+    return null;
+  }
+
+  function addressFromMessage(message) {
+    var bodies = [message && message.payload, message && message.data, message];
+    for (var i = 0; i < bodies.length; i++) {
+      var body = bodies[i];
+      if (!body || typeof body !== 'object' || !body.address) continue;
+      return { address: String(body.address), rows: rowCount(body) };
+    }
+    return null;
+  }
+
+  function ensureUsedButton() {
+    if (document.getElementById('use-used') || document.getElementById('btnUseUsed')) return true;
+    var anchor = document.getElementById('use-selection') || document.getElementById('btnUseSelection') ||
+      document.getElementById('pick-range') || document.getElementById('btnPickRange');
+    if (!anchor || !anchor.parentNode) return false;
+    injectStyles();
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = anchor.id.indexOf('btn') === 0 ? 'btnUseUsed' : 'use-used';
+    btn.className = anchor.className;
+    btn.setAttribute('data-range-mode', 'used');
+    btn.title = 'Use the detected worksheet range';
+    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Used range';
+    anchor.parentNode.insertBefore(btn, anchor);
+    var selection = document.getElementById('use-selection') || document.getElementById('btnUseSelection');
+    var pick = document.getElementById('pick-range') || document.getElementById('btnPickRange');
+    if (selection) selection.setAttribute('data-range-mode', 'selection');
+    if (pick) pick.setAttribute('data-range-mode', 'prompt');
+    var group = anchor.parentNode;
+    group.addEventListener('click', function (ev) {
+      var target = ev.target;
+      while (target && target !== group && !(target.getAttribute && target.getAttribute('data-range-mode'))) {
+        target = target.parentNode;
+      }
+      if (!target || target === group) return;
+      setActive(group, target.getAttribute('data-range-mode'));
+    });
+    btn.addEventListener('click', function () {
+      var addr = document.getElementById('mvRangeAddr') || document.getElementById('data-note');
+      if (addr) addr.textContent = 'Reading the worksheet range…';
+      postParent({ action: 'useUsed' });
+    });
+    setActive(group, 'used');
+    return true;
+  }
+
+  function wireBar(bar) {
+    var addr = bar.querySelector('#cfgInputRangeAddr');
+    var note = bar.querySelector('#cfgInputRangeNote');
+    var named = bar.querySelector('#cfgInputNamedRange');
+    var actions = bar.querySelector('.cfg-input-range-actions');
+
+    function showNote(text) {
+      if (!note) return;
+      note.textContent = text || '';
+    }
+
+    actions.addEventListener('click', function (ev) {
+      var target = ev.target;
+      while (target && target !== actions && !(target.getAttribute && target.getAttribute('data-range-mode'))) {
+        target = target.parentNode;
+      }
+      if (!target || target === actions) return;
+      var mode = target.getAttribute('data-range-mode');
+      setActive(actions, mode);
+      showNote('');
+      if (mode === 'named') {
+        named.hidden = false;
+        if (addr) addr.textContent = 'Choose a named range';
+        postParent({ action: 'listNamedRanges' });
+        return;
+      }
+      named.hidden = true;
+      if (addr) addr.textContent = mode === 'prompt' ? 'Select a range in Excel…' : 'Reading the worksheet range…';
+      var action = mode === 'prompt' ? 'pickRange' : (mode === 'selection' ? 'useSelection' : 'useUsed');
+      if (!postParent({ action: action })) showNote('Range changes are available inside Excel.');
+    });
+
+    named.addEventListener('change', function () {
+      if (!named.value) return;
+      setActive(actions, 'named');
+      if (addr) addr.textContent = named.value;
+      showNote('');
+      if (!postParent({ action: 'useNamed', name: named.value })) showNote('Range changes are available inside Excel.');
+    });
+
+    bar.__cfgRange = {
+      setAddress: function (found) {
+        if (!addr || !found || !found.address) return;
+        addr.textContent = found.address + (found.rows != null ? (' · ' + found.rows + ' rows') : '');
+        addr.title = found.address;
+        showNote('');
+      },
+      setError: function (text) { showNote(text || 'Could not read that range.'); },
+      setNames: function (names) {
+        var current = named.value;
+        named.innerHTML = '<option value="">— Select a named range —</option>';
+        (names || []).forEach(function (name) {
+          var option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          if (name === current) option.selected = true;
+          named.appendChild(option);
+        });
+        named.hidden = false;
+      }
+    };
+  }
+
+  function install() {
+    if (document.getElementById('cfgInputRange')) return true;
+    if (document.getElementById('pick-range') || document.getElementById('btnPickRange') ||
+        document.getElementById('use-selection') || document.getElementById('btnUseSelection')) {
+      return ensureUsedButton();
+    }
+    var anchor = document.querySelector('.cfg-header') || document.querySelector('.pt2-uni-head');
+    if (!anchor || !anchor.parentNode) return false;
+    injectStyles();
+    var bar = document.createElement('div');
+    bar.id = 'cfgInputRange';
+    bar.className = 'cfg-input-range';
+    bar.innerHTML =
+      '<div class="cfg-input-range-copy">' +
+        '<span class="cfg-input-range-kicker">Data range</span>' +
+        '<strong class="cfg-input-range-addr" id="cfgInputRangeAddr">Worksheet range</strong>' +
+        '<span class="cfg-input-range-note" id="cfgInputRangeNote"></span>' +
+      '</div>' +
+      '<div class="cfg-input-range-actions">' +
+        '<button type="button" class="cfg-btn-small is-active" data-range-mode="used">Used range</button>' +
+        '<button type="button" class="cfg-btn-small" data-range-mode="prompt">Select range</button>' +
+        '<button type="button" class="cfg-btn-small" data-range-mode="selection">Current selection</button>' +
+        '<button type="button" class="cfg-btn-small" data-range-mode="named">Named range</button>' +
+        '<select id="cfgInputNamedRange" hidden><option value="">— Select a named range —</option></select>' +
+      '</div>';
+    anchor.parentNode.insertBefore(bar, anchor.nextSibling);
+    wireBar(bar);
+    return true;
+  }
+
+  function onParentMessage(arg) {
+    var bar = document.getElementById('cfgInputRange');
+    if (!bar || !bar.__cfgRange) return;
+    var message;
+    try { message = JSON.parse(arg && arg.message ? arg.message : '{}'); } catch (e) { return; }
+    if (message.type === 'NAMED_RANGES') {
+      bar.__cfgRange.setNames(message.names || []);
+      return;
+    }
+    if (message.message && /RANGE_ERROR$/.test(message.type || '')) {
+      bar.__cfgRange.setError(message.message);
+      return;
+    }
+    var found = addressFromMessage(message);
+    if (found) bar.__cfgRange.setAddress(found);
+  }
+
+  function bindMessages() {
+    if (!window.Office || !Office.onReady) return;
+    Office.onReady(function () {
+      if (!Office.context || !Office.context.ui || typeof Office.context.ui.addHandlerAsync !== 'function') return;
+      try {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage, function () {
+          postParent({ action: 'requestData' });
+        });
+      } catch (e) {}
+    });
+  }
+
+  function start() {
+    if (!install()) return;
+    bindMessages();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();

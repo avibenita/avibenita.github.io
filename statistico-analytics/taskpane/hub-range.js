@@ -527,7 +527,44 @@
    * Read a worksheet range for a module dialog (does not change the hub data-source bar).
    * mode: "prompt" (Excel Select Data) or "selection" (current Excel selection).
    */
-  function captureRangeForDialog(mode, promptText) {
+  function captureRangeForDialog(mode, promptText, name) {
+    if (mode === "used") {
+      return Excel.run(function (ctx) {
+        var rng = ctx.workbook.worksheets.getActiveWorksheet().getUsedRange();
+        rng.load(["values", "address"]);
+        return ctx.sync().then(function () {
+          if (!rng.values || rng.values.length < 2) {
+            return { error: "The worksheet range needs a header row plus at least one data row." };
+          }
+          rangeMode = "used";
+          hubSyncRangeModeUI("used");
+          applyRangeData(rng.values, rng.address);
+          return { values: rng.values, address: rng.address, mode: "used" };
+        });
+      }).catch(function (e) {
+        return { error: (e && e.message) || "Could not read the worksheet range." };
+      });
+    }
+
+    if (mode === "named") {
+      if (!name) return Promise.resolve({ error: "Choose a named range." });
+      return Excel.run(function (ctx) {
+        var rng = ctx.workbook.names.getItem(name).getRange();
+        rng.load(["values", "address"]);
+        return ctx.sync().then(function () {
+          if (!rng.values || rng.values.length < 2) {
+            return { error: "That named range needs a header row plus at least one data row." };
+          }
+          rangeMode = "named";
+          hubSyncRangeModeUI("named");
+          applyRangeData(rng.values, rng.address);
+          return { values: rng.values, address: rng.address, mode: "named" };
+        });
+      }).catch(function (e) {
+        return { error: (e && e.message) || "Could not read that named range." };
+      });
+    }
+
     if (mode === "selection") {
       return Excel.run(function (ctx) {
         var rng = ctx.workbook.getSelectedRange();
@@ -537,8 +574,9 @@
             return { error: "Selection too small — needs a header row plus data." };
           }
           rangeMode = "selection";
+          hubSyncRangeModeUI("selection");
           applyRangeData(rng.values, rng.address);
-          return { values: rng.values, address: rng.address };
+          return { values: rng.values, address: rng.address, mode: "selection" };
         });
       }).catch(function (e) {
         return { error: (e && e.message) || "Could not read the current selection." };
@@ -576,8 +614,9 @@
             rng.load(["values", "address"]);
             return ctx.sync().then(function () {
               rangeMode = "prompt";
+              hubSyncRangeModeUI("prompt");
               applyRangeData(rng.values, rng.address);
-              resolve({ values: rng.values, address: rng.address });
+              resolve({ values: rng.values, address: rng.address, mode: "prompt" });
             });
           })
             .catch(function () {
@@ -695,7 +734,17 @@
   window.hubToggleDataCard = toggleDataCard;
   window.hubToggleRangePicker = toggleRangePicker;
   window.hubToggleRangeInfo = toggleRangeInfo;
+  function listNamedRangesForDialog() {
+    return Excel.run(function (ctx) {
+      var names = ctx.workbook.names.load("items");
+      return ctx.sync().then(function () {
+        return (names.items || []).map(function (item) { return item.name; }).filter(Boolean);
+      });
+    }).catch(function () { return []; });
+  }
+
   window.hubCaptureRange = captureRangeForDialog;
+  window.hubListNamedRanges = listNamedRangesForDialog;
   window.StatisticoHubRange = {
     describeWorksheetData: describeWorksheetData,
     countDataProblems: countDataProblems,

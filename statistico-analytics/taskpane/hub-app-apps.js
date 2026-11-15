@@ -30,6 +30,7 @@
     "html[data-hub-nav='family'] #hubNavTabs{display:none !important;}",
     "html[data-hub-nav='family'] #advisorStrip{display:none !important;}",
     "html[data-hub-nav='family'] .hub-analytics-allbar{display:none !important;}",
+    "html[data-hub-nav='family'] #hubRangeSection{display:none !important;}",
     ".hub-family-heading{margin:2px 2px 8px;font-size:15px;font-weight:700;line-height:1.3;color:#fff;overflow-wrap:anywhere;}",
     ".hub-family-lead{margin:0 2px 10px;font-size:12px;line-height:1.45;color:#94a3b8;overflow-wrap:anywhere;}",
     ".hub-family-more{margin:14px 2px 6px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;}",
@@ -2054,12 +2055,13 @@ function syncClusterHeader() {
   }
   var showAdvisor = HUB_ADVISOR_VISIBLE_CLUSTERS.indexOf(ACTIVE_CLUSTER) >= 0;
   if (HUB_LICENSE && HUB_LICENSE.procedureAdvisor === false) showAdvisor = false;
-  if (range) range.style.display = showRange ? "" : "none";
-  if (advisor) advisor.style.display = showAdvisor ? "" : "none";
   if (!HUB_USE_LEGACY_STRUCTURE && window.StatisticoHubFamily) {
     document.documentElement.setAttribute("data-hub-nav", "family");
-    if (advisor) advisor.style.display = "none";
+    showRange = false;
+    showAdvisor = false;
   }
+  if (range) range.style.display = showRange ? "" : "none";
+  if (advisor) advisor.style.display = showAdvisor ? "" : "none";
   syncHubToolsMenuSelection();
   syncHubAnalyticsMenuSelection();
   syncAnalyticsAllBar();

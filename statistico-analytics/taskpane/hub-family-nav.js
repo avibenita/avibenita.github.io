@@ -284,8 +284,7 @@
 
   function renderHomeHtml(model, error) {
     var sections = (model && model.sections) || [];
-    var html = '<h2 class="hub-family-heading" id="hubFamilyHeading">Choose an analysis or tool</h2>';
-    html += errorHtml(error);
+    var html = errorHtml(error);
     sections.forEach(function (section) {
       html += '<h3 class="hub-launcher-section">' + escapeHtml(section.label) + "</h3>";
       html += '<div class="hub-launcher-stack">';

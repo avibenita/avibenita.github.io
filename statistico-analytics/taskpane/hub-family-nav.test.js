@@ -83,7 +83,7 @@ describe("family home markup", () => {
 
   test("home shows family cards with module buttons and collapsed help", () => {
     const html = family.renderHomeHtml(model, null);
-    expect(html).toContain("Choose an analysis or tool");
+    expect(html).not.toContain("Choose an analysis or tool");
     expect(html).toContain("Statistical analysis");
     expect(html).toContain("Planning, quality &amp; utilities");
     expect(html).toContain("Explore &amp; summarize");

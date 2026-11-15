@@ -431,11 +431,10 @@
     var style = document.createElement('style');
     style.id = 'cfg-input-range-style';
     style.textContent =
-      '.cfg-range-anchor{position:relative;margin-left:auto;min-width:0;max-width:70%;display:inline-flex;justify-content:flex-end}' +
-      '.cfg-range-anchor .reg-model-meta,.cfg-range-anchor .cfg-range-launch{margin-left:0;max-width:none}' +
-      '.cfg-range-launch{cursor:pointer;border:0;background:transparent;font:inherit;color:inherit;text-align:right;padding:0}' +
-      '.cfg-range-launch:hover,.cfg-range-launch[aria-expanded="true"]{color:var(--cfg-text);text-decoration:underline;text-underline-offset:2px}' +
-      '.cfg-range-launch::after{content:"▾";margin-left:5px;font-size:9px;text-decoration:none;display:inline-block}' +
+      '.cfg-range-anchor{position:relative;margin-left:auto;min-width:0;max-width:70%;display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;cursor:pointer;border:1px solid var(--cfg-border);background:var(--cfg-surface2,#fff);color:var(--cfg-text);border-radius:999px;padding:3px 8px 3px 10px;line-height:1.2}' +
+      '.cfg-range-anchor:hover,.cfg-range-anchor.is-open{border-color:var(--cfg-run-from,#f97316)}' +
+      '.cfg-range-anchor .reg-model-meta,.cfg-range-anchor .cfg-range-launch{margin-left:0;max-width:none;overflow:visible;text-overflow:clip;white-space:nowrap;cursor:pointer;font-size:11px;font-weight:650;color:var(--cfg-text)}' +
+      '.cfg-range-caret{font-size:9px;color:var(--cfg-text3);line-height:1}' +
       '.cfg-range-menu{position:fixed;z-index:80;min-width:220px;padding:6px;border:1px solid var(--cfg-border);border-radius:8px;background:var(--cfg-surface,#fff);box-shadow:0 10px 28px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:4px}' +
       '.cfg-range-menu[hidden]{display:none}' +
       '.cfg-range-menu button{display:block;width:100%;text-align:left;border:1px solid transparent;background:transparent;color:var(--cfg-text);border-radius:6px;padding:7px 8px;font-size:12px;font-weight:600;cursor:pointer}' +
@@ -512,11 +511,16 @@
     host.parentNode.insertBefore(wrap, host);
     wrap.appendChild(host);
     host.classList.add('cfg-range-launch');
-    host.setAttribute('role', 'button');
-    host.setAttribute('tabindex', '0');
-    host.setAttribute('aria-expanded', 'false');
-    host.setAttribute('aria-haspopup', 'menu');
-    host.title = 'Change data range';
+    wrap.setAttribute('role', 'button');
+    wrap.setAttribute('tabindex', '0');
+    wrap.setAttribute('aria-expanded', 'false');
+    wrap.setAttribute('aria-haspopup', 'menu');
+    wrap.title = 'Change data range';
+    var caret = document.createElement('span');
+    caret.className = 'cfg-range-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '▾';
+    wrap.appendChild(caret);
 
     var menu = document.createElement('div');
     menu.id = 'cfgInputRange';
@@ -540,7 +544,7 @@
     }
 
     function place() {
-      var rect = host.getBoundingClientRect();
+      var rect = wrap.getBoundingClientRect();
       var width = Math.max(220, menu.offsetWidth || 220);
       var left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
       menu.style.left = left + 'px';
@@ -549,12 +553,14 @@
 
     function closeMenu() {
       menu.hidden = true;
-      host.setAttribute('aria-expanded', 'false');
+      wrap.setAttribute('aria-expanded', 'false');
+      wrap.classList.remove('is-open');
     }
 
     function openMenu() {
       menu.hidden = false;
-      host.setAttribute('aria-expanded', 'true');
+      wrap.setAttribute('aria-expanded', 'true');
+      wrap.classList.add('is-open');
       place();
     }
 
@@ -563,12 +569,12 @@
       else closeMenu();
     }
 
-    host.addEventListener('click', function (ev) {
+    wrap.addEventListener('click', function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
       toggleMenu();
     });
-    host.addEventListener('keydown', function (ev) {
+    wrap.addEventListener('keydown', function (ev) {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
       ev.preventDefault();
       toggleMenu();

@@ -431,15 +431,19 @@
     var style = document.createElement('style');
     style.id = 'cfg-input-range-style';
     style.textContent =
-      '.cfg-input-range{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--cfg-border);background:var(--cfg-surface);flex-shrink:0}' +
-      '.cfg-input-range-copy{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap}' +
-      '.cfg-input-range-kicker{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--cfg-text3)}' +
-      '.cfg-input-range-addr{font-size:12px;font-weight:700;color:var(--cfg-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px}' +
-      '.cfg-input-range-note{font-size:11px;color:#c2410c}' +
-      '.cfg-input-range-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto}' +
-      '.cfg-input-range .cfg-btn-small{background:var(--cfg-surface2);border:1px solid var(--cfg-border);color:var(--cfg-text)}' +
-      '.cfg-input-range .cfg-btn-small.is-active,.ps-data-actions .cfg-btn.is-active,.cfg-btn-small.is-active{box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316);border-color:var(--cfg-run-from,#f97316)}' +
-      '.cfg-input-range select{height:28px;max-width:190px;border-radius:6px;border:1px solid var(--cfg-border);background:var(--cfg-surface2);color:var(--cfg-text);font-size:11px}';
+      '.cfg-range-anchor{position:relative;margin-left:auto;min-width:0;max-width:70%;display:inline-flex;justify-content:flex-end}' +
+      '.cfg-range-anchor .reg-model-meta,.cfg-range-anchor .cfg-range-launch{margin-left:0;max-width:none}' +
+      '.cfg-range-launch{cursor:pointer;border:0;background:transparent;font:inherit;color:inherit;text-align:right;padding:0}' +
+      '.cfg-range-launch:hover,.cfg-range-launch[aria-expanded="true"]{color:var(--cfg-text);text-decoration:underline;text-underline-offset:2px}' +
+      '.cfg-range-launch::after{content:"▾";margin-left:5px;font-size:9px;text-decoration:none;display:inline-block}' +
+      '.cfg-range-menu{position:fixed;z-index:80;min-width:220px;padding:6px;border:1px solid var(--cfg-border);border-radius:8px;background:var(--cfg-surface,#fff);box-shadow:0 10px 28px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:4px}' +
+      '.cfg-range-menu[hidden]{display:none}' +
+      '.cfg-range-menu button{display:block;width:100%;text-align:left;border:1px solid transparent;background:transparent;color:var(--cfg-text);border-radius:6px;padding:7px 8px;font-size:12px;font-weight:600;cursor:pointer}' +
+      '.cfg-range-menu button:hover{background:var(--cfg-surface2,rgba(0,0,0,.04))}' +
+      '.cfg-range-menu button.is-active{border-color:var(--cfg-run-from,#f97316);box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316)}' +
+      '.cfg-range-menu select{height:28px;width:100%;border-radius:6px;border:1px solid var(--cfg-border);background:var(--cfg-surface2,#fff);color:var(--cfg-text);font-size:11px}' +
+      '.cfg-range-note{font-size:11px;color:#c2410c;padding:0 4px}' +
+      '.ps-data-actions .cfg-btn.is-active,.cfg-btn-small.is-active{box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316);border-color:var(--cfg-run-from,#f97316)}';
     document.head.appendChild(style);
   }
 
@@ -496,54 +500,135 @@
     return true;
   }
 
-  function wireBar(bar) {
-    var addr = bar.querySelector('#cfgInputRangeAddr');
-    var note = bar.querySelector('#cfgInputRangeNote');
-    var named = bar.querySelector('#cfgInputNamedRange');
-    var actions = bar.querySelector('.cfg-input-range-actions');
+  function isStatusText(text) {
+    return /reading|select a range|choose a named/i.test(text || '');
+  }
+
+  function attachMenu(host) {
+    if (!host || !host.parentNode || document.getElementById('cfgInputRange')) return false;
+    injectStyles();
+    var wrap = document.createElement('span');
+    wrap.className = 'cfg-range-anchor';
+    host.parentNode.insertBefore(wrap, host);
+    wrap.appendChild(host);
+    host.classList.add('cfg-range-launch');
+    host.setAttribute('role', 'button');
+    host.setAttribute('tabindex', '0');
+    host.setAttribute('aria-expanded', 'false');
+    host.setAttribute('aria-haspopup', 'menu');
+    host.title = 'Change data range';
+
+    var menu = document.createElement('div');
+    menu.id = 'cfgInputRange';
+    menu.className = 'cfg-range-menu';
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    menu.innerHTML =
+      '<button type="button" data-range-mode="used" class="is-active">Used range</button>' +
+      '<button type="button" data-range-mode="prompt">Select range</button>' +
+      '<button type="button" data-range-mode="selection">Current selection</button>' +
+      '<button type="button" data-range-mode="named">Named range</button>' +
+      '<select id="cfgInputNamedRange" hidden><option value="">— Select a named range —</option></select>' +
+      '<div class="cfg-range-note" id="cfgInputRangeNote"></div>';
+    document.body.appendChild(menu);
+
+    var note = menu.querySelector('#cfgInputRangeNote');
+    var named = menu.querySelector('#cfgInputNamedRange');
 
     function showNote(text) {
-      if (!note) return;
-      note.textContent = text || '';
+      if (note) note.textContent = text || '';
     }
 
-    actions.addEventListener('click', function (ev) {
+    function place() {
+      var rect = host.getBoundingClientRect();
+      var width = Math.max(220, menu.offsetWidth || 220);
+      var left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
+      menu.style.left = left + 'px';
+      menu.style.top = (rect.bottom + 6) + 'px';
+    }
+
+    function closeMenu() {
+      menu.hidden = true;
+      host.setAttribute('aria-expanded', 'false');
+    }
+
+    function openMenu() {
+      menu.hidden = false;
+      host.setAttribute('aria-expanded', 'true');
+      place();
+    }
+
+    function toggleMenu() {
+      if (menu.hidden) openMenu();
+      else closeMenu();
+    }
+
+    host.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      toggleMenu();
+    });
+    host.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      toggleMenu();
+    });
+    document.addEventListener('click', function () { closeMenu(); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') closeMenu();
+    });
+    window.addEventListener('resize', function () {
+      if (!menu.hidden) place();
+    });
+
+    menu.addEventListener('click', function (ev) {
+      ev.stopPropagation();
       var target = ev.target;
-      while (target && target !== actions && !(target.getAttribute && target.getAttribute('data-range-mode'))) {
+      while (target && target !== menu && !(target.getAttribute && target.getAttribute('data-range-mode'))) {
         target = target.parentNode;
       }
-      if (!target || target === actions) return;
+      if (!target || target === menu) return;
       var mode = target.getAttribute('data-range-mode');
-      setActive(actions, mode);
+      setActive(menu, mode);
       showNote('');
       if (mode === 'named') {
         named.hidden = false;
-        if (addr) addr.textContent = 'Choose a named range';
+        place();
         postParent({ action: 'listNamedRanges' });
         return;
       }
       named.hidden = true;
-      if (addr) addr.textContent = mode === 'prompt' ? 'Select a range in Excel…' : 'Reading the worksheet range…';
+      if (!isStatusText(host.textContent)) host.setAttribute('data-range-label', host.textContent);
+      host.textContent = mode === 'prompt' ? 'Select a range in Excel…' : 'Reading the worksheet range…';
+      closeMenu();
       var action = mode === 'prompt' ? 'pickRange' : (mode === 'selection' ? 'useSelection' : 'useUsed');
       if (!postParent({ action: action })) showNote('Range changes are available inside Excel.');
     });
 
     named.addEventListener('change', function () {
       if (!named.value) return;
-      setActive(actions, 'named');
-      if (addr) addr.textContent = named.value;
+      setActive(menu, 'named');
+      if (!isStatusText(host.textContent)) host.setAttribute('data-range-label', host.textContent);
+      host.textContent = named.value;
       showNote('');
+      closeMenu();
       if (!postParent({ action: 'useNamed', name: named.value })) showNote('Range changes are available inside Excel.');
     });
 
-    bar.__cfgRange = {
+    menu.__cfgRange = {
+      host: host,
       setAddress: function (found) {
-        if (!addr || !found || !found.address) return;
-        addr.textContent = found.address + (found.rows != null ? (' · ' + found.rows + ' rows') : '');
-        addr.title = found.address;
+        if (!found || !found.address || !isStatusText(host.textContent)) return;
+        host.textContent = found.address;
+        host.title = 'Change data range';
         showNote('');
       },
-      setError: function (text) { showNote(text || 'Could not read that range.'); },
+      setError: function (text) {
+        var saved = host.getAttribute('data-range-label');
+        if (saved && isStatusText(host.textContent)) host.textContent = saved;
+        showNote(text || 'Could not read that range.');
+        openMenu();
+      },
       setNames: function (names) {
         var current = named.value;
         named.innerHTML = '<option value="">— Select a named range —</option>';
@@ -555,38 +640,21 @@
           named.appendChild(option);
         });
         named.hidden = false;
+        if (!menu.hidden) place();
       }
     };
+    return true;
   }
 
   function install() {
     if (document.getElementById('cfgInputRange')) return true;
+    var host = document.getElementById('tbRange') || document.getElementById('pt2SourceBadge');
+    if (host) return attachMenu(host);
     if (document.getElementById('pick-range') || document.getElementById('btnPickRange') ||
         document.getElementById('use-selection') || document.getElementById('btnUseSelection')) {
       return ensureUsedButton();
     }
-    var anchor = document.querySelector('.cfg-header') || document.querySelector('.pt2-uni-head');
-    if (!anchor || !anchor.parentNode) return false;
-    injectStyles();
-    var bar = document.createElement('div');
-    bar.id = 'cfgInputRange';
-    bar.className = 'cfg-input-range';
-    bar.innerHTML =
-      '<div class="cfg-input-range-copy">' +
-        '<span class="cfg-input-range-kicker">Data range</span>' +
-        '<strong class="cfg-input-range-addr" id="cfgInputRangeAddr">Worksheet range</strong>' +
-        '<span class="cfg-input-range-note" id="cfgInputRangeNote"></span>' +
-      '</div>' +
-      '<div class="cfg-input-range-actions">' +
-        '<button type="button" class="cfg-btn-small is-active" data-range-mode="used">Used range</button>' +
-        '<button type="button" class="cfg-btn-small" data-range-mode="prompt">Select range</button>' +
-        '<button type="button" class="cfg-btn-small" data-range-mode="selection">Current selection</button>' +
-        '<button type="button" class="cfg-btn-small" data-range-mode="named">Named range</button>' +
-        '<select id="cfgInputNamedRange" hidden><option value="">— Select a named range —</option></select>' +
-      '</div>';
-    anchor.parentNode.insertBefore(bar, anchor.nextSibling);
-    wireBar(bar);
-    return true;
+    return false;
   }
 
   function onParentMessage(arg) {

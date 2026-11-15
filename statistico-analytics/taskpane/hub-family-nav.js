@@ -258,17 +258,19 @@
     html += '<span class="hub-family-icon">' + iconHtml(family.icon) + "</span>";
     html += '<span class="hub-family-copy">';
     html += '<span class="hub-family-title">' + escapeHtml(family.label) + "</span>";
-    html += '<span class="hub-family-desc">' + escapeHtml(family.tagline || "") + "</span>";
     html += "</span>";
     html += '<button type="button" class="hub-family-info" aria-label="About ' + escapeHtml(family.label) + '" aria-controls="' + helpId + '" aria-expanded="false" onclick="toggleHubFamilyHelp(\'' + id + '\')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>';
     html += "</div>";
-    html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(family.help || "") + "</p>";
+    var helpText = [family.tagline, family.help].filter(function (part, index, list) {
+      return part && list.indexOf(part) === index;
+    }).join(" ");
+    html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(helpText) + "</p>";
     html += '<div class="hub-family-modules">';
     (family.modules || []).forEach(function (mod) {
       var badges = "";
       if (mod.comingSoon) badges += ' <span class="soon-badge">Soon</span>';
       if (mod.locked) badges += ' <span class="plan-badge">Professional</span>';
-      html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '" onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
+      html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '" title="' + escapeHtml(mod.label) + '" onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
       html += "<span>" + escapeHtml(mod.label) + badges + "</span>";
       html += '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
       html += "</button>";

@@ -92,6 +92,9 @@ describe("family home markup", () => {
     expect(html).toContain(">Split Index<");
     expect(html).not.toContain("Survey Summaries");
     expect(html).toContain('class="hub-family-help" id="hub-family-help-explore" hidden');
+    expect(html).toContain("See what’s in your data.");
+    expect(html.indexOf("hub-family-title")).toBeLessThan(html.indexOf("See what’s in your data."));
+    expect(html).toContain('title="Paired / Repeated Measures"');
     expect(html).toContain('onclick="toggleHubFamilyHelp(\'explore\')"');
     expect(html.indexOf("Explore &amp; summarize")).toBeLessThan(html.indexOf("Compare groups"));
     expect(html.indexOf("Model outcomes")).toBeLessThan(html.indexOf("Calculators &amp; study planning"));

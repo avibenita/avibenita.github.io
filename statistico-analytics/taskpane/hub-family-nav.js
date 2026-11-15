@@ -79,11 +79,11 @@
       id: "quality",
       label: "Quality & process improvement",
       tagline: "Prioritize problems and assess process performance.",
-      help: "Start with Pareto to identify the largest contributors. Use Gage R&R to assess the measurement system, capability to compare a process with specifications, and optimization to compare candidate settings.",
+      help: "Start with Pareto to identify the largest contributors. Use Gage R&R to assess the measurement system, capability to compare a process with specifications, and optimization to compare candidate settings. Pareto is a proprietary innovation.",
       icon: "fa-sliders",
       accent: "quality",
       modules: [
-        { id: "pareto2080", label: "Pareto Analysis" },
+        { id: "pareto2080", label: "Pareto Analysis", mark: true },
         { id: "process-settings", label: "Process Optimization" },
         { id: "gage-rr", label: "Gage R&R" },
         { id: "capability-range", label: "Process Capability" }
@@ -93,11 +93,11 @@
       id: "survey",
       label: "Survey analysis",
       tagline: "See what separates groups and check multi-item scales.",
-      help: "Use Split Index to see which factors differentiate two respondent groups. Use scale reliability to assess consistency among items intended to measure the same construct.",
+      help: "Use Split Index to see which factors differentiate two respondent groups. Use scale reliability to assess consistency among items intended to measure the same construct. Split Index is a proprietary innovation.",
       icon: "fa-list-check",
       accent: "survey",
       modules: [
-        { id: "split-index", label: "Split Index" },
+        { id: "split-index", label: "Split Index", mark: true },
         { id: "reliability", label: "Scale Reliability" }
       ]
     },
@@ -105,14 +105,14 @@
       id: "utilities",
       label: "Data & reporting tools",
       tagline: "Prepare data, make charts, and share results.",
-      help: "Use Prepare Data before analysis, 3D Charts to visualize data, and Publication Tables or EzPaste to share outputs.",
+      help: "Use Prepare Data before analysis, 3D Charts to visualize data, and Publication Tables or EzPaste to share outputs. EzPaste is a proprietary innovation.",
       icon: "fa-wrench",
       accent: "utilities",
       modules: [
         { id: "prepare-data", label: "Prepare Data" },
         { id: "multivariable", label: "3D Charts" },
         { id: "publication-tables", label: "Publication Tables" },
-        { id: "ezpaste-open", label: "EzPaste" }
+        { id: "ezpaste-open", label: "EzPaste", mark: true }
       ]
     }
   ];
@@ -149,7 +149,7 @@
   function specModules(spec) {
     return (spec.modules || []).map(function (entry) {
       if (typeof entry === "string") return { id: entry, label: entry };
-      return { id: entry.id, label: entry.label || entry.id };
+      return { id: entry.id, label: entry.label || entry.id, mark: !!entry.mark };
     });
   }
 
@@ -162,6 +162,7 @@
         id: entry.id,
         label: entry.label,
         description: row.description || "",
+        mark: !!entry.mark,
         locked: !!row.locked,
         comingSoon: !!row.comingSoon
       });
@@ -278,7 +279,7 @@
         ? mod.label + " — " + mod.description
         : mod.label;
       html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '" title="' + escapeHtml(purpose) + '" onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
-      html += "<span>" + escapeHtml(mod.label) + badges + "</span>";
+      html += "<span>" + escapeHtml(mod.label) + (mod.mark ? "<sup>TM</sup>" : "") + badges + "</span>";
       html += '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
       html += "</button>";
     });

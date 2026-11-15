@@ -75,6 +75,7 @@
     ".hub-family-module:hover::after,.hub-family-module:focus-visible::after{content:attr(title);position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:4;padding:6px 8px;border-radius:6px;background:#0f172a;color:#f8fafc;font-size:12px;font-weight:500;line-height:1.35;white-space:normal;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;}",
     ".hub-family-module:hover{border-color:var(--hub-family-accent);background:color-mix(in srgb, var(--hub-family-accent) 14%, #1b2838);}",
     ".hub-family-module span{display:block;min-width:0;white-space:normal;overflow-wrap:anywhere;}",
+    ".hub-family-module sup{font-size:.65em;line-height:0;margin-left:1px;}",
     ".hub-family-module i{flex:0 0 auto;font-size:10px;color:var(--hub-family-accent);}"
   ].join("");
   function apply() {

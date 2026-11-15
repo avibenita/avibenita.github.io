@@ -89,7 +89,12 @@ describe("family home markup", () => {
     expect(html).toContain("Explore &amp; summarize");
     expect(html).toContain('onclick="launchHubFamilyModule(\'univariate\')"');
     expect(html).toContain('onclick="launchHubFamilyModule(\'split-index\')"');
-    expect(html).toContain(">Split Index<");
+    expect(html).toContain(">Split Index<sup>TM</sup>");
+    expect(html).toContain(">Pareto Analysis<sup>TM</sup>");
+    expect(html).toContain(">EzPaste<sup>TM</sup>");
+    expect(html).toContain("Pareto is a proprietary innovation.");
+    expect(html).toContain("Split Index is a proprietary innovation.");
+    expect(html).toContain("EzPaste is a proprietary innovation.");
     expect(html).not.toContain("Survey Summaries");
     expect(html).toContain('class="hub-family-help" id="hub-family-help-explore" hidden');
     expect(html).toContain("See what’s in your data.");

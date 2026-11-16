@@ -2383,6 +2383,24 @@ function rangeForNewAnalysis() {
 }
 
 var hubModuleRangeReady = Promise.resolve(null);
+var hubPreserveInputRange = false;
+var hubInputRangeError = "";
+var hubActiveRangeDialog = null;
+var hubNamedRangeCache = [];
+var hubNamedRangeRefresh = null;
+
+function refreshNamedRangeCache() {
+  var list = window.hubListNamedRanges;
+  if (typeof list !== "function") {
+    hubNamedRangeRefresh = Promise.resolve(hubNamedRangeCache);
+    return hubNamedRangeRefresh;
+  }
+  hubNamedRangeRefresh = Promise.resolve(list()).then(function (names) {
+    hubNamedRangeCache = names || [];
+    return hubNamedRangeCache;
+  }, function () { return hubNamedRangeCache; });
+  return hubNamedRangeRefresh;
+}
 
 function beginModuleInputRange(fallback) {
   var base = fallback || { values: [], address: "", mode: "used" };
@@ -2397,12 +2415,34 @@ function beginModuleInputRange(fallback) {
 }
 
 function armModuleInputRange() {
+  if (hubPreserveInputRange) {
+    hubPreserveInputRange = false;
+    var kept = getGlobalRangePayload() || rangeForNewAnalysis();
+    hubModuleRangeReady = Promise.resolve(kept);
+    return hubModuleRangeReady;
+  }
+  refreshNamedRangeCache();
   hubModuleRangeReady = beginModuleInputRange(rangeForNewAnalysis());
   return hubModuleRangeReady;
 }
 
 function afterModuleInputRange(fn) {
-  return hubModuleRangeReady.then(function (range) { return fn(range); }, function () { return fn(null); });
+  return hubModuleRangeReady.then(function (range) {
+    var result = fn(range);
+    flushInputRangeError(hubActiveRangeDialog);
+    return result;
+  }, function () {
+    var result = fn(null);
+    flushInputRangeError(hubActiveRangeDialog);
+    return result;
+  });
+}
+
+function flushInputRangeError(dlg) {
+  if (!hubInputRangeError || !dlg) return;
+  var message = hubInputRangeError;
+  hubInputRangeError = "";
+  setTimeout(function () { replyInputRange(dlg, "", message); }, 400);
 }
 
 function inputRangeAction(msg) {
@@ -2425,28 +2465,59 @@ function replyInputRange(dlg, type, message) {
   });
 }
 
-function handleInputRangeMessage(msg, dlg, onRange, errorType) {
+function rememberRangeDialog(dlg) {
+  hubActiveRangeDialog = dlg || null;
+  return dlg;
+}
+
+function reopenAfterRangeRead(reopen) {
+  hubPreserveInputRange = true;
+  setTimeout(function () {
+    try { reopen(); } catch (e) {}
+  }, 700);
+}
+
+function handleInputRangeMessage(msg, dlg, onRange, errorType, reopen) {
   var action = inputRangeAction(msg);
   if (!action) return false;
   if (action.mode === "list") {
-    var list = window.hubListNamedRanges;
-    Promise.resolve(typeof list === "function" ? list() : []).then(function (names) {
-      if (!dlg) return;
-      try { dlg.messageChild(JSON.stringify({ type: "NAMED_RANGES", names: names || [] })); } catch (e) {}
-    });
+    var names = hubNamedRangeCache || [];
+    try { if (dlg) dlg.messageChild(JSON.stringify({ type: "NAMED_RANGES", names: names })); } catch (e) {}
+    if (hubNamedRangeRefresh) {
+      hubNamedRangeRefresh.then(function (fresh) {
+        try { if (dlg) dlg.messageChild(JSON.stringify({ type: "NAMED_RANGES", names: fresh || [] })); } catch (e2) {}
+      });
+    }
     return true;
   }
   var capture = window.hubCaptureRange;
   if (typeof capture !== "function") return true;
-  Promise.resolve(capture(action.mode, "Select the data range (header row + data).", action.name)).then(function (result) {
-    if (!result || !result.values || result.values.length < 2) {
-      replyInputRange(dlg, errorType, (result && result.error) || "Could not read that range. Select a header row plus data.");
-      return;
-    }
-    if (typeof onRange === "function") onRange({ values: result.values, address: result.address || "", mode: action.mode });
-  }, function (err) {
-    replyInputRange(dlg, errorType, (err && err.message) || "Could not read that range.");
-  });
+  if (typeof reopen !== "function") {
+    Promise.resolve(capture(action.mode, "Select the data range (header row + data).", action.name)).then(function (result) {
+      if (!result || !result.values || result.values.length < 2) {
+        replyInputRange(dlg, errorType, (result && result.error) || "Could not read that range. Select a header row plus data.");
+        return;
+      }
+      if (typeof onRange === "function") onRange({ values: result.values, address: result.address || "", mode: action.mode });
+    }, function (err) {
+      replyInputRange(dlg, errorType, (err && err.message) || "Could not read that range.");
+    });
+    return true;
+  }
+  // Excel.run and the range prompt do not run while a module dialog is open.
+  try { if (dlg && typeof dlg.close === "function") dlg.close(); } catch (e) {}
+  hubActiveRangeDialog = null;
+  setTimeout(function () {
+    Promise.resolve(capture(action.mode, "Select the data range (header row + data).", action.name)).then(function (result) {
+      var failed = !result || !result.values || result.values.length < 2;
+      var message = failed ? ((result && result.error) || "Could not read that range. Select a header row plus data.") : "";
+      hubInputRangeError = failed && !/cancel/i.test(message) ? message : "";
+      reopenAfterRangeRead(reopen);
+    }, function (err) {
+      hubInputRangeError = (err && err.message) || "Could not read that range.";
+      reopenAfterRangeRead(reopen);
+    });
+  }, 400);
   return true;
 }
 
@@ -2952,15 +3023,13 @@ function openUnivariateConfigFromHub(moduleId, startView) {
         finishHubUnivariateFlow();
         return;
       }
-      hubConfigDialog = asyncResult.value;
+      hubConfigDialog = rememberRangeDialog(asyncResult.value);
       setTimeout(sendUnivariateDialogData, 550);
       hubConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var message = JSON.parse(arg.message || "{}");
-          if (handleInputRangeMessage(message, hubConfigDialog, function () {
-            var liveRange = getGlobalRangePayload();
-            if (liveRange) gr = liveRange;
-            sendUnivariateDialogData();
+          if (handleInputRangeMessage(message, hubConfigDialog, null, "", function () {
+            openUnivariateConfigFromHub(moduleId, startView);
           })) return;
           if (message.action === "ready" || message.action === "requestData") {
             sendUnivariateDialogData();
@@ -3094,16 +3163,15 @@ function openRegressionConfigFromHub() {
         finishHubRegressionFlow();
         return;
       }
-      hubRegressionConfigDialog = res.value;
+      hubRegressionConfigDialog = rememberRangeDialog(res.value);
       setTimeout(sendRegressionBuilderDataFromHub, 600);
       setTimeout(sendRegressionBuilderDataFromHub, 1200);
       setTimeout(sendRegressionBuilderDataFromHub, 2000);
       hubRegressionConfigDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (handleInputRangeMessage(msg, hubRegressionConfigDialog, function (next) {
-            gr = next;
-            sendRegressionBuilderDataFromHub();
+          if (handleInputRangeMessage(msg, hubRegressionConfigDialog, null, "", function () {
+            openRegressionConfigFromHub();
           })) return;
           if (msg.action === "ready" || msg.action === "requestData") {
             sendRegressionBuilderDataFromHub();
@@ -3151,7 +3219,7 @@ function openAnovaConfigFromHub() {
         finishHubAnovaFlow();
         return;
       }
-      hubAnovaDialog = res.value;
+      hubAnovaDialog = rememberRangeDialog(res.value);
       var sendAnovaData = function () {
         afterModuleInputRange(function () {
           var live = getGlobalRangePayload();
@@ -3172,7 +3240,7 @@ function openAnovaConfigFromHub() {
       hubAnovaDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (handleInputRangeMessage(msg, hubAnovaDialog, function () { sendAnovaData(); })) return;
+          if (handleInputRangeMessage(msg, hubAnovaDialog, null, "", function () { openAnovaConfigFromHub(); })) return;
           if (msg.action === "ready" || msg.action === "requestData") {
             sendAnovaData();
           } else if (msg.action === "anovaModel") {
@@ -3212,7 +3280,7 @@ function openIndependentConfigFromHub() {
         finishHubIndependentFlow();
         return;
       }
-      hubIndependentDialog = res.value;
+      hubIndependentDialog = rememberRangeDialog(res.value);
       var sendIndependentData = function () {
         afterModuleInputRange(function () {
           var live = getGlobalRangePayload();
@@ -3233,7 +3301,7 @@ function openIndependentConfigFromHub() {
       hubIndependentDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (handleInputRangeMessage(msg, hubIndependentDialog, function () { sendIndependentData(); })) return;
+          if (handleInputRangeMessage(msg, hubIndependentDialog, null, "", function () { openIndependentConfigFromHub(); })) return;
           if (msg.action === "ready" || msg.action === "requestData") {
             sendIndependentData();
           } else if (msg.action === "independentModel") {
@@ -3273,7 +3341,7 @@ function openCorrelationConfigFromHub() {
         finishHubCorrelationFlow();
         return;
       }
-      hubCorrelationDialog = res.value;
+      hubCorrelationDialog = rememberRangeDialog(res.value);
       var sendCorrelationData = function () {
         afterModuleInputRange(function () {
           var live = getGlobalRangePayload();
@@ -3289,7 +3357,7 @@ function openCorrelationConfigFromHub() {
       hubCorrelationDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (handleInputRangeMessage(msg, hubCorrelationDialog, function () { sendCorrelationData(); })) return;
+          if (handleInputRangeMessage(msg, hubCorrelationDialog, null, "", function () { openCorrelationConfigFromHub(); })) return;
           if (msg.action === "ready" || msg.action === "requestData") {
             sendCorrelationData();
           } else if (msg.action === "runAnalysis") {
@@ -3463,7 +3531,7 @@ function openBuilderDialogFromHub(options) {
         } catch (e) {}
         return;
       }
-      hubBuilderDialog = res.value;
+      hubBuilderDialog = rememberRangeDialog(res.value);
       var dlg = hubBuilderDialog;
       var sendPayload = function () {
         rangeReady.then(function (next) {
@@ -3475,6 +3543,7 @@ function openBuilderDialogFromHub(options) {
             type: options.dataType,
             payload: options.payloadBuilder ? options.payloadBuilder(gr) : {}
           }));
+          flushInputRangeError(dlg);
         });
       };
       setTimeout(sendPayload, options.initialDelayMs || 550);
@@ -3486,10 +3555,9 @@ function openBuilderDialogFromHub(options) {
             sendPayload();
             return;
           }
-          if (handleInputRangeMessage(msg, dlg, function (next) {
-            gr = next;
-            sendPayload();
-          }, "MV_RANGE_ERROR")) return;
+          if (handleInputRangeMessage(msg, dlg, null, "MV_RANGE_ERROR", function () {
+            openBuilderDialogFromHub(options);
+          })) return;
           var modelActions = options.modelActions || [];
           if (modelActions.indexOf(msg.action) >= 0) {
             gr = adoptAnalysisScope(gr, msg);
@@ -3623,7 +3691,7 @@ function openPublicationTablesConfigFromHub() {
         finishHubPublicationTablesFlow();
         return;
       }
-      hubPublicationTablesResultsDialog = res.value;
+      hubPublicationTablesResultsDialog = rememberRangeDialog(res.value);
       if (window.HubResultsBridge) HubResultsBridge.registerDialog(hubPublicationTablesResultsDialog);
       // Same multi-shot pattern as Regression/ANOVA: the dialog's handler
       // may not be registered on the first ready ping.
@@ -3633,8 +3701,8 @@ function openPublicationTablesConfigFromHub() {
       hubPublicationTablesResultsDialog.addEventHandler(Office.EventType.DialogMessageReceived, function (arg) {
         try {
           var msg = JSON.parse(arg.message || "{}");
-          if (handleInputRangeMessage(msg, hubPublicationTablesResultsDialog, function () {
-            sendPublicationTablesDataFromHub();
+          if (handleInputRangeMessage(msg, hubPublicationTablesResultsDialog, null, "", function () {
+            openPublicationTablesConfigFromHub();
           })) return;
           if (msg.action === "ready" || msg.action === "requestData" || msg.action === "refreshData") {
             sendPublicationTablesDataFromHub();
@@ -4081,10 +4149,13 @@ function openProcessSettingsDialog(kind) {
       window.alert("Could not open Process Settings Explorer.\n\n" + (err.message || "Unknown error"));
       return;
     }
-    hubBuilderDialog = res.value;
+    hubBuilderDialog = rememberRangeDialog(res.value);
     var dlg = hubBuilderDialog;
     var send = function () {
-      rangeReady.then(function () { sendProcessSettingsPayload(dlg); });
+      rangeReady.then(function () {
+        sendProcessSettingsPayload(dlg);
+        flushInputRangeError(dlg);
+      });
     };
     setTimeout(send, 550);
     setTimeout(send, 1400);
@@ -4105,10 +4176,13 @@ function openProcessSettingsDialog(kind) {
         });
         return;
       }
-      if (handleInputRangeMessage(msg, dlg, function () {
+      if (inputRangeAction(msg) && inputRangeAction(msg).mode !== "list") {
+        hubProcessSettingsHandoff = true;
         hubProcessSettingsTable = null;
-        sendProcessSettingsPayload(dlg);
-      }, "PROCESS_SETTINGS_ERROR")) return;
+      }
+      if (handleInputRangeMessage(msg, dlg, null, "PROCESS_SETTINGS_ERROR", function () {
+        openProcessSettingsDialog(kind);
+      })) return;
       if (msg.action === "processSettingsModel") {
         hubProcessSettingsModel = msg.payload || null;
         if (msg.payload && msg.payload.table && msg.payload.table.headers) hubProcessSettingsTable = msg.payload.table;
@@ -4200,10 +4274,13 @@ function openGageRrFromHub() {
       window.alert("Could not open Gage R&R.\n\n" + (err.message || "Unknown error"));
       return;
     }
-    hubGageDialog = res.value;
+    hubGageDialog = rememberRangeDialog(res.value);
     var dlg = hubGageDialog;
     var send = function () {
-      rangeReady.then(function () { sendGagePayload(dlg); });
+      rangeReady.then(function () {
+        sendGagePayload(dlg);
+        flushInputRangeError(dlg);
+      });
     };
     setTimeout(send, 550);
     setTimeout(send, 1400);
@@ -4223,7 +4300,7 @@ function openGageRrFromHub() {
         });
         return;
       }
-      if (handleInputRangeMessage(msg, dlg, function () { sendGagePayload(dlg); }, "GAGE_RR_ERROR")) return;
+      if (handleInputRangeMessage(msg, dlg, null, "GAGE_RR_ERROR", function () { openGageRrFromHub(); })) return;
       if (msg.action === "close") {
         try { dlg.close(); } catch (e) {}
         dlg = null;
@@ -4282,10 +4359,13 @@ function openCapabilityFromHub() {
       window.alert("Could not open Process Capability.\n\n" + (err.message || "Unknown error"));
       return;
     }
-    hubCapabilityDialog = res.value;
+    hubCapabilityDialog = rememberRangeDialog(res.value);
     var dlg = hubCapabilityDialog;
     var send = function () {
-      rangeReady.then(function () { sendCapabilityPayload(dlg); });
+      rangeReady.then(function () {
+        sendCapabilityPayload(dlg);
+        flushInputRangeError(dlg);
+      });
     };
     setTimeout(send, 550);
     setTimeout(send, 1400);
@@ -4305,7 +4385,7 @@ function openCapabilityFromHub() {
         });
         return;
       }
-      if (handleInputRangeMessage(msg, dlg, function () { sendCapabilityPayload(dlg); }, "CAPABILITY_ERROR")) return;
+      if (handleInputRangeMessage(msg, dlg, null, "CAPABILITY_ERROR", function () { openCapabilityFromHub(); })) return;
       if (msg.action === "close") {
         try { dlg.close(); } catch (e) {}
         dlg = null;

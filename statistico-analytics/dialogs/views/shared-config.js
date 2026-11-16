@@ -538,6 +538,26 @@
 
     var note = menu.querySelector('#cfgInputRangeNote');
     var named = menu.querySelector('#cfgInputNamedRange');
+    var waitTimer = null;
+
+    function clearWait() {
+      if (waitTimer) {
+        clearTimeout(waitTimer);
+        waitTimer = null;
+      }
+    }
+
+    function expectReply() {
+      clearWait();
+      waitTimer = setTimeout(function () {
+        waitTimer = null;
+        if (!isStatusText(host.textContent)) return;
+        var saved = host.getAttribute('data-range-label');
+        if (saved) host.textContent = saved;
+        showNote('Close the Statistico pane and open it again, then change the range.');
+        openMenu();
+      }, 4000);
+    }
 
     function showNote(text) {
       if (note) note.textContent = text || '';
@@ -608,28 +628,42 @@
       host.textContent = mode === 'prompt' ? 'Select a range in Excel…' : 'Reading the worksheet range…';
       closeMenu();
       var action = mode === 'prompt' ? 'pickRange' : (mode === 'selection' ? 'useSelection' : 'useUsed');
-      if (!postParent({ action: action })) showNote('Range changes are available inside Excel.');
+      if (!postParent({ action: action })) {
+        clearWait();
+        showNote('Range changes are available inside Excel.');
+        openMenu();
+      } else {
+        expectReply();
+      }
     });
 
     named.addEventListener('change', function () {
       if (!named.value) return;
       setActive(menu, 'named');
       if (!isStatusText(host.textContent)) host.setAttribute('data-range-label', host.textContent);
-      host.textContent = named.value;
+      host.textContent = 'Reading the worksheet range…';
       showNote('');
       closeMenu();
-      if (!postParent({ action: 'useNamed', name: named.value })) showNote('Range changes are available inside Excel.');
+      if (!postParent({ action: 'useNamed', name: named.value })) {
+        clearWait();
+        showNote('Range changes are available inside Excel.');
+        openMenu();
+      } else {
+        expectReply();
+      }
     });
 
     menu.__cfgRange = {
       host: host,
       setAddress: function (found) {
         if (!found || !found.address || !isStatusText(host.textContent)) return;
+        clearWait();
         host.textContent = found.address;
         host.title = 'Change data range';
         showNote('');
       },
       setError: function (text) {
+        clearWait();
         var saved = host.getAttribute('data-range-label');
         if (saved && isStatusText(host.textContent)) host.textContent = saved;
         showNote(text || 'Could not read that range.');

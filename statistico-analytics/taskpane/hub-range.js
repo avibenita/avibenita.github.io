@@ -527,7 +527,12 @@
    * Read a worksheet range for a module dialog (does not change the hub data-source bar).
    * mode: "prompt" (Excel Select Data) or "selection" (current Excel selection).
    */
+  var rangeCaptureSerial = 0;
+
   function captureRangeForDialog(mode, promptText, name) {
+    var serial = ++rangeCaptureSerial;
+    function current() { return serial === rangeCaptureSerial; }
+
     if (mode === "used") {
       return Excel.run(function (ctx) {
         var rng = ctx.workbook.worksheets.getActiveWorksheet().getUsedRange();
@@ -536,6 +541,7 @@
           if (!rng.values || rng.values.length < 2) {
             return { error: "The worksheet range needs a header row plus at least one data row." };
           }
+          if (!current()) return { values: rng.values, address: rng.address, mode: "used" };
           rangeMode = "used";
           hubSyncRangeModeUI("used");
           applyRangeData(rng.values, rng.address);
@@ -555,6 +561,7 @@
           if (!rng.values || rng.values.length < 2) {
             return { error: "That named range needs a header row plus at least one data row." };
           }
+          if (!current()) return { values: rng.values, address: rng.address, mode: "named" };
           rangeMode = "named";
           hubSyncRangeModeUI("named");
           applyRangeData(rng.values, rng.address);
@@ -573,6 +580,7 @@
           if (!rng.values || rng.values.length < 2) {
             return { error: "Selection too small — needs a header row plus data." };
           }
+          if (!current()) return { values: rng.values, address: rng.address, mode: "selection" };
           rangeMode = "selection";
           hubSyncRangeModeUI("selection");
           applyRangeData(rng.values, rng.address);
@@ -613,6 +621,10 @@
             var rng = binding.getRange();
             rng.load(["values", "address"]);
             return ctx.sync().then(function () {
+              if (!current()) {
+                resolve({ values: rng.values, address: rng.address, mode: "prompt" });
+                return;
+              }
               rangeMode = "prompt";
               hubSyncRangeModeUI("prompt");
               applyRangeData(rng.values, rng.address);

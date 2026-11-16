@@ -399,3 +399,304 @@
   }
 
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Input-view range picker
+   The worksheet used range is the default. Select range, the current
+   selection, or a named range replaces it from inside the module.
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  function postParent(payload) {
+    try {
+      if (window.Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+        Office.context.ui.messageParent(JSON.stringify(payload));
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function setActive(root, mode) {
+    if (!root) return;
+    var buttons = root.querySelectorAll('[data-range-mode]');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle('is-active', buttons[i].getAttribute('data-range-mode') === mode);
+    }
+  }
+
+  function injectStyles() {
+    if (document.getElementById('cfg-input-range-style')) return;
+    var style = document.createElement('style');
+    style.id = 'cfg-input-range-style';
+    style.textContent =
+      '.cfg-range-anchor{position:relative;margin-left:auto;min-width:0;max-width:70%;display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;cursor:pointer;border:1px solid var(--cfg-border);background:var(--cfg-surface2,#fff);color:var(--cfg-text);border-radius:999px;padding:3px 8px 3px 10px;line-height:1.2}' +
+      '.cfg-range-anchor:hover,.cfg-range-anchor.is-open{border-color:var(--cfg-run-from,#f97316)}' +
+      '.cfg-range-anchor .reg-model-meta,.cfg-range-anchor .cfg-range-launch{margin-left:0;max-width:none;overflow:visible;text-overflow:clip;white-space:nowrap;cursor:pointer;font-size:11px;font-weight:650;color:var(--cfg-text)}' +
+      '.cfg-range-caret{font-size:9px;color:var(--cfg-text3);line-height:1}' +
+      '.cfg-range-menu{position:fixed;z-index:80;min-width:220px;padding:6px;border:1px solid var(--cfg-border);border-radius:8px;background:var(--cfg-surface,#fff);box-shadow:0 10px 28px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:4px}' +
+      '.cfg-range-menu[hidden]{display:none}' +
+      '.cfg-range-menu button{display:block;width:100%;text-align:left;border:1px solid transparent;background:transparent;color:var(--cfg-text);border-radius:6px;padding:7px 8px;font-size:12px;font-weight:600;cursor:pointer}' +
+      '.cfg-range-menu button:hover{background:var(--cfg-surface2,rgba(0,0,0,.04))}' +
+      '.cfg-range-menu button.is-active{border-color:var(--cfg-run-from,#f97316);box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316)}' +
+      '.cfg-range-menu select{height:28px;width:100%;border-radius:6px;border:1px solid var(--cfg-border);background:var(--cfg-surface2,#fff);color:var(--cfg-text);font-size:11px}' +
+      '.cfg-range-note{font-size:11px;color:#c2410c;padding:0 4px}' +
+      '.ps-data-actions .cfg-btn.is-active,.cfg-btn-small.is-active{box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316);border-color:var(--cfg-run-from,#f97316)}';
+    document.head.appendChild(style);
+  }
+
+  function rowCount(body) {
+    if (!body || typeof body !== 'object') return null;
+    if (Array.isArray(body.rows)) return body.rows.length;
+    if (Array.isArray(body.values) && body.values.length) return Math.max(0, body.values.length - 1);
+    return null;
+  }
+
+  function addressFromMessage(message) {
+    var bodies = [message && message.payload, message && message.data, message];
+    for (var i = 0; i < bodies.length; i++) {
+      var body = bodies[i];
+      if (!body || typeof body !== 'object' || !body.address) continue;
+      return { address: String(body.address), rows: rowCount(body) };
+    }
+    return null;
+  }
+
+  function ensureUsedButton() {
+    if (document.getElementById('use-used') || document.getElementById('btnUseUsed')) return true;
+    var anchor = document.getElementById('use-selection') || document.getElementById('btnUseSelection') ||
+      document.getElementById('pick-range') || document.getElementById('btnPickRange');
+    if (!anchor || !anchor.parentNode) return false;
+    injectStyles();
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = anchor.id.indexOf('btn') === 0 ? 'btnUseUsed' : 'use-used';
+    btn.className = anchor.className;
+    btn.setAttribute('data-range-mode', 'used');
+    btn.title = 'Use the detected worksheet range';
+    btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Used range';
+    anchor.parentNode.insertBefore(btn, anchor);
+    var selection = document.getElementById('use-selection') || document.getElementById('btnUseSelection');
+    var pick = document.getElementById('pick-range') || document.getElementById('btnPickRange');
+    if (selection) selection.setAttribute('data-range-mode', 'selection');
+    if (pick) pick.setAttribute('data-range-mode', 'prompt');
+    var group = anchor.parentNode;
+    group.addEventListener('click', function (ev) {
+      var target = ev.target;
+      while (target && target !== group && !(target.getAttribute && target.getAttribute('data-range-mode'))) {
+        target = target.parentNode;
+      }
+      if (!target || target === group) return;
+      setActive(group, target.getAttribute('data-range-mode'));
+    });
+    btn.addEventListener('click', function () {
+      var addr = document.getElementById('mvRangeAddr') || document.getElementById('data-note');
+      if (addr) addr.textContent = 'Reading the worksheet range…';
+      postParent({ action: 'useUsed' });
+    });
+    setActive(group, 'used');
+    return true;
+  }
+
+  function isStatusText(text) {
+    return /reading|select a range|choose a named/i.test(text || '');
+  }
+
+  function attachMenu(host) {
+    if (!host || !host.parentNode || document.getElementById('cfgInputRange')) return false;
+    injectStyles();
+    var wrap = document.createElement('span');
+    wrap.className = 'cfg-range-anchor';
+    host.parentNode.insertBefore(wrap, host);
+    wrap.appendChild(host);
+    host.classList.add('cfg-range-launch');
+    wrap.setAttribute('role', 'button');
+    wrap.setAttribute('tabindex', '0');
+    wrap.setAttribute('aria-expanded', 'false');
+    wrap.setAttribute('aria-haspopup', 'menu');
+    wrap.title = 'Change data range';
+    var caret = document.createElement('span');
+    caret.className = 'cfg-range-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '▾';
+    wrap.appendChild(caret);
+
+    var menu = document.createElement('div');
+    menu.id = 'cfgInputRange';
+    menu.className = 'cfg-range-menu';
+    menu.setAttribute('role', 'menu');
+    menu.hidden = true;
+    menu.innerHTML =
+      '<button type="button" data-range-mode="used" class="is-active">Used range</button>' +
+      '<button type="button" data-range-mode="prompt">Select range</button>' +
+      '<button type="button" data-range-mode="selection">Current selection</button>' +
+      '<button type="button" data-range-mode="named">Named range</button>' +
+      '<select id="cfgInputNamedRange" hidden><option value="">— Select a named range —</option></select>' +
+      '<div class="cfg-range-note" id="cfgInputRangeNote"></div>';
+    document.body.appendChild(menu);
+
+    var note = menu.querySelector('#cfgInputRangeNote');
+    var named = menu.querySelector('#cfgInputNamedRange');
+
+    function showNote(text) {
+      if (note) note.textContent = text || '';
+    }
+
+    function place() {
+      var rect = wrap.getBoundingClientRect();
+      var width = Math.max(220, menu.offsetWidth || 220);
+      var left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
+      menu.style.left = left + 'px';
+      menu.style.top = (rect.bottom + 6) + 'px';
+    }
+
+    function closeMenu() {
+      menu.hidden = true;
+      wrap.setAttribute('aria-expanded', 'false');
+      wrap.classList.remove('is-open');
+    }
+
+    function openMenu() {
+      menu.hidden = false;
+      wrap.setAttribute('aria-expanded', 'true');
+      wrap.classList.add('is-open');
+      place();
+    }
+
+    function toggleMenu() {
+      if (menu.hidden) openMenu();
+      else closeMenu();
+    }
+
+    wrap.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      toggleMenu();
+    });
+    wrap.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      toggleMenu();
+    });
+    document.addEventListener('click', function () { closeMenu(); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') closeMenu();
+    });
+    window.addEventListener('resize', function () {
+      if (!menu.hidden) place();
+    });
+
+    menu.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      var target = ev.target;
+      while (target && target !== menu && !(target.getAttribute && target.getAttribute('data-range-mode'))) {
+        target = target.parentNode;
+      }
+      if (!target || target === menu) return;
+      var mode = target.getAttribute('data-range-mode');
+      setActive(menu, mode);
+      showNote('');
+      if (mode === 'named') {
+        named.hidden = false;
+        place();
+        postParent({ action: 'listNamedRanges' });
+        return;
+      }
+      named.hidden = true;
+      if (!isStatusText(host.textContent)) host.setAttribute('data-range-label', host.textContent);
+      host.textContent = mode === 'prompt' ? 'Select a range in Excel…' : 'Reading the worksheet range…';
+      closeMenu();
+      var action = mode === 'prompt' ? 'pickRange' : (mode === 'selection' ? 'useSelection' : 'useUsed');
+      if (!postParent({ action: action })) showNote('Range changes are available inside Excel.');
+    });
+
+    named.addEventListener('change', function () {
+      if (!named.value) return;
+      setActive(menu, 'named');
+      if (!isStatusText(host.textContent)) host.setAttribute('data-range-label', host.textContent);
+      host.textContent = named.value;
+      showNote('');
+      closeMenu();
+      if (!postParent({ action: 'useNamed', name: named.value })) showNote('Range changes are available inside Excel.');
+    });
+
+    menu.__cfgRange = {
+      host: host,
+      setAddress: function (found) {
+        if (!found || !found.address || !isStatusText(host.textContent)) return;
+        host.textContent = found.address;
+        host.title = 'Change data range';
+        showNote('');
+      },
+      setError: function (text) {
+        var saved = host.getAttribute('data-range-label');
+        if (saved && isStatusText(host.textContent)) host.textContent = saved;
+        showNote(text || 'Could not read that range.');
+        openMenu();
+      },
+      setNames: function (names) {
+        var current = named.value;
+        named.innerHTML = '<option value="">— Select a named range —</option>';
+        (names || []).forEach(function (name) {
+          var option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          if (name === current) option.selected = true;
+          named.appendChild(option);
+        });
+        named.hidden = false;
+        if (!menu.hidden) place();
+      }
+    };
+    return true;
+  }
+
+  function install() {
+    if (document.getElementById('cfgInputRange')) return true;
+    var host = document.getElementById('tbRange') || document.getElementById('pt2SourceBadge');
+    if (host) return attachMenu(host);
+    if (document.getElementById('pick-range') || document.getElementById('btnPickRange') ||
+        document.getElementById('use-selection') || document.getElementById('btnUseSelection')) {
+      return ensureUsedButton();
+    }
+    return false;
+  }
+
+  function onParentMessage(arg) {
+    var bar = document.getElementById('cfgInputRange');
+    if (!bar || !bar.__cfgRange) return;
+    var message;
+    try { message = JSON.parse(arg && arg.message ? arg.message : '{}'); } catch (e) { return; }
+    if (message.type === 'NAMED_RANGES') {
+      bar.__cfgRange.setNames(message.names || []);
+      return;
+    }
+    if (message.message && /RANGE_ERROR$/.test(message.type || '')) {
+      bar.__cfgRange.setError(message.message);
+      return;
+    }
+    var found = addressFromMessage(message);
+    if (found) bar.__cfgRange.setAddress(found);
+  }
+
+  function bindMessages() {
+    if (!window.Office || !Office.onReady) return;
+    Office.onReady(function () {
+      if (!Office.context || !Office.context.ui || typeof Office.context.ui.addHandlerAsync !== 'function') return;
+      try {
+        Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage, function () {
+          postParent({ action: 'requestData' });
+        });
+      } catch (e) {}
+    });
+  }
+
+  function start() {
+    if (!install()) return;
+    bindMessages();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();

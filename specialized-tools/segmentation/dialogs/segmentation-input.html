@@ -24,14 +24,14 @@
   <script src="../shared-config.js?v=20260928range2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highcharts/10.3.3/highcharts.js"></script>
   <script src="segmentation-sample-data.js?v=20261013seg1"></script>
-  <script src="segmentation-engine.js?v=20261020wording"></script>
+  <script src="segmentation-engine.js?v=20261024spark"></script>
   <script src="segmentation-split-index.js?v=20261024scale"></script>
   <style>
     :root { --seg-acc: #0d9488; }
     [data-theme="light"] { --seg-acc: #0f766e; }
     body.cfg-embed .cfg-header { display: none; }
     .reg-layout { display:flex; gap:10px; flex:1 1 0; min-height:0; padding:8px 10px; overflow:hidden; }
-    .reg-vars-col { flex:0 0 220px; display:flex; flex-direction:column; gap:6px; min-height:0; overflow:hidden; }
+    .reg-vars-col { flex:0 0 280px; display:flex; flex-direction:column; gap:6px; min-height:0; overflow:hidden; }
     .reg-model-col { flex:1 1 0; display:flex; flex-direction:column; gap:8px; min-height:0; overflow-y:auto; padding-right:4px; }
     .reg-vars-header { display:flex; align-items:center; gap:8px; padding:0 2px 6px; border-bottom:1px solid var(--cfg-border); }
     .reg-vars-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.55px; color:var(--cfg-text); }
@@ -43,8 +43,12 @@
     .reg-var-icon { width:16px; height:16px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:8px; font-weight:700; flex-shrink:0; }
     .reg-var-icon.num { background:rgba(13,148,136,.18); color:var(--seg-acc); }
     .reg-var-icon.cat { background:rgba(180,83,9,.15); color:#b45309; }
+    .reg-var-icon.date { background:rgba(37,99,235,.14); color:#2563eb; }
+    .reg-var-copy { flex:1 1 auto; min-width:0; }
     .reg-var-name { font-size:12px; font-weight:600; color:var(--cfg-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .reg-var-stats { font-size:9.5px; color:var(--cfg-text3); }
+    .reg-spark { width:72px; height:26px; flex:0 0 72px; display:block; }
+    .reg-spark rect { fill:var(--seg-acc); }
     .reg-model-title { display:flex; align-items:center; gap:10px; padding:0 2px 6px; border-bottom:1px solid var(--cfg-border); }
     .reg-model-title > span:first-child { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
     .reg-model-meta { font-size:10px; color:var(--cfg-text3); margin-left:auto; }
@@ -253,9 +257,11 @@
         </div>
       </div>
     </div>
+    <p class="run-hint" id="runHint" style="margin:0;padding:8px 14px 0;">Select both dimensions</p>
     <div class="cfg-footer">
       <button class="cfg-btn cancel" id="btnCancel" type="button"><i class="fa-solid fa-times"></i> Cancel</button>
-      <span class="run-hint" id="runHint">Select both dimensions</span>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" type="button" disabled><i class="fa-solid fa-folder-open"></i> Saved configs...</button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" type="button" disabled><i class="fa-solid fa-floppy-disk"></i> Save this Configuration</button>
       <button class="cfg-btn run" id="btnRun" type="button" disabled><i class="fa-solid fa-play"></i> Run Analysis</button>
     </div>
   </div>
@@ -337,19 +343,46 @@
       return values;
     }
 
+    function escAttr(value) {
+      return String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function sparklineSvg(sketch) {
+      if (!sketch || !sketch.bins || !sketch.bins.length) return '';
+      var bins = sketch.bins;
+      var w = 72;
+      var h = 26;
+      var gap = bins.length > 8 ? 0.6 : 1.4;
+      var bw = (w - gap * (bins.length - 1)) / bins.length;
+      var max = 1;
+      bins.forEach(function (v) { if (v > max) max = v; });
+      var parts = bins.map(function (v, i) {
+        var bh = v > 0 ? Math.max(1.6, (v / max) * (h - 1)) : 0;
+        var x = i * (bw + gap);
+        return '<rect x="' + x.toFixed(2) + '" y="' + (h - bh).toFixed(2) + '" width="' + Math.max(bw, 0.8).toFixed(2) + '" height="' + bh.toFixed(2) + '" rx="0.5"></rect>';
+      }).join('');
+      var label = escAttr(sketch.label || sketch.caption || 'Distribution');
+      return '<svg class="reg-spark" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="' + label + '"><title>' + label + '</title>' + parts + '</svg>';
+    }
+
     function renderVariables() {
       var box = qs('variablesListBox');
       box.innerHTML = '';
       profiles.forEach(function (p) {
         var used = usedNames().indexOf(p.name) >= 0;
+        var sketch = p.sketch || {};
+        var iconKind = sketch.kind === 'dates' ? 'date' : (p.numeric ? 'num' : 'cat');
+        var iconLetter = sketch.kind === 'dates' ? 'd' : (p.numeric ? 'n' : 'c');
         var row = document.createElement('div');
         row.className = 'reg-var-row' + (used ? ' used' : '') + (selectedVar === p.name ? ' selected' : '');
         row.draggable = !used;
         row.tabIndex = used ? -1 : 0;
-        row.innerHTML = '<div class="reg-var-icon ' + (p.numeric ? 'num' : 'cat') + '">' + (p.numeric ? 'n' : 'c') + '</div>' +
-          '<div><div class="reg-var-name"></div><div class="reg-var-stats"></div></div>';
+        row.innerHTML = '<div class="reg-var-icon ' + iconKind + '">' + iconLetter + '</div>' +
+          '<div class="reg-var-copy"><div class="reg-var-name"></div><div class="reg-var-stats"></div></div>' +
+          sparklineSvg(sketch);
         row.querySelector('.reg-var-name').textContent = p.name;
-        row.querySelector('.reg-var-stats').textContent = (p.numeric ? 'Numeric' : 'Categorical') + ' · ' + p.nLevels + ' levels';
+        row.querySelector('.reg-var-stats').textContent = sketch.caption || ((p.numeric ? 'Numeric' : 'Categorical') + ' · ' + p.nLevels + ' levels');
+        if (sketch.label) row.title = sketch.label;
         if (!used) {
           row.addEventListener('click', function () {
             selectedVar = selectedVar === p.name ? null : p.name;
@@ -639,6 +672,8 @@
       }
       qs('runHint').textContent = hint;
       qs('btnRun').disabled = !ready;
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !ready;
+      if (window.CfgSave && typeof CfgSave.syncConfigButtons === 'function') CfgSave.syncConfigButtons('segmentation-config');
       var bits = [];
       if (assign.x.length) bits.push(assign.x.join(' + '));
       if (assign.y.length) bits.push(assign.y.join(' + '));
@@ -1008,7 +1043,27 @@
     });
     qs('splitLowLabel').addEventListener('input', scheduleSplitPreview);
     qs('minItems').addEventListener('change', refresh);
+    function saveModelSpec() {
+      if (qs('btnRun').disabled || !window.CfgSave) return;
+      var spec = buildSpec();
+      CfgSave.showPrompt('Save this Configuration', 'Configuration name', spec.title || '', function (name) {
+        CfgSave.saveCfgEntry('segmentation-config', name, spec, function () { refresh(); });
+      });
+    }
+
+    function showSavedList() {
+      if (!window.CfgSave) return;
+      CfgSave.showSavedList('segmentation-config', function (item) {
+        var spec = item.spec || {};
+        return spec.title || '';
+      }, function (item) {
+        applyPayload({ headers: _headers, rows: _rows, address: _address, savedSpec: item.spec });
+      });
+    }
+
     qs('btnRun').addEventListener('click', runAnalysis);
+    qs('btnSaveConfig').addEventListener('click', saveModelSpec);
+    qs('btnLoadPrev').addEventListener('click', showSavedList);
     qs('btnCancel').addEventListener('click', function () { send('cancel'); });
 
     (function applyInputChrome() {

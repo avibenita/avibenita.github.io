@@ -374,6 +374,69 @@
     if (onDone) onDone(entry);
   }
 
+  function attachFormConfig(storageKey, root) {
+    var scope = typeof root === 'string' ? document.querySelector(root) : (root || document);
+    if (!scope) scope = document;
+    function readSpec() {
+      var spec = {};
+      scope.querySelectorAll('input, select, textarea').forEach(function (el) {
+        if (!el.id || (el.closest && el.closest('.cfg-footer'))) return;
+        if (el.type === 'checkbox') spec[el.id] = !!el.checked;
+        else if (el.type === 'radio') { if (el.checked) spec[el.name || el.id] = el.value; }
+        else spec[el.id] = el.value;
+      });
+      return spec;
+    }
+    function applySpec(spec) {
+      if (!spec) return;
+      Object.keys(spec).forEach(function (key) {
+        var el = document.getElementById(key);
+        if (el && el.type !== 'radio') {
+          if (el.type === 'checkbox') el.checked = !!spec[key];
+          else el.value = spec[key] == null ? '' : spec[key];
+          try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+          return;
+        }
+        var match = scope.querySelector('input[type="radio"][name="' + key + '"][value="' + spec[key] + '"]');
+        if (match) {
+          match.checked = true;
+          try { match.dispatchEvent(new Event('change', { bubbles: true })); } catch (e2) {}
+        }
+      });
+    }
+    function refresh() {
+      syncConfigButtons(storageKey);
+      var saveBtn = document.getElementById('btnSaveConfig');
+      var runBtn = document.getElementById('run-btn') || document.getElementById('primary-action') || document.getElementById('btnRun');
+      if (saveBtn && runBtn) saveBtn.disabled = !!runBtn.disabled;
+    }
+    var saveBtn = document.getElementById('btnSaveConfig');
+    var loadBtn = document.getElementById('btnLoadPrev');
+    if (saveBtn && !saveBtn.getAttribute('data-cfg-bound')) {
+      saveBtn.setAttribute('data-cfg-bound', '1');
+      saveBtn.addEventListener('click', function () {
+        if (saveBtn.disabled) return;
+        showCfgPrompt('Save this Configuration', 'Configuration name', '', function (name) {
+          saveCfgEntry(storageKey, name, readSpec(), refresh);
+        });
+      });
+    }
+    if (loadBtn && !loadBtn.getAttribute('data-cfg-bound')) {
+      loadBtn.setAttribute('data-cfg-bound', '1');
+      loadBtn.addEventListener('click', function () {
+        showCfgSavedList(storageKey, function () { return ''; }, function (item) {
+          applySpec(item && item.spec);
+          refresh();
+        });
+      });
+    }
+    var runBtn = document.getElementById('run-btn') || document.getElementById('primary-action') || document.getElementById('btnRun');
+    if (runBtn && window.MutationObserver) {
+      new MutationObserver(refresh).observe(runBtn, { attributes: true, attributeFilter: ['disabled'] });
+    }
+    refresh();
+  }
+
   // Expose globally
   window.CfgSave = {
     escHtml:          escHtml,
@@ -383,6 +446,7 @@
     showSavedList:    showCfgSavedList,
     saveCfgEntry:     saveCfgEntry,
     syncConfigButtons: syncConfigButtons,
+    attachFormConfig: attachFormConfig,
     _loadById:        _loadById,
     _deleteById:      _deleteById,
     _pendingLoad:     _pendingLoad

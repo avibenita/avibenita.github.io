@@ -320,8 +320,10 @@
 
     <div class="cfg-footer">
       <button class="cfg-btn cancel" id="btnCancel"><i class="fa-solid fa-times"></i> Cancel</button>
+      <button class="cfg-btn load-prev" id="btnLoadPrev" disabled><i class="fa-solid fa-folder-open"></i> Saved configs...</button>
+      <button class="cfg-btn save-config" id="btnSaveConfig" disabled><i class="fa-solid fa-floppy-disk"></i> Save this Configuration</button>
       <button class="cfg-btn run" id="btnRun" disabled>
-        <i class="fa-solid fa-play"></i> Run Reliability
+        <i class="fa-solid fa-play"></i> Run Analysis
       </button>
     </div>
   </div>
@@ -334,6 +336,8 @@
     var selectedItems = [];
     var reverseItems = [];
     var draggedElement = null;
+    var STORAGE_KEY = 'reliability-config';
+    window.STORAGE_KEY = STORAGE_KEY;
 
     function qs(id) { return document.getElementById(id); }
 
@@ -598,6 +602,8 @@
         qs('btnRun').disabled = true;
       }
       qs('setupWarn').textContent = warn.join(' ');
+      if (qs('btnSaveConfig')) qs('btnSaveConfig').disabled = !!qs('btnRun').disabled;
+      if (window.CfgSave && typeof CfgSave.syncConfigButtons === 'function') CfgSave.syncConfigButtons(STORAGE_KEY);
     }
 
     function buildSpec() {
@@ -690,6 +696,57 @@
       refresh();
     }
 
+    function applySavedSpec(spec) {
+      if (!spec) return;
+      selectedItems = (spec.items || []).filter(function (n) {
+        return columnStats.some(function (s) { return s.name === n && s.eligible; });
+      });
+      reverseItems = (spec.reverseItems || []).filter(function (n) { return selectedItems.indexOf(n) >= 0; });
+      if (spec.scoreRange) {
+        if (qs('scoreMin')) qs('scoreMin').value = spec.scoreRange.min;
+        if (qs('scoreMax')) qs('scoreMax').value = spec.scoreRange.max;
+      }
+      if (qs('groupVariable')) qs('groupVariable').value = spec.groupVariable || '';
+      var missingEl = document.querySelector('input[name="missing"][value="' + (spec.missingMethod || 'listwise') + '"]');
+      if (missingEl) missingEl.checked = true;
+      var c = spec.coefficients || {};
+      [['optAlpha', c.alpha], ['optOmega', c.omegaTotal], ['optStdAlpha', c.standardizedAlpha], ['optCI', c.confidenceInterval]].forEach(function (pair) {
+        if (qs(pair[0])) qs(pair[0]).checked = !!pair[1];
+      });
+      if (spec.confidenceLevel != null && qs('optLevel')) qs('optLevel').value = spec.confidenceLevel;
+      if (spec.bootstrapSamples != null && qs('optBoot')) qs('optBoot').value = spec.bootstrapSamples;
+      if (spec.weakItemThreshold != null && qs('optThresh')) qs('optThresh').value = spec.weakItemThreshold;
+      var d = spec.itemDiagnostics || {};
+      [['optITC', d.itemTotal], ['optAlphaDel', d.alphaIfDeleted], ['optOmegaDel', d.omegaIfDeleted], ['optMatrix', d.interItemMatrix], ['optFlagWeak', d.flagWeak]].forEach(function (pair) {
+        if (qs(pair[0])) qs(pair[0]).checked = !!pair[1];
+      });
+      var st = spec.structure || {};
+      if (qs('optUni')) qs('optUni').checked = !!st.unidimensionality;
+      if (qs('optScree')) qs('optScree').checked = !!st.scree;
+      var score = spec.scaleScore || {};
+      var methodEl = document.querySelector('input[name="scoreMethod"][value="' + (score.method || 'mean') + '"]');
+      if (methodEl) methodEl.checked = true;
+      if (qs('minCompleted') && score.minCompleted) qs('minCompleted').value = score.minCompleted;
+      refresh();
+    }
+
+    function saveModelSpec() {
+      if (qs('btnRun').disabled || !window.CfgSave) return;
+      CfgSave.showPrompt('Save this Configuration', 'Configuration name', '', function (name) {
+        CfgSave.saveCfgEntry(STORAGE_KEY, name, buildSpec(), function () { validate(); });
+      });
+    }
+
+    function showSavedList() {
+      if (!window.CfgSave) return;
+      CfgSave.showSavedList(STORAGE_KEY, function (item) {
+        var spec = item.spec || {};
+        return (spec.items || []).join(', ');
+      }, function (item) {
+        applySavedSpec(item.spec || {});
+      });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
       setupDropZone();
       document.querySelectorAll('.cfg-tab').forEach(function(b) {
@@ -697,6 +754,8 @@
       });
       qs('btnCancel').addEventListener('click', function() { send('close', null); });
       qs('btnRun').addEventListener('click', runAnalysis);
+      qs('btnSaveConfig').addEventListener('click', saveModelSpec);
+      qs('btnLoadPrev').addEventListener('click', showSavedList);
       qs('btnAddAllNumeric').addEventListener('click', selectAllNumeric);
       qs('btnClearAll').addEventListener('click', clearAll);
       ['scoreMin', 'scoreMax', 'groupVariable', 'optThresh'].forEach(function(id) {

@@ -431,10 +431,11 @@
     var style = document.createElement('style');
     style.id = 'cfg-input-range-style';
     style.textContent =
-      '.cfg-range-anchor{position:relative;margin-left:auto;min-width:0;max-width:70%;display:inline-flex;align-items:center;gap:6px;justify-content:flex-end;cursor:pointer;border:1px solid var(--cfg-border);background:var(--cfg-surface2,#fff);color:var(--cfg-text);border-radius:999px;padding:3px 8px 3px 10px;line-height:1.2}' +
-      '.cfg-range-anchor:hover,.cfg-range-anchor.is-open{border-color:var(--cfg-run-from,#f97316)}' +
-      '.cfg-range-anchor .reg-model-meta,.cfg-range-anchor .cfg-range-launch{margin-left:0;max-width:none;overflow:visible;text-overflow:clip;white-space:nowrap;cursor:pointer;font-size:11px;font-weight:650;color:var(--cfg-text)}' +
-      '.cfg-range-caret{font-size:9px;color:var(--cfg-text3);line-height:1}' +
+      '.cfg-range-anchor{position:relative;margin-left:auto;min-width:0;max-width:78%;display:inline-flex;align-items:center;gap:8px;justify-content:flex-end}' +
+      '.cfg-range-kicker{flex:none;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--cfg-text3,#64748b)}' +
+      '.cfg-range-anchor .reg-model-meta,.cfg-range-anchor .cfg-range-launch{margin-left:0;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default;font-size:12px;font-weight:700;color:var(--cfg-text);font-variant-numeric:tabular-nums}' +
+      '.cfg-range-change{flex:none;border:1px solid var(--cfg-border);background:var(--cfg-surface,#fff);color:var(--cfg-text);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700;line-height:1.2;cursor:pointer}' +
+      '.cfg-range-change:hover,.cfg-range-anchor.is-open .cfg-range-change{border-color:var(--cfg-run-from,#f97316);color:var(--cfg-run-from,#f97316)}' +
       '.cfg-range-menu{position:fixed;z-index:80;min-width:220px;padding:6px;border:1px solid var(--cfg-border);border-radius:8px;background:var(--cfg-surface,#fff);box-shadow:0 10px 28px rgba(15,23,42,.18);display:flex;flex-direction:column;gap:4px}' +
       '.cfg-range-menu[hidden]{display:none}' +
       '.cfg-range-menu button{display:block;width:100%;text-align:left;border:1px solid transparent;background:transparent;color:var(--cfg-text);border-radius:6px;padding:7px 8px;font-size:12px;font-weight:600;cursor:pointer}' +
@@ -509,18 +510,19 @@
     var wrap = document.createElement('span');
     wrap.className = 'cfg-range-anchor';
     host.parentNode.insertBefore(wrap, host);
+    var kicker = document.createElement('span');
+    kicker.className = 'cfg-range-kicker';
+    kicker.textContent = 'Range';
+    wrap.appendChild(kicker);
     wrap.appendChild(host);
     host.classList.add('cfg-range-launch');
-    wrap.setAttribute('role', 'button');
-    wrap.setAttribute('tabindex', '0');
-    wrap.setAttribute('aria-expanded', 'false');
-    wrap.setAttribute('aria-haspopup', 'menu');
-    wrap.title = 'Change data range';
-    var caret = document.createElement('span');
-    caret.className = 'cfg-range-caret';
-    caret.setAttribute('aria-hidden', 'true');
-    caret.textContent = '▾';
-    wrap.appendChild(caret);
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'cfg-range-change';
+    button.textContent = 'Change range';
+    button.setAttribute('aria-haspopup', 'menu');
+    button.setAttribute('aria-expanded', 'false');
+    wrap.appendChild(button);
 
     var menu = document.createElement('div');
     menu.id = 'cfgInputRange';
@@ -564,7 +566,7 @@
     }
 
     function place() {
-      var rect = wrap.getBoundingClientRect();
+      var rect = button.getBoundingClientRect();
       var width = Math.max(220, menu.offsetWidth || 220);
       var left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
       menu.style.left = left + 'px';
@@ -573,13 +575,13 @@
 
     function closeMenu() {
       menu.hidden = true;
-      wrap.setAttribute('aria-expanded', 'false');
+      button.setAttribute('aria-expanded', 'false');
       wrap.classList.remove('is-open');
     }
 
     function openMenu() {
       menu.hidden = false;
-      wrap.setAttribute('aria-expanded', 'true');
+      button.setAttribute('aria-expanded', 'true');
       wrap.classList.add('is-open');
       place();
     }
@@ -589,14 +591,9 @@
       else closeMenu();
     }
 
-    wrap.addEventListener('click', function (ev) {
+    button.addEventListener('click', function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      toggleMenu();
-    });
-    wrap.addEventListener('keydown', function (ev) {
-      if (ev.key !== 'Enter' && ev.key !== ' ') return;
-      ev.preventDefault();
       toggleMenu();
     });
     document.addEventListener('click', function () { closeMenu(); });
@@ -659,7 +656,7 @@
         if (!found || !found.address || !isStatusText(host.textContent)) return;
         clearWait();
         host.textContent = found.address;
-        host.title = 'Change data range';
+        host.title = found.address;
         showNote('');
       },
       setError: function (text) {

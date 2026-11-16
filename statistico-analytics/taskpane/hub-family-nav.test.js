@@ -15,7 +15,8 @@ const ALL = [
   "calc-power", "calc-precision", "calc-distribution-hub", "calc-erlang",
   "pareto2080", "process-settings", "gage-rr", "capability-range",
   "split-index", "reliability",
-  "prepare-data", "multivariable", "publication-tables", "ezpaste-open"
+  "prepare-data", "multivariable", "publication-tables", "ezpaste-open",
+  "meta-analysis"
 ];
 
 describe("family home catalog", () => {
@@ -35,7 +36,7 @@ describe("family home catalog", () => {
       "univariate", "correlations", "pca", "factor", "hierarchical", "kmeans"
     ]);
     expect(model.sections[0].families[1].moduleIds).toEqual([
-      "independent", "dependent", "anova", "contingency"
+      "independent", "dependent", "anova", "contingency", "meta-analysis"
     ]);
     expect(model.sections[0].families[2].moduleIds).toEqual(["regression", "logistic", "mixed"]);
     expect(model.sections[1].families[1].moduleIds).toEqual([
@@ -100,6 +101,11 @@ describe("family home markup", () => {
     expect(html).toContain("See what’s in your data.");
     expect(html.indexOf("hub-family-title")).toBeLessThan(html.indexOf("See what’s in your data."));
     expect(html).toContain('title="Paired / Repeated Measures"');
+    expect(html).toContain(">Across studies<");
+    expect(html).toContain(">Meta-analysis<");
+    expect(html).toContain("Combine effect estimates across studies.");
+    expect(html.indexOf(">Contingency Tables<")).toBeLessThan(html.indexOf(">Across studies<"));
+    expect(html.indexOf(">Across studies<")).toBeLessThan(html.indexOf(">Meta-analysis<"));
     expect(html.indexOf(">Independent Groups<")).toBeLessThan(html.indexOf(">Paired / Repeated Measures<"));
     expect(html.indexOf(">Paired / Repeated Measures<")).toBeLessThan(html.indexOf(">ANOVA<"));
     expect(html).toContain('aria-expanded="false" aria-controls="hub-family-body-explore"');

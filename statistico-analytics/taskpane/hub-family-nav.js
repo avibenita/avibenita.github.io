@@ -35,14 +35,16 @@
       id: "compare",
       label: "Compare groups & conditions",
       tagline: "Check whether groups or measurements differ.",
-      help: "Use independent groups for different people or units, and paired or repeated measures for the same subjects. Use contingency tables for categorical counts.",
+      help: "Use independent groups for different people or units, and paired or repeated measures for the same subjects. Use contingency tables for categorical counts. Those compare groups or conditions within a study. Meta-analysis combines effect estimates across studies.",
       icon: "fa-scale-balanced",
       accent: "compare",
       modules: [
         { id: "independent", label: "Independent Groups" },
         { id: "dependent", label: "Paired / Repeated Measures" },
         { id: "anova", label: "ANOVA" },
-        { id: "contingency", label: "Contingency Tables" }
+        { id: "contingency", label: "Contingency Tables" },
+        { divider: "Across studies" },
+        { id: "meta-analysis", label: "Meta-analysis", description: "Combine effect estimates across studies." }
       ]
     },
     {
@@ -148,20 +150,30 @@
 
   function specModules(spec) {
     return (spec.modules || []).map(function (entry) {
+      if (entry && entry.divider) return { divider: entry.divider };
       if (typeof entry === "string") return { id: entry, label: entry };
-      return { id: entry.id, label: entry.label || entry.id, mark: !!entry.mark };
+      return { id: entry.id, label: entry.label || entry.id, description: entry.description || "", mark: !!entry.mark };
     });
   }
 
   function visibleModules(spec, catalog) {
     var modules = [];
+    var pendingDivider = null;
     specModules(spec).forEach(function (entry) {
+      if (entry.divider) {
+        pendingDivider = entry;
+        return;
+      }
       var row = catalog && catalog[entry.id];
       if (!row || row.hidden) return;
+      if (pendingDivider) {
+        modules.push({ divider: pendingDivider.divider });
+        pendingDivider = null;
+      }
       modules.push({
         id: entry.id,
         label: entry.label,
-        description: row.description || "",
+        description: entry.description || row.description || "",
         mark: !!entry.mark,
         locked: !!row.locked,
         comingSoon: !!row.comingSoon
@@ -181,7 +193,7 @@
       icon: spec.icon,
       accent: spec.accent || spec.id,
       direct: !!spec.direct,
-      moduleIds: modules.map(function (mod) { return mod.id; }),
+      moduleIds: modules.filter(function (mod) { return mod.id; }).map(function (mod) { return mod.id; }),
       modules: modules
     };
   }
@@ -272,6 +284,10 @@
     html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(helpText) + "</p>";
     html += '<div class="hub-family-modules">';
     (family.modules || []).forEach(function (mod) {
+      if (mod.divider) {
+        html += '<p class="hub-family-divider"><span>' + escapeHtml(mod.divider) + "</span></p>";
+        return;
+      }
       var badges = "";
       if (mod.comingSoon) badges += ' <span class="soon-badge">Soon</span>';
       if (mod.locked) badges += ' <span class="plan-badge">Professional</span>';

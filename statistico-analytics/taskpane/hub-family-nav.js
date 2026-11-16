@@ -23,13 +23,13 @@
       icon: "fa-chart-bar",
       accent: "explore",
       modules: [
-        { heading: "Summaries & relationships" },
+        { divider: "Summaries & relationships" },
         { id: "univariate", label: "Univariate" },
         { id: "correlations", label: "Correlations" },
-        { heading: "Components & factors" },
+        { divider: "Components & factors" },
         { id: "pca", label: "PCA" },
         { id: "factor", label: "Factor Analysis" },
-        { heading: "Clustering" },
+        { divider: "Clustering" },
         { id: "hierarchical", label: "Hierarchical Clustering" },
         { id: "kmeans", label: "K-means" }
       ]
@@ -153,7 +153,6 @@
 
   function specModules(spec) {
     return (spec.modules || []).map(function (entry) {
-      if (entry && entry.heading) return { heading: entry.heading };
       if (entry && entry.divider) return { divider: entry.divider };
       if (typeof entry === "string") return { id: entry, label: entry };
       return { id: entry.id, label: entry.label || entry.id, description: entry.description || "", mark: !!entry.mark };
@@ -164,16 +163,14 @@
     var modules = [];
     var pendingDivider = null;
     specModules(spec).forEach(function (entry) {
-      if (entry.heading || entry.divider) {
+      if (entry.divider) {
         pendingDivider = entry;
         return;
       }
       var row = catalog && catalog[entry.id];
       if (!row || row.hidden) return;
       if (pendingDivider) {
-        modules.push(pendingDivider.heading
-          ? { heading: pendingDivider.heading }
-          : { divider: pendingDivider.divider });
+        modules.push({ divider: pendingDivider.divider });
         pendingDivider = null;
       }
       modules.push({
@@ -290,10 +287,6 @@
     html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(helpText) + "</p>";
     html += '<div class="hub-family-modules">';
     (family.modules || []).forEach(function (mod) {
-      if (mod.heading) {
-        html += '<p class="hub-family-group">' + escapeHtml(mod.heading) + "</p>";
-        return;
-      }
       if (mod.divider) {
         html += '<p class="hub-family-divider"><span>' + escapeHtml(mod.divider) + "</span></p>";
         return;

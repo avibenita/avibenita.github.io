@@ -443,6 +443,9 @@
       '.cfg-range-menu button.is-active{border-color:var(--cfg-run-from,#f97316);box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316)}' +
       '.cfg-range-menu select{height:28px;width:100%;border-radius:6px;border:1px solid var(--cfg-border);background:var(--cfg-surface2,#fff);color:var(--cfg-text);font-size:11px}' +
       '.cfg-range-note{font-size:11px;color:#c2410c;padding:0 4px}' +
+      '.cfg-range-spinner{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--cfg-bg,#f4f7fb);color:var(--cfg-text3,#64748b);font-size:14px;font-weight:650}' +
+      '.cfg-range-spinner[hidden]{display:none}' +
+      '.cfg-range-spinner i{font-size:22px;color:var(--cfg-run-from,#f97316)}' +
       '.ps-data-actions .cfg-btn.is-active,.cfg-btn-small.is-active{box-shadow:inset 0 0 0 1px var(--cfg-run-from,#f97316);border-color:var(--cfg-run-from,#f97316)}';
     document.head.appendChild(style);
   }
@@ -501,7 +504,80 @@
   }
 
   function isStatusText(text) {
-    return /reading|select a range|choose a named/i.test(text || '');
+    return /reading|select a range|choose a named|loading range/i.test(text || '');
+  }
+
+  var RANGE_RELOAD_KEY = 'statistico.rangeReload';
+
+  function markRangeReload() {
+    try { localStorage.setItem(RANGE_RELOAD_KEY, String(Date.now())); } catch (e) {}
+  }
+
+  function rangeReloadPending() {
+    try {
+      var stamp = Number(localStorage.getItem(RANGE_RELOAD_KEY) || 0);
+      return stamp > 0 && Date.now() - stamp < 20000;
+    } catch (e) { return false; }
+  }
+
+  function clearRangeReload() {
+    try { localStorage.removeItem(RANGE_RELOAD_KEY); } catch (e) {}
+  }
+
+  function showRangeSpinner() {
+    markRangeReload();
+    var spinner = document.getElementById('loadingSpinner');
+    var main = document.getElementById('mainContent');
+    if (spinner) {
+      spinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading range…';
+      spinner.style.display = 'flex';
+      if (main) main.style.display = 'none';
+      return;
+    }
+    var overlay = document.getElementById('cfgRangeSpinner');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'cfgRangeSpinner';
+      overlay.className = 'cfg-range-spinner';
+      overlay.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Loading range…</span>';
+      document.body.appendChild(overlay);
+    }
+    overlay.hidden = false;
+  }
+
+  function hideRangeSpinner() {
+    clearRangeReload();
+    var overlay = document.getElementById('cfgRangeSpinner');
+    if (overlay) overlay.hidden = true;
+  }
+
+  function restoreInputAfterRangeError() {
+    hideRangeSpinner();
+    var spinner = document.getElementById('loadingSpinner');
+    var main = document.getElementById('mainContent');
+    if (spinner) spinner.style.display = 'none';
+    if (main) main.style.display = 'flex';
+  }
+
+  function watchRangeReload(host) {
+    if (!host || !rangeReloadPending()) return;
+    var text = (host.textContent || '').trim();
+    if (text && text !== '-' && !isStatusText(text)) {
+      clearRangeReload();
+      return;
+    }
+    var spinner = document.getElementById('loadingSpinner');
+    if (spinner && spinner.style.display !== 'none') {
+      spinner.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Loading range…';
+    }
+    var obs = new MutationObserver(function () {
+      var next = (host.textContent || '').trim();
+      if (next && next !== '-' && !isStatusText(next)) {
+        clearRangeReload();
+        obs.disconnect();
+      }
+    });
+    obs.observe(host, { childList: true, characterData: true, subtree: true });
   }
 
   function attachMenu(host) {
@@ -554,6 +630,7 @@
       waitTimer = setTimeout(function () {
         waitTimer = null;
         if (!isStatusText(host.textContent)) return;
+        restoreInputAfterRangeError();
         var saved = host.getAttribute('data-range-label');
         if (saved) host.textContent = saved;
         showNote('Close the Statistico pane and open it again, then change the range.');
@@ -627,9 +704,11 @@
       var action = mode === 'prompt' ? 'pickRange' : (mode === 'selection' ? 'useSelection' : 'useUsed');
       if (!postParent({ action: action })) {
         clearWait();
+        restoreInputAfterRangeError();
         showNote('Range changes are available inside Excel.');
         openMenu();
       } else {
+        showRangeSpinner();
         expectReply();
       }
     });
@@ -643,12 +722,16 @@
       closeMenu();
       if (!postParent({ action: 'useNamed', name: named.value })) {
         clearWait();
+        restoreInputAfterRangeError();
         showNote('Range changes are available inside Excel.');
         openMenu();
       } else {
+        showRangeSpinner();
         expectReply();
       }
     });
+
+    watchRangeReload(host);
 
     menu.__cfgRange = {
       host: host,
@@ -658,9 +741,11 @@
         host.textContent = found.address;
         host.title = found.address;
         showNote('');
+        hideRangeSpinner();
       },
       setError: function (text) {
         clearWait();
+        restoreInputAfterRangeError();
         var saved = host.getAttribute('data-range-label');
         if (saved && isStatusText(host.textContent)) host.textContent = saved;
         showNote(text || 'Could not read that range.');

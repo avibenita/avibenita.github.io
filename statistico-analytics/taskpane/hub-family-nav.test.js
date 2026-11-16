@@ -106,6 +106,12 @@ describe("family home markup", () => {
     expect(html).toContain("Combine effect estimates across studies.");
     expect(html.indexOf(">Contingency Tables<")).toBeLessThan(html.indexOf(">Across studies<"));
     expect(html.indexOf(">Across studies<")).toBeLessThan(html.indexOf(">Meta-analysis<"));
+    expect(html.indexOf("Summaries &amp; relationships")).toBeLessThan(html.indexOf(">Univariate<"));
+    expect(html.indexOf(">Correlations<")).toBeLessThan(html.indexOf("Components &amp; factors"));
+    expect(html.indexOf("Components &amp; factors")).toBeLessThan(html.indexOf(">PCA<"));
+    expect(html.indexOf(">Factor Analysis<")).toBeLessThan(html.indexOf(">Clustering<"));
+    expect(html.indexOf(">Clustering<")).toBeLessThan(html.indexOf(">Hierarchical Clustering<"));
+    expect(html.indexOf(">Hierarchical Clustering<")).toBeLessThan(html.indexOf(">K-means<"));
     expect(html.indexOf(">Independent Groups<")).toBeLessThan(html.indexOf(">Paired / Repeated Measures<"));
     expect(html.indexOf(">Paired / Repeated Measures<")).toBeLessThan(html.indexOf(">ANOVA<"));
     expect(html).toContain('aria-expanded="false" aria-controls="hub-family-body-explore"');

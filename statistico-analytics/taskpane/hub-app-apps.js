@@ -71,6 +71,8 @@
     ".hub-family-help{margin:0 0 8px;font-size:12px;line-height:1.45;color:#cbd5e1;}",
     ".hub-family-help[hidden]{display:none !important;}",
     ".hub-family-modules{display:flex;flex-direction:column;gap:6px;margin-top:0;}",
+    ".hub-family-group{margin:12px 2px 0;font-size:11px;font-weight:650;line-height:1.3;color:#94a3b8;}",
+    ".hub-family-group:first-child{margin-top:2px;}",
     ".hub-family-divider{display:flex;align-items:center;gap:8px;margin:8px 2px 2px;color:#94a3b8;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;}",
     ".hub-family-divider::before,.hub-family-divider::after{content:\"\";flex:1;height:1px;background:rgba(148,163,184,.4);}",
     ".hub-family-module{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;min-height:34px;padding:8px 10px;border:1px solid #334963;border-radius:6px;background:#1b2838;color:#f8fafc;text-align:left;cursor:pointer;font:inherit;font-size:13px;font-weight:650;line-height:1.3;}",

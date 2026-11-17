@@ -4206,7 +4206,7 @@ function openCapabilityFromHub() {
     setSelectedModuleCard("capability-range", false);
     return true;
   }
-  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.REGRESSION_BUILDER, function (res) {
+  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
     if (res.status === Office.AsyncResultStatus.Failed) {
       setSelectedModuleCard("capability-range", false);
       var err = res.error || {};

@@ -15,7 +15,8 @@
   <link rel="stylesheet" href="../shared/module-guide.css?v=20261114guides" />
   <link rel="stylesheet" href="../shared-by-group.css?v=20261112cap3" />
   <script src="../shared-config.js?v=20261116footer"></script>
-  <script src="../shared/demo-data.js?v=20261117load4"></script>
+  <script src="../shared/demo-fixtures.js?v=20261117demo6"></script>
+  <script src="../shared/demo-data.js?v=20261117demo6"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
   <script src="../shared-header.js?v=20261114guides"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
@@ -787,7 +788,8 @@
     function loadTable(next, note) {
       table = next || { headers: [], rows: [] };
       var rows = table.rows || [];
-      el('data-note').textContent = (table.address ? ('Worksheet ' + table.address + ' · ') : '') + rows.length + ' data ' + (rows.length === 1 ? 'row' : 'rows') + (note ? ' · ' + note : '') + '.';
+      var sourceLabel = table.address ? ((String(table.address).indexOf('Demo data') === 0 ? '' : 'Worksheet ') + table.address + ' · ') : '';
+      el('data-note').textContent = sourceLabel + rows.length + ' data ' + (rows.length === 1 ? 'row' : 'rows') + (note ? ' · ' + note : '') + '.';
       if (el('tbRange')) el('tbRange').textContent = table.address || '';
       showError('host-error', '');
       paintInputForm();
@@ -797,15 +799,18 @@
     }
 
     function loadDemo() {
-      var demo = Engine.demoTable();
-      var demoSpec = Engine.demoSpec();
+      var bundled = window.StatisticoDemo && typeof StatisticoDemo.table === 'function'
+        ? StatisticoDemo.table('process_capability')
+        : null;
+      var demo = bundled || Engine.demoTable();
+      var demoSpec = bundled ? { lsl: 10, usl: 20, target: 15 } : Engine.demoSpec();
       spec.lsl = String(demoSpec.lsl);
       spec.usl = String(demoSpec.usl);
       spec.target = String(demoSpec.target);
       writeSpec('setup');
       writeSpec('results');
-      measure = 'Diameter';
-      groupName = 'Line';
+      measure = bundled ? 'diameter_mm' : 'Diameter';
+      groupName = bundled ? 'line' : 'Line';
       if (window.StatisticoDemo && typeof StatisticoDemo.remember === 'function') StatisticoDemo.remember(demo);
       else window.__statisticoDemo = { headers: demo.headers, rows: demo.rows, address: demo.address || 'Demo data' };
       loadTable(demo, 'demo process');

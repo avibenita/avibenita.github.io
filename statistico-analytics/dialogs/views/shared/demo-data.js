@@ -204,14 +204,324 @@
     return out;
   }
 
+  function fixtures() {
+    return root.StatisticoDemoFixtures || null;
+  }
+
+  function cloneTable(id) {
+    var src = fixtures() && fixtures().tables[id];
+    if (!src) return null;
+    return {
+      id: src.id,
+      title: src.title,
+      module: src.module,
+      groupField: src.groupField,
+      mode: src.mode,
+      roles: src.roles,
+      settings: src.settings,
+      headers: src.headers.slice(),
+      rows: src.rows.map(function (row) { return row.slice(); })
+    };
+  }
+
+  function table(id, opts) {
+    var src = cloneTable(id);
+    if (!src) return null;
+    if (opts && opts.groupField && opts.groupValue != null) {
+      var idx = src.headers.indexOf(opts.groupField);
+      if (idx >= 0) {
+        src.rows = src.rows.filter(function (row) { return String(row[idx]) === String(opts.groupValue); });
+      }
+    }
+    src.address = 'Demo data · ' + src.title;
+    src.values = [src.headers].concat(src.rows);
+    return src;
+  }
+
+  function columnIndex(headers, name) {
+    return headers.indexOf(name);
+  }
+
+  function levelsOf(tableObj, name) {
+    var idx = columnIndex(tableObj.headers, name);
+    var seen = Object.create(null);
+    var out = [];
+    if (idx < 0) return out;
+    tableObj.rows.forEach(function (row) {
+      var value = row[idx];
+      if (value == null || value === '') return;
+      var key = String(value);
+      if (seen[key]) return;
+      seen[key] = true;
+      out.push(key);
+    });
+    return out;
+  }
+
+  function pivotScores(source, factor, value, order) {
+    var factorIdx = columnIndex(source.headers, factor);
+    var valueIdx = columnIndex(source.headers, value);
+    var groups = Object.create(null);
+    var names = order.slice();
+    source.rows.forEach(function (row) {
+      var name = String(row[factorIdx]);
+      if (!groups[name]) groups[name] = [];
+      groups[name].push(row[valueIdx]);
+      if (names.indexOf(name) < 0) names.push(name);
+    });
+    var height = 0;
+    names.forEach(function (name) { height = Math.max(height, (groups[name] || []).length); });
+    var rows = [];
+    var r;
+    for (r = 0; r < height; r++) {
+      rows.push(names.map(function (name) {
+        var col = groups[name] || [];
+        return r < col.length ? col[r] : '';
+      }));
+    }
+    return { headers: names, rows: rows, title: source.title, id: source.id };
+  }
+
+  function namedColumns(headers, map) {
+    var spec = { colNames: {} };
+    Object.keys(map).forEach(function (key) {
+      spec.colNames[key] = map[key];
+      spec[key] = columnIndex(headers, map[key]);
+    });
+    return spec;
+  }
+
+  function activeMetaMode() {
+    var button = document.querySelector('#effectTypeSeg button.active');
+    return (button && button.getAttribute('data-type')) || 'continuous';
+  }
+
+  function clusterMethodNow() {
+    var sel = document.getElementById('clusterMethod');
+    if (sel && sel.value === 'hierarchical') return 'hierarchical';
+    if (root.CLUSTER_LOCKED_METHOD === 'hierarchical') return 'hierarchical';
+    return 'kmeans';
+  }
+
+  function build(kind) {
+    var src;
+    var spec;
+    var shaped;
+    if (kind === 'univariate') {
+      src = table('univariate');
+      spec = { columnIndex: columnIndex(src.headers, src.roles.measure) };
+      return withSpec(src, spec);
+    }
+    if (kind === 'correlation') {
+      src = table('correlations');
+      spec = { variables: src.roles.variables.slice(), selectAllNumeric: false };
+      return withSpec(src, spec);
+    }
+    if (kind === 'factor') {
+      var factorId = /(?:^|[?&])mode=pca(?:&|$)/.test(root.location && root.location.search || '') ? 'pca' : 'factor_analysis';
+      src = table(factorId);
+      spec = { variables: (src.roles.variables || src.roles.items).slice() };
+      if (factorId === 'factor_analysis') spec.factors = src.settings.suggested_factor_count || 3;
+      return withSpec(src, spec);
+    }
+    if (kind === 'cluster') {
+      var method = clusterMethodNow();
+      src = table(method === 'hierarchical' ? 'hierarchical' : 'kmeans');
+      spec = {
+        variables: src.roles.features.slice(),
+        clusterMethod: method,
+        k: src.settings.suggested_cluster_count || 3,
+        standardize: src.settings.standardize !== false,
+        linkage: 'average',
+        distance: 'euclidean'
+      };
+      shaped = withSpec(src, spec);
+      var sel = document.getElementById('clusterMethod');
+      shaped.lockedMethod = sel && sel.disabled ? sel.value : null;
+      return shaped;
+    }
+    if (kind === 'independent') {
+      src = table('independent_groups');
+      var order = (src.settings.three_group_levels || []).slice();
+      var wide = pivotScores(src, src.roles.comparison_factor, src.roles.outcome, order);
+      var two = (src.settings.two_group_levels || order.slice(0, 2)).slice();
+      spec = { selectedColumns: two };
+      shaped = withSpec(wide, spec);
+      shaped.address = 'Demo data · ' + src.title;
+      shaped.values = [shaped.headers].concat(shaped.rows);
+      return shaped;
+    }
+    if (kind === 'dependent') {
+      src = table('paired_repeated_wide');
+      spec = { selectedColumns: src.roles.repeated_measures.slice() };
+      return withSpec(src, spec);
+    }
+    if (kind === 'anova') {
+      src = table('anova');
+      spec = {
+        type: 'between',
+        dv: src.roles.outcome,
+        factor1: src.roles.factors[0],
+        factor2: src.roles.factors[1]
+      };
+      return withSpec(src, spec);
+    }
+    if (kind === 'contingency') {
+      src = table('contingency_2x2');
+      spec = {
+        rowVar: src.roles.row,
+        colVar: src.roles.column,
+        frequencyColumn: src.roles.frequency,
+        rowLevels: [src.settings.exposed_level, src.settings.reference_level].filter(Boolean),
+        colLevels: levelsOf(src, src.roles.column)
+      };
+      if (src.settings.event_level) {
+        spec.colLevels = [src.settings.event_level].concat(spec.colLevels.filter(function (level) {
+          return level !== src.settings.event_level;
+        }));
+      }
+      return withSpec(src, spec);
+    }
+    if (kind === 'meta') {
+      var mode = activeMetaMode();
+      if (mode === 'correlation') return null;
+      if (mode === 'binary') {
+        src = table('meta_binary');
+        spec = namedColumns(src.headers, {
+          studyCol: src.roles.study,
+          aCol: src.roles.intervention_events,
+          n1Col: src.roles.intervention_total,
+          cCol: src.roles.control_events,
+          n2Col: src.roles.control_total
+        });
+        spec.effectType = 'binary';
+        spec.effectMeasure = 'rr';
+        spec.binaryFormat = 'events_total';
+      } else if (mode === 'direct') {
+        src = table('meta_effect_se');
+        spec = namedColumns(src.headers, {
+          studyCol: src.roles.study,
+          effectCol: src.roles.effect,
+          seCol: src.roles.standard_error
+        });
+        spec.effectType = 'direct';
+        spec.effectMeasure = 'logrr';
+        spec.uncertaintyType = 'se';
+      } else {
+        src = table('meta_continuous');
+        spec = namedColumns(src.headers, {
+          studyCol: src.roles.study,
+          n1Col: 'intervention_n',
+          mean1Col: 'intervention_mean',
+          sd1Col: 'intervention_sd',
+          n2Col: 'control_n',
+          mean2Col: 'control_mean',
+          sd2Col: 'control_sd'
+        });
+        spec.effectType = 'continuous';
+        spec.effectMeasure = 'md';
+      }
+      return withSpec(src, spec);
+    }
+    if (kind === 'regression') {
+      src = table('linear_regression');
+      spec = {
+        y: src.roles.outcome,
+        xn: src.roles.predictors.slice(),
+        xc: [src.roles.optional_categorical_predictor],
+        intercept: 1
+      };
+      return withSpec(src, spec);
+    }
+    if (kind === 'logistic') {
+      src = table('logistic_regression');
+      spec = {
+        y: src.roles.outcome,
+        xn: src.roles.predictors.slice(),
+        xc: [src.roles.optional_categorical_predictor],
+        intercept: 1
+      };
+      return withSpec(src, spec);
+    }
+    if (kind === 'mixed') {
+      src = table('mixed_models');
+      spec = {
+        dep: src.roles.outcome,
+        fix: [src.roles.fixed_group],
+        cov: [src.roles.time, src.roles.covariate],
+        rnd: src.roles.random_intercept
+      };
+      return withSpec(src, spec);
+    }
+    if (kind === 'reliability') {
+      src = table('scale_reliability');
+      spec = { items: src.roles.items.slice(), groupVariable: src.groupField };
+      return withSpec(src, spec);
+    }
+    if (kind === 'pareto') {
+      src = table('pareto');
+      spec = { categoryColName: src.roles.category, valuesColName: src.roles.frequency };
+      return withSpec(src, spec);
+    }
+    if (kind === 'prepare') {
+      return withSpec(table('prepare_data'), null);
+    }
+    if (kind === 'segmentation') {
+      if (!/(?:^|[?&])product=split(?:&|$)/i.test(root.location && root.location.search || '')) return null;
+      src = table('split_index');
+      var splitAt = columnIndex(src.headers, src.roles.binary_split);
+      src.rows.forEach(function (row) {
+        var label = String(row[splitAt]);
+        if (label === src.settings.positive_level) row[splitAt] = 1;
+        else if (label === src.settings.reference_level) row[splitAt] = 0;
+      });
+      spec = {
+        product: 'split',
+        xDimension: { columns: [] },
+        yDimension: {
+          columns: [src.roles.binary_split],
+          label: src.roles.binary_split,
+          thresholdMethod: 'custom',
+          threshold: 1,
+          highLabel: src.settings.positive_level,
+          lowLabel: src.settings.reference_level
+        },
+        factorColumns: src.roles.factors.slice(),
+        legendLabelsCustom: true
+      };
+      shaped = withSpec(src, null);
+      shaped.savedSpec = spec;
+      return shaped;
+    }
+    if (kind === 'multivariable') {
+      src = table('charts_3d');
+      spec = {
+        xColName: src.roles.x,
+        yColName: src.roles.y,
+        sizeColName: src.roles.z,
+        colorColName: src.roles.color,
+        labelColName: src.roles.label
+      };
+      return withSpec(src, spec);
+    }
+    if (kind === 'publication') {
+      return withSpec(table('publication_tables'), null);
+    }
+    return null;
+  }
+
   function injectStyles() {
     if (document.getElementById('statistico-demo-style')) return;
     var style = document.createElement('style');
     style.id = 'statistico-demo-style';
     style.textContent = [
-      '.cfg-header-title{flex:0 1 auto;}',
-      '.cfg-demo-btn{margin-left:8px;flex:0 0 auto;border:1px solid rgba(255,255,255,.45);background:#fff;color:#1e293b;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:650;cursor:pointer;white-space:nowrap;font-family:inherit;line-height:1.2;}',
+      '.cfg-header,.pt2-uni-left{flex-wrap:wrap;}',
+      '#statistico-demo-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:8px;min-width:0;}',
+      '.cfg-demo-btn{flex:0 0 auto;border:1px solid rgba(255,255,255,.45);background:#fff;color:#1e293b;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:650;cursor:pointer;font-family:inherit;line-height:1.2;}',
       '.cfg-demo-btn:hover{background:#f8fafc;}',
+      '.cfg-demo-btn:disabled{opacity:.65;cursor:progress;}',
+      '.statistico-demo-status{flex:1 1 180px;min-width:0;font-size:11px;font-weight:650;line-height:1.3;color:inherit;}',
+      '.statistico-demo-status.is-error{color:#b91c1c;}',
       '.cfg-meta-badge{margin-left:auto;}'
     ].join('');
     document.head.appendChild(style);
@@ -366,8 +676,72 @@
     contingency: function (pack) { root.applyPayload(pack); },
     meta: function (pack) { root.applyPayload(pack); },
     reliability: function (pack) { root.applyPayload(pack); },
-    mixed: function (pack) { root.loadMixedModelData(pack); }
+    mixed: function (pack) { root.loadMixedModelData(pack); },
+    pareto: function (pack) { root.applyPayload(pack); },
+    prepare: function (pack) { root.applyPayload(pack); },
+    segmentation: function (pack) { root.applyPayload(pack); },
+    multivariable: function (pack) { root.applyPayload(pack); },
+    publication: function (pack) {
+      if (!root.StatisticoPublicationDemo || typeof root.StatisticoPublicationDemo.load !== 'function') {
+        throw new Error('publication demo is not ready');
+      }
+      root.StatisticoPublicationDemo.load(pack);
+    }
   };
+
+  var APPLY_NAME = {
+    regression: 'applyRegressionPayload',
+    logistic: 'applyRegressionPayload',
+    univariate: 'applyPayload',
+    anova: 'loadAnovaPayload',
+    correlation: 'loadCorrelationPayload',
+    independent: 'applyPayload',
+    dependent: 'applyPayload',
+    factor: 'applyPayload',
+    cluster: 'applyPayload',
+    contingency: 'applyPayload',
+    meta: 'applyPayload',
+    reliability: 'applyPayload',
+    mixed: 'loadMixedModelData',
+    pareto: 'applyPayload',
+    prepare: 'applyPayload',
+    segmentation: 'applyPayload',
+    multivariable: 'applyPayload'
+  };
+
+  var pageDraft = null;
+  var loadSerial = 0;
+  var statusNode = null;
+  var returnNode = null;
+  var demoButton = null;
+
+  function clonePack(pack) {
+    if (!pack) return null;
+    var copy = {
+      headers: (pack.headers || []).slice(),
+      rows: (pack.rows || []).map(function (row) { return Array.isArray(row) ? row.slice() : row; }),
+      address: pack.address || '',
+      savedModelSpec: pack.savedModelSpec || null,
+      savedSpec: pack.savedSpec || null,
+      values: pack.values || null,
+      lockedMethod: pack.lockedMethod
+    };
+    if (copy.values) copy.values = copy.values.map(function (row) { return row.slice(); });
+    return copy;
+  }
+
+  function wrapApply(kind) {
+    var name = APPLY_NAME[kind];
+    if (!name || typeof root[name] !== 'function' || root[name].__demoWrapped) return;
+    var orig = root[name];
+    function wrapped(pack) {
+      if (pack && !isDemoAddress(pack.address)) pageDraft = clonePack(pack);
+      return orig(pack);
+    }
+    wrapped.__demoWrapped = true;
+    wrapped.__orig = orig;
+    root[name] = wrapped;
+  }
 
   var autostarted = {};
 
@@ -388,11 +762,69 @@
     return realDialogUi();
   }
 
+  function setStatus(text, isError) {
+    if (!statusNode) return;
+    statusNode.textContent = text || '';
+    statusNode.classList.toggle('is-error', !!isError);
+  }
+
+  function showReturn(on) {
+    if (!returnNode) return;
+    returnNode.hidden = !on;
+  }
+
   function runDemo(kind) {
+    if (!ROUTES[kind]) return;
     if (!realDialogUi()) ensureDialogStubs();
-    var pack = StatisticoDemo.pack(kind);
-    remember(pack);
-    ROUTES[kind](pack);
+    var serial = ++loadSerial;
+    if (demoButton) {
+      demoButton.disabled = true;
+      demoButton.setAttribute('aria-busy', 'true');
+    }
+    setStatus('Loading demo data…', false);
+    root.setTimeout(function () {
+      if (serial !== loadSerial) return;
+      try {
+        var pack = build(kind);
+        if (!pack || !pack.headers) throw new Error('missing fixture');
+        remember(pack);
+        ROUTES[kind](pack);
+        if (serial !== loadSerial) return;
+        setStatus(pack.address, false);
+        showReturn(true);
+      } catch (err) {
+        console.error(err);
+        if (serial !== loadSerial) return;
+        setStatus('Couldn’t load demo data. Try again.', true);
+      }
+      if (demoButton) {
+        demoButton.disabled = false;
+        demoButton.removeAttribute('aria-busy');
+      }
+    }, 0);
+  }
+
+  function restoreDraft(kind) {
+    var serial = ++loadSerial;
+    root.__statisticoDemoLock = false;
+    root.__statisticoDemo = null;
+    var prior = kind === 'publication' ? (root.__statisticoPublicationUser || null) : pageDraft;
+    var empty = { headers: [], rows: [], address: '', savedModelSpec: null, savedSpec: null, values: [[]] };
+    var payload = prior ? clonePack(prior) : empty;
+    try {
+      var name = APPLY_NAME[kind];
+      var fn = name && root[name];
+      if (kind === 'publication' && root.StatisticoPublicationDemo) root.StatisticoPublicationDemo.load(payload);
+      else if (fn && fn.__orig) fn.__orig(payload);
+      else if (ROUTES[kind]) ROUTES[kind](payload);
+    } catch (err) {
+      console.error(err);
+      setStatus('Couldn’t load demo data. Try again.', true);
+      return;
+    }
+    if (serial !== loadSerial) return;
+    setStatus(prior && prior.address ? prior.address : '', false);
+    showReturn(false);
   }
 
   // Browser and website opens have Office.js but no dialog parent, so the
@@ -425,30 +857,58 @@
     function place() {
       try { injectStyles(); } catch (_style) {}
       try { installCarrier(); } catch (_carrier) {}
-      var title = document.querySelector('.cfg-header-title');
+      try { wrapApply(kind); } catch (_wrap) {}
+      var title = document.querySelector('.cfg-header-title') || document.querySelector('.pt2-uni-module');
       if (!title || !title.parentNode) return;
       ['use-selection', 'pick-range', 'refresh-data'].forEach(function (id) {
         var extra = document.getElementById(id);
         if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
       });
+      var row = document.getElementById('statistico-demo-row');
+      if (!row) {
+        row = document.createElement('div');
+        row.id = 'statistico-demo-row';
+      }
       var existing = document.getElementById('use-demo');
       var btn = existing || document.createElement('button');
       btn.type = 'button';
       btn.id = 'use-demo';
       btn.className = 'cfg-demo-btn';
-      btn.textContent = 'Use demo data';
+      btn.textContent = 'Load demo data';
       btn.title = 'Load a fixed sample shipped with this module. It does not read the cells selected in Excel.';
-      if (btn.parentNode !== title.parentNode || btn.previousSibling !== title) {
-        title.parentNode.insertBefore(btn, title.nextSibling);
+      demoButton = btn;
+      if (!returnNode) {
+        returnNode = document.createElement('button');
+        returnNode.type = 'button';
+        returnNode.id = 'statistico-demo-return';
+        returnNode.className = 'cfg-demo-btn';
+        returnNode.textContent = 'Return to my data';
+        returnNode.hidden = true;
       }
+      if (!statusNode) {
+        statusNode = document.createElement('span');
+        statusNode.id = 'statistico-demo-status';
+        statusNode.className = 'statistico-demo-status';
+      }
+      row.appendChild(btn);
+      row.appendChild(returnNode);
+      row.appendChild(statusNode);
+      if (row.parentNode !== title.parentNode) title.parentNode.insertBefore(row, title.nextSibling);
       var wrap = document.querySelector('.ps-data-actions');
       if (wrap && wrap.parentNode && !wrap.querySelector('button')) wrap.parentNode.removeChild(wrap);
       if (!ROUTES[kind]) return;
       if (!btn.__demoBound) {
         btn.__demoBound = true;
-        btn.addEventListener('click', function () {
-          runDemo(kind);
-        });
+        btn.addEventListener('click', function () { runDemo(kind); });
+      }
+      if (!returnNode.__demoBound) {
+        returnNode.__demoBound = true;
+        returnNode.addEventListener('click', function () { restoreDraft(kind); });
+      }
+      if (kind === 'segmentation' && !/(?:^|[?&])product=split(?:&|$)/i.test(root.location && root.location.search || '')) {
+        btn.hidden = true;
+        returnNode.hidden = true;
+        return;
       }
       autostart(kind);
     }
@@ -457,9 +917,15 @@
   }
 
   root.StatisticoDemo = {
-    pack: pack,
+    pack: function (kind) {
+      var fromZip = build(kind);
+      if (!fromZip || !fromZip.headers) throw new Error('No demo fixture for ' + kind);
+      return fromZip;
+    },
+    table: table,
     mount: mount,
     remember: remember,
-    longTable: longTable
+    longTable: longTable,
+    build: build
   };
 })(window);

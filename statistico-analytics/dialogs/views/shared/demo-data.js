@@ -515,14 +515,14 @@
     var style = document.createElement('style');
     style.id = 'statistico-demo-style';
     style.textContent = [
-      '.cfg-header,.pt2-uni-left{flex-wrap:wrap;}',
-      '#statistico-demo-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-left:8px;min-width:0;}',
+      '#statistico-demo-row{display:flex;flex:0 0 auto;align-items:center;gap:8px;box-sizing:border-box;width:100%;margin:0;padding:6px 16px;min-width:0;position:relative;z-index:1;background:rgba(15,23,42,.04);border-bottom:1px solid rgba(148,163,184,.35);color:#0f172a;}',
+      '.cfg-header + #statistico-demo-row{background:#1a212b;color:rgba(255,255,255,.88);border-bottom:1px solid rgba(249,115,22,.22);}',
       '.cfg-demo-btn{flex:0 0 auto;border:1px solid rgba(255,255,255,.45);background:#fff;color:#1e293b;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:650;cursor:pointer;font-family:inherit;line-height:1.2;}',
       '.cfg-demo-btn:hover{background:#f8fafc;}',
       '.cfg-demo-btn:disabled{opacity:.65;cursor:progress;}',
-      '.statistico-demo-status{flex:1 1 180px;min-width:0;font-size:11px;font-weight:650;line-height:1.3;color:inherit;}',
+      '.statistico-demo-status{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:650;line-height:1.3;color:inherit;}',
       '.statistico-demo-status.is-error{color:#b91c1c;}',
-      '.cfg-meta-badge{margin-left:auto;}'
+      '.cfg-header + #statistico-demo-row .statistico-demo-status.is-error{color:#fecaca;}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -893,7 +893,14 @@
       row.appendChild(btn);
       row.appendChild(returnNode);
       row.appendChild(statusNode);
-      if (row.parentNode !== title.parentNode) title.parentNode.insertBefore(row, title.nextSibling);
+      var header = title.closest ? title.closest('.cfg-header') : null;
+      if (header && header.parentNode) {
+        if (row.parentNode !== header.parentNode || row.previousElementSibling !== header) {
+          header.parentNode.insertBefore(row, header.nextSibling);
+        }
+      } else if (row.parentNode !== title.parentNode) {
+        title.parentNode.insertBefore(row, title.nextSibling);
+      }
       var wrap = document.querySelector('.ps-data-actions');
       if (wrap && wrap.parentNode && !wrap.querySelector('button')) wrap.parentNode.removeChild(wrap);
       if (!ROUTES[kind]) return;

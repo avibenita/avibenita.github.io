@@ -9158,9 +9158,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261117capsliders')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261117ppkci')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261117capsliders');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261117ppkci');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -9652,9 +9652,9 @@ REPORT: [one polished paragraph suitable for a report]`;
       'capability-setup':
         'Choose one numeric measurement and enter the lower and upper specification limits. Leave the target blank to use the midpoint for Cpm. Run analysis opens the capability results. The worksheet is not changed. Do not invent Pp, Ppk, yield, or a planner result on this screen.',
       'capability-results':
-        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Histogram and Normal curve change the distribution display. Edit the specification limits here without returning to input.',
+        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. Report the displayed 95% intervals, the benchmark, the sample-based verdict, and n from the confidence object. The Pp interval is the chi-square interval. The Ppk interval is the normal approximation and is withheld below 25 observations. The gauge follows the Ppk estimate. Normal-model yield and expected PPM are not observed defect counts. Histogram and Normal curve change the distribution display. Edit the specification limits here without returning to input.',
       'capability-planner':
-        'Find settings searches for a mean, standard deviation, or outward specification change that reaches a Ppk, modeled-yield, or expected-PPM goal. When Ppk is reachable at the current standard deviation, the presets are the smallest mean shift and the most margin from centering. Pp and Ppk use the overall sample standard deviation (n − 1). Yield and expected PPM are normal-model estimates. The scenario stays in this view. The worksheet and the capability results keep the analyzed values.',
+        'Find settings searches for a mean, standard deviation, or outward specification change that reaches a Ppk, modeled-yield, or expected-PPM goal. Scenario indexes are Projected Ppk, calculated from the entered settings, not a confidence interval and not a new sample. When Ppk is reachable at the current standard deviation, the presets are the smallest mean shift and the most margin from centering. Pp and Ppk use the overall sample standard deviation (n − 1). Yield and expected PPM are normal-model estimates. The scenario stays in this view. The worksheet and the capability results keep the analyzed values.',
       'capability-by-group':
         'Compare Pp and Ppk across the selected grouping column. The status describes whether capability stays in a similar band, varies, or changes which specification limit is binding. Group differences are descriptive and are not a formal test that the groups differ.',
       'regression-diag-overview':

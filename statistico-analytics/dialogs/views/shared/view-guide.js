@@ -2371,18 +2371,21 @@
         'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
         [
           'LSL, USL, and Target can be typed or moved with the sliders. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
+          'Confidence details sets the Ppk benchmark, starting at 1.00. The assessment compares the sample interval with that benchmark. The gauge colour follows the Ppk estimate.',
           'Find settings opens the Capability Planner for the index on the gauge.',
           'Histogram draws the observed values. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
         ],
         [
           'The gauge is Ppk. Pp is the spread relative to the specification width, as if the mean were centred. Ppk is the worse of Cpu and Cpl.',
+          'Under Pp, the 95% interval uses the chi-square distribution of the overall sample variance. Under Ppk, the approximate 95% interval is shown when n is at least 25.',
           'Cpu is the room to the upper limit. Cpl is the room to the lower limit. The smaller one is the binding side.',
-          'Expected PPM and Yield are the tails of a normal curve with this mean and this standard deviation. They are not a count of the points outside the limits.',
+          'Normal-model PPM and normal-model yield are the tails of a normal curve with this mean and this standard deviation. They are not a count of the points outside the limits.',
           'Bars outside the specification are the observed values beyond the limits. The orange curve is the normal model, not a second sample.'
         ],
         [
           'Pp and Ppk use the overall sample standard deviation (n − 1). They are not within-process Cp and Cpk.',
-          'The normal yield and expected PPM can mislead when the measurement is skewed or has more than one peak.',
+          'Assumes independent measurements from a stable, approximately normal process and fixed specification limits. The interval is not evidence that the process is stable or normal.',
+          'The normal-model yield and expected PPM can mislead when the measurement is skewed or has more than one peak.',
           'A high Ppk describes this sample. It does not prove that the process is stable.'
         ]
       ),
@@ -2396,6 +2399,7 @@
           'Changing the metric, the goal, or a constraint clears the solved result until you choose Find settings again.'
         ],
         [
+          'Scenario indexes are labeled Projected Ppk. They are calculated from the entered settings, not from a new sample, and they do not carry the results-view confidence interval.',
           'The opening sentence says whether the goal is reachable at the current standard deviation, and the mean interval that meets it when that interval exists.',
           'Current and Selected scenario show the mean, the standard deviation, the metric, and the normal-model yield or expected PPM. Both charts use that same selected mean and standard deviation.',
           'Scenario SD is the standard deviation of the selected setting. Maximum SD for the goal is how wide the process could be at that mean and still meet the goal. The current SD caps a process-improvement scenario, so the search does not propose a larger standard deviation.',

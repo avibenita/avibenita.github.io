@@ -17,13 +17,14 @@
   <script src="../shared-config.js?v=20261116footer"></script>
   <script src="../shared/demo-data.js?v=20261117demo"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261114guides"></script>
+  <script src="../shared-header.js?v=20261117ppkci"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
   <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
   <script src="../shared/group-column-suitability.js?v=20261112cap3"></script>
   <script src="../../shared/capability-range-engine.js?v=20261113plan"></script>
   <script src="../../shared/capability-planner.js?v=20261113plan2"></script>
+  <script src="../../shared/capability-intervals.js?v=20261117ppkci"></script>
   <style>
     html, body { height: 100%; margin: 0; }
     body {
@@ -143,6 +144,11 @@
     html[data-theme="light"] .metric-primary { background: rgba(234, 88, 12, 0.12); }
     .metric-label { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary, rgba(255,255,255,.7)); font-weight: 700; }
     .metric-value { margin-top: 2px; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .metric-interval { margin-top: 3px; font-size: 11px; font-weight: 700; line-height: 1.35; color: var(--text-secondary, rgba(255,255,255,.78)); white-space: normal; }
+    #confidence-details { margin: 2px 0 8px; }
+    #confidence-details summary { cursor: pointer; font-weight: 750; font-size: 13px; }
+    #confidence-details .field { max-width: 200px; margin-top: 8px; }
+    #confidence-onesided { margin: 8px 0 0; font-size: 12px; line-height: 1.45; }
     .metric-primary .metric-value { font-size: 18px; }
     .info-dot { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; font-weight: 800; line-height: 1; color: rgba(226,232,240,.92); background: rgba(148,163,184,.18); border: 1px solid rgba(148,163,184,.35); cursor: help; position: relative; }
     .info-dot::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 8px); min-width: 210px; max-width: 280px; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(120,200,255,.28); background: #0b1b33; box-shadow: 0 10px 22px rgba(0,0,0,.45); color: #eaf2ff; font-size: 11px; font-weight: 600; line-height: 1.35; white-space: normal; opacity: 0; pointer-events: none; z-index: 40; }
@@ -396,6 +402,16 @@
                   <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
                   <p id="assessment"></p>
                 </div>
+                <details id="confidence-details">
+                  <summary>Confidence details</summary>
+                  <label class="field">Ppk benchmark
+                    <input id="ppk-benchmark" type="number" step="any" value="1.00" inputmode="decimal" />
+                  </label>
+                  <p id="benchmark-error" class="cap-error" hidden></p>
+                  <p id="confidence-onesided"></p>
+                  <p class="cap-help">The one-sided bound is a separate decision rule for confirming a minimum. It can support the minimum when the two-sided interval still overlaps it. For post-improvement verification, select a fresh sample collected after the change and set the required benchmark, such as 1.33.</p>
+                  <p class="cap-help">Assumes independent measurements from a stable, approximately normal process and fixed specification limits. Stability has not been checked. An eligible sample size is not evidence of stability, normality, or independence.</p>
+                </details>
                 <div class="hist-tools">
                   <label><input type="checkbox" id="show-histogram" /> Histogram</label>
                   <label id="bin-control" hidden>Bins
@@ -412,7 +428,7 @@
 
         <section id="view-planner" class="cap-view" hidden aria-labelledby="planner-title">
           <div class="cap-card">
-            <h2 id="planner-title"><i class="fa-solid fa-bullseye"></i> Capability Planner <span class="info-dot" tabindex="0" data-tip="Pp and Ppk use the overall sample standard deviation (n − 1). Yield and expected PPM are normal-model estimates, not a claim that the process is stable. The nominal value is separate from the metric goal.">i</span></h2>
+            <h2 id="planner-title"><i class="fa-solid fa-bullseye"></i> Capability Planner <span class="info-dot" tabindex="0" data-tip="Pp and Ppk use the overall sample standard deviation (n − 1). Scenario indexes are Projected Ppk, calculated from the entered settings, not a new sample. Yield and expected PPM are normal-model estimates. The nominal value is separate from the metric goal and from the results benchmark.">i</span></h2>
             <p id="planner-basis" class="cap-help" hidden></p>
             <div class="readout" id="planner-baseline"></div>
             <div class="planner-form">
@@ -1233,9 +1249,81 @@
       host.appendChild(svg);
     }
 
-    function metricCard(label, tip, valueHtml, primary, extra) {
+    var CAP_ASSUMPTION = 'Assumes independent measurements from a stable, approximately normal process and fixed specification limits. Stability has not been checked.';
+    function readBenchmark() {
+      var node = el('ppk-benchmark');
+      var text = node ? String(node.value).trim() : '';
+      if (!text) return { ok: false, error: 'Enter a positive Ppk benchmark.' };
+      var n = Number(text.replace(/\u2212/g, '-'));
+      if (!Number.isFinite(n) || !(n > 0)) return { ok: false, error: 'Enter a positive Ppk benchmark.' };
+      return { ok: true, value: n, text: text };
+    }
+    function benchmarkLabel(bench) {
+      if (!bench || !bench.ok) return '';
+      if (!/[.eE]$/.test(bench.text)) return bench.text;
+      return String(Number(bench.value.toPrecision(6)));
+    }
+    function benchmarkStatement(verdict, label) {
+      if (verdict === 'supports') return 'Sample supports Ppk \u2265 ' + label + '.';
+      if (verdict === 'below') return 'Sample supports Ppk below ' + label + '.';
+      if (verdict === 'inconclusive') return 'Sample is inconclusive at Ppk ' + label + '.';
+      return '';
+    }
+    function currentConfidence(result) {
+      var Intervals = window.StatisticoCapabilityIntervals;
+      var bench = readBenchmark();
+      if (!Intervals || !result) return { bench: bench, pp: null, ppk: null, verdict: null };
+      var pp = Intervals.ppInterval(result.cp, result.n);
+      var ppk = Intervals.ppkInterval(result.cpk, result.n);
+      var verdict = ppk.available && bench.ok ? Intervals.twoSidedVerdict(ppk.low, ppk.high, bench.value) : null;
+      return { bench: bench, pp: pp, ppk: ppk, verdict: verdict };
+    }
+    function paintConfidence(result) {
+      var confidence = currentConfidence(result);
+      var input = el('ppk-benchmark');
+      var host = el('confidence-onesided');
+      if (input) input.setAttribute('aria-invalid', confidence.bench.ok ? 'false' : 'true');
+      showError('benchmark-error', confidence.bench.ok ? '' : confidence.bench.error);
+      if (!host) return confidence;
+      if (!result || !confidence.ppk) {
+        host.textContent = '';
+        return confidence;
+      }
+      var Intervals = window.StatisticoCapabilityIntervals;
+      if (!confidence.ppk.available) {
+        host.textContent = confidence.ppk.message || 'Ppk interval unavailable.';
+        return confidence;
+      }
+      var supports = confidence.bench.ok ? Intervals.oneSidedSupports(confidence.ppk.oneSidedLow, confidence.bench.value) : null;
+      var bound = Intervals.formatBound(confidence.ppk.oneSidedLow, confidence.bench.ok ? confidence.bench.value : NaN, supports);
+      var line = 'Approx. one-sided 95% lower bound ' + bound + '.';
+      if (confidence.bench.ok) {
+        line += supports
+          ? ' Sample supports Ppk \u2265 ' + benchmarkLabel(confidence.bench) + ' at 95% one-sided confidence.'
+          : ' The one-sided lower bound falls below ' + benchmarkLabel(confidence.bench) + '.';
+      }
+      host.textContent = line;
+      return confidence;
+    }
+    function intervalText(kind, confidence) {
+      var Intervals = window.StatisticoCapabilityIntervals;
+      if (!Intervals || !confidence) return '';
+      if (kind === 'pp') {
+        if (!confidence.pp || !confidence.pp.available) return '95% CI unavailable.';
+        return '95% CI ' + Intervals.formatPair(confidence.pp.low, confidence.pp.high);
+      }
+      if (!confidence.ppk || !confidence.ppk.available) return (confidence.ppk && confidence.ppk.message) || 'Ppk interval unavailable.';
+      return 'Approx. 95% CI ' + Intervals.formatPair(
+        confidence.ppk.low,
+        confidence.ppk.high,
+        confidence.bench.ok ? confidence.bench.value : NaN,
+        confidence.verdict
+      );
+    }
+    function metricCard(label, tip, valueHtml, primary, extra, interval) {
       return '<div class="metric' + (primary ? ' metric-primary' : '') + '"><div class="metric-label">' + escapeHtml(label) +
-        ' <span class="info-dot" tabindex="0" data-tip="' + escapeHtml(tip) + '">i</span></div><div class="metric-value">' + valueHtml + '</div>' + (extra || '') + '</div>';
+        ' <span class="info-dot" tabindex="0" data-tip="' + escapeHtml(tip) + '">i</span></div><div class="metric-value">' + valueHtml + '</div>' +
+        (interval ? '<div class="metric-interval">' + escapeHtml(interval) + '</div>' : '') + (extra || '') + '</div>';
     }
     function ratingHtml(rating) {
       if (!rating) return '';
@@ -1254,21 +1342,32 @@
         el('metric-grid').textContent = '';
         el('cpkGauge').textContent = '';
         el('distributionChart').textContent = '';
+        var stale = el('confidence-onesided');
+        if (stale) stale.textContent = '';
         return;
       }
       showError('results-error', '');
       var result = last.overall;
+      var confidence = paintConfidence(result);
+      var verdictText = '';
+      if (confidence.ppk && !confidence.ppk.available) verdictText = confidence.ppk.message || '';
+      else if (confidence.verdict) verdictText = benchmarkStatement(confidence.verdict, benchmarkLabel(confidence.bench));
       el('results-readout').innerHTML = '<span>n <b>' + result.n + '</b></span><span>Mean <b>' + fmt(result.mean) + '</b></span><span>SD <b>' + fmt(result.sd) + '</b></span>'
         + (last.excluded ? '<span>Excluded <b>' + last.excluded + '</b></span>' : '');
-      el('assessment').textContent = assessment(result) + ' Pp and Ppk use the overall sample standard deviation (n − 1) of ' + last.valueName + '.';
+      el('assessment').textContent = [
+        assessment(result),
+        'Pp and Ppk use the overall sample standard deviation (n − 1) of ' + last.valueName + '.',
+        verdictText,
+        CAP_ASSUMPTION
+      ].filter(Boolean).join(' ');
       el('metric-grid').innerHTML = [
-        metricCard('Pp', 'Pp = (USL − LSL) / (6s). Spread only, as if the mean were centered. s is the overall sample standard deviation.', fmt(result.cp)),
-        metricCard('Ppk', 'Ppk = min(Cpu, Cpl). The worse one-sided capability from the overall sample standard deviation.', fmt(result.cpk) + ratingHtml(result.rating), true, '<button type="button" class="primary" id="open-planner">Find settings</button>'),
+        metricCard('Pp', 'Pp = (USL − LSL) / (6s). Spread only, as if the mean were centered. s is the overall sample standard deviation. The 95% interval multiplies Pp by the square root of a chi-square quantile over n − 1. Assumes independent measurements from a stable, approximately normal process and fixed specification limits.', fmt(result.cp), false, '', intervalText('pp', confidence)),
+        metricCard('Ppk', 'Ppk = min(Cpu, Cpl). The worse one-sided capability from the overall sample standard deviation. For n at least 25, the approximate 95% interval is Ppk ± Φ⁻¹(0.975) × SE, with SE = √[1/(9n) + Ppk²/(2(n−1))]. Fewer than 25 observations does not use this approximation. An eligible sample size is not evidence of stability, normality, or independence.', fmt(result.cpk) + ratingHtml(result.rating), true, '<button type="button" class="primary" id="open-planner">Find settings</button>', intervalText('ppk', confidence)),
         metricCard('Cpu', 'Cpu = (USL − mean) / (3s). Room from the mean to the upper limit, using the overall sample standard deviation.', fmt(result.cpu)),
         metricCard('Cpl', 'Cpl = (mean − LSL) / (3s). Room from the mean to the lower limit, using the overall sample standard deviation.', fmt(result.cpl)),
         metricCard('Cpm', 'Cpm = (USL − LSL) / (6 √(s² + (mean − target)²)). Penalizes distance from the target.', fmt(result.cpm)),
-        metricCard('Expected PPM', 'PPM = 1,000,000 × (P(X < LSL) + P(X > USL)), assuming a normal process.', Math.round(result.ppm).toLocaleString()),
-        metricCard('Yield', 'Yield = 100% × P(LSL ≤ X ≤ USL).', result.yieldPct.toFixed(2) + '%')
+        metricCard('Normal-model PPM', 'Normal-model estimate. PPM = 1,000,000 × (P(X < LSL) + P(X > USL)), assuming a normal process. This is not a count of observed out-of-spec values.', Math.round(result.ppm).toLocaleString()),
+        metricCard('Normal-model yield', 'Normal-model estimate. Yield = 100% × P(LSL ≤ X ≤ USL). This is not a count of the observations inside the limits.', result.yieldPct.toFixed(2) + '%')
       ].join('');
       drawGauge(result);
       drawDistribution(result);
@@ -1474,10 +1573,10 @@
       syncPlannerMode();
       renderPlannerResult();
     }
-    function metricBits(index, ppm) {
+    function metricBits(index, ppm, projected) {
       var labels = window.StatisticoCapabilityPlanner.labels('overall');
       var metric = el('planner-metric').value;
-      var indexText = labels.index + ' ' + fmt(index);
+      var indexText = (projected ? 'Projected ' : '') + labels.index + ' ' + fmt(index);
       var ppmText = 'Normal-model PPM ' + formatPpm(ppm);
       if (metric === 'ppm') return ppmText + ' · ' + indexText;
       return indexText + ' · ' + ppmText;
@@ -1542,7 +1641,7 @@
       var parts = ['Scenario SD ' + fmt(item.sd) + unitSuffix() + '.'];
       if (Number.isFinite(item.sdGoal)) parts.push('Maximum SD for the goal at this mean is ' + fmt(item.sdGoal) + unitSuffix() + '.');
       if (item.cappedByCurrent) parts.push('The current SD of ' + fmt(item.sdCeiling) + unitSuffix() + ' caps the scenario.');
-      parts.push(metricBits(item.index, item.ppm) + '.');
+      parts.push(metricBits(item.index, item.ppm, true) + '.');
       return parts.join(' ');
     }
     function paintComparison() {
@@ -1558,11 +1657,11 @@
       var change = el('planner-mode').value === 'spec'
         ? 'LSL ' + fmt(item.lsl) + ' (' + signed(item.lsl - snap.lsl) + '), USL ' + fmt(item.usl) + ' (' + signed(item.usl - snap.usl) + ')'
         : 'Mean ' + signed(item.mean - snap.mean) + unitSuffix() + ', SD ' + signed(item.sd - snap.sd) + unitSuffix();
-      function card(title, mean, sd, index, ppm, note, role) {
-        return '<article data-role="' + role + '" data-mean="' + mean + '" data-sd="' + sd + '"><b>' + escapeHtml(title) + '</b><span>Mean ' + fmt(mean) + unitSuffix() + '</span><span>SD ' + fmt(sd) + unitSuffix() + '</span><span>' + escapeHtml(metricBits(index, ppm)) + '</span><small>' + note + '</small></article>';
+      function card(title, mean, sd, index, ppm, note, role, projected) {
+        return '<article data-role="' + role + '" data-mean="' + mean + '" data-sd="' + sd + '"><b>' + escapeHtml(title) + '</b><span>Mean ' + fmt(mean) + unitSuffix() + '</span><span>SD ' + fmt(sd) + unitSuffix() + '</span><span>' + escapeHtml(metricBits(index, ppm, projected)) + '</span><small>' + note + '</small></article>';
       }
-      host.innerHTML = card('Current', snap.mean, snap.sd, last.overall.cpk, last.overall.ppm, below ? 'Below goal' : 'Baseline', 'current')
-        + card(item.title || 'Selected scenario', item.mean, item.sd, item.index, item.ppm, change, 'scenario');
+      host.innerHTML = card('Current', snap.mean, snap.sd, last.overall.cpk, last.overall.ppm, below ? 'Below goal' : 'Baseline', 'current', false)
+        + card(item.title || 'Selected scenario', item.mean, item.sd, item.index, item.ppm, change, 'scenario', true);
     }
     function showSelectedMean(mean) {
       var domain = plannerResult && plannerResult.meanDomain;
@@ -1605,8 +1704,9 @@
       el('planner-stale').hidden = true;
       var labels = window.StatisticoCapabilityPlanner.labels('overall');
       var found = plannerResult;
+      var projectedIndex = el('planner-metric').value === 'index' ? 'Projected ' + labels.index : labels.index;
       var answer = window.StatisticoCapabilityPlanner.answerText(found, {
-        indexLabel: labels.index,
+        indexLabel: projectedIndex,
         goal: Number(el('planner-goal').value),
         digits: decimals(),
         unit: plannerSnapshot && plannerSnapshot.unit
@@ -1618,7 +1718,7 @@
           : found.reason || 'Cannot reach goal with these constraints.');
       if (!answer && found.status === 'unreachable' && found.limiting) status += ' Limiting input: ' + found.limiting + '.';
       if (found.status === 'unreachable' && found.best && found.best.attained && Number.isFinite(found.best.index)) {
-        status += ' Best achievable ' + labels.index + ' is ' + fmt(found.best.index);
+        status += ' Best achievable Projected ' + labels.index + ' is ' + fmt(found.best.index);
         if (Number.isFinite(found.best.mean)) status += ' at mean ' + fmt(found.best.mean) + unitSuffix();
         if (Number.isFinite(found.best.sd)) status += ' and SD ' + fmt(found.best.sd) + unitSuffix();
         status += '.';
@@ -1640,8 +1740,8 @@
           ? 'LSL ' + fmt(item.lsl) + ' (' + signed(item.deltaLsl) + '), USL ' + fmt(item.usl) + ' (' + signed(item.deltaUsl) + ')'
           : 'Mean ' + fmt(item.mean) + unitSuffix() + ' (' + signed(item.deltaMean) + '), SD ' + fmt(item.sd) + unitSuffix() + ' (' + signed(item.deltaSd) + ', ' + fmt(item.sdReductionPct) + '% reduction)';
         button.innerHTML = '<b>' + escapeHtml(item.title) + '</b><small>' + escapeHtml(item.minimizes) + '. ' + change + '</small><small>'
-          + metricBits(item.index, item.ppm).replace('Normal-model PPM', 'PPM') + (mark ? ' · boundary' : '') + '</small>';
-        if (mark) button.lastChild.textContent = labels.index + ' ' + mark + fmt(item.index) + ' · Normal-model yield ' + formatYield(item.yieldPct) + ' · PPM ' + formatPpm(item.ppm);
+          + metricBits(item.index, item.ppm, true).replace('Normal-model PPM', 'PPM') + (mark ? ' · boundary' : '') + '</small>';
+        if (mark) button.lastChild.textContent = 'Projected ' + labels.index + ' ' + mark + fmt(item.index) + ' · Normal-model yield ' + formatYield(item.yieldPct) + ' · PPM ' + formatPpm(item.ppm);
         button.addEventListener('click', function () { adoptScenario(scenarioFromCandidate(item)); });
         host.appendChild(button);
       });
@@ -1721,7 +1821,7 @@
       }
       if (d) svg.appendChild(svgEl('path', { d: d + ' Z', fill: 'rgba(125,211,252,0.28)', stroke: '#7dd3fc', 'stroke-width': '1.2' }));
       var shadeLabel = svgEl('text', { x: String((px(domain.lo) + px(domain.hi)) / 2), y: String(T + 16), 'text-anchor': 'middle', fill: ink(), 'font-size': '12', 'font-weight': '700' });
-      shadeLabel.textContent = 'Meets ' + labels.index + ' ≥ ' + fmt(Number(el('planner-goal').value));
+      shadeLabel.textContent = 'Meets ' + (el('planner-metric').value === 'index' ? 'Projected ' + labels.index : labels.index) + ' ≥ ' + fmt(Number(el('planner-goal').value));
       svg.appendChild(shadeLabel);
       var ceilingLine = svgEl('line', { x1: L, y1: py(plannerSnapshot.sd), x2: W - R, y2: py(plannerSnapshot.sd), stroke: '#7dd3fc', 'stroke-dasharray': '5 4', 'stroke-width': '1.4' });
       var ceilingTip = svgEl('title', {});
@@ -1986,6 +2086,9 @@
         });
       });
     });
+    el('ppk-benchmark').addEventListener('input', function () {
+      if (view === 'results' && hasRun && last && last.ok) paintResults();
+    });
     var measureZone = el('zoneMeasure');
     measureZone.addEventListener('dragover', function (event) {
       event.preventDefault();
@@ -2226,8 +2329,42 @@
         cpm: aiNum(source.cpm),
         expectedPpm: aiNum(source.ppm),
         normalModelYieldPct: aiNum(source.yieldPct),
+        yieldAndPpm: 'normal-model estimates',
         rating: source.rating && source.rating.text,
         limitedBy: source.binding || ''
+      };
+    }
+    function aiConfidence(overall) {
+      if (!overall || !window.StatisticoCapabilityIntervals) return null;
+      var confidence = currentConfidence(overall);
+      var pp = confidence.pp;
+      var ppk = confidence.ppk;
+      var label = benchmarkLabel(confidence.bench);
+      return {
+        level: 0.95,
+        n: overall.n,
+        estimator: 'overall sample standard deviation (n - 1)',
+        assumption: CAP_ASSUMPTION,
+        stabilityChecked: false,
+        benchmark: confidence.bench.ok ? confidence.bench.value : null,
+        benchmarkLabel: confidence.bench.ok ? label : null,
+        twoSidedVerdict: confidence.verdict,
+        twoSidedStatement: confidence.verdict ? benchmarkStatement(confidence.verdict, label) : null,
+        pp: pp && pp.available ? {
+          method: pp.method,
+          low: pp.low,
+          high: pp.high,
+          displayed: intervalText('pp', confidence)
+        } : { available: false },
+        ppk: ppk && ppk.available ? {
+          method: ppk.method,
+          minimumN: ppk.minN,
+          low: ppk.low,
+          high: ppk.high,
+          oneSidedLow: ppk.oneSidedLow,
+          displayed: intervalText('ppk', confidence),
+          oneSidedSupports: confidence.bench.ok ? window.StatisticoCapabilityIntervals.oneSidedSupports(ppk.oneSidedLow, confidence.bench.value) : null
+        } : { available: false, minimumN: 25, message: ppk && ppk.message ? ppk.message : null }
       };
     }
     function aiCandidate(item) {
@@ -2240,6 +2377,8 @@
         lsl: aiNum(item.lsl),
         usl: aiNum(item.usl),
         ppk: aiNum(item.index),
+        projectedPpk: aiNum(item.index),
+        indexLabel: 'Projected Ppk',
         expectedPpm: aiNum(item.ppm),
         normalModelYieldPct: aiNum(item.yieldPct)
       };
@@ -2259,6 +2398,7 @@
           ? { lsl: aiNum(overall.lsl), usl: aiNum(overall.usl), target: overall.hasTarget ? aiNum(overall.target) : null }
           : { lsl: spec.lsl, usl: spec.usl, target: spec.target },
         overall: aiIndex(overall),
+        confidence: overall ? aiConfidence(overall) : null,
         excludedRows: last && last.excluded ? last.excluded : 0,
         byGroup: grouped ? {
           groupName: grouped.groupName,

@@ -51,7 +51,7 @@
       var converted = treatment === 'Control' ? (i % 2) : (rand() > 0.28 ? 1 : 0);
       rows.push([i + 1, age, tenure, baseline, spend, satisfaction, response, outcome, converted, treatment, site]);
     }
-    return { headers: headers, rows: rows, address: 'Demo data' };
+    return { headers: headers, rows: rows, address: 'Built-in sample' };
   }
 
   function wideGroups() {
@@ -68,7 +68,7 @@
         SITES[i % 3]
       ]);
     }
-    return { headers: headers, rows: rows, address: 'Demo data' };
+    return { headers: headers, rows: rows, address: 'Built-in sample' };
   }
 
   function repeatedScores() {
@@ -82,7 +82,7 @@
       var followup = round1(after - 1.5 + rand() * 3);
       rows.push([before, after, followup, SITES[i % 3]]);
     }
-    return { headers: headers, rows: rows, address: 'Demo data' };
+    return { headers: headers, rows: rows, address: 'Built-in sample' };
   }
 
   function reliabilityTable() {
@@ -100,7 +100,7 @@
       }
       rows.push([item(), item(), item(), item(), item(), SITES[i % 3]]);
     }
-    return { headers: headers, rows: rows, address: 'Demo data' };
+    return { headers: headers, rows: rows, address: 'Built-in sample' };
   }
 
   function metaTable() {
@@ -114,7 +114,7 @@
       var mean1 = round1(mean2 + 3.5 + rand() * 4);
       return [study, mean1, round1(7 + rand() * 3), n1, mean2, round1(7 + rand() * 3), n2, SITES[i % 3]];
     });
-    return { headers: headers, rows: rows, address: 'Demo data' };
+    return { headers: headers, rows: rows, address: 'Built-in sample' };
   }
 
   function indexOf(headers, name) {
@@ -217,11 +217,16 @@
     document.head.appendChild(style);
   }
 
+  function isDemoAddress(address) {
+    var text = String(address || '');
+    return text.indexOf('Demo') === 0 || text.indexOf('Built-in sample') === 0;
+  }
+
   function isSheetPayload(message) {
     try {
       var msg = JSON.parse(message || '{}');
       var body = msg.payload || msg.data;
-      return !!(body && body.headers && String(body.address || '').indexOf('Demo') !== 0);
+      return !!(body && body.headers && !isDemoAddress(body.address));
     } catch (_e) {
       return false;
     }
@@ -254,6 +259,9 @@
     try {
       if (!root.Office || !Office.context) return;
       var ctx = Office.context;
+      var existing = ctx.ui;
+      if (existing && typeof existing.messageParent === 'function' && !existing.messageParent.__demoStub && !existing.messageParent.__demoCarrier) return;
+      if (existing && existing.messageParent && existing.messageParent.__demoCarrier && existing.messageParent.__orig && !existing.messageParent.__orig.__demoStub) return;
       var current = ctx.ui || {};
       function parentStub() {}
       parentStub.__demoStub = true;
@@ -288,7 +296,7 @@
       try {
         noteHost(info);
         if (!root.Office || !Office.context) return;
-        if (!inOfficeDialog()) {
+        if (!realDialogUi()) {
           ensureDialogStubs();
           return;
         }
@@ -340,7 +348,7 @@
     root.__statisticoDemo = {
       headers: pack.headers.slice(),
       rows: pack.rows.map(function (row) { return row.slice(); }),
-      address: pack.address || 'Demo data'
+      address: pack.address || 'Built-in sample'
     };
     installCarrier();
   }
@@ -363,9 +371,8 @@
 
   var autostarted = {};
 
-  function inOfficeDialog() {
+  function realDialogUi() {
     try {
-      if (!hostKnown || !officeHost) return false;
       var ui = root.Office && Office.context && Office.context.ui;
       if (!ui || typeof ui.messageParent !== 'function' || typeof ui.addHandlerAsync !== 'function') return false;
       if (ui.messageParent.__demoStub || ui.addHandlerAsync.__demoStub) return false;
@@ -377,8 +384,12 @@
     }
   }
 
+  function inOfficeDialog() {
+    return realDialogUi();
+  }
+
   function runDemo(kind) {
-    ensureDialogStubs();
+    if (!realDialogUi()) ensureDialogStubs();
     var pack = StatisticoDemo.pack(kind);
     remember(pack);
     ROUTES[kind](pack);
@@ -426,6 +437,7 @@
       btn.id = 'use-demo';
       btn.className = 'cfg-demo-btn';
       btn.textContent = 'Use demo data';
+      btn.title = 'Load a fixed sample shipped with this module. It does not read the cells selected in Excel.';
       if (btn.parentNode !== title.parentNode || btn.previousSibling !== title) {
         title.parentNode.insertBefore(btn, title.nextSibling);
       }

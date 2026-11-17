@@ -227,43 +227,113 @@
     }
   }
 
-  function installCarrier() {
-    function wrap() {
-      if (!root.Office || !Office.context || !Office.context.ui) return false;
-      if (typeof Office.context.ui.addHandlerAsync === 'function' && !Office.context.ui.addHandlerAsync.__demoGuard) {
-        var origAdd = Office.context.ui.addHandlerAsync.bind(Office.context.ui);
-        Office.context.ui.addHandlerAsync = function (type, handler, callback) {
-          var guarded = function (arg) {
-            if (root.__statisticoDemoLock && type === Office.EventType.DialogParentMessageReceived && isSheetPayload(arg && arg.message)) return;
-            return handler(arg);
-          };
-          return origAdd(type, guarded, callback);
-        };
-        Office.context.ui.addHandlerAsync.__demoGuard = true;
-      }
-      if (typeof Office.context.ui.messageParent !== 'function') return false;
-      if (Office.context.ui.messageParent.__demoCarrier) return true;
-      var orig = Office.context.ui.messageParent.bind(Office.context.ui);
-      function wrapped(message) {
-        try {
-          if (root.__statisticoDemo) {
-            var parsed = JSON.parse(message);
-            if (parsed && parsed.action && parsed.action !== 'ready' && parsed.action !== 'requestData' && parsed.action !== 'close') {
-              parsed.demo = root.__statisticoDemo;
-              message = JSON.stringify(parsed);
-            }
-          }
-        } catch (_e2) {}
-        return orig(message);
-      }
-      wrapped.__demoCarrier = true;
-      Office.context.ui.messageParent = wrapped;
-      return true;
-    }
-    if (!wrap() && root.Office && typeof Office.onReady === 'function') Office.onReady(wrap);
+  var hostKnown = false;
+  var officeHost = null;
+
+  function noteHost(info) {
+    if (hostKnown) return;
+    var host = (info && info.host) || (root.Office && Office.context && Office.context.host) || null;
+    officeHost = host || null;
+    hostKnown = true;
   }
 
-  if (root.Office && typeof Office.onReady === 'function') Office.onReady(installCarrier);
+  function setMethod(obj, key, fn) {
+    if (!obj) return false;
+    try {
+      obj[key] = fn;
+      if (obj[key] === fn) return true;
+    } catch (_e) {}
+    try {
+      Object.defineProperty(obj, key, { configurable: true, writable: true, value: fn });
+      return obj[key] === fn;
+    } catch (_e2) {}
+    return false;
+  }
+
+  function ensureDialogStubs() {
+    try {
+      if (!root.Office || !Office.context) return;
+      var ctx = Office.context;
+      var current = ctx.ui || {};
+      function parentStub() {}
+      parentStub.__demoStub = true;
+      function addStub(_type, _handler, callback) {
+        if (typeof callback === 'function') try { callback({ status: 'succeeded' }); } catch (_cb) {}
+      }
+      addStub.__demoStub = true;
+      var shield = {
+        messageParent: parentStub,
+        addHandlerAsync: addStub
+      };
+      var replaced = false;
+      try {
+        ctx.ui = shield;
+        replaced = ctx.ui === shield;
+      } catch (_ui) {}
+      if (!replaced) {
+        if (!ctx.ui) {
+          try { ctx.ui = {}; } catch (_make) {}
+        }
+        if (ctx.ui) {
+          if (typeof ctx.ui.messageParent !== 'function' || !ctx.ui.messageParent.__demoStub) setMethod(ctx.ui, 'messageParent', parentStub);
+          if (typeof ctx.ui.addHandlerAsync !== 'function' || !ctx.ui.addHandlerAsync.__demoStub) setMethod(ctx.ui, 'addHandlerAsync', addStub);
+        }
+      }
+      void current;
+    } catch (_e) {}
+  }
+
+  function installCarrier() {
+    function arm(info) {
+      try {
+        noteHost(info);
+        if (!root.Office || !Office.context) return;
+        if (!inOfficeDialog()) {
+          ensureDialogStubs();
+          return;
+        }
+        var ui = Office.context.ui;
+        if (!ui || (ui.addHandlerAsync && ui.addHandlerAsync.__demoStub)) return;
+        if (typeof ui.addHandlerAsync === 'function' && !ui.addHandlerAsync.__demoGuard) {
+          var origAdd = ui.addHandlerAsync.bind(ui);
+          var guardedAdd = function (type, handler, callback) {
+            var guarded = function (arg) {
+              if (root.__statisticoDemoLock && type === Office.EventType.DialogParentMessageReceived && isSheetPayload(arg && arg.message)) return;
+              return handler(arg);
+            };
+            return origAdd(type, guarded, callback);
+          };
+          guardedAdd.__demoGuard = true;
+          if (setMethod(ui, 'addHandlerAsync', guardedAdd)) ui.addHandlerAsync.__demoGuard = true;
+        }
+        if (typeof ui.messageParent !== 'function' || ui.messageParent.__demoCarrier || ui.messageParent.__demoStub) return;
+        var orig = ui.messageParent.bind(ui);
+        function wrapped(message) {
+          try {
+            if (root.__statisticoDemo) {
+              var parsed = JSON.parse(message);
+              if (parsed && parsed.action && parsed.action !== 'ready' && parsed.action !== 'requestData' && parsed.action !== 'close') {
+                parsed.demo = root.__statisticoDemo;
+                message = JSON.stringify(parsed);
+              }
+            }
+          } catch (_e2) {}
+          return orig(message);
+        }
+        wrapped.__demoCarrier = true;
+        wrapped.__orig = orig;
+        setMethod(ui, 'messageParent', wrapped);
+      } catch (_arm) {}
+    }
+    if (typeof root.Office !== 'undefined' && typeof Office.onReady === 'function') {
+      try { Office.onReady(arm); }
+      catch (_e3) { arm(); }
+    } else {
+      arm();
+    }
+  }
+
+  installCarrier();
 
   function remember(pack) {
     root.__statisticoDemoLock = true;
@@ -291,10 +361,59 @@
     mixed: function (pack) { root.loadMixedModelData(pack); }
   };
 
+  var autostarted = {};
+
+  function inOfficeDialog() {
+    try {
+      if (!hostKnown || !officeHost) return false;
+      var ui = root.Office && Office.context && Office.context.ui;
+      if (!ui || typeof ui.messageParent !== 'function' || typeof ui.addHandlerAsync !== 'function') return false;
+      if (ui.messageParent.__demoStub || ui.addHandlerAsync.__demoStub) return false;
+      var parent = ui.messageParent.__demoCarrier ? ui.messageParent.__orig : ui.messageParent;
+      if (parent && parent.__demoStub) return false;
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function runDemo(kind) {
+    ensureDialogStubs();
+    var pack = StatisticoDemo.pack(kind);
+    remember(pack);
+    ROUTES[kind](pack);
+  }
+
+  // Browser and website opens have Office.js but no dialog parent, so the
+  // setup would sit on "Loading data…" forever. Open the demo once the host
+  // is known. Inside an Excel dialog, wait for the worksheet payload.
+  function autostart(kind) {
+    if (!ROUTES[kind] || autostarted[kind]) return;
+    autostarted[kind] = true;
+    function go() {
+      if (inOfficeDialog() || root.__statisticoDemoLock) return;
+      try { runDemo(kind); }
+      catch (err) { console.error(err); }
+    }
+    function arm() {
+      if (typeof root.Office === 'undefined' || typeof Office.onReady !== 'function') {
+        go();
+        return;
+      }
+      try {
+        Office.onReady(function (info) {
+          noteHost(info);
+          go();
+        });
+      } catch (_e) { go(); }
+    }
+    setTimeout(arm, 0);
+  }
+
   function mount(kind) {
     function place() {
-      injectStyles();
-      installCarrier();
+      try { injectStyles(); } catch (_style) {}
+      try { installCarrier(); } catch (_carrier) {}
       var title = document.querySelector('.cfg-header-title');
       if (!title || !title.parentNode) return;
       ['use-selection', 'pick-range', 'refresh-data'].forEach(function (id) {
@@ -312,13 +431,14 @@
       }
       var wrap = document.querySelector('.ps-data-actions');
       if (wrap && wrap.parentNode && !wrap.querySelector('button')) wrap.parentNode.removeChild(wrap);
-      if (existing || btn.__demoBound || !ROUTES[kind]) return;
-      btn.__demoBound = true;
-      btn.addEventListener('click', function () {
-        var pack = StatisticoDemo.pack(kind);
-        remember(pack);
-        ROUTES[kind](pack);
-      });
+      if (!ROUTES[kind]) return;
+      if (!btn.__demoBound) {
+        btn.__demoBound = true;
+        btn.addEventListener('click', function () {
+          runDemo(kind);
+        });
+      }
+      autostart(kind);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', place);
     else place();

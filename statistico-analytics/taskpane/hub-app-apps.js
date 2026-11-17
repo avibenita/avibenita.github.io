@@ -3686,7 +3686,7 @@ function openPublicationTablesConfigFromHub() {
   setSelectedModuleCard("publication-tables", true);
   Office.context.ui.displayDialogAsync(
     getDialogsBaseUrl() + "publication-tables/publication-tables-builder.html?v=" + Date.now(),
-    DIALOG_SIZES.RESULTS_HUB,
+    DIALOG_SIZES.REGRESSION_BUILDER,
     function (res) {
       if (res.status === Office.AsyncResultStatus.Failed) {
         console.error("Could not open publication tables builder:", res.error && res.error.message);
@@ -4269,7 +4269,7 @@ function openGageRrFromHub() {
     setSelectedModuleCard("gage-rr", false);
     return true;
   }
-  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
+  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.REGRESSION_BUILDER, function (res) {
     if (res.status === Office.AsyncResultStatus.Failed) {
       setSelectedModuleCard("gage-rr", false);
       var err = res.error || {};
@@ -4354,7 +4354,7 @@ function openCapabilityFromHub() {
     setSelectedModuleCard("capability-range", false);
     return true;
   }
-  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
+  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.REGRESSION_BUILDER, function (res) {
     if (res.status === Office.AsyncResultStatus.Failed) {
       setSelectedModuleCard("capability-range", false);
       var err = res.error || {};

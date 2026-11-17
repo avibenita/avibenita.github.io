@@ -2354,7 +2354,7 @@
         [
           'Drag one numeric column into Measurement. The same column is used for the results, the planner, and By Group.',
           'Enter the lower and upper specification limits, or move the sliders. Leave Target blank to use the midpoint. That midpoint is used for Cpm.',
-          'Use demo process, Use Excel selection, Pick a range, and Refresh worksheet data change the rows. They do not change the limits you typed.',
+          'Use demo data replaces the rows with a measurement and a grouping column. It does not change the limits you typed.',
           'Run analysis opens the capability results. Cancel closes the dialog.'
         ],
         [
@@ -2433,7 +2433,7 @@
         [
           'Choose three different columns. Part and Operator are identifiers. Measurement is the numeric reading. One row is one reading.',
           'The count grid lists every Part × Operator cell. Highlighted cells are empty or do not share the common repeat count.',
-          'Lower and upper specification limits are optional. Use demo data, Use Excel selection, Pick a range, and Refresh worksheet data replace the rows.',
+          'Lower and upper specification limits are optional. Use demo data replaces the rows with a balanced Part, Operator, and Measurement study.',
           'Run analysis opens the overview only when the design is valid. Cancel closes the dialog.'
         ],
         [

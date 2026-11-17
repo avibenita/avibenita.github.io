@@ -578,7 +578,7 @@
   }
 
   function demoTable() {
-    var headers = ['Yield', 'Temperature', 'Recipe'];
+    var headers = ['Yield', 'Temperature', 'Recipe', 'Line'];
     var cells = [
       [90, 'A', 66],
       [100, 'A', 70],
@@ -587,12 +587,13 @@
       [100, 'B', 72],
       [110, 'B', 78]
     ];
+    var lines = ['North', 'South', 'East'];
     var rows = [];
-    cells.forEach(function (cell) {
-      rows.push([cell[2] - 1, cell[0], cell[1]]);
-      rows.push([cell[2] + 1, cell[0], cell[1]]);
+    cells.forEach(function (cell, i) {
+      rows.push([cell[2] - 1, cell[0], cell[1], lines[i % 3]]);
+      rows.push([cell[2] + 1, cell[0], cell[1], lines[i % 3]]);
     });
-    return { headers: headers, rows: rows, address: 'Demo!A1:C13' };
+    return { headers: headers, rows: rows, address: 'Demo!A1:D13' };
   }
 
   function demoPreset() {

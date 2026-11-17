@@ -2353,7 +2353,7 @@
         'Chooses the measurement and the specification limits before Pp and Ppk are calculated.',
         [
           'Drag one numeric column into Measurement. The same column is used for the results, the planner, and By Group.',
-          'Enter the lower and upper specification limits. Leave Target blank to use the midpoint. That midpoint is used for Cpm.',
+          'Enter the lower and upper specification limits, or move the sliders. Leave Target blank to use the midpoint. That midpoint is used for Cpm.',
           'Use demo process, Use Excel selection, Pick a range, and Refresh worksheet data change the rows. They do not change the limits you typed.',
           'Run analysis opens the capability results. Cancel closes the dialog.'
         ],
@@ -2370,7 +2370,7 @@
         'Process capability',
         'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
         [
-          'LSL, USL, and Target can be edited here. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
+          'LSL, USL, and Target can be typed or moved with the sliders. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
           'Find settings opens the Capability Planner for the index on the gauge.',
           'Histogram draws the observed values. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
         ],

@@ -123,8 +123,10 @@
     .reg-equation-strip { font-size: 12px; color: var(--cfg-text); padding: 6px 8px; background: var(--cfg-surface); border: 1px dashed var(--cfg-border); border-radius: 6px; }
     #view-setup label.field { color: var(--cfg-text3); min-width: 0; flex: 1 1 120px; }
     #view-setup input[type="number"] { width: 100%; background: var(--cfg-bg); color: var(--cfg-text); border: 1px solid var(--cfg-border); border-radius: 8px; padding: 7px 8px; }
-    .spec-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
-    .spec-row .field { width: 140px; }
+    .spec-row { display: flex; flex-wrap: wrap; gap: 12px 10px; margin-top: 10px; }
+    .spec-row .field { flex: 1 1 132px; width: auto; min-width: 132px; }
+    .spec-range { width: 100%; margin: 0; accent-color: #f97316; cursor: pointer; }
+    #view-setup .spec-range { accent-color: var(--reg-out, #f97316); }
     .cap-grid { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 12px; align-items: start; }
     .results-top { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); gap: 10px; align-items: stretch; }
     .gauge-panel { border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 10px; background: rgba(14, 20, 27, 0.35); padding: 6px 10px 8px; display: flex; flex-direction: column; min-width: 0; }
@@ -327,9 +329,18 @@
                   </div>
                 </div>
                 <div class="reg-zone-body" style="align-items:flex-end;">
-                  <label class="field">Lower limit<input id="setup-lsl" type="number" step="any" /></label>
-                  <label class="field">Upper limit<input id="setup-usl" type="number" step="any" /></label>
-                  <label class="field">Target<input id="setup-target" type="number" step="any" /></label>
+                  <label class="field">Lower limit
+                    <input id="setup-lsl" type="number" step="any" />
+                    <input id="setup-lsl-range" class="spec-range" type="range" aria-label="Lower limit" />
+                  </label>
+                  <label class="field">Upper limit
+                    <input id="setup-usl" type="number" step="any" />
+                    <input id="setup-usl-range" class="spec-range" type="range" aria-label="Upper limit" />
+                  </label>
+                  <label class="field">Target
+                    <input id="setup-target" type="number" step="any" />
+                    <input id="setup-target-range" class="spec-range" type="range" aria-label="Target" />
+                  </label>
                 </div>
                 <p id="setup-error" class="cap-error" hidden style="padding:0 10px 8px;"></p>
               </section>
@@ -356,12 +367,15 @@
                 <div class="spec-row">
                   <label class="field">LSL
                     <input id="results-lsl" type="number" step="any" />
+                    <input id="results-lsl-range" class="spec-range" type="range" aria-label="LSL" />
                   </label>
                   <label class="field">USL
                     <input id="results-usl" type="number" step="any" />
+                    <input id="results-usl-range" class="spec-range" type="range" aria-label="USL" />
                   </label>
                   <label class="field">Target
                     <input id="results-target" type="number" step="any" />
+                    <input id="results-target-range" class="spec-range" type="range" aria-label="Target" />
                   </label>
                 </div>
                 <div class="readout" id="results-readout"></div>
@@ -600,10 +614,140 @@
       node.textContent = message || '';
     }
 
+    var specTrackKey = '';
+    var specTrackLo = null;
+    var specTrackHi = null;
+    var specSliderSyncing = false;
+
+    function finiteSpec(field) {
+      var raw = spec[field];
+      if (raw == null || String(raw).trim() === '') return null;
+      var n = Number(String(raw).replace(/\u2212/g, '-'));
+      return Number.isFinite(n) ? n : null;
+    }
+    function measurementSummary() {
+      if (!table || !measure || !window.StatisticoColumnType) return null;
+      var idx = columnIndex(measure);
+      if (idx < 0) return null;
+      var values = [];
+      (table.rows || []).forEach(function (row) {
+        var n = StatisticoColumnType.parseNumericCell(row ? row[idx] : null);
+        if (Number.isFinite(n)) values.push(n);
+      });
+      if (!values.length || !Engine || typeof Engine.summarize !== 'function') return null;
+      return Engine.summarize(values);
+    }
+    function niceStep(raw) {
+      if (!(raw > 0) || !Number.isFinite(raw)) return 0.01;
+      var pow = Math.pow(10, Math.floor(Math.log10(raw)));
+      var n = raw / pow;
+      var m = n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10;
+      return m * pow;
+    }
+    function stepDecimals(step) {
+      var decimals = 0;
+      var probe = step;
+      while (decimals < 8 && Math.abs(probe - Math.round(probe)) > 1e-6) {
+        probe *= 10;
+        decimals += 1;
+      }
+      return decimals;
+    }
+    function formatSliderNumber(n, step) {
+      if (!Number.isFinite(n)) return '';
+      var snapped = Math.round(n / step) * step;
+      return String(Number(snapped.toFixed(stepDecimals(step))));
+    }
+    function alignStep(n, step, dir) {
+      var q = n / step;
+      var k = dir < 0 ? Math.floor(q + 1e-8) : Math.ceil(q - 1e-8);
+      return Number((k * step).toFixed(stepDecimals(step)));
+    }
+    function specTrack() {
+      var summary = measurementSummary();
+      var lsl = finiteSpec('lsl');
+      var usl = finiteSpec('usl');
+      var target = finiteSpec('target');
+      var key = measure + '|' + (summary ? [summary.n, summary.min, summary.max, summary.mean, summary.sd].join(',') : '');
+      if (key !== specTrackKey) {
+        specTrackKey = key;
+        specTrackLo = null;
+        specTrackHi = null;
+      }
+      var mean;
+      var sd;
+      if (summary && Number.isFinite(summary.mean)) {
+        mean = summary.mean;
+        sd = summary.sd > 0 ? summary.sd : Math.max(Math.abs(mean) * 0.05, 1);
+      } else if (lsl != null && usl != null) {
+        mean = (lsl + usl) / 2;
+        sd = Math.abs(usl - lsl) > 0 ? Math.abs(usl - lsl) / 6 : Math.max(Math.abs(mean) * 0.05, 1);
+      } else {
+        mean = lsl != null ? lsl : (usl != null ? usl : (target != null ? target : 50));
+        sd = Math.max(Math.abs(mean) * 0.2, 1);
+      }
+      var lo = mean - 6 * sd;
+      var hi = mean + 6 * sd;
+      if (summary && Number.isFinite(summary.min) && Number.isFinite(summary.max)) {
+        lo = Math.min(lo, summary.min);
+        hi = Math.max(hi, summary.max);
+      }
+      [lsl, usl, target].forEach(function (n) {
+        if (n == null) return;
+        lo = Math.min(lo, n);
+        hi = Math.max(hi, n);
+      });
+      if (!(hi > lo)) {
+        lo -= 1;
+        hi += 1;
+      }
+      // The track only widens, so dragging a limit does not rescale the slider under the thumb.
+      if (specTrackLo == null || lo < specTrackLo) specTrackLo = lo;
+      if (specTrackHi == null || hi > specTrackHi) specTrackHi = hi;
+      var step = niceStep(Math.max(sd / 10, (specTrackHi - specTrackLo) / 200));
+      var boundLo = alignStep(specTrackLo, step, -1);
+      var boundHi = alignStep(specTrackHi, step, 1);
+      if (!(boundHi > boundLo)) boundHi = Number((boundLo + step).toFixed(stepDecimals(step)));
+      var gap = step;
+      var lslMax = usl != null ? usl - gap : boundHi;
+      var uslMin = lsl != null ? lsl + gap : boundLo;
+      lslMax = Math.min(Math.max(lslMax, lsl != null ? lsl : boundLo), boundHi);
+      uslMin = Math.max(Math.min(uslMin, usl != null ? usl : boundHi), boundLo);
+      if (!(lslMax > boundLo)) lslMax = Math.min(boundHi, Number((boundLo + step).toFixed(stepDecimals(step))));
+      if (!(boundHi > uslMin)) uslMin = Math.max(boundLo, Number((boundHi - step).toFixed(stepDecimals(step))));
+      var center = lsl != null && usl != null ? (lsl + usl) / 2 : mean;
+      return {
+        step: step,
+        lsl: { min: boundLo, max: lslMax, value: lsl != null ? lsl : Math.min(boundHi, Math.max(boundLo, mean - 3 * sd)) },
+        usl: { min: uslMin, max: boundHi, value: usl != null ? usl : Math.min(boundHi, Math.max(boundLo, mean + 3 * sd)) },
+        target: { min: boundLo, max: boundHi, value: target != null ? target : Math.min(boundHi, Math.max(boundLo, center)) }
+      };
+    }
+    function paintSpecRange(id, bound, step) {
+      var node = el(id);
+      if (!node || !bound) return;
+      var max = bound.max > bound.min ? bound.max : bound.min + step;
+      node.min = String(bound.min);
+      node.max = String(max);
+      node.step = String(step);
+      var value = Math.min(max, Math.max(bound.min, bound.value));
+      node.value = String(value);
+    }
+    function syncSpecSliders() {
+      var track = specTrack();
+      specSliderSyncing = true;
+      ['setup', 'results'].forEach(function (prefix) {
+        paintSpecRange(prefix + '-lsl-range', track.lsl, track.step);
+        paintSpecRange(prefix + '-usl-range', track.usl, track.step);
+        paintSpecRange(prefix + '-target-range', track.target, track.step);
+      });
+      specSliderSyncing = false;
+    }
     function writeSpec(prefix) {
       el(prefix + '-lsl').value = spec.lsl;
       el(prefix + '-usl').value = spec.usl;
       el(prefix + '-target').value = spec.target;
+      syncSpecSliders();
     }
     function readSpec(prefix) {
       spec.lsl = el(prefix + '-lsl').value;
@@ -611,6 +755,13 @@
       spec.target = el(prefix + '-target').value;
       var other = prefix === 'setup' ? 'results' : 'setup';
       writeSpec(other);
+    }
+    function refreshAfterSpec() {
+      if (!hasRun) return;
+      compute();
+      if (view === 'results') paintResults();
+      if (view === 'by-group') paintByGroup();
+      syncShell();
     }
 
     function columnList() {
@@ -703,6 +854,7 @@
         if (view === 'results') paintResults();
         if (view === 'by-group') paintByGroup();
       }
+      syncSpecSliders();
       syncShell();
     }
 
@@ -777,6 +929,7 @@
       paintInputForm();
       syncGroupChoice();
       if (hasRun) compute();
+      syncSpecSliders();
       showView(hasRun && last && last.ok ? view : 'setup');
     }
 
@@ -1824,11 +1977,14 @@
       ['lsl', 'usl', 'target'].forEach(function (field) {
         el(prefix + '-' + field).addEventListener('input', function () {
           readSpec(prefix);
-          if (!hasRun) return;
-          compute();
-          if (view === 'results') paintResults();
-          if (view === 'by-group') paintByGroup();
-          syncShell();
+          refreshAfterSpec();
+        });
+        el(prefix + '-' + field + '-range').addEventListener('input', function () {
+          if (specSliderSyncing) return;
+          var track = specTrack();
+          el(prefix + '-' + field).value = formatSliderNumber(Number(el(prefix + '-' + field + '-range').value), track.step);
+          readSpec(prefix);
+          refreshAfterSpec();
         });
       });
     });

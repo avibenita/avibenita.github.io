@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../shared/module-guide.css?v=20261106aboutlabel"/>
   <script src="../shared/module-guide.js?v=20261106aboutlabel" id="statistico-module-guide-js"></script>
   <script src="../shared-config.js?v=20261116rangespin"></script>
+  <script src="../shared/demo-data.js?v=20261117demo"></script>
   <style>
     .cfg-trim-control { display: flex; flex-direction: column; gap: 9px; }
     .cfg-trim-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 10.5px; color: rgba(255,255,255,.42); }
@@ -260,6 +261,7 @@
       send({ action: 'dataApplied' });
 
       document.querySelectorAll('input[name="selectedColumn"]').forEach((radio) => { radio.checked = false; });
+      if (p.savedSpec && Number.isInteger(p.savedSpec.columnIndex) && typeof pickRow === 'function') pickRow(p.savedSpec.columnIndex);
       document.getElementById('trimMin').value = 0;
       document.getElementById('trimMax').value = 100;
       const defaultTransform = document.querySelector('input[name="transform"][value="none"]');
@@ -504,6 +506,8 @@
       }
       data = applyTransform(data, transform);
       const results = calculateStatistics(data, STATE.address, colName, transform, trimMin, trimMax);
+      results.sourceHeaders = STATE.headers.slice();
+      if (window.__statisticoDemo) results.sourceRows = STATE.rows.map(function (r) { return r.slice(); });
       try {
         localStorage.setItem('univariateRunResultPayload', JSON.stringify({
           spec: { columnIndex: idx, columnName: colName, trimMin, trimMax, transform },
@@ -564,5 +568,6 @@
     function cancel() { send({ action: 'close' }); }
     function send(msg) { Office.context.ui.messageParent(JSON.stringify(msg)); }
   </script>
+  <script>StatisticoDemo.mount("univariate");</script>
 </body>
 </html>

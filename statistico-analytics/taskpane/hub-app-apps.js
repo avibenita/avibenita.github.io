@@ -2524,6 +2524,14 @@ function handleInputRangeMessage(msg, dlg, onRange, errorType, reopen) {
 }
 
 function adoptAnalysisScope(gr, msg) {
+  var demo = msg && msg.demo;
+  if (demo && Array.isArray(demo.headers) && Array.isArray(demo.rows) && demo.rows.length) {
+    var demoValues = [demo.headers].concat(demo.rows);
+    if (window.StatisticoGlobalRange && typeof StatisticoGlobalRange.beginRun === "function") {
+      StatisticoGlobalRange.beginRun(demoValues, demo.address || "Demo data", "demo", null);
+    }
+    gr = { values: demoValues, address: demo.address || "Demo data", mode: "demo" };
+  }
   var sample = sampleFromMessage(msg);
   if (!sample || !gr || !gr.values || !window.StatisticoGlobalRange || typeof StatisticoGlobalRange.drawSample !== "function") {
     rememberAnalysisSample(null);
@@ -3038,6 +3046,11 @@ function openUnivariateConfigFromHub(moduleId, startView) {
           } else if (message.action === "univariateResults" && message.data) {
             var liveRange = getGlobalRangePayload();
             if (liveRange) gr = liveRange;
+            if (message.demo && Array.isArray(message.demo.headers) && Array.isArray(message.demo.rows) && message.demo.rows.length) {
+              gr = adoptAnalysisScope(gr, message);
+              message.data.sourceHeaders = message.demo.headers.slice();
+              message.data.sourceRows = message.demo.rows.map(function (row) { return row.slice(); });
+            }
             var runSpec = Object.assign({}, message.spec || {});
             if (hubUnivariateStartView) runSpec.startView = hubUnivariateStartView;
             var uniData = message.data;
@@ -3365,6 +3378,7 @@ function openCorrelationConfigFromHub() {
           } else if (msg.action === "runAnalysis") {
             var liveCorrelation = getGlobalRangePayload();
             if (liveCorrelation) gr = liveCorrelation;
+            gr = adoptAnalysisScope(gr, msg);
             hubPendingCorrelationRunData = msg.data || {};
             rememberAnalysisSample(hubPendingCorrelationRunData.sample || null);
             try { hubCorrelationDialog.close(); } catch (e) {}

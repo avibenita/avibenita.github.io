@@ -227,23 +227,45 @@
     }
   }
 
+  function ensureDialogStubs() {
+    try {
+      if (!root.Office || !Office.context) return;
+      if (!Office.context.ui) Office.context.ui = {};
+      var ui = Office.context.ui;
+      if (typeof ui.messageParent !== 'function') {
+        function stub() {}
+        stub.__demoStub = true;
+        ui.messageParent = stub;
+      }
+      if (typeof ui.addHandlerAsync !== 'function') {
+        function addStub(_type, _handler, callback) {
+          if (typeof callback === 'function') callback({ status: 'succeeded' });
+        }
+        addStub.__demoStub = true;
+        ui.addHandlerAsync = addStub;
+      }
+    } catch (_e) {}
+  }
+
   function installCarrier() {
-    function wrap() {
-      if (!root.Office || !Office.context || !Office.context.ui) return false;
-      if (typeof Office.context.ui.addHandlerAsync === 'function' && !Office.context.ui.addHandlerAsync.__demoGuard) {
-        var origAdd = Office.context.ui.addHandlerAsync.bind(Office.context.ui);
-        Office.context.ui.addHandlerAsync = function (type, handler, callback) {
+    function arm() {
+      if (!root.Office || !Office.context) return;
+      if (!inOfficeDialog()) ensureDialogStubs();
+      var ui = Office.context.ui;
+      if (!ui || (ui.messageParent && ui.messageParent.__demoStub)) return;
+      if (typeof ui.addHandlerAsync === 'function' && !ui.addHandlerAsync.__demoGuard) {
+        var origAdd = ui.addHandlerAsync.bind(ui);
+        ui.addHandlerAsync = function (type, handler, callback) {
           var guarded = function (arg) {
             if (root.__statisticoDemoLock && type === Office.EventType.DialogParentMessageReceived && isSheetPayload(arg && arg.message)) return;
             return handler(arg);
           };
           return origAdd(type, guarded, callback);
         };
-        Office.context.ui.addHandlerAsync.__demoGuard = true;
+        ui.addHandlerAsync.__demoGuard = true;
       }
-      if (typeof Office.context.ui.messageParent !== 'function') return false;
-      if (Office.context.ui.messageParent.__demoCarrier) return true;
-      var orig = Office.context.ui.messageParent.bind(Office.context.ui);
+      if (typeof ui.messageParent !== 'function' || ui.messageParent.__demoCarrier) return;
+      var orig = ui.messageParent.bind(ui);
       function wrapped(message) {
         try {
           if (root.__statisticoDemo) {
@@ -257,13 +279,18 @@
         return orig(message);
       }
       wrapped.__demoCarrier = true;
-      Office.context.ui.messageParent = wrapped;
-      return true;
+      wrapped.__orig = orig;
+      ui.messageParent = wrapped;
     }
-    if (!wrap() && root.Office && typeof Office.onReady === 'function') Office.onReady(wrap);
+    if (typeof root.Office !== 'undefined' && typeof Office.onReady === 'function') {
+      try { Office.onReady(arm); }
+      catch (_e3) { arm(); }
+    } else {
+      arm();
+    }
   }
 
-  if (root.Office && typeof Office.onReady === 'function') Office.onReady(installCarrier);
+  installCarrier();
 
   function remember(pack) {
     root.__statisticoDemoLock = true;
@@ -291,6 +318,50 @@
     mixed: function (pack) { root.loadMixedModelData(pack); }
   };
 
+  var autostarted = {};
+
+  function inOfficeDialog() {
+    try {
+      var ui = root.Office && Office.context && Office.context.ui;
+      if (!ui || typeof ui.messageParent !== 'function' || typeof ui.addHandlerAsync !== 'function') return false;
+      if (ui.messageParent.__demoStub || ui.addHandlerAsync.__demoStub) return false;
+      var parent = ui.messageParent.__demoCarrier ? ui.messageParent.__orig : ui.messageParent;
+      if (parent && parent.__demoStub) return false;
+      return true;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function runDemo(kind) {
+    ensureDialogStubs();
+    var pack = StatisticoDemo.pack(kind);
+    remember(pack);
+    ROUTES[kind](pack);
+  }
+
+  // Browser and website opens have Office.js but no dialog parent, so the
+  // setup would sit on "Loading data…" forever. Open the demo once the host
+  // is known. Inside an Excel dialog, wait for the worksheet payload.
+  function autostart(kind) {
+    if (!ROUTES[kind] || autostarted[kind]) return;
+    autostarted[kind] = true;
+    function go() {
+      if (inOfficeDialog() || root.__statisticoDemoLock) return;
+      try { runDemo(kind); }
+      catch (err) { console.error(err); }
+    }
+    function arm() {
+      if (typeof root.Office === 'undefined' || typeof Office.onReady !== 'function') {
+        go();
+        return;
+      }
+      try { Office.onReady(go); }
+      catch (_e) { go(); }
+    }
+    setTimeout(arm, 0);
+  }
+
   function mount(kind) {
     function place() {
       injectStyles();
@@ -312,13 +383,14 @@
       }
       var wrap = document.querySelector('.ps-data-actions');
       if (wrap && wrap.parentNode && !wrap.querySelector('button')) wrap.parentNode.removeChild(wrap);
-      if (existing || btn.__demoBound || !ROUTES[kind]) return;
-      btn.__demoBound = true;
-      btn.addEventListener('click', function () {
-        var pack = StatisticoDemo.pack(kind);
-        remember(pack);
-        ROUTES[kind](pack);
-      });
+      if (!ROUTES[kind]) return;
+      if (!btn.__demoBound) {
+        btn.__demoBound = true;
+        btn.addEventListener('click', function () {
+          runDemo(kind);
+        });
+      }
+      autostart(kind);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', place);
     else place();

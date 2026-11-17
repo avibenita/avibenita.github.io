@@ -227,60 +227,103 @@
     }
   }
 
+  var hostKnown = false;
+  var officeHost = null;
+
+  function noteHost(info) {
+    if (hostKnown) return;
+    var host = (info && info.host) || (root.Office && Office.context && Office.context.host) || null;
+    officeHost = host || null;
+    hostKnown = true;
+  }
+
+  function setMethod(obj, key, fn) {
+    if (!obj) return false;
+    try {
+      obj[key] = fn;
+      if (obj[key] === fn) return true;
+    } catch (_e) {}
+    try {
+      Object.defineProperty(obj, key, { configurable: true, writable: true, value: fn });
+      return obj[key] === fn;
+    } catch (_e2) {}
+    return false;
+  }
+
   function ensureDialogStubs() {
     try {
       if (!root.Office || !Office.context) return;
-      if (!Office.context.ui) Office.context.ui = {};
-      var ui = Office.context.ui;
-      if (typeof ui.messageParent !== 'function') {
-        function stub() {}
-        stub.__demoStub = true;
-        ui.messageParent = stub;
+      var ctx = Office.context;
+      var current = ctx.ui || {};
+      function parentStub() {}
+      parentStub.__demoStub = true;
+      function addStub(_type, _handler, callback) {
+        if (typeof callback === 'function') try { callback({ status: 'succeeded' }); } catch (_cb) {}
       }
-      if (typeof ui.addHandlerAsync !== 'function') {
-        function addStub(_type, _handler, callback) {
-          if (typeof callback === 'function') callback({ status: 'succeeded' });
+      addStub.__demoStub = true;
+      var shield = {
+        messageParent: parentStub,
+        addHandlerAsync: addStub
+      };
+      var replaced = false;
+      try {
+        ctx.ui = shield;
+        replaced = ctx.ui === shield;
+      } catch (_ui) {}
+      if (!replaced) {
+        if (!ctx.ui) {
+          try { ctx.ui = {}; } catch (_make) {}
         }
-        addStub.__demoStub = true;
-        ui.addHandlerAsync = addStub;
+        if (ctx.ui) {
+          if (typeof ctx.ui.messageParent !== 'function' || !ctx.ui.messageParent.__demoStub) setMethod(ctx.ui, 'messageParent', parentStub);
+          if (typeof ctx.ui.addHandlerAsync !== 'function' || !ctx.ui.addHandlerAsync.__demoStub) setMethod(ctx.ui, 'addHandlerAsync', addStub);
+        }
       }
+      void current;
     } catch (_e) {}
   }
 
   function installCarrier() {
-    function arm() {
-      if (!root.Office || !Office.context) return;
-      if (!inOfficeDialog()) ensureDialogStubs();
-      var ui = Office.context.ui;
-      if (!ui || (ui.messageParent && ui.messageParent.__demoStub)) return;
-      if (typeof ui.addHandlerAsync === 'function' && !ui.addHandlerAsync.__demoGuard) {
-        var origAdd = ui.addHandlerAsync.bind(ui);
-        ui.addHandlerAsync = function (type, handler, callback) {
-          var guarded = function (arg) {
-            if (root.__statisticoDemoLock && type === Office.EventType.DialogParentMessageReceived && isSheetPayload(arg && arg.message)) return;
-            return handler(arg);
+    function arm(info) {
+      try {
+        noteHost(info);
+        if (!root.Office || !Office.context) return;
+        if (!inOfficeDialog()) {
+          ensureDialogStubs();
+          return;
+        }
+        var ui = Office.context.ui;
+        if (!ui || (ui.addHandlerAsync && ui.addHandlerAsync.__demoStub)) return;
+        if (typeof ui.addHandlerAsync === 'function' && !ui.addHandlerAsync.__demoGuard) {
+          var origAdd = ui.addHandlerAsync.bind(ui);
+          var guardedAdd = function (type, handler, callback) {
+            var guarded = function (arg) {
+              if (root.__statisticoDemoLock && type === Office.EventType.DialogParentMessageReceived && isSheetPayload(arg && arg.message)) return;
+              return handler(arg);
+            };
+            return origAdd(type, guarded, callback);
           };
-          return origAdd(type, guarded, callback);
-        };
-        ui.addHandlerAsync.__demoGuard = true;
-      }
-      if (typeof ui.messageParent !== 'function' || ui.messageParent.__demoCarrier) return;
-      var orig = ui.messageParent.bind(ui);
-      function wrapped(message) {
-        try {
-          if (root.__statisticoDemo) {
-            var parsed = JSON.parse(message);
-            if (parsed && parsed.action && parsed.action !== 'ready' && parsed.action !== 'requestData' && parsed.action !== 'close') {
-              parsed.demo = root.__statisticoDemo;
-              message = JSON.stringify(parsed);
+          guardedAdd.__demoGuard = true;
+          if (setMethod(ui, 'addHandlerAsync', guardedAdd)) ui.addHandlerAsync.__demoGuard = true;
+        }
+        if (typeof ui.messageParent !== 'function' || ui.messageParent.__demoCarrier || ui.messageParent.__demoStub) return;
+        var orig = ui.messageParent.bind(ui);
+        function wrapped(message) {
+          try {
+            if (root.__statisticoDemo) {
+              var parsed = JSON.parse(message);
+              if (parsed && parsed.action && parsed.action !== 'ready' && parsed.action !== 'requestData' && parsed.action !== 'close') {
+                parsed.demo = root.__statisticoDemo;
+                message = JSON.stringify(parsed);
+              }
             }
-          }
-        } catch (_e2) {}
-        return orig(message);
-      }
-      wrapped.__demoCarrier = true;
-      wrapped.__orig = orig;
-      ui.messageParent = wrapped;
+          } catch (_e2) {}
+          return orig(message);
+        }
+        wrapped.__demoCarrier = true;
+        wrapped.__orig = orig;
+        setMethod(ui, 'messageParent', wrapped);
+      } catch (_arm) {}
     }
     if (typeof root.Office !== 'undefined' && typeof Office.onReady === 'function') {
       try { Office.onReady(arm); }
@@ -322,6 +365,7 @@
 
   function inOfficeDialog() {
     try {
+      if (!hostKnown || !officeHost) return false;
       var ui = root.Office && Office.context && Office.context.ui;
       if (!ui || typeof ui.messageParent !== 'function' || typeof ui.addHandlerAsync !== 'function') return false;
       if (ui.messageParent.__demoStub || ui.addHandlerAsync.__demoStub) return false;
@@ -356,16 +400,20 @@
         go();
         return;
       }
-      try { Office.onReady(go); }
-      catch (_e) { go(); }
+      try {
+        Office.onReady(function (info) {
+          noteHost(info);
+          go();
+        });
+      } catch (_e) { go(); }
     }
     setTimeout(arm, 0);
   }
 
   function mount(kind) {
     function place() {
-      injectStyles();
-      installCarrier();
+      try { injectStyles(); } catch (_style) {}
+      try { installCarrier(); } catch (_carrier) {}
       var title = document.querySelector('.cfg-header-title');
       if (!title || !title.parentNode) return;
       ['use-selection', 'pick-range', 'refresh-data'].forEach(function (id) {

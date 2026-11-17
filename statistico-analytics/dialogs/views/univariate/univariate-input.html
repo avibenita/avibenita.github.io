@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="../shared/module-guide.css?v=20261106aboutlabel"/>
   <script src="../shared/module-guide.js?v=20261106aboutlabel" id="statistico-module-guide-js"></script>
   <script src="../shared-config.js?v=20261115rangechip"></script>
-  <script src="../shared/demo-data.js?v=20261117load2"></script>
+  <script src="../shared/demo-data.js?v=20261117load3"></script>
   <script src="../../shared/large-range-scope.js?v=20260928range2"></script>
   <script src="../../shared/column-type.js?v=20260910num1"></script>
   <style>
@@ -525,7 +525,11 @@
         try { window.parent.postMessage({ statisticoUnivariateEmbed: true, body: s }, '*'); } catch (_e) {}
         return;
       }
-      Office.context.ui.messageParent(s);
+      try {
+        if (window.Office && Office.context && Office.context.ui && typeof Office.context.ui.messageParent === 'function') {
+          Office.context.ui.messageParent(s);
+        }
+      } catch (_e2) {}
     }
 
     let _requestDataRetryTimer = null;
@@ -557,10 +561,12 @@
           } catch (_e) {}
         });
       } else {
-        Office.context.ui.addHandlerAsync(
-          Office.EventType.DialogParentMessageReceived,
-          onMessageFromParent
-        );
+        try {
+          var dialogUi = Office.context && Office.context.ui;
+          if (dialogUi && typeof dialogUi.addHandlerAsync === 'function') {
+            dialogUi.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onMessageFromParent);
+          }
+        } catch (_office) {}
       }
       setupDropZone();
       setupAdvSections();
@@ -607,6 +613,8 @@
 
       buildColumnStats();
       renderVariables();
+      document.getElementById('loadingSpinner').style.display = 'none';
+      showMain();
       stopRequestDataRetry();
       send({ action: 'dataApplied' });
 
@@ -615,9 +623,6 @@
       applySavedSpec();
       renderAssignment();
       validateModel();
-
-      document.getElementById('loadingSpinner').style.display = 'none';
-      showMain();
     }
 
     function applySavedSpec() {

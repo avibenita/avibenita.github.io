@@ -369,18 +369,11 @@
     .scatter-view-toggle {
       display:inline-flex; align-items:center; gap:10px; cursor:pointer;
       color:var(--text-secondary); font-size:13px; font-weight:650; user-select:none;
-      position:relative;
-    }
-    /* Hide the native checkbox — it looks idle/greyed-out in Excel WebView. */
-    .scatter-view-toggle input {
-      position:absolute;
-      width:1px; height:1px; padding:0; margin:-1px;
-      overflow:hidden; clip:rect(0, 0, 0, 0); white-space:nowrap; border:0;
-      appearance:none; -webkit-appearance:none; opacity:0; pointer-events:none;
+      margin:0; padding:2px 0; border:0; background:transparent; font-family:inherit;
     }
     .scatter-toggle-ui {
       width:42px; height:24px; flex:0 0 42px; border-radius:999px; position:relative;
-      background:color-mix(in srgb, var(--text-secondary) 32%, var(--surface-2));
+      background:#3d4654;
       transition:background .15s ease, box-shadow .15s ease;
       box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);
     }
@@ -391,18 +384,21 @@
     }
     .scatter-view-toggle:hover { color:var(--text-primary); }
     .scatter-view-toggle:hover .scatter-toggle-ui {
-      background:color-mix(in srgb, var(--accent-2) 36%, var(--surface-2));
-      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 55%, transparent);
+      background:#4c6178;
+      box-shadow:inset 0 0 0 1px rgba(120,200,255,.55);
     }
-    .scatter-view-toggle input:checked + .scatter-toggle-ui {
-      background:linear-gradient(135deg, var(--accent-2), color-mix(in srgb, var(--accent-1) 55%, var(--accent-2)));
-      box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 40%, transparent);
+    .scatter-view-toggle.is-on { color:var(--text-primary); }
+    .scatter-view-toggle.is-on .scatter-toggle-ui {
+      background:linear-gradient(135deg, #3b82f6, #f97316);
+      box-shadow:inset 0 0 0 1px rgba(59,130,246,.45);
     }
-    .scatter-view-toggle input:checked + .scatter-toggle-ui::after { transform:translateX(18px); }
-    .scatter-view-toggle:focus-visible { outline:none; }
-    .scatter-view-toggle:focus-visible .scatter-toggle-ui,
-    .scatter-view-toggle input:focus-visible + .scatter-toggle-ui { outline:2px solid var(--accent-2); outline-offset:2px; }
-    .scatter-view-toggle:has(input:checked) { color:var(--text-primary); }
+    .scatter-view-toggle.is-on .scatter-toggle-ui::after { transform:translateX(18px); }
+    html[data-theme="light"] .scatter-toggle-ui { background:#c5d0dc; box-shadow:inset 0 0 0 1px rgba(13,33,55,.18); }
+    html[data-theme="light"] .scatter-toggle-ui::after { background:#fff; }
+    html[data-theme="light"] .scatter-view-toggle.is-on .scatter-toggle-ui {
+      background:linear-gradient(135deg, #0D2137, #0E8A8A);
+    }
+    .scatter-view-toggle:focus-visible { outline:2px solid var(--accent-2); outline-offset:2px; }
     .scatter-dialog-body { padding:14px 16px 18px; overflow:auto; }
     .profile-dialog { width:min(1080px, 96vw); }
     .scatter-combined-wrap { display:block; }
@@ -973,11 +969,10 @@
         <button class="scatter-dialog-close" type="button" onclick="closeScatterPopup()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="scatter-dialog-toolbar">
-        <label class="scatter-view-toggle" for="scatterCombinedToggle" tabindex="0" role="switch" aria-checked="false">
-          <input type="checkbox" id="scatterCombinedToggle" tabindex="-1" />
+        <button type="button" class="scatter-view-toggle" id="scatterCombinedToggle" aria-pressed="false">
           <span class="scatter-toggle-ui" aria-hidden="true"></span>
           <span>All curves in one chart</span>
-        </label>
+        </button>
       </div>
       <div class="scatter-dialog-body">
         <div class="scatter-panel-grid" id="scatterPanels"></div>
@@ -1142,7 +1137,7 @@
       return -1;
     }
     const levelSelections = {};
-    let scatterPopupState = { panels: [], varA: '', varB: '', combined: false, hiddenKeys: { overall: true } };
+    let scatterPopupState = { panels: [], varA: '', varB: '', combined: false, hiddenKeys: {} };
     const scatterGroupColors = ['#78c8ff', '#4ade80', '#c084fc', '#fbbf24', '#fb7185', '#38bdf8', '#a3e635'];
 
     function decimalDigits(autoDefault) {
@@ -1916,7 +1911,7 @@
 
     function toggleScatterSeries(key) {
       if (!key) return;
-      const hidden = Object.assign({ overall: true }, scatterPopupState.hiddenKeys || {});
+      const hidden = Object.assign({}, scatterPopupState.hiddenKeys || {});
       hidden[key] = !hidden[key];
       scatterPopupState.hiddenKeys = hidden;
       renderScatterDialogContent();
@@ -1994,6 +1989,7 @@
       let dots = '';
       const legend = [];
       let groupIdx = 0;
+      const groupDotsVisible = panels.some((panel, idx) => panel.variant !== 'overall' && panel.points.length && !isScatterSeriesHidden(panel, idx));
       panels.forEach((panel, idx) => {
         if (!panel.points.length) return;
         const color = scatterPanelColor(panel, groupIdx);
@@ -2003,9 +1999,12 @@
         if (!hidden) {
           const fit = computeLinearFit(panel.points);
           lines += buildFitLineSvg(sx, sy, fit, xRange, ' scatter-fit-combined', color);
-          panel.points.forEach(([x, y]) => {
-            dots += `<circle class="scatter-dot scatter-dot-combined" style="fill:${color}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.2" />`;
-          });
+          const drawDots = panel.variant !== 'overall' || !groupDotsVisible;
+          if (drawDots) {
+            panel.points.forEach(([x, y]) => {
+              dots += `<circle class="scatter-dot scatter-dot-combined" style="fill:${color}" cx="${sx(x).toFixed(1)}" cy="${sy(y).toFixed(1)}" r="3.2" />`;
+            });
+          }
         }
         legend.push(`<button type="button" class="scatter-legend-item${panel.variant === 'overall' ? ' overall' : ''}${hidden ? ' is-off' : ''}" data-series-key="${escapeHtml(key)}" aria-pressed="${hidden ? 'false' : 'true'}" title="${hidden ? 'Show' : 'Hide'} ${escapeHtml(panel.label)}">
           <span class="scatter-legend-swatch" style="border-top-color:${color}"></span>
@@ -2032,9 +2031,10 @@
       const container = document.getElementById('scatterPanels');
       const toggle = document.getElementById('scatterCombinedToggle');
       if (!container) return;
-      if (toggle) toggle.checked = !!combined;
-      const label = document.querySelector('.scatter-view-toggle');
-      if (label) label.setAttribute('aria-checked', combined ? 'true' : 'false');
+      if (toggle) {
+        toggle.classList.toggle('is-on', !!combined);
+        toggle.setAttribute('aria-pressed', combined ? 'true' : 'false');
+      }
       if (combined) {
         container.className = 'scatter-combined-wrap';
         container.innerHTML = buildCombinedScatterChart(panels, varA, varB);
@@ -2051,20 +2051,11 @@
     }
 
     function bindScatterCombinedToggle() {
-      const label = document.querySelector('.scatter-view-toggle');
-      const input = document.getElementById('scatterCombinedToggle');
-      if (!label || !input || label.dataset.bound === '1') return;
-      label.dataset.bound = '1';
-      label.addEventListener('click', (event) => {
-        event.preventDefault();
-        input.checked = !input.checked;
-        toggleScatterCombinedView(input.checked);
-      });
-      label.addEventListener('keydown', (event) => {
-        if (event.key !== ' ' && event.key !== 'Enter' && event.key !== 'Spacebar') return;
-        event.preventDefault();
-        input.checked = !input.checked;
-        toggleScatterCombinedView(input.checked);
+      const toggle = document.getElementById('scatterCombinedToggle');
+      if (!toggle || toggle.dataset.bound === '1') return;
+      toggle.dataset.bound = '1';
+      toggle.addEventListener('click', () => {
+        toggleScatterCombinedView(!scatterPopupState.combined);
       });
     }
 
@@ -2107,7 +2098,7 @@
         varA,
         varB,
         combined: scatterPopupState.combined,
-        hiddenKeys: { overall: true }
+        hiddenKeys: {}
       };
       document.getElementById('scatterDialogTitle').textContent = `${varA} vs ${varB}`;
       document.getElementById('scatterDialogSubtitle').textContent =
@@ -3355,7 +3346,7 @@
         varA: msg.varA,
         varB: msg.varB,
         combined: scatterPopupState.combined,
-        hiddenKeys: { overall: true }
+        hiddenKeys: {}
       };
       const shown = msg.overall ? msg.overall.shown : 0;
       const total = msg.overall ? msg.overall.total : 0;

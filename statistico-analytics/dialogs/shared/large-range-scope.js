@@ -284,21 +284,27 @@
     if (hooked) return;
     if (typeof Office === "undefined" || !Office.context || !Office.context.ui || typeof Office.context.ui.messageParent !== "function") return;
     var ui = Office.context.ui;
+    if (ui.messageParent.__largeRangeHook) { hooked = true; return; }
     var native = ui.messageParent.bind(ui);
     var skip = { ready: 1, requestdata: 1, close: 1, cancel: 1, dataapplied: 1, pickrange: 1, useselection: 1 };
-    ui.messageParent = function (raw) {
+    function hookedSend(raw) {
       try {
         var msg = JSON.parse(raw);
         var action = String(msg && msg.action || "").toLowerCase();
         if (msg && !skip[action]) {
+          if (window.__statisticoDemo && window.__statisticoDemo.headers && window.__statisticoDemo.rows) {
+            msg.demo = window.__statisticoDemo;
+          }
           if (msg.data && typeof msg.data === "object") stamp(msg.data);
           if (msg.payload && typeof msg.payload === "object") stamp(msg.payload);
           raw = JSON.stringify(msg);
         }
       } catch (e) {}
       return native(raw);
-    };
-    hooked = true;
+    }
+    hookedSend.__largeRangeHook = true;
+    ui.messageParent = hookedSend;
+    hooked = ui.messageParent === hookedSend;
   }
 
   function mulberry32(seed) {

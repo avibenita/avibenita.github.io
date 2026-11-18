@@ -11,11 +11,12 @@
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="../shared-config.css?v=20261109ps" />
-  <link rel="stylesheet" href="../shared-header.css?v=20261109ps" />
-  <script src="../shared-config.js?v=20261116footer"></script>
-  <script src="../shared/demo-data.js?v=20261117load4"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20261118tip4" />
+  <script src="../shared-config.js?v=20261118tip2"></script>
+  <script src="../shared/demo-fixtures.js?v=20261117demo6"></script>
+  <script src="../shared/demo-data.js?v=20261118demo8"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261109ps"></script>
+  <script src="../shared-header.js?v=20261118tip4"></script>
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
   <script src="../../shared/column-type.js"></script>
   <script src="../../shared/regression-case-trace.js"></script>
@@ -1637,14 +1638,34 @@
     setStatus(note, false);
   }
 
+  function optimizationDemo() {
+    var bundled = window.StatisticoDemo && typeof StatisticoDemo.table === 'function'
+      ? StatisticoDemo.table('process_optimization')
+      : null;
+    if (!bundled) return Engine.demoPreset();
+    return {
+      table: bundled,
+      config: {
+        response: 'seal_strength_n',
+        numeric: ['seal_temp_c', 'pressure_bar', 'dwell_seconds'],
+        categorical: [],
+        roles: { seal_temp_c: 'adjustable', pressure_bar: 'adjustable', dwell_seconds: 'adjustable' },
+        units: { seal_temp_c: 'C', pressure_bar: 'bar', dwell_seconds: 's' },
+        interactions: [],
+        responseScale: { kind: 'number', unit: 'N' },
+        includeIntercept: true
+      }
+    };
+  }
+
   function loadDemo() {
     session = Engine.createSession();
     lockedResponse = '';
     stagedTable = null;
     editing = false;
-    var demo = Engine.demoPreset();
+    var demo = optimizationDemo();
     if (window.StatisticoDemo && typeof StatisticoDemo.remember === 'function') StatisticoDemo.remember(demo.table);
-    acceptTable(demo.table, 'Built-in demo · ' + demo.table.address + ' · 12 complete rows. Fit the model to open Overview.', demo);
+    acceptTable(demo.table, 'Demo data · ' + (demo.table.address || 'Heat-seal parameter trials') + '. Cycle time stays available as the other measured response. Fit the model to open Overview.', demo);
   }
   function loadTable(table, note) {
     acceptTable(table, note || (table.address || 'Worksheet data loaded.'), null);
@@ -1721,7 +1742,10 @@
     };
     try { sessionStorage.setItem('statistico-process-settings-launch', JSON.stringify(payload)); } catch (e) {}
     if (window.Office && Office.context && Office.context.ui && Office.context.ui.messageParent) {
-      Office.context.ui.messageParent(JSON.stringify({ action: 'processSettingsModel', payload: payload }));
+      var launchBody = { action: 'processSettingsModel', payload: payload };
+      if (!(window.StatisticoDemo && typeof StatisticoDemo.deliver === 'function' && StatisticoDemo.deliver(launchBody))) {
+        Office.context.ui.messageParent(JSON.stringify(launchBody));
+      }
       setStatus('Opening results.', false);
       return;
     }

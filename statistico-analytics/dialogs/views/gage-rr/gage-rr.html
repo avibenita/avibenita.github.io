@@ -11,12 +11,13 @@
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link rel="stylesheet" href="../shared-config.css?v=20261114gage1" />
-  <link rel="stylesheet" href="../shared-header.css?v=20261114gage1" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261118tip4" />
   <link rel="stylesheet" href="../shared/module-guide.css?v=20261114gage1" />
-  <script src="../shared-config.js?v=20261116footer"></script>
-  <script src="../shared/demo-data.js?v=20261117load4"></script>
+  <script src="../shared-config.js?v=20261118tip2"></script>
+  <script src="../shared/demo-fixtures.js?v=20261117demo6"></script>
+  <script src="../shared/demo-data.js?v=20261118demo8"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261114gage1"></script>
+  <script src="../shared-header.js?v=20261118tip4"></script>
   <script src="../../shared/column-type.js?v=20261114gage1"></script>
   <script src="../../shared/gage-rr-engine.js?v=20261114gage1"></script>
   <style>
@@ -325,7 +326,9 @@
         guessMap();
         el('metaBadge').textContent = source === 'demo' ? 'Demo' : ((next && next.address) || 'Worksheet');
         el('data-note').textContent = source === 'demo'
-          ? 'Demo study, two parts and two operators. Specification width 40 is filled in so %Tolerance can be read.'
+          ? ((table.headers || []).indexOf('part_id') >= 0
+            ? 'Demo data · Crossed diameter-gage study. Bench A is loaded so the design is one complete crossed study.'
+            : 'Demo study, two parts and two operators. Specification width 40 is filled in so %Tolerance can be read.')
           : 'Worksheet range loaded. Map Part, Operator, and Measurement if the columns were not named that way.';
         if (source === 'demo') {
           spec.lsl = '80';
@@ -650,9 +653,22 @@
       el('close-btn').addEventListener('click', function () { post('close'); });
       if (window.CfgSave && typeof CfgSave.attachFormConfig === 'function') CfgSave.attachFormConfig('gage-config', document.getElementById('view-setup'));
       el('use-demo').addEventListener('click', function () {
-        var demo = Engine.demoTable();
+        var bundled = window.StatisticoDemo && typeof StatisticoDemo.table === 'function'
+          ? StatisticoDemo.table('gage_rr', { groupField: 'bench', groupValue: 'Bench A' })
+          : null;
+        var demo = bundled || Engine.demoTable();
         if (window.StatisticoDemo && typeof StatisticoDemo.remember === 'function') StatisticoDemo.remember(demo);
         loadTable(demo, 'demo');
+        if (bundled) {
+          el('map-part').value = 'part_id';
+          el('map-operator').value = 'operator';
+          el('map-measure').value = 'diameter_mm';
+          spec.lsl = '24.5';
+          spec.usl = '25.5';
+          writeSpec('setup');
+          writeSpec('overview');
+          paintSetup();
+        }
       });
       el('aboutModuleSetup').addEventListener('click', function () {
         var open = function () {

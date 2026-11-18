@@ -23,16 +23,23 @@
         min-width: 140px;
         padding: 10px 12px;
         border-radius: 10px;
-        background: #f8fafc;
-        color: #1e293b;
-        border: 1px solid rgba(15, 23, 42, .08);
+        /* Light card. Dark-canvas rules (and OS dark color-scheme) were
+           painting this layer the same color as the page, which left the
+           slate text unreadable. !important keeps the fill light. */
+        color-scheme: light !important;
+        background: #f8fafc !important;
+        background-color: #f8fafc !important;
+        background-image: none !important;
+        color: #1e293b !important;
+        -webkit-text-fill-color: #1e293b !important;
+        border: 1px solid rgba(15, 23, 42, .12) !important;
         font-size: 11.5px;
         font-weight: 400;
         line-height: 1.45;
         box-shadow:
           0 1px 2px rgba(15, 23, 42, .08),
           0 12px 32px rgba(15, 23, 42, .28),
-          0 0 0 1px rgba(255,255,255,.7) inset;
+          0 0 0 1px rgba(255,255,255,.7) inset !important;
         pointer-events: none;
         opacity: 0;
         transform: translateY(6px);
@@ -47,21 +54,24 @@
         display: block;
         font-size: 12px;
         font-weight: 700;
-        color: #0f172a;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
         margin-bottom: 4px;
         letter-spacing: .01em;
       }
       .st-tt-body {
         display: block;
         font-size: 11px;
-        color: #475569;
+        color: #475569 !important;
+        -webkit-text-fill-color: #475569 !important;
         line-height: 1.5;
       }
       .st-tt-hint {
         display: block;
         margin-top: 5px;
         font-size: 10.5px;
-        color: #64748b;
+        color: #64748b !important;
+        -webkit-text-fill-color: #64748b !important;
         font-style: italic;
       }
       /* Suppress legacy CSS tooltips once managed by this script */
@@ -86,25 +96,61 @@
         visibility: hidden !important;
       }
       [${SCRIPT_FLAG}="1"].res-tooltip .res-tooltiptext,
-      [${SCRIPT_FLAG}="1"].res-tooltip:hover .res-tooltiptext {
+      [${SCRIPT_FLAG}="1"].res-tooltip:hover .res-tooltiptext,
+      [${SCRIPT_FLAG}="1"].tooltip-icon .tooltip-text,
+      [${SCRIPT_FLAG}="1"].tooltip-icon:hover .tooltip-text,
+      [${SCRIPT_FLAG}="1"].save-scenario-btn .tooltip-text,
+      [${SCRIPT_FLAG}="1"].save-scenario-btn:hover .tooltip-text,
+      [${SCRIPT_FLAG}="1"].tooltip .tooltiptext,
+      [${SCRIPT_FLAG}="1"].tooltip:hover .tooltiptext,
+      [${SCRIPT_FLAG}="1"].info-icon .tip,
+      [${SCRIPT_FLAG}="1"].info-icon:hover .tip,
+      [${SCRIPT_FLAG}="1"] .zone-tooltip,
+      [${SCRIPT_FLAG}="1"]:hover .zone-tooltip {
         opacity: 0 !important;
         visibility: hidden !important;
+        display: none !important;
         pointer-events: none !important;
+      }
+      [${SCRIPT_FLAG}="1"].info-dot::after,
+      [${SCRIPT_FLAG}="1"].info-dot:hover::after,
+      [${SCRIPT_FLAG}="1"].info-dot:focus::after,
+      [${SCRIPT_FLAG}="1"].hero-action-btn::after,
+      [${SCRIPT_FLAG}="1"].hero-action-btn:hover::after {
+        content: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        display: none !important;
       }
     `;
     document.head.appendChild(style);
   }
 
+  function paintTooltip(node) {
+    if (!node || !node.style) return;
+    const set = (prop, value) => node.style.setProperty(prop, value, 'important');
+    set('color-scheme', 'light');
+    set('background', '#f8fafc');
+    set('background-color', '#f8fafc');
+    set('background-image', 'none');
+    set('color', '#1e293b');
+    set('-webkit-text-fill-color', '#1e293b');
+    set('border', '1px solid rgba(15, 23, 42, 0.12)');
+    set('box-shadow', '0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 32px rgba(15, 23, 42, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.7)');
+  }
+
   function ensureTooltipNode() {
     let node = document.getElementById(TOOLTIP_ID);
-    if (node) return node;
-    if (!document.body) return null;
-    node = document.createElement('div');
-    node.id = TOOLTIP_ID;
-    node.className = 'st-tooltip';
-    node.setAttribute('role', 'tooltip');
-    node.setAttribute('data-visible', '0');
-    document.body.appendChild(node);
+    if (!node) {
+      if (!document.body) return null;
+      node = document.createElement('div');
+      node.id = TOOLTIP_ID;
+      node.className = 'st-tooltip';
+      node.setAttribute('role', 'tooltip');
+      node.setAttribute('data-visible', '0');
+      document.body.appendChild(node);
+    }
+    paintTooltip(node);
     return node;
   }
 
@@ -156,9 +202,9 @@
       prepareElement(el);
     });
 
-    scope.querySelectorAll('.res-tooltip').forEach((el) => {
+    scope.querySelectorAll('.res-tooltip, .tooltip-icon, .save-scenario-btn, .tooltip, .info-icon, .zone-info-btn').forEach((el) => {
       if (el.getAttribute('data-st-tip') || el.getAttribute('data-st-tip-html')) return;
-      const tip = el.querySelector('.res-tooltiptext');
+      const tip = el.querySelector('.res-tooltiptext, .tooltip-text, .tooltiptext, .tip, .zone-tooltip');
       if (tip && tip.textContent.trim()) {
         el.setAttribute('data-st-tip', tip.textContent.trim());
       }

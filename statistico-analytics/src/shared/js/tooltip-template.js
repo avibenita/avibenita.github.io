@@ -23,9 +23,16 @@
         min-width: 140px;
         padding: 10px 12px;
         border-radius: 10px;
-        background: #f8fafc;
-        color: #1e293b;
-        border: 1px solid rgba(15, 23, 42, .08);
+        /* Office's dark color-scheme was repainting this light card as the
+           page canvas. Lock the element to light and beat later !important rules. */
+        color-scheme: light !important;
+        forced-color-adjust: none !important;
+        background: #f8fafc !important;
+        background-color: #f8fafc !important;
+        background-image: linear-gradient(#f8fafc, #f8fafc) !important;
+        color: #1e293b !important;
+        -webkit-text-fill-color: #1e293b !important;
+        border: 1px solid rgba(15, 23, 42, .12) !important;
         font-size: 11.5px;
         font-weight: 400;
         line-height: 1.45;
@@ -47,21 +54,24 @@
         display: block;
         font-size: 12px;
         font-weight: 700;
-        color: #0f172a;
+        color: #0f172a !important;
+        -webkit-text-fill-color: #0f172a !important;
         margin-bottom: 4px;
         letter-spacing: .01em;
       }
       .st-tt-body {
         display: block;
         font-size: 11px;
-        color: #475569;
+        color: #475569 !important;
+        -webkit-text-fill-color: #475569 !important;
         line-height: 1.5;
       }
       .st-tt-hint {
         display: block;
         margin-top: 5px;
         font-size: 10.5px;
-        color: #64748b;
+        color: #64748b !important;
+        -webkit-text-fill-color: #64748b !important;
         font-style: italic;
       }
       /* Suppress legacy CSS tooltips once managed by this script */
@@ -95,16 +105,32 @@
     document.head.appendChild(style);
   }
 
+  function paintTooltip(node) {
+    if (!node || !node.style) return;
+    const set = (prop, value) => node.style.setProperty(prop, value, 'important');
+    set('color-scheme', 'light');
+    set('forced-color-adjust', 'none');
+    set('background', '#f8fafc');
+    set('background-color', '#f8fafc');
+    set('background-image', 'linear-gradient(#f8fafc, #f8fafc)');
+    set('color', '#1e293b');
+    set('-webkit-text-fill-color', '#1e293b');
+    set('border', '1px solid rgba(15, 23, 42, 0.12)');
+    set('box-shadow', '0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 32px rgba(15, 23, 42, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.7)');
+  }
+
   function ensureTooltipNode() {
     let node = document.getElementById(TOOLTIP_ID);
-    if (node) return node;
-    if (!document.body) return null;
-    node = document.createElement('div');
-    node.id = TOOLTIP_ID;
-    node.className = 'st-tooltip';
-    node.setAttribute('role', 'tooltip');
-    node.setAttribute('data-visible', '0');
-    document.body.appendChild(node);
+    if (!node) {
+      if (!document.body) return null;
+      node = document.createElement('div');
+      node.id = TOOLTIP_ID;
+      node.className = 'st-tooltip';
+      node.setAttribute('role', 'tooltip');
+      node.setAttribute('data-visible', '0');
+      document.body.appendChild(node);
+    }
+    paintTooltip(node);
     return node;
   }
 

@@ -131,6 +131,53 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
     return `${origin}/${relPath}`;
   }
 
+  function stripNativeTitles(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('[title]').forEach((el) => {
+      const title = el.getAttribute('title');
+      if (title && !el.getAttribute('data-st-tip-html')) el.setAttribute('data-st-tip', title);
+      el.removeAttribute('title');
+    });
+  }
+
+  function watchNativeTitles() {
+    stripNativeTitles(document);
+    if (!window.MutationObserver) return;
+    const observer = new MutationObserver((records) => {
+      records.forEach((record) => {
+        if (record.type === 'attributes' && record.target && record.target.getAttribute) {
+          stripNativeTitles(record.target.parentNode || record.target);
+          if (record.target.getAttribute('title')) {
+            const title = record.target.getAttribute('title');
+            if (title && !record.target.getAttribute('data-st-tip-html')) record.target.setAttribute('data-st-tip', title);
+            record.target.removeAttribute('title');
+          }
+          return;
+        }
+        record.addedNodes.forEach((node) => {
+          if (!node || node.nodeType !== 1) return;
+          if (node.getAttribute && node.getAttribute('title')) {
+            const title = node.getAttribute('title');
+            if (title && !node.getAttribute('data-st-tip-html')) node.setAttribute('data-st-tip', title);
+            node.removeAttribute('title');
+          }
+          stripNativeTitles(node);
+        });
+      });
+    });
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['title']
+    });
+  }
+
+  if (!window.__stNativeTitleWatch) {
+    window.__stNativeTitleWatch = true;
+    watchNativeTitles();
+  }
+
   function initTooltip() {
     if (!document.body) {
       document.addEventListener('DOMContentLoaded', initTooltip, { once: true });
@@ -150,7 +197,7 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
   const script = document.createElement('script');
   script.id = 'st-tooltip-template-script';
-  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20261118tip3');
+  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20261118tip4');
   script.async = true;
   script.onload = initTooltip;
   document.head.appendChild(script);
@@ -2682,7 +2729,7 @@ const StatisticoHeader = {
     }
   },
 
-  _TAB_ASSET_VER: '20261118tip3',
+  _TAB_ASSET_VER: '20261118tip4',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

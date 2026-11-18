@@ -185,7 +185,7 @@
     );
   }
 
-  function prepareElement(el, keepTitle) {
+  function prepareElement(el) {
     if (!el || isTooltipNode(el)) return;
     const text = resolveText(el);
     const html = resolveHtml(el);
@@ -193,9 +193,7 @@
     if (!el.getAttribute('data-st-tip') && text) el.setAttribute('data-st-tip', text);
     if (el.getAttribute('title')) {
       el.setAttribute('data-st-title-orig', el.getAttribute('title'));
-      // Removing title during pointerover cancels the hover in the webview,
-      // so the tip flashes once and then stays gone until the next rebuild.
-      if (!keepTitle) el.removeAttribute('title');
+      el.removeAttribute('title');
     }
     el.setAttribute(SCRIPT_FLAG, '1');
   }
@@ -287,8 +285,8 @@
   function closestTooltipAnchor(target) {
     let el = target && target.nodeType === 1 ? target : (target && target.parentElement);
     while (el && el !== document.documentElement) {
-      if (hasTipSource(el) || el.getAttribute(SCRIPT_FLAG) === '1') {
-        prepareElement(el, true);
+        if (hasTipSource(el) || el.getAttribute(SCRIPT_FLAG) === '1') {
+        prepareElement(el);
         if (el.getAttribute(SCRIPT_FLAG) === '1') return el;
       }
       el = el.parentElement;
@@ -315,10 +313,9 @@
     if (!anchor) return;
     const to = ev.relatedTarget;
     if (to && anchor.contains(to)) return;
-    if (activeAnchor === anchor) {
-      if (anchor.getAttribute('title')) anchor.removeAttribute('title');
-      hide();
-    }
+    if (activeAnchor !== anchor) return;
+    if (typeof ev.clientX === 'number' && isPointerOverAnchor(anchor, ev.clientX, ev.clientY)) return;
+    hide();
   }
 
   function handlePointerMove(ev) {

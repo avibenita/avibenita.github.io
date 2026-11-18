@@ -346,23 +346,8 @@ const StatisticoHeader = {
       .replace(/</g, '&lt;');
   },
 
-  _renderThemeSwitcherHtml(extraClass) {
-    const pref = this.getThemePreference();
-    const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
-    const isSidebar = !!(extraClass && String(extraClass).indexOf('sidebar') !== -1);
-    const cls = extraClass ? `hc-theme-switch ${extraClass}` : 'hc-theme-switch';
-    const tip = isSidebar
-      ? ''
-      : ` title="${this._escapeAttr(this._themeSwitcherTipText())}" data-st-tip-pos="top"`;
-    return `
-      <div class="${cls}" id="${isSidebar ? 'sbThemeSwitch' : 'headerThemeSwitch'}" role="radiogroup" aria-label="Color theme"${tip}>
-        <button type="button" class="hc-theme-opt" data-theme-pref="auto" aria-pressed="${pref === 'auto' ? 'true' : 'false'}" aria-label="Auto, follow system appearance, currently ${hint}">
-          Auto <span class="hc-theme-auto-hint">(${hint})</span>
-        </button>
-        <button type="button" class="hc-theme-opt" data-theme-pref="light" aria-pressed="${pref === 'light' ? 'true' : 'false'}" aria-label="Light theme">Light</button>
-        <button type="button" class="hc-theme-opt" data-theme-pref="dark" aria-pressed="${pref === 'dark' ? 'true' : 'false'}" aria-label="Dark theme">Dark</button>
-      </div>
-    `;
+  _renderThemeSwitcherHtml() {
+    return '';
   },
 
   _syncThemeSwitcherUI() {
@@ -5028,7 +5013,6 @@ const StatisticoHeader = {
         <select id="decimalSelect" class="header-decimals-hidden-select" aria-hidden="true" tabindex="-1" onchange="StatisticoHeader.onDecimalChange(this.value)">
           ${optionsHtml}
         </select>
-        ${this._renderThemeSwitcherHtml()}
       </div>
     `;
   },
@@ -8050,8 +8034,7 @@ REPORT: [one polished paragraph suitable for a report]`;
 
     let toolsOpen = false;
     const extraTools = surveySidebar ? '' : (
-      '<div class="sb-theme-switch-wrap">' + this._renderThemeSwitcherHtml('hc-theme-switch--sidebar') + '</div>'
-      + '<button class="sb-bottom-btn sb-bottom-btn--json ' + (hasJson ? '' : 'sb-bottom-btn--disabled') + '" id="sbExportJsonBtn" '
+      '<button class="sb-bottom-btn sb-bottom-btn--json ' + (hasJson ? '' : 'sb-bottom-btn--disabled') + '" id="sbExportJsonBtn" '
       + (hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled')
       + ' title="' + (hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet') + '">'
       + '<i class="fa-solid fa-download"></i><span class="sb-item-label">Download JSON</span></button>'
@@ -8063,7 +8046,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     utilities.innerHTML = `
       <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
               aria-expanded="${toolsOpen ? 'true' : 'false'}"
-              title="${surveySidebar ? 'View Data and Save PNG' : 'View Data, Save PNG, Color theme, Download JSON'}">
+              title="${surveySidebar ? 'View Data and Save PNG' : 'View Data, Save PNG, Download JSON'}">
         <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
         <span class="sb-bottom-label">Output &amp; Tools</span>
         <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>

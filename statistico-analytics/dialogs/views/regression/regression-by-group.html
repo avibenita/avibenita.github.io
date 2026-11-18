@@ -15,7 +15,7 @@
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20261105tabflush" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
   <script src="../../shared/by-group-standard.js?v=20260929levels15"></script>
-  <script src="../shared-header.js?v=20261106aboutlabel"></script>
+  <script src="../shared-header.js?v=20261118themeoff"></script>
   <script src="../../shared/regression-similarity.js?v=20260919pair0"></script>
   <script src="../../shared/regression-pred-labels.js?v=20260916pred2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
@@ -2990,33 +2990,58 @@
       if (typeof StatisticoHeader.render === 'function') StatisticoHeader.render();
     }
 
+    function observationCells(headerList, row) {
+      return headerList.map((header, idx) => {
+        const value = Array.isArray(row) ? row[idx] : (row && row[header]);
+        return value == null || value === '' ? null : value;
+      });
+    }
+
+    function rowsInSelectedGroups(headerList, source) {
+      if (!Array.isArray(source)) return [];
+      if (groupIndex == null || groupIndex < 0 || groupIndex >= sourceHeaders.length) return source;
+      const included = new Set(
+        getLevelCounts(groupIndex)
+          .filter((item) => isLevelIncluded(groupIndex, item.level))
+          .map((item) => item.level)
+      );
+      if (!included.size) return source;
+      const name = sourceHeaders[groupIndex];
+      const found = headerList.indexOf(name);
+      const col = found >= 0 ? found : groupIndex;
+      return source.filter((row) => included.has(levelKey(rowValue(row, col, headerList[col]))));
+    }
+
+    function observationView() {
+      const headerList = sourceHeaders.slice();
+      const storedAll = regressionPayload && (
+        (Array.isArray(regressionPayload.sourceRowsAll) && regressionPayload.sourceRowsAll.length >= sourceRows.length && regressionPayload.sourceRowsAll)
+        || (Array.isArray(regressionPayload.rows) && regressionPayload.rows.length >= sourceRows.length && regressionPayload.rows)
+      );
+      const all = storedAll || sourceRows;
+      if (!headerList.length || !all.length) {
+        return {
+          headers: [],
+          allRows: [],
+          usedRows: [],
+          notice: 'The observation rows are not in this view. Re-run the regression, then open By Group again.'
+        };
+      }
+      const address = (regressionPayload && (regressionPayload.address || regressionPayload.dataSource)) || '';
+      return {
+        headers: headerList,
+        allRows: all.map((row) => observationCells(headerList, row)),
+        usedRows: rowsInSelectedGroups(headerList, sourceRows).map((row) => observationCells(headerList, row)),
+        fullRange: address,
+        usedRange: address
+      };
+    }
+
     function registerHeaderActions(groupFits) {
       if (typeof StatisticoHeader === 'undefined') return;
-      const exportHeaders = [
-        'Term', 'Stability',
-        'Overall β', 'Overall 95% CI lower', 'Overall 95% CI upper', 'Overall p',
-        ...activeGroups.flatMap((g) => [`${prettyGroupLabel(g.group)} β`, `${prettyGroupLabel(g.group)} 95% CI lower`, `${prettyGroupLabel(g.group)} 95% CI upper`])
-      ];
-      const exportRows = getSortedRows();
       StatisticoHeader.registerActions({
-        getData: () => ({
-          headers: exportHeaders,
-          allRows: exportRows.map((row) => [
-            row.term,
-            row.stability ? row.stability.label : '',
-            row.overall.beta, row.overall.ciLower, row.overall.ciUpper, row.overall.p,
-            ...row.groupCoefs.flatMap((gr) => [gr.beta, gr.ciLower, gr.ciUpper])
-          ]),
-          usedRows: exportRows.map((row) => [
-            row.term,
-            row.stability ? row.stability.label : '',
-            row.overall.beta, row.overall.ciLower, row.overall.ciUpper, row.overall.p,
-            ...row.groupCoefs.flatMap((gr) => [gr.beta, gr.ciLower, gr.ciUpper])
-          ]),
-          usedRange: 'Regression by group',
-          notice: 'Grouped regressions refit the same model on each level. Estimate labels describe fitted coefficients and are not tests that groups differ. Sample sizes are complete-case n used in each fit.'
-        }),
-        moduleName: 'Copy grouped regression to clipboard'
+        getData: () => observationView(),
+        moduleName: 'Copy observations to clipboard'
       });
     }
 

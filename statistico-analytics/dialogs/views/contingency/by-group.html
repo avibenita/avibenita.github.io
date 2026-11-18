@@ -18,7 +18,7 @@
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20261105tabflush" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
   <script src="../../shared/by-group-standard.js?v=20260929levels15"></script>
-  <script src="../shared-header.js?v=20261106aboutlabel"></script>
+  <script src="../shared-header.js?v=20261118themeoff"></script>
   <script src="contingency-engine.js?v=20260911freq1"></script>
   <script src="contingency-sample-data.js?v=20260909ctsim"></script>
   <script src="../../shared/contingency-similarity.js?v=20260919pair0"></script>
@@ -2197,11 +2197,43 @@
       });
     }
 
+    function observationCells(headerList, row) {
+      return headerList.map(function (header, idx) {
+        var value = Array.isArray(row) ? row[idx] : (row && row[header]);
+        return value == null || value === '' ? null : value;
+      });
+    }
+
+    function registerHeaderActions() {
+      if (typeof StatisticoHeader === 'undefined') return;
+      StatisticoHeader.registerActions({
+        getData: function () {
+          if (!sourceHeaders.length || !sourceRows.length) {
+            return {
+              headers: [],
+              allRows: [],
+              usedRows: [],
+              notice: 'The observation rows are not in this view. Return to the contingency results and open By Group again.'
+            };
+          }
+          var used = includedRows();
+          return {
+            headers: sourceHeaders.slice(),
+            allRows: sourceRows.map(function (row) { return observationCells(sourceHeaders, row); }),
+            usedRows: used.map(function (row) { return observationCells(sourceHeaders, row); }),
+            columnRoles: sourceHeaders.map(function () { return 'xc'; })
+          };
+        },
+        moduleName: 'Copy observations to clipboard'
+      });
+    }
+
     function boot() {
       if (typeof StatisticoHeader !== 'undefined') {
         StatisticoHeader.init('contingency-by-group', 'By-Group Analysis', 0, 'contingency');
         StatisticoHeader.initSidebarPage();
         StatisticoHeader.updateTitle('By-Group Analysis');
+        registerHeaderActions();
       }
       if (window.StatisticoByGroup) {
         window.StatisticoByGroup.applyPageTitles();

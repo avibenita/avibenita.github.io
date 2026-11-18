@@ -17,7 +17,7 @@
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20261106theme" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
   <script src="../../shared/by-group-standard.js?v=20260929levels15"></script>
-  <script src="../shared-header.js?v=20261106aboutlabel"></script>
+  <script src="../shared-header.js?v=20261118themeoff"></script>
   <script src="../shared/group-column-suitability.js?v=20260929levels15"></script>
   <script src="../../shared/uni-normality-tests.js?v=20260601g"></script>
   <script src="../../shared/distribution-similarity.js?v=20260919pair0"></script>
@@ -2600,30 +2600,75 @@
       return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
     }
 
+    function observationCells(headerList, row) {
+      return headerList.map((header, idx) => {
+        const value = Array.isArray(row) ? row[idx] : (row && row[header]);
+        return value == null || value === '' ? null : value;
+      });
+    }
+
+    function columnIndex(headerList, name, fallback) {
+      const found = name ? headerList.indexOf(name) : -1;
+      return found >= 0 ? found : fallback;
+    }
+
+    function rowsInSelectedGroups(headerList, source) {
+      if (!Array.isArray(source)) return [];
+      if (!isValidGroupIndex(groupIndex)) return source;
+      const included = new Set(
+        getLevelCounts(groupIndex)
+          .filter((item) => isLevelIncluded(groupIndex, item.level))
+          .map((item) => item.level)
+      );
+      if (!included.size) return source;
+      const col = columnIndex(headerList, headers[groupIndex], groupIndex);
+      const name = headerList[col];
+      return source.filter((row) => {
+        const raw = Array.isArray(row) ? row[col] : (row && row[name]);
+        return included.has(levelKey(raw));
+      });
+    }
+
+    function observationView() {
+      const meta = (typeof UniRowFilter !== 'undefined' && typeof UniRowFilter.getSourceMeta === 'function')
+        ? UniRowFilter.getSourceMeta()
+        : null;
+      const headerList = (meta && meta.headers && meta.headers.length)
+        ? meta.headers.slice()
+        : ((payload && Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length)
+          ? payload.sourceHeaders.slice()
+          : headers.slice());
+      const all = (meta && Array.isArray(meta.allRows) && meta.allRows.length)
+        ? meta.allRows
+        : ((payload && Array.isArray(payload.sourceRowsAll) && payload.sourceRowsAll.length)
+          ? payload.sourceRowsAll
+          : rows);
+      const filtered = (meta && meta.headers && meta.headers.length && Array.isArray(meta.filteredRows))
+        ? meta.filteredRows
+        : rows;
+      if (!headerList.length || !all.length) {
+        return {
+          headers: [],
+          allRows: [],
+          usedRows: [],
+          notice: 'The observation rows are not in this view. Return to the distribution and open By Group again.'
+        };
+      }
+      const address = (payload && payload.dataSource) || '';
+      return {
+        headers: headerList,
+        allRows: all.map((row) => observationCells(headerList, row)),
+        usedRows: rowsInSelectedGroups(headerList, filtered).map((row) => observationCells(headerList, row)),
+        fullRange: address,
+        usedRange: address
+      };
+    }
+
     function registerHeaderActions() {
       if (typeof StatisticoHeader === 'undefined') return;
       StatisticoHeader.registerActions({
-        getData: () => {
-          if (activeByGroupTab === 'similarity' && dspProfile && dspProfile.pairs.length) {
-            return {
-              headers: ['Groups', 'Range', 'Location', 'Spread', 'Shape', 'Combined index'],
-              allRows: dspProfile.pairs.map((p) => [`${prettyGroupLabel(p.a)} vs ${prettyGroupLabel(p.b)}`, p.band, p.location, p.spread, p.shape, p.overall]),
-              usedRows: dspProfile.pairs.map((p) => [`${prettyGroupLabel(p.a)} vs ${prettyGroupLabel(p.b)}`, p.band, p.location, p.spread, p.shape, p.overall]),
-              fullRange: payload && payload.dataSource,
-              usedRange: 'BY GROUP similarity',
-              notice: 'Similarity Profile™ uses the active source row filter.'
-            };
-          }
-          return {
-            headers: ['Group', 'N', 'Mean', 'LCL', 'UCL', 'Median', 'Std Dev', 'Variance', 'Min', 'Q1', 'Q3', 'Max', 'Skew', 'Kurtosis'],
-            allRows: groupStats.map((g) => [g.group, g.n, g.mean, g.lcl, g.ucl, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
-            usedRows: groupStats.map((g) => [g.group, g.n, g.mean, g.lcl, g.ucl, g.median, g.stdDev, g.variance, g.min, g.q1, g.q3, g.max, g.skew, g.kurtosis]),
-            fullRange: payload && payload.dataSource,
-            usedRange: 'BY GROUP summary',
-            notice: 'Grouped statistics use the active source row filter.'
-          };
-        },
-        moduleName: 'Copy BY GROUP statistics to clipboard'
+        getData: () => observationView(),
+        moduleName: 'Copy observations to clipboard'
       });
     }
 

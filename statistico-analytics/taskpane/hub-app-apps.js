@@ -2556,9 +2556,10 @@ function beginModuleInputRange(fallback) {
   var capture = window.hubCaptureRange;
   if (typeof capture !== "function") return Promise.resolve(base);
   return Promise.resolve(capture("used")).then(function (result) {
-    if (result && result.values && result.values.length >= 2) {
+    if (result && result.values && result.values.length >= 2 && !result.emptySheet) {
       return { values: result.values, address: result.address || "", mode: "used" };
     }
+    if (result && result.error) hubInputRangeError = result.error;
     return base;
   }, function () { return base; });
 }
@@ -2914,6 +2915,7 @@ function sendCorrelationSnapshotMeta() {
     retainedAt: snap.retainedAt,
     analysisColumns: snap.analysisColumns,
     columns: hubColumnMeta(snap),
+    sourceRows: snap.rows,
     sample: snap.sampleInfo || null
   });
 }
@@ -4515,7 +4517,7 @@ function openCapabilityFromHub() {
     setSelectedModuleCard("capability-range", false);
     return true;
   }
-  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.REGRESSION_BUILDER, function (res) {
+  Office.context.ui.displayDialogAsync(base, DIALOG_SIZES.RESULTS, function (res) {
     if (res.status === Office.AsyncResultStatus.Failed) {
       setSelectedModuleCard("capability-range", false);
       var err = res.error || {};

@@ -310,10 +310,9 @@
       var badges = "";
       if (mod.comingSoon) badges += ' <span class="soon-badge">Soon</span>';
       if (mod.locked) badges += ' <span class="plan-badge">Professional</span>';
-      var purpose = mod.description && mod.description !== mod.label
-        ? mod.label + " — " + mod.description
-        : mod.label;
-      html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '" title="' + escapeHtml(purpose) + '" onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
+      var detail = mod.description && mod.description !== mod.label ? mod.description : "";
+      var purposeAttr = detail ? ' data-purpose="' + escapeHtml(detail) + '"' : "";
+      html += '<button type="button" class="hub-family-module' + (mod.locked ? " hub-family-module--locked" : "") + '" data-module-id="' + escapeHtml(mod.id) + '"' + purposeAttr + ' onclick="launchHubFamilyModule(\'' + jsId(mod.id) + '\')">';
       html += "<span>" + escapeHtml(mod.label) + (mod.mark ? "<sup>TM</sup>" : "") + badges + "</span>";
       html += '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
       html += "</button>";

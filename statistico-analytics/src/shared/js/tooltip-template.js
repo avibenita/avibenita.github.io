@@ -152,6 +152,7 @@
 
   function prepareElement(el) {
     if (!el) return;
+    if (el.closest && el.closest(".hub-family-module")) return;
     const text = resolveText(el);
     const html = resolveHtml(el);
     if (!text && !html) return;

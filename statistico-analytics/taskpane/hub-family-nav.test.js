@@ -100,7 +100,8 @@ describe("family home markup", () => {
     expect(html).toContain('class="hub-family-help" id="hub-family-help-explore" hidden');
     expect(html).toContain("See what’s in your data.");
     expect(html.indexOf("hub-family-title")).toBeLessThan(html.indexOf("See what’s in your data."));
-    expect(html).toContain('title="Paired / Repeated Measures"');
+    expect(html).toContain(">Paired / Repeated Measures<");
+    expect(html).not.toContain('title="Paired / Repeated Measures"');
     expect(html).toContain(">Across studies<");
     expect(html).toContain(">Meta-analysis<");
     expect(html).toContain("Combine effect estimates across studies.");
@@ -129,7 +130,7 @@ describe("family home markup", () => {
       "prepare-data": { description: "Scan the Active Range, then recode, compute, filter, and reshape into a new worksheet." }
     });
     const html = family.renderHomeHtml(family.buildNavigationModel(source), null);
-    expect(html).toContain('title="Prepare Data — Scan the Active Range, then recode, compute, filter, and reshape into a new worksheet."');
+    expect(html).toContain('data-purpose="Scan the Active Range, then recode, compute, filter, and reshape into a new worksheet."');
     expect(html).toContain(">Prepare Data<");
   });
 

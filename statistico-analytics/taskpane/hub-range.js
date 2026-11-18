@@ -523,6 +523,31 @@
     }
   }
 
+  var EMPTY_SHEET_MESSAGE = "This worksheet is empty. Add a header row and at least one data row, or load the demo data.";
+
+  function worksheetHasTable(values) {
+    if (!values || values.length < 2) return false;
+    var r, c, row, cell;
+    for (r = 0; r < values.length; r++) {
+      row = values[r] || [];
+      for (c = 0; c < row.length; c++) {
+        cell = row[c];
+        if (cell != null && String(cell).trim() !== "") return true;
+      }
+    }
+    return false;
+  }
+
+  function emptySheetResult() {
+    return { error: EMPTY_SHEET_MESSAGE, emptySheet: true };
+  }
+
+  function usedRangeIsMissing(err) {
+    var code = err && (err.code || "");
+    var msg = (err && err.message) || "";
+    return code === "ItemNotFound" || /ItemNotFound|doesn't exist|does not exist|requested resource/i.test(msg);
+  }
+
   /**
    * Read a worksheet range for a module dialog (does not change the hub data-source bar).
    * mode: "prompt" (Excel Select Data) or "selection" (current Excel selection).
@@ -538,9 +563,7 @@
         var rng = ctx.workbook.worksheets.getActiveWorksheet().getUsedRange();
         rng.load(["values", "address"]);
         return ctx.sync().then(function () {
-          if (!rng.values || rng.values.length < 2) {
-            return { error: "The worksheet range needs a header row plus at least one data row." };
-          }
+          if (!worksheetHasTable(rng.values)) return emptySheetResult();
           if (!current()) return { values: rng.values, address: rng.address, mode: "used" };
           rangeMode = "used";
           hubSyncRangeModeUI("used");
@@ -548,6 +571,7 @@
           return { values: rng.values, address: rng.address, mode: "used" };
         });
       }).catch(function (e) {
+        if (usedRangeIsMissing(e)) return emptySheetResult();
         return { error: (e && e.message) || "Could not read the worksheet range." };
       });
     }

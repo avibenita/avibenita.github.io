@@ -2409,9 +2409,10 @@ function beginModuleInputRange(fallback) {
   var capture = window.hubCaptureRange;
   if (typeof capture !== "function") return Promise.resolve(base);
   return Promise.resolve(capture("used")).then(function (result) {
-    if (result && result.values && result.values.length >= 2) {
+    if (result && result.values && result.values.length >= 2 && !result.emptySheet) {
       return { values: result.values, address: result.address || "", mode: "used" };
     }
+    if (result && result.error) hubInputRangeError = result.error;
     return base;
   }, function () { return base; });
 }

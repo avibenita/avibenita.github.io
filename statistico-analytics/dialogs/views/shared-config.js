@@ -843,17 +843,52 @@
     return false;
   }
 
+  function escapeHtml(text) {
+    return String(text || '').replace(/[&<>"]/g, function (ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch];
+    });
+  }
+
+  function sheetStillLoading() {
+    var main = document.getElementById('mainContent');
+    if (!main) return true;
+    var display = main.style.display;
+    return display === 'none' || display === '';
+  }
+
+  function showEmptySheetMessage(text) {
+    var spinner = document.getElementById('loadingSpinner');
+    if (!spinner) return false;
+    if (!document.getElementById('cfg-empty-sheet-style')) {
+      var style = document.createElement('style');
+      style.id = 'cfg-empty-sheet-style';
+      style.textContent = '.cfg-empty-sheet{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;max-width:440px;text-align:center;color:var(--cfg-text,#0f172a);font-size:14px;line-height:1.45}.cfg-empty-sheet i{font-size:22px;color:var(--cfg-run-from,#f97316)}.cfg-empty-sheet strong{font-size:15px}';
+      document.head.appendChild(style);
+    }
+    var message = text || 'This worksheet is empty. Add a header row and at least one data row, or load the demo data.';
+    var isEmpty = /^This worksheet is empty\./.test(message);
+    var title = isEmpty ? 'This worksheet is empty.' : 'No worksheet data';
+    var detail = isEmpty ? message.replace(/^This worksheet is empty\.\s*/, '') : message;
+    spinner.style.display = 'flex';
+    spinner.innerHTML = '<div class="cfg-empty-sheet"><i class="fa-solid fa-table" aria-hidden="true"></i><strong>' + escapeHtml(title) + '</strong><span>' + escapeHtml(detail) + '</span></div>';
+    var status = document.getElementById('statistico-demo-status');
+    if (status && !/^Demo data/.test(status.textContent || '')) status.textContent = message;
+    return true;
+  }
+
   function onParentMessage(arg) {
-    var bar = document.getElementById('cfgInputRange');
-    if (!bar || !bar.__cfgRange) return;
     var message;
     try { message = JSON.parse(arg && arg.message ? arg.message : '{}'); } catch (e) { return; }
-    if (message.type === 'NAMED_RANGES') {
-      bar.__cfgRange.setNames(message.names || []);
+    if (message.message && /RANGE_ERROR$/.test(message.type || '')) {
+      if (sheetStillLoading() && showEmptySheetMessage(message.message)) return;
+      var errorBar = document.getElementById('cfgInputRange');
+      if (errorBar && errorBar.__cfgRange) errorBar.__cfgRange.setError(message.message);
       return;
     }
-    if (message.message && /RANGE_ERROR$/.test(message.type || '')) {
-      bar.__cfgRange.setError(message.message);
+    var bar = document.getElementById('cfgInputRange');
+    if (!bar || !bar.__cfgRange) return;
+    if (message.type === 'NAMED_RANGES') {
+      bar.__cfgRange.setNames(message.names || []);
       return;
     }
     var found = addressFromMessage(message);
@@ -868,6 +903,10 @@
         Office.context.ui.addHandlerAsync(Office.EventType.DialogParentMessageReceived, onParentMessage, function () {
           postParent({ action: 'requestData' });
         });
+        setTimeout(function () {
+          if (!sheetStillLoading() || document.querySelector('.cfg-empty-sheet')) return;
+          showEmptySheetMessage('This worksheet is empty. Add a header row and at least one data row, or load the demo data.');
+        }, 3500);
       } catch (e) {}
     });
   }

@@ -2332,6 +2332,49 @@
       if (window.StatisticoHeader && typeof StatisticoHeader.init === 'function') {
         StatisticoHeader.init('cap-setup', 'Measurement', 0, 'capability');
         StatisticoHeader.initSidebarPage();
+        StatisticoHeader.registerActions({
+          getData: function () {
+            var headers = (table && table.headers) ? table.headers.slice() : [];
+            var all = (table && table.rows) ? table.rows : [];
+            if (!headers.length || !all.length) {
+              return {
+                headers: [],
+                allRows: [],
+                usedRows: [],
+                notice: 'Load a measurement range, then open View Data.'
+              };
+            }
+            var used = all;
+            if (groupName && typeof columnIndex === 'function' && typeof includedLevelNames === 'function') {
+              var idx = columnIndex(groupName);
+              var included = includedLevelNames(groupName);
+              if (idx >= 0 && included.length) {
+                var allow = Object.create(null);
+                included.forEach(function (level) { allow[level] = true; });
+                used = all.filter(function (row) {
+                  var raw = row ? row[idx] : null;
+                  return raw != null && allow[String(raw).trim()];
+                });
+              }
+            }
+            var cells = function (rows) {
+              return rows.map(function (row) {
+                return headers.map(function (_, col) {
+                  var value = row ? row[col] : null;
+                  return value == null || value === '' ? null : value;
+                });
+              });
+            };
+            return {
+              headers: headers,
+              allRows: cells(all),
+              usedRows: cells(used),
+              fullRange: table.address || '',
+              usedRange: table.address || ''
+            };
+          },
+          moduleName: 'Copy observations to clipboard'
+        });
       }
       showView('setup');
       if (/(?:^|[?&])demo=1(?:&|$)/.test(window.location.search || '') || typeof Office === 'undefined' || !Office.context || !Office.context.ui) {

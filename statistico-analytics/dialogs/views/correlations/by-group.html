@@ -737,6 +737,7 @@
     .group-option:hover { border-color:color-mix(in srgb, var(--accent-1) 55%, var(--border)); }
     .group-option.is-selected { border-color:var(--accent-1); box-shadow:0 0 0 1px color-mix(in srgb, var(--accent-1) 45%, transparent); }
     .group-option small { color:var(--text-secondary); font-weight:500; }
+    .group-option-empty { padding: 16px 12px; color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
     .level-preview { padding:12px; overflow:auto; min-height:360px; }
     .level-preview.is-hidden { display:none; }
     .level-placeholder { display:flex; height:100%; min-height:320px; align-items:center; justify-content:center; color:var(--text-secondary); text-align:center; padding:20px; font-size:13px; line-height:1.5; }
@@ -1299,6 +1300,20 @@
       if (BG && BG.tooManyGroupLevels) return BG.tooManyGroupLevels(count);
       return Number(count) > 15;
     }
+    function groupLevelCount(idx) {
+      const meta = columnMeta[idx];
+      if (meta && Number.isFinite(Number(meta.levelCount))) return Number(meta.levelCount);
+      return getLevelCounts(idx).length;
+    }
+
+    function isUsefulGroupColumn(header, idx) {
+      if ((analysisHeaders || []).indexOf(header) >= 0) return false;
+      const meta = columnMeta[idx];
+      if (meta && (meta.analysis || meta.groupable === false)) return false;
+      const nLevels = groupLevelCount(idx);
+      return nLevels >= 2 && !tooManyGroupLevels(nLevels);
+    }
+
     function groupOptionHtml(header, idx) {
       const analysisSet = new Set(analysisHeaders);
       const levels = getLevelCounts(idx);
@@ -1321,18 +1336,19 @@
       const BG = window.StatisticoByGroup;
       function finish(parts) {
         if (token !== groupListToken || !list) return;
-        list.innerHTML = (parts || []).join('');
+        const html = (parts || []).filter(Boolean).join('');
+        list.innerHTML = html || '<div class="group-option-empty">No grouping column is available. Analysis variables and columns with one level or more than 15 levels are left out.</div>';
         refreshGroupDialogSelection();
         if (typeof onReady === 'function') onReady();
       }
       if (!BG || !BG.scanColumns) {
-        finish(sourceHeaders.map((header, idx) => groupOptionHtml(header, idx)));
+        finish(sourceHeaders.map((header, idx) => isUsefulGroupColumn(header, idx) ? groupOptionHtml(header, idx) : ''));
         return;
       }
       BG.scanColumns({
         count: sourceHeaders.length,
         listEl: list,
-        onIndex: (idx) => groupOptionHtml(sourceHeaders[idx], idx),
+        onIndex: (idx) => isUsefulGroupColumn(sourceHeaders[idx], idx) ? groupOptionHtml(sourceHeaders[idx], idx) : '',
         onDone: finish
       });
     }

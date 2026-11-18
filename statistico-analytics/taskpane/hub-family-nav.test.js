@@ -106,6 +106,7 @@ describe("family home markup", () => {
     expect(html).toContain("Combine effect estimates across studies.");
     expect(html.indexOf(">Contingency Tables<")).toBeLessThan(html.indexOf(">Across studies<"));
     expect(html.indexOf(">Across studies<")).toBeLessThan(html.indexOf(">Meta-analysis<"));
+    expect(html.indexOf('class="hub-family-group"')).toBeLessThan(html.indexOf("Summaries &amp; relationships"));
     expect(html).toContain('class="hub-family-divider"><span>Summaries &amp; relationships</span>');
     expect(html).toContain('class="hub-family-divider"><span>Components &amp; factors</span>');
     expect(html).toContain('class="hub-family-divider"><span>Clustering</span>');

@@ -284,13 +284,29 @@
       return part && list.indexOf(part) === index;
     }).join(" ");
     html += '<div class="hub-family-body" id="' + bodyId + '" hidden>';
+    html += '<div class="hub-family-body-clip">';
     html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(helpText) + "</p>";
     html += '<div class="hub-family-modules">';
+    var groupIndex = 0;
+    var groupOpen = false;
+    function closeGroup() {
+      if (!groupOpen) return;
+      html += "</div>";
+      groupOpen = false;
+    }
+    function openGroup(label) {
+      closeGroup();
+      html += '<div class="hub-family-group" style="--group-i:' + groupIndex + '">';
+      groupIndex += 1;
+      groupOpen = true;
+      if (label) html += '<p class="hub-family-divider"><span>' + escapeHtml(label) + "</span></p>";
+    }
     (family.modules || []).forEach(function (mod) {
       if (mod.divider) {
-        html += '<p class="hub-family-divider"><span>' + escapeHtml(mod.divider) + "</span></p>";
+        openGroup(mod.divider);
         return;
       }
+      if (!groupOpen) openGroup("");
       var badges = "";
       if (mod.comingSoon) badges += ' <span class="soon-badge">Soon</span>';
       if (mod.locked) badges += ' <span class="plan-badge">Professional</span>';
@@ -302,7 +318,8 @@
       html += '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i>';
       html += "</button>";
     });
-    html += "</div></div></section>";
+    closeGroup();
+    html += "</div></div></div></section>";
     return html;
   }
 

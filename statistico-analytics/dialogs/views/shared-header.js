@@ -11359,7 +11359,14 @@ ${this._overallAiReplyFormat()}`;
       const sorted = values.slice().sort((a, b) => a - b);
       const mean = values.reduce((a, b) => a + b, 0) / n;
       const sd = n > 1 ? Math.sqrt(values.reduce((acc, v) => acc + (v - mean) ** 2, 0) / (n - 1)) : 0;
-      return { variable: header, n, mean: f(mean), sd: f(sd), min: f(sorted[0]), max: f(sorted[n - 1]) };
+      const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)];
+      const skew = n >= 3 && sd > 0
+        ? (n / ((n - 1) * (n - 2))) * values.reduce((acc, v) => acc + ((v - mean) / sd) ** 3, 0)
+        : NaN;
+      return {
+        variable: header, n, mean: f(mean), sd: f(sd),
+        min: f(sorted[0]), median: f(median), max: f(sorted[n - 1]), skew: f(skew)
+      };
     });
   },
 
@@ -11486,7 +11493,7 @@ ${this._overallAiReplyFormat()}`;
     if (allData.descriptives?.length) {
       lines.push('[ Descriptives ]');
       allData.descriptives.slice(0, 8).forEach((d) => {
-        lines.push(`  ${d.variable}: n=${d.n}, mean=${d.mean}, sd=${d.sd}, range=[${d.min}, ${d.max}]`);
+        lines.push(`  ${d.variable}: n=${d.n}, mean=${d.mean}, sd=${d.sd}, median=${d.median || 'N/A'}, range=[${d.min}, ${d.max}], skew=${d.skew || 'N/A'}`);
       });
     }
     return lines.join('\n');
@@ -11765,10 +11772,66 @@ ${this._localAiReplyFormat()}`;
       'partial-correlations': 'Partial correlation removes the part of each variable that can be predicted linearly from the listed controls, then correlates what remains. Compare the unadjusted r and the partial r on the SAME complete-case observations. Follow the actual change: the association may weaken, disappear, strengthen, emerge, or reverse sign. Only the partial r is adjusted.',
       reliability: 'Reliability view evaluates whether selected variables behave like a consistent scale using alpha, omega, item-total correlations, alpha-if-deleted, and PCA dimensionality cues.',
       'taylor-diagram': 'Taylor view compares variables against a reference using correlation, standard deviation, and centered RMSE-style geometry.',
-      'descriptive-stats': 'Descriptives summarize each variable before interpreting the correlation structure.',
+      'descriptive-stats': 'Descriptives lists each variable on its own: N, mean, SD, minimum, median, maximum, skew, and kurtosis, plus a histogram of the selected row. It does not show correlations.',
       'correlation-by-group': 'By Group compares overall and per-level r for each variable pair, with n per group and a sparkline of group-specific correlations.',
       'correlation-by-group-similarity': 'Similarity Profile™ compares group correlation structures (not Overall) on pattern (Tucker congruence of aligned pairwise r), strength (mean |r|), and sign agreement. Scores are 0–100 descriptive similarity, not a matrix-difference test. The layout matches Regression: a homogeneity gauge, a congruence scatter (r in one group vs r in the other), and a pairwise table with a three-component profile. Click a table row for the profile; click a congruence point to open that pair’s scatter. Group labels use col="level" (n=N).'
     };
+  },
+
+  _readOnScreenDescriptives() {
+    const body = document.getElementById('stats-body');
+    if (!body) return [];
+    const fields = ['variable', 'n', 'mean', 'sd', 'min', 'median', 'max', 'skew', 'kurt'];
+    return Array.from(body.querySelectorAll('tr')).map((tr) => {
+      const cells = Array.from(tr.children).map((td) => String(td.textContent || '').replace(/\s+/g, ' ').trim());
+      if (!cells[0]) return null;
+      const row = { selected: tr.classList.contains('selected') };
+      fields.forEach((key, i) => { row[key] = cells[i] || '—'; });
+      return row;
+    }).filter(Boolean);
+  },
+
+  _buildDescriptivesInsightPrompt(allData) {
+    const onScreen = this._readOnScreenDescriptives();
+    const lines = [];
+    if (onScreen.length) {
+      onScreen.forEach((row) => {
+        lines.push(`${row.selected ? '* ' : '  '}${row.variable}: N=${row.n}, mean=${row.mean}, SD=${row.sd}, min=${row.min}, median=${row.median}, max=${row.max}, skew=${row.skew}, kurtosis=${row.kurt}`);
+      });
+    } else if (allData?.descriptives?.length) {
+      allData.descriptives.forEach((d) => {
+        lines.push(`  ${d.variable}: N=${d.n}, mean=${d.mean}, SD=${d.sd}, min=${d.min}, median=${d.median || 'N/A'}, max=${d.max}, skew=${d.skew || 'N/A'}`);
+      });
+    }
+    const panel = document.getElementById('histogram-panel');
+    const histShown = !!(panel && panel.style.display !== 'none');
+    const histName = String(document.getElementById('histogram-title')?.textContent || '').trim();
+    const bins = document.getElementById('bins-value')?.textContent || document.getElementById('num-bins')?.value || '';
+    const normal = document.getElementById('show-normal')?.checked ? 'on' : 'off';
+    const histLine = histShown && histName && histName.toLowerCase() !== 'histogram'
+      ? `Histogram on screen: ${histName}. Bins=${bins || 'default'}. Normal curve=${normal}.`
+      : 'No variable histogram is open. The table is the whole view.';
+
+    return `You are explaining the Descriptive Statistics view. This screen summarizes each variable on its own. It is not a correlation analysis.
+
+WHAT IS ON SCREEN:
+A table with one row per variable: sample size, mean, standard deviation, minimum, median, maximum, skewness, and kurtosis. Clicking a row opens that variable's histogram. A starred row is the one currently plotted.
+
+DISPLAYED STATISTICS:
+${lines.join('\n') || '(no descriptive table is loaded)'}
+
+${histLine}
+
+RULES:
+- Write only about each variable's own level, spread, and shape.
+- Do not mention correlations, r, p-values, partial correlations, networks, Cronbach alpha, or any relationship between variables. None of those are results of this view.
+- BOTTOMLINE names the plotted variable when a histogram is open, otherwise the variable whose center or spread stands out, and states that center and spread with the numbers shown.
+- EVIDENCE quotes N, mean, SD, median, min, max, skew, or kurtosis from the table above. Compare mean with median when they differ.
+- MEANING explains what those numbers say about the histogram: where the values sit, how wide they are, and whether skew says the tail stretches toward higher or lower values.
+- CHECKS stays inside this view: small N, mean far from median, an extreme min or max, or skew and kurtosis far from zero.
+- NEXT stays on this screen: open another variable's histogram, or use Normality Tests for the plotted variable.
+
+${this._localAiReplyFormat()}`;
   },
 
   _buildCorrelationStructuredPrompt(view, mode, preCollectedData = null) {
@@ -11794,6 +11857,10 @@ PARTIAL VIEW RULES — the finding is the change in r, not the fact that control
 - Use the Analysis N from the same-observation comparison. Do not quote the header / filtered row count as the sample size if it differs.
 - Both r values use the same complete cases; only the partial r is adjusted. Do not treat a missing-data n change as an adjustment effect.
 ` : '';
+
+    if (mode !== 'full' && (view === 'descriptive-stats' || view === 'descriptives')) {
+      return this._buildDescriptivesInsightPrompt(allData);
+    }
 
     if (mode === 'full') {
       return `You are a senior statistician writing a full correlation-analysis report that synthesises ALL available correlation views.

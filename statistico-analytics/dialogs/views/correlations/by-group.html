@@ -3096,48 +3096,61 @@
       return parts.join(' ');
     }
 
+    function observationCells(headers, row) {
+      return headers.map((header, idx) => {
+        const value = Array.isArray(row) ? row[idx] : (row && row[header]);
+        return value == null || value === '' ? null : value;
+      });
+    }
+
+    function observationView() {
+      const stored = (typeof correlationData !== 'undefined' && correlationData) || {};
+      const headers = (Array.isArray(stored.sourceHeaders) && stored.sourceHeaders.length)
+        ? stored.sourceHeaders.slice()
+        : (sourceHeaders || []).slice();
+      const all = (Array.isArray(stored.sourceRowsAll) && stored.sourceRowsAll.length)
+        ? stored.sourceRowsAll
+        : ((Array.isArray(sourceRows) && sourceRows.length) ? sourceRows : []);
+      if (!headers.length || !all.length) return null;
+      let used = all;
+      if (isValidGroupIndex(groupIndex)) {
+        const included = new Set(
+          getLevelCounts(groupIndex)
+            .filter((item) => isLevelIncluded(groupIndex, item.level))
+            .map((item) => item.level)
+        );
+        if (included.size) {
+          const name = headers[groupIndex];
+          used = all.filter((row) => {
+            const raw = Array.isArray(row) ? row[groupIndex] : (row && row[name]);
+            return included.has(levelKey(raw));
+          });
+        }
+      }
+      const address = stored.address || (remoteSnapshot && remoteSnapshot.address) || '';
+      return {
+        headers,
+        allRows: all.map((row) => observationCells(headers, row)),
+        usedRows: used.map((row) => observationCells(headers, row)),
+        fullRange: address,
+        usedRange: address,
+        sourceHeaders: headers,
+        sourceRowsAll: all,
+        sourceRows: used,
+        rowFilterActive: used.length !== all.length
+      };
+    }
+
     function registerHeaderActions() {
       if (typeof StatisticoHeader === 'undefined') return;
-      const exportHeaders = [
-        'Pair',
-        'Overall r', 'Overall p', 'Overall n',
-        ...activeGroups.flatMap((g) => [`${groupLevelWithN(g.group, g.n)} r`, `${groupLevelWithN(g.group, g.n)} p`, `${groupLevelWithN(g.group, g.n)} n`])
-      ];
-      const exportRows = getFilteredRows();
-      const allExportRows = getSortedRows();
       StatisticoHeader.registerActions({
-        getData: () => ({
-          headers: exportHeaders,
-          allRows: allExportRows.map((row) => [
-            row.pair,
-            Number.isFinite(row.overall.r) ? row.overall.r : '',
-            row.overall.p,
-            row.overall.n,
-            ...row.groupResults.flatMap((gr) => [
-              Number.isFinite(gr.r) ? gr.r : '',
-              gr.p,
-              gr.n
-            ])
-          ]),
-          usedRows: exportRows.map((row) => [
-            row.pair,
-            Number.isFinite(row.overall.r) ? row.overall.r : '',
-            row.overall.p,
-            row.overall.n,
-            ...row.groupResults.flatMap((gr) => [
-              Number.isFinite(gr.r) ? gr.r : '',
-              gr.p,
-              gr.n
-            ])
-          ]),
-          usedRange: 'Correlations by group',
-          notice: [
-            'Grouped correlations use the active row filter and selected group levels.',
-            pairVarFilter ? `Pair filter: pairs including ${pairVarFilter}.` : '',
-            corrSimNotice()
-          ].filter(Boolean).join(' ')
-        }),
-        moduleName: 'Copy grouped correlations to clipboard'
+        getData: () => observationView() || {
+          headers: [],
+          allRows: [],
+          usedRows: [],
+          notice: 'The observation rows are not in this view. Re-run the correlation, then open By Group again.'
+        },
+        moduleName: 'Copy observations to clipboard'
       });
     }
 
@@ -3276,7 +3289,16 @@
       columnMeta = msg.columns || [];
       sourceHeaders = columnMeta.map((col) => col.name);
       analysisHeaders = (msg.analysisColumns || []).slice();
-      sourceRows = [];
+      sourceRows = Array.isArray(msg.sourceRows)
+        ? msg.sourceRows.map((row) => Array.isArray(row) ? row.slice() : row)
+        : [];
+      correlationData = correlationData || {};
+      correlationData.sourceHeaders = sourceHeaders.slice();
+      correlationData.sourceRowsAll = sourceRows;
+      correlationData.sourceRows = sourceRows;
+      correlationData.headers = analysisHeaders.slice();
+      correlationData.address = msg.address || correlationData.address || '';
+      window.correlationData = correlationData;
       corrType = normalizeCorrMethod(msg.method || corrType);
       const typeSelect = document.getElementById('corrTypeSelect');
       if (typeSelect) typeSelect.value = corrType;

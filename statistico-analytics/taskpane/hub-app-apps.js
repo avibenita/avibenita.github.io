@@ -2768,6 +2768,7 @@ function sendCorrelationSnapshotMeta() {
     retainedAt: snap.retainedAt,
     analysisColumns: snap.analysisColumns,
     columns: hubColumnMeta(snap),
+    sourceRows: snap.rows,
     sample: snap.sampleInfo || null
   });
 }

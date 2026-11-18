@@ -312,7 +312,7 @@
       var labelSpan = btn.querySelector('span:not(.ws-tab-label):not(.ws-tab-sub):not(.view-switcher-glow):not(.view-switcher-mark)');
       if (!labelSpan) return;
       var key = getTabKey(btn);
-      var titleAttr = btn.getAttribute('title') || '';
+      var titleAttr = btn.getAttribute('data-st-tip') || btn.getAttribute('title') || '';
       var skipSub = !!(btn.closest && btn.closest('.uni-view-tabs, .view-switcher-bar'));
       var sub = skipSub ? '' : (subtitles[key] || titleAttr);
       if (sub.length > 42) sub = sub.split('.')[0];
@@ -321,6 +321,7 @@
       text.innerHTML = '<span class="ws-tab-label">' + labelSpan.textContent + '</span>' +
         (sub ? '<span class="ws-tab-sub">' + sub + '</span>' : '');
       labelSpan.replaceWith(text);
+      if (titleAttr && !btn.getAttribute('data-st-tip')) btn.setAttribute('data-st-tip', titleAttr.trim());
       if (sub && titleAttr && titleAttr.trim().toLowerCase() === sub.trim().toLowerCase()) {
         btn.removeAttribute('title');
       }
@@ -332,7 +333,7 @@
     var active = bar.querySelector('.ws-mode-tab.active') || bar.querySelector('.ws-mode-tab');
     if (!active) return '';
     var key = getTabKey(active);
-    var title = (active.getAttribute('title') || '').trim();
+    var title = (active.getAttribute('data-st-tip') || active.getAttribute('title') || '').trim();
     var subEl = active.querySelector('.ws-tab-sub');
     var sub = subEl ? subEl.textContent.trim() : '';
     return title || sub || subtitles[key] || '';

@@ -150,7 +150,7 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
 
   const script = document.createElement('script');
   script.id = 'st-tooltip-template-script';
-  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20261118tip2');
+  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20261118tip3');
   script.async = true;
   script.onload = initTooltip;
   document.head.appendChild(script);
@@ -2682,7 +2682,7 @@ const StatisticoHeader = {
     }
   },
 
-  _TAB_ASSET_VER: '20261105tabflush',
+  _TAB_ASSET_VER: '20261118tip3',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -4232,6 +4232,9 @@ const StatisticoHeader = {
     this._ensurePlainTabUnderlineStyles();
     this._decorateViewSwitcherInviteAndGlow();
     this._syncExploreTabPanels(cfg);
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh(stack);
+    }
   },
 
   _renderUnivariateResultsTabs() {
@@ -4342,6 +4345,9 @@ const StatisticoHeader = {
       tabs: viewTabs,
       getActive: () => activeInPageTab
     });
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh(stack);
+    }
   },
 
   _renderSidebarNavItem(item) {
@@ -9098,7 +9104,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     wrap.innerHTML = ''
       + '<button type="button" class="sb-module-about" id="sbModuleAboutBtn"'
       + ' aria-expanded="false" aria-controls="moduleGuideOverlay"'
-      + ' title="' + aboutLabel.replace(/"/g, '&quot;') + '">'
+      + ' title="Open a short guide to this analysis.">'
       + '<i class="fa-solid fa-book-open" aria-hidden="true"></i>'
       + '<span class="sb-item-label">' + aboutLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>'
       + '</button>';

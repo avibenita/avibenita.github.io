@@ -170,15 +170,32 @@
     return (el.getAttribute('data-st-tip-html') || '').trim();
   }
 
-  function prepareElement(el) {
-    if (!el) return;
+  function isTooltipNode(el) {
+    return !!(el && (el.id === TOOLTIP_ID || (el.classList && el.classList.contains('st-tooltip'))));
+  }
+
+  function hasTipSource(el) {
+    if (!el || el.nodeType !== 1 || isTooltipNode(el)) return false;
+    return !!(
+      el.getAttribute('data-st-tip') ||
+      el.getAttribute('data-st-tip-html') ||
+      el.getAttribute('data-tip') ||
+      el.getAttribute('data-info') ||
+      el.getAttribute('title')
+    );
+  }
+
+  function prepareElement(el, keepTitle) {
+    if (!el || isTooltipNode(el)) return;
     const text = resolveText(el);
     const html = resolveHtml(el);
     if (!text && !html) return;
     if (!el.getAttribute('data-st-tip') && text) el.setAttribute('data-st-tip', text);
     if (el.getAttribute('title')) {
       el.setAttribute('data-st-title-orig', el.getAttribute('title'));
-      el.removeAttribute('title');
+      // Removing title during pointerover cancels the hover in the webview,
+      // so the tip flashes once and then stays gone until the next rebuild.
+      if (!keepTitle) el.removeAttribute('title');
     }
     el.setAttribute(SCRIPT_FLAG, '1');
   }
@@ -268,8 +285,15 @@
   }
 
   function closestTooltipAnchor(target) {
-    if (!target || !target.closest) return null;
-    return target.closest(`[${SCRIPT_FLAG}="1"]`);
+    let el = target && target.nodeType === 1 ? target : (target && target.parentElement);
+    while (el && el !== document.documentElement) {
+      if (hasTipSource(el) || el.getAttribute(SCRIPT_FLAG) === '1') {
+        prepareElement(el, true);
+        if (el.getAttribute(SCRIPT_FLAG) === '1') return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
   }
 
   function isPointerOverAnchor(anchor, x, y) {
@@ -291,7 +315,10 @@
     if (!anchor) return;
     const to = ev.relatedTarget;
     if (to && anchor.contains(to)) return;
-    if (activeAnchor === anchor) hide();
+    if (activeAnchor === anchor) {
+      if (anchor.getAttribute('title')) anchor.removeAttribute('title');
+      hide();
+    }
   }
 
   function handlePointerMove(ev) {
@@ -356,6 +383,19 @@
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) hide();
     });
+
+    if (window.MutationObserver) {
+      const observer = new MutationObserver((records) => {
+        records.forEach((record) => {
+          record.addedNodes.forEach((node) => {
+            if (!node || node.nodeType !== 1 || isTooltipNode(node)) return;
+            prepareLegacyElements(node);
+            prepareElement(node);
+          });
+        });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   function refresh(scope) {

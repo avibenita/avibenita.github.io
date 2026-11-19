@@ -34,8 +34,8 @@ describe('Statistico AI structure (Cursor100)', () => {
   test('view guide and interpret results live in the view, not the header', () => {
     expect(header).toMatch(/_placeViewDock/);
     expect(header).toMatch(/sb-view-dock/);
-    expect(header).toMatch(/How to use and read it/);
-    expect(header).toMatch(/What the numbers suggest/);
+    expect(header).not.toMatch(/How to use and read it/);
+    expect(header).not.toMatch(/What the numbers suggest/);
     const mount = header.slice(
       header.indexOf('  _mountViewActionGroup(group) {'),
       header.indexOf('  _supportsInsightGuide() {')
@@ -43,8 +43,7 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(mount).toMatch(/_placeViewDock\(group\)/);
     expect(mount).not.toMatch(/headerRight\.insertBefore/);
     expect(css).toMatch(/\.sb-view-dock/);
-    expect(css).toMatch(/\.sb-view-dock-mark/);
-    expect(css).toMatch(/\.right-col\.has-view-dock/);
+    expect(css).toMatch(/writing-mode:\s*vertical-rl/);
     expect(css).toMatch(/\.sb-view-dock \.sb-ai-float-btn\.sb-ai-local-btn/);
     expect(css).toMatch(/\.sb-guide-btn/);
     expect(css).toMatch(/\.vg-panel/);

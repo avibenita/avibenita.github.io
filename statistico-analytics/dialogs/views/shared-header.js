@@ -7990,28 +7990,19 @@ const StatisticoHeader = {
 
   _viewGuideButtonInnerHtml() {
     return '<span class="sb-view-dock-mark" aria-hidden="true"><i class="fa-regular fa-circle-question"></i></span>'
-      + '<span class="sb-view-dock-copy">'
       + '<span class="sb-ai-local-label sb-ai-local-label--full">View guide</span>'
-      + '<span class="sb-ai-local-label sb-ai-local-label--short">Guide</span>'
-      + '<span class="sb-view-dock-hint">How to use and read it</span>'
-      + '</span>';
+      + '<span class="sb-ai-local-label sb-ai-local-label--short">Guide</span>';
   },
 
   _interpretResultsButtonInnerHtml() {
     return '<span class="sb-view-dock-mark sb-view-dock-mark--ai" aria-hidden="true">' + this._aiIconHtml() + '</span>'
-      + '<span class="sb-view-dock-copy">'
       + '<span class="sb-ai-local-label sb-ai-local-label--full">Interpret results</span>'
-      + '<span class="sb-ai-local-label sb-ai-local-label--short">Interpret</span>'
-      + '<span class="sb-view-dock-hint">What the numbers suggest</span>'
-      + '</span>';
+      + '<span class="sb-ai-local-label sb-ai-local-label--short">Interpret</span>';
   },
 
   _interpretResultsBusyHtml() {
     return '<span class="sb-view-dock-mark sb-view-dock-mark--ai" aria-hidden="true"><i class="fa-solid fa-spinner fa-spin"></i></span>'
-      + '<span class="sb-view-dock-copy">'
-      + '<span class="sb-ai-local-label sb-ai-local-label--full">Interpreting…</span>'
-      + '<span class="sb-view-dock-hint">Reading this view</span>'
-      + '</span>';
+      + '<span class="sb-ai-local-label sb-ai-local-label--full">Interpreting…</span>';
   },
 
   _sidebarAiButtonTitle() {
@@ -9350,10 +9341,6 @@ REPORT: [one polished paragraph suitable for a report]`;
     group.className = 'sb-view-actions sb-view-dock';
     group.setAttribute('role', 'region');
     group.setAttribute('aria-label', 'Help for this view');
-    const intro = document.createElement('div');
-    intro.className = 'sb-view-dock-intro';
-    intro.innerHTML = '<span class="sb-view-dock-kicker">This view</span>';
-    group.appendChild(intro);
     group.appendChild(guide);
     group.appendChild(btn);
     this._mountViewActionGroup(group);
@@ -9387,18 +9374,19 @@ REPORT: [one polished paragraph suitable for a report]`;
   },
 
   /**
-   * Keep View guide and Interpret results inside the results column.
-   * Wide views get a card in the right gutter. Narrow views get the same
-   * card in a row under the header, still inside the view.
+   * Pin View guide and Interpret results to the right edge of the view.
+   * The rail stays narrow so it does not cover the results.
    */
   _placeViewDock(group) {
     if (!group) return;
     group.classList.add('sb-view-dock');
+    group.classList.remove('is-inline');
     const col = document.querySelector('.right-col');
     if (!col) {
       this._mountFloatingAiButton(group);
       return;
     }
+    col.classList.remove('has-view-dock');
     const header = col.querySelector('#header-container');
     if (header && header.parentElement === col) {
       if (group.previousElementSibling !== header) header.insertAdjacentElement('afterend', group);
@@ -9408,11 +9396,16 @@ REPORT: [one polished paragraph suitable for a report]`;
     const sync = () => {
       if (!group.isConnected) return;
       const chrome = col.querySelector('#header-container') || col.querySelector('.statistico-shell');
-      const belowChrome = chrome ? Math.round(chrome.offsetHeight) + 14 : 14;
-      const inline = col.clientWidth < 1080;
-      group.classList.toggle('is-inline', inline);
-      col.classList.toggle('has-view-dock', !inline);
-      group.style.top = inline ? '' : belowChrome + 'px';
+      const belowChrome = chrome ? Math.round(chrome.offsetHeight) + 18 : 18;
+      group.style.top = belowChrome + 'px';
+      group.style.transformOrigin = 'top right';
+      group.style.transform = '';
+      const room = col.clientHeight - belowChrome - 8;
+      const needed = group.offsetHeight;
+      if (room > 80 && needed > room) {
+        const scale = Math.max(0.72, Math.min(1, room / needed));
+        group.style.transform = 'scale(' + scale.toFixed(3) + ')';
+      }
     };
     sync();
     if (group.dataset.dockPlaced === '1') return;

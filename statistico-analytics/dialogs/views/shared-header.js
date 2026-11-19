@@ -2813,7 +2813,7 @@ const StatisticoHeader = {
     }
   },
 
-  _TAB_ASSET_VER: '20261105tabflush',
+  _TAB_ASSET_VER: '20261119out1',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 
@@ -8139,7 +8139,6 @@ REPORT: [one polished paragraph suitable for a report]`;
     const actions = this._pendingActions || {};
     const hasView = typeof actions.getData === 'function';
     const hasHtml = typeof actions.exportHtml === 'function';
-    const hasJson = typeof actions.exportJson === 'function';
     const surveySidebar = this.module === 'segmentation';
 
     // ── AI pill — above export / tools (every sidebar module) ─────────────
@@ -8172,27 +8171,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     }
     }
 
-    const exportWrap = document.createElement('div');
-    exportWrap.id = 'sbExportWrap';
-    exportWrap.className = 'sb-export-wrap';
-    exportWrap.innerHTML = `
-      <button class="sb-bottom-btn sb-bottom-btn--html ${hasHtml ? '' : 'sb-bottom-btn--disabled'}"
-              id="sbExportHtmlBtn"
-              ${hasHtml ? 'onclick="StatisticoHeader._pendingActions.exportHtml()"' : 'disabled'}
-              title="${hasHtml ? 'Export full analysis as HTML, PDF, or Word' : 'Export Report is not available for this page yet'}">
-        <i class="fa-solid fa-file-export"></i>
-        <span class="sb-item-label">Export Report</span>
-      </button>
-    `;
-    footer.appendChild(exportWrap);
-
     let toolsOpen = false;
-    const extraTools = surveySidebar ? '' : (
-      '<button class="sb-bottom-btn sb-bottom-btn--json ' + (hasJson ? '' : 'sb-bottom-btn--disabled') + '" id="sbExportJsonBtn" '
-      + (hasJson ? 'onclick="StatisticoHeader._pendingActions.exportJson()"' : 'disabled')
-      + ' title="' + (hasJson ? 'Download results as JSON file' : 'JSON export is not available for this page yet') + '">'
-      + '<i class="fa-solid fa-download"></i><span class="sb-item-label">Download JSON</span></button>'
-    );
 
     const utilities = document.createElement('div');
     utilities.id = 'sbUtilities';
@@ -8200,12 +8179,19 @@ REPORT: [one polished paragraph suitable for a report]`;
     utilities.innerHTML = `
       <button type="button" class="sb-output-tools-toggle" id="sbOutputToolsToggle"
               aria-expanded="${toolsOpen ? 'true' : 'false'}"
-              title="${surveySidebar ? 'View Data and Save PNG' : 'View Data, Save PNG, Download JSON'}">
+              title="Export Report, View Data, and Send feedback">
         <i class="fa-solid fa-screwdriver-wrench sb-bottom-icon"></i>
         <span class="sb-bottom-label">Output &amp; Tools</span>
         <i class="fa-solid fa-chevron-right sb-collapse-chevron" aria-hidden="true"></i>
       </button>
       <div class="sb-output-tools-body" id="sbOutputToolsBody" ${toolsOpen ? '' : 'hidden'}>
+        <button class="sb-bottom-btn sb-bottom-btn--html ${hasHtml ? '' : 'sb-bottom-btn--disabled'}"
+                id="sbExportHtmlBtn"
+                ${hasHtml ? 'onclick="StatisticoHeader._pendingActions.exportHtml()"' : 'disabled'}
+                title="${hasHtml ? 'Export full analysis as HTML, PDF, or Word' : 'Export Report is not available for this page yet'}">
+          <i class="fa-solid fa-file-export"></i>
+          <span class="sb-item-label">Export Report</span>
+        </button>
         <button class="sb-bottom-btn sb-bottom-btn--data ${hasView ? '' : 'sb-bottom-btn--disabled'}"
                 id="sbViewDataBtn"
                 ${hasView ? 'onclick="StatisticoHeader._toggleViewData()"' : 'disabled'}
@@ -8213,18 +8199,11 @@ REPORT: [one polished paragraph suitable for a report]`;
           <i class="fa-solid fa-eye"></i>
           <span class="sb-item-label">View Data</span>
         </button>
-        <button class="sb-bottom-btn sb-bottom-btn--png"
-                id="sbSavePngBtn"
-                onclick="StatisticoHeader.exportPreviewPng()"
-                title="Save the on-screen chart preview as a PNG image">
-          <i class="fa-solid fa-image"></i>
-          <span class="sb-item-label">Save as PNG</span>
-        </button>
-        ${extraTools}
       </div>
     `;
+    const toolsBodyEl = utilities.querySelector('#sbOutputToolsBody');
+    if (toolsBodyEl) toolsBodyEl.appendChild(this._sidebarFeedbackLink());
     footer.appendChild(utilities);
-    footer.appendChild(this._sidebarFeedbackLink());
     nav.appendChild(footer);
 
     const toolsToggle = document.getElementById('sbOutputToolsToggle');
@@ -8250,15 +8229,16 @@ REPORT: [one polished paragraph suitable for a report]`;
   feedbackAppVersion: '1.0.1.36',
 
   _sidebarFeedbackLink() {
-    const wrap = document.createElement('div');
-    wrap.className = 'sb-feedback';
-    wrap.innerHTML =
-      '<button type="button" class="sb-feedback-link" id="sbFeedbackLink">' +
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sb-bottom-btn sb-bottom-btn--feedback';
+    btn.id = 'sbFeedbackLink';
+    btn.title = 'Send feedback about this analysis';
+    btn.innerHTML =
       '<i class="fa-solid fa-comment" aria-hidden="true"></i>' +
-      '<span>Send feedback</span></button>';
-    const btn = wrap.querySelector('#sbFeedbackLink');
-    if (btn) btn.addEventListener('click', () => this.openModuleFeedback());
-    return wrap;
+      '<span class="sb-item-label">Send feedback</span>';
+    btn.addEventListener('click', () => this.openModuleFeedback());
+    return btn;
   },
 
   _ensureModuleFeedback() {

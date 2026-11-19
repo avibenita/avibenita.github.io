@@ -247,11 +247,11 @@ CALCULATORS = [
         "tool_url": "/statistico-calculators/0Distribution_Calculators/index-distribution.html",
         "tool_label": "Open the distribution suite",
         "meta_desc": (
-            "Thirteen interactive distribution calculators: normal, t, chi-square, F, binomial, Poisson, "
+            "Thirteen real-time interactive distribution calculators: normal, t, chi-square, F, binomial, Poisson, "
             "Weibull and more, with PDF and CDF charts and critical values."
         ),
         "app_desc": (
-            "Interactive distribution calculator suite covering normal, uniform, exponential, log-normal, "
+            "Real-Time Interactive distribution calculator suite covering normal, uniform, exponential, log-normal, "
             "Weibull, beta, binomial, Poisson, geometric, hypergeometric, chi-square, F and t distributions, "
             "with PDF, CDF and combined charts, quantiles and random sample generation."
         ),

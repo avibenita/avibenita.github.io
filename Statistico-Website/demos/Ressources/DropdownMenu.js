@@ -147,13 +147,13 @@ class DropdownMenu extends HTMLElement {
       <div class="header">
         <div class="left">Results Panel</div>
         <div class="center">
-          <div id="analysisName" class="analysis-title">Interactive Histogram</div>
+          <div id="analysisName" class="analysis-title">Real-Time Interactive Histogram</div>
           <div class="variable-line" id="headerVariableLine"><span id="variableName">Variable Name</span> <span class="n">(n=<span id="sampleSize">0</span>)</span></div>
         </div>
         <div class="dropdown">
           <button class="dropbtn">Advanced Analysis Options ▼</button>
           <div class="dropdown-content">
-            <a href="javascript:void(0)" data-case="Case00" data-name="Interactive Histogram"><span class="option-icon">📈</span>Interactive Histogram</a>
+            <a href="javascript:void(0)" data-case="Case00" data-name="Real-Time Interactive Histogram"><span class="option-icon">📈</span>Real-Time Interactive Histogram</a>
             <a href="javascript:void(0)" data-case="Case10" data-name="Box Plot Analysis"><span class="option-icon">📦</span>Box Plot Analysis</a>
             <a href="javascript:void(0)" data-case="Case20" data-name="Cumulative Distribution"><span class="option-icon">📈</span>Cumulative Distribution</a>
             <a href="javascript:void(0)" data-case="Case30" data-name="Percentiles"><span class="option-icon">📊</span>Percentiles</a>
@@ -253,7 +253,7 @@ window.updateVariableName = function(variableName) {
         const analysisName = activeOption.getAttribute('data-base-name') || activeOption.querySelector('.option-text').textContent;
         selectedTitleElement.textContent = analysisName;
     } else if (selectedTitleElement) {
-        selectedTitleElement.textContent = 'Interactive Histogram';
+        selectedTitleElement.textContent = 'Real-Time Interactive Histogram';
     }
 
     // Update the variable name display under the title (without sample size initially)
@@ -271,7 +271,7 @@ window.updateVariableName = function(variableName) {
 
     const histogramTitle = document.getElementById('histogram-title');
     if (histogramTitle) {
-        histogramTitle.textContent = `Interactive Histogram`;
+        histogramTitle.textContent = `Real-Time Interactive Histogram`;
     }
 };
 

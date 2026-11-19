@@ -28,12 +28,12 @@ MODULES = [
         "family": "Explore Data",
         "family_icon": "fa-chart-pie",
         "accent": "orange",
-        "meta_desc": "Explore Univariate Analysis in Statistico with interactive histograms, box plots, QQ plots, normality checks, outliers, percentiles, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive univariate analysis module inside Excel: histogram, box plot, QQ, kernel density, normality index, outliers, percentiles, confidence intervals, and hypothesis testing.",
+        "meta_desc": "Explore Univariate Analysis in Statistico with real-time interactive histograms, box plots, QQ plots, normality checks, outliers, percentiles, and AI-assisted interpretation inside Excel.",
+        "app_desc": "Real-Time Interactive univariate analysis module inside Excel: histogram, box plot, QQ, kernel density, normality index, outliers, percentiles, confidence intervals, and hypothesis testing.",
         "hero_subline": "Experience a completed Univariate Analysis exactly as it appears inside Statistico.",
         "hero_lead": "Understand one variable in depth — reshape bins, overlays, and tests live across histogram, box plot, QQ, density, normality, and outlier views.",
         "why_chain": ["Inspect distribution", "Check normality", "Flag outliers", "Estimate intervals", "Run tests", "Interpret results"],
-        "why_brand": "From raw values to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From raw values to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-chart-column", "Binning"),
             ("fa-sliders", "Overlays"),
@@ -41,7 +41,7 @@ MODULES = [
             ("fa-flask", "Tests respond"),
         ],
         "caps": [
-            ("fa-chart-column", "Interactive histogram with auto-binning"),
+            ("fa-chart-column", "Real-Time Interactive histogram with auto-binning"),
             ("fa-box", "Box plot with outlier flagging"),
             ("fa-chart-line", "QQ and PP normality plots"),
             ("fa-wave-square", "Kernel density estimation"),
@@ -81,7 +81,7 @@ MODULES = [
             ("linear-regression.html", "Linear Regression", "Continuous outcomes and diagnostics."),
             ("anova.html", "ANOVA", "Multi-group comparisons and post-hoc."),
         ],
-        "final_cta": "Explore Univariate Analysis as an interactive module",
+        "final_cta": "Explore Univariate Analysis as a real-time interactive module",
     },
     {
         "slug": "correlation",
@@ -93,11 +93,11 @@ MODULES = [
         "family_icon": "fa-chart-pie",
         "accent": "orange",
         "meta_desc": "Explore Correlation Analysis in Statistico with Pearson, Spearman, and Kendall matrices, heatmaps, network graphs, partial correlations, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive correlation module inside Excel: matrix and heatmap views, click-through scatter analysis, network graph, Taylor diagram, partial correlations, and reliability coefficients.",
+        "app_desc": "Real-Time Interactive correlation module inside Excel: matrix and heatmap views, click-through scatter analysis, network graph, Taylor diagram, partial correlations, and reliability coefficients.",
         "hero_subline": "Experience a completed Correlation Analysis exactly as it appears inside Statistico.",
-        "hero_lead": "Scan pairwise associations in one interactive workspace — switch coefficient types, open any cell into a full scatter analysis, and explore network structure live.",
+        "hero_lead": "Scan pairwise associations in one real-time interactive workspace — switch coefficient types, open any cell into a full scatter analysis, and explore network structure live.",
         "why_chain": ["Build matrix", "Switch coefficient", "Open scatter", "Inspect network", "Check partials", "Interpret results"],
-        "why_brand": "From coefficient table to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From coefficient table to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-table-cells", "Matrix"),
             ("fa-sliders", "Coefficient type"),
@@ -145,7 +145,7 @@ MODULES = [
             ("factor-analysis.html", "Factor Analysis", "Latent structure and rotation."),
             ("pca.html", "PCA", "Component retention and biplots."),
         ],
-        "final_cta": "Explore Correlation Analysis as an interactive module",
+        "final_cta": "Explore Correlation Analysis as a real-time interactive module",
     },
     {
         "slug": "independent-means",
@@ -157,11 +157,11 @@ MODULES = [
         "family_icon": "fa-arrows-left-right",
         "accent": "cyan",
         "meta_desc": "Explore Independent Means comparisons in Statistico with group exploration, assumptions, effect sizes, power analysis, APA reporting, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive independent-means module inside Excel: explore group distributions, assumptions, primary results, robustness checks, effect sizes, power, and APA-ready reporting.",
+        "app_desc": "Real-Time Interactive independent-means module inside Excel: explore group distributions, assumptions, primary results, robustness checks, effect sizes, power, and APA-ready reporting.",
         "hero_subline": "Experience a completed Independent Means analysis exactly as it appears inside Statistico.",
         "hero_lead": "Move from exploring group distributions to test results, effect sizes, and power in one continuous workflow — without leaving Excel.",
         "why_chain": ["Explore groups", "Check assumptions", "Run test", "Review effects", "Estimate power", "Export report"],
-        "why_brand": "From group comparison to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From group comparison to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-chart-column", "Group visuals"),
             ("fa-stethoscope", "Assumptions"),
@@ -169,7 +169,7 @@ MODULES = [
             ("fa-bolt", "Power"),
         ],
         "caps": [
-            ("fa-chart-column", "Interactive group descriptives and visuals"),
+            ("fa-chart-column", "Real-Time Interactive group descriptives and visuals"),
             ("fa-stethoscope", "Assumption and diagnostics checks"),
             ("fa-flask", "Primary results plus robustness checks"),
             ("fa-table", "Post-hoc pairwise comparisons when relevant"),
@@ -209,7 +209,7 @@ MODULES = [
             ("univariate.html", "Univariate", "Distribution shape and normality."),
             ("mixed-models.html", "Mixed Models", "Clustered and repeated designs."),
         ],
-        "final_cta": "Explore Independent Means as an interactive module",
+        "final_cta": "Explore Independent Means as a real-time interactive module",
     },
     {
         "slug": "paired-repeated",
@@ -221,11 +221,11 @@ MODULES = [
         "family_icon": "fa-arrows-left-right",
         "accent": "cyan",
         "meta_desc": "Explore Paired and Repeated Measures analysis in Statistico with trajectories, assumptions, effect sizes, power analysis, APA reporting, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive paired and repeated-measures module inside Excel: explore change, assumptions, results, trajectories, effect sizes, power, and APA-ready reporting.",
+        "app_desc": "Real-Time Interactive paired and repeated-measures module inside Excel: explore change, assumptions, results, trajectories, effect sizes, power, and APA-ready reporting.",
         "hero_subline": "Experience a completed Paired / Repeated Means analysis exactly as it appears inside Statistico.",
         "hero_lead": "Follow within-subject change live — from trajectories and assumptions to effects, power, and reporting in one continuous workflow.",
         "why_chain": ["Align pairs", "Explore change", "Check assumptions", "Estimate effects", "Review power", "Export report"],
-        "why_brand": "From paired observations to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From paired observations to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-chart-line", "Trajectories"),
             ("fa-stethoscope", "Assumptions"),
@@ -273,7 +273,7 @@ MODULES = [
             ("anova.html", "ANOVA", "Multi-group comparisons and post-hoc."),
             ("univariate.html", "Univariate", "Distribution shape and normality."),
         ],
-        "final_cta": "Explore Paired / Repeated Means as an interactive module",
+        "final_cta": "Explore Paired / Repeated Means as a real-time interactive module",
     },
     {
         "slug": "anova",
@@ -284,12 +284,12 @@ MODULES = [
         "family": "Advanced Comparisons",
         "family_icon": "fa-scale-balanced",
         "accent": "green",
-        "meta_desc": "Explore ANOVA in Statistico with interactive multi-group comparisons, post-hoc matrices, diagnostics, visuals, power tools, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive ANOVA module inside Excel: ANOVA table, inference, post-hoc comparisons, diagnostics, visuals with effect-size badges, power tools, and reporting.",
+        "meta_desc": "Explore ANOVA in Statistico with real-time interactive multi-group comparisons, post-hoc matrices, diagnostics, visuals, power tools, and AI-assisted interpretation inside Excel.",
+        "app_desc": "Real-Time Interactive ANOVA module inside Excel: ANOVA table, inference, post-hoc comparisons, diagnostics, visuals with effect-size badges, power tools, and reporting.",
         "hero_subline": "Experience a completed ANOVA analysis exactly as it appears inside Statistico.",
-        "hero_lead": "Compare groups interactively — refine the model and watch the ANOVA table, post-hoc matrices, diagnostics, and power tools update together.",
+        "hero_lead": "Compare groups with real-time interactivity — refine the model and watch the ANOVA table, post-hoc matrices, diagnostics, and power tools update together.",
         "why_chain": ["Specify design", "Inspect ANOVA", "Run post-hoc", "Check diagnostics", "Estimate power", "Interpret results"],
-        "why_brand": "From multi-group design to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From multi-group design to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-table", "ANOVA table"),
             ("fa-table-cells", "Post-hoc"),
@@ -337,7 +337,7 @@ MODULES = [
             ("paired-repeated.html", "Paired / Repeated", "Within-subject change."),
             ("linear-regression.html", "Linear Regression", "Continuous outcomes and covariates."),
         ],
-        "final_cta": "Explore ANOVA as an interactive module",
+        "final_cta": "Explore ANOVA as a real-time interactive module",
     },
     {
         "slug": "mixed-models",
@@ -349,11 +349,11 @@ MODULES = [
         "family_icon": "fa-scale-balanced",
         "accent": "green",
         "meta_desc": "Explore Mixed Models in Statistico with fixed and random effects, ICC, BLUPs, marginal means, diagnostics, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive mixed-models module inside Excel: ICC narrative, fixed effects, random effects, BLUPs, marginal means, likelihood-ratio tests, and fit statistics.",
+        "app_desc": "Real-Time Interactive mixed-models module inside Excel: ICC narrative, fixed effects, random effects, BLUPs, marginal means, likelihood-ratio tests, and fit statistics.",
         "hero_subline": "Experience a completed Mixed Models analysis exactly as it appears inside Statistico.",
         "hero_lead": "Explore fixed and random effects together and watch the model story update as you adjust structure — ideal for clustered, repeated, and hierarchical data.",
         "why_chain": ["Set structure", "Review ICC", "Inspect fixed effects", "Inspect random effects", "Compare means", "Interpret fit"],
-        "why_brand": "From multilevel structure to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From multilevel structure to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-sitemap", "Structure"),
             ("fa-chart-line", "Fixed effects"),
@@ -401,7 +401,7 @@ MODULES = [
             ("linear-regression.html", "Linear Regression", "Single-level continuous outcomes."),
             ("independent-means.html", "Independent Means", "Between-group comparisons."),
         ],
-        "final_cta": "Explore Mixed Models as an interactive module",
+        "final_cta": "Explore Mixed Models as a real-time interactive module",
     },
     {
         "slug": "linear-regression",
@@ -413,11 +413,11 @@ MODULES = [
         "family_icon": "fa-chart-line",
         "accent": "blue",
         "meta_desc": "Explore Linear Regression in Statistico with coefficients, partial plots, residual diagnostics, influential cases, predictions, interactions, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive linear regression module inside Excel: coefficients, partial regression plots, residual diagnostics, influential cases, predictions, interactions, and AI insights.",
+        "app_desc": "Real-Time Interactive linear regression module inside Excel: coefficients, partial regression plots, residual diagnostics, influential cases, predictions, interactions, and AI insights.",
         "hero_subline": "Experience a completed Linear Regression analysis exactly as it appears inside Statistico.",
         "hero_lead": "Explore the model live — coefficients, assumptions, diagnostics, partial plots, and predictions evolve together as you refine the specification.",
         "why_chain": ["Specify model", "Inspect coefficients", "Check residuals", "Review influence", "Predict scenarios", "Interpret results"],
-        "why_brand": "From fitted equation to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From fitted equation to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-sliders", "Predictors"),
             ("fa-chart-line", "Coefficients"),
@@ -465,7 +465,7 @@ MODULES = [
             ("anova.html", "ANOVA", "Multi-group comparisons."),
             ("mixed-models.html", "Mixed Models", "Clustered and hierarchical data."),
         ],
-        "final_cta": "Explore Linear Regression as an interactive module",
+        "final_cta": "Explore Linear Regression as a real-time interactive module",
     },
     {
         "slug": "pca",
@@ -477,11 +477,11 @@ MODULES = [
         "family_icon": "fa-layer-group",
         "accent": "purple",
         "meta_desc": "Explore PCA in Statistico with eigenvalues, scree guidance, loadings, rotation, biplots, score plots, contribution plots, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive PCA module inside Excel: adequacy checks, eigenvalue retention, loadings, rotation, biplot, score plot, contribution plot, and outlier map.",
+        "app_desc": "Real-Time Interactive PCA module inside Excel: adequacy checks, eigenvalue retention, loadings, rotation, biplot, score plot, contribution plot, and outlier map.",
         "hero_subline": "Experience a completed Principal Component Analysis exactly as it appears inside Statistico.",
-        "hero_lead": "Adjust retention and rotation interactively; eigenvalues, scree evidence, loadings, biplots, and score plots respond together.",
+        "hero_lead": "Adjust retention and rotation with real-time interactivity; eigenvalues, scree evidence, loadings, biplots, and score plots respond together.",
         "why_chain": ["Check adequacy", "Retain components", "Inspect loadings", "Rotate solution", "Map scores", "Interpret structure"],
-        "why_brand": "From correlation structure to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From correlation structure to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-chart-simple", "Scree"),
             ("fa-sliders", "Retention"),
@@ -529,7 +529,7 @@ MODULES = [
             ("correlation.html", "Correlation", "Pairwise relationships and redundancy."),
             ("k-means.html", "K-Means", "Partition cases into segments."),
         ],
-        "final_cta": "Explore PCA as an interactive module",
+        "final_cta": "Explore PCA as a real-time interactive module",
     },
     {
         "slug": "reliability",
@@ -541,11 +541,11 @@ MODULES = [
         "family_icon": "fa-layer-group",
         "accent": "purple",
         "meta_desc": "Explore Scale Reliability in Statistico: Cronbach’s alpha, McDonald’s omega, item diagnostics, reverse coding, and bootstrap intervals inside Excel.",
-        "app_desc": "Interactive scale reliability module inside Excel: Cronbach’s alpha, standardized alpha, McDonald’s omega total from a one-factor model, item diagnostics, inter-item matrix, dimensionality scree, scale-score descriptives, and optional by-group reliability.",
+        "app_desc": "Real-Time Interactive scale reliability module inside Excel: Cronbach’s alpha, standardized alpha, McDonald’s omega total from a one-factor model, item diagnostics, inter-item matrix, dimensionality scree, scale-score descriptives, and optional by-group reliability.",
         "hero_subline": "Experience a completed Scale Reliability analysis exactly as it appears inside Statistico.",
         "hero_lead": "Assess whether selected items behave as one consistent scale — coefficients, weak items, reverse-coding cues, and a dimensionality diagnostic stay in the same workspace.",
         "why_chain": ["Select items", "Reverse-code if needed", "Read alpha and omega", "Inspect weak items", "Check structure", "Compare groups"],
-        "why_brand": "From item set to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From item set to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-clipboard-check", "Overview"),
             ("fa-list-check", "Item diagnostics"),
@@ -593,7 +593,7 @@ MODULES = [
             ("correlation.html", "Correlation", "Pairwise relationships before forming a scale."),
             ("data-manipulation.html", "Data Manipulation", "Reverse-score Likert items and build composites."),
         ],
-        "final_cta": "Explore Scale Reliability as an interactive module",
+        "final_cta": "Explore Scale Reliability as a real-time interactive module",
     },
     {
         "slug": "k-means",
@@ -604,12 +604,12 @@ MODULES = [
         "family": "Find Segments",
         "family_icon": "fa-object-group",
         "accent": "teal",
-        "meta_desc": "Explore K-Means Clustering in Statistico with interactive k selection, centroids, cluster profiles, diagnostics, separation maps, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive K-means clustering module inside Excel: cluster sizes, centers, mean z-score profiles, WCSS diagnostics, assignments, and separation map.",
+        "meta_desc": "Explore K-Means Clustering in Statistico with real-time interactive k selection, centroids, cluster profiles, diagnostics, separation maps, and AI-assisted interpretation inside Excel.",
+        "app_desc": "Real-Time Interactive K-means clustering module inside Excel: cluster sizes, centers, mean z-score profiles, WCSS diagnostics, assignments, and separation map.",
         "hero_subline": "Experience a completed K-Means Clustering analysis exactly as it appears inside Statistico.",
         "hero_lead": "Partition cases into k groups around centroids and watch sizes, centers, profiles, and diagnostics reorganize live as you change k and distance.",
         "why_chain": ["Choose features", "Set k", "Inspect sizes", "Compare centers", "Review profiles", "Check separation"],
-        "why_brand": "From partitioning to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From partitioning to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-sliders", "Change k"),
             ("fa-bullseye", "Centroids"),
@@ -657,7 +657,7 @@ MODULES = [
             ("factor-analysis.html", "Factor Analysis", "Latent structure discovery."),
             ("correlation.html", "Correlation", "Feature associations before clustering."),
         ],
-        "final_cta": "Explore K-Means Clustering as an interactive module",
+        "final_cta": "Explore K-Means Clustering as a real-time interactive module",
     },
     {
         "slug": "hierarchical",
@@ -669,11 +669,11 @@ MODULES = [
         "family_icon": "fa-object-group",
         "accent": "teal",
         "meta_desc": "Explore Hierarchical Clustering in Statistico with dendrograms, linkage choices, tree cuts, cluster profiles, separation maps, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive hierarchical clustering module inside Excel: dendrogram, linkage and distance controls, tree cut at k, cluster sizes, merge steps, profiles, and separation map.",
+        "app_desc": "Real-Time Interactive hierarchical clustering module inside Excel: dendrogram, linkage and distance controls, tree cut at k, cluster sizes, merge steps, profiles, and separation map.",
         "hero_subline": "Experience a completed Hierarchical Clustering analysis exactly as it appears inside Statistico.",
         "hero_lead": "Build a merge tree and cut it at k — dendrogram, cluster sizes, and profiles update together as you change distance and linkage.",
         "why_chain": ["Choose features", "Pick linkage", "Inspect dendrogram", "Cut at k", "Review profiles", "Check separation"],
-        "why_brand": "From merge tree to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From merge tree to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-sitemap", "Dendrogram"),
             ("fa-sliders", "Tree cut"),
@@ -721,7 +721,7 @@ MODULES = [
             ("factor-analysis.html", "Factor Analysis", "Latent structure discovery."),
             ("correlation.html", "Correlation", "Feature associations before clustering."),
         ],
-        "final_cta": "Explore Hierarchical Clustering as an interactive module",
+        "final_cta": "Explore Hierarchical Clustering as a real-time interactive module",
     },
     {
         "slug": "meta-analysis",
@@ -733,11 +733,11 @@ MODULES = [
         "family_icon": "fa-layer-group",
         "accent": "indigo",
         "meta_desc": "Explore Meta-Analysis in Statistico: pool study-level effects with forest plots, heterogeneity, funnel plots, Egger tests, and AI-assisted interpretation inside Excel.",
-        "app_desc": "Interactive meta-analysis module inside Excel: Hedges' g, risk ratios, forest plots, I² / Q heterogeneity, funnel plots, Egger tests, and random-effects pooling.",
+        "app_desc": "Real-Time Interactive meta-analysis module inside Excel: Hedges' g, risk ratios, forest plots, I² / Q heterogeneity, funnel plots, Egger tests, and random-effects pooling.",
         "hero_subline": "Experience a completed Meta-Analysis exactly as it appears inside Statistico.",
         "hero_lead": "Pool study-level effects into one estimate and inspect the forest plot, heterogeneity, and small-study checks together — without leaving Excel.",
         "why_chain": ["Assign studies", "Choose measure", "Pool effects", "Inspect forest", "Check heterogeneity", "Review bias"],
-        "why_brand": "From study rows to statistical reasoning — this is Interactive Statistical Computing, not a sequence of static outputs.",
+        "why_brand": "From study rows to statistical reasoning — this is Real-Time Interactive Statistical Computing, not a sequence of static outputs.",
         "live_steps": [
             ("fa-table", "Study rows"),
             ("fa-scale-balanced", "Pooled effect"),
@@ -785,7 +785,7 @@ MODULES = [
             ("logistic-regression.html", "Logistic Regression", "Binary outcomes and odds ratios."),
             ("mixed-models.html", "Mixed Models", "Fixed and random effects."),
         ],
-        "final_cta": "Explore Meta-Analysis as an interactive module",
+        "final_cta": "Explore Meta-Analysis as a real-time interactive module",
     },
 ]
 
@@ -1379,7 +1379,7 @@ def render_page(m: dict) -> str:
 
     <section id="gallery" aria-labelledby="workflow-heading" style="border-top:1px solid var(--border);">
       <div class="container">
-        <span class="section-kicker-label">Interactive workflow</span>
+        <span class="section-kicker-label">Real-Time Interactive workflow</span>
         <h2 id="workflow-heading" class="section-title">{m['workflow_title']}</h2>
         <p class="section-lead">{m['workflow_lead']}</p>
         <div class="lr-flow" role="tablist" aria-label="{m['title']} analytical workflow">

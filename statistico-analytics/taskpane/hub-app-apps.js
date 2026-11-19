@@ -123,6 +123,7 @@ let hubRegressionConfigDialog = null;
 let hubRegressionResultsDialog = null;
 let hubRegressionModelSpec = null;
 let hubRegressionDataPayload = null;
+let hubRegressionHandoff = false;
 let hubAnovaFlowActive = false;
 let hubAnovaDialog = null;
 let hubIndependentFlowActive = false;
@@ -2719,6 +2720,7 @@ function finishHubUnivariateFlow() {
 
 function finishHubRegressionFlow() {
   hubRegressionFlowActive = false;
+  hubRegressionHandoff = false;
   hubRegressionModelSpec = null;
   hubRegressionDataPayload = null;
   if (!hubRegressionConfigDialog && !hubRegressionResultsDialog) setSelectedModuleCard("regression", false);
@@ -3354,6 +3356,7 @@ function openRegressionConfigFromHub() {
               sample: regScoped.sample || null,
               savedModelSpec: null
             };
+            hubRegressionHandoff = true;
             hubRegressionConfigDialog.close();
             hubRegressionConfigDialog = null;
             setTimeout(openRegressionResultsFromHub, 500);
@@ -3366,6 +3369,10 @@ function openRegressionConfigFromHub() {
       });
       hubRegressionConfigDialog.addEventHandler(Office.EventType.DialogEventReceived, function () {
         hubRegressionConfigDialog = null;
+        if (hubRegressionHandoff) {
+          hubRegressionHandoff = false;
+          return;
+        }
         if (!hubRegressionResultsDialog) finishHubRegressionFlow();
       });
     }

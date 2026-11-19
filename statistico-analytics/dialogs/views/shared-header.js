@@ -7989,15 +7989,29 @@ const StatisticoHeader = {
   },
 
   _viewGuideButtonInnerHtml() {
-    return '<i class="fa-regular fa-circle-question" aria-hidden="true"></i>'
+    return '<span class="sb-view-dock-mark" aria-hidden="true"><i class="fa-regular fa-circle-question"></i></span>'
+      + '<span class="sb-view-dock-copy">'
       + '<span class="sb-ai-local-label sb-ai-local-label--full">View guide</span>'
-      + '<span class="sb-ai-local-label sb-ai-local-label--short">Guide</span>';
+      + '<span class="sb-ai-local-label sb-ai-local-label--short">Guide</span>'
+      + '<span class="sb-view-dock-hint">How to use and read it</span>'
+      + '</span>';
   },
 
   _interpretResultsButtonInnerHtml() {
-    return this._aiIconHtml()
+    return '<span class="sb-view-dock-mark sb-view-dock-mark--ai" aria-hidden="true">' + this._aiIconHtml() + '</span>'
+      + '<span class="sb-view-dock-copy">'
       + '<span class="sb-ai-local-label sb-ai-local-label--full">Interpret results</span>'
-      + '<span class="sb-ai-local-label sb-ai-local-label--short">Interpret</span>';
+      + '<span class="sb-ai-local-label sb-ai-local-label--short">Interpret</span>'
+      + '<span class="sb-view-dock-hint">What the numbers suggest</span>'
+      + '</span>';
+  },
+
+  _interpretResultsBusyHtml() {
+    return '<span class="sb-view-dock-mark sb-view-dock-mark--ai" aria-hidden="true"><i class="fa-solid fa-spinner fa-spin"></i></span>'
+      + '<span class="sb-view-dock-copy">'
+      + '<span class="sb-ai-local-label sb-ai-local-label--full">Interpreting…</span>'
+      + '<span class="sb-view-dock-hint">Reading this view</span>'
+      + '</span>';
   },
 
   _sidebarAiButtonTitle() {
@@ -9049,35 +9063,22 @@ REPORT: [one polished paragraph suitable for a report]`;
   // ── Global AI Interpretation (univariate sidebar) ────────────────────────
 
   /**
-   * Place the local "Explain this view" button beside the active view title.
-   * Falls back to a sticky slot in the results column, then a floating host.
+   * Place a lone local AI button in the shared in-view dock.
    */
   _mountLocalAiButton(btn) {
     if (!btn) return;
     btn.type = 'button';
     btn.classList.add('sb-ai-local-btn');
-    const headerRight = document.querySelector('.header-right');
-    if (headerRight) {
-      btn.classList.add('sb-ai-local-btn--header');
-      btn.classList.remove('is-floating-free', 'sb-ai-float-btn--tab');
-      headerRight.insertBefore(btn, headerRight.firstChild);
-      let sep = headerRight.querySelector('.sb-ai-local-sep');
-      if (!sep) {
-        sep = document.createElement('span');
-        sep.className = 'sb-ai-local-sep';
-        sep.setAttribute('aria-hidden', 'true');
-      }
-      if (btn.nextSibling !== sep) headerRight.insertBefore(sep, btn.nextSibling);
-      this._wireLocalAiCompactLabel(btn, headerRight);
-      return;
+    btn.classList.remove('sb-ai-local-btn--header', 'sb-ai-local-btn--sticky', 'is-floating-free');
+    let group = btn.closest ? btn.closest('#sbViewActions') : null;
+    if (!group) group = document.getElementById('sbViewActions');
+    if (!group) {
+      group = document.createElement('div');
+      group.id = 'sbViewActions';
+      group.className = 'sb-view-actions sb-view-dock';
     }
-    const rightCol = document.querySelector('.right-col') || document.querySelector('.lf-content');
-    if (rightCol) {
-      btn.classList.add('sb-ai-local-btn--sticky');
-      rightCol.insertBefore(btn, rightCol.firstChild);
-      return;
-    }
-    this._mountFloatingAiButton(btn);
+    if (btn.parentElement !== group) group.appendChild(btn);
+    this._placeViewDock(group);
   },
 
   _wireLocalAiCompactLabel(btn, headerRight) {
@@ -9309,7 +9310,11 @@ REPORT: [one polished paragraph suitable for a report]`;
   },
 
   _mountViewActions() {
-    if (document.getElementById('sbViewGuideBtn') && document.getElementById('sbAiFloatBtn')) return;
+    if (document.getElementById('sbViewGuideBtn') && document.getElementById('sbAiFloatBtn')) {
+      const group = document.getElementById('sbViewActions');
+      if (group) this._placeViewDock(group);
+      return;
+    }
     const existing = document.getElementById('sbAiFloatBtn');
     if (existing) existing.remove();
     const oldGroup = document.getElementById('sbViewActions');
@@ -9342,7 +9347,13 @@ REPORT: [one polished paragraph suitable for a report]`;
 
     const group = document.createElement('div');
     group.id = 'sbViewActions';
-    group.className = 'sb-view-actions';
+    group.className = 'sb-view-actions sb-view-dock';
+    group.setAttribute('role', 'region');
+    group.setAttribute('aria-label', 'Help for this view');
+    const intro = document.createElement('div');
+    intro.className = 'sb-view-dock-intro';
+    intro.innerHTML = '<span class="sb-view-dock-kicker">This view</span>';
+    group.appendChild(intro);
     group.appendChild(guide);
     group.appendChild(btn);
     this._mountViewActionGroup(group);
@@ -9364,24 +9375,55 @@ REPORT: [one polished paragraph suitable for a report]`;
 
   _mountViewActionGroup(group) {
     if (!group) return;
-    const headerRight = document.querySelector('.header-right');
-    if (!headerRight) {
+    const guide = group.querySelector('#sbViewGuideBtn');
+    const interpret = group.querySelector('#sbAiFloatBtn');
+    if (guide) guide.classList.remove('sb-guide-btn--header');
+    if (interpret) {
+      interpret.classList.remove('sb-ai-local-btn--header', 'sb-ai-local-btn--sticky', 'is-floating-free');
+    }
+    const headerSep = document.querySelector('.header-right > .sb-ai-local-sep');
+    if (headerSep) headerSep.remove();
+    this._placeViewDock(group);
+  },
+
+  /**
+   * Keep View guide and Interpret results inside the results column.
+   * Wide views get a card in the right gutter. Narrow views get the same
+   * card in a row under the header, still inside the view.
+   */
+  _placeViewDock(group) {
+    if (!group) return;
+    group.classList.add('sb-view-dock');
+    const col = document.querySelector('.right-col');
+    if (!col) {
       this._mountFloatingAiButton(group);
       return;
     }
-    const guide = group.querySelector('#sbViewGuideBtn');
-    const interpret = group.querySelector('#sbAiFloatBtn');
-    if (guide) guide.classList.add('sb-guide-btn--header');
-    if (interpret) interpret.classList.add('sb-ai-local-btn--header');
-    headerRight.insertBefore(group, headerRight.firstChild);
-    let sep = headerRight.querySelector('.sb-ai-local-sep');
-    if (!sep) {
-      sep = document.createElement('span');
-      sep.className = 'sb-ai-local-sep';
-      sep.setAttribute('aria-hidden', 'true');
+    const header = col.querySelector('#header-container');
+    if (header && header.parentElement === col) {
+      if (group.previousElementSibling !== header) header.insertAdjacentElement('afterend', group);
+    } else if (group.parentElement !== col) {
+      col.insertBefore(group, col.firstChild);
     }
-    if (group.nextSibling !== sep) headerRight.insertBefore(sep, group.nextSibling);
-    this._wireLocalAiCompactLabel(group, headerRight);
+    const sync = () => {
+      if (!group.isConnected) return;
+      const chrome = col.querySelector('#header-container') || col.querySelector('.statistico-shell');
+      const belowChrome = chrome ? Math.round(chrome.offsetHeight) + 14 : 14;
+      const inline = col.clientWidth < 1080;
+      group.classList.toggle('is-inline', inline);
+      col.classList.toggle('has-view-dock', !inline);
+      group.style.top = inline ? '' : belowChrome + 'px';
+    };
+    sync();
+    if (group.dataset.dockPlaced === '1') return;
+    group.dataset.dockPlaced = '1';
+    window.addEventListener('resize', sync);
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(sync);
+      ro.observe(col);
+      const chrome = col.querySelector('#header-container') || col.querySelector('.statistico-shell');
+      if (chrome) ro.observe(chrome);
+    }
   },
 
   _supportsInsightGuide() {
@@ -10126,7 +10168,7 @@ ${this._localAiReplyFormat()}`;
     const btn = document.getElementById('sbAiFloatBtn');
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Interpreting…</span>';
+      btn.innerHTML = this._interpretResultsBusyHtml();
     }
     try {
       this._lastAiMeta = null;
@@ -10552,7 +10594,7 @@ ${this._overallAiReplyFormat()}`;
       if (!btn) return;
       btn.disabled = busy;
       btn.innerHTML = busy
-        ? '<i class="fa-solid fa-spinner fa-spin"></i><span>Interpreting…</span>'
+        ? this._interpretResultsBusyHtml()
         : this._interpretResultsButtonInnerHtml();
     };
     this._lastAiInvoke = { mode: 'per-view', kind: 'generic' };

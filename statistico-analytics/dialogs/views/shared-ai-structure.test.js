@@ -31,17 +31,21 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(header).not.toMatch(/<span>Explain View<\/span>/);
   });
 
-  test('local button mounts beside the view title, not as a filled float', () => {
-    expect(header).toMatch(/_mountLocalAiButton/);
-    expect(header).toMatch(/header-right/);
-    expect(header).toMatch(/sb-ai-local-btn--header/);
-    expect(header).toMatch(/sb-ai-local-sep/);
-    expect(header).toMatch(/View insight/);
-    expect(header).toMatch(/_wireLocalAiCompactLabel/);
-    expect(css).toMatch(/\.sb-ai-local-btn--header/);
-    expect(css).toMatch(/\.sb-ai-local-sep/);
-    expect(css).toMatch(/@media \(max-width:\s*1400px\)/);
-    expect(css).toMatch(/background:\s*rgba\(139,92,246,\.12\)/);
+  test('view guide and interpret results live in the view, not the header', () => {
+    expect(header).toMatch(/_placeViewDock/);
+    expect(header).toMatch(/sb-view-dock/);
+    expect(header).toMatch(/How to use and read it/);
+    expect(header).toMatch(/What the numbers suggest/);
+    const mount = header.slice(
+      header.indexOf('  _mountViewActionGroup(group) {'),
+      header.indexOf('  _supportsInsightGuide() {')
+    );
+    expect(mount).toMatch(/_placeViewDock\(group\)/);
+    expect(mount).not.toMatch(/headerRight\.insertBefore/);
+    expect(css).toMatch(/\.sb-view-dock/);
+    expect(css).toMatch(/\.sb-view-dock-mark/);
+    expect(css).toMatch(/\.right-col\.has-view-dock/);
+    expect(css).toMatch(/\.sb-view-dock \.sb-ai-float-btn\.sb-ai-local-btn/);
     expect(css).toMatch(/\.sb-guide-btn/);
     expect(css).toMatch(/\.vg-panel/);
     expect(css).toMatch(/\.sb-view-actions/);

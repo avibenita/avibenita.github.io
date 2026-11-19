@@ -928,7 +928,7 @@ const StatisticoHeader = {
     const style = document.createElement('style');
     style.id = 'statistico-demo-flag-style';
     style.textContent = [
-      '.header-demo-flag{display:inline-flex;align-items:center;margin-top:3px;padding:1px 7px;border-radius:999px;',
+      '.header-demo-flag{display:inline-flex;align-items:center;margin-left:6px;padding:1px 7px;border-radius:999px;vertical-align:middle;',
       'font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;line-height:1.5;',
       'color:#ffedd5;background:rgba(249,115,22,.28);border:1px solid rgba(251,146,60,.75);}',
       '.header-demo-flag[hidden]{display:none !important;}',
@@ -938,8 +938,11 @@ const StatisticoHeader = {
   },
 
   showDemoFlag() {
+    this._ensureDemoFlagStyles();
+    const on = this.isDemoRun();
     const flag = document.getElementById('headerDemoFlag');
-    if (flag) flag.hidden = true;
+    if (!flag) return;
+    flag.hidden = !on;
   },
 
   _listenForDemoRun() {
@@ -1221,6 +1224,7 @@ const StatisticoHeader = {
           <div class="header-variable">
             <span id="headerVariableName">${this.variableName}</span>
             <span id="headerSampleSize">${this.formatHeaderN()}</span>
+            <span class="header-demo-flag" id="headerDemoFlag"${this.isDemoRun() ? '' : ' hidden'} data-st-tip="These results use the built-in demo data, not the worksheet.">Demo</span>
           </div>
         </div>
         <div class="header-right">

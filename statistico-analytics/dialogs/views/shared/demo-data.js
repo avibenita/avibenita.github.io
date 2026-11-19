@@ -601,6 +601,32 @@
     } catch (_e) {}
   }
 
+  var DEMO_SKIP = { ready: 1, requestData: 1, close: 1, cancel: 1 };
+
+  function attachDemo(message) {
+    var text = typeof message === 'string' ? message : JSON.stringify(message || {});
+    if (!root.__statisticoDemo || !root.__statisticoDemo.headers || !root.__statisticoDemo.rows) return text;
+    try {
+      var parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object' || !parsed.action || DEMO_SKIP[parsed.action]) return text;
+      parsed.demo = {
+        headers: root.__statisticoDemo.headers,
+        rows: root.__statisticoDemo.rows,
+        address: root.__statisticoDemo.address || 'Built-in sample'
+      };
+      return JSON.stringify(parsed);
+    } catch (_e) {
+      return text;
+    }
+  }
+
+  function deliver(message) {
+    var ui = root.Office && Office.context && Office.context.ui;
+    if (!ui || typeof ui.messageParent !== 'function') return false;
+    ui.messageParent(attachDemo(message));
+    return true;
+  }
+
   function installCarrier() {
     function arm(info) {
       try {
@@ -627,16 +653,7 @@
         if (typeof ui.messageParent !== 'function' || ui.messageParent.__demoCarrier || ui.messageParent.__demoStub) return;
         var orig = ui.messageParent.bind(ui);
         function wrapped(message) {
-          try {
-            if (root.__statisticoDemo) {
-              var parsed = JSON.parse(message);
-              if (parsed && parsed.action && parsed.action !== 'ready' && parsed.action !== 'requestData' && parsed.action !== 'close') {
-                parsed.demo = root.__statisticoDemo;
-                message = JSON.stringify(parsed);
-              }
-            }
-          } catch (_e2) {}
-          return orig(message);
+          return orig(attachDemo(message));
         }
         wrapped.__demoCarrier = true;
         wrapped.__orig = orig;
@@ -924,6 +941,7 @@
   }
 
   root.StatisticoDemo = {
+    deliver: deliver,
     pack: function (kind) {
       var fromZip = build(kind);
       if (!fromZip || !fromZip.headers) throw new Error('No demo fixture for ' + kind);

@@ -123,7 +123,7 @@
   ];
 
   var LAUNCHER_SECTIONS = [
-    { id: "analysis", label: "Statistical analysis", familyIds: ["explore", "compare", "model"] },
+    { id: "analysis", label: "Core statistical analysis", familyIds: ["explore", "compare", "model"] },
     { id: "tools", label: "Planning, quality & utilities", familyIds: ["planning", "quality", "survey", "utilities"] }
   ];
 

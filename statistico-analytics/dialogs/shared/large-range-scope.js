@@ -291,6 +291,9 @@
         var msg = JSON.parse(raw);
         var action = String(msg && msg.action || "").toLowerCase();
         if (msg && !skip[action]) {
+          if (window.__statisticoDemo && window.__statisticoDemo.headers && window.__statisticoDemo.rows) {
+            msg.demo = window.__statisticoDemo;
+          }
           if (msg.data && typeof msg.data === "object") stamp(msg.data);
           if (msg.payload && typeof msg.payload === "object") stamp(msg.payload);
           raw = JSON.stringify(msg);

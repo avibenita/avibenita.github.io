@@ -23,7 +23,7 @@ describe("family home catalog", () => {
   test("groups analysis first, then planning, quality, survey, and reporting", () => {
     const model = family.buildNavigationModel(catalog(ALL));
     expect(model.sections.map(function (section) { return section.label; })).toEqual([
-      "Statistical analysis",
+      "Core statistical analysis",
       "Planning, quality & utilities"
     ]);
     expect(model.sections[0].families.map(function (row) { return row.id; })).toEqual([
@@ -85,7 +85,7 @@ describe("family home markup", () => {
   test("home shows family cards with module buttons and collapsed help", () => {
     const html = family.renderHomeHtml(model, null);
     expect(html).not.toContain("Choose an analysis or tool");
-    expect(html).toContain("Statistical analysis");
+    expect(html).toContain("Core statistical analysis");
     expect(html).toContain("Planning, quality &amp; utilities");
     expect(html).toContain("Explore &amp; summarize");
     expect(html).toContain('onclick="launchHubFamilyModule(\'univariate\')"');

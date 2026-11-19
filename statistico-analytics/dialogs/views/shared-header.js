@@ -938,11 +938,8 @@ const StatisticoHeader = {
   },
 
   showDemoFlag() {
-    this._ensureDemoFlagStyles();
-    const on = this.isDemoRun();
     const flag = document.getElementById('headerDemoFlag');
-    if (!flag) return;
-    flag.hidden = !on;
+    if (flag) flag.hidden = true;
   },
 
   _listenForDemoRun() {
@@ -1213,7 +1210,6 @@ const StatisticoHeader = {
           <div class="header-module-frame">
             <div class="header-module-kicker">Module</div>
             <div class="header-module-name" id="headerModuleName">${moduleName}</div>
-            <span class="header-demo-flag" id="headerDemoFlag"${this.isDemoRun() ? '' : ' hidden'} data-st-tip="These results use the built-in demo data, not the worksheet.">Demo</span>
           </div>
         </div>
         <div class="header-center">

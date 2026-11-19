@@ -98,7 +98,10 @@
     var variable = document.getElementById('uniWorkspaceVariable');
     var insight = document.getElementById('uniWorkspaceInsight');
     if (variable) variable.textContent = variableName();
-    if (insight) insight.innerHTML = insightMarkup();
+    if (insight) insight.textContent = '';
+    if (window.StatisticoViewReadings) {
+      window.StatisticoViewReadings.add('histogram', [insightMarkup().replace(/<[^>]+>/g, '')]);
+    }
 
     summary.querySelectorAll('[data-source-stat]').forEach(function (target) {
       target.textContent = text(target.getAttribute('data-source-stat'), '--');

@@ -451,9 +451,11 @@
       var dim = obs.structure && obs.structure.firstComponentVariance != null
         ? ('First component explains ' + fmt(obs.structure.firstComponentVariance, 1) + '% of variance in the Scale Structure diagnostic.')
         : 'Dimensionality diagnostic not available.';
+      if (window.StatisticoViewReadings && band && band.label) {
+        window.StatisticoViewReadings.set('reliability-overview', ['Reliability level: ' + band.label]);
+      }
       document.getElementById('assessmentCard').innerHTML =
-        '<div class="stat-field"><span class="stat-label">Reliability level</span> <strong>' + esc(band.label || '—') + '</strong></div>'
-        + '<div class="stat-field"><span class="stat-label">Lowest item–total correlation</span> <strong>' + esc(lowest && lowest.item ? lowest.item : '—')
+        '<div class="stat-field"><span class="stat-label">Lowest item–total correlation</span> <strong>' + esc(lowest && lowest.item ? lowest.item : '—')
         + '</strong>' + (lowest && lowest.itemTotalCorrelation != null ? ' (' + fmt(lowest.itemTotalCorrelation, 2) + ')' : '') + '</div>'
         + '<div class="stat-field"><span class="stat-label">Average inter-item correlation</span> <strong>' + fmt(obs.averageInterItemCorrelation, 3) + '</strong></div>'
         + '<div class="stat-note" style="margin-top:8px;">' + esc(dim) + '</div>'
@@ -673,12 +675,16 @@
 
     function renderStructure(obs, cfg) {
       var st = obs.structure || {};
-      var txt = 'Dimensionality diagnostic from a principal-component decomposition of the inter-item correlations. This is not proof of unidimensionality.';
+      var txt = 'First component variance comes from a principal-component decomposition of the inter-item correlations.';
       if (st.firstComponentVariance != null) {
-        txt = 'First component explains ' + fmt(st.firstComponentVariance, 1) + '% of variance. '
-          + (st.firstComponentVariance > 40
-            ? 'A single dominant dimension is plausible, but this is only a diagnostic.'
-            : 'More than one dimension may be present; inspect Factor Analysis.');
+        txt = 'First component explains ' + fmt(st.firstComponentVariance, 1) + '% of variance.';
+        if (window.StatisticoViewReadings) {
+          window.StatisticoViewReadings.set('reliability-structure', [
+            st.firstComponentVariance > 40
+              ? 'A single dominant dimension is plausible, but this is only a diagnostic.'
+              : 'More than one dimension may be present; inspect Factor Analysis.'
+          ]);
+        }
       }
       document.getElementById('structureSummary').textContent = txt;
       var evals = st.eigenvalues || [];

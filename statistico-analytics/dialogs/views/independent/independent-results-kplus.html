@@ -1769,17 +1769,22 @@
         : ("F(" + fmtDf(ob.anovaDf1) + ", " + fmtDf(ob.anovaDf2) + ") = " + fmt(ob.anovaF)));
       setText("omnibusP", "p = " + fmtP(primaryP));
       setText("omnibusEffect", isFinite(eta) ? ("η² = " + eta.toFixed(3)) : "η² = —");
-      setText("omnibusSentence", significant
+      var omnibusSentence = significant
         ? ("The overall test met the α = " + alphaLabel + " threshold.")
-        : ("The overall test fell short of the α = " + alphaLabel + " threshold."));
-      setText("omnibusEffectSentence", isFinite(eta)
+        : ("The overall test fell short of the α = " + alphaLabel + " threshold.");
+      var omnibusEffectSentence = isFinite(eta)
         ? ("Between-group differences account for " + (eta * 100).toFixed(1) + "% of the observed variation in this sample.")
-        : "");
+        : "";
+      setText("omnibusSentence", "");
+      setText("omnibusEffectSentence", "");
+      if (window.StatisticoViewReadings) window.StatisticoViewReadings.set('independent-results', [omnibusSentence, omnibusEffectSentence].filter(Boolean));
       setText("omnibusSecondary", welchPrimary
         ? formatOmnibusLine("One-way ANOVA", ob.anovaF, ob.anovaDf1, ob.anovaDf2, ob.anovaP)
         : (isFinite(parseMaybeNumber(welch.f)) ? formatOmnibusLine("Welch ANOVA", welch.f, welch.df1, welch.df2, welch.p) : ""));
       var takeaway = document.getElementById("groupMeansTakeaway");
-      if (takeaway) takeaway.textContent = groupMeansTakeaway(groupRowsForChart());
+      var takeawayText = groupMeansTakeaway(groupRowsForChart());
+      if (takeaway) takeaway.textContent = "";
+      if (takeawayText && window.StatisticoViewReadings) window.StatisticoViewReadings.add('independent-explore', [takeawayText]);
     }
     function updateKwConclusion(ob, alpha) {
       var box = document.getElementById("kwConclusionBox");
@@ -1800,8 +1805,13 @@
           html += '<p>Effect size (ε² = ' + eps.toFixed(3) + ') suggests limited rank variability explained by between-variable differences.</p>';
         }
       }
-      box.innerHTML = html;
-      box.style.display = 'flex';
+      box.innerHTML = '';
+      box.style.display = 'none';
+      if (window.StatisticoViewReadings) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        window.StatisticoViewReadings.add('independent-results', [(tmp.textContent || '').replace(/\s+/g, ' ').trim()]);
+      }
     }
     function updateRankDescSummary(mrMap, colStats) {
       var host = document.getElementById("rankDescSummary");
@@ -1936,7 +1946,11 @@
       const yAxisTitle = metricType === 'means' ? 'Mean' : 'Variance';
       const showGrandMean = !!(document.getElementById("showGrandMean") && document.getElementById("showGrandMean").checked);
       const takeawayEl = document.getElementById("groupMeansTakeaway");
-      if (takeawayEl && metricType === "means") takeawayEl.textContent = groupMeansTakeaway(groupData);
+      if (takeawayEl && metricType === "means") {
+        var chartTakeaway = groupMeansTakeaway(groupData);
+        takeawayEl.textContent = "";
+        if (chartTakeaway && window.StatisticoViewReadings) window.StatisticoViewReadings.add('independent-explore', [chartTakeaway]);
+      }
       
       console.log("About to create chart...");
       try {

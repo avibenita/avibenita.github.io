@@ -16,6 +16,62 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
   Storage.prototype.__statisticoOptionalWrite = true;
 })();
 
+/* Judgments that used to be printed on result views. Interpret results reads them. */
+(function (root) {
+  var store = {};
+  function clean(value) {
+    return String(value == null ? '' : value)
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function asLines(value) {
+    var list = Array.isArray(value) ? value : [value];
+    var out = [];
+    list.forEach(function (item) {
+      var text = clean(item);
+      if (text && out.indexOf(text) === -1) out.push(text);
+    });
+    return out;
+  }
+  function remember(scope, value, append) {
+    var key = scope || 'default';
+    var lines = asLines(value);
+    if (append && store[key] && store[key].length) {
+      store[key].forEach(function (line) {
+        if (lines.indexOf(line) === -1) lines.unshift(line);
+      });
+    }
+    store[key] = lines;
+  }
+  function block(viewKey) {
+    var keys = Object.keys(store).filter(function (key) { return store[key] && store[key].length; });
+    if (!keys.length) return '';
+    var use = keys;
+    if (viewKey && viewKey !== 'full') {
+      var exact = keys.filter(function (key) { return key === viewKey; });
+      var loose = exact.length ? exact : keys.filter(function (key) {
+        return viewKey.indexOf(key) !== -1 || key.indexOf(viewKey) !== -1;
+      });
+      use = loose.length ? loose : [];
+    }
+    if (!use.length) return '';
+    var body = use.map(function (key) {
+      return '[' + key + ']\n' + store[key].map(function (line) { return '- ' + line; }).join('\n');
+    }).join('\n');
+    return 'COMPUTED READINGS (these judgments are not printed on the view; state the block for this view in the interpretation):\n' + body;
+  }
+  root.StatisticoViewReadings = {
+    set: function (scope, value) { remember(scope, value, false); },
+    add: function (scope, value) { remember(scope, value, true); },
+    block: block
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
 (function () {
   function sanitizeDialogHostInfoParam() {
     try {
@@ -2307,7 +2363,7 @@ const StatisticoHeader = {
           {
             title: 'Results',
             items: [
-              resultItem('overview', 'fa-chart-pie', 'Process Results', 'Model conclusion, contribution, and coefficients. Technical holds the specification and ANOVA.'),
+              resultItem('overview', 'fa-chart-pie', 'Process Results', 'Contribution, coefficients, and fit statistics. Technical holds the specification and ANOVA.'),
               resultItem('effects', 'fa-arrows-split-up-and-left', 'Effects & Interactions', 'Coefficients and interaction profiles.'),
               resultItem('diagnostics', 'fa-stethoscope', 'Diagnostics', 'Observed versus fitted and residual checks.'),
               resultItem('scatters', 'fa-chart-scatter', 'Predictor Scatters', 'Response versus one predictor, with a fit toggle and chart options.'),
@@ -8027,6 +8083,13 @@ const StatisticoHeader = {
     return 'How do I use and read this view? Reviewed guidance about the controls, charts, and limits.';
   },
 
+  _viewReadingsPrompt(viewKey) {
+    const api = (typeof window !== 'undefined') ? window.StatisticoViewReadings : null;
+    if (!api || typeof api.block !== 'function') return '';
+    const text = api.block(viewKey);
+    return text ? (text + '\n\n') : '';
+  },
+
   _localAiReplyFormat() {
     return `Reply ONLY in this exact format — each key on its own line. Do not use markdown.
 BOTTOMLINE: [1-2 sentences describing the most important observation from the current results]
@@ -9515,9 +9578,14 @@ REPORT: [one polished paragraph suitable for a report]`;
     const activeSidebar = document.querySelector('.sb-item.active[data-tab], .sb-item.active[id]');
     const tab = activeSidebar?.dataset?.tab || activeSidebar?.id || this._getIndependentActiveTab();
 
-    if (this.module === 'process-settings' && this.currentView === 'ps-overview') {
-      const inner = document.querySelector('#view-overview:not([hidden]) .ws-mode-tab.active[data-ps-tab]');
-      if (inner && inner.dataset.psTab) return 'process-settings-ps-' + inner.dataset.psTab;
+    if (this.module === 'process-settings') {
+      const psView = String(this.currentView || '');
+      if (psView === 'ps-overview') {
+        const inner = document.querySelector('#view-overview:not([hidden]) .ws-mode-tab.active[data-ps-tab]');
+        if (inner && inner.dataset.psTab) return 'process-settings-ps-' + inner.dataset.psTab;
+        return 'process-settings-ps-overview';
+      }
+      if (psView.indexOf('ps-') === 0) return 'process-settings-' + psView;
     }
     // For modules that host an in-page workspace tab bar (regression, etc.),
     // prefer the active inner tab so the Insight Guide can describe the
@@ -9762,7 +9830,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'power-sbReg':
         'Standalone power calculator for multiple regression. Set R² (or f²), the number of predictors, and α, then read achieved power at a given N or the N required for target power.',
       'meta-summary':
-        'Read the model setup (fixed vs random-effects), effect type, pooled effect with ± and 95% CI bar, KPI tiles (LCL / point / UCL / z·p / I² / k), and the plain-language interpretation. Use this view to decide whether the pooled estimate is significant and practically meaningful before drilling into forest, heterogeneity, or bias.',
+        'Read the model setup (fixed vs random-effects), effect type, pooled effect with ± and 95% CI bar, and KPI tiles (LCL / point / UCL / z·p / I² / k). The plain-language magnitude, evidence, and consistency judgments are in the computed readings, not printed on the view.',
       'meta-forest':
         'This is a forest plot: each study is a point with a horizontal 95% CI, and the pooled effect is usually marked as a diamond or vertical reference. Describe study-to-study consistency, which studies pull left/right, and how the pooled estimate sits relative to the null (0 or 1 depending on scale). Do not recite Egger statistics here — those belong on Small-study Effects.',
       'meta-heterogeneity':
@@ -9772,7 +9840,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'meta-studies':
         'Read the study audit table (study, arm n, effect, 95% CI, weight %; optional Technical columns for SE, sampling variance, IV weight). Note the pooled footer row and any sensitivity banner if studies were unchecked. Use Source data for continuous means/SDs. Identify influential or heavily weighted studies — do not restate I² or Egger results.',
       'factor-suitability':
-        'Read the evidence-driven verdict banner, KMO, Bartlett, determinant, correlation heatmap (Avg |r|), MSA summary bars, suggested refinement panel, and optional Optimize Variables path. Explain whether factor analysis is appropriate and which variables to remove — use exact MSA and KMO values.',
+        'Read KMO, Bartlett, the determinant, the correlation heatmap (Avg |r|), MSA summary bars, the suggested refinement panel, and the optional Optimize Variables path. The suitability judgment is in the computed readings, not printed as a banner. Explain whether factor analysis is appropriate and which variables to remove — use exact MSA and KMO values.',
       'factor-extraction': 'Review eigenvalues, variance explained, communalities, and extraction choice.',
       'factor-rotation': 'Apply rotation (Varimax, Promax, etc.) and inspect rotated loadings for simple structure.',
       'factor-diagnostics': 'Check residuals, model fit, cross-loadings, and problematic variables.',
@@ -9808,7 +9876,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       // Regression — workspace sub-views (chart-aware so the AI explanation
       // matches what the user actually sees, not the coefficients table).
       'regression-results-overview':
-        'Read the conclusion card, the KPI strip, and the predictor contribution chart. Contribution is the drop in full-model R², in percentage points, when that predictor is removed from the same analyzed rows. The coefficient table and fitted equation follow.',
+        'Read the KPI strip and the predictor contribution chart. Contribution is the drop in full-model R², in percentage points, when that predictor is removed from the same analyzed rows. The coefficient table and fitted equation follow. Significance, fit strength, and sample-size judgments are in the computed readings, not printed on the view.',
       'regression-results-detail':
         'Read the coefficients table (estimate, SE, t, p, 95% CI), ANOVA decomposition, and inference details. Use this view to interpret each predictor numerically once the overall model is supported.',
       'regression-pred-overview':
@@ -9820,7 +9888,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'regression-viz-unique':
         'Each small chart is a partial regression (added-variable) plot: the x-axis shows the predictor after removing the linear influence of all other predictors (e(x | others)), and the y-axis shows the outcome with the same adjustment (e(y | others)). The slope is exactly the multiple-regression coefficient for that predictor. Read whether the line is clearly tilted (unique contribution), whether it is flat (no effect after controlling), and whether points hug the line tightly or scatter widely (how much remains unexplained).',
       'process-settings-ps-overview':
-        'Read the model conclusion, analyzed n, R², adjusted R², and the overall F-test. Predictor contribution is the drop in full-model R², in percentage points, when that predictor is removed from the same analyzed rows. The coefficient table and fitted equation use this fit. The recipe, specifications, and Open Prediction Profiler sit in the strip above the conclusion.',
+        'Read the analyzed n, R², adjusted R², and the overall F-test. Predictor contribution is the drop in full-model R², in percentage points, when that predictor is removed from the same analyzed rows. The coefficient table and fitted equation use this fit. The recipe, specifications, and Open Prediction Profiler sit above the results. Significance, fit strength, and sample-size judgments are in the computed readings, not printed on the view.',
       'process-settings-ps-technical':
         'Read the model specification, predictor roles, fitted terms, interactions, and categorical reference levels. Sample accounting lists analyzed and excluded rows. The ANOVA table gives sums of squares, degrees of freedom, mean squares, the F-statistic, and its p-value. The residual standard deviation is the spread of the profiler\u2019s projected output curve.',
       'process-settings-ps-scatters':
@@ -9886,7 +9954,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       // Cluster (K-means / Hierarchical) — the Separation & Map views get the
       // most elaborate docs because they carry the visual separation story.
       'cluster-km-overview':
-        'Read the analysis summary (variables, cases, excluded rows, distance metric, k, standardisation), the Cluster quality panel (convergence, iterations, WCSS, between-cluster SS, explained variance, average silhouette), the generated verdict (an automatic interpretation combining silhouette strength, explained variance, and size balance), and the Cluster summary table (size, share, dominant profile per cluster). Use this view to judge whether the solution is trustworthy before exploring the clusters.',
+        'Read the analysis summary (variables, cases, excluded rows, distance metric, k, standardisation), the Cluster quality panel (convergence, iterations, WCSS, between-cluster SS, explained variance, average silhouette), and the Cluster summary table (size, share, dominant profile per cluster). The structure judgment (silhouette strength, explained variance, and size balance) is in the computed readings, not printed on the view. Use this view to judge whether the solution is trustworthy before exploring the clusters.',
       'cluster-km-sizes':
         'Read the bar chart of cluster sizes with percentage labels and the Assignments table listing which cluster each case belongs to. Use this view to spot degenerate solutions (one giant cluster, or tiny clusters that may be outlier groups) and to trace individual cases back to the worksheet.',
       'cluster-km-profiles':
@@ -9896,7 +9964,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'cluster-km-diagnostics':
         'Read convergence (converged flag, iterations, WCSS), the variance decomposition (total / within / between SS and explained variance), the convergence-process chart (WCSS line falling and flattening per iteration, columns counting cases reassigned each round and reaching zero at convergence), and the per-cluster silhouette table with plain-language readings. Use this view to quantify solution quality: silhouette above ~0.5 is solid structure, below ~0.25 is weak; low explained variance means clusters capture little of the data\u2019s spread; a WCSS curve still sloping at the last iteration explains a non-converged flag.',
       'cluster-hi-overview':
-        'Read the analysis summary (variables, cases, distance metric, linkage, k, standardisation), the Cluster quality panel (explained variance, average silhouette), the verdict, and the Cluster summary table. Use this view to judge whether the hierarchical solution is trustworthy before exploring the tree.',
+        'Read the analysis summary (variables, cases, distance metric, linkage, k, standardisation), the Cluster quality panel (explained variance, average silhouette), and the Cluster summary table. The structure judgment is in the computed readings, not printed on the view. Use this view to judge whether the hierarchical solution is trustworthy before exploring the tree.',
       'cluster-hi-dendrogram':
         'Read the dendrogram: leaves are cases, and each join shows the distance (height) at which two groups merge. Long vertical gaps before a merge indicate well-separated groups; cutting the tree where gaps are largest suggests a natural k. The dashed cut line is INTERACTIVE: dragging it up or down previews how many clusters each level yields, and the Apply button re-runs the whole module at that k, refreshing every page. Use this view to judge whether the chosen k respects the tree structure and to explore alternative cuts.',
       'cluster-hi-clusters':
@@ -10082,6 +10150,7 @@ ${snapshot.controls.length ? snapshot.controls.map((c) => `- ${c}`).join('\n') :
 COMPUTED PAYLOAD WHEN AVAILABLE:
 ${snapshot.payload || '(No structured payload exposed by this page.)'}
 
+${this._viewReadingsPrompt(viewKey)}
 YOUR TASK:
 1. Start with the current result — not a definition of the chart or table.
 2. Cite exact values that are visible on this page.
@@ -10300,6 +10369,7 @@ Views browsed for this full analysis: ${viewsBrowsed.join(', ')}
 Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
+${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -10338,6 +10408,7 @@ Do not infer causality. If a value is null or unavailable, say it is not availab
 Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
+${this._viewReadingsPrompt('independent-' + tab)}
 ${this._localAiReplyFormat()}`;
   },
 
@@ -10421,6 +10492,7 @@ ${packed.sources.join('\n\n') || '(No structured payload was exposed.)'}
 VISIBLE RESULTS ACROSS PANELS:
 ${packed.panelText || '(No panel text captured.)'}
 
+${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -10557,6 +10629,7 @@ Views covered: ${views.join(', ')}
 Computed results:
 ${JSON.stringify(compact, null, 2)}
 
+${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -11932,6 +12005,7 @@ RULES:
 - Do NOT report a single overall mean/SD as if there is one sample
 - Similarity scores are descriptive 0–100 values, not p-values. Do not label them good/poor.
 
+${this._viewReadingsPrompt(view)}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -11959,6 +12033,7 @@ RULES:
 - Use exact numbers from PER-GROUP STATISTICS / ACTIVE TAB blocks above
 - Be specific to this tab (${viewName}), not generic univariate advice
 
+${this._viewReadingsPrompt(view)}
 ${this._localAiReplyFormat()}`;
   },
 
@@ -12028,6 +12103,7 @@ RULES:
 - CHECKS stays inside this view: small N, mean far from median, an extreme min or max, or skew and kurtosis far from zero.
 - NEXT stays on this screen: open another variable's histogram, or use Normality Tests for the plotted variable.
 
+${this._viewReadingsPrompt('descriptive-stats')}
 ${this._localAiReplyFormat()}`;
   },
 
@@ -12074,6 +12150,7 @@ RULES:
 - Mention disconnected variables if present.
 - Do not mention Cronbach alpha, omega, or other reliability metrics unless the Reliability view is included in the data and the question is specifically about a scale.
 
+${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -12099,6 +12176,7 @@ RULES:
 - Do not call this a published coefficient — it is Statistico's Similarity Profile™.
 - Use Very similar / Mostly similar / Mixed similarity / Substantially different.` : ''}
 
+${this._viewReadingsPrompt(view)}
 ${this._localAiReplyFormat()}`;
   },
 
@@ -12241,6 +12319,7 @@ RULES:
 
 TASK: Write a decision-oriented overall assessment. Synthesise signals and results into a unified narrative. Where test results exist, cite exact numbers. Cover: the defining characteristic, what diagnostics collectively confirm, practical consequences, limitations, and what to do next.
 
+${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -12280,6 +12359,7 @@ RULES:
 - Do NOT be vague — every sentence should give actionable information
 - Do NOT calculate new statistics
 
+${this._viewReadingsPrompt(view)}
 ${this._localAiReplyFormat()}`;
   },
 

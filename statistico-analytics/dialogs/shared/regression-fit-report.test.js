@@ -34,7 +34,9 @@ test('binds Process Results to the active fit', () => {
   expect(Contrib.chartDrop(57.81 / 100, 11.20 / 100).pointsText).toBe('46.61 pp');
 
   expect(model.ssModel + model.ssResidual).toBeCloseTo(model.ssTotal, 8);
-  expect(overview).toContain('Model Conclusion');
+  expect(overview).not.toContain('Model Conclusion');
+  expect(Report.conclusionReadings(model).join(' ')).toMatch(/explanatory power/);
+  expect(Report.conclusionReadings(model).join(' ')).toMatch(/statistically significant|not statistically significant/);
   expect(overview).toContain(r2);
   expect(overview).toContain(adj);
   expect(overview).toContain('F-test p');

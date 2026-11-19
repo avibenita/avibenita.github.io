@@ -1107,7 +1107,7 @@
         'ANCOVA — results',
         'Compares group means after a covariate is held fixed.',
         [
-          'Read the model formula, the Type III table, and the key finding on this view.',
+          'Read the model formula and the Type III table. The significance judgment is in Interpret results.',
           'The adjusted means and the slope picture are on the visualization view. The slope check is on Assumptions.'
         ],
         [

@@ -1230,9 +1230,8 @@
       return '<div class="metric' + (primary ? ' metric-primary' : '') + '"><div class="metric-label">' + escapeHtml(label) +
         ' <span class="info-dot" tabindex="0" data-tip="' + escapeHtml(tip) + '">i</span></div><div class="metric-value">' + valueHtml + '</div>' + (extra || '') + '</div>';
     }
-    function ratingHtml(rating) {
-      if (!rating) return '';
-      return ' <span class="capability-rating ' + escapeHtml(rating.className) + '">' + escapeHtml(rating.text) + '</span>';
+    function ratingHtml() {
+      return '';
     }
     function paintResults() {
       var ready = hasRun && last && last.ok;
@@ -1255,7 +1254,11 @@
       var result = last.overall;
       el('results-readout').innerHTML = '<span>n <b>' + result.n + '</b></span><span>Mean <b>' + fmt(result.mean) + '</b></span><span>SD <b>' + fmt(result.sd) + '</b></span>'
         + (last.excluded ? '<span>Excluded <b>' + last.excluded + '</b></span>' : '');
-      el('assessment').textContent = assessment(result) + ' Pp and Ppk use the overall sample standard deviation (n − 1) of ' + last.valueName + '.';
+      el('assessment').textContent = 'Pp and Ppk use the overall sample standard deviation (n − 1) of ' + last.valueName + '.';
+      if (window.StatisticoViewReadings) {
+        var ratingLine = result.rating && result.rating.text ? result.rating.text : '';
+        window.StatisticoViewReadings.set('capability-results', [assessment(result), ratingLine].filter(Boolean));
+      }
       el('metric-grid').innerHTML = [
         metricCard('Pp', 'Pp = (USL − LSL) / (6s). Spread only, as if the mean were centered. s is the overall sample standard deviation.', fmt(result.cp)),
         metricCard('Ppk', 'Ppk = min(Cpu, Cpl). The worse one-sided capability from the overall sample standard deviation.', fmt(result.cpk) + ratingHtml(result.rating), true, '<button type="button" class="primary" id="open-planner">Find settings</button>'),
@@ -1334,11 +1337,10 @@
         : grouped.status.id === 'varies' ? grouped.interpretation.differs
         : grouped.status.id === 'insufficient' ? grouped.status.hint
         : grouped.interpretation.consistent;
-      finding.innerHTML = BG.findingHtml({
-        headline: grouped.status.label,
-        conclusion: conclusion,
-        descriptive: true
-      });
+      finding.innerHTML = '';
+      if (window.StatisticoViewReadings) {
+        window.StatisticoViewReadings.set('capability-by-group', [grouped.status.label, conclusion].filter(Boolean));
+      }
       var scale = 3;
       grouped.groups.forEach(function (group) {
         var width = group.ok ? Math.max(0, Math.min(scale, group.cpk)) / scale * 100 : 0;

@@ -7018,7 +7018,7 @@
 
       // ── Conclusion card: only in Insight mode ───────────────────
       const card = document.getElementById('conclusionCard');
-      if (card) card.classList.toggle('visible', depth === 'insight');
+      if (card) card.classList.remove('visible');
 
       // ── Interpretation panel removed ────────────────────────────
       // (panel was removed from HTML; this guard is kept for safety)
@@ -7032,6 +7032,14 @@
       const detail   = document.getElementById('conclusionDetail');
       const microtags = document.getElementById('conclusionMicrotags');
       if (!verdict || !detail || !results) return;
+      const publishConclusion = (lines) => {
+        if (window.StatisticoViewReadings) window.StatisticoViewReadings.set('regression-results-overview', lines);
+        const card = document.getElementById('conclusionCard');
+        if (card) card.classList.remove('visible');
+        verdict.textContent = '';
+        detail.textContent = '';
+        if (microtags) microtags.innerHTML = '';
+      };
 
       const sig   = results.F_pvalue;
       const r2    = results.R2;
@@ -7042,10 +7050,13 @@
 
       if (!regressionFTestReady(results)) {
         const fullP = fullFit && Number.isFinite(fullFit.F_pvalue) ? formatFPValue(fullFit.F_pvalue) : '';
-        verdict.innerHTML = 'No predictors are in the model, so there is no overall F-test.'
-          + (fullP ? ` (full model p = ${withFull(fullP, '')})` : '');
-        detail.innerHTML = `The fitted value is the mean of the outcome, based on <strong>${n}</strong> observations.${droppedNote}`;
-        microtags.innerHTML = '<span class="microtag microtag-weak"><i class="fa-solid fa-filter" aria-hidden="true"></i>Reduced model</span>';
+        publishConclusion([
+          'No predictors are in the model, so there is no overall F-test.'
+            + (fullP ? ` (full model p = ${fullP})` : ''),
+          `The fitted value is the mean of the outcome, based on ${n} observations.`
+            + (droppedNote ? ' ' + droppedNote.replace(/<[^>]+>/g, ' ') : ''),
+          'Reduced model'
+        ]);
         return;
       }
 
@@ -7062,7 +7073,8 @@
         ? 'The model is statistically significant'
         : 'The model is not statistically significant';
       const pClause = modelIsReduced() ? `, p = ${sigShown}` : ` (p = ${sigShown})`;
-      verdict.innerHTML = `${lead}${pClause} ${sigBadge}`;
+      const verdictText = `${lead}${pClause}`;
+      void sigBadge;
 
       // ── R² strength (clean sentence, no badge inline) ─────────
       let r2Strength = 'weak';
@@ -7071,10 +7083,11 @@
 
       const r2Now = `${(r2 * 100).toFixed(2)}%`;
       const r2Full = fullFit && Number.isFinite(fullFit.R2) ? `${(fullFit.R2 * 100).toFixed(2)}%` : '';
-      detail.innerHTML =
-        `Explains <strong>${withFull(r2Now, r2Full)}</strong> of the variance — ` +
-        `<strong>${r2Strength}</strong> explanatory power. ` +
-        `Based on <strong>${n}</strong> observations.${droppedNote}`;
+      const detailText =
+        `Explains ${withFull(r2Now, r2Full)} of the variance — ` +
+        `${r2Strength} explanatory power. ` +
+        `Based on ${n} observations.` +
+        (droppedNote ? ' ' + droppedNote.replace(/<[^>]+>/g, ' ') : '');
 
       // ── Micro-tags ────────────────────────────────────────────
       const tags = [];
@@ -7098,9 +7111,7 @@
         tags.push({ cls: 'microtag-mod', icon: 'fa-filter', label: droppedCount === 1 ? '1 term dropped' : `${droppedCount} terms dropped` });
       }
 
-      microtags.innerHTML = tags
-        .map(t => `<span class="microtag ${t.cls}"><i class="fa-solid ${t.icon}" aria-hidden="true"></i>${t.label}</span>`)
-        .join('');
+      publishConclusion([verdictText, detailText].concat(tags.map(t => t.label)));
     }
 
     // Sidebar collapse/expand
@@ -10573,11 +10584,11 @@ ${sectionsHtml}
       const outIcon   = r.outlierCount>0  ? 'fa-exclamation-triangle': 'fa-check-circle';
       const outCls    = r.outlierCount>r.nObs*0.05 ? 'warning' : 'pass';
       const issueCount= [!r.normality,!r.homoscedasticity,!r.independence].filter(Boolean).length;
-      const [ovIcon,ovText,ovColor] = issueCount===0 && r.outlierCount<r.nObs*0.05
-        ? ['fa-check-circle',   'Model assumptions are largely satisfied', 'var(--success)']
+      const ovText = issueCount===0 && r.outlierCount<r.nObs*0.05
+        ? 'Model assumptions are largely satisfied'
         : issueCount<=1 && r.outlierCount<r.nObs*0.1
-          ? ['fa-exclamation-triangle','Model has minor assumption violations',     'var(--warning)']
-          : ['fa-times-circle',        'Model has significant assumption violations','var(--danger)'];
+          ? 'Model has minor assumption violations'
+          : 'Model has significant assumption violations';
       const sw=r.tests.sw, bp=r.tests.bp, dw=r.tests.dw;
       const swMark = _resVerdict(sw.p, '✓ Normality Assumed', '✗ Non-Normal', 'Inference is reliable', 'Inference may be biased');
       const bpMark = _resVerdict(bp.p, '✓ Homoscedastic', '✗ Heteroscedastic', 'Standard errors are valid', 'Standard errors may be unreliable');
@@ -10587,6 +10598,14 @@ ${sectionsHtml}
         ? { cls: '', result: 'Not available', impact: '' }
         : { cls: dwClose ? 'pass' : (dwFar ? 'fail' : 'warning'), result: dwClose ? '✓ No Autocorrelation' : '⚠ Check Autocorrelation', impact: dwClose ? 'Residuals are independent' : 'Standard errors unreliable' };
       const tooltip = (txt)=>`<span class="res-tooltip"><i class="fa-solid fa-circle-question" style="font-size:9px;color:var(--text-muted);cursor:help;opacity:.6;"></i><span class="res-tooltiptext">${txt}</span></span>`;
+      if (window.StatisticoViewReadings) {
+        window.StatisticoViewReadings.set('regression-diag-overview', [
+          ovText,
+          'Shapiro-Wilk: ' + swMark.result + (swMark.impact ? '. ' + swMark.impact : ''),
+          'Breusch-Pagan: ' + bpMark.result + (bpMark.impact ? '. ' + bpMark.impact : ''),
+          'Durbin-Watson: ' + dwMark.result + (dwMark.impact ? '. ' + dwMark.impact : '')
+        ]);
+      }
 
       document.getElementById('residualsPanel').innerHTML = `
         <div class="res-overview-stack">
@@ -10605,9 +10624,6 @@ ${sectionsHtml}
                   <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${r.outlierCount} (${r.outlierPct.toFixed(1)}%)</div>
                 </div></div>
             </div>
-            <div class="res-verdict-overall" style="border-color:${ovColor};">
-              <i class="fa-solid ${ovIcon}" style="color:${ovColor};"></i> Overall Status: ${ovText}
-            </div>
           </div>
 
           <div class="res-tests-panel">
@@ -10617,29 +10633,22 @@ ${sectionsHtml}
                 <div class="res-test-name"><i class="fa-solid fa-bell-curve"></i> Shapiro-Wilk</div>
                 <div class="res-test-stat">Statistic: ${_resFmtStat(sw.W)}</div>
                 <div class="res-test-stat">p-value: ${_resFmtP(sw.p)}</div>
-                <div class="res-test-result ${swMark.cls}">${swMark.result}</div>
-                <div class="res-test-impact">${swMark.impact}</div>
               </div>
               <div class="res-test-card">
                 <div class="res-test-name"><i class="fa-solid fa-wave-square"></i> Breusch-Pagan</div>
                 <div class="res-test-stat">χ²: ${_resFmtStat(bp.chi2)}</div>
                 <div class="res-test-stat">p-value: ${_resFmtP(bp.p)}</div>
-                <div class="res-test-result ${bpMark.cls}">${bpMark.result}</div>
-                <div class="res-test-impact">${bpMark.impact}</div>
               </div>
               <div class="res-test-card">
                 <div class="res-test-name"><i class="fa-solid fa-arrows-left-right"></i> Durbin-Watson</div>
                 <div class="res-test-stat">Statistic: ${_resFmtStat(dw.DW)}</div>
                 <div class="res-test-stat">Expected: ≈ 2.0</div>
-                <div class="res-test-result ${dwMark.cls}">${dwMark.result}</div>
-                <div class="res-test-impact">${dwMark.impact}</div>
               </div>
               <div class="res-test-card">
                 <div class="res-test-name"><i class="fa-solid fa-chart-simple"></i> Residual Summary</div>
                 <div class="res-test-stat">Mean: ${(d.residuals.reduce((a,b)=>a+b,0)/d.n).toFixed(4)}</div>
                 <div class="res-test-stat">Std Dev: ${Math.sqrt(d.residuals.reduce((s,r)=>s+r*r,0)/d.n).toFixed(4)}</div>
                 <div class="res-test-stat">Outliers: ${r.outlierCount} (${r.outlierPct.toFixed(1)}%)</div>
-                <div class="res-test-result ${r.outlierCount<d.n*0.05?'pass':'warning'}">${r.outlierCount<d.n*0.05?'✓':' ⚠'} ${d.n} Observations</div>
               </div>
             </div>
           </div>
@@ -11222,13 +11231,11 @@ ${sectionsHtml}
         r.outlierCount===0 ? {t:'No outliers detected',c:'success'} : r.outlierCount<r.nObs*0.05 ? {t:`${r.outlierCount} moderate outliers detected (acceptable)`,c:'success'} : {t:`${r.outlierCount} outliers detected — may affect model stability`,c:'warning'},
         maxCook>1 ? {t:'Influential observations detected — model sensitive to specific data points',c:'warning'} : maxCook>0.5 ? {t:'Moderate influence detected in some observations',c:'warning'} : {t:'No highly influential observations detected',c:'success'}
       ];
-      document.getElementById('resAiPanel').innerHTML = `
-        <div class="res-workspace">
-          <div class="res-ai-box">
-            <div class="res-ai-title"><i class="fa-solid fa-robot"></i> Preliminary AI Assessment</div>
-            <ul class="res-ai-findings">${findings.map(f=>`<li class="${f.c}">${f.t}</li>`).join('')}</ul>
-          </div>
-        </div>`;
+      if (window.StatisticoViewReadings) {
+        window.StatisticoViewReadings.add('regression-diag-overview', findings.map(f => f.t));
+      }
+      const resAiPanel = document.getElementById('resAiPanel');
+      if (resAiPanel) resAiPanel.innerHTML = '';
       window.resAiLoaded = true;
     }
 
@@ -11810,7 +11817,6 @@ ${sectionsHtml}
 
     function updateInterpretationPanel(stats) {
       const el = document.getElementById('interpretationText');
-      if (!el) return;
       const r2 = parseNumericValue(stats.rSquared || stats.R2);
       const rmse = stats.rootMSE || stats.rmse || stats.RMSE || 'N/A';
       const fP = parsePValue(stats.fPValue || stats.pValue || stats.F_pvalue);
@@ -11835,7 +11841,9 @@ ${sectionsHtml}
         Number.isFinite(Number(rmse)) ? formatNumber(Number(rmse)) : rmse,
         full && Number.isFinite(full.RMSE) ? formatNumber(full.RMSE) : ''
       );
-      el.innerHTML = `${fitStatement} RMSE = ${rmseShown}. Sample size n = ${escapeHtmlText(n)}. ${sigStatement}${reducedModelNote()}`;
+      const reading = `${fitStatement} RMSE = ${rmseShown}. Sample size n = ${n}. ${sigStatement}${reducedModelNote() ? ' ' + reducedModelNote().replace(/<[^>]+>/g, ' ') : ''}`;
+      if (window.StatisticoViewReadings) window.StatisticoViewReadings.set('regression-results-detail', [reading]);
+      if (el) el.textContent = '';
     }
 
     // Function to populate the panels dynamically
@@ -13993,8 +14001,14 @@ ${sectionsHtml}
             </table>
             <p class="table-footnote" style="margin:6px 0 0 0;">
               The interaction block explains an additional <strong>ΔR² = ${r2Change}</strong> of variance.
-              ${pPartial < 0.05 ? 'The improvement is statistically significant — moderation is present.' : 'The improvement is not statistically significant at α = 0.05.'}
             </p>`;
+          if (window.StatisticoViewReadings) {
+            window.StatisticoViewReadings.add('regression-ix-summary', [
+              pPartial < 0.05
+                ? 'The improvement is statistically significant — moderation is present.'
+                : 'The improvement is not statistically significant at α = 0.05.'
+            ]);
+          }
         }
       } catch(e) {
         console.warn('⚠️ Partial F computation failed:', e.message);
@@ -14353,24 +14367,29 @@ ${sectionsHtml}
         }
         cardsEl.innerHTML = html || '<div style="color:var(--text-muted);font-style:italic;">No interaction coefficients available.</div>';
 
+        const ixReadings = [];
         if (interpEl && ix && ixi && nIntCols > 0) {
           const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
           const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
+          interpEl.textContent = '';
           if (p < 0.05) {
-            interpEl.innerHTML = `<strong>Significant interaction.</strong> The effect of <em>${roles.focal}</em> on <em>${yVar}</em> depends on <em>${roles.moderator}</em>. Review simple slopes and the preview plot.`;
+            ixReadings.push(`Significant interaction. The effect of ${roles.focal} on ${yVar} depends on ${roles.moderator}. Review simple slopes and the preview plot.`);
           } else {
-            interpEl.innerHTML = `<strong>Not significant</strong> (p = ${p < 0.0001 ? '&lt; .0001' : p.toFixed(3)}). The <em>${roles.focal}</em> → <em>${yVar}</em> relationship does not meaningfully change across <em>${roles.moderator}</em> levels.`;
+            ixReadings.push(`Not significant (p = ${p < 0.0001 ? '< .0001' : p.toFixed(3)}). The ${roles.focal} to ${yVar} relationship does not meaningfully change across ${roles.moderator} levels.`);
           }
         }
+        if (window.StatisticoViewReadings && ixReadings.length) window.StatisticoViewReadings.set('regression-ix-summary', ixReadings);
       }
 
       if (conclusionEl && ix && roles && nIntCols > 0) {
         const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
         const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
-        conclusionEl.style.display = '';
-        conclusionEl.innerHTML = p < 0.05
-          ? `<strong>Moderation conclusion:</strong> Retain the interaction — <em>${roles.moderator}</em> moderates the <em>${roles.focal}</em> effect on <em>${yVar}</em>.`
-          : `<strong>Moderation conclusion:</strong> No evidence that <em>${roles.moderator}</em> moderates the <em>${roles.focal}</em> effect; consider reporting main effects only.`;
+        conclusionEl.style.display = 'none';
+        conclusionEl.textContent = '';
+        const line = p < 0.05
+          ? `Moderation conclusion: Retain the interaction — ${roles.moderator} moderates the ${roles.focal} effect on ${yVar}.`
+          : `Moderation conclusion: No evidence that ${roles.moderator} moderates the ${roles.focal} effect; consider reporting main effects only.`;
+        if (window.StatisticoViewReadings) window.StatisticoViewReadings.add('regression-ix-summary', [line]);
       } else if (conclusionEl) {
         conclusionEl.style.display = 'none';
       }
@@ -14866,26 +14885,20 @@ ${sectionsHtml}
       const fmt  = (v) => Number(v).toFixed(2);
       const pFmt = (p) => p < 0.001 ? '< .001' : `= ${p.toFixed(3)}`;
       const others = xc.concat(xn).filter(n => n !== best?.source);
+      wrap.textContent = '';
+      const card = document.getElementById('ancovaKeyFindings');
+      if (card) card.style.display = 'none';
+      var line = '';
       if (sig) {
         const noun = (xc.includes(best.source) ? 'effect of' : 'covariate');
-        wrap.innerHTML = `
-          The ${noun} <strong>${best.source}</strong> on <strong>${yVar}</strong> remains significant after
-          adjusting for ${others.length ? others.join(' and ') : 'the other predictors'}
-          (<span class="finding-stat">F = ${fmt(best.F)}</span>,
-          <span class="finding-stat">p ${pFmt(best.p)}</span>,
-          <span class="finding-stat">η² = ${best.partialEta2.toFixed(3)}</span>).
-        `;
+        line = 'The ' + noun + ' ' + best.source + ' on ' + yVar + ' remains significant after adjusting for '
+          + (others.length ? others.join(' and ') : 'the other predictors')
+          + ' (F = ' + fmt(best.F) + ', p ' + pFmt(best.p).replace('<', '<') + ', η² = ' + best.partialEta2.toFixed(3) + ').';
       } else if (best) {
-        wrap.innerHTML = `
-          No source reached statistical significance. The strongest effect was
-          <strong>${best.source}</strong>
-          (<span class="finding-stat">F = ${fmt(best.F)}</span>,
-          <span class="finding-stat">p ${pFmt(best.p)}</span>,
-          <span class="finding-stat">η² = ${best.partialEta2.toFixed(3)}</span>).
-        `;
-      } else {
-        wrap.innerHTML = '<span style="color:var(--text-muted);">No effects available.</span>';
+        line = 'No source reached statistical significance. The strongest effect was ' + best.source
+          + ' (F = ' + fmt(best.F) + ', p ' + pFmt(best.p) + ', η² = ' + best.partialEta2.toFixed(3) + ').';
       }
+      if (line && window.StatisticoViewReadings) window.StatisticoViewReadings.set('regression-ancova-results', [line]);
     }
 
     /**
@@ -15871,6 +15884,18 @@ ${sectionsHtml}
       displayVariableInsights(payload);
       displayAssumptionChecks(payload);
       displayRecommendations(payload);
+      const ids = ['overallAssessment', 'keyFindings', 'variableInsights', 'assumptionChecks', 'recommendations'];
+      const lines = [];
+      ids.forEach(function (id) {
+        const node = document.getElementById(id);
+        if (!node) return;
+        const text = (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
+        if (text) lines.push(text);
+        node.innerHTML = '';
+      });
+      if (lines.length && window.StatisticoViewReadings) {
+        window.StatisticoViewReadings.add('regression-results-overview', lines);
+      }
     }
 
     /**
@@ -16949,13 +16974,14 @@ ${sectionsHtml}
         const gapSd = Math.sqrt(gaps.reduce((s, g) => s + g * g, 0) / Math.max(1, gaps.length));
         jobs.push({
           xIdx, xName, xMeta, eXi, eY, beta, p, se,
-          tol: Math.max(0.05, 0.15 * (Number.isFinite(gapSd) ? gapSd : 0))
+          tol: Math.max(0.05, 0.15 * (Number.isFinite(gapSd) ? gapSd : 0)),
+          interp: _pgInterp(xMeta, yMeta, beta, p, othersPhrase),
+          line: _pgLineSentence(xMeta, yMeta, beta, se, p)
         });
         const above = _pgAboveWord(yMeta);
         return `<div class="chart-panel pg-card" style="min-height:0;min-width:0;">
            <div class="chart-panel-h"><i class="fa-solid fa-chart-scatter" aria-hidden="true"></i> ${escapeHtmlText(xName)}</div>
            <div class="pg-copy">
-             <p class="pg-interp">${escapeHtmlText(_pgInterp(xMeta, yMeta, beta, p, othersPhrase))}</p>
              <p class="pg-slope ${_pgSigClass(p)}">Slope B = ${_pgStatNum(beta)} · SE = ${_pgStatNum(Math.abs(se))} &nbsp;&nbsp; ${_pgPHtml(p)} ${_pgStars(p)}</p>
              <div class="pg-read">
                <h3>How to read this chart</h3>
@@ -16963,7 +16989,6 @@ ${sectionsHtml}
                <ul>
                  <li>Right of zero: ${escapeHtmlText(xMeta.labelLower)} is higher than expected from ${othersPhrase}.</li>
                  <li>Above zero: ${escapeHtmlText(yMeta.labelLower)} is ${above} than expected from ${othersPhrase}.</li>
-                 <li>${escapeHtmlText(_pgLineSentence(xMeta, yMeta, beta, se, p))}</li>
                  <li>Dots closer to the line follow this relationship more closely.</li>
                </ul>
                <p class="pg-neg">Negative axis values represent differences from expected values\u2014not ${escapeHtmlText(_pgNegativeNoun(xMeta))} or ${escapeHtmlText(_pgNegativeNoun(yMeta))}.</p>
@@ -16978,6 +17003,14 @@ ${sectionsHtml}
            </div>
          </div>`;
       }).join('');
+      if (window.StatisticoViewReadings) {
+        const lines = [];
+        jobs.forEach(function (job) {
+          if (job.interp) lines.push(job.xName + ': ' + job.interp);
+          if (job.line) lines.push(job.xName + ': ' + job.line);
+        });
+        window.StatisticoViewReadings.set('regression-viz-unique', lines);
+      }
 
       document.getElementById('pgLoading').style.display = 'none';
       document.getElementById('pgContent').style.display = 'flex';

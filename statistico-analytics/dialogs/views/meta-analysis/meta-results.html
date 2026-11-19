@@ -1650,8 +1650,17 @@
 
     function syncForestInterpretation(bundle) {
       var el = document.getElementById('forestInterpretation');
-      if (!el) return;
-      el.innerHTML = buildForestInterpretation(bundle || metaBundle);
+      var html = buildForestInterpretation(bundle || metaBundle);
+      if (el) {
+        el.textContent = '';
+        el.style.display = 'none';
+      }
+      if (window.StatisticoViewReadings) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html || '';
+        var text = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+        if (text) window.StatisticoViewReadings.set('meta-forest', [text]);
+      }
     }
 
     function magnitudeBand(bundle, et) {
@@ -1668,6 +1677,18 @@
       // Phrase only — value is appended once in the narrative ("… of −2.186")
       var nice = (et || 'effect').replace(/\s*\(log\)\s*$/i, '').trim();
       return { key: 'effect', label: nice.charAt(0).toLowerCase() + nice.slice(1) };
+    }
+
+    function publishMetaReadings(interp) {
+      var card = document.getElementById('interpCard');
+      if (card) card.style.display = 'none';
+      ['interpNarrative', 'interpMag', 'interpCert', 'interpCons'].forEach(function (id) {
+        var node = document.getElementById(id);
+        if (node) node.textContent = '';
+      });
+      if (!interp || !window.StatisticoViewReadings) return;
+      var narrative = String(interp.narrative || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      window.StatisticoViewReadings.set('meta-summary', [narrative, interp.mag, interp.cert, interp.cons].filter(Boolean));
     }
 
     function buildInterpretationCard(bundle, et, outcomeBetter) {
@@ -1899,7 +1920,11 @@
       }
       if (favorEl) {
         if (better === 'none' || fisher) favorEl.textContent = '';
-        else favorEl.textContent = arm ? ('Result favors ' + arm) : 'Result near no difference';
+        else {
+          var favorLine = arm ? ('Result favors ' + arm) : 'Result near no difference';
+          favorEl.textContent = '';
+          if (window.StatisticoViewReadings) window.StatisticoViewReadings.add('meta-summary', [favorLine]);
+        }
       }
     }
 
@@ -1910,14 +1935,8 @@
       var better = outcomeBetterOf(bundle);
       var et = effectTypeLabel(bundle.spec);
       var interp = buildInterpretationCard(bundle, et, better);
-      var nEl = document.getElementById('interpNarrative');
-      var mEl = document.getElementById('interpMag');
-      var cEl = document.getElementById('interpCert');
-      if (nEl) nEl.innerHTML = interp.narrative;
-      if (mEl) mEl.textContent = interp.mag;
-      if (cEl) cEl.textContent = interp.cert;
-      var sEl = document.getElementById('interpCons');
-      if (sEl) sEl.textContent = interp.cons;
+      publishMetaReadings(interp);
+      syncDirectionHeader(bundle);
       syncForestInterpretation(bundle);
       updateCiBar(bundle);
       if (activeTabName === 'forest') renderForestPlot(bundle);
@@ -2502,10 +2521,8 @@
       document.getElementById('tileK').textContent = String(bundle.k);
 
       var interp = buildInterpretationCard(bundle, et, better);
-      document.getElementById('interpNarrative').innerHTML = interp.narrative;
-      document.getElementById('interpMag').textContent = interp.mag;
-      document.getElementById('interpCert').textContent = interp.cert;
-      document.getElementById('interpCons').textContent = interp.cons;
+      publishMetaReadings(interp);
+      syncDirectionHeader(bundle);
 
       document.getElementById('qStat').textContent = fmt(bundle.heterogeneity.Q, 2);
       document.getElementById('qDf').textContent = String(bundle.heterogeneity.df);

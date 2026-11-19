@@ -2354,6 +2354,9 @@ function pscDefaultCtrl() {
     if (openEffects) openEffects.addEventListener('click', function () { showView('effects', { focus: true }); });
     var openDiagnostics = el('open-diagnostics');
     if (openDiagnostics) openDiagnostics.addEventListener('click', function () { showView('diagnostics', { focus: true }); });
+    if (Report && window.StatisticoViewReadings && view.model) {
+      window.StatisticoViewReadings.set('process-settings-ps-overview', Report.conclusionReadings(view.model));
+    }
     el('view-overview').querySelectorAll('[data-ps-tab]').forEach(function (button) {
       button.addEventListener('click', function () {
         var next = button.getAttribute('data-ps-tab') === 'technical' ? 'technical' : 'overview';
@@ -3143,11 +3146,8 @@ function pscDefaultCtrl() {
       : '';
     var status = effectStatus(card, view.spec);
     var targetLine = targetDistancePhrase(card);
-    var verdict = '';
-    if (status.text || targetLine) {
-      verdict = '<div class="ps-effect-verdict' + (status.tone ? (' is-' + status.tone) : '') + '">' +
-        (status.text ? ('<p>' + esc(status.text) + '</p>') : '') +
-        (targetLine ? ('<p class="ps-effect-target">' + esc(targetLine) + '</p>') : '') + '</div>';
+    if (window.StatisticoViewReadings) {
+      window.StatisticoViewReadings.set('process-settings-ps-profiler', [status.text, targetLine].filter(Boolean));
     }
     var recipe = '';
     if (pinned && view.currentCard && view.currentCard.available && card) {
@@ -3162,7 +3162,7 @@ function pscDefaultCtrl() {
         '<span class="ps-effect-kicker">' + esc(kicker) + '</span></div>' +
         (ciLine ? ('<p class="ps-effect-ci">' + esc(ciLine) + '</p>') : '') +
         '<div class="ps-effect-scale">' + effectSvg(view, card) + '</div>' + projected +
-        (projected.indexOf('ps-projected') === -1 ? outsideLine : '') + assumption + recipe + verdict + notes)
+        (projected.indexOf('ps-projected') === -1 ? outsideLine : '') + assumption + recipe + notes)
       : ('<p class="ps-effect-ci">' + esc(view.withheldReason || 'Enter the remaining settings to predict.') + '</p>');
     if (el('effect-readout')) el('effect-readout').innerHTML = hero;
     el('withheld').hidden = view.phase !== 'withheld' && view.phase !== 'needs-input';

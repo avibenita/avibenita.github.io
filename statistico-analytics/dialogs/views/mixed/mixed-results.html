@@ -2651,7 +2651,15 @@ ${sectionsHtml}
         </div>
       </div>`;
 
-    row.innerHTML = card1HTML + card2HTML;
+    var holder = document.createElement('div');
+    holder.innerHTML = card1HTML + card2HTML;
+    var insightLines = [];
+    holder.querySelectorAll('.insight-card').forEach(function (card) {
+      var text = (card.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text) insightLines.push(text);
+    });
+    if (window.StatisticoViewReadings) window.StatisticoViewReadings.set('mixed-model-overview', insightLines);
+    row.innerHTML = '';
   }
 
 
@@ -3931,7 +3939,12 @@ ${sectionsHtml}
       tagsEl.innerHTML = tags.map(t =>
         `<span class="microtag ${t.cls}">${t.icon} ${t.label}</span>`).join('');
     }
-    card.classList.add('visible');
+    var conclusionLines = [verdict];
+    bullets.forEach(function (b) { conclusionLines.push(String(b.text).replace(/<[^>]+>/g, ' ')); });
+    tags.forEach(function (t) { conclusionLines.push(t.label); });
+    if (window.StatisticoViewReadings) window.StatisticoViewReadings.add('mixed-model-overview', conclusionLines);
+    card.classList.remove('visible');
+    card.style.display = 'none';
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -3984,10 +3997,12 @@ ${sectionsHtml}
       pillList.push({ cls: 'warn', label: 'Convergence warning' });
     }
 
-    body.textContent = sentences.join(' ');
-    pills.innerHTML = pillList.map(p =>
-      `<span class="rec-pill ${p.cls}">${p.label}</span>`).join('');
-    card.style.display = 'block';
+    if (window.StatisticoViewReadings) {
+      window.StatisticoViewReadings.add('mixed-model-overview', sentences.concat(pillList.map(function (p) { return p.label; })));
+    }
+    body.textContent = '';
+    pills.innerHTML = '';
+    card.style.display = 'none';
   }
 
   /* ─────────────────────────────────────────────────────────────
@@ -5139,6 +5154,16 @@ ${sectionsHtml}
     }  // end if (residualsEl)
 
     // ── Normality tab ─────────────────────────────────────────────
+    if (window.StatisticoViewReadings && res) {
+      var swLine = res.swP == null
+        ? 'Shapiro-Wilk was not computed.'
+        : res.swP > .05
+          ? ('Residuals are consistent with a normal distribution (W = ' + fmt(res.swW) + ', p = ' + fmtP(res.swP) + ').')
+          : res.swP > .01
+            ? ('Residuals exhibit mild deviation from normality (W = ' + fmt(res.swW) + ', p = ' + fmtP(res.swP) + '). Proceed with caution.')
+            : ('Residuals exhibit statistically significant deviation from normality (W = ' + fmt(res.swW) + ', p = ' + fmtP(res.swP) + '). Consider robust methods.');
+      window.StatisticoViewReadings.add('mixed-model-diagnostics', [swLine]);
+    }
     const normalityEl = document.getElementById('diagNormalityContent');
       if (normalityEl) {
         normalityEl.innerHTML = `
@@ -5152,13 +5177,6 @@ ${sectionsHtml}
               <div class="mm-section-body padded">
                 <div class="stat-field"><span class="stat-label">W statistic:</span><span class="stat-value">${fmt(res.swW)}</span></div>
                 <div class="stat-field"><span class="stat-label">p-value:</span><span class="stat-value ${pClass(res.swP)}">${fmtP(res.swP)}</span></div>
-                <p style="font-size:.72rem;color:var(--text-muted);margin-top:8px;">
-                  ${res.swP == null ? 'Not computed.' : res.swP > .05
-                    ? `✓ Residuals are consistent with a normal distribution (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}).`
-                    : res.swP > .01
-                    ? `⚠ Residuals exhibit mild deviation from normality (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}). Proceed with caution.`
-                    : `⚠ Residuals exhibit statistically significant deviation from normality (W = ${fmt(res.swW)}, p = ${fmtP(res.swP)}). Consider robust methods.`}
-                </p>
               </div>
             </div>
             <div class="mm-section" style="min-width:0;overflow:hidden;">

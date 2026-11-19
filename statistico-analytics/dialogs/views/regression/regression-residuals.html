@@ -911,7 +911,7 @@
           <button class="tab-btn" onclick="switchTab('influential')">
             <i class="fa-solid fa-triangle-exclamation"></i> Influential Obs
           </button>
-          <button class="tab-btn" onclick="switchTab('assessment')">
+          <button class="tab-btn" onclick="switchTab('assessment')" hidden>
             <i class="fa-solid fa-robot"></i> AI Assessment
           </button>
         </div>
@@ -1905,27 +1905,24 @@
 
       // Overall status
       const issueCount = [!results.normality, !results.homoscedasticity, !results.independence].filter(Boolean).length;
-      let overallIcon, overallText, overallColor;
+      let overallText;
       
       if (issueCount === 0 && results.outlierCount < results.nObs * 0.05) {
-        overallIcon = 'fa-check-circle';
         overallText = 'Model assumptions are largely satisfied';
-        overallColor = 'var(--success)';
       } else if (issueCount <= 1 && results.outlierCount < results.nObs * 0.1) {
-        overallIcon = 'fa-exclamation-triangle';
         overallText = 'Model has minor assumption violations';
-        overallColor = 'var(--warning)';
       } else {
-        overallIcon = 'fa-times-circle';
         overallText = 'Model has significant assumption violations';
-        overallColor = 'var(--danger)';
       }
 
-      verdictOverall.innerHTML = `
-        <i class="fa-solid ${overallIcon}" style="color: ${overallColor};"></i>
-        Overall Status: ${overallText}
-      `;
-      verdictOverall.style.borderColor = overallColor;
+      if (verdictOverall) {
+        verdictOverall.textContent = '';
+        verdictOverall.style.display = 'none';
+      }
+      if (window.StatisticoViewReadings) {
+        window.StatisticoViewReadings.set('regression-residuals', [overallText]);
+        window.StatisticoViewReadings.set('regression-diag-overview', [overallText]);
+      }
     }
 
     function displayOutliersHistogram(standardized) {
@@ -2233,9 +2230,12 @@
         findings.push({ text: 'No highly influential observations detected', class: 'success' });
       }
 
-      aiFindings.innerHTML = findings.map(f => 
-        `<li class="${f.class}">${f.text}</li>`
-      ).join('');
+      if (aiFindings) aiFindings.innerHTML = '';
+      if (window.StatisticoViewReadings) {
+        const lines = findings.map(f => f.text);
+        window.StatisticoViewReadings.add('regression-residuals', lines);
+        window.StatisticoViewReadings.add('regression-diag-overview', lines);
+      }
     }
 
     // Store original model for restoration

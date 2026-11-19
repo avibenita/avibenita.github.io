@@ -1082,7 +1082,13 @@
       var act = activeMethodBlock(bundle);
       var blk = act.block;
       var q = blk && blk.quality;
-      if (!blk || !q) { el.textContent = s.verdict || "—"; return; }
+      if (!blk || !q) {
+        el.textContent = "";
+        if (s.verdict && window.StatisticoViewReadings) {
+          window.StatisticoViewReadings.set(act.method === "hierarchical" ? "cluster-hi-overview" : "cluster-km-overview", [s.verdict]);
+        }
+        return;
+      }
       var parts = [];
       var sizes = blk.sizes || [];
       var k = sizes.length || s.k;
@@ -1113,7 +1119,13 @@
       if (s.caseCount != null && k && s.caseCount < k * 10) {
         parts.push("The sample is small relative to k — interpret with caution.");
       }
-      el.innerHTML = parts.join(" ");
+      var verdictText = parts.join(" ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      el.textContent = "";
+      var verdictWrap = el.closest(".clu-verdict");
+      if (verdictWrap) verdictWrap.style.display = "none";
+      if (window.StatisticoViewReadings && verdictText) {
+        window.StatisticoViewReadings.set(act.method === "hierarchical" ? "cluster-hi-overview" : "cluster-km-overview", [verdictText]);
+      }
     }
 
     function dominantProfileLabel(series, categories, clusterIdx) {

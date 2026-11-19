@@ -72,40 +72,26 @@
     return { cls: 'rfr-tag-ok', icon: 'fa-users', label: 'Large Sample' };
   }
 
-  function conclusion(model) {
+  function conclusionReadings(model) {
     var n = model && model.n != null ? model.n : '—';
     if (!fReady(model)) {
-      return '<section class="rfr-conclusion">' +
-        '<div class="rfr-kicker"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Model Conclusion</div>' +
-        '<p class="rfr-verdict">No predictors are in the model, so there is no overall F-test.</p>' +
-        '<p class="rfr-detail">The fitted value is the mean of the outcome, based on <strong>' + esc(n) + '</strong> observations.</p>' +
-        '</section>';
+      return [
+        'No predictors are in the model, so there is no overall F-test.',
+        'The fitted value is the mean of the outcome, based on ' + n + ' observations.'
+      ];
     }
     var sig = finite(model.fp);
     var r2 = finite(model.r2);
     var isSig = sig < 0.05;
-    var pText = sig < 0.0001 ? '&lt; 0.0001' : esc(Contrib.fixed(sig, 4));
-    var badge = isSig
-      ? '<span class="rfr-badge rfr-badge-sig">Significant</span>'
-      : '<span class="rfr-badge rfr-badge-ns">Not significant</span>';
+    var pText = sig < 0.0001 ? '< 0.0001' : Contrib.fixed(sig, 4);
     var lead = isSig ? 'The model is statistically significant' : 'The model is not statistically significant';
     var word = strength(r2);
-    var fitTag = word === 'strong'
-      ? { cls: 'rfr-tag-ok', icon: 'fa-arrow-trend-up', label: 'Strong Fit' }
-      : (word === 'moderate'
-        ? { cls: 'rfr-tag-mid', icon: 'fa-chart-simple', label: 'Moderate Fit' }
-        : { cls: 'rfr-tag-warn', icon: 'fa-arrow-trend-down', label: 'Weak Fit' });
-    var sigTag = isSig
-      ? { cls: 'rfr-tag-ok', icon: 'fa-check', label: 'Significant' }
-      : { cls: 'rfr-tag-warn', icon: 'fa-xmark', label: 'Not Significant' };
-    var tags = [fitTag, sigTag, sampleTag(Number(model.n))];
-    return '<section class="rfr-conclusion">' +
-      '<div class="rfr-kicker"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> Model Conclusion</div>' +
-      '<p class="rfr-verdict">' + lead + ' (p = ' + pText + ') ' + badge + '</p>' +
-      '<p class="rfr-detail">Explains <strong>' + esc(r2Text(r2)) + '</strong> of the variance — <strong>' + word + '</strong> explanatory power. Based on <strong>' + esc(n) + '</strong> observations.</p>' +
-      '<div class="rfr-tags">' + tags.map(function (tag) {
-        return '<span class="rfr-tag ' + tag.cls + '"><i class="fa-solid ' + tag.icon + '" aria-hidden="true"></i>' + esc(tag.label) + '</span>';
-      }).join('') + '</div></section>';
+    var fitLabel = word === 'strong' ? 'Strong Fit' : (word === 'moderate' ? 'Moderate Fit' : 'Weak Fit');
+    return [
+      lead + ' (p = ' + pText + ').',
+      'Explains ' + r2Text(r2) + ' of the variance — ' + word + ' explanatory power. Based on ' + n + ' observations.',
+      fitLabel + '. ' + (isSig ? 'Significant' : 'Not Significant') + '. ' + sampleTag(Number(model.n)).label + '.'
+    ];
   }
 
   function kpis(model) {
@@ -283,7 +269,6 @@
     var model = view.model || {};
     return '<div class="rfr">' +
       contextStrip(view) +
-      conclusion(model) +
       kpis(model) +
       contributionChart(model.contributions || {}, predictorOrder(view)) +
       coefficients(model) +
@@ -364,6 +349,7 @@
     contributionChart: contributionChart,
     processOverview: processOverview,
     processTechnical: processTechnical,
+    conclusionReadings: conclusionReadings,
     r2Text: r2Text,
     formatStat: formatStat
   };

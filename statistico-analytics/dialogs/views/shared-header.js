@@ -750,9 +750,12 @@ const StatisticoHeader = {
     // Keep univariate result dialogs visually capped to a laptop-like viewport.
     this.ensureLaptopFrame();
     
+    this._ensureDemoFlagStyles();
     this.render();
     this.showSampleNote();
+    this.showDemoFlag();
     this._listenForAnalysisSample();
+    this._listenForDemoRun();
     this._installPreviewChartHook();
     this._previewReady = true;
     this._restorePreviewTemplate();
@@ -864,9 +867,89 @@ const StatisticoHeader = {
         const parsed = JSON.parse(arg.message || '{}');
         const sample = self.findAnalysisSample(parsed);
         if (sample) self.showSampleNote(sample);
+        self.noteDemoFromMessage(parsed);
         if (parsed && typeof window.__applyIndependentBundle === 'function') window.__applyIndependentBundle(parsed);
       } catch (e) {}
     });
+  },
+
+  isDemoAddress(address) {
+    const text = String(address || '');
+    return text.indexOf('Demo') === 0 || text.indexOf('Built-in sample') === 0;
+  },
+
+  isDemoRun() {
+    try {
+      if (window.__statisticoDemo && window.__statisticoDemo.headers && window.__statisticoDemo.rows) return true;
+    } catch (e) {}
+    try { return sessionStorage.getItem('statisticoDemoRun') === '1'; } catch (e) { return false; }
+  },
+
+  setDemoRun(on) {
+    try {
+      if (on) sessionStorage.setItem('statisticoDemoRun', '1');
+      else sessionStorage.removeItem('statisticoDemoRun');
+    } catch (e) {}
+    this.showDemoFlag();
+  },
+
+  noteDemoFromMessage(parsed) {
+    if (!parsed || typeof parsed !== 'object') return;
+    if (parsed.demoRun === true) {
+      this.setDemoRun(true);
+      return;
+    }
+    const bodies = [parsed, parsed.payload, parsed.data];
+    let sawWorksheet = false;
+    for (let i = 0; i < bodies.length; i++) {
+      const body = bodies[i];
+      if (!body || typeof body !== 'object') continue;
+      if (body.demoRun === true || body.mode === 'demo') {
+        this.setDemoRun(true);
+        return;
+      }
+      const address = body.address || body.rangeAddress || '';
+      if (!address) continue;
+      if (this.isDemoAddress(address)) {
+        this.setDemoRun(true);
+        return;
+      }
+      sawWorksheet = true;
+    }
+    if (!sawWorksheet) return;
+    try {
+      if (window.__statisticoDemo && window.__statisticoDemo.headers) return;
+    } catch (e) {}
+    this.setDemoRun(false);
+  },
+
+  _ensureDemoFlagStyles() {
+    if (document.getElementById('statistico-demo-flag-style')) return;
+    const style = document.createElement('style');
+    style.id = 'statistico-demo-flag-style';
+    style.textContent = [
+      '.header-demo-flag{display:inline-flex;align-items:center;margin-top:3px;padding:1px 7px;border-radius:999px;',
+      'font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;line-height:1.5;',
+      'color:#ffedd5;background:rgba(249,115,22,.28);border:1px solid rgba(251,146,60,.75);}',
+      '.header-demo-flag[hidden]{display:none !important;}',
+      'html[data-theme="light"] .header-demo-flag{color:#9a3412;background:rgba(249,115,22,.16);border-color:rgba(234,88,12,.5);}'
+    ].join('');
+    document.head.appendChild(style);
+  },
+
+  showDemoFlag() {
+    this._ensureDemoFlagStyles();
+    const on = this.isDemoRun();
+    const flag = document.getElementById('headerDemoFlag');
+    if (!flag) return;
+    flag.hidden = !on;
+  },
+
+  _listenForDemoRun() {
+    if (this._demoRunListenerInstalled) return;
+    this._demoRunListenerInstalled = true;
+    const self = this;
+    window.addEventListener('statistico-demo-change', function () { self.showDemoFlag(); });
   },
 
   updateGroupLabel(groupName) {
@@ -1130,6 +1213,7 @@ const StatisticoHeader = {
           <div class="header-module-frame">
             <div class="header-module-kicker">Module</div>
             <div class="header-module-name" id="headerModuleName">${moduleName}</div>
+            <span class="header-demo-flag" id="headerDemoFlag"${this.isDemoRun() ? '' : ' hidden'} data-st-tip="These results use the built-in demo data, not the worksheet.">Demo</span>
           </div>
         </div>
         <div class="header-center">
@@ -1236,6 +1320,7 @@ const StatisticoHeader = {
     this._syncRowFilterHeader();
     this._wireQuestionsAnsweredEvents();
     this._refreshQuestionsAnsweredControl();
+    this.showDemoFlag();
   },
 
   _normalizeQuestionKey(s) {

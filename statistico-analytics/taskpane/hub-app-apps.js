@@ -1430,7 +1430,79 @@ function closeHubFamily() {
   if (btn && typeof btn.focus === "function") btn.focus();
 }
 
+function demoAddressText(address) {
+  var text = String(address || "");
+  return text.indexOf("Demo") === 0 || text.indexOf("Built-in sample") === 0;
+}
+
+function analysisRunIsDemo() {
+  try {
+    var gr = window.StatisticoGlobalRange && typeof StatisticoGlobalRange.load === "function" && StatisticoGlobalRange.load();
+    if (!gr) return false;
+    return gr.mode === "demo" || demoAddressText(gr.address);
+  } catch (e) {
+    return false;
+  }
+}
+
+function stampDemoRunMessage(message) {
+  if (!analysisRunIsDemo()) return message;
+  var text = typeof message === "string" ? message : JSON.stringify(message || {});
+  try {
+    var parsed = JSON.parse(text);
+    if (!parsed || typeof parsed !== "object" || parsed.demoRun === true) return text;
+    parsed.demoRun = true;
+    return JSON.stringify(parsed);
+  } catch (e) {
+    return text;
+  }
+}
+
+function setDialogMethod(obj, key, fn) {
+  if (!obj) return false;
+  try {
+    obj[key] = fn;
+    if (obj[key] === fn) return true;
+  } catch (e) {}
+  try {
+    Object.defineProperty(obj, key, { configurable: true, writable: true, value: fn });
+    return obj[key] === fn;
+  } catch (e2) {}
+  return false;
+}
+
+function stampDialogDemoRun(dlg) {
+  if (!dlg || typeof dlg.messageChild !== "function" || dlg.messageChild.__demoRunStamp) return;
+  var send = dlg.messageChild.bind(dlg);
+  function stamped(message) {
+    return send(stampDemoRunMessage(message));
+  }
+  stamped.__demoRunStamp = true;
+  setDialogMethod(dlg, "messageChild", stamped);
+}
+
+function installDemoRunStamp() {
+  var ui = (typeof Office !== "undefined" && Office.context && Office.context.ui) ? Office.context.ui : null;
+  if (!ui || typeof ui.displayDialogAsync !== "function" || ui.displayDialogAsync.__demoRunStamp) return;
+  if (ui.__hubFamilyOrig) return;
+  var orig = ui.displayDialogAsync.bind(ui);
+  function wrapped(url, options, callback) {
+    return orig(url, options, function (res) {
+      try { stampDialogDemoRun(res && res.value); } catch (e) {}
+      if (typeof callback === "function") callback(res);
+    });
+  }
+  wrapped.__demoRunStamp = true;
+  ui.displayDialogAsync = wrapped;
+}
+
+if (typeof Office !== "undefined" && typeof Office.onReady === "function") {
+  Office.onReady(function () { installDemoRunStamp(); });
+}
+installDemoRunStamp();
+
 function beginHubLaunchWatch(epoch, onFail) {
+  installDemoRunStamp();
   var ui = (typeof Office !== "undefined" && Office.context && Office.context.ui) ? Office.context.ui : null;
   if (!ui || typeof ui.displayDialogAsync !== "function") return;
   if (ui.__hubFamilyOrig && ui.displayDialogAsync !== ui.__hubFamilyOrig) {
@@ -1448,6 +1520,7 @@ function beginHubLaunchWatch(epoch, onFail) {
   function wrapped(url, options, callback) {
     restore();
     return orig.call(ui, url, options, function (res) {
+      try { stampDialogDemoRun(res && res.value); } catch (e) {}
       var current = hubLaunchStillCurrent(epoch);
       var failed = !!(res && Office.AsyncResultStatus && res.status === Office.AsyncResultStatus.Failed);
       if (!current) {

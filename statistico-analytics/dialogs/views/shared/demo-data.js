@@ -670,6 +670,14 @@
 
   installCarrier();
 
+  function markDemoRun(on) {
+    try {
+      if (on) sessionStorage.setItem('statisticoDemoRun', '1');
+      else sessionStorage.removeItem('statisticoDemoRun');
+    } catch (_store) {}
+    try { root.dispatchEvent(new CustomEvent('statistico-demo-change')); } catch (_event) {}
+  }
+
   function remember(pack) {
     root.__statisticoDemoLock = true;
     root.__statisticoDemo = {
@@ -678,6 +686,7 @@
       address: pack.address || 'Built-in sample'
     };
     installCarrier();
+    markDemoRun(true);
   }
 
   var ROUTES = {
@@ -825,6 +834,7 @@
     var serial = ++loadSerial;
     root.__statisticoDemoLock = false;
     root.__statisticoDemo = null;
+    markDemoRun(false);
     var prior = kind === 'publication' ? (root.__statisticoPublicationUser || null) : pageDraft;
     var empty = { headers: [], rows: [], address: '', savedModelSpec: null, savedSpec: null, values: [[]] };
     var payload = prior ? clonePack(prior) : empty;

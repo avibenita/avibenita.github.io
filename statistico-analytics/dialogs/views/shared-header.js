@@ -880,6 +880,14 @@ const StatisticoHeader = {
 
   isDemoRun() {
     try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('demo') === '1') return true;
+    } catch (e) {}
+    try {
+      if (document.body && document.body.classList.contains('demo-embed')) return true;
+      if (document.documentElement.classList.contains('demo-embed-root')) return true;
+    } catch (e) {}
+    try {
       if (window.__statisticoDemo && window.__statisticoDemo.headers && window.__statisticoDemo.rows) return true;
     } catch (e) {}
     try { return sessionStorage.getItem('statisticoDemoRun') === '1'; } catch (e) { return false; }
@@ -943,6 +951,19 @@ const StatisticoHeader = {
     const flag = document.getElementById('headerDemoFlag');
     if (!flag) return;
     flag.hidden = !on;
+    this._syncHeaderVariableLine();
+  },
+
+  _syncHeaderVariableLine() {
+    const line = document.getElementById('headerVariableLine');
+    if (!line) return;
+    const nameEl = document.getElementById('headerVariableName');
+    const nEl = document.getElementById('headerSampleSize');
+    const flag = document.getElementById('headerDemoFlag');
+    const hasName = !!(nameEl && String(nameEl.textContent || '').trim());
+    const hasN = !!(nEl && String(nEl.textContent || '').trim());
+    const hasDemo = !!(flag && !flag.hidden);
+    line.hidden = !hasName && !hasN && !hasDemo;
   },
 
   _listenForDemoRun() {
@@ -981,6 +1002,7 @@ const StatisticoHeader = {
         nEl.textContent = this.formatHeaderN();
       }
     }
+    this._syncHeaderVariableLine();
 
     if (hasAsterisk) {
       this.showModificationNotice();
@@ -1207,6 +1229,9 @@ const StatisticoHeader = {
 
     const groupName = String(this.groupLabel || '').trim()
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const variableText = this.variableName && this.variableName !== 'Variable' ? this.variableName : '';
+    const sampleText = this.formatHeaderN();
+    const showVariableLine = !!(variableText || sampleText || this.isDemoRun());
     const topHeader = `
       <div class="statistico-header">
         <div class="header-left">
@@ -1221,9 +1246,9 @@ const StatisticoHeader = {
             <span class="header-group-kicker">By group</span>
             <span class="header-group-name" id="headerGroupName">${groupName}</span>
           </div>
-          <div class="header-variable">
-            <span id="headerVariableName">${this.variableName}</span>
-            <span id="headerSampleSize">${this.formatHeaderN()}</span>
+          <div class="header-variable" id="headerVariableLine"${showVariableLine ? '' : ' hidden'}>
+            <span id="headerVariableName">${variableText}</span>
+            <span id="headerSampleSize">${sampleText}</span>
             <span class="header-demo-flag" id="headerDemoFlag"${this.isDemoRun() ? '' : ' hidden'} data-st-tip="These results use the built-in demo data, not the worksheet.">Demo</span>
           </div>
         </div>
@@ -7524,9 +7549,10 @@ const StatisticoHeader = {
         wrap.style.display = 'none';
       }
       const varEl = document.getElementById('headerVariableName');
-      if (varEl) varEl.textContent = this.variableName || 'Variable';
+      if (varEl) varEl.textContent = (this.variableName && this.variableName !== 'Variable') ? this.variableName : '';
       const nEl = document.getElementById('headerSampleSize');
       if (nEl) nEl.textContent = this.formatHeaderN();
+      this.showDemoFlag();
       return;
     }
 
@@ -7572,7 +7598,7 @@ const StatisticoHeader = {
     }
     const published = Number(this._publishedAnalysisN);
     if (published > 0) this.sampleSize = published;
-    const varName = this.variableName || headerVarName || 'Variable';
+    const varName = this.variableName || headerVarName || '';
 
     const varEl = document.getElementById('headerVariableName');
     if (varEl) {
@@ -7582,6 +7608,7 @@ const StatisticoHeader = {
     }
     const nEl = document.getElementById('headerSampleSize');
     if (nEl) nEl.textContent = this.formatHeaderN();
+    this.showDemoFlag();
 
     let notice = document.getElementById('uni-filter-active-notice');
     if (!notice) {

@@ -1615,14 +1615,32 @@
 
     paintAboutButtons: function (root) {
       const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('.mg-launch').forEach(function (button) {
+      if (!scope.querySelectorAll) return;
+      scope.querySelectorAll('.mg-launch, #sbModuleAboutBtn').forEach(function (button) {
         let moduleName = button.getAttribute('data-module');
         if (!moduleName && (button.id === 'aboutModuleBtn' || button.id === 'aboutModuleSetup')) moduleName = 'univariate';
+        if (!moduleName && window.StatisticoHeader && window.StatisticoHeader.module) {
+          moduleName = window.StatisticoHeader.module;
+        }
         const label = StatisticoModuleGuide.buttonLabel(moduleName);
-        const span = button.querySelector('span');
-        if (span) span.textContent = label;
-        button.title = label;
+        const entry = StatisticoModuleGuide.resolve(moduleName);
+        const body = (entry && entry.lead) || 'What this method does, when to use it, and what it cannot show.';
+        const hint = 'Click to open the guide.';
+        button.classList.add('st-module-help');
+        button.setAttribute('aria-label', label);
+        button.removeAttribute('title');
+        button.setAttribute('data-st-tip', label + '. ' + body + ' ' + hint);
+        button.setAttribute('data-st-tip-html',
+          '<strong class="st-tt-title">' + escapeHtml(label) + '</strong>'
+          + '<span class="st-tt-body">' + escapeHtml(body) + '</span>'
+          + '<span class="st-tt-hint">' + escapeHtml(hint) + '</span>');
+        if (!button.querySelector('.st-module-help-glyph')) {
+          button.insertAdjacentHTML('beforeend', '<span class="st-module-help-glyph" aria-hidden="true">?</span>');
+        }
       });
+      if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+        window.StatisticoTooltip.refresh(scope);
+      }
     },
 
     _render: function () {

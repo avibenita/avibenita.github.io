@@ -1237,7 +1237,9 @@ const StatisticoHeader = {
         <div class="header-left">
           <div class="header-module-frame">
             <div class="header-module-kicker">Module</div>
-            <div class="header-module-name" id="headerModuleName">${moduleName}</div>
+            <div class="header-module-name-row">
+              <div class="header-module-name" id="headerModuleName">${moduleName}</div>
+            </div>
           </div>
         </div>
         <div class="header-center">
@@ -1294,6 +1296,7 @@ const StatisticoHeader = {
 
     // Trigger subtle module-name reveal animation
     this.revealModuleName();
+    this._mountModuleHelpButton();
     // Trigger view-name slide-in animation
     this.revealViewName();
 
@@ -9209,33 +9212,66 @@ REPORT: [one polished paragraph suitable for a report]`;
     this._ensureViewGuideScript(() => this._mountViewActions());
   },
 
-  _mountModuleAboutButton(footer) {
-    if (!footer || this.module === 'segmentation') return;
-    if (document.getElementById('sbModuleAboutBtn')) return;
-    const moduleName = this.module;
-    const aboutLabel = this._aboutButtonLabel(moduleName);
-    const wrap = document.createElement('div');
-    wrap.id = 'sbModuleAbout';
-    wrap.className = 'sb-module-about-wrap';
-    wrap.innerHTML = ''
-      + '<button type="button" class="sb-module-about" id="sbModuleAboutBtn"'
-      + ' aria-expanded="false" aria-controls="moduleGuideOverlay"'
-      + ' title="' + aboutLabel.replace(/"/g, '&quot;') + '">'
-      + '<i class="fa-solid fa-book-open" aria-hidden="true"></i>'
-      + '<span class="sb-item-label">' + aboutLabel.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>'
-      + '</button>';
-    footer.appendChild(wrap);
-    const btn = wrap.querySelector('#sbModuleAboutBtn');
-    if (btn) {
-      btn.addEventListener('click', () => {
-        this._ensureModuleGuideScript(() => {
-          if (window.StatisticoModuleGuide && window.StatisticoModuleGuide.has(moduleName)) {
-            window.StatisticoModuleGuide.toggle(moduleName);
-          }
-        });
-      });
+  _mountModuleAboutButton() {
+    const legacy = document.getElementById('sbModuleAbout');
+    if (legacy) legacy.remove();
+    this._mountModuleHelpButton();
+  },
+
+  _mountModuleHelpButton() {
+    if (this.module === 'segmentation') return;
+    const row = document.querySelector('.statistico-header .header-module-name-row');
+    if (!row) return;
+    let btn = document.getElementById('sbModuleAboutBtn');
+    if (btn && !row.contains(btn)) {
+      btn.remove();
+      btn = null;
     }
-    this._ensureModuleGuideScript();
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = 'sbModuleAboutBtn';
+      btn.className = 'st-module-help';
+      btn.innerHTML = '<span class="st-module-help-glyph" aria-hidden="true">?</span>';
+      row.appendChild(btn);
+    }
+    const moduleName = this.module;
+    const label = this._aboutButtonLabel(moduleName);
+    const body = 'What this method does, when to use it, and what it cannot show.';
+    const hint = 'Click to open the guide.';
+    btn.setAttribute('data-module', moduleName);
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-expanded', btn.getAttribute('aria-expanded') || 'false');
+    btn.setAttribute('aria-controls', 'moduleGuideOverlay');
+    btn.removeAttribute('title');
+    btn.setAttribute('data-st-tip', label + '. ' + body + ' ' + hint);
+    btn.setAttribute('data-st-tip-html',
+      '<strong class="st-tt-title">' + this._escapeAiHtml(label) + '</strong>'
+      + '<span class="st-tt-body">' + this._escapeAiHtml(body) + '</span>'
+      + '<span class="st-tt-hint">' + this._escapeAiHtml(hint) + '</span>');
+    this._wireModuleHelpButton(btn, moduleName);
+    if (window.StatisticoTooltip && typeof window.StatisticoTooltip.refresh === 'function') {
+      window.StatisticoTooltip.refresh(row);
+    }
+  },
+
+  _wireModuleHelpButton(btn, moduleName) {
+    if (!btn || btn.dataset.helpWired === '1') return;
+    btn.dataset.helpWired = '1';
+    btn.addEventListener('click', () => {
+      this._ensureModuleGuideScript(() => {
+        const guide = window.StatisticoModuleGuide;
+        if (!guide) return;
+        if (typeof guide.paintAboutButtons === 'function') guide.paintAboutButtons(btn.parentNode || document);
+        if (guide.has(moduleName)) guide.toggle(moduleName);
+      });
+    });
+    this._ensureModuleGuideScript(() => {
+      const guide = window.StatisticoModuleGuide;
+      if (guide && typeof guide.paintAboutButtons === 'function') {
+        guide.paintAboutButtons(btn.parentNode || document);
+      }
+    });
   },
 
   _ensureModuleGuideScript(done) {
@@ -9251,9 +9287,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     script.id = 'statistico-module-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261114guides')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261119help')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261114guides');
+    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261119help');
     const release = () => {
       const waiters = this._moduleGuideWaiters || [];
       this._moduleGuideWaiters = null;

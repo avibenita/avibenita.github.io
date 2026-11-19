@@ -21,6 +21,13 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(header).toMatch(/logistic: 'logistic regression'/);
     expect(header).toMatch(/_aboutButtonLabel/);
     expect(header).toMatch(/_mountModuleAboutButton/);
+    expect(header).toMatch(/header-module-name-row/);
+    expect(header).toMatch(/st-module-help/);
+    expect(header).toMatch(/st-tt-title/);
+    expect(header).toMatch(/Click to open the guide/);
+    expect(header).not.toMatch(/class="sb-module-about"/);
+    expect(css).toMatch(/\.header-module-name-row/);
+    expect(css).toMatch(/\.st-module-help/);
     expect(header).toMatch(/shared\/module-guide\.js/);
     expect(header).toMatch(/shared\/view-guide\.js/);
     expect(css).toMatch(/\.sb-ai-panel--overall/);

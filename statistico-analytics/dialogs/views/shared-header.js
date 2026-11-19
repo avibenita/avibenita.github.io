@@ -35,15 +35,33 @@ console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
     document.documentElement.setAttribute('data-tabs', 'contained');
   })();
 
-  /* Every page load starts in dark. Light remains available from the switcher. */
-  (function applyDarkOnLoad() {
+  /* Default is dark. A saved Auto or Light choice stays in effect across views. */
+  (function applySavedThemeEarly() {
     try {
       var root = document.documentElement;
-      root.setAttribute('data-theme', 'dark');
-      root.setAttribute('data-theme-pref', 'dark');
-      root.classList.add('highcharts-dark');
-      root.classList.remove('highcharts-light');
-      localStorage.setItem('statistico-theme', 'dark');
+      var params = new URLSearchParams(window.location.search);
+      var forced = params.get('demo') === '1' || params.get('embed') === '1';
+      var stored = 'dark';
+      try {
+        var saved = localStorage.getItem('statistico-theme');
+        if (saved === 'auto' || saved === 'light' || saved === 'dark') stored = saved;
+      } catch (e) {}
+      var theme = stored === 'light' ? 'light' : 'dark';
+      if (!forced && stored === 'auto') {
+        try {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        } catch (e2) {
+          theme = 'dark';
+        }
+      }
+      if (forced) {
+        theme = 'dark';
+        stored = 'dark';
+      }
+      root.setAttribute('data-theme', theme);
+      root.setAttribute('data-theme-pref', stored);
+      root.classList.toggle('highcharts-dark', theme !== 'light');
+      root.classList.toggle('highcharts-light', theme === 'light');
     } catch (e) {}
   })();
 
@@ -346,8 +364,23 @@ const StatisticoHeader = {
       .replace(/</g, '&lt;');
   },
 
-  _renderThemeSwitcherHtml() {
-    return '';
+  _renderThemeSwitcherHtml(extraClass) {
+    const pref = this.getThemePreference();
+    const hint = this.getSystemTheme() === 'dark' ? 'dark' : 'light';
+    const isSidebar = !!(extraClass && String(extraClass).indexOf('sidebar') !== -1);
+    const cls = extraClass ? `hc-theme-switch ${extraClass}` : 'hc-theme-switch';
+    const tip = isSidebar
+      ? ''
+      : ` title="${this._escapeAttr(this._themeSwitcherTipText())}" data-st-tip-pos="top"`;
+    return `
+      <div class="${cls}" id="${isSidebar ? 'sbThemeSwitch' : 'headerThemeSwitch'}" role="radiogroup" aria-label="Color theme"${tip}>
+        <button type="button" class="hc-theme-opt" data-theme-pref="auto" aria-pressed="${pref === 'auto' ? 'true' : 'false'}" aria-label="Auto, follow system appearance, currently ${hint}">
+          Auto <span class="hc-theme-auto-hint">(${hint})</span>
+        </button>
+        <button type="button" class="hc-theme-opt" data-theme-pref="light" aria-pressed="${pref === 'light' ? 'true' : 'false'}" aria-label="Light theme">Light</button>
+        <button type="button" class="hc-theme-opt" data-theme-pref="dark" aria-pressed="${pref === 'dark' ? 'true' : 'false'}" aria-label="Dark theme">Dark</button>
+      </div>
+    `;
   },
 
   _syncThemeSwitcherUI() {
@@ -5013,6 +5046,7 @@ const StatisticoHeader = {
         <select id="decimalSelect" class="header-decimals-hidden-select" aria-hidden="true" tabindex="-1" onchange="StatisticoHeader.onDecimalChange(this.value)">
           ${optionsHtml}
         </select>
+        ${this._renderThemeSwitcherHtml()}
       </div>
     `;
   },

@@ -268,7 +268,7 @@
       [
         'Method is Classical or Bootstrap. Bootstrap shows Iterations and the refresh control beside it.',
         'Classical estimates the mean or the standard deviation. Bootstrap also unlocks the median and a percentile.',
-        'Confidence level offers 90%, 95%, and 99%. The slider fine-tunes that level, and its tooltip shows the significance level, α. Population Size is optional. Refresh applies it. Leave it blank when you are not correcting for a finite population. What if? explores precision for a classical mean without changing this result. Reset scenario returns the projection to the current sample.'
+        'Confidence level offers 90%, 95%, and 99%. The slider fine-tunes that level, and its tooltip shows the significance level, α. What if? explores precision for a classical mean without changing this result. Sample size, confidence, and an optional population size change only the projection. Leave population size blank when you are not correcting for a finite population. Reset scenario returns the projection to the current sample.'
       ],
       [
         'The large figure is the point estimate plus or minus the margin of error. LCL and UCL are the ends of the interval. The bar draws that same interval.',

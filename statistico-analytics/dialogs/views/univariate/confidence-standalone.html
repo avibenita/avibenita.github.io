@@ -189,59 +189,6 @@
       box-shadow: none;
     }
 
-    .popsize-control {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-height: 32px;
-    }
-
-    .popsize-control input[type="number"] {
-      flex: 1;
-      min-width: 0;
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 4px;
-      color: white;
-      padding: 6px 10px;
-      font-size: 14px;
-    }
-
-    .popsize-control .refresh-btn {
-      flex: 0 0 auto;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      width: auto;
-      height: 32px;
-      min-width: 96px;
-      padding: 0 12px;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    #popsize-section.is-inactive {
-      opacity: 0.5;
-    }
-
-    .popsize-error {
-      margin-top: 8px;
-      color: #ffb4a8;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
-    :root[data-theme="light"] .popsize-error {
-      color: #b42318;
-    }
-
-    :root[data-theme="light"] .popsize-control input[type="number"] {
-      background: #ffffff;
-      border-color: var(--border);
-      color: var(--text-primary);
-    }
-
     /* Alpha Control */
     .alpha-control {
       display: flex;
@@ -572,9 +519,16 @@
       line-height: 1.35;
     }
 
-    :root[data-theme="light"] .whatif-error,
-    :root[data-theme="light"] .popsize-error {
+    :root[data-theme="light"] .whatif-error {
       color: #b42318;
+    }
+
+    #whatif-pop-field {
+      flex: 0 1 168px;
+    }
+
+    #whatif-population {
+      width: 100%;
     }
 
     .whatif-hint {
@@ -747,9 +701,7 @@
 
     :root[data-theme="light"] .whatif input[type="number"],
     :root[data-theme="light"] .whatif input[type="text"],
-    :root[data-theme="light"] .whatif select,
-    :root[data-theme="light"] .popsize-control input[type="text"],
-    :root[data-theme="light"] .popsize-control input[type="number"] {
+    :root[data-theme="light"] .whatif select {
       background: #ffffff;
       border-color: #cbd5e1;
       color: #111827;
@@ -876,7 +828,7 @@
         </div>
       </div>
 
-      <!-- Row 2: Alpha & Population Size -->
+      <!-- Row 2: Confidence level -->
       <div class="config-row">
         <div class="config-section">
           <div class="section-title" title="The slider fine-tunes the confidence level. Hover it to see the significance level, α.">Confidence level</div>
@@ -888,17 +840,6 @@
             </select>
             <input type="range" id="alpha-slider" min="0.01" max="0.15" step="0.001" value="0.05" oninput="updateAlpha()" title="95% confidence. Significance level α = 0.050." aria-label="95% confidence. Significance level α = 0.050.">
           </div>
-        </div>
-
-        <div class="config-section" id="popsize-section">
-          <div class="section-title">Population Size (Optional)</div>
-          <div class="popsize-control">
-            <input type="text" inputmode="numeric" id="population-size" placeholder="Unknown" autocomplete="off" aria-describedby="popsize-error" onchange="calculate()" onkeydown="if(event.key==='Enter'){event.preventDefault();refreshPopulation();}">
-            <button type="button" class="refresh-btn" id="popsize-refresh" onclick="refreshPopulation()" title="Apply population size">
-              <i class="fa-solid fa-rotate-right"></i> Refresh
-            </button>
-          </div>
-          <p class="popsize-error" id="popsize-error" role="alert" hidden></p>
         </div>
       </div>
     </div>
@@ -959,14 +900,14 @@
     </div>
 
     <section class="whatif" id="whatif" data-planning-only>
-      <button type="button" class="whatif-toggle" id="whatif-toggle" aria-expanded="true" aria-controls="whatif-body">
+      <button type="button" class="whatif-toggle" id="whatif-toggle" aria-expanded="false" aria-controls="whatif-body">
         <span>
           <span class="whatif-title">What if? — Explore precision</span>
-          <span class="whatif-sub">Explore how sample size and confidence affect the precision of the mean.</span>
+          <span class="whatif-sub">Explore how sample size, confidence, and population size affect the precision of the mean.</span>
         </span>
         <i class="fa-solid fa-chevron-down whatif-chevron" aria-hidden="true"></i>
       </button>
-      <div class="whatif-body" id="whatif-body">
+      <div class="whatif-body" id="whatif-body" hidden>
         <p class="whatif-message" id="whatif-unsupported" hidden>Precision exploration is currently available for Classical mean intervals.</p>
         <p class="whatif-message" id="whatif-blocked" hidden></p>
         <div id="whatif-active">
@@ -1004,6 +945,11 @@
                 </select>
                 <input type="range" id="whatif-alpha" min="0.01" max="0.15" step="0.001" value="0.05" title="Scenario confidence, 95%. Significance level α = 0.050." aria-label="Scenario confidence, 95%. Significance level α = 0.050." oninput="onWhatIfAlpha(false)" onchange="onWhatIfAlpha(true)">
               </div>
+            </div>
+            <div class="whatif-field" id="whatif-pop-field">
+              <label for="whatif-population">Population size</label>
+              <input type="text" inputmode="numeric" id="whatif-population" placeholder="Unknown" autocomplete="off" aria-describedby="whatif-pop-error" title="Optional. A finite population narrows the projection. Leave blank when you are not correcting for one." oninput="onWhatIfPopulationInput()" onchange="onWhatIfPopulationCommit()" onkeydown="if(event.key==='Enter'){event.preventDefault();onWhatIfPopulationCommit();}">
+              <p class="whatif-error" id="whatif-pop-error" role="alert" hidden></p>
             </div>
             <div class="whatif-actions">
               <button type="button" class="refresh-btn" id="whatif-reset" onclick="resetWhatIf()">Reset scenario</button>
@@ -1106,10 +1052,10 @@
     let currentAlpha = 0.05;
     let dataReady = false;
     let lastResult = null;
-    let lastPopulation = { ok: true, N: null };
     let scenarioMode = 'explore';
     let scenarioNText = '';
     let scenarioConfidence = 0.95;
+    let scenarioPopulationText = '';
     let scenarioTargetText = '';
     let scenarioAxisHalf = null;
     let scenarioDrag = false;
@@ -1180,17 +1126,7 @@
       const stdev = calculateStdev(originalData, mean);
       
       if (currentParameter === 'mean') {
-        const population = ConfidencePrecision.parsePopulation(document.getElementById('population-size').value, n);
-        const error = document.getElementById('popsize-error');
-        if (error) {
-          error.hidden = population.ok;
-          error.textContent = population.ok ? '' : population.reason;
-        }
-        const popInput = document.getElementById('population-size');
-        if (popInput) popInput.setAttribute('aria-invalid', population.ok ? 'false' : 'true');
-        lastPopulation = population;
-        const N = population.ok ? population.N : null;
-        const margin = ConfidencePrecision.marginOfError(n, 1 - currentAlpha, stdev, N);
+        const margin = ConfidencePrecision.marginOfError(n, 1 - currentAlpha, stdev, null);
         return {
           center: mean,
           margin: margin,
@@ -1390,28 +1326,40 @@
       return String(n) + (n === 1 ? ' observation' : ' observations');
     }
 
-    function takeawaySentence(n0, ns, change, currentConf, scenarioConf) {
+    function takeawaySentence(n0, ns, change, currentConf, scenarioConf, populationN) {
       if (!change || !change.comparable || ns == null) return '';
       const relation = change.text === 'Unchanged'
         ? 'the same width as'
         : change.text.replace(/ narrower$/, ' narrower than').replace(/ wider$/, ' wider than');
       const projected = observationPhrase(ns);
       const current = observationPhrase(n0);
-      if (Math.abs(currentConf - scenarioConf) < 0.0005) {
-        return 'With ' + projected + ', the projected interval is ' + relation + ' with your current ' + current + '.';
+      const sameConfidence = Math.abs(currentConf - scenarioConf) < 0.0005;
+      const fromPopulation = populationN != null;
+      if (sameConfidence && ns === n0 && fromPopulation) {
+        return 'From a population of ' + populationN + ', the projected interval is ' + relation + ' with your current ' + current + '.';
       }
-      return 'With ' + projected + ' at ' + confidenceLabel(scenarioConf) + ' confidence, the projected interval is ' + relation + ' with your current ' + current + ' at ' + confidenceLabel(currentConf) + ' confidence.';
+      const populationClause = fromPopulation ? ' from a population of ' + populationN : '';
+      if (sameConfidence) {
+        return 'With ' + projected + populationClause + ', the projected interval is ' + relation + ' with your current ' + current + '.';
+      }
+      const confidenceClause = ' at ' + confidenceLabel(scenarioConf) + ' confidence';
+      return 'With ' + projected + confidenceClause + populationClause + ', the projected interval is ' + relation + ' with your current ' + current + ' at ' + confidenceLabel(currentConf) + ' confidence.';
     }
 
     function baselineKey() {
       if (!lastResult) return '';
-      const pop = !lastPopulation ? 'blank' : (lastPopulation.ok ? String(lastPopulation.N) : 'invalid');
-      return [currentMethod, currentParameter, lastResult.n, lastResult.center, lastResult.stdev, currentAlpha, pop].join('|');
+      return [currentMethod, currentParameter, lastResult.n, lastResult.center, lastResult.stdev, currentAlpha].join('|');
+    }
+
+    function scenarioPopulation() {
+      const n0 = lastResult ? lastResult.n : 2;
+      return ConfidencePrecision.parsePopulation(scenarioPopulationText, n0);
     }
 
     function scenarioBounds() {
       const n0 = lastResult.n;
-      const N = lastPopulation && lastPopulation.ok ? lastPopulation.N : null;
+      const population = scenarioPopulation();
+      const N = population.ok ? population.N : null;
       return { minN: 2, maxN: ConfidencePrecision.scenarioMaximum(n0, N), N: N, n0: n0 };
     }
 
@@ -1421,6 +1369,7 @@
       scenarioConfidence = 1 - currentAlpha;
       scenarioTargetText = '';
       scenarioTargetCommitted = '';
+      scenarioPopulationText = '';
       scenarioAxisHalf = null;
       scenarioDrag = false;
       scenarioSolvedN = null;
@@ -1428,6 +1377,8 @@
       if (explore) explore.checked = true;
       const target = document.getElementById('whatif-target');
       if (target) target.value = '';
+      const population = document.getElementById('whatif-population');
+      if (population) population.value = '';
     }
 
     function syncWhatIfConfidenceControls() {
@@ -1493,12 +1444,6 @@
         active.hidden = true;
         return;
       }
-      if (lastPopulation && lastPopulation.ok === false) {
-        blocked.hidden = false;
-        blocked.textContent = lastPopulation.reason;
-        active.hidden = true;
-        return;
-      }
       blocked.hidden = true;
       active.hidden = false;
 
@@ -1524,6 +1469,17 @@
       slider.setAttribute('aria-valuenow', parsedN.ok ? String(parsedN.n) : '');
       slider.setAttribute('aria-valuetext', parsedN.ok ? String(parsedN.n) : 'invalid');
       syncWhatIfConfidenceControls();
+
+      const populationInput = document.getElementById('whatif-population');
+      const populationError = document.getElementById('whatif-pop-error');
+      if (populationInput && document.activeElement !== populationInput) populationInput.value = scenarioPopulationText;
+      const population = scenarioPopulation();
+      const showPopulationError = scenarioPopulationText.trim() !== '' && !population.ok;
+      if (populationError) {
+        populationError.hidden = !showPopulationError;
+        populationError.textContent = showPopulationError ? population.reason : '';
+      }
+      if (populationInput) populationInput.setAttribute('aria-invalid', showPopulationError ? 'true' : 'false');
 
       const targetInput = document.getElementById('whatif-target');
       const targetHint = document.getElementById('whatif-target-hint');
@@ -1596,7 +1552,7 @@
         document.getElementById('whatif-margin').title = '±' + fmtFull(scenarioHalf);
         const change = ConfidencePrecision.widthChange(lastResult.ucl - lastResult.lcl, scenarioHalf * 2);
         document.getElementById('whatif-width').textContent = change.comparable ? change.text : 'Comparison unavailable';
-        const sentence = takeawaySentence(bounds.n0, scenarioN, change, 1 - currentAlpha, scenarioConfidence);
+        const sentence = takeawaySentence(bounds.n0, scenarioN, change, 1 - currentAlpha, scenarioConfidence, bounds.N);
         takeaway.hidden = !sentence;
         takeaway.textContent = sentence;
         const extraLabel = document.getElementById('whatif-extra-label');
@@ -1709,6 +1665,18 @@
       renderWhatIf();
     };
 
+    window.onWhatIfPopulationInput = function () {
+      scenarioPopulationText = document.getElementById('whatif-population').value;
+      scenarioDrag = false;
+      renderWhatIf();
+    };
+
+    window.onWhatIfPopulationCommit = function () {
+      scenarioPopulationText = document.getElementById('whatif-population').value.trim();
+      scenarioDrag = false;
+      renderWhatIf();
+    };
+
     window.resetWhatIf = function () {
       if (!lastResult) return;
       resetScenarioState();
@@ -1779,24 +1747,9 @@
     }
 
     // UI controls
-    window.refreshPopulation = function() {
-      calculate();
-    };
-
-    function syncPopSizeAvailability() {
-      const enabled = currentMethod === 'classical' && currentParameter === 'mean';
-      const section = document.getElementById('popsize-section');
-      const input = document.getElementById('population-size');
-      const button = document.getElementById('popsize-refresh');
-      if (section) section.classList.toggle('is-inactive', !enabled);
-      if (input) input.disabled = !enabled;
-      if (button) button.disabled = !enabled;
-    }
-
     window.selectMethod = function(method) {
       currentMethod = method;
       document.getElementById('bootstrap-iterations').style.display = method === 'bootstrap' ? 'flex' : 'none';
-      syncPopSizeAvailability();
       document.getElementById('stat-method').textContent = method === 'classical' ? 'Classical' : 'Bootstrap';
       
       if (method === 'bootstrap') {
@@ -1823,7 +1776,6 @@
 
     window.selectParameter = function(param) {
       currentParameter = param;
-      syncPopSizeAvailability();
       
       // Show/hide percentile control
       document.getElementById('percentile-control').style.display = param === 'percentile' ? 'flex' : 'none';

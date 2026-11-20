@@ -7929,6 +7929,8 @@ const StatisticoHeader = {
   _fitResultsToOneView() {
     const right = document.querySelector('.right-col');
     if (!right || right.clientHeight < 80) return;
+    const dock = document.getElementById('sbViewActions');
+    if (dock) this._placeViewDock(dock);
     const panes = this._resultsFitPanes(right);
     panes.forEach((pane) => this._compressResultsPane(pane, right));
     if (window.Highcharts && Array.isArray(Highcharts.charts)) {
@@ -9657,8 +9659,8 @@ REPORT: [one polished paragraph suitable for a report]`;
   },
 
   /**
-   * Pin View guide and Interpret results to the right edge of the view.
-   * The rail stays narrow so it does not cover the results.
+   * Put View guide and Interpret results in a column beside the results.
+   * Panels stay in the left track and end before the buttons start.
    */
   _placeViewDock(group) {
     if (!group) return;
@@ -9669,22 +9671,33 @@ REPORT: [one polished paragraph suitable for a report]`;
       this._mountFloatingAiButton(group);
       return;
     }
-    col.classList.remove('has-view-dock');
-    const header = col.querySelector('#header-container');
-    if (header && header.parentElement === col) {
-      if (group.previousElementSibling !== header) header.insertAdjacentElement('afterend', group);
-    } else if (group.parentElement !== col) {
-      col.insertBefore(group, col.firstChild);
+    const header = col.querySelector(':scope > #header-container');
+    let row = col.querySelector(':scope > .right-main-row');
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'right-main-row';
+      const main = document.createElement('div');
+      main.className = 'right-main';
+      row.appendChild(main);
+      if (header) header.insertAdjacentElement('afterend', row);
+      else col.insertBefore(row, col.firstChild);
     }
+    const main = row.querySelector(':scope > .right-main');
+    [...col.children].forEach((el) => {
+      if (el === header || el === row || el === group) return;
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return;
+      main.appendChild(el);
+    });
+    if (group.parentElement !== row) row.appendChild(group);
+    group.style.top = '';
+    group.style.right = '';
+    group.style.position = '';
     const sync = () => {
       if (!group.isConnected) return;
-      const chrome = col.querySelector('#header-container') || col.querySelector('.statistico-shell');
-      const belowChrome = chrome ? Math.round(chrome.offsetHeight) + 18 : 18;
-      group.style.top = belowChrome + 'px';
       group.style.transformOrigin = 'top right';
-      group.style.transform = '';
-      const room = col.clientHeight - belowChrome - 8;
+      const room = row.clientHeight - 16;
       const needed = group.offsetHeight;
+      group.style.transform = '';
       if (room > 80 && needed > room) {
         const scale = Math.max(0.72, Math.min(1, room / needed));
         group.style.transform = 'scale(' + scale.toFixed(3) + ')';
@@ -9696,9 +9709,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     window.addEventListener('resize', sync);
     if (typeof ResizeObserver === 'function') {
       const ro = new ResizeObserver(sync);
-      ro.observe(col);
-      const chrome = col.querySelector('#header-container') || col.querySelector('.statistico-shell');
-      if (chrome) ro.observe(chrome);
+      ro.observe(row);
     }
   },
 

@@ -3440,7 +3440,7 @@ const StatisticoHeader = {
     const headClone = document.head ? document.head.cloneNode(true) : document.createElement('head');
     headClone.querySelectorAll('script, noscript').forEach((node) => node.remove());
     const bodyClone = document.body ? document.body.cloneNode(true) : document.createElement('body');
-    bodyClone.querySelectorAll('script, noscript, #stExportProgressOverlay, #stReportExportOverlay').forEach((node) => node.remove());
+    bodyClone.querySelectorAll('script, noscript, #stExportProgressOverlay, #stReportExportOverlay, [data-planning-only]').forEach((node) => node.remove());
     this._prepareExportSnapshotBody(bodyClone);
     const primary = bodyClone.querySelector('.right-col') || bodyClone;
     const payload = primary === bodyClone ? bodyClone.innerHTML : primary.outerHTML;
@@ -10219,8 +10219,11 @@ REPORT: [one polished paragraph suitable for a report]`;
       document.querySelector('.right-col') ||
       document.body;
     const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
-    const visibleText = clean(activePanel?.innerText || '').slice(0, 2600);
+    const source = (activePanel || document.body).cloneNode(true);
+    source.querySelectorAll('[data-planning-only]').forEach((el) => el.remove());
+    const visibleText = clean(source.innerText || '').slice(0, 2600);
     const controls = Array.from((activePanel || document).querySelectorAll('button, select, input[type="radio"], input[type="checkbox"], input[type="range"]'))
+      .filter((el) => !el.closest('[data-planning-only]'))
       .map((el) => clean(el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || el.id || el.name || el.value))
       .filter(Boolean)
       .slice(0, 18);

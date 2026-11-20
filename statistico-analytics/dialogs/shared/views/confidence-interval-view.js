@@ -920,20 +920,21 @@ function calculateClassicalCI() {
     const mean = data.reduce((a, b) => a + b, 0) / n;
     const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (n - 1);
     const stdev = Math.sqrt(variance);
-    
-    // Finite population correction factor (matching HTML version)
-    let Factor = 1;
     const popInput = document.getElementById('ci-popsize-input');
-    const populationSize = popInput && popInput.value ? parseInt(popInput.value) : null;
     
-    if (populationSize && populationSize > n) {
-      Factor = Math.sqrt((populationSize - n) / (populationSize - 1));
-      console.log('  FPC applied:', Factor.toFixed(4));
+    let marginOfError;
+    if (typeof ConfidencePrecision !== 'undefined') {
+      const parsedPop = ConfidencePrecision.parsePopulation(popInput && popInput.value ? popInput.value : '', n);
+      marginOfError = ConfidencePrecision.marginOfError(n, currentConfidence / 100, stdev, parsedPop.ok ? parsedPop.N : null);
+    } else {
+      let Factor = 1;
+      const populationSize = popInput && popInput.value ? parseInt(popInput.value, 10) : null;
+      if (populationSize && populationSize >= n) {
+        Factor = populationSize === n ? 0 : Math.sqrt((populationSize - n) / populationSize);
+      }
+      const tValue = getTValue(alpha / 2, n - 1);
+      marginOfError = tValue * Factor * stdev / Math.sqrt(n);
     }
-    
-    // VB6: xlApp.TInv(alpha, n - 1) * Factor * Stdev / n ^ 0.5
-    const tValue = getTValue(alpha / 2, n - 1);
-    const marginOfError = tValue * Factor * stdev / Math.sqrt(n);
     
     // VB6: LCL = Average - TInv * Factor * Stdev / sqrt(n)
     // VB6: UCL = Average + TInv * Factor * Stdev / sqrt(n)
@@ -1246,14 +1247,9 @@ function calculatePercentile(data, p) {
 // VB6 uses: xlApp.TInv(alpha, n - 1)
 // Excel's TINV returns two-tailed t-value
 function getTValue(p, df) {
-  // t-distribution approximation
-  // For df > 30, use normal approximation
-  if (df > 30) {
-    return normalInv(1 - p);
+  if (typeof ConfidencePrecision !== 'undefined') {
+    return ConfidencePrecision.studentTQuantile(1 - p, df);
   }
-  
-  // For smaller df, use improved approximation
-  // This matches Excel's TINV function more closely
   const z = normalInv(1 - p);
   const g1 = (z * z * z + z) / 4;
   const g2 = (5 * z * z * z * z * z + 16 * z * z * z + 3 * z) / 96;

@@ -4,7 +4,7 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('Loading shared-header.js VERSION 2026-06-02-uniw');
+console.log('Loading shared-header.js VERSION 2026-11-20-controls');
 
 (function () {
   if (typeof Storage === 'undefined' || Storage.prototype.__statisticoOptionalWrite) return;
@@ -815,6 +815,7 @@ const StatisticoHeader = {
     this._installPreviewChartHook();
     this._previewReady = true;
     this._restorePreviewTemplate();
+    this._bindLiveControlAiRefresh();
   },
 
   /**
@@ -1485,10 +1486,10 @@ const StatisticoHeader = {
         'How similar are the groups across location, spread, and shape together?'
       ],
       'qqplot': [
-        'How closely do observed quantiles track the theoretical normal line?',
-        'Are deviations mainly in tails, center, or both?',
-        'Do deviations suggest skewness, heavy tails, or outlier influence?',
-        'Is a normal-theory test/model still acceptable for this variable?'
+        'How closely do the points follow the reference distribution that is selected now?',
+        'Are departures mainly in the tails, the center, or both?',
+        'Does the detrended panel bend, or sit in a cloud around zero?',
+        'Does this reference look usable, or should a different distribution be tried?'
       ],
       'normality': [
         'What do formal normality tests agree on, and where do they differ?',
@@ -10972,6 +10973,9 @@ ${this._overallAiReplyFormat()}`;
         : await this._collectAllViewsViaIframes((done, total, label) => {
             setLabel(`<i class="fa-solid fa-spinner fa-spin"></i><span>${done}/${total} — ${label}</span>`);
           });
+      if (allData && this.currentView === 'qqplot') {
+        allData.qqplot = Object.assign({}, allData.qqplot || {}, this._readQqPlotState(document));
+      }
 
       setLabel('<i class="fa-solid fa-brain fa-spin"></i><span>Thinking…</span>');
 
@@ -11116,9 +11120,7 @@ ${this._overallAiReplyFormat()}`;
     }
 
     if (view === 'qqplot') {
-      const qqRadio = document.querySelector('input[name="plotType"]:checked');
-      d.plotType    = qqRadio?.value || 'qq';
-      d.distribution = val('distributionSelect');
+      Object.assign(d, this._readQqPlotState(document));
     }
 
     if (view === 'boxplot') {
@@ -11406,9 +11408,7 @@ ${this._overallAiReplyFormat()}`;
     }
 
     if (viewId === 'qqplot') {
-      const qqRadio = doc.querySelector('input[name="plotType"]:checked');
-      d.plotType    = qqRadio?.value || 'qq';
-      d.distribution = val('distributionSelect');
+      Object.assign(d, this._readQqPlotState(doc));
     }
 
     if (viewId === 'boxplot') {
@@ -11540,12 +11540,9 @@ ${this._overallAiReplyFormat()}`;
     }
 
     // ── QQ / PP ───────────────────────────────────────────────────────────
-    const qqRadio = document.querySelector('input[name="plotType"]:checked');
-    if (qqRadio || el('distributionSelect')) {
-      out.qqplot = {
-        plotType:     qqRadio?.value || 'qq',
-        distribution: val('distributionSelect')
-      };
+    const qqState = this._readQqPlotState(document);
+    if (document.querySelector('input[name="plotType"], input[name="referenceDistribution"], #distributionSelect')) {
+      out.qqplot = qqState;
     }
 
     return out;
@@ -12057,7 +12054,11 @@ ${this._overallAiReplyFormat()}`;
     if (allData.qqplot) {
       const q = allData.qqplot;
       lines.push('[ QQ/PP Plot ]');
-      lines.push(`  Type: ${q.plotType?.toUpperCase() || 'QQ'}, compared against: ${q.distribution || 'Normal'}`);
+      const referenceName = q.referenceDistribution || q.distribution;
+      lines.push(`  Type: ${q.plotType?.toUpperCase() || 'QQ'}, compared against: ${referenceName || 'the selected reference'}`);
+      if (referenceName && String(referenceName).toLowerCase() !== 'normal') {
+        lines.push(`  Judge this plot against ${referenceName}. Do not describe it as a normal-distribution check.`);
+      }
     }
 
     return lines.join('\n');
@@ -12084,7 +12085,7 @@ ${this._overallAiReplyFormat()}`;
 
       normality: `Controls available: (1) Alpha slider (0.01–0.15) — sets the significance threshold for all six tests simultaneously; drag left for stricter evidence of non-normality, right for more lenient. The gauge and pass/fail counts update in real time. Six tests run in parallel: Shapiro-Wilk, Anderson-Darling, Kolmogorov-Smirnov, Cramér-von Mises, D'Agostino-Pearson, and Jarque-Bera.`,
 
-      qqplot: `Controls available: (1) Plot type radios (QQ / PP) — QQ plot compares quantiles; PP plot compares cumulative probabilities; (2) Distribution dropdown (Normal / Exponential / Uniform / Log-Normal / Gamma / Weibull) — the theoretical distribution to compare against. Points close to the diagonal line indicate a good fit. The detrended panel below shows residuals from the line.`,
+      qqplot: `Controls available: (1) Plot type radios (QQ / PP) — QQ plot compares quantiles; PP plot compares cumulative probabilities; (2) Reference distribution radios (Normal / Exponential / Uniform / Log-Normal / Gamma / Weibull) — the theoretical distribution selected now. Read referenceDistribution from LIVE CONTROLS. Points close to the diagonal support that selected reference. The detrended panel shows residuals from that line. Do not treat the plot as a normal check unless the selected reference is Normal.`,
 
       confidence: `Controls available: (1) Method radios (Classical / Bootstrap) — classical uses t/chi-squared formulas; bootstrap resamples the data; (2) Parameter radios (Mean / Std Dev / Median / Percentile when bootstrap) — what population parameter to estimate; (3) Confidence level selector (90% / 95% / 99%) plus a fine-grained alpha slider; (4) Bootstrap iterations input — higher = more accurate but slower; (5) Optional finite population size — applies finite population correction.`,
 
@@ -12626,6 +12627,9 @@ ${this._localAiReplyFormat()}`;
 
   async _callAiForSidebar(prompt) {
     const PROXY_URL = 'https://statistico-ai.statistico.workers.dev/';
+    this._aiPromptFingerprint = this._aiFingerprint();
+    const controlBlock = this._liveControlBlock();
+    const fullPrompt = controlBlock ? `${prompt}\n\n${controlBlock}` : prompt;
 
     let lastErr = null;
     for (const model of ['openai/gpt-oss-120b', 'openai/gpt-oss-20b']) {
@@ -12646,11 +12650,12 @@ CRITICAL RULES (strictly enforced):
 - Do NOT mention formula names or ratio names (e.g. do not say "CV", "IQR/SD ratio", "skewness value") — describe patterns in plain language
 - Do NOT repeat the same idea across sections
 - Do NOT give UI instructions or mention charts, sliders, or interface elements unless the user prompt explicitly asks for CONTROLS / PATTERNS guidance
+- LIVE CONTROLS in the user message are the settings on screen now. Interpret the result for those settings. Do not substitute a default such as the normal distribution when another reference is selected.
 - "What to Check Next" must use conditional reasoning ("If X, then run Y") — not a plain test list
 - NUMBER FORMAT: report effects, SEs, CIs, Q, τ², and intercepts to 3 decimal places; I² to 1 decimal with %; p-values to 3 decimals (use p < .001 when smaller). Never paste long floating-point tails from JSON.
 
 Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUSION keys over tutorial text. Never wrap the reply in markdown fences.` },
-              { role: 'user',   content: prompt }
+              { role: 'user',   content: fullPrompt }
             ],
             max_tokens: 1200,
             temperature: 0.3
@@ -12711,6 +12716,139 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     return { level: 'moderate', label: 'Moderate' };
   },
 
+  _readQqPlotState(doc) {
+    const root = doc || document;
+    const labels = {
+      normal: 'Normal',
+      exponential: 'Exponential',
+      uniform: 'Uniform',
+      lognormal: 'Log-Normal',
+      gamma: 'Gamma',
+      weibull: 'Weibull'
+    };
+    const plotEl = root.querySelector('input[name="plotType"]:checked');
+    const distEl = root.querySelector('input[name="referenceDistribution"]:checked')
+      || root.querySelector('#distributionSelect');
+    const key = distEl && distEl.value ? String(distEl.value) : null;
+    return {
+      plotType: plotEl && plotEl.value ? plotEl.value : 'qq',
+      distribution: key,
+      referenceDistribution: key ? (labels[key] || key) : null
+    };
+  },
+
+  _controlCaption(el) {
+    if (!el) return '';
+    if (el.id) {
+      const lab = el.ownerDocument.querySelector('label[for="' + (window.CSS && CSS.escape ? CSS.escape(el.id) : el.id) + '"]');
+      if (lab && lab.textContent) return lab.textContent.replace(/\s+/g, ' ').trim().slice(0, 80);
+    }
+    const wrap = el.closest && el.closest('label');
+    if (wrap && wrap.textContent) {
+      const text = wrap.textContent.replace(/\s+/g, ' ').trim();
+      if (text) return text.slice(0, 80);
+    }
+    const aria = el.getAttribute && el.getAttribute('aria-label');
+    if (aria) return aria.trim();
+    if (el.name) return el.name;
+    if (el.id) return el.id;
+    return '';
+  },
+
+  _isChromeControl(el) {
+    if (!el || !el.closest) return true;
+    return !!el.closest('#sbAiOverlay, #sbAiFloatBtn, #sbAiBtn, [data-ai-action], .sb-nav, .sb-ai-float, .header-tabs-stack, #sbUtilities, #sbAiSection, #sbNavFooter, .sb-product-footer');
+  },
+
+  _liveControlLines(doc) {
+    const root = doc || document;
+    const lines = [];
+    const seen = new Set();
+    const push = (line) => {
+      const text = String(line || '').replace(/\s+/g, ' ').trim();
+      if (!text || seen.has(text)) return;
+      seen.add(text);
+      lines.push(text);
+    };
+    root.querySelectorAll('input, select, textarea').forEach((el) => {
+      if (this._isChromeControl(el) || el.disabled) return;
+      const type = String(el.type || '').toLowerCase();
+      if (type === 'hidden' || type === 'file' || type === 'button' || type === 'submit' || type === 'reset') return;
+      if ((type === 'radio' || type === 'checkbox') && !el.checked) return;
+      const caption = this._controlCaption(el);
+      if (!caption) return;
+      let value = el.value == null ? '' : String(el.value);
+      if (el.tagName === 'SELECT' && el.selectedIndex >= 0 && el.options[el.selectedIndex]) {
+        const opt = el.options[el.selectedIndex].textContent.replace(/\s+/g, ' ').trim();
+        if (opt && opt.toLowerCase() !== value.toLowerCase()) value = value + ' (' + opt + ')';
+      }
+      if (type === 'checkbox') value = 'on';
+      if (!value) return;
+      push(caption + ' = ' + value.slice(0, 80));
+    });
+    root.querySelectorAll('button[aria-pressed="true"], button.active, button.is-active').forEach((el) => {
+      if (this._isChromeControl(el)) return;
+      const caption = (el.textContent || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+      if (!caption) return;
+      push(caption.slice(0, 80) + ' = selected');
+    });
+    return lines;
+  },
+
+  _liveControlBlock() {
+    const lines = this._liveControlLines(document);
+    if (!lines.length) return '';
+    const shown = lines.slice(0, 80);
+    const more = lines.length > shown.length ? '\n- (' + (lines.length - shown.length) + ' more controls)' : '';
+    return `LIVE CONTROLS (settings on screen now; they override defaults):
+${shown.map((line) => '- ' + line).join('\n')}${more}
+
+Interpret this view for these settings.
+If a reference distribution is listed, judge the plot against that distribution and quote it in EVIDENCE.
+Do not describe a normal-distribution check unless the selected reference is Normal.
+Do not recommend switching to a setting that is already selected.`;
+  },
+
+  _bindLiveControlAiRefresh() {
+    if (this._liveControlAiBound || typeof document === 'undefined') return;
+    this._liveControlAiBound = true;
+    const onControl = (event) => {
+      const el = event.target;
+      if (!el || this._isChromeControl(el)) return;
+      const tag = String(el.tagName || '').toLowerCase();
+      const type = String(el.type || '').toLowerCase();
+      const isField = tag === 'select' || tag === 'textarea' || (tag === 'input' && type !== 'hidden' && type !== 'file' && type !== 'button');
+      const isToggle = tag === 'button' || !!(el.closest && el.closest('button, [role="radio"], .method-btn, .dist-option, .radio-option'));
+      if (event.type !== 'click' && !isField) return;
+      if (event.type === 'click' && !isToggle) return;
+      if (!document.getElementById('sbAiOverlay')) return;
+      this._scheduleAiControlRefresh();
+    };
+    document.addEventListener('change', onControl, true);
+    document.addEventListener('input', onControl, true);
+    document.addEventListener('click', onControl, true);
+  },
+
+  _scheduleAiControlRefresh(attempt) {
+    const n = attempt || 0;
+    clearTimeout(this._liveControlAiTimer);
+    if (n > 8) return;
+    this._liveControlAiTimer = setTimeout(() => {
+      const overlay = document.getElementById('sbAiOverlay');
+      if (!overlay) return;
+      if (overlay.classList.contains('sb-ai-overlay--overall')) {
+        this.markOpenAiStale();
+        return;
+      }
+      const btn = document.getElementById('sbAiFloatBtn');
+      if (btn && btn.disabled) {
+        this._scheduleAiControlRefresh(n + 1);
+        return;
+      }
+      this._refreshLastAi();
+    }, 650);
+  },
+
   _aiFingerprint() {
     const bits = [this.module, this.currentView, this.variableName, this.sampleSize, this._aiRunNonce || 0];
     if (this.module === 'contingency' && typeof window.__contingencySelectionKey === 'function') {
@@ -12728,13 +12866,14 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
         || '';
       bits.push(String(stored).length + ':' + String(stored).slice(0, 64));
     } catch (_e) {}
+    try { bits.push(this._liveControlLines(document).join(';')); } catch (_e2) {}
     return bits.join('|');
   },
 
   _storeAiCache(scope, sections, meta, view) {
     this._aiCache = this._aiCache || {};
     this._aiCache[scope] = {
-      fingerprint: this._aiFingerprint(),
+      fingerprint: this._aiPromptFingerprint || this._aiFingerprint(),
       sections,
       meta,
       view,
@@ -12963,6 +13102,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     if (this._aiForceRefresh) return false;
     const cache = this._readAiCache(scope);
     if (!cache || !cache.sections) return false;
+    if (cache.stale) return false;
     if (scope === 'local' && cache.view && fallbackView && cache.view !== fallbackView) return false;
     this._showAiOverlay(
       cache.sections,
@@ -13026,6 +13166,9 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
     const allowHtml = !!meta?.ruleBased;
     const scope = mode === 'full' ? 'overall' : 'local';
     if (sections && !sections.error && !meta?.fromCache) this._storeAiCache(scope, sections, meta, view);
+    if (!meta?.fromCache && this._aiPromptFingerprint && this._aiPromptFingerprint !== this._aiFingerprint()) {
+      this._scheduleAiControlRefresh();
+    }
     const stale = !!meta?.stale;
 
     const card = (cls, label, html, icon) => this._aiSectionCard(cls, label, html, icon);

@@ -8094,6 +8094,8 @@ const StatisticoHeader = {
     const nodes = [...pane.querySelectorAll('.chart-panel, .chart-wrap, .boxplot-panel, #histogram-panel')];
     return nodes.filter((chart) => {
       if (!pane.contains(chart) || chart === pane) return false;
+      /* Histogram sizes itself in fitLayout. Collapsing it here clips the plot. */
+      if (chart.id === 'histogram-panel') return false;
       if (nodes.some((other) => other !== chart && other.contains(chart))) return false;
       if (chart.closest('.sb-nav, .modal, .vg-overlay')) return false;
       const h = chart.getBoundingClientRect().height;

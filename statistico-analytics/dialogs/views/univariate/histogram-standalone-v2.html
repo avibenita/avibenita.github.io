@@ -42,9 +42,9 @@
   
   <!-- Shared Header -->
   <!-- build: 20260519u -->
-  <link rel="stylesheet" href="../shared-header.css?v=20261120dock1">
+  <link rel="stylesheet" href="../shared-header.css?v=20261120hist1">
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261120dock1"></script>
+  <script src="../shared-header.js?v=20261120hist1"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1395,14 +1395,14 @@
     }
 
     function getHistogramChartHeight() {
-      const chartEl = document.getElementById('histogram-chart');
-      if (!chartEl) return 360;
-      const panelBody = chartEl.closest('.panel-body');
-      if (!panelBody) return Math.max(260, chartEl.clientHeight || 360);
-      const controls = panelBody.querySelector('.controls');
+      const panel = document.getElementById('histogram-panel');
+      if (!panel) return 360;
+      const heading = panel.querySelector('.panel-heading');
+      const controls = panel.querySelector('.controls');
+      const headingH = heading ? heading.offsetHeight : 0;
       const controlsH = controls ? controls.offsetHeight : 0;
-      const bodyH = panelBody.clientHeight || chartEl.parentElement.clientHeight || 0;
-      return Math.max(220, bodyH - controlsH - 16);
+      const panelH = panel.getBoundingClientRect().height;
+      return Math.max(180, Math.floor(panelH - headingH - controlsH - 24));
     }
 
     function fitLayout() {
@@ -1413,10 +1413,29 @@
       container.style.height = '';
       container.style.width = '';
       const chartPanel = document.getElementById('histogram-panel');
-      if (chartPanel) chartPanel.style.height = '';
       const chartEl = document.getElementById('histogram-chart');
+      if (chartPanel) {
+        const paneRect = container.getBoundingClientRect();
+        const top = chartPanel.getBoundingClientRect().top;
+        const footer = container.querySelector('.statistico-footer');
+        const footerH = footer ? footer.offsetHeight : 0;
+        const pad = parseFloat(getComputedStyle(container).paddingBottom) || 0;
+        const available = paneRect.bottom - top - footerH - pad;
+        if (available > 180) {
+          const px = Math.floor(available) + 'px';
+          chartPanel.style.setProperty('height', px, 'important');
+          chartPanel.style.setProperty('max-height', px, 'important');
+          chartPanel.style.setProperty('min-height', '0', 'important');
+          chartPanel.style.setProperty('flex', '0 0 auto', 'important');
+          chartPanel.style.setProperty('overflow', 'hidden', 'important');
+        }
+      }
       const chartH = getHistogramChartHeight();
-      if (chartEl) chartEl.style.height = chartH + 'px';
+      if (chartEl) {
+        chartEl.style.setProperty('height', chartH + 'px', 'important');
+        chartEl.style.setProperty('max-height', 'none', 'important');
+        chartEl.style.setProperty('min-height', '0', 'important');
+      }
 
       requestAnimationFrame(function () {
         if (histogramChart && histogramChart.setSize) {

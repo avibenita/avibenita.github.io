@@ -80,22 +80,38 @@
     /* Override responsive panel for controls */
     .controls-panel {
       flex: 0 0 auto !important; /* Don't grow - fixed height */
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      overflow: visible !important;
     }
     
     .controls-panel .responsive-panel-body {
       display: flex;
-      gap: 20px;
+      flex-direction: row !important;
+      gap: 64px;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      padding: 8px 12px !important; /* Compact controls */
+      padding: 4px 48px 8px 4px !important;
       flex: 0 0 auto !important; /* Don't grow */
+      overflow: visible !important;
     }
 
     .plot-type-group {
       display: flex;
       gap: 12px;
       align-items: center;
+      flex: 0 0 auto;
+    }
+
+    .dist-family {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex: 0 0 auto;
+      margin-left: auto;
     }
 
     .radio-option {
@@ -143,44 +159,124 @@
       font-size: 10px;
     }
 
-    .distribution-select {
-      padding: 8px 12px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+    .dist-option {
+      display: grid;
+      grid-template-columns: auto auto;
+      grid-template-rows: auto auto;
+      column-gap: 6px;
+      row-gap: 1px;
+      align-items: center;
+      padding: 4px 8px 5px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 6px;
-      color: var(--text-primary);
-      font-size: 13px;
       cursor: pointer;
-      min-width: 150px;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
     }
 
-    .distribution-select:focus {
-      outline: none;
+    .dist-option:hover {
+      background: rgba(255, 255, 255, 0.08);
       border-color: var(--accent-1);
     }
 
-    .distribution-select option {
-      background: var(--surface-1);
+    .dist-option.active {
+      background: rgba(255, 165, 120, 0.15);
+      border-color: var(--accent-1);
       color: var(--text-primary);
+    }
+
+    .dist-option input[type="radio"] {
+      grid-row: 1 / span 2;
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: var(--accent-1);
+    }
+
+    .dist-icon {
+      grid-column: 2;
+      grid-row: 1;
+      width: 36px;
+      height: 20px;
+      justify-self: center;
+      display: block;
+      color: var(--text-muted);
+    }
+
+    .dist-option.active .dist-icon {
+      color: var(--accent-1);
+    }
+
+    .dist-base {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1;
+      opacity: 0.4;
+    }
+
+    .dist-curve,
+    .dist-icon rect {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .dist-name {
+      grid-column: 2;
+      grid-row: 2;
+      justify-self: center;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    :root[data-theme="light"] .radio-option,
+    :root[data-theme="light"] .dist-option {
+      background: #ffffff;
+      border-color: #cbd5e1;
+    }
+
+    :root[data-theme="light"] .radio-option:hover,
+    :root[data-theme="light"] .dist-option:hover {
+      background: #f8fafc;
+      border-color: var(--accent-1);
+    }
+
+    :root[data-theme="light"] .radio-option.active,
+    :root[data-theme="light"] .dist-option.active {
+      background: rgba(37, 99, 235, 0.08);
+      border-color: var(--accent-1);
     }
 
     /* Charts Grid - Side by side layout */
     .charts-grid {
       display: flex;
       flex-direction: column;  /* stacked vertically */
+      align-items: center;
       gap: 8px;
       flex: 1 1 auto;
       overflow: hidden;
       min-height: 0;
+      width: 100%;
     }
 
-    /* Chart Panel - work with responsive layout */
+    /* Chart panels are narrower than the dialog and centered */
     .chart-panel {
-      flex: 1 1 0;           /* ? each takes equal half-width */
+      flex: 1 1 0;
       display: flex;
       flex-direction: column;
       min-height: 0;
       overflow: hidden;
+      width: min(840px, 70%);
+      max-width: 840px;
+      align-self: center;
+      border: none !important;
+      box-shadow: none !important;
     }
 
     .chart-panel .responsive-panel-heading {
@@ -263,7 +359,8 @@
     /* Panel card */
     .responsive-panel {
       background: var(--surface-1);
-      border: 1px solid var(--border);
+      border: none;
+      box-shadow: none;
       border-radius: 8px;
       display: flex;
       flex-direction: column;
@@ -318,7 +415,7 @@
     <!-- Controls Panel -->
     <div class="responsive-panel controls-panel">
       <div class="responsive-panel-body">
-        <div class="plot-type-group">
+        <div class="plot-type-group" role="radiogroup" aria-label="Plot type">
           <label class="radio-option active" id="radioQQ">
             <input type="radio" name="plotType" value="qq" checked onchange="switchPlotType('qq')">
             <span class="radio-label">
@@ -334,18 +431,39 @@
               <small>Probability-Probability</small>
             </span>
           </label>
-      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-        
-        
-          <label for="distributionSelect" style="color: var(--text-muted); font-size: 12px; margin-right: 8px;">Distribution:</label>
-          <select id="distributionSelect" class="distribution-select" onchange="switchDistribution()">
-            <option value="normal" selected>Normal</option>
-            <option value="exponential">Exponential</option>
-            <option value="uniform">Uniform</option>
-            <option value="lognormal">Log-Normal</option>
-            <option value="gamma">Gamma</option>
-            <option value="weibull">Weibull</option>
-          </select>
+        </div>
+
+        <div class="dist-family" role="radiogroup" aria-label="Distribution">
+          <label class="dist-option active" data-value="normal">
+            <input type="radio" name="referenceDistribution" value="normal" checked onchange="switchDistribution('normal')">
+            <svg class="dist-icon" viewBox="0 0 44 24" aria-hidden="true"><path class="dist-base" d="M3 21 H41"/><path class="dist-curve" d="M3 21 C9 21 11 20 14 15 C17 8 19 3 22 3 C25 3 27 8 30 15 C33 20 35 21 41 21"/></svg>
+            <span class="dist-name">Normal</span>
+          </label>
+          <label class="dist-option" data-value="exponential">
+            <input type="radio" name="referenceDistribution" value="exponential" onchange="switchDistribution('exponential')">
+            <svg class="dist-icon" viewBox="0 0 44 24" aria-hidden="true"><path class="dist-base" d="M3 21 H41"/><path class="dist-curve" d="M4 4 C8 4 11 7 15 12 C19 17 25 21 41 21"/></svg>
+            <span class="dist-name">Exponential</span>
+          </label>
+          <label class="dist-option" data-value="uniform">
+            <input type="radio" name="referenceDistribution" value="uniform" onchange="switchDistribution('uniform')">
+            <svg class="dist-icon" viewBox="0 0 44 24" aria-hidden="true"><path class="dist-base" d="M3 21 H41"/><rect x="8" y="6" width="28" height="14" rx="1"/></svg>
+            <span class="dist-name">Uniform</span>
+          </label>
+          <label class="dist-option" data-value="lognormal">
+            <input type="radio" name="referenceDistribution" value="lognormal" onchange="switchDistribution('lognormal')">
+            <svg class="dist-icon" viewBox="0 0 44 24" aria-hidden="true"><path class="dist-base" d="M3 21 H41"/><path class="dist-curve" d="M3 21 C6 21 7 17 9 11 C11 5 14 3 16 6 C19 11 26 19 41 21"/></svg>
+            <span class="dist-name">Log-Normal</span>
+          </label>
+          <label class="dist-option" data-value="gamma">
+            <input type="radio" name="referenceDistribution" value="gamma" onchange="switchDistribution('gamma')">
+            <svg class="dist-icon" viewBox="0 0 44 24" aria-hidden="true"><path class="dist-base" d="M3 21 H41"/><path class="dist-curve" d="M3 21 C8 21 10 17 13 12 C16 6 19 4 22 7 C26 12 33 19 41 21"/></svg>
+            <span class="dist-name">Gamma</span>
+          </label>
+          <label class="dist-option" data-value="weibull">
+            <input type="radio" name="referenceDistribution" value="weibull" onchange="switchDistribution('weibull')">
+            <svg class="dist-icon" viewBox="0 0 44 24" aria-hidden="true"><path class="dist-base" d="M3 21 H41"/><path class="dist-curve" d="M3 21 C10 21 14 19 17 13 C19 8 22 4 26 4 C30 4 32 9 34 14 C36 19 38 21 41 21"/></svg>
+            <span class="dist-name">Weibull</span>
+          </label>
         </div>
       </div>
     </div>
@@ -383,10 +501,11 @@
       const availH  = (frame.clientHeight || window.innerHeight) - headerH;
 
       const container = document.getElementById('results-container');
-      const frameW = frame.clientWidth || window.innerWidth;
+      const rightCol = document.querySelector('.right-col');
+      const frameW = (rightCol && rightCol.clientWidth) || frame.clientWidth || window.innerWidth;
       if (container) {
         container.style.height = availH + 'px';
-        container.style.width  = frameW + 'px';  // explicit: bypasses flex-cache width issue
+        container.style.width  = frameW + 'px';
       }
 
       // Controls panel (fixed height)
@@ -720,9 +839,24 @@
       }
     }
 
+    const DISTRIBUTION_LABELS = {
+      normal: 'Normal',
+      exponential: 'Exponential',
+      uniform: 'Uniform',
+      lognormal: 'Log-Normal',
+      gamma: 'Gamma',
+      weibull: 'Weibull'
+    };
+
     // Switch distribution
-    function switchDistribution() {
-      currentDistribution = document.getElementById('distributionSelect').value;
+    function switchDistribution(value) {
+      currentDistribution = value || currentDistribution;
+      document.querySelectorAll('.dist-option').forEach(function (el) {
+        const input = el.querySelector('input');
+        const on = !!(input && input.value === currentDistribution);
+        el.classList.toggle('active', on);
+        if (input) input.checked = on;
+      });
       updateChartTitle();
       
       // Only create charts if data is ready
@@ -734,7 +868,7 @@
     // Update chart title
     function updateChartTitle() {
       const plotTypeLabel = currentPlotType.toUpperCase();
-      const distLabel = currentDistribution.charAt(0).toUpperCase() + currentDistribution.slice(1);
+      const distLabel = DISTRIBUTION_LABELS[currentDistribution] || currentDistribution;
       document.getElementById('chartTitle').textContent = `${plotTypeLabel} Plot - ${distLabel} Distribution`;
     }
 

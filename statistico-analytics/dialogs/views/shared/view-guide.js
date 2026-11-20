@@ -247,8 +247,8 @@
       'PP / QQ plot',
       'Compares the sample with a reference distribution. QQ compares quantiles. PP compares cumulative probabilities.',
       [
-        'QQ Plot and PP Plot are the two choices, with Quantile-Quantile and Probability-Probability written under the names.',
-        'Distribution chooses the reference: Normal, Exponential, Uniform, Log-Normal, Gamma, or Weibull.'
+        'QQ Plot and PP Plot are the two choices on the left, with Quantile-Quantile and Probability-Probability written under the names.',
+        'The reference distribution is the radio row on the right. Each option shows its shape: Normal, Exponential, Uniform, Log-Normal, Gamma, or Weibull.'
       ],
       [
         'On the main chart, points near the diagonal support that reference. A bend in the tails, or a curve through the middle, is the usual sign of a poor match.',

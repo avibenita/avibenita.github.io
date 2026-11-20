@@ -7896,6 +7896,210 @@ const StatisticoHeader = {
     this._installPreviewChartHook();
     this._previewReady = true;
     this._restorePreviewTemplate();
+    this._installResultsFit();
+  },
+
+  /* Fit each module view to the right column. Shrink a chart to absorb a
+     small overflow. Keep a vertical scrollbar only when the remaining
+     report (tables, many sections) cannot fit. */
+  _installResultsFit() {
+    if (this._resultsFitInstalled) {
+      this._fitResultsToOneView();
+      return;
+    }
+    this._resultsFitInstalled = true;
+    this._fitResultsToOneView();
+    [120, 400, 900, 1600, 2800, 4500].forEach((ms) => {
+      setTimeout(() => { try { this._fitResultsToOneView(); } catch (_e) {} }, ms);
+    });
+    window.addEventListener('resize', () => {
+      if (this._resultsFitTimer) clearTimeout(this._resultsFitTimer);
+      this._resultsFitTimer = setTimeout(() => this._fitResultsToOneView(), 60);
+    });
+    const right = document.querySelector('.right-col');
+    if (right && typeof MutationObserver !== 'undefined') {
+      const obs = new MutationObserver(() => {
+        if (this._resultsFitTimer) clearTimeout(this._resultsFitTimer);
+        this._resultsFitTimer = setTimeout(() => this._fitResultsToOneView(), 80);
+      });
+      obs.observe(right, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden'] });
+    }
+  },
+
+  _fitResultsToOneView() {
+    const right = document.querySelector('.right-col');
+    if (!right || right.clientHeight < 80) return;
+    const panes = this._resultsFitPanes(right);
+    panes.forEach((pane) => this._compressResultsPane(pane, right));
+    if (window.Highcharts && Array.isArray(Highcharts.charts)) {
+      Highcharts.charts.forEach((chart) => {
+        try { if (chart && chart.reflow) chart.reflow(); } catch (_e) {}
+      });
+    }
+  },
+
+  _resultsFitPanes(right) {
+    const sel = '.results-container, #results-container, .responsive-container, :scope > .container, .view-container, .tab-panel.active, .content, .view-wrap, .res-workspace, .card-body';
+    const found = [];
+    right.querySelectorAll(sel).forEach((el) => {
+      if (found.indexOf(el) === -1) found.push(el);
+    });
+    return found.filter((el) => this._isMainResultsPane(el, right));
+  },
+
+  _isMainResultsPane(el, right) {
+    if (!el || el.closest('.sb-nav, .vg-overlay, .sb-ai-overlay, .modal, .custom-dialog-overlay, .power-overlay')) return false;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    if (!el.getClientRects().length) return false;
+    /* The window bar sits on the pane that fills the column, not an inner table. */
+    if (el.clientHeight < right.clientHeight * 0.5) return false;
+    return true;
+  },
+
+  _compressResultsPane(pane, right) {
+    const overflow = () => pane.scrollHeight - pane.clientHeight;
+    const charts = this._shrinkableCharts(pane);
+    const flexHost = pane.matches('.results-container, #results-container, .responsive-container, .container');
+    if (charts.length && flexHost && getComputedStyle(pane).display !== 'flex') {
+      pane.style.setProperty('display', 'flex', 'important');
+      pane.style.setProperty('flex-direction', 'column', 'important');
+      pane.style.setProperty('min-height', '0', 'important');
+      pane.style.setProperty('gap', '6px', 'important');
+    }
+    if (flexHost) {
+      pane.querySelectorAll(':scope > .stats-cards-panel, :scope > .controls-panel, :scope > .method-panel, :scope > .config-panel, :scope > .config-section, :scope > .statistico-footer').forEach((child) => {
+        child.style.setProperty('flex', '0 0 auto', 'important');
+        child.style.setProperty('margin-bottom', '0', 'important');
+      });
+    }
+    charts.forEach((chart) => {
+      chart.style.setProperty('flex', '1 1 auto', 'important');
+      chart.style.setProperty('min-height', '0', 'important');
+      chart.style.setProperty('height', 'auto', 'important');
+      chart.style.setProperty('overflow', 'hidden', 'important');
+      chart.style.setProperty('margin-bottom', '0', 'important');
+    });
+
+    let extra = overflow();
+    const floor = 140;
+    if (extra > 2 && charts.length) {
+      const room = charts.reduce((sum, chart) => sum + Math.max(0, chart.getBoundingClientRect().height - floor), 0);
+      if (room >= extra - 2) {
+        let left = extra + 2;
+        charts.forEach((chart) => {
+          if (left <= 0) return;
+          const h = chart.getBoundingClientRect().height;
+          const give = Math.min(left, Math.max(0, h - floor));
+          if (give > 0) {
+            chart.style.setProperty('flex', '0 0 auto', 'important');
+            chart.style.setProperty('height', Math.max(floor, Math.floor(h - give)) + 'px', 'important');
+            left -= give;
+          }
+        });
+      }
+    }
+
+    extra = overflow();
+    if (extra > 2 && extra <= 160) {
+      pane.style.setProperty('padding-top', '4px', 'important');
+      pane.style.setProperty('padding-bottom', '2px', 'important');
+      pane.style.setProperty('gap', '4px', 'important');
+      [...pane.children].forEach((child) => {
+        if (!child || child.nodeType !== 1) return;
+        const pos = getComputedStyle(child).position;
+        if (pos === 'fixed' || pos === 'absolute') return;
+        child.style.setProperty('margin-top', '0', 'important');
+        child.style.setProperty('margin-bottom', '0', 'important');
+      });
+      extra = overflow();
+    }
+
+    extra = overflow();
+    if (extra > 2 && extra <= 240) {
+      const blocks = [...pane.children].filter((child) => {
+        if (!child || child.nodeType !== 1 || child.offsetHeight < 40) return false;
+        const pos = getComputedStyle(child).position;
+        if (pos === 'fixed' || pos === 'absolute') return false;
+        return child.matches('.results-grid, .visual-output, .chart-wrap, .chart-panel, .boxplot-panel, #main-content, .results-section')
+          || !!child.querySelector('.highcharts-container, canvas, .chart-container, .chart-wrap');
+      });
+      const target = blocks.sort((a, b) => b.offsetHeight - a.offsetHeight)[0];
+      const floorBlock = 150;
+      if (target && target.offsetHeight - floorBlock >= extra) {
+        target.style.setProperty('height', Math.max(floorBlock, Math.floor(target.offsetHeight - extra - 4)) + 'px', 'important');
+        target.style.setProperty('min-height', '0', 'important');
+        target.style.setProperty('overflow', 'hidden', 'important');
+        target.style.setProperty('flex', '1 1 auto', 'important');
+      }
+    }
+
+    const shell = document.querySelector('.right-col .statistico-shell');
+    if (shell) shell.style.setProperty('margin-bottom', '0', 'important');
+
+    if (charts.length && this._fitChartIntoPane(pane, charts[0])) {
+      pane.classList.remove('results-fit-scroll');
+      pane.style.setProperty('overflow-x', 'hidden', 'important');
+      pane.style.setProperty('overflow-y', 'hidden', 'important');
+      return;
+    }
+
+    if (overflow() <= 2) {
+      pane.classList.remove('results-fit-scroll');
+      pane.style.setProperty('overflow-x', 'hidden', 'important');
+      pane.style.setProperty('overflow-y', 'hidden', 'important');
+      return;
+    }
+
+    /* The summary and plot could not absorb the extra height. A long
+       table or multi-section report still needs the bar. */
+    pane.classList.add('results-fit-scroll');
+    pane.style.setProperty('overflow-x', 'hidden', 'important');
+    pane.style.setProperty('overflow-y', 'auto', 'important');
+  },
+
+  _fitChartIntoPane(pane, chart) {
+    if (!pane || !chart) return false;
+    const paneRect = pane.getBoundingClientRect();
+    const chartRect = chart.getBoundingClientRect();
+    let below = 0;
+    let sib = chart.nextElementSibling;
+    while (sib) {
+      const pos = getComputedStyle(sib).position;
+      if (pos !== 'absolute' && pos !== 'fixed') below += sib.offsetHeight;
+      sib = sib.nextElementSibling;
+    }
+    const padBottom = parseFloat(getComputedStyle(pane).paddingBottom) || 0;
+    const available = pane.clientHeight - (chartRect.top - paneRect.top) - below - padBottom;
+    if (available < 120) return false;
+    const px = Math.floor(available) + 'px';
+    chart.style.setProperty('height', px, 'important');
+    chart.style.setProperty('max-height', px, 'important');
+    chart.style.setProperty('min-height', '0', 'important');
+    chart.style.setProperty('flex', '0 0 auto', 'important');
+    chart.style.setProperty('overflow', 'hidden', 'important');
+    chart.style.setProperty('margin', '0', 'important');
+    const inner = chart.querySelector('.chart-container, #histogram-chart');
+    if (inner) {
+      inner.style.setProperty('height', '100%', 'important');
+      inner.style.setProperty('max-height', '100%', 'important');
+      inner.style.setProperty('min-height', '0', 'important');
+    }
+    return true;
+  },
+
+  _shrinkableCharts(pane) {
+    const nodes = [...pane.querySelectorAll('.chart-panel, .chart-wrap, .boxplot-panel, #histogram-panel')];
+    return nodes.filter((chart) => {
+      if (!pane.contains(chart) || chart === pane) return false;
+      if (nodes.some((other) => other !== chart && other.contains(chart))) return false;
+      if (chart.closest('.sb-nav, .modal, .vg-overlay')) return false;
+      const h = chart.getBoundingClientRect().height;
+      if (h < 80) return false;
+      const scrollParent = chart.parentElement && chart.parentElement.closest('.table-wrap, .modal-content');
+      if (scrollParent && pane.contains(scrollParent)) return false;
+      return true;
+    });
   },
 
   _isValidRegressionNavPayload(payload) {
@@ -12964,6 +13168,7 @@ window.updateUniFilterButtonState = function () { StatisticoHeader.updateUniFilt
 // Auto-initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
   console.log('✅ StatisticoHeader loaded and ready');
+  try { StatisticoHeader._installResultsFit(); } catch (_e) {}
 
   // Recovery: if logistic results page inline script crashed, reload from v3
   (function _logisticRecovery() {

@@ -521,6 +521,11 @@
     if (typeof globalThis !== 'undefined') {
       globalThis.__byGroupStandardContext = ctx || null;
     }
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('statisticoGroupContext', JSON.stringify(ctx || { available: false }));
+      }
+    } catch (_e) {}
     return ctx;
   }
 

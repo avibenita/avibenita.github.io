@@ -10450,6 +10450,8 @@ ${this._localAiReplyFormat()}`;
     try {
       this._lastAiMeta = null;
       const payload = this._getIndependentAiPayload();
+      const repeated = payload && payload.analysis && /repeated/i.test(String(payload.analysis.module || ''));
+      if (this._showRuleAssessment(repeated ? 'repeated' : 'independent', payload, this.currentView)) return;
       const browsedViews = this._independentFullAnalysisViews(payload);
       for (let i = 0; i < browsedViews.length; i += 1) {
         const label = browsedViews[i];
@@ -10680,6 +10682,25 @@ ${this._localAiReplyFormat()}`;
     return value;
   },
 
+  _ruleModuleRequest() {
+    const moduleName = this.module;
+    try {
+      if (moduleName === 'logistic' && typeof window.buildAIPayload === 'function') return { kind: 'logistic', payload: window.buildAIPayload(), view: 'logistic' };
+      if (moduleName === 'anova' && window._bundle) return { kind: 'anova', payload: window._bundle, view: 'anova' };
+      if (moduleName === 'regression') {
+        const session = window._regCaseSession;
+        const comparison = session && typeof session.state === 'function' ? session.state().comparison : null;
+        return { kind: 'regression', payload: { results: window.regressionResultsForAI || window.regressionResults, temporaryRefit: comparison && comparison.payload }, view: 'regression' };
+      }
+      if (moduleName === 'pca' && window.__pcaResult) return { kind: 'pca', payload: window.__pcaResult, view: 'pca' };
+      if (moduleName === 'capability' && typeof window.buildAIPayload === 'function') return { kind: 'capability', payload: window.buildAIPayload(), view: 'capability' };
+      if (moduleName === 'power' && window.currentPowerResults) return { kind: 'power', payload: window.currentPowerResults, view: 'power' };
+      if ((moduleName === 'dependent' || moduleName === 'repeated') && typeof window.buildAIPayload === 'function') return { kind: 'repeated', payload: window.buildAIPayload(), view: moduleName };
+      if (moduleName === 'reliability' && window.__reliabilityBundle) return { kind: 'reliability', payload: window.__reliabilityBundle.aiPackage || window.__reliabilityBundle, view: 'reliability' };
+    } catch (_) {}
+    return null;
+  },
+
   _moduleOverallSources() {
     const sources = [];
     const take = (label, value) => {
@@ -10787,6 +10808,8 @@ ${this._overallAiReplyFormat()}`;
     }
     setBusy(true);
     try {
+      const rule = this._ruleModuleRequest();
+      if (rule && this._showRuleAssessment(rule.kind, rule.payload, rule.view)) return;
       const prompt = this._buildModuleOverallPrompt();
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
       const raw = await this._callAiForSidebar(prompt);
@@ -10926,6 +10949,8 @@ ${this._overallAiReplyFormat()}`;
     }
     setBusy(true);
     try {
+      const source = this._contingencyOverallSource();
+      if (source.payload && this._showRuleAssessment('contingency', source.payload, this.currentView)) return;
       const prompt = this._buildContingencyOverallPrompt();
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
       const raw = await this._callAiForSidebar(prompt);
@@ -10991,6 +11016,14 @@ ${this._overallAiReplyFormat()}`;
           typeof window.buildFactorSuitabilityAiPrompt === 'function') {
         prompt = window.buildFactorSuitabilityAiPrompt();
       } else {
+        if (this.module === 'correlations' && this._ix()) {
+          const built = this._ix().buildKnownModuleAssessment('correlations', this._collectAllCorrelationViewsData());
+          if (built) {
+            this._lastAiMeta = built.meta;
+            this._showAiOverlay(built.sections, viewKey, 'per-view', built.meta);
+            return;
+          }
+        }
         prompt = this.module === 'correlations'
           ? this._buildCorrelationStructuredPrompt(viewKey, 'per-view')
           : this.module === 'univariate'
@@ -11039,6 +11072,15 @@ ${this._overallAiReplyFormat()}`;
         allData.qqplot = Object.assign({}, allData.qqplot || {}, this._readQqPlotState(document));
       }
 
+      if (this.module === 'correlations' && this._ix() && allData) {
+        const built = this._ix().buildKnownModuleAssessment('correlations', allData);
+        if (built) {
+          this._lastAiMeta = built.meta;
+          this._showAiOverlay(built.sections, this.currentView, 'full', built.meta);
+          return;
+        }
+      }
+
       if (this.module === 'univariate' && this._ix()) {
         const built = this._ix().buildUnivariateAssessment(this._univariateInput(allData));
         this._lastAiMeta = built.meta;
@@ -11085,17 +11127,26 @@ ${this._overallAiReplyFormat()}`;
     }
   },
 
+  _readJsonStore(key) {
+    try {
+      const raw = sessionStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+
   _univariateInput(collected) {
     const ix = this._ix();
-    const groups = globalThis.__byGroupStandardContext;
-    const groupInput = groups && groups.status
-      ? {
-          status: 'completed',
-          summary: [groups.status.label, groups.status.hint, groups.differsText].filter(Boolean).join('. '),
-          descriptive: !groups.status || groups.status.descriptive !== false
-        }
-      : { status: 'not_run', reason: 'No grouping variable was analysed, so there is no group-consistency finding.' };
-    const hypothesis = (typeof window !== 'undefined' && window.currentHypothesisResults) || null;
+    const liveGroups = globalThis.__byGroupStandardContext || this._readJsonStore('statisticoGroupContext');
+    const groupInput = ix && typeof ix.groupsFromContext === 'function'
+      ? ix.groupsFromContext(liveGroups)
+      : { status: 'unavailable', reason: 'the comparison result was not supplied.' };
+    const liveHypothesis = (typeof window !== 'undefined' && (window.currentTestResults || window.currentHypothesisResults))
+      || this._readJsonStore('univariateHypothesisResults');
+    const hypothesis = ix && typeof ix.hypothesisFromRecord === 'function'
+      ? (ix.hypothesisFromRecord(liveHypothesis) || { status: 'unavailable', reason: 'No completed reference-value test is available for this assessment.' })
+      : liveHypothesis;
     const input = {
       stored: this._readStoredUnivariate(),
       descriptives: this._getUnivariateDescriptives(),
@@ -11104,6 +11155,18 @@ ${this._overallAiReplyFormat()}`;
       hypothesis: hypothesis
     };
     return ix ? ix.assembleUnivariateInput(input) : input;
+  },
+
+  _showRuleAssessment(kind, payload, view) {
+    const ix = this._ix();
+    if (!ix || typeof ix.buildKnownModuleAssessment !== 'function') return false;
+    let built = null;
+    try { built = ix.buildKnownModuleAssessment(kind, payload); } catch (_) { built = null; }
+    if (!built || !built.sections) return false;
+    this._lastAiMeta = built.meta;
+    this._lastAiInvoke = { mode: 'full', kind: kind };
+    this._showAiOverlay(built.sections, view || this.currentView, 'full', built.meta);
+    return true;
   },
 
   _getUnivariateDescriptives() {

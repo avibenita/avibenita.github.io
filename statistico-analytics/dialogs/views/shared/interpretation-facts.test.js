@@ -70,7 +70,8 @@ describe('Univariate overall assessment', () => {
     expect(text).toMatch(/evidence of departure from normality/i);
     expect(text).toMatch(/not independent confirmations/i);
     expect(text).toMatch(/does not establish normality/i);
-    expect(text).toMatch(/pass\/fail count does not match/i);
+    expect(text).toMatch(/pass\/fail tally does not agree/i);
+    expect(text).not.toMatch(/stored count was not used|stale aggregate/i);
   });
 
   test('an unresolved normality conflict is named and not invented away', () => {
@@ -118,7 +119,7 @@ describe('Univariate overall assessment', () => {
   test('already computed results are included when their views were not opened', () => {
     const text = textOf(Object.assign({}, screenshot, { openedViews: [] }));
     expect(text).toMatch(/\[42\.02, 48\.19\]/);
-    expect(text).toMatch(/skewness = 0\.094/i);
+    expect(text).toMatch(/Skewness of 0\.094/);
   });
 
   test('interval labels follow method, level, parameter, and side', () => {
@@ -266,5 +267,113 @@ describe('module distinctions', () => {
     const text = facts.assessmentPlainText(facts.buildUnivariateAssessment(input));
     expect(text).toMatch(/\[42\.02, 48\.19\]/);
     expect(text).toMatch(/evidence of departure/i);
+  });
+
+  test('missing group and hypothesis results are not described as not run', () => {
+    const input = facts.assembleUnivariateInput({
+      stored: {
+        column: 'Ages',
+        descriptive: { n: 121, mean: 45.107, stdDev: 12, median: 44, min: 18, max: 80, skewness: 0.094, q1: 30, q3: 62 },
+        rowFilterActive: true,
+        sourceRowsAll: new Array(130),
+        sourceRows: new Array(121),
+        missingCount: 4
+      }
+    });
+    const text = facts.assessmentPlainText(facts.buildUnivariateAssessment(input));
+    expect(text).toMatch(/median|quartiles/i);
+    expect(text).toMatch(/standard deviation is 12/i);
+    expect(text).toMatch(/range is 18 to 80/i);
+    expect(text).toMatch(/4 missing/);
+    expect(text).toMatch(/9 excluded/);
+    expect(text).toMatch(/not supplied|not available/i);
+    expect(text).not.toMatch(/has not been run/i);
+    expect(text).toMatch(/mean and the median are close/i);
+  });
+
+  test('a completed hypothesis record survives leaving the hypothesis view', () => {
+    const record = facts.hypothesisFromRecord({
+      testType: 'One-sample t', method: 'classical', parameter: 'mean', h0Value: 40, orientation: 'two-sided', testStat: 2.4, pValue: 0.018, alpha: 0.05
+    });
+    const text = facts.assessmentPlainText(facts.buildUnivariateAssessment(Object.assign({}, screenshot, { hypothesis: record })));
+    expect(text).toMatch(/One-sample t/);
+    expect(text).toMatch(/40/);
+    expect(text).toMatch(/classical/);
+    expect(text).toMatch(/p = \.018/);
+    expect(text).not.toMatch(/No reference-value test was run/);
+  });
+
+  test('module assessments quote the computed payload', () => {
+    const logistic = facts.assessmentPlainText(facts.buildKnownModuleAssessment('logistic', {
+      outcome: { name: 'Admit', eventLevel: 'yes', nonEventLevel: 'no' },
+      fit: { observations: 200, events: 40, auc: 0.81 },
+      coefficients: [{ name: 'Score', inModel: true, oddsRatio: 1.4, orCi95: [1.1, 1.8], p: 0.01, reference: null }],
+      classificationAtThreshold: { threshold: '0.50' }
+    }));
+    expect(logistic).toMatch(/event level yes/i);
+    expect(logistic).toMatch(/not a risk/i);
+    expect(logistic).toMatch(/Score/);
+    expect(logistic).toMatch(/Rule-based|association/i);
+    const reversed = facts.assessmentPlainText(facts.buildKnownModuleAssessment('logistic', {
+      outcome: { eventLevel: 'no', nonEventLevel: 'yes' }, fit: { observations: 10, events: 3 }, coefficients: []
+    }));
+    expect(reversed).toMatch(/event level no/i);
+
+    const means = facts.assessmentPlainText(facts.buildKnownModuleAssessment('independent', {
+      design: { k: 3 }, setup: { alpha: 0.01 }, groups: { summary: { totalN: 90, totalMissing: 2 } },
+      results: { decision: { primary: { test: 'anova', p: 0.004 } }, omnibus: { welch: { p: 0.02 } } },
+      assumptions: { homogeneity: { levene: { p: 0.4 } } },
+      posthoc: { available: true, method: 'tukey', correction: 'builtin', rows: [{}, {}, {}] },
+      effects: { kplus: { eta2: 0.12 } }
+    }));
+    expect(means).toMatch(/alpha = \.01/);
+    expect(means).toMatch(/Tukey–Kramer/);
+    expect(means).toMatch(/does not prove equal variances/i);
+    expect(means).toMatch(/2 values are recorded as missing/);
+
+    const table = facts.assessmentPlainText(facts.buildKnownModuleAssessment('contingency', {
+      rowVar: 'Treatment', colVar: 'Outcome', representedN: 80, nRows: 2, nCols: 2,
+      tests: { pearson: { stat: 4.2, df: 1, p: 0.04 } },
+      measures2x2: {
+        layout: { rowIndex: 'Drug', rowReference: 'Placebo', colEvent: 'Yes' },
+        oddsRatio: { available: true, value: 2.5 },
+        riskRatio: { available: true, value: 1.8 }
+      }
+    }));
+    expect(table).toMatch(/represented n = 80/);
+    expect(table).toMatch(/Odds ratio 2\.5/);
+    expect(table).toMatch(/Risk ratio 1\.8/);
+    expect(table).toMatch(/not the odds ratio/i);
+    expect(table).toMatch(/Drug/);
+
+    const refit = facts.assessmentPlainText(facts.buildKnownModuleAssessment('regression', {
+      results: { yVariable: 'Yield', observations: 30, rSquared: 0.62, fPValue: 0.001 },
+      temporaryRefit: { status: 'ready', omittedLabel: 'row 4', nOriginal: 30, nTemporary: 29 }
+    }));
+    expect(refit).toMatch(/original fit is unchanged/i);
+    expect(refit).toMatch(/R² = 0\.62/);
+
+    const corr = facts.assessmentPlainText(facts.buildKnownModuleAssessment('correlations', {
+      data: { variables: ['A', 'B', 'C'], rows: 40 },
+      matrix: { pairs: [{ x: 'A', y: 'B', r: 0.4, n: 28 }], strongest: [{ x: 'A', y: 'B', r: 0.4, n: 28 }] },
+      partial: { headerRows: 40, selected: { x: 'A', y: 'B', n: 28, controls: ['C'], unadjusted: { r: 0.4 }, partial: { r: 0.15 } } }
+    }));
+    expect(corr).toMatch(/Pearson/);
+    expect(corr).toMatch(/pair n = 28/);
+    expect(corr).toMatch(/partial r = 0\.15/);
+    expect(corr).toMatch(/header row count is 40/);
+    expect(corr).toMatch(/does not establish causation/i);
+
+    const power = facts.assessmentPlainText(facts.buildKnownModuleAssessment('power', {
+      mode: 'power', f: 0.25, k: 3, alpha: 0.05, N: 60, power: 0.72, fromObserved: true
+    }));
+    expect(power).toMatch(/not additional evidence/i);
+    expect(power).toMatch(/72%/);
+
+    const mixed = facts.assessmentPlainText(facts.buildKnownModuleAssessment('mixed', {
+      outcome: 'Score', n: 120, nGroups: 30, method: 'REML', covarianceStructure: 'unstructured', converged: true, ICC: 0.2
+    }));
+    expect(mixed).toMatch(/30 groups/);
+    expect(mixed).toMatch(/not independent sample units/i);
   });
 });

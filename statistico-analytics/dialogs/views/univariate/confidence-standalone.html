@@ -553,8 +553,47 @@
     }
 
     .whatif input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
       flex: 1;
       min-width: 48px;
+      height: 6px;
+      margin: 0;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.22);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .whatif input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid rgb(120, 200, 255);
+      box-shadow: 0 0 0 4px rgba(120, 200, 255, 0.22);
+      cursor: grab;
+    }
+
+    .whatif input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgb(120, 200, 255);
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(120, 200, 255, 0.22);
+      cursor: grab;
+    }
+
+    :root[data-theme="light"] .whatif input[type="range"] {
+      background: rgba(15, 23, 42, 0.16);
+    }
+
+    :root[data-theme="light"] .whatif input[type="range"]::-webkit-slider-thumb,
+    :root[data-theme="light"] .whatif input[type="range"]::-moz-range-thumb {
+      border-color: #1d4ed8;
+      box-shadow: 0 0 0 4px rgba(29, 78, 216, 0.16);
     }
 
     .whatif-panels {
@@ -1125,6 +1164,7 @@
     let scenarioTargetText = '';
     let scenarioAxisHalf = null;
     let scenarioDrag = false;
+    let scenarioHold = '';
     let scenarioKey = '';
     let scenarioSolvedN = null;
 
@@ -1429,6 +1469,26 @@
       return { minN: 2, maxN: ConfidencePrecision.scenarioMaximum(n0, N), N: N, n0: n0 };
     }
 
+    function sampleSliderRange(n0) {
+      const minN = Math.max(2, Math.round(n0 / 8));
+      const maxN = Math.max(minN + 1, Math.round(n0 * 12));
+      return { minN: minN, maxN: maxN };
+    }
+
+    function populationSliderMax(n0) {
+      return Math.max(n0 + 1, n0 * 8);
+    }
+
+    function paintRange(el) {
+      if (!el) return;
+      const min = Number(el.min);
+      const max = Number(el.max);
+      const pct = max > min ? ((Number(el.value) - min) / (max - min)) * 100 : 0;
+      const fill = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim() || 'rgb(120, 200, 255)';
+      const rest = document.documentElement.getAttribute('data-theme') === 'light' ? 'rgba(15, 23, 42, 0.16)' : 'rgba(255,255,255,0.22)';
+      el.style.background = 'linear-gradient(90deg, ' + fill + ' ' + pct + '%, ' + rest + ' ' + pct + '%)';
+    }
+
     function resetScenarioState() {
       scenarioMode = 'explore';
       scenarioNText = String(lastResult.n);
@@ -1438,6 +1498,7 @@
       scenarioPopulationText = '';
       scenarioAxisHalf = null;
       scenarioDrag = false;
+      scenarioHold = '';
       scenarioSolvedN = null;
       const explore = document.querySelector('input[name="whatif-mode"][value="explore"]');
       if (explore) explore.checked = true;
@@ -1529,11 +1590,14 @@
       nError.hidden = !showNError;
       nError.textContent = showNError ? parsedN.reason : '';
       nInput.setAttribute('aria-invalid', showNError ? 'true' : 'false');
-      if (parsedN.ok && document.activeElement !== slider) {
-        slider.value = String(Math.round(ConfidencePrecision.nToSlider(parsedN.n, bounds.minN, bounds.maxN) * 1000));
+      const slide = sampleSliderRange(bounds.n0);
+      if (parsedN.ok && scenarioHold !== 'n' && document.activeElement !== slider) {
+        const shown = Math.min(slide.maxN, Math.max(slide.minN, parsedN.n));
+        slider.value = String(Math.round(ConfidencePrecision.nToSlider(shown, slide.minN, slide.maxN) * 1000));
       }
-      slider.setAttribute('aria-valuemin', String(bounds.minN));
-      slider.setAttribute('aria-valuemax', String(bounds.maxN));
+      paintRange(slider);
+      slider.setAttribute('aria-valuemin', String(slide.minN));
+      slider.setAttribute('aria-valuemax', String(slide.maxN));
       slider.setAttribute('aria-valuenow', parsedN.ok ? String(parsedN.n) : '');
       slider.setAttribute('aria-valuetext', parsedN.ok ? String(parsedN.n) : 'invalid');
       syncWhatIfConfidenceControls();
@@ -1549,11 +1613,15 @@
       }
       if (populationInput) populationInput.setAttribute('aria-invalid', showPopulationError ? 'true' : 'false');
       const popSlider = document.getElementById('whatif-pop-slider');
-      if (popSlider && document.activeElement !== popSlider && lastResult) {
-        const popMax = ConfidencePrecision.scenarioMaximum(lastResult.n, null);
+      if (popSlider && scenarioHold !== 'pop' && document.activeElement !== popSlider && lastResult) {
+        const popMax = populationSliderMax(lastResult.n);
         if (!scenarioPopulationText.trim() || !population.ok || population.N == null) popSlider.value = '0';
-        else popSlider.value = String(Math.max(1, Math.round(ConfidencePrecision.nToSlider(population.N, lastResult.n, popMax) * 1000)));
+        else {
+          const shown = Math.min(popMax, Math.max(lastResult.n, population.N));
+          popSlider.value = String(Math.max(1, Math.round(ConfidencePrecision.nToSlider(shown, lastResult.n, popMax) * 1000)));
+        }
       }
+      paintRange(popSlider);
 
       const targetInput = document.getElementById('whatif-target');
       const targetHint = document.getElementById('whatif-target-hint');
@@ -1614,7 +1682,7 @@
           right: 'whatif-bar-label-right',
           lcl: 'whatif-label-lcl',
           ucl: 'whatif-label-ucl'
-        }, { center: mean, lcl: lo, ucl: hi }, 1 - scenarioConfidence, false);
+        }, { center: mean, lcl: lo, ucl: hi }, currentAlpha, false, Math.abs(lastResult.ucl - lastResult.lcl));
         const scenarioBar = document.getElementById('whatif-scenario-bar');
         const scenarioText = 'What-if scenario mean ' + fmtFull(mean) + ', limits ' + fmtFull(lo) + ' to ' + fmtFull(hi) + ', n=' + scenarioN + ', ' + confidenceLabel(scenarioConfidence);
         scenarioBar.title = scenarioText;
@@ -1677,12 +1745,14 @@
 
     window.onWhatIfSlider = function (commit) {
       if (!lastResult) return;
-      const bounds = scenarioBounds();
       const slider = document.getElementById('whatif-n-slider');
-      const n = ConfidencePrecision.sliderToN(Number(slider.value) / 1000, bounds.minN, bounds.maxN);
+      const slide = sampleSliderRange(lastResult.n);
+      const n = ConfidencePrecision.sliderToN(Number(slider.value) / 1000, slide.minN, slide.maxN);
       scenarioNText = String(n);
+      scenarioHold = 'n';
       scenarioDrag = !commit;
       renderWhatIf();
+      if (commit) scenarioHold = '';
     };
 
     window.onWhatIfNInput = function () {
@@ -1730,11 +1800,13 @@
       if (!(value > 0)) {
         scenarioPopulationText = '';
       } else {
-        const maxN = ConfidencePrecision.scenarioMaximum(lastResult.n, null);
+        const maxN = populationSliderMax(lastResult.n);
         scenarioPopulationText = String(ConfidencePrecision.sliderToN(value / 1000, lastResult.n, maxN));
       }
+      scenarioHold = 'pop';
       scenarioDrag = !commit;
       renderWhatIf();
+      if (commit) scenarioHold = '';
     };
 
     window.onWhatIfPopulationInput = function () {
@@ -1756,8 +1828,9 @@
       renderWhatIf();
     };
 
-    function paintIntervalBar(ids, result, alpha, bootstrap) {
-      const range = result.ucl - result.lcl;
+    function paintIntervalBar(ids, result, alpha, bootstrap, referenceRange) {
+      const own = result.ucl - result.lcl;
+      const range = (referenceRange > 0 && isFinite(referenceRange)) ? referenceRange : own;
       const bar = document.getElementById(ids.bar);
       const leftLabel = document.getElementById(ids.left);
       const rightLabel = document.getElementById(ids.right);

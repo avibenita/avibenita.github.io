@@ -1742,6 +1742,19 @@
         stdev: calculateStdev(originalData, calculateMean(originalData)),
         n: originalData.length
       };
+      window.currentCIResults = {
+        status: 'completed',
+        method: currentMethod,
+        parameter: currentParameter,
+        level: 1 - currentAlpha,
+        side: intervalSide === 'two' ? 'two-sided' : intervalSide,
+        estimate: result.center,
+        lower: intervalSide === 'upper' ? null : result.lcl,
+        upper: intervalSide === 'lower' ? null : result.ucl,
+        bound: intervalSide === 'upper' ? result.ucl : (intervalSide === 'lower' ? result.lcl : null),
+        n: originalData.length,
+        planning: null
+      };
       renderWhatIf();
     }
 
@@ -2212,6 +2225,18 @@
       }
 
       const scenarioBlock = document.getElementById('whatif-scenario-block');
+      if (window.currentCIResults) {
+        window.currentCIResults.planning = (scenarioHalf != null && isFinite(scenarioHalf)) ? {
+          planning: true,
+          parameter: 'mean',
+          method: 'classical',
+          level: scenarioConfidence,
+          side: intervalSide === 'two' ? 'two-sided' : intervalSide,
+          lower: intervalSide === 'upper' ? null : mean - scenarioHalf,
+          upper: intervalSide === 'lower' ? null : mean + scenarioHalf,
+          assumptions: 'The projection uses the observed standard deviation and the planner sample size or target.'
+        } : null;
+      }
       if (scenarioHalf != null && isFinite(scenarioHalf)) {
         const oneSided = intervalSide === 'upper' || intervalSide === 'lower';
         const lo = intervalSide === 'upper' ? null : mean - scenarioHalf;

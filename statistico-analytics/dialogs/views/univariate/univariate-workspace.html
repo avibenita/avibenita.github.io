@@ -1880,21 +1880,13 @@
       document.getElementById('stat-max').textContent = fmt(stats.max);
 
       // JS-computed insight sentence
+      window.__univariateComputedStats = stats;
       const insightEl = document.getElementById('stat-insight');
       if (insightEl && stats.stdDev > 0) {
-        const mmGapSD = (stats.mean - stats.median) / stats.stdDev;
-        const cv = Math.abs(stats.mean) > 0 ? Math.abs(stats.stdDev / stats.mean) : null;
-        const skew = stats.skewness;
-        const symmetryWord = (Math.abs(mmGapSD) < 0.15 && Math.abs(skew) < 0.3)
-          ? 'approximately symmetric'
-          : (skew > 0.5 || mmGapSD > 0.3) ? 'right-skewed'
-          : (skew < -0.5 || mmGapSD < -0.3) ? 'left-skewed'
-          : 'mildly skewed';
-        const spreadWord = cv !== null
-          ? (cv > 0.5 ? 'high spread' : cv > 0.25 ? 'moderate spread' : 'tight concentration')
-          : '';
-        const cvStr = cv !== null ? ` (CV = ${cv.toFixed(2)})` : '';
-        const reading = `Distribution is ${symmetryWord}${spreadWord ? ' with ' + spreadWord + cvStr : ''}.`;
+        const api = window.StatisticoInterpretation;
+        const reading = api
+          ? [api.describeShape(stats).text, api.describeSpread({ iqr: stats.q3 - stats.q1, variable: varName, unit: null }).text].filter(Boolean).join(' ')
+          : ('Skewness is ' + Number(stats.skewness).toFixed(3) + '. The middle 50% span ' + Number(stats.q3 - stats.q1).toFixed(2) + ' units.');
         insightEl.textContent = '';
         insightEl.classList.remove('visible');
         if (window.StatisticoViewReadings) window.StatisticoViewReadings.set('histogram', [reading]);

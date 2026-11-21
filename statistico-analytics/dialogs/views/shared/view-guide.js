@@ -271,7 +271,7 @@
         'Confidence level offers 90%, 95%, and 99%. The slider fine-tunes that level, and its tooltip shows the significance level, α. Interval type is two-sided by default. Upper bound and Lower bound answer a one-sided question and use the one-sided critical value. What if? keeps that choice and changes only the projection. Sample size, confidence, and an optional population size do not change the result above. Leave population size blank when you are not correcting for a finite population. Reset scenario returns the projection to the current sample.'
       ],
       [
-        'A symmetric interval, such as a classical mean, is the estimate plus or minus the margin of error. An asymmetric interval, such as a classical standard deviation, is shown as its lower and upper values. A one-sided bound shades every value on the open side of that limit.',
+        'A symmetric interval, such as a classical mean, is the estimate plus or minus the margin of error. An asymmetric interval, such as a classical standard deviation, is shown as its lower and upper values. A one-sided bound fades toward the side with no endpoint and ends in a firm line at the bound. The estimate is the small mark, and the axis names the quantity.',
         'A higher confidence level makes a wider interval. A larger sample, all else equal, makes it narrower.',
         'A classical mean interval uses the sample standard deviation and a t critical value. A bootstrap interval is built by resampling the sample.'
       ],

@@ -109,12 +109,14 @@
    * N null means no finite-population correction.
    * ns === N returns 0.
    */
-  function marginOfError(ns, confidence, s, N) {
+  function marginOfError(ns, confidence, s, N, side) {
     if (!(ns >= 2) || !isFinite(ns) || !isFinite(confidence) || !isFinite(s) || s < 0) return NaN;
     if (N != null && (!(N >= ns))) return NaN;
     if (s === 0) return 0;
     if (N != null && ns === N) return 0;
-    var t = studentTQuantile((1 + confidence) / 2, ns - 1);
+    var oneSided = side === 'upper' || side === 'lower';
+    var probability = oneSided ? confidence : (1 + confidence) / 2;
+    var t = studentTQuantile(probability, ns - 1);
     var margin = t * s / Math.sqrt(ns);
     if (N != null) margin *= Math.sqrt((N - ns) / N);
     return margin;
@@ -129,17 +131,17 @@
    * Smallest integer n >= n0 whose margin is at most target.
    * status: met | solved | unattainable
    */
-  function requiredSampleSize(n0, confidence, s, N, target) {
+  function requiredSampleSize(n0, confidence, s, N, target, side) {
     var limit = scenarioMaximum(n0, N);
-    var atCurrent = marginOfError(n0, confidence, s, N);
+    var atCurrent = marginOfError(n0, confidence, s, N, side);
     if (atCurrent <= target) return { status: 'met', n: n0, maximum: limit };
-    var atLimit = marginOfError(limit, confidence, s, N);
+    var atLimit = marginOfError(limit, confidence, s, N, side);
     if (!(atLimit <= target)) return { status: 'unattainable', n: null, maximum: limit };
     var lo = n0;
     var hi = limit;
     while (lo + 1 < hi) {
       var mid = Math.floor((lo + hi) / 2);
-      if (marginOfError(mid, confidence, s, N) <= target) hi = mid;
+      if (marginOfError(mid, confidence, s, N, side) <= target) hi = mid;
       else lo = mid;
     }
     return { status: 'solved', n: hi, maximum: limit };

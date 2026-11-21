@@ -48,6 +48,14 @@ assert.ok(fn >= 100 && fn <= 200);
 assert.ok(P.marginOfError(fn, c, s, 200) <= 1);
 assert.ok(fn === 100 || P.marginOfError(fn - 1, c, s, 200) > 1);
 
+const oneSided = P.marginOfError(100, c, s, null, 'upper');
+const t95 = P.studentTQuantile(0.95, 99);
+const t975 = P.studentTQuantile(0.975, 99);
+close(oneSided, t95 * s / 10, 'one-sided 95% uses the 95th percentile of t');
+close(e100, t975 * s / 10, 'two-sided 95% uses the 97.5th percentile of t');
+assert.ok(oneSided < e100, 'one-sided bound is closer than the two-sided margin');
+assert.strictEqual(P.marginOfError(100, c, s, null, 'lower'), oneSided);
+
 assert.ok(P.marginOfError(100, 0.99, s, null) > P.marginOfError(100, 0.95, s, null));
 assert.ok(P.marginOfError(400, c, s, null) < P.marginOfError(100, c, s, null));
 

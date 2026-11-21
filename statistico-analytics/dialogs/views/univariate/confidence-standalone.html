@@ -947,6 +947,32 @@
       color: white;
     }
 
+    .whatif-feature {
+      text-align: center;
+      padding: 2px 0 0;
+    }
+
+    .whatif-feature-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .whatif-feature-value {
+      margin-top: 2px;
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--accent-1);
+    }
+
+    #whatif-headline {
+      font-size: 18px;
+      font-weight: 650;
+    }
+
     .whatif-note {
       margin: 0;
       color: var(--text-muted);
@@ -1281,6 +1307,10 @@
           <div class="whatif-actions">
             <button type="button" class="refresh-btn" id="whatif-reset" onclick="resetWhatIf()"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> Reset scenario</button>
           </div>
+          <div class="whatif-feature" id="whatif-feature" hidden>
+            <div class="whatif-feature-label" id="whatif-feature-label">Projected margin of error</div>
+            <div class="whatif-feature-value" id="whatif-feature-value">—</div>
+          </div>
           <div class="whatif-plot" id="whatif-plot" aria-label="What-if scenario interval">
             <div class="interval-block" id="whatif-scenario-block" hidden>
               <div class="result-main" id="whatif-headline">
@@ -1314,7 +1344,7 @@
             </div>
           </div>
           <div class="whatif-metrics" id="whatif-metrics">
-            <div class="whatif-metric">
+            <div class="whatif-metric" id="whatif-margin-metric">
               <div class="label" id="whatif-margin-label">Projected margin of error</div>
               <div class="value" id="whatif-margin" title="">—</div>
             </div>
@@ -1894,6 +1924,35 @@
       el.setAttribute('aria-label', text);
     }
 
+    function showWhatIfAnswer(half, n) {
+      const feature = document.getElementById('whatif-feature');
+      const label = document.getElementById('whatif-feature-label');
+      const value = document.getElementById('whatif-feature-value');
+      const oneSided = intervalSide === 'upper' || intervalSide === 'lower';
+      const marginName = oneSided ? 'Distance to bound' : 'Projected margin of error';
+      const hasHalf = half != null && isFinite(half);
+      document.getElementById('whatif-margin-metric').hidden = scenarioMode !== 'required';
+      document.getElementById('whatif-required-metric').hidden = true;
+      if (scenarioMode === 'required') {
+        feature.hidden = false;
+        label.textContent = 'Required total sample size';
+        value.textContent = n != null ? Number(n).toLocaleString() : '—';
+        if (n != null) value.title = String(n);
+        else value.removeAttribute('title');
+        return;
+      }
+      if (!hasHalf) {
+        feature.hidden = true;
+        value.textContent = '—';
+        value.removeAttribute('title');
+        return;
+      }
+      feature.hidden = false;
+      label.textContent = marginName;
+      value.textContent = (oneSided ? '' : '\u00B1') + fmt2(half);
+      value.title = (oneSided ? '' : '\u00B1') + fmtFull(half);
+    }
+
     function renderWhatIf() {
       const unsupported = document.getElementById('whatif-unsupported');
       const blocked = document.getElementById('whatif-blocked');
@@ -1938,7 +1997,6 @@
       const bounds = scenarioBounds();
       document.getElementById('whatif-explore-fields').hidden = scenarioMode !== 'explore';
       document.getElementById('whatif-required-fields').hidden = scenarioMode !== 'required';
-      document.getElementById('whatif-required-metric').hidden = scenarioMode !== 'required';
 
       const nInput = document.getElementById('whatif-n');
       const slider = document.getElementById('whatif-n-slider');
@@ -2123,6 +2181,7 @@
         document.getElementById('whatif-extra').textContent = '—';
         document.getElementById('whatif-required-n').textContent = '—';
       }
+      showWhatIfAnswer(scenarioHalf, scenarioN);
 
       const plan = document.getElementById('whatif-plan-note');
       plan.hidden = !planNote;

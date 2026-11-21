@@ -90,8 +90,8 @@
     }
 
     .main-panel-gap {
-      height: 24px;
-      flex: 0 0 24px;
+      height: 12px;
+      flex: 0 0 12px;
     }
 
     .config-row {
@@ -262,7 +262,7 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 12px 14px;
-      margin-bottom: 28px;
+      margin-bottom: 12px;
       flex: 0 0 auto;
       display: flex;
       flex-direction: column;
@@ -474,10 +474,10 @@
     }
 
     .whatif-body {
-      margin-top: 24px;
+      margin-top: 8px;
       display: flex;
       flex-direction: column;
-      gap: 36px;
+      gap: 8px;
     }
 
     .whatif-modes,
@@ -503,7 +503,7 @@
     .whatif-field {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
       min-width: auto;
       flex: 1 1 auto;
     }
@@ -620,7 +620,7 @@
     #whatif-active {
       display: flex;
       flex-direction: column;
-      gap: 32px;
+      gap: 12px;
     }
 
     #whatif-n,
@@ -1127,11 +1127,7 @@
               <div class="value" id="whatif-required-n">—</div>
             </div>
           </div>
-          <p class="whatif-takeaway" id="whatif-takeaway" hidden></p>
           <p class="whatif-note" id="whatif-plan-note" hidden></p>
-          <p class="whatif-note">Planning projection using the current sample variability. The mean of a future sample may differ.</p>
-          <p class="whatif-note" id="whatif-fpc" hidden></p>
-          <p class="whatif-note" id="whatif-census" hidden></p>
         </div>
       </div>
     </section>
@@ -1438,30 +1434,6 @@
       }
     }
 
-    function observationPhrase(n) {
-      return String(n) + (n === 1 ? ' observation' : ' observations');
-    }
-
-    function takeawaySentence(n0, ns, change, currentConf, scenarioConf, populationN) {
-      if (!change || !change.comparable || ns == null) return '';
-      const relation = change.text === 'Unchanged'
-        ? 'the same width as'
-        : change.text.replace(/ narrower$/, ' narrower than').replace(/ wider$/, ' wider than');
-      const projected = observationPhrase(ns);
-      const current = observationPhrase(n0);
-      const sameConfidence = Math.abs(currentConf - scenarioConf) < 0.0005;
-      const fromPopulation = populationN != null;
-      if (sameConfidence && ns === n0 && fromPopulation) {
-        return 'From a population of ' + populationN + ', the projected interval is ' + relation + ' with your current ' + current + '.';
-      }
-      const populationClause = fromPopulation ? ' from a population of ' + populationN : '';
-      if (sameConfidence) {
-        return 'With ' + projected + populationClause + ', the projected interval is ' + relation + ' with your current ' + current + '.';
-      }
-      const confidenceClause = ' at ' + confidenceLabel(scenarioConf) + ' confidence';
-      return 'With ' + projected + confidenceClause + populationClause + ', the projected interval is ' + relation + ' with your current ' + current + ' at ' + confidenceLabel(currentConf) + ' confidence.';
-    }
-
     function baselineKey() {
       if (!lastResult) return '';
       return [currentMethod, currentParameter, lastResult.n, lastResult.center, lastResult.stdev, currentAlpha].join('|');
@@ -1700,7 +1672,6 @@
       }
 
       const scenarioBlock = document.getElementById('whatif-scenario-block');
-      const takeaway = document.getElementById('whatif-takeaway');
       if (scenarioHalf != null && isFinite(scenarioHalf)) {
         const lo = mean - scenarioHalf;
         const hi = mean + scenarioHalf;
@@ -1725,9 +1696,6 @@
         document.getElementById('whatif-margin').title = '±' + fmtFull(scenarioHalf);
         const change = ConfidencePrecision.widthChange(lastResult.ucl - lastResult.lcl, scenarioHalf * 2);
         document.getElementById('whatif-width').textContent = change.comparable ? change.text : 'Comparison unavailable';
-        const sentence = takeawaySentence(bounds.n0, scenarioN, change, 1 - currentAlpha, scenarioConfidence, bounds.N);
-        takeaway.hidden = !sentence;
-        takeaway.textContent = sentence;
         const extraLabel = document.getElementById('whatif-extra-label');
         const extra = document.getElementById('whatif-extra');
         if (scenarioN >= bounds.n0) {
@@ -1743,8 +1711,6 @@
         document.getElementById('whatif-margin').textContent = '—';
         document.getElementById('whatif-margin').title = '';
         document.getElementById('whatif-width').textContent = '—';
-        takeaway.hidden = true;
-        takeaway.textContent = '';
         document.getElementById('whatif-extra-label').textContent = 'Additional observations';
         document.getElementById('whatif-extra').textContent = '—';
         document.getElementById('whatif-required-n').textContent = '—';
@@ -1753,22 +1719,6 @@
       const plan = document.getElementById('whatif-plan-note');
       plan.hidden = !planNote;
       plan.textContent = planNote;
-      const fpc = document.getElementById('whatif-fpc');
-      if (N != null) {
-        fpc.hidden = false;
-        fpc.textContent = 'Finite population: N = ' + N + '. The projection assumes random sampling without replacement from that fixed population.';
-      } else {
-        fpc.hidden = true;
-        fpc.textContent = '';
-      }
-      const census = document.getElementById('whatif-census');
-      if (scenarioN != null && N != null && scenarioN === N) {
-        census.hidden = false;
-        census.textContent = 'Sampling the entire finite population leaves no sampling uncertainty about the mean. This does not address measurement error or bias.';
-      } else {
-        census.hidden = true;
-        census.textContent = '';
-      }
     }
 
     window.setWhatIfMode = function (mode) {

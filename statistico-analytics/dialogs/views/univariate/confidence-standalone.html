@@ -1489,6 +1489,27 @@
       el.style.background = 'linear-gradient(90deg, ' + fill + ' ' + pct + '%, ' + rest + ' ' + pct + '%)';
     }
 
+    function wholeCount(raw) {
+      const text = String(raw == null ? '' : raw).trim();
+      if (!/^[0-9]+$/.test(text)) return null;
+      return parseInt(text, 10);
+    }
+
+    function sizeMismatch(nText, popText, n0) {
+      const n = wholeCount(nText);
+      const N = wholeCount(popText);
+      let sample = '';
+      let population = '';
+      if (N != null && N < n0) {
+        population = 'Population size (' + N.toLocaleString() + ') is smaller than the current sample (' + n0.toLocaleString() + ').';
+      }
+      if (n != null && N != null && n > N) {
+        sample = 'Scenario sample size (' + n.toLocaleString() + ') is larger than the population (' + N.toLocaleString() + ').';
+        if (!population) population = 'Population size (' + N.toLocaleString() + ') is smaller than the scenario sample (' + n.toLocaleString() + ').';
+      }
+      return { sample: sample, population: population, conflict: n != null && N != null && n > N };
+    }
+
     function resetScenarioState() {
       scenarioMode = 'explore';
       scenarioNText = String(lastResult.n);
@@ -1586,9 +1607,10 @@
       const nError = document.getElementById('whatif-n-error');
       if (document.activeElement !== nInput) nInput.value = scenarioNText;
       const parsedN = ConfidencePrecision.parseScenarioN(scenarioNText, bounds.minN, bounds.maxN);
-      const showNError = scenarioMode === 'explore' && scenarioNText.trim() !== '' && !parsedN.ok;
+      const mismatch = sizeMismatch(scenarioNText, scenarioPopulationText, bounds.n0);
+      const showNError = scenarioMode === 'explore' && scenarioNText.trim() !== '' && (!parsedN.ok || !!mismatch.sample);
       nError.hidden = !showNError;
-      nError.textContent = showNError ? parsedN.reason : '';
+      nError.textContent = showNError ? (mismatch.sample || parsedN.reason) : '';
       nInput.setAttribute('aria-invalid', showNError ? 'true' : 'false');
       const slide = sampleSliderRange(bounds.n0);
       if (parsedN.ok && scenarioHold !== 'n' && document.activeElement !== slider) {
@@ -1606,10 +1628,10 @@
       const populationError = document.getElementById('whatif-pop-error');
       if (populationInput && document.activeElement !== populationInput) populationInput.value = scenarioPopulationText;
       const population = scenarioPopulation();
-      const showPopulationError = scenarioPopulationText.trim() !== '' && !population.ok;
+      const showPopulationError = scenarioPopulationText.trim() !== '' && (!population.ok || !!mismatch.population);
       if (populationError) {
         populationError.hidden = !showPopulationError;
-        populationError.textContent = showPopulationError ? population.reason : '';
+        populationError.textContent = showPopulationError ? (mismatch.population || population.reason) : '';
       }
       if (populationInput) populationInput.setAttribute('aria-invalid', showPopulationError ? 'true' : 'false');
       const popSlider = document.getElementById('whatif-pop-slider');
@@ -1650,7 +1672,7 @@
       let scenarioHalf = null;
       let planNote = '';
 
-      if (scenarioMode === 'explore' && parsedN.ok) {
+      if (scenarioMode === 'explore' && parsedN.ok && !mismatch.conflict) {
         scenarioN = parsedN.n;
         scenarioHalf = ConfidencePrecision.marginOfError(scenarioN, scenarioConfidence, s, N);
       } else if (scenarioMode === 'required' && targetValue != null && draft === scenarioTargetCommitted) {

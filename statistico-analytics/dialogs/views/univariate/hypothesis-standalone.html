@@ -3720,6 +3720,45 @@ Decision: ${testData.decision}`;
       };
     }
 
+    function sampleSizeLimitError(result) {
+      return !!(result && !result.success && /maximum limit/i.test(String(result.message || '')));
+    }
+
+    // The sample-size cloud call stops near n = 1,000 and returns HTTP 500.
+    // Power itself still computes at that size. Continue the same noncentral-t
+    // search locally; it matches the cloud on every size the cloud will return.
+    function requiredMeanSampleSize(effectSize, alpha, targetPower, tailType) {
+      if (typeof jStat === 'undefined' || !jStat.noncentralt || !jStat.studentt) return NaN;
+      const d = Math.abs(effectSize);
+      if (!(d > 0) || !(targetPower > 0) || targetPower >= 1 || !(alpha > 0) || alpha >= 1) return Infinity;
+      const powerAt = function (sampleSize) {
+        const df = sampleSize - 1;
+        const ncp = d * Math.sqrt(sampleSize);
+        if (tailType === 'greater') {
+          const crit = jStat.studentt.inv(1 - alpha, df);
+          return 1 - jStat.noncentralt.cdf(crit, df, ncp);
+        }
+        if (tailType === 'less') {
+          const crit = jStat.studentt.inv(1 - alpha, df);
+          return jStat.noncentralt.cdf(-crit, df, -ncp);
+        }
+        const crit = jStat.studentt.inv(1 - alpha / 2, df);
+        return 1 - jStat.noncentralt.cdf(crit, df, ncp) + jStat.noncentralt.cdf(-crit, df, ncp);
+      };
+      let lo = 2;
+      let hi = 4;
+      while (powerAt(hi) < targetPower && hi < 1000000) {
+        hi = Math.min(1000000, Math.ceil(hi * 1.5));
+      }
+      if (!(powerAt(hi) >= targetPower)) return Infinity;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (powerAt(mid) >= targetPower) hi = mid;
+        else lo = mid + 1;
+      }
+      return lo;
+    }
+
     async function calculateMeanPowerAnalysis(results, alpha, n, orientation) {
       console.log('');
       console.log('---------------------------------------------------------');
@@ -3793,11 +3832,14 @@ Decision: ${testData.decision}`;
       const powerResult = await callCloudPowerFunction(CLOUD_ENDPOINTS.tTest, powerParams);
       
       const sampleResult = await callCloudPowerFunction(CLOUD_ENDPOINTS.tTest, sampleParams);
-      
-      if (powerResult.success && sampleResult.success) {
-        // SUCCESS: Cloud function returned results
+      let requiredN = NaN;
+      if (sampleResult.success) requiredN = Math.ceil(sampleResult.data.required_sample_size);
+      else if (sampleSizeLimitError(sampleResult)) requiredN = requiredMeanSampleSize(effectSize, alpha, targetPower, tailType);
+
+      if (powerResult.success && (isFinite(requiredN) || requiredN === Infinity)) {
+        // SUCCESS: observed power from the cloud; required n from the cloud or,
+        // when that search hits its cap, from the same noncentral-t calculation.
         const observedPower = powerResult.data.power;
-        const requiredN = Math.ceil(sampleResult.data.required_sample_size);
         
         powerAnalysisCache = {
           effectSize,

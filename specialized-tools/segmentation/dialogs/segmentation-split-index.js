@@ -804,7 +804,12 @@
           plotLines: highlight ? spreadLine(result, light) : []
         }
       ],
-      tooltip: { shared: false, borderRadius: 8 },
+      tooltip: {
+        shared: false,
+        borderRadius: 8,
+        headerFormat: '<span style="font-size:11px">{point.key}</span><br/>',
+        pointFormat: '<span style="color:{point.color}">\u25CF</span> {series.name}: <b>{point.y:.2f}</b><br/>'
+      },
       plotOptions: {
         spline: {
           lineWidth: 2.75,

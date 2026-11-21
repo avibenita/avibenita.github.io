@@ -732,6 +732,218 @@
     return boundsOf(req);
   }
 
+  function blank(value) {
+    return value == null || String(value).trim() === '';
+  }
+
+  function constraintsActive(req) {
+    return !blank(req.meanMin) || !blank(req.meanMax) || !blank(req.sdMin);
+  }
+
+  function methodOf(req) {
+    if (req.mode === 'spec') return 'spec';
+    if (req.adjust === 'mean' || req.adjust === 'sd' || req.adjust === 'both') return req.adjust;
+    return 'both';
+  }
+
+  function describePlan(req) {
+    var found = solve(req || {});
+    if (!found.ok) {
+      return {
+        ok: false,
+        status: 'invalid',
+        method: methodOf(req || {}),
+        message: found.error,
+        proposal: null,
+        overlay: 'none',
+        feasibleMean: null,
+        bestIndex: null,
+        bestMean: null,
+        sideIndex: null,
+        limiting: '',
+        constraintNote: ''
+      };
+    }
+    var method = methodOf(req);
+    var base = req.baseline;
+    var goal = num(req.goal);
+    var scoredBase = metricsOf(base.lsl, base.usl, base.mean, base.sd, base.nominal);
+    var described = {
+      ok: true,
+      status: found.status,
+      method: method,
+      metric: req.metric,
+      message: '',
+      proposal: null,
+      overlay: 'none',
+      feasibleMean: found.feasibleMean || null,
+      bestIndex: found.best && Number.isFinite(found.best.index) ? found.best.index : null,
+      bestMean: found.best && Number.isFinite(found.best.mean) ? found.best.mean : null,
+      sideIndex: null,
+      limiting: found.limiting || '',
+      constraintNote: '',
+      baselineIndex: scoredBase ? scoredBase.index : null,
+      detail: found.reason || ''
+    };
+    if (found.status === 'already-met') {
+      described.message = 'Your current process already meets this goal. No change is required.';
+      return described;
+    }
+    if (found.status === 'unreachable') {
+      described.message = unreachableCopy(req, found, base, goal, described);
+      return described;
+    }
+    var cand = found.candidates && found.candidates[0];
+    if (!cand) {
+      described.ok = false;
+      described.status = 'failed';
+      described.message = 'Could not calculate this scenario. Please try again.';
+      return described;
+    }
+    var scored = metricsOf(cand.lsl, cand.usl, cand.mean, cand.sd, base.nominal);
+    var meets = scored && (req.metric === 'index'
+      ? meetsIndex(scored.index, goal)
+      : meetsFraction(scored.fraction, targetFraction(req)));
+    if (!meets) {
+      described.ok = false;
+      described.status = 'failed';
+      described.message = 'Could not calculate this scenario. Please try again.';
+      described.proposal = null;
+      return described;
+    }
+    described.proposal = {
+      mean: cand.mean,
+      sd: cand.sd,
+      lsl: cand.lsl,
+      usl: cand.usl,
+      index: scored.index,
+      ppm: scored.ppm,
+      yieldPct: scored.yieldPct,
+      sdReductionPct: (base.sd - cand.sd) / base.sd * 100,
+      deltaMean: cand.mean - base.mean,
+      deltaSd: cand.sd - base.sd,
+      deltaLsl: cand.lsl - base.lsl,
+      deltaUsl: cand.usl - base.usl
+    };
+    described.overlay = method === 'spec' ? 'specs' : 'curve';
+    if (constraintsActive(req) && method !== 'spec') {
+      described.constraintNote = 'Advanced bounds are applied, so this is the closest change inside those bounds.';
+    }
+    described.message = reachableCopy(req, described, base);
+    return described;
+  }
+
+  function unreachableCopy(req, found, base, goal, described) {
+    var method = methodOf(req);
+    if (method === 'sd' && req.metric === 'index') {
+      var gap = roomAt(base.mean, base.lsl, base.usl);
+      if (!(gap > INDEX_TOL)) {
+        return 'Reducing variation alone cannot reach this goal. The mean must move inside the specifications.';
+      }
+      if (found.limiting === 'practical minimum standard deviation') {
+        return 'Reducing variation to the practical minimum in Advanced still misses this goal.';
+      }
+    }
+    if (method === 'mean' && req.metric === 'index') {
+      var half = 3 * goal * base.sd;
+      var empty = base.usl - half < base.lsl + half - INDEX_TOL;
+      var best = (base.usl - base.lsl) / (6 * base.sd);
+      var mid = (base.lsl + base.usl) / 2;
+      described.bestIndex = Number.isFinite(described.bestIndex) ? described.bestIndex : best;
+      described.bestMean = Number.isFinite(described.bestMean) ? described.bestMean : mid;
+      if (empty) {
+        return 'Shifting the mean alone cannot reach this goal. Variation must also decrease.';
+      }
+      return 'The advanced mean bounds miss the means that would meet this goal at the current standard deviation.';
+    }
+    if (method === 'spec' && req.metric === 'index') {
+      if (found.limiting === 'upper specification') {
+        described.sideIndex = (base.usl - base.mean) / (3 * base.sd);
+        return 'The upper limit is locked, so this goal is unreachable. Allowing the upper limit to increase would help. Changing the lower limit alone does not remove that limit.';
+      }
+      if (found.limiting === 'lower specification') {
+        described.sideIndex = (base.mean - base.lsl) / (3 * base.sd);
+        return 'The lower limit is locked, so this goal is unreachable. Allowing the lower limit to decrease would help. Changing the upper limit alone does not remove that limit.';
+      }
+    }
+    return found.reason || 'This goal is unreachable under the current limits.';
+  }
+
+  function reachableCopy(req, described, base) {
+    var proposal = described.proposal;
+    var method = described.method;
+    if (method === 'sd' && req.metric === 'index') {
+      return 'Required SD: at most the proposed standard deviation. The mean and the specification limits stay where they are.';
+    }
+    if (method === 'mean' && req.metric === 'index') {
+      return 'Shift the mean into the feasible interval. The standard deviation and the specification limits stay where they are.';
+    }
+    if (method === 'both' && req.metric === 'index') {
+      if (Math.abs(proposal.sd - base.sd) <= 1e-9 * Math.max(1, base.sd)) {
+        return 'The current standard deviation can reach this goal if the mean moves to the nearest feasible value.';
+      }
+      var centered = 'Centers the process between the specifications to minimize the required reduction in variation. This assumes unrestricted mean movement.';
+      return described.constraintNote ? centered + ' ' + described.constraintNote : centered;
+    }
+    if (method === 'spec') {
+      var parts = ['Keeps the process unchanged and explores different acceptance limits. It does not improve production.'];
+      if (Math.abs(proposal.lsl - base.lsl) <= 1e-7 * Math.max(1, Math.abs(base.lsl))) {
+        parts.push('The lower limit already satisfies the goal and stays in place.');
+      } else {
+        parts.push('The lower limit moves outward.');
+      }
+      if (Math.abs(proposal.usl - base.usl) <= 1e-7 * Math.max(1, Math.abs(base.usl))) {
+        parts.push('The upper limit already satisfies the goal and stays in place.');
+      } else {
+        parts.push('The upper limit moves outward.');
+      }
+      return parts.join(' ');
+    }
+    if (req.metric === 'yield') return 'Modeled yield can reach this goal at the proposed mean and standard deviation. This is not a Ppk calculation.';
+    if (req.metric === 'ppm') return 'Expected PPM can reach this goal at the proposed mean and standard deviation. This is not a Ppk calculation.';
+    return 'The goal is reachable at the proposed settings.';
+  }
+
+  function planCopy(described, format) {
+    if (!described) return '';
+    var f = format || function (n) { return Number.isFinite(n) ? String(n) : '—'; };
+    if (!described.ok && described.status === 'failed') return 'Could not calculate this scenario. Please try again.';
+    if (!described.ok) return described.message || '';
+    if (described.status === 'already-met') return described.message;
+    if (described.status === 'unreachable' && described.method === 'mean' && described.metric === 'index' && Number.isFinite(described.bestIndex)) {
+      return described.message + ' The best Ppk from shifting the mean is ' + f(described.bestIndex) + ' at mean ' + f(described.bestMean) + '.';
+    }
+    if (described.status === 'unreachable' && described.method === 'spec' && Number.isFinite(described.sideIndex)) {
+      var side = described.limiting === 'lower specification' ? 'lower-side' : 'upper-side';
+      return described.message + ' The unchanged ' + side + ' index is ' + f(described.sideIndex) + '.';
+    }
+    if (described.status === 'reachable' && described.proposal && described.method === 'sd' && described.metric === 'index') {
+      return 'Required SD: at most ' + f(described.proposal.sd) + ', a ' + f(described.proposal.sdReductionPct) + '% reduction. The mean and the specification limits stay where they are.';
+    }
+    if (described.status === 'reachable' && described.proposal && described.method === 'mean' && described.metric === 'index' && described.feasibleMean) {
+      return 'Shift the mean to ' + f(described.proposal.mean) + '. Means from ' + f(described.feasibleMean.lo) + ' to ' + f(described.feasibleMean.hi) + ' meet the goal at the current standard deviation.';
+    }
+    if (described.status === 'reachable' && described.proposal && described.method === 'both' && described.metric === 'index' && described.proposal.sdReductionPct > 1e-6) {
+      return described.message + ' Proposed mean ' + f(described.proposal.mean) + ', required SD ' + f(described.proposal.sd) + ' (' + f(described.proposal.sdReductionPct) + '% reduction).';
+    }
+    return described.message || '';
+  }
+
+  function controlSignature(state) {
+    var b = (state && state.baseline) || {};
+    var s = state || {};
+    return [
+      b.lsl, b.usl, b.mean, b.sd, b.n, b.nominal,
+      s.goal, s.altGoal, s.method, s.mode, s.metric, s.action,
+      s.meanMin, s.meanMax, s.sdMin,
+      s.unlockLower, s.unlockUpper, s.lowerOut, s.upperOut
+    ].join('|');
+  }
+
+  function proposalCurrent(saved, state) {
+    return !!saved && saved === controlSignature(state);
+  }
+
   return {
     INDEX_TOL: INDEX_TOL,
     FRACTION_TOL: FRACTION_TOL,
@@ -742,6 +954,10 @@
     solve: solve,
     sdBoundsAtMean: sdBoundsAtMean,
     previewMean: previewMean,
-    answerText: answerText
+    answerText: answerText,
+    describePlan: describePlan,
+    planCopy: planCopy,
+    controlSignature: controlSignature,
+    proposalCurrent: proposalCurrent
   };
 });

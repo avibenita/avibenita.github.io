@@ -2371,7 +2371,7 @@
         'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
         [
           'LSL, USL, and Target can be edited here. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
-          'Find settings opens the Capability Planner for the index on the gauge.',
+          'Find settings opens Reach a capability goal on this screen, above the distribution chart. It does not leave the results.',
           'Histogram draws the observed values. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
         ],
         [
@@ -2387,24 +2387,22 @@
         ]
       ),
       'capability-planner': guide(
-        'Capability Planner',
-        'Finds a mean, a standard deviation, or an outward specification change that would reach the goal you enter.',
+        'Reach a capability goal',
+        'Plans a Ppk goal on the capability results screen, above the same distribution chart.',
         [
-          'Metric chooses Ppk, modeled yield, or expected PPM. Goal is the value to reach. Mode chooses process improvement or a specification what-if. Change chooses whether the mean, the standard deviation, or both may move.',
-          'Constraints holds optional mean bounds and a practical minimum standard deviation. A blank bound adds no further constraint. The summary names the bounds that are active.',
-          'Find settings runs the search. After a result, the two current-SD presets are the smallest mean shift and the most margin from centering, when those settings differ. The slider and the scenario-mean field select a custom mean.',
-          'Changing the metric, the goal, or a constraint clears the solved result until you choose Find settings again.'
+          'Find settings opens the panel. Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Both. Calculate required change runs the plan. Close planner returns to the ordinary chart.',
+          'Advanced holds specification exploration, modeled yield, expected PPM, and optional mean or standard-deviation bounds. Those metrics keep their own calculations.',
+          'Changing the goal, the method, the specifications, or the analyzed data clears the proposal until you calculate again.'
         ],
         [
-          'The opening sentence says whether the goal is reachable at the current standard deviation, and the mean interval that meets it when that interval exists.',
-          'Current and Selected scenario show the mean, the standard deviation, the metric, and the normal-model yield or expected PPM. Both charts use that same selected mean and standard deviation.',
-          'Scenario SD is the standard deviation of the selected setting. Maximum SD for the goal is how wide the process could be at that mean and still meet the goal. The current SD caps a process-improvement scenario, so the search does not propose a larger standard deviation.',
-          'Settings that meet the goal shades the mean and standard-deviation pairs that satisfy the goal. The current marker is labeled when the analysed process is below the goal.'
+          'A result states the required change, then compares the current process with the proposed scenario. The chart keeps the current curve and overlays the proposal on the same scale.',
+          'Reduce variation keeps the mean. Shift mean keeps the standard deviation and shows the feasible mean interval. Both keeps the current standard deviation when a mean shift is enough, and otherwise centers the mean to minimize the reduction in variation.',
+          'Specification exploration keeps the process curve and draws proposed limits. It does not improve production.'
         ],
         [
-          'Yield and expected PPM are normal-model estimates. A very small expected PPM is not a promise of zero defects.',
-          'The scenario stays in this view. The worksheet and the capability results keep the analysed values.',
-          'An unreachable goal names the binding constraint and the best point the search could reach. That point is not a recommendation that the process can be operated there.'
+          'The proposal is a hypothetical point estimate. It is not a confidence interval and it is not written back to the worksheet or the capability results.',
+          'If the current process already meets the goal, no change is proposed. If the goal is unreachable, the panel names the limit and does not draw a proposed curve.',
+          'Yield and expected PPM are normal-model estimates. A very small expected PPM is not a promise of zero defects.'
         ]
       ),
       'capability-by-group': guide(

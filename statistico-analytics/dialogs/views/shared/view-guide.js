@@ -2412,7 +2412,7 @@
         'Reach a capability goal',
         'Calculates the process change required to reach a Ppk goal. Specifications stay at their actual values.',
         [
-          'Ppk goal defaults to 1.33. The number and the slider stay in step. Dragging the goal recalculates the required change immediately. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation.',
+          'Ppk goal defaults to 1.33. The number and the slider stay in step on the same row as By. Dragging the goal recalculates the required change immediately. By is Reduce variation, Shift mean, or Shift mean + reduce variation.',
           'A typed goal recalculates shortly afterward. An invalid goal clears the previous result. Comparison lists Current, Required, and Change.',
           'Current capability returns to the observed process without applying the requirement.'
         ],

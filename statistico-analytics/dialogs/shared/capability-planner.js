@@ -828,7 +828,7 @@
     };
     described.overlay = method === 'spec' ? 'specs' : 'curve';
     if (constraintsActive(req) && method !== 'spec') {
-      described.constraintNote = 'Advanced bounds are applied, so this is the closest change inside those bounds.';
+      described.constraintNote = 'Process constraints are applied, so this is the closest change inside those bounds.';
     }
     described.message = reachableCopy(req, described, base);
     return described;
@@ -842,7 +842,7 @@
         return 'Reducing variation alone cannot reach this goal. The mean must move inside the specifications.';
       }
       if (found.limiting === 'practical minimum standard deviation') {
-        return 'Reducing variation to the practical minimum in Advanced still misses this goal.';
+        return 'Reducing variation to the practical minimum still misses this goal.';
       }
     }
     if (method === 'mean' && req.metric === 'index') {

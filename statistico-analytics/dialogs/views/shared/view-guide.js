@@ -2398,7 +2398,7 @@
           'Ppk is the smaller of (mean − LSL) / (3 × SD) and (USL − mean) / (3 × SD). The specifications stay at their actual values, and the goal is that Ppk.',
           'Reduce variation keeps the mean. The required SD is the distance from the mean to the nearer limit, divided by 3 × the goal. The strip’s percent is (current SD − required SD) / current SD. A mean on or outside a limit cannot reach a positive goal by reducing variation alone.',
           'Shift mean keeps the SD. A mean meets the goal when it is at least 3 × goal × SD inside both limits, and the proposal is the feasible mean closest to the current mean. When no such mean exists, the best Ppk is (USL − LSL) / (6 × SD), at the midpoint of the limits.',
-          'Shift mean + reduce variation uses only that mean shift when the current SD can already reach the goal. Otherwise it places the mean at the midpoint and sets SD to (USL − LSL) / (6 × goal). That is the smallest reduction in variation, assuming the mean may move freely. Advanced bounds keep the result inside the range you set.',
+          'Shift mean + reduce variation uses only that mean shift when the current SD can already reach the goal. Otherwise it places the mean at the midpoint and sets SD to (USL − LSL) / (6 × goal). That is the smallest reduction in variation, assuming the mean may move freely. Process constraints keep the result inside a mean range or a minimum SD when those are filled.',
           'The strip rounds the percent to one decimal and the mean, SD, and Ppk to two decimals. The comparison table follows the display precision.',
           'The sentence under the chart says these are calculated requirements. They are not applied to the process.'
         ],
@@ -2412,16 +2412,17 @@
         'Reach a capability goal',
         'Calculates the process change required to reach a Ppk goal. Specifications stay at their actual values.',
         [
-          'Ppk goal defaults to 1.33. The number and the slider stay in step on the same row as By. Dragging the goal recalculates the required change immediately. By is Reduce variation, Shift mean, or Shift mean + reduce variation.',
-          'A typed goal recalculates shortly afterward. An invalid goal clears the previous result. Comparison lists Current, Required, and Change.',
+          'Ppk goal defaults to 1.33. The number and the slider stay in step on the same row as By. Moving the goal or choosing By recalculates immediately. By is Reduce variation, Shift mean, or Shift mean + reduce variation.',
+          'The answer states the required change, for example reducing the standard deviation from the current value to the required value to reach the Ppk goal. Yield and expected PPM appear with that result. Comparison lists Current, Required, and Change.',
+          'Process constraints stays collapsed. A minimum mean, maximum mean, or practical minimum SD is summarized on the control while it is active.',
           'Current capability returns to the observed process without applying the requirement.'
         ],
         [
-          'The strip states the required change. The chart shows the current process and, when a change is required, the required scenario on one density scale.',
+          'The answer states the required change in one sentence. The chart shows the current process and, when a change is required, the required scenario on one density scale. Yield and expected PPM are outcomes of that change.',
           'Ppk is the smaller of (mean − LSL) / (3 × SD) and (USL − mean) / (3 × SD). The specifications stay fixed, and the calculation changes only the mean, the SD, or both until that Ppk meets the goal.',
           'Reduce variation keeps the mean. The required SD is the distance from the mean to the nearer limit, divided by 3 × the goal. The percent on the strip is (current SD − required SD) / current SD. A mean on or outside a limit cannot reach a positive goal by reducing variation alone.',
           'Shift mean keeps the current SD. Means that meet the goal lie at least 3 × goal × SD inside both limits. The proposal is the one in that interval closest to the current mean. If the interval is empty, shifting alone cannot reach the goal, and the best Ppk is (USL − LSL) / (6 × SD) at the midpoint.',
-          'Shift mean + reduce variation shifts the mean only, with no SD reduction, when the current SD can already reach the goal. Otherwise it centres the mean between the limits and sets the SD to (USL − LSL) / (6 × goal). That choice minimises the reduction in variation and assumes the mean may move freely. A mean range or a minimum SD in Advanced keeps the result inside those bounds.',
+          'Shift mean + reduce variation shifts the mean only, with no SD reduction, when the current SD can already reach the goal. Otherwise it centres the mean between the limits and sets the SD to (USL − LSL) / (6 × goal). That choice minimises the reduction in variation and assumes the mean may move freely. Process constraints keep the result inside a mean range or a minimum SD when those are filled.',
           'The strip shows the percent to one decimal and the mean, SD, and Ppk to two decimals. The comparison uses the precision set for the page.',
           'An unreachable goal explains the limit. It does not invent a curve that meets the goal.'
         ],

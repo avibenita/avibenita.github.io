@@ -18,13 +18,13 @@
   <script src="../shared/demo-fixtures.js?v=20261117demo6"></script>
   <script src="../shared/demo-data.js?v=20261119demo"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261122by"></script>
+  <script src="../shared-header.js?v=20261122simple"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
   <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
   <script src="../shared/group-column-suitability.js?v=20261112cap3"></script>
   <script src="../../shared/capability-range-engine.js?v=20261113plan"></script>
-  <script src="../../shared/capability-planner.js?v=20261122fit"></script>
+  <script src="../../shared/capability-planner.js?v=20261122simple"></script>
   <style>
     html, body { height: 100%; margin: 0; }
     body {
@@ -211,9 +211,13 @@
     #planner-detail summary { cursor: pointer; font-size: 12px; font-weight: 750; }
     #planner-detail[hidden] { display: none !important; }
     .plan-table { width: 100%; min-width: 0; margin-top: 8px; }
-    #planner-advanced { margin-top: 12px; }
-    #planner-advanced summary { cursor: pointer; font-weight: 750; }
-    #planner-advanced h3 { margin: 12px 0 4px; font-size: 13px; }
+    .plan-strip.is-answer { margin-top: 12px; padding: 16px 18px; font-size: 22px; line-height: 1.35; }
+    .plan-outcomes { margin: 8px 0 0; font-size: 14px; font-weight: 700; color: var(--text-secondary, rgba(255,255,255,.82)); }
+    .plan-outcomes[hidden] { display: none !important; }
+    .plan-foot { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 16px; margin-top: 10px; }
+    #planner-constraints { margin: 0; min-width: 0; }
+    #planner-constraints summary { cursor: pointer; font-size: 13px; font-weight: 750; }
+    #planner-constraint-summary { font-weight: 650; color: var(--text-secondary, rgba(255,255,255,.72)); }
     #reach-panel button:disabled { opacity: .45; cursor: not-allowed; }
     #planner-goal[aria-invalid="true"], #planner-alt-goal[aria-invalid="true"] { border-color: #fb7185; }
     .planner-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 8px; }
@@ -477,50 +481,28 @@
               </div>
               <p id="planner-goal-error" class="cap-error" hidden></p>
               <div id="planner-status" class="plan-strip" role="status" aria-live="polite" hidden></div>
-              <div class="plan-bar">
-                <div class="cap-actions">
-                  <button type="button" class="primary" id="planner-find">Calculate required change</button>
-                  <button type="button" id="planner-close">Current capability</button>
-                </div>
-              </div>
-              <p id="planner-prompt">Drag the Ppk goal, or choose what can change. The required change updates as the goal moves.</p>
+              <p id="planner-outcomes" class="plan-outcomes" hidden></p>
+              <p id="planner-prompt">Drag the Ppk goal or choose By. The required change appears here.</p>
               <p id="planner-error" class="cap-error" role="alert" hidden></p>
               <details id="planner-detail" hidden>
                 <summary>Comparison</summary>
                 <div id="planner-compare"></div>
                 <p id="planner-note" class="plan-note" hidden></p>
               </details>
-                  <details id="planner-advanced">
-                    <summary>Advanced</summary>
-                    <h3>Other metrics</h3>
-                    <p class="cap-help">Modeled yield and expected PPM keep their own calculations. They are not recalculated as Ppk. Cpm stays on the results card and follows the nominal value.</p>
-                    <div class="planner-form">
-                      <label class="field">Metric
-                        <select id="planner-metric">
-                          <option value="yield">Modeled yield (%)</option>
-                          <option value="ppm">Expected PPM</option>
-                        </select>
-                      </label>
-                      <label class="field">Goal
-                        <input id="planner-alt-goal" type="number" step="any" value="99.73" aria-describedby="planner-alt-error" />
-                      </label>
-                    </div>
-                    <p id="planner-alt-error" class="cap-error" hidden></p>
-                    <div class="cap-actions" style="margin-top:8px;">
-                      <button type="button" id="planner-alt">Calculate this metric</button>
-                    </div>
-                    <div id="planner-constraints">
-                      <h3>Bounds</h3>
-                      <p class="cap-help">Blank bounds add no further limit. A filled bound is reported with the result. The search can keep the current standard deviation or reduce it.</p>
-                      <div class="planner-form">
-                        <label class="field">Minimum mean<input id="planner-mean-min" type="number" step="any" /></label>
-                        <label class="field">Maximum mean<input id="planner-mean-max" type="number" step="any" /></label>
-                        <label class="field">Practical minimum SD<input id="planner-sd-min" type="number" step="any" /></label>
-                      </div>
-                    </div>
-                  </details>
-                  <input type="hidden" id="planner-mode" value="process" />
-                  <input type="hidden" id="planner-adjust" value="sd" />
+              <div class="plan-foot">
+                <details id="planner-constraints">
+                  <summary>Process constraints<span id="planner-constraint-summary"></span></summary>
+                  <p class="cap-help">Blank fields add no further limit. A filled bound keeps the required change inside that range. The search can keep the current standard deviation or reduce it.</p>
+                  <div class="planner-form">
+                    <label class="field">Minimum mean<input id="planner-mean-min" type="number" step="any" /></label>
+                    <label class="field">Maximum mean<input id="planner-mean-max" type="number" step="any" /></label>
+                    <label class="field">Practical minimum SD<input id="planner-sd-min" type="number" step="any" /></label>
+                  </div>
+                </details>
+                <button type="button" id="planner-close">Current capability</button>
+              </div>
+              <input type="hidden" id="planner-mode" value="process" />
+              <input type="hidden" id="planner-adjust" value="sd" />
             </section>
             <div class="cap-card">
               <div id="reachChart"></div>
@@ -1649,6 +1631,7 @@
       return '';
     }
     function altGoalError(metric) {
+      if (!el('planner-alt-goal')) return '';
       var raw = String(el('planner-alt-goal').value).trim();
       var n = Number(raw);
       if (raw === '' || !Number.isFinite(n)) return 'Enter a numeric goal.';
@@ -1765,6 +1748,7 @@
         el('planner-status').textContent = '';
         el('planner-status').className = 'plan-strip';
       }
+      clearOutcomes();
       if (el('planner-compare')) el('planner-compare').innerHTML = '';
       if (el('planner-detail')) el('planner-detail').hidden = true;
       if (el('planner-note')) el('planner-note').hidden = true;
@@ -1807,19 +1791,64 @@
           ['USL', fmt(snap.usl) + unitSuffix(), fmt(proposal.usl) + unitSuffix(), changeText(snap.usl, proposal.usl)]
         );
       }
-      if (described.metric === 'yield') rows.push(['Modeled yield', formatYield(last.overall.yieldPct), formatYield(proposal.yieldPct), changeText(last.overall.yieldPct, proposal.yieldPct)]);
+      rows.push(['Yield', formatYield(last.overall.yieldPct), formatYield(proposal.yieldPct), changeText(last.overall.yieldPct, proposal.yieldPct)]);
       return '<table class="plan-table"><thead><tr><th>Measure</th><th>Current</th><th>Required</th><th>Change</th></tr></thead><tbody>' +
         rows.map(function (row) {
           return '<tr><td>' + escapeHtml(row[0]) + '</td><td>' + escapeHtml(row[1]) + '</td><td>' + escapeHtml(row[2]) + '</td><td>' + escapeHtml(row[3]) + '</td></tr>';
         }).join('') + '</tbody></table>';
     }
+    function twoDecimals(n) {
+      return Number.isFinite(n) ? n.toFixed(2) : '—';
+    }
+    function answerSentence(described) {
+      var proposal = described.proposal;
+      var unit = unitSuffix();
+      var goalText = twoDecimals(Number(el('planner-goal').value));
+      if (goalText === '—') goalText = twoDecimals(proposal.index);
+      var baseMean = proposal.mean - proposal.deltaMean;
+      var baseSd = proposal.sd - proposal.deltaSd;
+      var meanMoved = Math.abs(proposal.deltaMean) > 1e-6;
+      var sdReduced = proposal.sdReductionPct > 0.05;
+      var meanText = 'Shift the mean from ' + twoDecimals(baseMean) + unit + ' to ' + twoDecimals(proposal.mean) + unit;
+      var sdText = 'Reduce SD from ' + twoDecimals(baseSd) + unit + ' to ' + twoDecimals(proposal.sd) + unit;
+      var tail = ' to reach Ppk ' + goalText + '.';
+      if (meanMoved && sdReduced) return meanText + ' and reduce SD from ' + twoDecimals(baseSd) + unit + ' to ' + twoDecimals(proposal.sd) + unit + tail;
+      if (sdReduced) return sdText + tail;
+      if (meanMoved) return meanText + tail;
+      return 'The current process already meets this goal. No change is required.';
+    }
+    function outcomeLine(described) {
+      var proposal = described.proposal;
+      return 'Ppk ' + twoDecimals(described.baselineIndex) + ' → ' + twoDecimals(proposal.index)
+        + ' · Yield ' + formatYield(last.overall.yieldPct) + ' → ' + formatYield(proposal.yieldPct)
+        + ' · Expected PPM ' + formatPpm(last.overall.ppm) + ' → ' + formatPpm(proposal.ppm);
+    }
+    function clearOutcomes() {
+      var outcomes = el('planner-outcomes');
+      if (!outcomes) return;
+      outcomes.hidden = true;
+      outcomes.textContent = '';
+    }
     function renderPlanStrip(described) {
       var status = el('planner-status');
       var Planner = window.StatisticoCapabilityPlanner;
       if (!status || !Planner || typeof Planner.planStrip !== 'function') return;
-      var strip = Planner.planStrip(described);
+      var reachableIndex = described && described.ok && described.status === 'reachable' && described.proposal && described.metric === 'index' && described.method !== 'spec';
       status.className = 'plan-strip';
       status.textContent = '';
+      if (reachableIndex) {
+        status.hidden = false;
+        status.classList.add('is-answer');
+        status.textContent = answerSentence(described);
+        var outcomes = el('planner-outcomes');
+        if (outcomes) {
+          outcomes.hidden = false;
+          outcomes.textContent = outcomeLine(described);
+        }
+        return;
+      }
+      clearOutcomes();
+      var strip = Planner.planStrip(described);
       if (!strip) {
         status.hidden = true;
         return;
@@ -1861,6 +1890,7 @@
           el('planner-status').textContent = '';
           el('planner-status').className = 'plan-strip';
         }
+        clearOutcomes();
         if (el('planner-compare')) el('planner-compare').innerHTML = '';
         if (detail) detail.hidden = true;
         if (el('planner-note')) el('planner-note').hidden = true;
@@ -1889,7 +1919,7 @@
     function plannerRequest() {
       snapshotPlanner();
       return {
-        metric: el('planner-metric').value,
+        metric: el('planner-metric') ? el('planner-metric').value : 'index',
         goal: el('planner-goal').value,
         mode: el('planner-mode').value,
         adjust: el('planner-adjust').value,
@@ -1913,11 +1943,13 @@
       el('planner-dist').textContent = '';
     }
     function constraintSummary() {
+      var node = el('planner-constraint-summary');
+      if (!node || !el('planner-mean-min')) return;
       var parts = [];
       if (String(el('planner-mean-min').value).trim() !== '') parts.push('Minimum mean ' + el('planner-mean-min').value + unitSuffix());
       if (String(el('planner-mean-max').value).trim() !== '') parts.push('Maximum mean ' + el('planner-mean-max').value + unitSuffix());
       if (String(el('planner-sd-min').value).trim() !== '') parts.push('Practical minimum SD ' + el('planner-sd-min').value + unitSuffix());
-      el('planner-constraint-summary').textContent = parts.length ? parts.join(' · ') : 'No extra constraints';
+      node.textContent = parts.length ? ' · ' + parts.join(' · ') : '';
     }
     function syncPlannerMode() {
       var specMode = el('planner-mode').value === 'spec';
@@ -2371,7 +2403,7 @@
         mode = 'spec';
         metric = el('planner-spec-metric').value || 'index';
         if (metric !== 'index') goal = el('planner-alt-goal').value;
-      } else if (plannerAction === 'alt') {
+      } else if (plannerAction === 'alt' && el('planner-metric') && el('planner-alt-goal')) {
         metric = el('planner-metric').value;
         goal = el('planner-alt-goal').value;
       }
@@ -2684,7 +2716,7 @@
         if (el('reach-empty')) el('reach-empty').hidden = hasRun;
         if (el('reach-body')) el('reach-body').hidden = !hasRun;
         if (hasRun && last && last.ok) drawModel(last.overall, true);
-        syncGoalRange();
+        if (hasRun && last && last.ok && !goalFieldError()) scheduleReach(0);
         if (options && options.focusPlanner && el('planner-goal')) el('planner-goal').focus();
       }
       if (view === 'process') paintProcess();
@@ -2882,10 +2914,10 @@
     el('metric-grid').addEventListener('click', function (event) {
       if (event.target.closest && event.target.closest('#open-planner')) openPlanner();
     });
-    el('planner-find').addEventListener('click', function () { runPlanner('ppk'); });
+    if (el('planner-find')) el('planner-find').addEventListener('click', function () { runPlanner('ppk'); });
     el('planner-close').addEventListener('click', closePlanner);
     if (el('planner-spec')) el('planner-spec').addEventListener('click', function () { runPlanner('spec'); });
-    el('planner-alt').addEventListener('click', function () { runPlanner('alt'); });
+    if (el('planner-alt')) el('planner-alt').addEventListener('click', function () { runPlanner('alt'); });
     el('planner-goal').addEventListener('input', function () { scheduleReach(200); });
     el('planner-goal-range').addEventListener('input', function () {
       var n = Number(el('planner-goal-range').value);
@@ -2899,20 +2931,30 @@
         else if (plannerDescribed) invalidateProposal();
       });
     });
-    var altDefaults = { yield: '99.73', ppm: '2700' };
-    var altMetric = 'yield';
-    el('planner-metric').addEventListener('change', function () {
-      var next = el('planner-metric').value;
-      if (el('planner-alt-goal').value === altDefaults[altMetric]) el('planner-alt-goal').value = altDefaults[next];
-      altMetric = next;
-      syncAltGoal();
-      invalidateProposal();
-    });
-    ['planner-alt-goal', 'planner-spec-metric', 'planner-mean-min', 'planner-mean-max', 'planner-sd-min', 'planner-lower-out', 'planner-upper-out'].forEach(function (id) {
+    if (el('planner-metric') && el('planner-alt-goal')) {
+      var altDefaults = { yield: '99.73', ppm: '2700' };
+      var altMetric = 'yield';
+      el('planner-metric').addEventListener('change', function () {
+        var next = el('planner-metric').value;
+        if (el('planner-alt-goal').value === altDefaults[altMetric]) el('planner-alt-goal').value = altDefaults[next];
+        altMetric = next;
+        syncAltGoal();
+        invalidateProposal();
+      });
+    }
+    ['planner-alt-goal', 'planner-spec-metric', 'planner-lower-out', 'planner-upper-out'].forEach(function (id) {
       if (!el(id)) return;
       el(id).addEventListener('input', function () {
         syncAltGoal();
         invalidateProposal();
+      });
+    });
+    ['planner-mean-min', 'planner-mean-max', 'planner-sd-min'].forEach(function (id) {
+      if (!el(id)) return;
+      el(id).addEventListener('input', function () {
+        constraintSummary();
+        if (goalFieldError()) invalidateProposal();
+        else scheduleReach(200);
       });
     });
     ['planner-unlock-lower', 'planner-unlock-upper'].forEach(function (id) {

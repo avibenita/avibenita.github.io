@@ -202,5 +202,8 @@ describe('Univariate view guide', () => {
       expect(guide.resolve({ module: 'gage-rr', key: key })).toBeTruthy();
     });
     expect(guide.resolve({ module: 'capability', key: 'capability-results' }).sections[3].items.join(' ')).toMatch(/not within-process Cp and Cpk/i);
+    expect(guide.resolve({ module: 'capability', key: 'capability-results' }).sections[2].items.join(' ')).toMatch(/PPU = \(USL − mean\)/);
+    expect(guide.resolve({ module: 'capability', key: 'capability-reach' }).sections[2].items.join(' ')).toMatch(/nearer limit/);
+    expect(guide.resolve({ module: 'capability', key: 'capability-reach' }).sections[2].items.join(' ')).toMatch(/\(USL − LSL\) \/ \(6 × goal\)/);
   });
 });

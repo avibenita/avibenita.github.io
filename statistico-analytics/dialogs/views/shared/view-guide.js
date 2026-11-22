@@ -2374,10 +2374,10 @@
           'Histogram draws the observed values and adds a two-row table of bin ranges and the number of observations in each. The bins slider sets the number of intervals. Normal curve overlays the normal model. This view does not draw a proposed curve.'
         ],
         [
-          'The gauge is Ppk. Pp is the spread relative to the specification width, as if the mean were centred. Ppk is the worse of Cpu and Cpl.',
-          'Cpu is the room to the upper limit. Cpl is the room to the lower limit. The smaller one is the binding side.',
-          'Expected PPM and Yield are the tails of a normal curve with this mean and this standard deviation. They are not a count of the points outside the limits.',
-          'Bars outside the specification are the observed values beyond the limits. The orange curve is the normal model, not a second sample.'
+          'The gauge is Ppk. Pp = (USL − LSL) / (6 × overall SD). It describes the spread against the specification width, as if the mean were centred.',
+          'PPU = (USL − mean) / (3 × overall SD). PPL = (mean − LSL) / (3 × overall SD). Ppk is the smaller of PPU and PPL, so the nearer limit sets it.',
+          'Expected PPM is one million times the normal-curve probability beyond the limits. Yield is the share of that same curve inside the limits. Observed out of spec counts the measurements that actually fall outside.',
+          'Bars outside the specification are those observed values. The orange curve is the normal model fitted to this mean and overall SD.'
         ],
         [
           'Pp and Ppk use the overall sample standard deviation (n − 1). They are not within-process Cp and Cpk.',
@@ -2395,7 +2395,11 @@
         ],
         [
           'A result states the required change, then compares the current process with the required scenario. The chart keeps the current curve and overlays the required scenario on the same scale.',
-          'Reduce variation keeps the mean. Shift mean keeps the standard deviation. Shift mean + reduce variation keeps the current standard deviation when a mean shift is enough, and otherwise centers the mean to minimize the reduction in variation.',
+          'Ppk is the smaller of (mean − LSL) / (3 × SD) and (USL − mean) / (3 × SD). The specifications stay at their actual values, and the goal is that Ppk.',
+          'Reduce variation keeps the mean. The required SD is the distance from the mean to the nearer limit, divided by 3 × the goal. The strip’s percent is (current SD − required SD) / current SD. A mean on or outside a limit cannot reach a positive goal by reducing variation alone.',
+          'Shift mean keeps the SD. A mean meets the goal when it is at least 3 × goal × SD inside both limits, and the proposal is the feasible mean closest to the current mean. When no such mean exists, the best Ppk is (USL − LSL) / (6 × SD), at the midpoint of the limits.',
+          'Shift mean + reduce variation uses only that mean shift when the current SD can already reach the goal. Otherwise it places the mean at the midpoint and sets SD to (USL − LSL) / (6 × goal). That is the smallest reduction in variation, assuming the mean may move freely. Advanced bounds keep the result inside the range you set.',
+          'The strip rounds the percent to one decimal and the mean, SD, and Ppk to two decimals. The comparison table follows the display precision.',
           'The sentence under the chart says these are calculated requirements. They are not applied to the process.'
         ],
         [
@@ -2414,6 +2418,11 @@
         ],
         [
           'The strip states the required change. The chart shows the current process and, when a change is required, the required scenario on one density scale.',
+          'Ppk is the smaller of (mean − LSL) / (3 × SD) and (USL − mean) / (3 × SD). The specifications stay fixed, and the calculation changes only the mean, the SD, or both until that Ppk meets the goal.',
+          'Reduce variation keeps the mean. The required SD is the distance from the mean to the nearer limit, divided by 3 × the goal. The percent on the strip is (current SD − required SD) / current SD. A mean on or outside a limit cannot reach a positive goal by reducing variation alone.',
+          'Shift mean keeps the current SD. Means that meet the goal lie at least 3 × goal × SD inside both limits. The proposal is the one in that interval closest to the current mean. If the interval is empty, shifting alone cannot reach the goal, and the best Ppk is (USL − LSL) / (6 × SD) at the midpoint.',
+          'Shift mean + reduce variation shifts the mean only, with no SD reduction, when the current SD can already reach the goal. Otherwise it centres the mean between the limits and sets the SD to (USL − LSL) / (6 × goal). That choice minimises the reduction in variation and assumes the mean may move freely. A mean range or a minimum SD in Advanced keeps the result inside those bounds.',
+          'The strip shows the percent to one decimal and the mean, SD, and Ppk to two decimals. The comparison uses the precision set for the page.',
           'An unreachable goal explains the limit. It does not invent a curve that meets the goal.'
         ],
         [
@@ -2429,7 +2438,8 @@
           'A number outside the initial slider range is accepted and the slider expands to include it.'
         ],
         [
-          'The solid curve is the current process. The dashed curve is the proposed process. Pp stays the same when only the mean changes.',
+          'Pp and Ppk use the Current Capability formulas. Pp = (USL − LSL) / (6 × proposed SD). Ppk is the smaller of (proposed mean − LSL) / (3 × proposed SD) and (USL − proposed mean) / (3 × proposed SD).',
+          'The solid curve is the current process. The dashed curve is the proposed process. Changing only the mean leaves Pp unchanged and moves Ppk. Changing the SD moves both.',
           'The observed histogram stays on Current Capability. This view does not invent a sample at the proposed mean and SD.'
         ],
         [
@@ -2445,6 +2455,7 @@
           'Reset to current restores the actual specifications on this view only.'
         ],
         [
+          'Pp and Ppk use the Current Capability formulas with the actual mean and overall SD. Proposed LSL and USL replace the actual limits: Pp = (proposed USL − proposed LSL) / (6 × SD), and Ppk is the smaller of the two sides against those proposed limits.',
           'One process curve is drawn. Actual and proposed specification lines are distinct. The process mean and SD do not change.',
           'Sample outside proposed limits recounts the same measurements against the proposed limits. It is not a new observed defect count and not the model-based expected rate.'
         ],

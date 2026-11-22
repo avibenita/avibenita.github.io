@@ -2391,7 +2391,7 @@
         [
           'Ppk goal defaults to 1.33. The number and the slider stay in step, and the slider widens if you type a goal outside 0.5 to 3. Dragging the slider recalculates immediately. Choosing another method does the same, and a typed goal recalculates shortly afterward.',
           'Ppk goal defaults to 1.33. The number and the slider stay in step. Moving the goal or choosing another method recalculates immediately. Specification changes belong on Specification What-If.',
-          'Current capability returns to the actual process. Changing the analyzed data clears the previous proposal and calculates again from the new baseline.'
+          'Current Capability in the sidebar returns to the observed process. Changing the analyzed data clears the previous proposal and calculates again from the new baseline.'
         ],
         [
           'A result states the required change, then compares the current process with the required scenario. The chart keeps the current curve and overlays the required scenario on the same scale.',
@@ -2414,7 +2414,7 @@
         [
           'Ppk goal defaults to 1.33. The number and the slider stay in step on the same row as By. Moving the goal or choosing By recalculates immediately. By is Reduce variation, Shift mean, or Shift mean + reduce variation.',
           'The answer states the required change, for example reducing the standard deviation from the current value to the required value to reach the Ppk goal. Yield and expected PPM appear with that result. Comparison lists Current, Required, and Change.',
-          'Current capability returns to the observed process without applying the requirement.'
+          'Current Capability in the sidebar returns to the observed process. The requirement is not applied.'
         ],
         [
           'The answer states the required change in one sentence. The chart shows the current process and, when a change is required, the required scenario on one density scale. Yield and expected PPM are outcomes of that change.',

@@ -195,7 +195,7 @@ describe('Univariate view guide', () => {
     expect(guide.resolve({ module: 'independent', key: 'independent-results' }).title).toMatch(/Test results/);
     expect(guide.resolve({ module: 'power', key: 'power-sbMeans' }).sections[0].paragraphs.join(' ')).toMatch(/not available yet/);
     expect(guide.resolve({ module: 'logistic', key: 'logistic-model-results-overview' }).title).toMatch(/overview/i);
-    ['capability-setup', 'capability-results', 'capability-planner', 'capability-by-group'].forEach((key) => {
+    ['capability-setup', 'capability-results', 'capability-planner', 'capability-reach', 'capability-process', 'capability-spec', 'capability-by-group'].forEach((key) => {
       expect(guide.resolve({ module: 'capability', key: key })).toBeTruthy();
     });
     ['gage-rr-setup', 'gage-rr-overview', 'gage-rr-diagnostics', 'gage-rr-anova'].forEach((key) => {

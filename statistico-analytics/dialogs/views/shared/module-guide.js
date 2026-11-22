@@ -1257,7 +1257,7 @@
       section('does', 'What it does', {
         paragraphs: [
           'The module summarises the selected column against a lower limit, an upper limit, and an optional target. Pp describes the spread relative to the width of the specification. Ppk describes the worse side, so a centred process and an off-centre process with the same spread do not receive the same Ppk.',
-          'Find settings, on the capability results, asks what reduction in variation, shift in the mean, or both would reach a Ppk goal. The plan stays on the capability screen. Modeled yield and expected PPM stay in Advanced. By Group repeats the indices inside categories.'
+          'Reach a Goal asks what reduction in variation, shift in the mean, or both would reach a Ppk goal. Process What-If and Specification What-If explore a hypothetical mean, variation, or acceptance limits without changing the analyzed process. By Group repeats the indices inside categories.'
         ]
       }),
       section('when', 'When to use it', {

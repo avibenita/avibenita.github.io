@@ -786,7 +786,7 @@
       detail: found.reason || ''
     };
     if (found.status === 'already-met') {
-      described.message = 'Your current process already meets this goal. No change is required.';
+      described.message = 'The current process already meets this goal. No change is required.';
       return described;
     }
     if (found.status === 'unreachable') {
@@ -817,6 +817,7 @@
       lsl: cand.lsl,
       usl: cand.usl,
       index: scored.index,
+      spread: scored.spread,
       ppm: scored.ppm,
       yieldPct: scored.yieldPct,
       sdReductionPct: (base.sd - cand.sd) / base.sd * 100,

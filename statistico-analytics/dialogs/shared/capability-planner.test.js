@@ -299,7 +299,7 @@ describe('capability planner basic Ppk contract', () => {
       expect(found.status).toBe('already-met');
       expect(found.proposal).toBeNull();
       expect(found.overlay).toBe('none');
-      expect(Planner.planCopy(found)).toBe('Your current process already meets this goal. No change is required.');
+      expect(Planner.planCopy(found)).toBe('The current process already meets this goal. No change is required.');
     });
   });
 
@@ -360,5 +360,24 @@ describe('capability planner basic Ppk contract', () => {
     }))).toBe(false);
     expect(Planner.proposalCurrent('', state)).toBe(false);
     expect(Planner.proposalCurrent(null, state)).toBe(false);
+  });
+
+  test('what-if metrics keep the untouched baseline moments', () => {
+    const base = Planner.metricsOf(10, 20, 15.679, 1.422, '');
+    expect(base.spread).toBeCloseTo(1.1720581341, 8);
+    expect(base.index).toBeCloseTo(1.0128926395, 8);
+
+    const centred = Planner.metricsOf(10, 20, 15, 1.422, '');
+    expect(centred.spread).toBeCloseTo(base.spread, 10);
+    expect(centred.index).toBeCloseTo(1.1720581341, 8);
+
+    const narrower = Planner.metricsOf(10, 20, 15.679, 1, '');
+    expect(narrower.spread).toBeCloseTo(1.6666666667, 8);
+    expect(narrower.index).toBeCloseTo(1.4403333333, 8);
+
+    const wider = Planner.metricsOf(10, 21, 15.679, 1.422, '');
+    expect(wider.spread).toBeCloseTo(1.2892639475, 8);
+    expect(wider.index).toBeCloseTo(1.2473042663, 8);
+    expect(base.spread).toBeCloseTo(1.1720581341, 8);
   });
 });

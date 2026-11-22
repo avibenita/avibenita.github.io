@@ -2370,9 +2370,8 @@
         'Process capability',
         'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
         [
-          'Descriptives and the specification from the input are shown as cards. The limits are not edited on this screen.',
-          'Find settings opens Reach a capability goal on this screen, above the distribution chart. Capability stays selected.',
-          'Histogram draws the observed values and adds a two-row table of bin ranges and the number of observations in each. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
+          'Descriptives and the actual specification are shown as cards. Reach a goal opens the separate Reach a Goal view and focuses the Ppk goal.',
+          'Histogram draws the observed values and adds a two-row table of bin ranges and the number of observations in each. The bins slider sets the number of intervals. Normal curve overlays the normal model. This view does not draw a proposed curve.'
         ],
         [
           'The gauge is Ppk. Pp is the spread relative to the specification width, as if the mean were centred. Ppk is the worse of Cpu and Cpl.',
@@ -2388,21 +2387,69 @@
       ),
       'capability-planner': guide(
         'Reach a capability goal',
-        'Plans a Ppk goal on the capability results screen, above the same distribution chart.',
+        'Calculates the process change required to reach a Ppk goal. Specifications stay at their actual values.',
         [
-          'Find settings opens the panel. Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation. Calculate required change runs the plan. After that, choosing another method calculates it immediately. Close returns to the ordinary chart.',
-          'Advanced holds specification exploration, modeled yield, expected PPM, and optional mean or standard-deviation bounds. Those metrics keep their own calculations.',
-          'Changing the goal, the method, the specifications, or the analyzed data clears the proposal until you calculate again.'
+          'Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation. Calculate required change runs the plan. After that, choosing another method calculates it immediately, and editing a valid goal recalculates shortly afterward.',
+          'Advanced holds modeled yield, expected PPM, and optional mean or standard-deviation bounds. Specification changes belong on Specification What-If.',
+          'Current capability returns to the actual process. Changing the analyzed data clears the previous proposal and calculates again from the new baseline.'
         ],
         [
-          'A result states the required change, then compares the current process with the proposed scenario. The chart keeps the current curve and overlays the proposal on the same scale.',
-          'Reduce variation keeps the mean. Shift mean keeps the standard deviation and shows the feasible mean interval. Both keeps the current standard deviation when a mean shift is enough, and otherwise centers the mean to minimize the reduction in variation.',
-          'Specification exploration keeps the process curve and draws proposed limits. It does not improve production.'
+          'A result states the required change, then compares the current process with the required scenario. The chart keeps the current curve and overlays the required scenario on the same scale.',
+          'Reduce variation keeps the mean. Shift mean keeps the standard deviation. Shift mean + reduce variation keeps the current standard deviation when a mean shift is enough, and otherwise centers the mean to minimize the reduction in variation.',
+          'The sentence under the chart says these are calculated requirements. They are not applied to the process.'
         ],
         [
-          'The proposal is a hypothetical point estimate. It is not a confidence interval and it is not written back to the worksheet or the capability results.',
-          'If the current process already meets the goal, no change is proposed. If the goal is unreachable, the panel names the limit and does not draw a proposed curve.',
+          'The proposal is a hypothetical point estimate. It is not a confidence interval and it is not written back to the worksheet or the current capability results.',
+          'If the current process already meets the goal, no change is proposed. If the goal is unreachable, the view names the limit and does not draw a required curve.',
           'Yield and expected PPM are normal-model estimates. A very small expected PPM is not a promise of zero defects.'
+        ]
+      ),
+      'capability-reach': guide(
+        'Reach a capability goal',
+        'Calculates the process change required to reach a Ppk goal. Specifications stay at their actual values.',
+        [
+          'Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation.',
+          'After the first calculation, another method or a valid goal edit recalculates. An invalid goal clears the previous result.',
+          'Current capability returns to the observed process without applying the requirement.'
+        ],
+        [
+          'The strip states the required change. The chart shows the current process and, when a change is required, the required scenario on one density scale.',
+          'An unreachable goal explains the limit. It does not invent a curve that meets the goal.'
+        ],
+        [
+          'These are calculated requirements. Achieving them requires process changes. They are not a confidence interval.'
+        ]
+      ),
+      'capability-process': guide(
+        'Process What-If',
+        'Shows the capability of a hypothetical mean and overall standard deviation against the actual specifications.',
+        [
+          'Proposed mean and proposed overall SD start at the current process. Sliders and numbers stay in step, and the chart updates as they move.',
+          'Reset to current restores this view only. It does not change Reach a Goal or Specification What-If.',
+          'A number outside the initial slider range is accepted and the slider expands to include it.'
+        ],
+        [
+          'The solid curve is the current process. The dashed curve is the proposed process. Pp stays the same when only the mean changes.',
+          'The observed histogram stays on Current Capability. This view does not invent a sample at the proposed mean and SD.'
+        ],
+        [
+          'The proposed process is hypothetical. It is not written to the worksheet or treated as the current capability.'
+        ]
+      ),
+      'capability-spec': guide(
+        'Specification What-If',
+        'Shows the capability of the actual process against proposed acceptance limits.',
+        [
+          'Proposed LSL and proposed USL start at the actual limits. Moving either updates the markers and the indices immediately.',
+          'Limits may tighten or widen. Proposed LSL must stay below proposed USL. A limit may pass the mean, and Ppk may be negative.',
+          'Reset to current restores the actual specifications on this view only.'
+        ],
+        [
+          'One process curve is drawn. Actual and proposed specification lines are distinct. The process mean and SD do not change.',
+          'Sample outside proposed limits recounts the same measurements against the proposed limits. It is not a new observed defect count and not the model-based expected rate.'
+        ],
+        [
+          'Changing the limits changes what would be accepted. It does not change the manufactured process.'
         ]
       ),
       'capability-by-group': guide(

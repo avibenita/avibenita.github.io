@@ -18,7 +18,7 @@
   <script src="../shared/demo-fixtures.js?v=20261117demo6"></script>
   <script src="../shared/demo-data.js?v=20261119demo"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261122cards"></script>
+  <script src="../shared-header.js?v=20261122views"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
   <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
@@ -187,6 +187,12 @@
     .plan-method input { margin: 0; accent-color: #f97316; }
     .plan-method.is-selected { border-color: #f97316; box-shadow: inset 3px 0 0 #f97316; }
     .plan-bar .cap-actions { margin: 0; }
+    .whatif-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .whatif-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .whatif-control input[type="range"] { flex: 1 1 120px; min-width: 80px; accent-color: #f97316; }
+    .whatif-control input[type="number"] { width: 6.5rem; }
+    .whatif-note { margin: 8px 0 0; color: var(--text-secondary, rgba(255,255,255,.78)); font-size: 13px; line-height: 1.4; }
+    @media (max-width: 800px) { .whatif-grid { grid-template-columns: minmax(0, 1fr); } }
     #planner-prompt, #planner-note { margin: 6px 0 0; color: var(--text-secondary, rgba(255,255,255,.78)); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
     .plan-strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-top: 8px; padding: 8px 12px; border-radius: 8px; background: rgba(20, 184, 166, 0.14); border: 1px solid rgba(20, 184, 166, 0.5); font-size: 16px; font-weight: 750; line-height: 1.35; }
     .plan-strip[hidden] { display: none !important; }
@@ -396,7 +402,7 @@
               </section>
             </div>
             <div class="cap-card">
-              <h2 id="results-title"><i class="fa-solid fa-chart-area"></i> Capability results</h2>
+              <h2 id="results-title"><i class="fa-solid fa-chart-area"></i> Current Capability</h2>
               <div class="results-top">
                 <div class="gauge-panel">
                   <div id="cpkGauge"></div>
@@ -408,7 +414,28 @@
                 <p id="assessment"></p>
               </div>
             </div>
-            <section id="reach-panel" class="cap-card plan-span" hidden aria-labelledby="reach-title">
+            <div class="cap-card plan-span" id="distribution-card">
+                <div class="hist-tools">
+                  <label><input type="checkbox" id="show-histogram" /> Histogram</label>
+                  <label id="bin-control" hidden>Bins
+                    <input type="range" id="hist-bins" min="4" max="30" value="12" step="1" />
+                    <span class="bin-readout" id="hist-bins-value">12</span>
+                  </label>
+                  <label><input type="checkbox" id="show-normal" checked /> Normal curve</label>
+                </div>
+                <div id="distributionChart"></div>
+                <div id="hist-values" class="hist-values" hidden></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-reach" class="cap-view" hidden aria-labelledby="reach-title">
+          <div id="reach-empty" class="empty-prompt" hidden>
+            <p>Analyze a measurement column, then calculate the change required to reach a capability goal.</p>
+            <button type="button" id="reach-to-setup">Go to input</button>
+          </div>
+          <div id="reach-body">
+            <section id="reach-panel" class="cap-card" aria-labelledby="reach-title">
               <h2 id="reach-title" tabindex="-1">Reach a capability goal</h2>
               <div class="plan-bar">
                 <label class="field plan-goal" for="planner-goal">Ppk goal
@@ -431,7 +458,7 @@
                 </fieldset>
                 <div class="cap-actions">
                   <button type="button" class="primary" id="planner-find">Calculate required change</button>
-                  <button type="button" id="planner-close">Close</button>
+                  <button type="button" id="planner-close">Current capability</button>
                 </div>
               </div>
               <p id="planner-goal-error" class="cap-error" hidden></p>
@@ -445,28 +472,6 @@
               </details>
                   <details id="planner-advanced">
                     <summary>Advanced</summary>
-                    <h3>Explore specification changes</h3>
-                    <p class="cap-help">Keeps the process unchanged and explores different acceptance limits. It does not improve production.</p>
-                    <div class="planner-form" id="planner-spec-bounds">
-                      <label class="field">Specification metric
-                        <select id="planner-spec-metric">
-                          <option value="index">Ppk goal above</option>
-                          <option value="yield">Modeled yield (%)</option>
-                          <option value="ppm">Expected PPM</option>
-                        </select>
-                      </label>
-                      <label class="plan-choice"><input type="checkbox" id="planner-unlock-lower" checked /> <span>Allow lower limit to decrease</span></label>
-                      <label class="field">Lower outward allowance <span class="plan-unit"></span>
-                        <input id="planner-lower-out" type="number" step="any" placeholder="No cap" />
-                      </label>
-                      <label class="plan-choice"><input type="checkbox" id="planner-unlock-upper" checked /> <span>Allow upper limit to increase</span></label>
-                      <label class="field">Upper outward allowance <span class="plan-unit"></span>
-                        <input id="planner-upper-out" type="number" step="any" placeholder="No cap" />
-                      </label>
-                    </div>
-                    <div class="cap-actions" style="margin-top:8px;">
-                      <button type="button" id="planner-spec">Calculate specification change</button>
-                    </div>
                     <h3>Other metrics</h3>
                     <p class="cap-help">Modeled yield and expected PPM keep their own calculations. They are not recalculated as Ppk. Cpm stays on the results card and follows the nominal value.</p>
                     <div class="planner-form">
@@ -497,17 +502,71 @@
                   <input type="hidden" id="planner-mode" value="process" />
                   <input type="hidden" id="planner-adjust" value="sd" />
             </section>
-            <div class="cap-card plan-span" id="distribution-card">
-                <div class="hist-tools">
-                  <label><input type="checkbox" id="show-histogram" /> Histogram</label>
-                  <label id="bin-control" hidden>Bins
-                    <input type="range" id="hist-bins" min="4" max="30" value="12" step="1" />
-                    <span class="bin-readout" id="hist-bins-value">12</span>
-                  </label>
-                  <label><input type="checkbox" id="show-normal" checked /> Normal curve</label>
-                </div>
-                <div id="distributionChart"></div>
-                <div id="hist-values" class="hist-values" hidden></div>
+            <div class="cap-card">
+              <div id="reachChart"></div>
+              <p class="whatif-note">Calculated requirements; achieving them requires process changes.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-process" class="cap-view" hidden aria-labelledby="process-title">
+          <div id="process-empty" class="empty-prompt" hidden>
+            <p>Analyze a measurement column, then explore a different mean or standard deviation.</p>
+            <button type="button" id="process-to-setup">Go to input</button>
+          </div>
+          <div id="process-body">
+            <div class="cap-card">
+              <h2 id="process-title">Process What-If</h2>
+              <p id="process-specs" class="whatif-note"></p>
+              <div class="whatif-grid">
+                <label class="whatif-control">Proposed mean
+                  <input id="process-mean" type="number" step="any" />
+                  <input id="process-mean-range" type="range" step="any" />
+                </label>
+                <label class="whatif-control">Proposed overall SD
+                  <input id="process-sd" type="number" step="any" />
+                  <input id="process-sd-range" type="range" step="any" />
+                </label>
+              </div>
+              <div class="cap-actions">
+                <button type="button" id="process-reset">Reset to current</button>
+              </div>
+              <p id="process-error" class="cap-error" hidden></p>
+              <div id="process-status" class="plan-strip" role="status" hidden></div>
+              <div id="processChart"></div>
+              <div id="process-compare"></div>
+              <p class="whatif-note">The histogram of observed values stays on Current Capability. This curve is the hypothetical process, not a new sample.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-spec" class="cap-view" hidden aria-labelledby="spec-what-title">
+          <div id="spec-empty" class="empty-prompt" hidden>
+            <p>Analyze a measurement column, then explore different acceptance limits.</p>
+            <button type="button" id="spec-to-setup">Go to input</button>
+          </div>
+          <div id="spec-body">
+            <div class="cap-card">
+              <h2 id="spec-what-title">Specification What-If</h2>
+              <p id="spec-process" class="whatif-note"></p>
+              <div class="whatif-grid">
+                <label class="whatif-control">Proposed LSL
+                  <input id="spec-lsl" type="number" step="any" />
+                  <input id="spec-lsl-range" type="range" step="any" />
+                </label>
+                <label class="whatif-control">Proposed USL
+                  <input id="spec-usl" type="number" step="any" />
+                  <input id="spec-usl-range" type="range" step="any" />
+                </label>
+              </div>
+              <div class="cap-actions">
+                <button type="button" id="spec-reset">Reset to current</button>
+              </div>
+              <p id="spec-error" class="cap-error" hidden></p>
+              <div id="spec-status" class="plan-strip" role="status" hidden></div>
+              <div id="specChart"></div>
+              <div id="spec-compare"></div>
+              <p class="whatif-note">Changes acceptance limits; the process itself is unchanged.</p>
             </div>
           </div>
         </section>
@@ -535,7 +594,7 @@
                   <table>
                     <thead>
                       <tr>
-                        <th>Group</th><th>n</th><th>Mean</th><th>SD</th><th>Pp</th><th>Ppk</th><th>Cpu</th><th>Cpl</th><th>Limited by</th><th>PPM</th>
+                        <th>Group</th><th>n</th><th>Mean</th><th>SD</th><th>Pp</th><th>Ppk</th><th>PPU</th><th>PPL</th><th>Limited by</th><th>PPM</th>
                       </tr>
                     </thead>
                     <tbody id="group-table"></tbody>
@@ -598,6 +657,11 @@
     var plannerMetricUsed = 'index';
     var plannerModeUsed = 'process';
     var plannerOpen = false;
+    var processInputs = null;
+    var specInputs = null;
+    var processPlan = null;
+    var specPlan = null;
+    var reachDebounce = 0;
     var plannerFollowsMethod = false;
     var draggedName = '';
 
@@ -1077,7 +1141,7 @@
       svg.appendChild(current);
       svg.appendChild(svgEl('line', { x1: '156', y1: '30', x2: '176', y2: '30', stroke: '#38bdf8', 'stroke-width': '2.4', 'stroke-dasharray': '6 4' }));
       var proposed = svgEl('text', { x: '180', y: '34', fill: ink(), 'font-size': '11', 'font-weight': '700' });
-      proposed.textContent = 'Proposed scenario';
+      proposed.textContent = view === 'process' ? 'Proposed process' : 'Required scenario';
       svg.appendChild(proposed);
     }
     function drawDistribution(result) {
@@ -1090,7 +1154,7 @@
     }
     function drawModel(result, showCurve) {
       clearBinTable();
-      var plan = proposalOverlay();
+      var plan = scenePlan();
       var xMin = Math.min(result.lsl, result.mean - 4 * result.sd);
       var xMax = Math.max(result.usl, result.mean + 4 * result.sd);
       if (plan) {
@@ -1120,11 +1184,12 @@
       var B = 16;
       function px(v) { return L + ((v - xMin) / (xMax - xMin)) * (W - L - R); }
       function py(v) { return T + (1 - v / maxY) * (H - T - B); }
-      var host = el('distributionChart');
+      var host = chartNode();
+      if (!host) return;
       host.textContent = '';
-      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': plan && plan.overlay === 'curve' ? 'Current process and a hypothetical proposed scenario on the same density scale' : (plan && plan.overlay === 'specs' ? 'Current process with proposed specification limits' : 'Process distribution and specification limits') });
+      var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': plan && plan.overlay === 'curve' ? 'Current process and a hypothetical proposed scenario on the same density scale' : (plan && plan.overlay === 'specs' ? 'Actual process with proposed specification limits' : 'Process distribution and specification limits') });
       var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
-      title.textContent = plan && plan.overlay === 'curve' ? 'Current process and proposed scenario' : (plan && plan.overlay === 'specs' ? 'Current process with proposed limits' : 'Process distribution and specification limits');
+      title.textContent = plan && plan.overlay === 'curve' ? (view === 'process' ? 'Current process and proposed process' : 'Current process and required scenario') : (plan && plan.overlay === 'specs' ? 'Actual process with proposed limits' : 'Process distribution and specification limits');
       svg.appendChild(title);
       drawPlanLegend(svg, plan);
       function areaBetween(a, b) {
@@ -1158,8 +1223,8 @@
         vline(plan.usl, '#fbbf24', '2 2');
       }
       var labels = [
-        { name: 'LSL', value: result.lsl, color: '#e74c3c' },
-        { name: 'USL', value: result.usl, color: '#e74c3c' },
+        { name: plan && plan.overlay === 'specs' ? 'Actual LSL' : 'LSL', value: result.lsl, color: '#e74c3c' },
+        { name: plan && plan.overlay === 'specs' ? 'Actual USL' : 'USL', value: result.usl, color: '#e74c3c' },
         { name: 'Mean', value: result.mean, color: '#2ecc71' }
       ];
       if (result.hasTarget) labels.push({ name: 'Target', value: result.target, color: 'rgb(255,165,120)' });
@@ -1190,7 +1255,7 @@
     }
     function drawHistogram(result, showCurve) {
       var values = measurementValues();
-      var plan = proposalOverlay();
+      var plan = scenePlan();
       var win = chartWindow(result, values);
       var xMin = win.xMin;
       var xMax = win.xMax;
@@ -1230,7 +1295,8 @@
       var B = 16;
       function px(v) { return L + ((v - xMin) / (xMax - xMin)) * (W - L - R); }
       function py(v) { return T + (1 - v / maxY) * (H - T - B); }
-      var host = el('distributionChart');
+      var host = chartNode();
+      if (!host) return;
       host.textContent = '';
       var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': (plan && plan.overlay === 'curve' ? 'Observed histogram, current process, and hypothetical proposed scenario. ' : 'Histogram of measured values. ') + observed.count + ' of ' + observed.n + ' are out of spec.' });
       var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
@@ -1277,8 +1343,8 @@
         vline(plan.usl, '#fbbf24', '2 2');
       }
       var labels = [
-        { name: 'LSL', value: result.lsl, color: '#e74c3c' },
-        { name: 'USL', value: result.usl, color: '#e74c3c' },
+        { name: plan && plan.overlay === 'specs' ? 'Actual LSL' : 'LSL', value: result.lsl, color: '#e74c3c' },
+        { name: plan && plan.overlay === 'specs' ? 'Actual USL' : 'USL', value: result.usl, color: '#e74c3c' },
         { name: 'Mean', value: result.mean, color: '#2ecc71' }
       ];
       if (result.hasTarget) labels.push({ name: 'Target', value: result.target, color: 'rgb(255,165,120)' });
@@ -1364,9 +1430,9 @@
       }
       el('metric-grid').innerHTML = [
         metricCard('Pp', 'Pp = (USL − LSL) / (6s). Spread only, as if the mean were centered. s is the overall sample standard deviation.', fmt(result.cp)),
-        metricCard('Ppk', 'Ppk = min(Cpu, Cpl). The worse one-sided capability from the overall sample standard deviation.', fmt(result.cpk) + ratingHtml(result.rating), true, '<button type="button" class="primary" id="open-planner" aria-controls="reach-panel" aria-expanded="' + (plannerOpen ? 'true' : 'false') + '">Find settings</button>'),
-        metricCard('Cpu', 'Cpu = (USL − mean) / (3s). Room from the mean to the upper limit, using the overall sample standard deviation.', fmt(result.cpu)),
-        metricCard('Cpl', 'Cpl = (mean − LSL) / (3s). Room from the mean to the lower limit, using the overall sample standard deviation.', fmt(result.cpl)),
+        metricCard('Ppk', 'Ppk = min(PPU, PPL). The worse one-sided capability from the overall sample standard deviation.', fmt(result.cpk) + ratingHtml(result.rating), true, '<button type="button" class="primary" id="open-planner">Reach a goal</button>'),
+        metricCard('PPU', 'PPU = (USL − mean) / (3s). Room from the mean to the upper limit, using the overall sample standard deviation.', fmt(result.cpu)),
+        metricCard('PPL', 'PPL = (mean − LSL) / (3s). Room from the mean to the lower limit, using the overall sample standard deviation.', fmt(result.cpl)),
         metricCard('Cpm', 'Cpm = (USL − LSL) / (6 √(s² + (mean − target)²)). Penalizes distance from the target.', fmt(result.cpm)),
         metricCard('Expected PPM', 'Estimate from the fitted normal curve. PPM = 1,000,000 × (P(X < LSL) + P(X > USL)). This is not a count of observed out-of-spec measurements, and it does not change with the histogram bins.', escapeHtml(ppmCountText(result.ppm) + ' (' + ppmShareText(result.ppm) + ')')),
         metricCard('Yield', 'Yield = 100% × P(LSL ≤ X ≤ USL).', result.yieldPct.toFixed(2) + '%')
@@ -1513,6 +1579,16 @@
         upperOut: el('planner-upper-out') ? el('planner-upper-out').value : ''
       };
     }
+    function chartNode() {
+      var id = view === 'reach' ? 'reachChart' : view === 'process' ? 'processChart' : view === 'spec' ? 'specChart' : 'distributionChart';
+      return el(id);
+    }
+    function scenePlan() {
+      if (view === 'reach') return proposalOverlay();
+      if (view === 'process') return processPlan;
+      if (view === 'spec') return specPlan;
+      return null;
+    }
     function proposalOverlay() {
       if (!plannerDescribed || plannerDescribed.status !== 'reachable' || !plannerDescribed.proposal) return null;
       var Planner = window.StatisticoCapabilityPlanner;
@@ -1593,8 +1669,9 @@
       document.querySelectorAll('.plan-unit').forEach(function (node) { node.textContent = unit; });
     }
     function refreshChart() {
-      if (!(view === 'results' && last && last.ok)) return;
-      drawDistribution(last.overall);
+      if (!last || !last.ok) return;
+      if (view === 'results') drawDistribution(last.overall);
+      else if (view === 'reach' || view === 'process' || view === 'spec') drawModel(last.overall, true);
     }
     function invalidateProposal() {
       plannerDescribed = null;
@@ -1623,8 +1700,12 @@
       snapshotPlanner();
       syncPlanUnits();
       if (previous && plannerSnapshot && plannerSnapshot.key !== previous) {
-        plannerFollowsMethod = false;
+        processInputs = null;
+        specInputs = null;
+        processPlan = null;
+        specPlan = null;
         invalidateProposal();
+        if (plannerFollowsMethod) runPlanner('ppk');
       }
     }
     function comparisonTable(described) {
@@ -1633,6 +1714,7 @@
       var rows = [
         ['Mean', fmt(snap.mean) + unitSuffix(), fmt(proposal.mean) + unitSuffix()],
         ['Overall SD', fmt(snap.sd) + unitSuffix(), fmt(proposal.sd) + unitSuffix()],
+        ['Pp', fmt(last.overall.cp), fmt(Number.isFinite(proposal.spread) ? proposal.spread : last.overall.cp)],
         ['Ppk', fmt(described.baselineIndex), fmt(proposal.index)],
         ['Expected out-of-spec rate', formatPpm(last.overall.ppm) + ' PPM', formatPpm(proposal.ppm) + ' PPM']
       ];
@@ -1715,7 +1797,7 @@
         el('planner-note').hidden = false;
         el('planner-note').textContent = described.overlay === 'specs'
           ? 'Proposed limits are a what-if on the current process. They do not change the analyzed specifications.'
-          : 'Calculated from the proposed mean and variation; achieving these values requires process changes.';
+          : 'Calculated requirements; achieving them requires process changes.';
       }
     }
     function plannerRequest() {
@@ -1729,10 +1811,10 @@
         meanMin: el('planner-mean-min').value,
         meanMax: el('planner-mean-max').value,
         sdMin: el('planner-sd-min').value,
-        unlockLower: el('planner-unlock-lower').checked,
-        unlockUpper: el('planner-unlock-upper').checked,
-        lowerOut: el('planner-lower-out').value,
-        upperOut: el('planner-upper-out').value
+        unlockLower: !!(el('planner-unlock-lower') && el('planner-unlock-lower').checked),
+        unlockUpper: !!(el('planner-unlock-upper') && el('planner-unlock-upper').checked),
+        lowerOut: el('planner-lower-out') ? el('planner-lower-out').value : '',
+        upperOut: el('planner-upper-out') ? el('planner-upper-out').value : ''
       };
     }
     function markPlannerStale() {
@@ -2229,10 +2311,10 @@
           meanMin: el('planner-mean-min').value,
           meanMax: el('planner-mean-max').value,
           sdMin: el('planner-sd-min').value,
-          unlockLower: !!el('planner-unlock-lower').checked,
-          unlockUpper: !!el('planner-unlock-upper').checked,
-          lowerOut: el('planner-lower-out').value,
-          upperOut: el('planner-upper-out').value
+          unlockLower: !!(el('planner-unlock-lower') && el('planner-unlock-lower').checked),
+          unlockUpper: !!(el('planner-unlock-upper') && el('planner-unlock-upper').checked),
+          lowerOut: el('planner-lower-out') ? el('planner-lower-out').value : '',
+          upperOut: el('planner-upper-out') ? el('planner-upper-out').value : ''
         });
       } catch (err) {
         described = { ok: false, status: 'failed', message: 'Could not calculate this scenario. Please try again.', proposal: null, overlay: 'none' };
@@ -2258,26 +2340,19 @@
         showView('results');
         return;
       }
-      plannerOpen = true;
-      showView('results', { focusPlanner: true });
+      showView('reach', { focusPlanner: true });
     }
     function closePlanner() {
-      plannerOpen = false;
-      invalidateProposal();
-      if (el('reach-panel')) el('reach-panel').hidden = true;
-      syncShell();
+      showView('results');
       var opener = el('open-planner');
-      if (opener) {
-        opener.setAttribute('aria-expanded', 'false');
-        opener.focus();
-      }
+      if (opener) opener.focus();
     }
 
     function syncShell() {
       window.__capView = view;
       window.__capFitted = hasRun;
-      var titles = { setup: 'Input & Setup', results: 'Process Capability', 'by-group': 'By-Group Analysis' };
-      var views = { setup: 'cap-setup', results: 'cap-results', 'by-group': 'cap-by-group' };
+      var titles = { setup: 'Input & Setup', results: 'Current Capability', reach: 'Reach a capability goal', process: 'Process What-If', spec: 'Specification What-If', 'by-group': 'By-Group Analysis' };
+      var views = { setup: 'cap-setup', results: 'cap-results', reach: 'cap-reach', process: 'cap-process', spec: 'cap-spec', 'by-group': 'cap-by-group' };
       if (!window.StatisticoHeader) return;
       StatisticoHeader.currentView = views[view] || view;
       StatisticoHeader.updateTitle(titles[view] || 'Process Capability');
@@ -2288,35 +2363,245 @@
       if (typeof StatisticoHeader._syncViewGuide === 'function') StatisticoHeader._syncViewGuide();
     }
 
+    function scenarioTable(rows) {
+      return '<table class="plan-table"><thead><tr><th>Measure</th><th>Current</th><th>Proposed</th></tr></thead><tbody>' +
+        rows.map(function (row) {
+          return '<tr><td>' + escapeHtml(row[0]) + '</td><td>' + row[1] + '</td><td>' + row[2] + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    }
+    function finiteNumber(raw) {
+      if (raw == null || String(raw).trim() === '') return NaN;
+      var n = Number(raw);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    function inputNumber(n) {
+      if (!Number.isFinite(n)) return '';
+      var digits = 6;
+      try { digits = Math.max(3, decimals()); } catch (err) { digits = 6; }
+      return n.toFixed(digits).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+    }
+    function ensureProcessInputs() {
+      snapshotPlanner();
+      if (!plannerSnapshot) return null;
+      if (processInputs && processInputs.key === plannerSnapshot.key) return processInputs;
+      var b = plannerSnapshot;
+      var mid = (Number(b.lsl) + Number(b.usl)) / 2;
+      var anchors = [b.mean - 3 * b.sd, b.mean + 3 * b.sd, b.mean];
+      if (Number.isFinite(b.lsl)) anchors.push(b.lsl);
+      if (Number.isFinite(b.usl)) anchors.push(b.usl);
+      if (Number.isFinite(mid)) anchors.push(mid);
+      processInputs = {
+        key: b.key,
+        mean: b.mean,
+        sd: b.sd,
+        meanLo: Math.min.apply(null, anchors),
+        meanHi: Math.max.apply(null, anchors),
+        sdLo: b.sd * 0.1,
+        sdHi: b.sd * 2
+      };
+      return processInputs;
+    }
+    function paintProcess() {
+      if (el('process-empty')) el('process-empty').hidden = !!hasRun;
+      if (el('process-body')) el('process-body').hidden = !hasRun;
+      if (!hasRun || !last || !last.ok) return;
+      snapshotPlanner();
+      var b = plannerSnapshot;
+      el('process-specs').textContent = 'Actual specifications stay fixed: LSL ' + fmt(b.lsl) + ', USL ' + fmt(b.usl) + (b.nominal !== '' && b.nominal != null ? ', nominal ' + fmt(Number(b.nominal)) : '') + '.';
+      var state = ensureProcessInputs();
+      el('process-mean').value = inputNumber(state.mean);
+      el('process-sd').value = inputNumber(state.sd);
+      applyProcess(true);
+    }
+    function applyProcess(fromControl) {
+      var state = ensureProcessInputs();
+      if (!state || !last || !last.ok || !window.StatisticoCapabilityPlanner) return;
+      var mean = fromControl === 'sd' ? state.mean : finiteNumber(el(fromControl === 'mean-range' ? 'process-mean-range' : 'process-mean').value);
+      var sd = fromControl === 'mean' || fromControl === 'mean-range' ? state.sd : finiteNumber(el(fromControl === 'sd-range' ? 'process-sd-range' : 'process-sd').value);
+      if (fromControl === true) {
+        mean = state.mean;
+        sd = state.sd;
+      }
+      var err = el('process-error');
+      if (!Number.isFinite(mean) || !(sd > 0)) {
+        processPlan = null;
+        err.hidden = false;
+        err.textContent = 'Enter a finite proposed mean and a positive overall standard deviation.';
+        el('process-status').hidden = true;
+        el('process-compare').innerHTML = '';
+        drawModel(last.overall, true);
+        return;
+      }
+      err.hidden = true;
+      if (mean < state.meanLo) state.meanLo = mean;
+      if (mean > state.meanHi) state.meanHi = mean;
+      if (sd < state.sdLo) state.sdLo = sd;
+      if (sd > state.sdHi) state.sdHi = sd;
+      state.mean = mean;
+      state.sd = sd;
+      el('process-mean-range').min = state.meanLo;
+      el('process-mean-range').max = state.meanHi;
+      el('process-mean-range').value = mean;
+      el('process-sd-range').min = state.sdLo;
+      el('process-sd-range').max = state.sdHi;
+      el('process-sd-range').value = sd;
+      if (fromControl === 'mean-range') el('process-mean').value = inputNumber(mean);
+      if (fromControl === 'sd-range') el('process-sd').value = inputNumber(sd);
+      var base = plannerSnapshot;
+      var scored = window.StatisticoCapabilityPlanner.metricsOf(base.lsl, base.usl, mean, sd, base.nominal);
+      if (!scored) {
+        processPlan = null;
+        err.hidden = false;
+        err.textContent = 'Could not calculate this scenario. Please try again.';
+        el('process-status').hidden = true;
+        el('process-compare').innerHTML = '';
+        drawModel(last.overall, true);
+        return;
+      }
+      var same = Math.abs(mean - base.mean) <= 1e-9 && Math.abs(sd - base.sd) <= 1e-9 * Math.max(1, base.sd);
+      processPlan = same ? null : { overlay: 'curve', mean: mean, sd: sd, lsl: base.lsl, usl: base.usl, ppm: scored.ppm };
+      var pct = (base.sd - sd) / base.sd * 100;
+      var sdLead = Math.abs(pct) < 0.05 ? 'SD unchanged' : (pct > 0 ? 'Reduce SD by ' + pct.toFixed(1) + '%' : 'Increase SD by ' + Math.abs(pct).toFixed(1) + '%');
+      var parts = [sdLead];
+      if (Math.abs(mean - base.mean) > 1e-6) parts.push('Mean ' + fmt(base.mean) + ' → ' + fmt(mean));
+      parts.push('Pp ' + fmt(last.overall.cp) + ' → ' + fmt(scored.spread));
+      parts.push('Ppk ' + fmt(last.overall.cpk) + ' → ' + fmt(scored.index));
+      el('process-status').hidden = false;
+      el('process-status').className = 'plan-strip';
+      el('process-status').innerHTML = parts.map(function (text, i) {
+        return (i ? '<span class="plan-strip-sep">|</span>' : '') + '<span>' + escapeHtml(text) + '</span>';
+      }).join('');
+      el('process-compare').innerHTML = scenarioTable([
+        ['Mean', fmt(base.mean), fmt(mean)],
+        ['Overall SD', fmt(base.sd), fmt(sd)],
+        ['Pp', fmt(last.overall.cp), fmt(scored.spread)],
+        ['Ppk', fmt(last.overall.cpk), fmt(scored.index)],
+        ['Expected out-of-spec rate', escapeHtml(formatPpm(last.overall.ppm) + ' PPM'), escapeHtml(formatPpm(scored.ppm) + ' PPM')]
+      ]);
+      drawModel(last.overall, true);
+    }
+    function ensureSpecInputs() {
+      snapshotPlanner();
+      if (!plannerSnapshot) return null;
+      if (specInputs && specInputs.key === plannerSnapshot.key) return specInputs;
+      var b = plannerSnapshot;
+      var width = Number(b.usl) - Number(b.lsl);
+      var pad = Number.isFinite(width) && width > 0 ? width / 2 : Math.max(Math.abs(b.mean) || 1, 1);
+      var lo = Number.isFinite(Number(b.lsl)) && Number.isFinite(Number(b.usl)) ? Math.min(Number(b.lsl), Number(b.usl)) - pad : b.mean - pad;
+      var hi = Number.isFinite(Number(b.lsl)) && Number.isFinite(Number(b.usl)) ? Math.max(Number(b.lsl), Number(b.usl)) + pad : b.mean + pad;
+      specInputs = { key: b.key, lsl: b.lsl, usl: b.usl, lo: lo, hi: hi, ranged: Number.isFinite(lo) && Number.isFinite(hi) && hi > lo };
+      return specInputs;
+    }
+    function paintSpecWhatIf() {
+      if (el('spec-empty')) el('spec-empty').hidden = !!hasRun;
+      if (el('spec-body')) el('spec-body').hidden = !hasRun;
+      if (!hasRun || !last || !last.ok) return;
+      snapshotPlanner();
+      var b = plannerSnapshot;
+      el('spec-process').textContent = 'Actual process stays fixed: mean ' + fmt(b.mean) + ', overall SD ' + fmt(b.sd) + '.';
+      var state = ensureSpecInputs();
+      el('spec-lsl').value = inputNumber(state.lsl);
+      el('spec-usl').value = inputNumber(state.usl);
+      el('spec-lsl-range').hidden = !state.ranged;
+      el('spec-usl-range').hidden = !state.ranged;
+      applySpec(true);
+    }
+    function applySpec(fromControl) {
+      var state = ensureSpecInputs();
+      if (!state || !last || !last.ok || !window.StatisticoCapabilityPlanner) return;
+      var lsl = finiteNumber(el(fromControl === 'lsl-range' ? 'spec-lsl-range' : 'spec-lsl').value);
+      var usl = finiteNumber(el(fromControl === 'usl-range' ? 'spec-usl-range' : 'spec-usl').value);
+      if (fromControl === true) {
+        lsl = Number(state.lsl);
+        usl = Number(state.usl);
+      }
+      var err = el('spec-error');
+      if (!Number.isFinite(lsl) || !Number.isFinite(usl)) {
+        specPlan = null;
+        err.hidden = false;
+        err.textContent = 'Enter finite proposed limits.';
+        el('spec-status').hidden = true;
+        el('spec-compare').innerHTML = '';
+        drawModel(last.overall, true);
+        return;
+      }
+      if (!(lsl < usl)) {
+        specPlan = null;
+        err.hidden = false;
+        err.textContent = 'Proposed LSL has to be below proposed USL.';
+        el('spec-status').hidden = true;
+        el('spec-compare').innerHTML = '';
+        drawModel(last.overall, true);
+        return;
+      }
+      err.hidden = true;
+      if (state.ranged) {
+        if (lsl < state.lo) state.lo = lsl;
+        if (usl > state.hi) state.hi = usl;
+        if (lsl > state.hi) state.hi = lsl;
+        if (usl < state.lo) state.lo = usl;
+        el('spec-lsl-range').min = state.lo;
+        el('spec-lsl-range').max = state.hi;
+        el('spec-lsl-range').value = lsl;
+        el('spec-usl-range').min = state.lo;
+        el('spec-usl-range').max = state.hi;
+        el('spec-usl-range').value = usl;
+      }
+      state.lsl = lsl;
+      state.usl = usl;
+      if (fromControl === 'lsl-range') el('spec-lsl').value = inputNumber(lsl);
+      if (fromControl === 'usl-range') el('spec-usl').value = inputNumber(usl);
+      var base = plannerSnapshot;
+      var scored = window.StatisticoCapabilityPlanner.metricsOf(lsl, usl, base.mean, base.sd, base.nominal);
+      if (!scored) {
+        specPlan = null;
+        err.hidden = false;
+        err.textContent = 'Could not calculate this scenario. Please try again.';
+        el('spec-status').hidden = true;
+        el('spec-compare').innerHTML = '';
+        drawModel(last.overall, true);
+        return;
+      }
+      var same = Math.abs(lsl - base.lsl) <= 1e-9 && Math.abs(usl - base.usl) <= 1e-9;
+      specPlan = same ? null : { overlay: 'specs', mean: base.mean, sd: base.sd, lsl: lsl, usl: usl, ppm: scored.ppm };
+      var sample = observedOutOfSpec(measurementValues(), lsl, usl);
+      var actual = observedOutOfSpec(measurementValues(), base.lsl, base.usl);
+      el('spec-status').hidden = false;
+      el('spec-status').className = 'plan-strip';
+      el('spec-status').textContent = 'Pp ' + fmt(last.overall.cp) + ' → ' + fmt(scored.spread) + '  |  Ppk ' + fmt(last.overall.cpk) + ' → ' + fmt(scored.index);
+      el('spec-compare').innerHTML = scenarioTable([
+        ['LSL', fmt(base.lsl), fmt(lsl)],
+        ['USL', fmt(base.usl), fmt(usl)],
+        ['Pp', fmt(last.overall.cp), fmt(scored.spread)],
+        ['Ppk', fmt(last.overall.cpk), fmt(scored.index)],
+        ['Expected out-of-spec rate', escapeHtml(formatPpm(last.overall.ppm) + ' PPM'), escapeHtml(formatPpm(scored.ppm) + ' PPM')],
+        ['Sample outside limits', actual.count + ' observed', sample.count + ' under proposed limits']
+      ]);
+      drawModel(last.overall, true);
+    }
     function showView(next, options) {
       options = options || {};
-      if (next === 'planner') {
-        if (!hasRun || !last || !last.ok) {
-          plannerOpen = false;
-          next = 'results';
-        } else {
-          plannerOpen = true;
-          next = 'results';
-          options.focusPlanner = true;
-        }
-      } else if (next === 'results' && options.closePlanner) {
-        plannerOpen = false;
-      }
+      if (next === 'planner') next = 'reach';
+      if ((next === 'reach' || next === 'process' || next === 'spec') && (!hasRun || !last || !last.ok)) next = 'results';
       view = next;
       document.body.classList.toggle('cap-config', view === 'setup');
       if (view === 'setup' && window.CfgTheme) CfgTheme.apply(CfgTheme.get());
       else if (window.StatisticoHeader && typeof StatisticoHeader.applyTheme === 'function' && typeof StatisticoHeader.resolveTheme === 'function') {
         StatisticoHeader.applyTheme(StatisticoHeader.resolveTheme(), { savePreference: false, preference: StatisticoHeader.getThemePreference() });
       }
-      ['setup', 'results', 'by-group'].forEach(function (name) {
+      ['setup', 'results', 'reach', 'process', 'spec', 'by-group'].forEach(function (name) {
         var node = el('view-' + name);
         if (node) node.hidden = view !== name;
       });
-      if (view === 'results') {
-        paintResults();
-        if (el('reach-panel')) el('reach-panel').hidden = !plannerOpen;
-        if (plannerOpen && options && options.focusPlanner && el('reach-title')) el('reach-title').focus();
+      if (view === 'results') paintResults();
+      if (view === 'reach') {
+        if (el('reach-empty')) el('reach-empty').hidden = hasRun;
+        if (el('reach-body')) el('reach-body').hidden = !hasRun;
+        if (hasRun && last && last.ok) drawModel(last.overall, true);
+        if (options && options.focusPlanner && el('planner-goal')) el('planner-goal').focus();
       }
+      if (view === 'process') paintProcess();
+      if (view === 'spec') paintSpecWhatIf();
       if (view === 'by-group') {
         paintByGroup();
         if (hasRun && !(options && options.keepDialog)) {
@@ -2357,6 +2642,9 @@
         if (!hasRun) return;
         compute();
         if (view === 'results') paintResults();
+        if (view === 'reach' && last && last.ok) drawModel(last.overall, true);
+        if (view === 'process') paintProcess();
+        if (view === 'spec') paintSpecWhatIf();
         if (view === 'by-group') paintByGroup();
         syncShell();
       });
@@ -2509,11 +2797,19 @@
     });
     el('planner-find').addEventListener('click', function () { runPlanner('ppk'); });
     el('planner-close').addEventListener('click', closePlanner);
-    el('planner-spec').addEventListener('click', function () { runPlanner('spec'); });
+    if (el('planner-spec')) el('planner-spec').addEventListener('click', function () { runPlanner('spec'); });
     el('planner-alt').addEventListener('click', function () { runPlanner('alt'); });
     el('planner-goal').addEventListener('input', function () {
       syncGoalField();
-      invalidateProposal();
+      if (reachDebounce) clearTimeout(reachDebounce);
+      if (goalFieldError() || !plannerFollowsMethod) {
+        invalidateProposal();
+        return;
+      }
+      reachDebounce = setTimeout(function () {
+        reachDebounce = 0;
+        runPlanner('ppk');
+      }, 350);
     });
     document.querySelectorAll('input[name="plan-method"]').forEach(function (input) {
       input.addEventListener('change', function () {
@@ -2532,12 +2828,14 @@
       invalidateProposal();
     });
     ['planner-alt-goal', 'planner-spec-metric', 'planner-mean-min', 'planner-mean-max', 'planner-sd-min', 'planner-lower-out', 'planner-upper-out'].forEach(function (id) {
+      if (!el(id)) return;
       el(id).addEventListener('input', function () {
         syncAltGoal();
         invalidateProposal();
       });
     });
     ['planner-unlock-lower', 'planner-unlock-upper'].forEach(function (id) {
+      if (!el(id)) return;
       el(id).addEventListener('change', function () {
         syncAllowances();
         invalidateProposal();
@@ -2553,8 +2851,24 @@
       redrawDistribution();
     });
     el('group-to-setup').addEventListener('click', function () { showView('setup'); });
+    if (el('reach-to-setup')) el('reach-to-setup').addEventListener('click', function () { showView('setup'); });
+    if (el('process-to-setup')) el('process-to-setup').addEventListener('click', function () { showView('setup'); });
+    if (el('spec-to-setup')) el('spec-to-setup').addEventListener('click', function () { showView('setup'); });
+    el('process-mean').addEventListener('input', function () { applyProcess('mean'); });
+    el('process-sd').addEventListener('input', function () { applyProcess('sd'); });
+    el('process-mean-range').addEventListener('input', function () { applyProcess('mean-range'); });
+    el('process-sd-range').addEventListener('input', function () { applyProcess('sd-range'); });
+    el('process-reset').addEventListener('click', function () { processInputs = null; processPlan = null; paintProcess(); });
+    el('spec-lsl').addEventListener('input', function () { applySpec('lsl'); });
+    el('spec-usl').addEventListener('input', function () { applySpec('usl'); });
+    el('spec-lsl-range').addEventListener('input', function () { applySpec('lsl-range'); });
+    el('spec-usl-range').addEventListener('input', function () { applySpec('usl-range'); });
+    el('spec-reset').addEventListener('click', function () { specInputs = null; specPlan = null; paintSpecWhatIf(); });
     window.setDecimalPrecision = function () {
       if (view === 'results') paintResults();
+      if (view === 'reach' && last && last.ok) drawModel(last.overall, true);
+      if (view === 'process') paintProcess();
+      if (view === 'spec') paintSpecWhatIf();
       if (view === 'by-group') paintByGroup();
     };
 

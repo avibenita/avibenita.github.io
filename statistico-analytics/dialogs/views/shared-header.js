@@ -1213,8 +1213,11 @@ const StatisticoHeader = {
       'regression-by-group': 'By-Group Analysis',
       'setup': 'Input & Setup',
       'cap-setup': 'Input & Setup',
-      'cap-results': 'Process Capability',
-      'cap-planner': 'Capability Planner',
+      'cap-results': 'Current Capability',
+      'cap-reach': 'Reach a Goal',
+      'cap-process': 'Process What-If',
+      'cap-spec': 'Specification What-If',
+      'cap-planner': 'Reach a Goal',
       'cap-by-group': 'By-Group Analysis',
       'gage-setup': 'Input & Setup',
       'gage-overview': 'Overview',
@@ -2458,7 +2461,10 @@ const StatisticoHeader = {
             items: (fitted ? [] : [
               resultItem('setup', 'setup', 'fa-pen-to-square', 'Input & Setup', 'Choose the measurement and set the specification limits.')
             ]).concat([
-              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Pp, Ppk, and the distribution against the specification limits. Find settings opens planning on this screen.')
+              resultItem('results', 'results', 'fa-gauge-high', 'Current Capability', 'Assess the observed process against its current specifications.'),
+              resultItem('reach', 'reach', 'fa-bullseye', 'Reach a Goal', 'Calculate the process changes needed to reach a capability goal.'),
+              resultItem('process', 'process', 'fa-sliders', 'Process What-If', 'Explore how changes in the mean and variation affect capability.'),
+              resultItem('spec', 'spec', 'fa-ruler-horizontal', 'Specification What-If', 'Explore how acceptance limits affect capability.')
             ])
           }
         ],
@@ -9556,9 +9562,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-module-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261122cards')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261122views')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261122cards');
+    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261122views');
     const release = () => {
       const waiters = this._moduleGuideWaiters || [];
       this._moduleGuideWaiters = null;
@@ -9585,9 +9591,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261122cards')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261122views')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261122cards');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261122views');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -9895,8 +9901,11 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'contingency-by-group-similarity': 'Similarity Profile™',
       'regression-by-group': 'By-Group Analysis',
       'cap-setup': 'Input & Setup',
-      'cap-results': 'Process Capability',
-      'cap-planner': 'Capability Planner',
+      'cap-results': 'Current Capability',
+      'cap-reach': 'Reach a Goal',
+      'cap-process': 'Process What-If',
+      'cap-spec': 'Specification What-If',
+      'cap-planner': 'Reach a Goal',
       'cap-by-group': 'By-Group Analysis',
       'gage-setup': 'Input & Setup',
       'gage-overview': 'Overview',
@@ -10131,7 +10140,7 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'capability-setup':
         'Choose one numeric measurement and enter the lower and upper specification limits. Leave the target blank to use the midpoint for Cpm. Run analysis opens the capability results. The worksheet is not changed. Do not invent Pp, Ppk, yield, or a planner result on this screen.',
       'capability-results':
-        'Pp and Ppk are calculated from the measurement column. The top cards show the sample descriptives, including observed out of spec, and the specification from the input. The standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Histogram adds a two-row table of bin ranges and counts under the chart. Find settings opens Reach a capability goal above the same chart. Capability stays the selected view.',
+        'This is the current process only. Cards show the sample descriptives, observed out of spec, and the actual specification. Pp, Ppk, PPU, and PPL use the overall sample standard deviation (n − 1). Reach a goal opens a separate view. Do not describe a hypothetical curve on this screen.',
       'capability-planner':
         'Reach a capability goal is the planning panel on the capability results. Ppk goal, Reduce variation, Shift mean, and Both are the basic controls. Calculate required change draws one hypothetical proposal on the existing chart. Advanced holds specification exploration, modeled yield, and expected PPM, each with its own calculation. The proposal is not written to the worksheet or the capability results. Close planner restores the ordinary chart.',
       'capability-by-group':

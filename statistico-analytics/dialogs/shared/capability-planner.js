@@ -852,7 +852,9 @@
       described.bestIndex = Number.isFinite(described.bestIndex) ? described.bestIndex : best;
       described.bestMean = Number.isFinite(described.bestMean) ? described.bestMean : mid;
       if (empty) {
-        return 'Shifting the mean alone cannot reach this goal. Variation must also decrease.';
+        var atCentre = Math.abs(described.bestMean - mid) <= 1e-4 * Math.max(1, Math.abs(mid));
+        var where = atCentre ? 'at the centre' : ('at mean ' + compactNumber(described.bestMean, 2));
+        return 'Shifting alone cannot reach Ppk ' + compactNumber(goal, 2) + '. Even ' + where + ', the maximum is approximately ' + compactNumber(described.bestIndex, 2) + '. Try reducing variation as well.';
       }
       return 'The advanced mean bounds miss the means that would meet this goal at the current standard deviation.';
     }
@@ -911,7 +913,7 @@
     if (!described.ok) return described.message || '';
     if (described.status === 'already-met') return described.message;
     if (described.status === 'unreachable' && described.method === 'mean' && described.metric === 'index' && Number.isFinite(described.bestIndex)) {
-      return described.message + ' The best Ppk from shifting the mean is ' + f(described.bestIndex) + ' at mean ' + f(described.bestMean) + '.';
+      return described.message;
     }
     if (described.status === 'unreachable' && described.method === 'spec' && Number.isFinite(described.sideIndex)) {
       var side = described.limiting === 'lower specification' ? 'lower-side' : 'upper-side';
@@ -927,6 +929,40 @@
       return described.message + ' Proposed mean ' + f(described.proposal.mean) + ', required SD ' + f(described.proposal.sd) + ' (' + f(described.proposal.sdReductionPct) + '% reduction).';
     }
     return described.message || '';
+  }
+
+  function compactNumber(n, digits) {
+    if (!Number.isFinite(n)) return '—';
+    return n.toFixed(digits);
+  }
+
+  function planStrip(described) {
+    if (!described || !described.ok) return null;
+    var proposal = described.proposal;
+    var indexPlan = described.status === 'reachable' && proposal && described.metric === 'index' && described.method !== 'spec';
+    if (!indexPlan) {
+      var sentence = planCopy(described, function (n) { return compactNumber(n, 2); });
+      return sentence ? { kind: 'sentence', text: sentence } : null;
+    }
+    var baseMean = proposal.mean - proposal.deltaMean;
+    var baseSd = proposal.sd - proposal.deltaSd;
+    var parts = [];
+    if (described.method === 'sd') {
+      parts.push({ lead: true, text: 'Reduce SD by ' + compactNumber(proposal.sdReductionPct, 1) + '%' });
+      parts.push({ text: 'SD ' + compactNumber(baseSd, 2) + ' → ' + compactNumber(proposal.sd, 2) });
+    } else if (described.method === 'mean') {
+      parts.push({ lead: true, text: 'Shift the mean' });
+      parts.push({ text: 'Mean ' + compactNumber(baseMean, 2) + ' → ' + compactNumber(proposal.mean, 2) });
+    } else if (described.method === 'both') {
+      if (proposal.sdReductionPct > 1e-6) parts.push({ lead: true, text: 'Reduce SD by ' + compactNumber(proposal.sdReductionPct, 1) + '%' });
+      else parts.push({ lead: true, text: 'Shift the mean' });
+      if (Math.abs(proposal.deltaMean) > 1e-6) parts.push({ text: 'Mean ' + compactNumber(baseMean, 2) + ' → ' + compactNumber(proposal.mean, 2) });
+      if (proposal.sdReductionPct > 1e-6) parts.push({ text: 'SD ' + compactNumber(baseSd, 2) + ' → ' + compactNumber(proposal.sd, 2) });
+    } else {
+      return { kind: 'sentence', text: planCopy(described, function (n) { return compactNumber(n, 2); }) };
+    }
+    parts.push({ text: 'Ppk ' + compactNumber(described.baselineIndex, 2) + ' → ' + compactNumber(proposal.index, 2) });
+    return { kind: 'parts', parts: parts };
   }
 
   function controlSignature(state) {
@@ -957,6 +993,7 @@
     answerText: answerText,
     describePlan: describePlan,
     planCopy: planCopy,
+    planStrip: planStrip,
     controlSignature: controlSignature,
     proposalCurrent: proposalCurrent
   };

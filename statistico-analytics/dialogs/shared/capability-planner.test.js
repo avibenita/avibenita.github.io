@@ -253,6 +253,7 @@ describe('capability planner basic Ppk contract', () => {
     expect(reduced.proposal.index).toBeCloseTo(1.33, 8);
     expect(reduced.overlay).toBe('curve');
     expect(Planner.planCopy(reduced)).toMatch(/Required SD: at most/);
+    expect(Planner.planStrip(reduced).parts.map((part) => part.text).join(' | ')).toBe('Reduce SD by 23.8% | SD 1.42 → 1.08 | Ppk 1.01 → 1.33');
 
     const shifted = screenAsk({ adjust: 'mean' });
     expect(shifted.status).toBe('unreachable');
@@ -260,7 +261,8 @@ describe('capability planner basic Ppk contract', () => {
     expect(shifted.overlay).toBe('none');
     expect(shifted.bestIndex).toBeCloseTo(1.1720581341, 8);
     expect(shifted.bestMean).toBeCloseTo(15, 8);
-    expect(Planner.planCopy(shifted)).toMatch(/Variation must also decrease/);
+    expect(Planner.planCopy(shifted)).toBe('Shifting alone cannot reach Ppk 1.33. Even at the centre, the maximum is approximately 1.17. Try reducing variation as well.');
+    expect(Planner.planStrip(shifted).text).toBe(Planner.planCopy(shifted));
 
     const both = screenAsk({ adjust: 'both' });
     expect(both.status).toBe('reachable');
@@ -269,6 +271,7 @@ describe('capability planner basic Ppk contract', () => {
     expect(both.proposal.sdReductionPct).toBeCloseTo(11.8753282644, 6);
     expect(both.proposal.index).toBeCloseTo(1.33, 8);
     expect(Planner.planCopy(both)).toMatch(/unrestricted mean movement/);
+    expect(Planner.planStrip(both).parts.map((part) => part.text).join(' | ')).toBe('Reduce SD by 11.9% | Mean 15.68 → 15.00 | SD 1.42 → 1.25 | Ppk 1.01 → 1.33');
 
     const lowerOnly = screenAsk({ mode: 'spec', unlockLower: true, unlockUpper: false });
     expect(lowerOnly.status).toBe('unreachable');

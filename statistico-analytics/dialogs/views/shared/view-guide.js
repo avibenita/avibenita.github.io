@@ -2371,7 +2371,7 @@
         'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
         [
           'LSL, USL, and Target can be edited here. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
-          'Capability Planner in the sidebar, and Find settings, open Reach a capability goal on this screen, above the distribution chart.',
+          'Find settings opens Reach a capability goal on this screen, above the distribution chart. Capability stays selected.',
           'Histogram draws the observed values. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
         ],
         [
@@ -2390,7 +2390,7 @@
         'Reach a capability goal',
         'Plans a Ppk goal on the capability results screen, above the same distribution chart.',
         [
-          'Find settings opens the panel. Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Both. Calculate required change runs the plan. Close planner returns to the ordinary chart.',
+          'Find settings opens the panel. Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation. Calculate required change runs the plan. After that, choosing another method calculates it immediately. Close returns to the ordinary chart.',
           'Advanced holds specification exploration, modeled yield, expected PPM, and optional mean or standard-deviation bounds. Those metrics keep their own calculations.',
           'Changing the goal, the method, the specifications, or the analyzed data clears the proposal until you calculate again.'
         ],

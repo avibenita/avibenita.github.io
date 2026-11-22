@@ -521,13 +521,18 @@
     if (typeof globalThis !== 'undefined') {
       globalThis.__byGroupStandardContext = ctx || null;
     }
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('statisticoGroupContext', JSON.stringify(ctx || { available: false }));
+      }
+    } catch (_e) {}
     return ctx;
   }
 
   function aiPromptBlock(ctx) {
     ctx = ctx || (typeof globalThis !== 'undefined' ? globalThis.__byGroupStandardContext : null);
     if (!ctx || !ctx.status) {
-      return 'GROUP CONSISTENCY DATA: Not assessed — the analyst has not opened By Group, or no grouping column is selected. In GROUP CONSISTENCY say that subgroup consistency was not assessed and recommend opening By Group.';
+      return 'GROUP CONSISTENCY DATA: No group comparison has been computed. In GROUP CONSISTENCY, say that group comparison has not been run. Do not treat that as a consistency finding, and do not say to open By Group.';
     }
     var lines = [
       'GROUP CONSISTENCY DATA (authoritative; do not invent a significance test):',

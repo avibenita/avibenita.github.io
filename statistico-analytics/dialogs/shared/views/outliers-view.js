@@ -430,7 +430,7 @@ function displayOutliersResults() {
     tableHTML = `
       <div class="no-outliers">
         <i class="fa-solid fa-circle-check" style="font-size: 48px; color: var(--accent-2); margin-bottom: 12px;"></i>
-        <div>No outliers detected</div>
+        <div>No observations were flagged by the selected rule (${method}).</div>
       </div>
     `;
   }

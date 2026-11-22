@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Power & Sample Size — Statistico</title>
-  <link rel="stylesheet" href="../shared-header.css?v=20261120hist1"/>
+  <link rel="stylesheet" href="../shared-header.css?v=20261122glass"/>
   <link rel="stylesheet" href="../shared-config.css?v=20260715a"/>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet"/>
   <script src="https://code.highcharts.com/highcharts.js"></script>
@@ -737,16 +737,15 @@
       dec.querySelector('i').className = pow>=0.8
         ? 'fa-solid fa-circle-check'
         : pow>=0.7 ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-xmark';
+      var observedNote = _fromObserved ? ' The effect was taken from an observed analysis, so this figure is not additional evidence for that test.' : '';
       if (pow >= 0.8) {
-        decText.textContent = 'Adequate power (' + pct + '%) — N = ' + N + ' is sufficient to detect f = ' + fmt(f,2) + ' (' + _fLabel(f) + ' effect) at α = ' + alpha + '.';
-      } else if (pow >= 0.7) {
-        var n80 = findN(f, k, alpha, 0.80);
-        decText.textContent = 'Borderline power (' + pct + '%) — N = ' + N + '. To reach 80% power you need N = ' + n80 + '.';
+        decText.textContent = 'Estimated power is ' + pct + '% for f = ' + fmt(f,2) + ' (Cohen\'s conventional ' + _fLabel(f) + ' benchmark), N = ' + N + ', k = ' + k + ', alpha = ' + alpha + '. It meets the conventional 80% planning target.' + observedNote;
       } else {
         var n80 = findN(f, k, alpha, 0.80);
         var n90 = findN(f, k, alpha, 0.90);
-        decText.textContent = 'Insufficient power (' + pct + '%) — N = ' + N + '. Need N = ' + n80 + ' for 80% power, N = ' + n90 + ' for 90%.';
+        decText.textContent = 'Estimated power is ' + pct + '% for f = ' + fmt(f,2) + ', N = ' + N + ', k = ' + k + ', alpha = ' + alpha + '. It is below the conventional 80% planning target. The approximation gives N = ' + n80 + ' for 80% and N = ' + n90 + ' for 90%.' + observedNote;
       }
+      window.currentPowerResults = { mode: _mode, f: f, k: k, alpha: alpha, N: N, power: pow, fromObserved: !!_fromObserved };
 
       /* interpretation */
       _renderInterp(pow, f, k, N, alpha);
@@ -777,7 +776,9 @@
       dec.className = 'pw-decision good';
       dec.querySelector('i').className = 'fa-solid fa-circle-check';
       document.getElementById('pwDecisionText').textContent =
-        'To detect a ' + _fLabel(f) + ' effect (f = ' + fmt(f,2) + ') with ' + (desired*100).toFixed(0) + '% power at α = ' + alpha + ' → required N = ' + nNeeded + '.';
+        'Under the stated planning assumptions, required N = ' + nNeeded + ' for ' + (desired*100).toFixed(0) + '% power, f = ' + fmt(f,2) + ', k = ' + k + ', alpha = ' + alpha + '.'
+        + (_fromObserved ? ' The effect was taken from an observed analysis, so this required N is not additional evidence for that test.' : '');
+      window.currentPowerResults = { mode: 'n', f: f, k: k, alpha: alpha, N: nNum, nNeeded: nNum, desired: desired, power: pow80, fromObserved: !!_fromObserved };
     }
 
     /* draw/update power curve */
@@ -793,25 +794,15 @@
     var pct = (pow*100).toFixed(1);
     var fLbl = _fLabel(f);
     var n80 = findN(f, k, alpha, 0.80);
-    var interp;
-    if (pow >= 0.9) {
-      interp = '<strong style="color:var(--accent-1)"><i class="fa-solid fa-circle-check"></i> Excellent power (' + pct + '%).</strong> ' +
-        'Your study has a ' + pct + '% chance of detecting a ' + fLbl + ' effect (f = ' + fmt(f,2) + ') with N = ' + N + ' and α = ' + alpha + '. ' +
-        'The risk of a Type II error is only ' + ((1-pow)*100).toFixed(1) + '%.';
-    } else if (pow >= 0.8) {
-      interp = '<strong style="color:var(--accent-1)"><i class="fa-solid fa-circle-check"></i> Adequate power (' + pct + '%).</strong> ' +
-        'Your design meets the conventional 80% threshold. With N = ' + N + ' and f = ' + fmt(f,2) + ' (' + fLbl + ' effect), the study is well-powered.';
-    } else if (pow >= 0.7) {
-      interp = '<strong style="color:#fbbf24"><i class="fa-solid fa-triangle-exclamation"></i> Borderline power (' + pct + '%).</strong> ' +
-        'Power is below the 80% convention. Consider increasing N to <strong>' + n80 + '</strong> to reach 80% power. ' +
-        'Current risk of missing a real effect: ' + ((1-pow)*100).toFixed(1) + '%.';
-    } else {
-      interp = '<strong style="color:#fb7185"><i class="fa-solid fa-circle-xmark"></i> Insufficient power (' + pct + '%).</strong> ' +
-        'There is a ' + ((1-pow)*100).toFixed(1) + '% chance of missing a real ' + fLbl + ' effect with this design. ' +
-        'Needed N for 80% power: <strong>' + n80 + '</strong>. ' +
-        'Needed N for 90% power: <strong>' + findN(f, k, alpha, 0.90) + '</strong>.';
-    }
-    el.innerHTML = interp;
+    var observed = _fromObserved
+      ? ' The effect was taken from an observed analysis and treated as the planning effect. This is not additional evidence for that test.'
+      : ' This is a prospective calculation under the stated assumptions.';
+    var interp = 'Estimated power is ' + pct + '% for Cohen\'s f = ' + fmt(f, 2) + ' (conventional ' + fLbl + ' benchmark), N = ' + N + ', k = ' + k + ' groups, alpha = ' + alpha + '. '
+      + (pow >= 0.8
+        ? 'That meets the conventional 80% planning target.'
+        : 'That is below the conventional 80% planning target. The approximation gives N = ' + n80 + ' for 80% and N = ' + findN(f, k, alpha, 0.90) + ' for 90%.')
+      + observed;
+    el.textContent = interp;
   }
 
   /* ── Power curve ─────────────────────────────────────────────── */
@@ -872,8 +863,10 @@
   }
 
   /* ── Pre-fill from ANOVA bundle ──────────────────────────────── */
+  var _fromObserved = false;
   function prefillFromBundle(b) {
     _bundle = b;
+    _fromObserved = true;
 
     var N   = _getBundleN(b) || 30;
     var k   = _getBundleK(b) || 3;

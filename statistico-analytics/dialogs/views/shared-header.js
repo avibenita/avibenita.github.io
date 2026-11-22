@@ -4,7 +4,17 @@
  * VERSION: 2026-02-27-laptop-frame
  */
 
-console.log('Loading shared-header.js VERSION 2026-11-20-controls');
+console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
+
+(function loadInterpretationFacts() {
+  if (typeof window === 'undefined' || window.StatisticoInterpretation) return;
+  if (typeof document === 'undefined' || document.readyState !== 'loading') return;
+  var script = document.currentScript;
+  if (!script || !script.src || typeof document.write !== 'function') return;
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/interpretation-facts.js?v=20261121ix1');
+  if (src === script.src) return;
+  document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
+})();
 
 (function () {
   if (typeof Storage === 'undefined' || Storage.prototype.__statisticoOptionalWrite) return;
@@ -3010,6 +3020,7 @@ const StatisticoHeader = {
       }
       if (prompt) {
         const raw = await this._callAiForSidebar(prompt);
+        if (!raw) return { description: fallbackDesc, interpretation: fallbackInterp };
         const parsed = this._parseAiStructured(raw) || {};
         if (wantDesc) description = parsed.ABOUT || fallbackDesc;
         if (wantInterp) {
@@ -5909,7 +5920,7 @@ const StatisticoHeader = {
         const lower = stats.q1 - 1.5 * iqr;
         const upper = stats.q3 + 1.5 * iqr;
         const outliers = values.filter((v) => v < lower || v > upper);
-        const outRows = outliers.length ? outliers.map((v, i) => `<tr><td>${i + 1}</td><td>${v.toFixed(4)}</td></tr>`).join('') : '<tr><td colspan="2">No outliers detected.</td></tr>';
+        const outRows = outliers.length ? outliers.map((v, i) => `<tr><td>${i + 1}</td><td>${v.toFixed(4)}</td></tr>`).join('') : '<tr><td colspan="2">No observations were flagged by the IQR rule.</td></tr>';
         return `<p>IQR-based outlier detection (fences: ${lower.toFixed(4)} to ${upper.toFixed(4)}).</p><table><thead><tr><th>#</th><th>Outlier value</th></tr></thead><tbody>${outRows}</tbody></table>`;
       }
 
@@ -8311,18 +8322,24 @@ CONTROLS: [control: what it does] | [next control]
 PATTERNS: [what to look for → meaning] | [next pattern]`;
   },
 
+  _ix() {
+    return (typeof window !== 'undefined' && window.StatisticoInterpretation) || null;
+  },
+
   _overallAiReplyFormat() {
+    const rules = this._ix() ? this._ix().moduleGroundRules() : '';
     return `Reply ONLY in this exact format — each key on its own line. Do not use markdown.
-CONCLUSION: [short answer to the main analytical question]
-STRENGTH: [Strong, Moderate, Tentative, or Inconclusive — short reason from the computed evidence, not subjective confidence]
+CONCLUSION: [the main result and its uncertainty, in one or two sentences]
 FINDINGS: [prioritized finding 1] | [finding 2] | [finding 3]
 SUPPORT: [exact statistic, effect size, CI or n, with source view when known] | [exact statistic] | [exact statistic]
-GROUP CONSISTENCY: [Consistent, Varies by group, Direction changes, or Insufficient data — say whether the overall finding holds, weakens, or reverses across groups. Prominently report any strong difference or direction reversal. If By Group was not run, write "Not assessed — open By Group."]
-DIAGNOSTICS: [what passed, what failed, and how much it affects the conclusion]
-INTERPRETATION: [what the findings mean in realistic terms, without inventing domain information]
+GROUP CONSISTENCY: [the computed group result, or a coverage note that group comparison has not been run or does not apply. Do not call that absence a consistency finding. Do not say "open By Group" when results are already computed or grouping does not apply.]
+DIAGNOSTICS: [what the computed diagnostics show, what is missing, and what that means for the conclusion]
+INTERPRETATION: [a complete sentence on what the result implies. Omit this key if the only content would be the variable name or a repeated finding.]
 LIMITATIONS: [limitation 1] | [limitation 2]
 ACTION: [recommended next step 1] | [next step 2]
-REPORT: [one polished paragraph suitable for a report]`;
+REPORT: [one polished paragraph suitable for a report]
+Do not emit a STRENGTH label. Do not use Strong, High, or any calibrated certainty badge.
+${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
   },
 
   _groupConsistencyAiInstruction() {
@@ -8330,7 +8347,7 @@ REPORT: [one polished paragraph suitable for a report]`;
     if (std && typeof std.aiPromptBlock === 'function') return std.aiPromptBlock();
     const ctx = globalThis.__byGroupStandardContext;
     if (!ctx || !ctx.status) {
-      return 'GROUP CONSISTENCY DATA: Not assessed — open By Group to check whether the overall finding holds across categories, segments, or conditions.';
+      return 'GROUP CONSISTENCY DATA: No group comparison has been computed. Say that group comparison has not been run. Do not treat that as a finding that groups are consistent, and do not say to open By Group.';
     }
     return `GROUP CONSISTENCY DATA: Status=${ctx.status.label}. Prominently report any strong difference or direction reversal. Visible differences are descriptive unless a formal group-comparison test supports them.`;
   },
@@ -10433,6 +10450,8 @@ ${this._localAiReplyFormat()}`;
     try {
       this._lastAiMeta = null;
       const payload = this._getIndependentAiPayload();
+      const repeated = payload && payload.analysis && /repeated/i.test(String(payload.analysis.module || ''));
+      if (this._showRuleAssessment(repeated ? 'repeated' : 'independent', payload, this.currentView)) return;
       const browsedViews = this._independentFullAnalysisViews(payload);
       for (let i = 0; i < browsedViews.length; i += 1) {
         const label = browsedViews[i];
@@ -10447,6 +10466,7 @@ ${this._localAiReplyFormat()}`;
       const prompt = this._buildIndependentStructuredPrompt(payload);
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
       const raw = await this._callAiForSidebar(prompt);
+      if (!raw) return;
       const sections = this._parseAiStructured(raw);
       this._showAiOverlay(sections, this.currentView, 'full', this._lastAiMeta);
     } catch (err) {
@@ -10476,6 +10496,7 @@ ${this._localAiReplyFormat()}`;
       const prompt = this._buildIndependentTabPrompt(payload, activeTab);
       if (!prompt) { this._showAiOverlay(null, `independent-${activeTab}`, 'per-view'); return; }
       const raw = await this._callAiForSidebar(prompt);
+      if (!raw) return;
       const sections = this._parseAiStructured(raw);
       this._showAiOverlay(sections, `independent-${activeTab}`, 'per-view', this._lastAiMeta);
     } catch (err) {
@@ -10572,11 +10593,23 @@ ${this._localAiReplyFormat()}`;
     const compact = this._compactIndependentAiPayload(payload);
     const primarySignal = this._independentPrimarySignal(payload);
     const viewsBrowsed = this._independentFullAnalysisViews(payload);
+    const ix = this._ix();
+    const posthoc = payload.posthoc || (payload.results && payload.results.posthoc) || {};
+    const requiredFindings = [];
+    if (ix && (posthoc.method || posthoc.procedure || posthoc.correction || posthoc.adjustment || (posthoc.rows && posthoc.rows.length))) {
+      requiredFindings.push(ix.describePairwise({
+        procedure: posthoc.method || posthoc.procedure,
+        correction: posthoc.correction || posthoc.adjustment,
+        familySize: posthoc.familySize || (posthoc.rows && posthoc.rows.length)
+      }));
+    }
     this._lastAiMeta = {
       primarySignal,
       viewsBrowsed,
       strengthLevel: null,
-      strengthNote: null
+      strengthNote: null,
+      omitStrengthBadge: true,
+      requiredFindings: requiredFindings
     };
 
     return `You are interpreting a Statistico Independent Means analysis from pre-computed results.
@@ -10590,7 +10623,7 @@ Views browsed for this full analysis: ${viewsBrowsed.join(', ')}
 Computed independent-means payload:
 ${JSON.stringify(compact, null, 2)}
 
-${this._viewReadingsPrompt('full')}
+${requiredFindings.length ? 'REQUIRED FACTS (include these sentences; do not contradict them):\n' + requiredFindings.join('\n') + '\n' : ''}${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -10649,6 +10682,25 @@ ${this._localAiReplyFormat()}`;
     return value;
   },
 
+  _ruleModuleRequest() {
+    const moduleName = this.module;
+    try {
+      if (moduleName === 'logistic' && typeof window.buildAIPayload === 'function') return { kind: 'logistic', payload: window.buildAIPayload(), view: 'logistic' };
+      if (moduleName === 'anova' && window._bundle) return { kind: 'anova', payload: window._bundle, view: 'anova' };
+      if (moduleName === 'regression') {
+        const session = window._regCaseSession;
+        const comparison = session && typeof session.state === 'function' ? session.state().comparison : null;
+        return { kind: 'regression', payload: { results: window.regressionResultsForAI || window.regressionResults, temporaryRefit: comparison && comparison.payload }, view: 'regression' };
+      }
+      if (moduleName === 'pca' && window.__pcaResult) return { kind: 'pca', payload: window.__pcaResult, view: 'pca' };
+      if (moduleName === 'capability' && typeof window.buildAIPayload === 'function') return { kind: 'capability', payload: window.buildAIPayload(), view: 'capability' };
+      if (moduleName === 'power' && window.currentPowerResults) return { kind: 'power', payload: window.currentPowerResults, view: 'power' };
+      if ((moduleName === 'dependent' || moduleName === 'repeated') && typeof window.buildAIPayload === 'function') return { kind: 'repeated', payload: window.buildAIPayload(), view: moduleName };
+      if (moduleName === 'reliability' && window.__reliabilityBundle) return { kind: 'reliability', payload: window.__reliabilityBundle.aiPackage || window.__reliabilityBundle, view: 'reliability' };
+    } catch (_) {}
+    return null;
+  },
+
   _moduleOverallSources() {
     const sources = [];
     const take = (label, value) => {
@@ -10695,11 +10747,30 @@ ${this._localAiReplyFormat()}`;
       .filter((label) => label && label !== 'Analyze all results' && label !== 'Explain this view')
       .slice(0, 12);
     if (!packed.sources.length && !packed.panelText) return null;
+    const ix = this._ix();
+    const requiredFindings = [];
+    if (ix && this.module === 'logistic') {
+      let logisticPayload = null;
+      try { if (typeof window.buildAIPayload === 'function') logisticPayload = window.buildAIPayload(); } catch (_) {}
+      requiredFindings.push.apply(requiredFindings, ix.logisticStatements(logisticPayload || (typeof window !== 'undefined' && window.__logisticState) || {}));
+    }
+    if (ix && this.module === 'anova') {
+      const bundle = typeof window !== 'undefined' ? window._bundle : null;
+      const posthoc = bundle && (bundle.posthoc || (bundle.results && bundle.results.posthoc));
+      if (posthoc) requiredFindings.push(ix.describePairwise({
+        procedure: posthoc.method || posthoc.procedure,
+        correction: posthoc.correction || posthoc.adjustment,
+        familySize: posthoc.familySize || (posthoc.rows && posthoc.rows.length)
+      }));
+    }
+    if (ix && this.module === 'regression') requiredFindings.push.apply(requiredFindings, ix.regressionStatements(typeof window !== 'undefined' ? window : {}));
     this._lastAiMeta = {
       primarySignal: moduleName,
       viewsBrowsed: views,
       strengthLevel: null,
-      strengthNote: null
+      strengthNote: null,
+      omitStrengthBadge: true,
+      requiredFindings: requiredFindings
     };
     return `You are writing the overall assessment of a Statistico ${moduleName} analysis.
 
@@ -10713,7 +10784,7 @@ ${packed.sources.join('\n\n') || '(No structured payload was exposed.)'}
 VISIBLE RESULTS ACROSS PANELS:
 ${packed.panelText || '(No panel text captured.)'}
 
-${this._viewReadingsPrompt('full')}
+${requiredFindings.length ? 'REQUIRED FACTS (include these sentences; do not contradict them):\n' + requiredFindings.join('\n') + '\n' : ''}${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
 
 ${this._groupConsistencyAiInstruction()}
@@ -10737,9 +10808,12 @@ ${this._overallAiReplyFormat()}`;
     }
     setBusy(true);
     try {
+      const rule = this._ruleModuleRequest();
+      if (rule && this._showRuleAssessment(rule.kind, rule.payload, rule.view)) return;
       const prompt = this._buildModuleOverallPrompt();
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
       const raw = await this._callAiForSidebar(prompt);
+      if (!raw) return;
       const sections = this._parseAiStructured(raw);
       this._showAiOverlay(sections, this.currentView, 'full', this._lastAiMeta);
     } catch (err) {
@@ -10875,9 +10949,12 @@ ${this._overallAiReplyFormat()}`;
     }
     setBusy(true);
     try {
+      const source = this._contingencyOverallSource();
+      if (source.payload && this._showRuleAssessment('contingency', source.payload, this.currentView)) return;
       const prompt = this._buildContingencyOverallPrompt();
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
       const raw = await this._callAiForSidebar(prompt);
+      if (!raw) return;
       const sections = this._parseAiStructured(raw);
       this._showAiOverlay(sections, this.currentView, 'full', this._lastAiMeta);
     } catch (err) {
@@ -10928,11 +11005,25 @@ ${this._overallAiReplyFormat()}`;
           return;
         }
       }
+      if (this.module === 'univariate' && this._ix()) {
+        const built = this._ix().buildUnivariateViewAssessment(this._univariateInput(this._collectAllViewsData()), viewKey);
+        this._lastAiMeta = built.meta;
+        this._showAiOverlay(built.sections, viewKey, 'per-view', built.meta);
+        return;
+      }
       let prompt;
       if (this.module === 'factor' && viewKey === 'factor-suitability' &&
           typeof window.buildFactorSuitabilityAiPrompt === 'function') {
         prompt = window.buildFactorSuitabilityAiPrompt();
       } else {
+        if (this.module === 'correlations' && this._ix()) {
+          const built = this._ix().buildKnownModuleAssessment('correlations', this._collectAllCorrelationViewsData());
+          if (built) {
+            this._lastAiMeta = built.meta;
+            this._showAiOverlay(built.sections, viewKey, 'per-view', built.meta);
+            return;
+          }
+        }
         prompt = this.module === 'correlations'
           ? this._buildCorrelationStructuredPrompt(viewKey, 'per-view')
           : this.module === 'univariate'
@@ -10941,6 +11032,7 @@ ${this._overallAiReplyFormat()}`;
       }
       if (!prompt) { this._showAiOverlay(null, viewKey); return; }
       const raw = await this._callAiForSidebar(prompt);
+      if (!raw) return;
       const sections = this._parseAiStructured(raw);
       this._showAiOverlay(sections, viewKey, 'per-view', this._lastAiMeta);
     } catch (err) {
@@ -10980,6 +11072,22 @@ ${this._overallAiReplyFormat()}`;
         allData.qqplot = Object.assign({}, allData.qqplot || {}, this._readQqPlotState(document));
       }
 
+      if (this.module === 'correlations' && this._ix() && allData) {
+        const built = this._ix().buildKnownModuleAssessment('correlations', allData);
+        if (built) {
+          this._lastAiMeta = built.meta;
+          this._showAiOverlay(built.sections, this.currentView, 'full', built.meta);
+          return;
+        }
+      }
+
+      if (this.module === 'univariate' && this._ix()) {
+        const built = this._ix().buildUnivariateAssessment(this._univariateInput(allData));
+        this._lastAiMeta = built.meta;
+        this._showAiOverlay(built.sections, this.currentView, 'full', built.meta);
+        return;
+      }
+
       setLabel('<i class="fa-solid fa-brain fa-spin"></i><span>Thinking…</span>');
 
       const prompt = this.module === 'correlations'
@@ -10994,8 +11102,9 @@ ${this._overallAiReplyFormat()}`;
       if (!prompt) { this._showAiOverlay(null, this.currentView, 'full'); return; }
 
       const raw = await this._callAiForSidebar(prompt);
+      if (!raw) return;
       const sections = this._parseAiStructured(raw);
-      this._showAiOverlay(sections, this.currentView, 'full');
+      this._showAiOverlay(sections, this.currentView, 'full', this._lastAiMeta);
     } catch (err) {
       this._showAiOverlay({ error: err.message || 'AI request failed.' }, this.currentView, 'full');
     } finally {
@@ -11008,6 +11117,57 @@ ${this._overallAiReplyFormat()}`;
   },
 
   // ── Data helpers ─────────────────────────────────────────────────────────
+
+  _readStoredUnivariate() {
+    try {
+      const raw = sessionStorage.getItem('univariateResults') || localStorage.getItem('univariateResults');
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  _readJsonStore(key) {
+    try {
+      const raw = sessionStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  _univariateInput(collected) {
+    const ix = this._ix();
+    const liveGroups = globalThis.__byGroupStandardContext || this._readJsonStore('statisticoGroupContext');
+    const groupInput = ix && typeof ix.groupsFromContext === 'function'
+      ? ix.groupsFromContext(liveGroups)
+      : { status: 'unavailable', reason: 'the comparison result was not supplied.' };
+    const liveHypothesis = (typeof window !== 'undefined' && (window.currentTestResults || window.currentHypothesisResults))
+      || this._readJsonStore('univariateHypothesisResults');
+    const hypothesis = ix && typeof ix.hypothesisFromRecord === 'function'
+      ? (ix.hypothesisFromRecord(liveHypothesis) || { status: 'unavailable', reason: 'No completed reference-value test is available for this assessment.' })
+      : liveHypothesis;
+    const input = {
+      stored: this._readStoredUnivariate(),
+      descriptives: this._getUnivariateDescriptives(),
+      collected: collected || {},
+      groups: groupInput,
+      hypothesis: hypothesis
+    };
+    return ix ? ix.assembleUnivariateInput(input) : input;
+  },
+
+  _showRuleAssessment(kind, payload, view) {
+    const ix = this._ix();
+    if (!ix || typeof ix.buildKnownModuleAssessment !== 'function') return false;
+    let built = null;
+    try { built = ix.buildKnownModuleAssessment(kind, payload); } catch (_) { built = null; }
+    if (!built || !built.sections) return false;
+    this._lastAiMeta = built.meta;
+    this._lastAiInvoke = { mode: 'full', kind: kind };
+    this._showAiOverlay(built.sections, view || this.currentView, 'full', built.meta);
+    return true;
+  },
 
   _getUnivariateDescriptives() {
     let parsed = null;
@@ -11378,6 +11538,8 @@ ${this._overallAiReplyFormat()}`;
       d.failCount = txt('fail-count');
       d.alpha     = txt('significance');
       if (win.currentNormalityResults) d.tests = win.currentNormalityResults;
+      if (win.currentNormalityMeta) d.meta = win.currentNormalityMeta;
+      if (win.currentNormalityMeta && Number.isFinite(win.currentNormalityMeta.alpha)) d.alphaValue = win.currentNormalityMeta.alpha;
     }
 
     if (viewId === 'outliers') {
@@ -11386,8 +11548,9 @@ ${this._overallAiReplyFormat()}`;
       d.method  = mBtn?.textContent?.trim() || null;
       if (win.currentOutliersData) {
         const od = win.currentOutliersData;
+        d.numeric = od;
         d.count       = od.outliers?.length ?? od.count;
-        d.method      = d.method || od.method;
+        d.method      = od.method || d.method;
         if (od.bounds) { d.lowerBound = od.bounds.lower; d.upperBound = od.bounds.upper; }
       }
     }
@@ -11402,10 +11565,9 @@ ${this._overallAiReplyFormat()}`;
       d.marginError    = txt('margin-error');
       if (win.currentCIResults) {
         const ci = win.currentCIResults;
-        d.lcl    = d.lcl    || String(ci.lower);
-        d.ucl    = d.ucl    || String(ci.upper);
+        d.numeric = ci;
         d.level  = ci.level;
-        d.method = d.method || ci.method;
+        d.method = ci.method || d.method;
         d.estimate = ci.estimate;
       }
     }
@@ -11495,9 +11657,11 @@ ${this._overallAiReplyFormat()}`;
     }
 
     // ── Normality ─────────────────────────────────────────────────────────
-    if (window.currentNormalityResults) {
+    if (window.currentNormalityResults || window.currentNormalityMeta) {
       out.normality = {
-        alpha:      txt('significance'),
+        alpha:      window.currentNormalityMeta && window.currentNormalityMeta.alpha,
+        alphaValue: window.currentNormalityMeta && window.currentNormalityMeta.alpha,
+        meta:       window.currentNormalityMeta || null,
         passCount:  txt('pass-count'),
         failCount:  txt('fail-count'),
         tests:      window.currentNormalityResults
@@ -11516,8 +11680,9 @@ ${this._overallAiReplyFormat()}`;
     if (window.currentOutliersData) {
       const od = window.currentOutliersData;
       out.outliers = out.outliers || {};
+      out.outliers.numeric = od;
       out.outliers.count  = od.outliers?.length ?? od.count;
-      out.outliers.method = out.outliers.method || od.method;
+      out.outliers.method = od.method || out.outliers.method;
       if (od.bounds) { out.outliers.lowerBound = od.bounds.lower; out.outliers.upperBound = od.bounds.upper; }
     }
 
@@ -11537,8 +11702,9 @@ ${this._overallAiReplyFormat()}`;
     if (window.currentCIResults) {
       const ci = window.currentCIResults;
       out.confidence = out.confidence || {};
+      out.confidence.numeric = ci;
       Object.assign(out.confidence, {
-        lcl: ci.lower, ucl: ci.upper, level: ci.level, method: ci.method, estimate: ci.estimate
+        level: ci.level, method: ci.method, estimate: ci.estimate, side: ci.side, parameter: ci.parameter
       });
     }
 
@@ -11746,6 +11912,14 @@ ${this._overallAiReplyFormat()}`;
     return result;
   },
 
+  _analysisAlpha() {
+    if (typeof document === 'undefined') return null;
+    const el = document.getElementById('alpha') || document.getElementById('significance');
+    if (!el) return null;
+    const n = parseFloat(el.value || el.textContent);
+    return Number.isFinite(n) && n > 0 && n < 1 ? n : null;
+  },
+
   _describePartialChange(cmp) {
     const r0 = cmp?.unadjusted?.r;
     const r1 = cmp?.partial?.r;
@@ -11760,8 +11934,9 @@ ${this._overallAiReplyFormat()}`;
     const abs0 = Math.abs(r0);
     const abs1 = Math.abs(r1);
     const small = 0.10;
-    const sig0 = Number.isFinite(p0) && p0 < 0.05;
-    const sig1 = Number.isFinite(p1) && p1 < 0.05;
+    const threshold = typeof this._analysisAlpha === 'function' && this._analysisAlpha() != null ? this._analysisAlpha() : 0.05;
+    const sig0 = Number.isFinite(p0) && p0 < threshold;
+    const sig1 = Number.isFinite(p1) && p1 < threshold;
     if (r0 * r1 < 0 && abs0 >= 0.05 && abs1 >= 0.05) {
       return { code: 'sign-reversal', label: 'Sign reversal after adjustment' };
     }
@@ -12029,10 +12204,15 @@ ${this._overallAiReplyFormat()}`;
       lines.push('[ Normality Tests ]');
       lines.push(`  Alpha=${n.alpha || '0.05'}, Pass=${n.passCount || '?'}, Fail=${n.failCount || '?'}`);
       if (n.tests && typeof n.tests === 'object') {
-        Object.entries(n.tests).forEach(([name, r]) => {
-          if (r?.pValue !== undefined) {
-            const fp = (v) => (Number.isFinite(v) ? Number(v).toFixed(4) : 'N/A');
-            lines.push(`  ${name}: p=${fp(r.pValue)} → ${r.significant ? 'NON-NORMAL' : 'normal'}`);
+        const rows = Array.isArray(n.tests) ? n.tests : Object.entries(n.tests).map(([name, row]) => Object.assign({ name }, row));
+        rows.forEach((r) => {
+          if (r?.pValue !== undefined && Number.isFinite(Number(r.pValue))) {
+            const p = Number(r.pValue);
+            const shown = p === 0 || p < 0.001 ? '<.001' : p.toFixed(3).replace(/^0(?=\.)/, '');
+            const alpha = Number(n.alphaValue != null ? n.alphaValue : n.alpha);
+            const below = Number.isFinite(alpha) ? p < alpha : null;
+            const reading = below === null ? 'alpha not recorded' : (below ? 'p below alpha; evidence of departure on this test' : 'no clear evidence of departure on this test');
+            lines.push(`  ${r.name || 'Test'}: p=${shown} → ${reading}`);
           }
         });
       }
@@ -12416,74 +12596,27 @@ ${this._localAiReplyFormat()}`;
 
     const { n, varName, mean, sd, med, q1, q3, iqr, min, max, skew, kurt, f } = d;
 
-    // ── Step 1: Compute numeric ratios ───────────────────────────────────────
-    const cvNum    = (mean !== 0 && sd > 0) ? Math.abs(sd / mean) : null;
-    const mmGapNum = sd > 0 ? (mean - med) / sd : null;
-    const iqrSdNum = sd > 0 ? iqr / sd : null;
-
-    // ── Step 2: Derive diagnostic signals (JS decides truth) ─────────────────
-    const symmetry =
-      mmGapNum !== null && skew !== null
-        ? (Math.abs(mmGapNum) < 0.1 && Math.abs(skew) < 0.2 ? 'strong'
-          : Math.abs(mmGapNum) < 0.25 && Math.abs(skew) < 0.5 ? 'moderate'
-          : 'low')
-        : 'unknown';
-
-    const dispersion =
-      cvNum !== null
-        ? (cvNum > 0.5 ? 'high' : cvNum > 0.25 ? 'moderate' : 'low')
-        : 'unknown';
-
-    const middleSpread =
-      iqrSdNum !== null
-        ? (iqrSdNum > 1.5 ? 'wide' : iqrSdNum > 1.2 ? 'slightly_elevated' : 'normal')
-        : 'unknown';
-
-    const tailBehavior =
-      kurt !== null
-        ? (kurt > 1 ? 'heavy' : kurt < -1 ? 'light' : 'normal')
-        : 'unknown';
-
-    const heterogeneityRisk =
-      (dispersion === 'high' && middleSpread === 'wide') ? 'possible' : 'unlikely';
-
-    // Normality status — only "confirmed" or "rejected" if formal tests were run
     const viewData = promptOpts.viewDataOverride || this._collectViewData(view);
-    let normalityStatus = 'not_tested';
-    if (viewData && typeof viewData === 'object' && viewData.normalityTests) {
-      const tests = Object.values(viewData.normalityTests).filter((r) => r?.pValue !== undefined);
-      if (tests.length > 0) {
-        normalityStatus = tests.some((r) => r.significant) ? 'rejected' : 'confirmed';
-      }
-    }
+    const normalityRows = []
+      .concat(viewData && viewData.tests ? viewData.tests : [])
+      .concat(viewData && viewData.normalityTests ? viewData.normalityTests : [])
+      .concat(preCollectedData && preCollectedData.normality && preCollectedData.normality.tests ? preCollectedData.normality.tests : [])
+      .concat(typeof window !== 'undefined' && window.currentNormalityResults ? window.currentNormalityResults : []);
+    const completedNormality = (Array.isArray(normalityRows) ? normalityRows : Object.values(normalityRows))
+      .filter((r) => r && Number.isFinite(Number(r.pValue)));
+    let normalityStatus = completedNormality.length ? 'completed' : 'not_run';
 
-    // ── Step 3: JS-computed Insight Strength (AI does NOT decide this) ───────
-    const strengthLevel =
-      (symmetry === 'strong' && dispersion === 'low' && normalityStatus !== 'rejected') ? 'High'
-      : (symmetry === 'low' || dispersion === 'high' || normalityStatus === 'rejected') ? 'Low'
-      : 'Moderate';
+    // Diagnostic labels are descriptive only. They are not a certainty badge.
+    const strengthLevel = null;
 
-    const strengthNote =
-      strengthLevel === 'High'
-        ? `Symmetry indicators align consistently and spread is well-controlled (n=${n}).`
-        : strengthLevel === 'Low'
-        ? `${symmetry === 'low' ? 'Distributional asymmetry' : 'High variability'} limits confidence; formal testing is required to go further (n=${n}).`
-        : `Symmetry is ${symmetry} but ${dispersion === 'high' ? 'high dispersion reduces confidence in distributional assumptions' : normalityStatus === 'not_tested' ? 'normality has not been formally tested' : 'mixed evidence exists'} (n=${n}).`;
+    const strengthNote = completedNormality.length
+      ? `Completed normality tests are available (n=${n}). Do not describe them as not tested.`
+      : `Normality tests have not been supplied with this request (n=${n}).`;
 
-    // ── Step 4: JS-computed Primary Signal (cognitive anchor for the panel) ──
-    const sigParts = [];
-    if (symmetry === 'strong') sigParts.push('Strong symmetry');
-    else if (symmetry === 'moderate') sigParts.push('Moderate symmetry');
-    else if (symmetry === 'low') sigParts.push('Asymmetric distribution');
-    if (dispersion === 'high') sigParts.push('high dispersion');
-    else if (dispersion === 'moderate') sigParts.push('moderate spread');
-    else if (dispersion === 'low') sigParts.push('tight concentration');
-    if (heterogeneityRisk === 'possible') sigParts.push('heterogeneity suspected');
-    if (normalityStatus === 'rejected') sigParts.push('non-normality confirmed');
-    const primarySignal = sigParts.join(' · ');
+    const primarySignal = `n = ${n}; mean = ${f(mean)}; IQR = ${f(iqr)}`;
 
     // Store meta so _showAiOverlay can display JS-computed values
-    this._lastAiMeta = { primarySignal, strengthLevel, strengthNote };
+    this._lastAiMeta = { primarySignal, strengthLevel, strengthNote, omitStrengthBadge: true };
 
     // ── Step 5: Build signals block for AI (AI translates, not computes) ─────
     const statsBlock = [
@@ -12495,13 +12628,12 @@ ${this._localAiReplyFormat()}`;
     ].filter(Boolean).join('\n');
 
     const signalsJson = JSON.stringify({
-      symmetry,
-      dispersion,
-      middle_spread:       middleSpread,
-      tail_behavior:       tailBehavior,
-      heterogeneity_risk:  heterogeneityRisk,
-      normality_status:    normalityStatus,
-      sample_size:         n,
+      sample_size: n,
+      mean, standard_deviation: sd, median: med,
+      q1, q3, iqr, min, max,
+      skewness: skew, excess_kurtosis: kurt,
+      normality_status: normalityStatus,
+      completed_normality_tests: completedNormality.length
     }, null, 2);
 
     // Serialise live view state for additional context
@@ -12510,7 +12642,14 @@ ${this._localAiReplyFormat()}`;
       .map(([k, v]) => {
         if (typeof v === 'object') {
           return Object.entries(v).filter(([, r]) => r?.pValue !== undefined)
-            .map(([name, r]) => `  ${name}: p=${f(r.pValue, 4)}, ${r.significant ? 'NON-NORMAL' : 'normal'}`)
+            .map(([name, r]) => {
+              const p = Number(r.pValue);
+              const pText = Number.isFinite(p) ? (Math.abs(p) < 0.001 ? 'p < .001' : `p = ${f(p, 4)}`) : 'p not available';
+              const reading = !Number.isFinite(p)
+                ? 'no p-value recorded'
+                : (r.significant ? 'p below the recorded cutoff on this test' : 'no clear evidence of departure on this test');
+              return `  ${name}: ${pText}; ${reading}`;
+            })
             .join('\n');
         }
         return `  ${k}: ${v}`;
@@ -12523,7 +12662,7 @@ ${this._localAiReplyFormat()}`;
 
       return `You are a senior statistician writing a full-variable diagnostic report that synthesises ALL available analysis results.
 
-DIAGNOSTIC SIGNALS (pre-computed, authoritative):
+COMPUTED VALUES (quote these; do not invent others):
 ${signalsJson}
 
 RAW STATISTICS (cite numbers when useful):
@@ -12533,12 +12672,14 @@ RESULTS FROM COMPLETED ANALYSES:
 ${allDataBlock || '(No additional view results available — base statistics only)'}
 
 RULES:
-- If normality_status = "not_tested", do NOT conclude normality or non-normality
-- Do NOT recompute or question the signals
+- If completed normality tests are listed, describe those tests. Do not call them not tested.
+- A nonsignificant test is not proof of normality. Do not use majority voting across tests.
+- Quote the sample size, mean, and confidence interval when they are supplied.
+- Do not say "strong symmetry", "wide central spread", or give a one-word practical interpretation.
+- A one-sided bound is not a two-sided interval. A planning figure is not an observed result.
 - Do NOT repeat the same fact across sections
-- Do NOT mention formula names (CV, IQR/SD, etc.) — describe patterns in plain language
 
-TASK: Write a decision-oriented overall assessment. Synthesise signals and results into a unified narrative. Where test results exist, cite exact numbers. Cover: the defining characteristic, what diagnostics collectively confirm, practical consequences, limitations, and what to do next.
+TASK: Write a decision-oriented overall assessment. Synthesise the computed values and completed results. Where test results exist, cite exact numbers. Cover the main result, the uncertainty, the diagnostics that were actually run, and the limitations.
 
 ${this._viewReadingsPrompt('full')}
 ${this._overallAssessmentEmphasis()}
@@ -12628,9 +12769,19 @@ ${this._localAiReplyFormat()}`;
 
   // ── AI API call ──────────────────────────────────────────────────────────
 
+  _aiResponseCurrent(requestFingerprint, serial) {
+    const ix = this._ix();
+    const current = this._aiFingerprint();
+    if (serial !== this._aiRequestSerial) return false;
+    if (ix) return ix.acceptResponse(requestFingerprint, current);
+    return requestFingerprint === current;
+  },
+
   async _callAiForSidebar(prompt) {
     const PROXY_URL = 'https://statistico-ai.statistico.workers.dev/';
-    this._aiPromptFingerprint = this._aiFingerprint();
+    const requestFingerprint = this._aiFingerprint();
+    this._aiPromptFingerprint = requestFingerprint;
+    const serial = (this._aiRequestSerial = (this._aiRequestSerial || 0) + 1);
     const controlBlock = this._liveControlBlock();
     const fullPrompt = controlBlock ? `${prompt}\n\n${controlBlock}` : prompt;
 
@@ -12647,14 +12798,16 @@ ${this._localAiReplyFormat()}`;
 Your task is to translate pre-computed diagnostic signals into clear, human analytical insight.
 
 CRITICAL RULES (strictly enforced):
-- Do NOT recompute or question the signals you are given — they are authoritative
-- If normality_status = "not_tested", you MUST NOT imply normality or non-normality
-- Use cautious language ("suggests", "indicates", "appears to") unless certainty is "confirmed" or "rejected"
-- Do NOT mention formula names or ratio names (e.g. do not say "CV", "IQR/SD ratio", "skewness value") — describe patterns in plain language
+- Use only numbers and results that are supplied. Do not invent a statistic, a test, or a sample size.
+- A missing p-value is not a nonsignificant result. Never print p = 0; use p < .001 when the value is smaller than .001.
+- Do not assign Strong, High, or any other calibrated certainty label.
+- A nonsignificant normality test is not proof of normality. Completed tests override a stale not-tested flag.
+- Do not say a plot was visually inspected unless an image was supplied.
+- A one-sided bound stays one bound. A planning or What If figure is not an observed result.
+- Name the actual multiplicity adjustment, the logistic event level, and a temporary regression refit when those results are supplied.
 - Do NOT repeat the same idea across sections
 - Do NOT give UI instructions or mention charts, sliders, or interface elements unless the user prompt explicitly asks for CONTROLS / PATTERNS guidance
 - LIVE CONTROLS in the user message are the settings on screen now. Interpret the result for those settings. Do not substitute a default such as the normal distribution when another reference is selected.
-- "What to Check Next" must use conditional reasoning ("If X, then run Y") — not a plain test list
 - NUMBER FORMAT: report effects, SEs, CIs, Q, τ², and intercepts to 3 decimal places; I² to 1 decimal with %; p-values to 3 decimals (use p < .001 when smaller). Never paste long floating-point tails from JSON.
 
 Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUSION keys over tutorial text. Never wrap the reply in markdown fences.` },
@@ -12668,6 +12821,7 @@ Always follow the exact output format requested. Prefer the BOTTOMLINE / CONCLUS
         const d = await r.json();
         const text = d?.choices?.[0]?.message?.content?.trim();
         if (!text) { lastErr = new Error('Empty response'); continue; }
+        if (!this._aiResponseCurrent(requestFingerprint, serial)) return null;
         return this._formatAiProseNumbers(text);
       } catch (err) { lastErr = err; if (err.message?.includes('not found')) continue; throw err; }
     }
@@ -12839,16 +12993,7 @@ Do not recommend switching to a setting that is already selected.`;
     this._liveControlAiTimer = setTimeout(() => {
       const overlay = document.getElementById('sbAiOverlay');
       if (!overlay) return;
-      if (overlay.classList.contains('sb-ai-overlay--overall')) {
-        this.markOpenAiStale();
-        return;
-      }
-      const btn = document.getElementById('sbAiFloatBtn');
-      if (btn && btn.disabled) {
-        this._scheduleAiControlRefresh(n + 1);
-        return;
-      }
-      this._refreshLastAi();
+      this.markOpenAiStale();
     }, 650);
   },
 
@@ -13038,7 +13183,7 @@ Do not recommend switching to a setting that is already selected.`;
       text = bits.join(' ');
     }
     if (!text) {
-      text = 'Not assessed — open By Group to see whether the overall finding holds across categories, segments, or conditions.';
+      text = 'Group comparison has not been run, so there is no group-consistency finding.';
     }
     const reversal = /direction changes|revers/i.test(text);
     const varies = /varies by group|strong difference/i.test(text);
@@ -13090,9 +13235,19 @@ Do not recommend switching to a setting that is already selected.`;
   },
 
   _copyAiOverlayText() {
-    const body = document.querySelector('#sbAiOverlay .sb-ai-body');
-    const text = body ? String(body.innerText || '').trim() : '';
+    const overlay = document.getElementById('sbAiOverlay');
+    const body = overlay ? overlay.querySelector('.sb-ai-body') : null;
+    let text = body ? String(body.innerText || '').trim() : '';
     if (!text) return;
+    const ix = this._ix();
+    if (ix) {
+      text = ix.textForCopy({
+        text: text,
+        stale: !!(overlay && overlay.dataset.stale === '1'),
+        fingerprint: overlay && overlay.dataset.stale === '1' ? 'previous' : 'current',
+        currentFingerprint: 'current'
+      });
+    }
     const done = () => this._flashAiAction('Copied');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done).catch(done);
@@ -13149,6 +13304,17 @@ Do not recommend switching to a setting that is already selected.`;
   },
 
   _showAiOverlay(sections, view, mode = 'per-view', meta = null) {
+    const ix = this._ix();
+    if (ix && sections && !sections.error && meta && Array.isArray(meta.requiredFindings)) {
+      sections = ix.enforceRequiredFindings(sections, meta.requiredFindings);
+    }
+    if (ix && mode === 'full' && sections && !sections.error && !meta?.ruleBased) {
+      const classified = ix.classifyInterpretationResponse({ parsed: sections, mode: 'full' });
+      if (!classified.ok) sections = { error: classified.error };
+    }
+    if (ix && sections && !sections.error && sections.INTERPRETATION) {
+      sections.INTERPRETATION = ix.usableNarrative(sections.INTERPRETATION, this.variableName);
+    }
     if (window.StatisticoViewGuide && typeof window.StatisticoViewGuide.close === 'function') {
       window.StatisticoViewGuide.close({ silent: true });
     }
@@ -13190,10 +13356,12 @@ Do not recommend switching to a setting that is already selected.`;
     } else if (sections.error) {
       bodyHtml = `<p class="sb-ai-empty sb-ai-error"><i class="fa-solid fa-triangle-exclamation"></i> ${this._escapeAiHtml(sections.error)}</p>`;
     } else if (mode === 'full') {
-      const strength = this._normalizeStrength(sections.STRENGTH, meta?.strengthLevel);
-      const strengthNote = meta?.strengthNote || (sections.STRENGTH
-        ? String(sections.STRENGTH).replace(/^(strong|high|moderate|tentative|low|inconclusive)\s*[—–:-]?\s*/i, '')
-        : '');
+      const strengthNote = meta?.omitStrengthBadge
+        ? ''
+        : (meta?.strengthNote && /\d|p\s*[<>=]|alpha|silhouette|threshold/i.test(String(meta.strengthNote))
+          ? this._cleanAiText(meta.strengthNote)
+          : '');
+      const strength = strengthNote ? { level: 'ruled', label: '' } : null;
       const findings = sections.FINDINGS && sections.FINDINGS.length ? sections.FINDINGS : sections.EVIDENCE;
       const support = sections.SUPPORT && sections.SUPPORT.length ? sections.SUPPORT : null;
       bodyHtml = `
@@ -13214,8 +13382,7 @@ Do not recommend switching to a setting that is already selected.`;
         ${strength ? `<div class="sb-ai-section sb-ai-section--strength">
           <div class="sb-ai-section-label">Evidence strength</div>
           <div class="sb-ai-section-body sb-ai-strength-body">
-            <span class="sb-ai-strength-badge sb-ai-strength-${strength.level}">${strength.label}</span>
-            ${strengthNote ? `<span class="sb-ai-strength-note">${this._escapeAiHtml(this._cleanAiText(strengthNote))}</span>` : ''}
+            <span class="sb-ai-strength-note">${this._escapeAiHtml(strengthNote)}</span>
           </div>
         </div>` : ''}
         ${listCard('sb-ai-section--evidence', 'Main findings', findings)}
@@ -13262,6 +13429,7 @@ Do not recommend switching to a setting that is already selected.`;
     const overlay = document.createElement('div');
     overlay.id = 'sbAiOverlay';
     overlay.className = 'sb-ai-overlay' + (mode === 'full' ? ' sb-ai-overlay--overall' : ' sb-ai-overlay--local');
+    overlay.dataset.stale = stale ? '1' : '0';
     const scopeLabel = mode === 'full' ? 'Full analysis' : 'This view';
     const scopeHtml = this.module === 'independent'
       ? `<div class="sb-ai-scope-switch" role="group" aria-label="Interpretation scope">

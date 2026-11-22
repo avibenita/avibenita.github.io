@@ -16,7 +16,7 @@
   <script src="../../shared/uni-normality-dashboard.js?v=20260531p"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20261120hist1" />  <script src="../shared-brand-logo.js?v=20261005light1"></script>
+  <link rel="stylesheet" href="../shared-header.css?v=20261122glass" />  <script src="../shared-brand-logo.js?v=20261005light1"></script>
 
   <script src="../shared-header.js?v=20261120ctrl1"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
@@ -7128,6 +7128,8 @@
     
     function prepareAIDataPackage() {
       if (!lastBundle) return null;
+      var analysisAlpha = Number((document.getElementById('setAlpha') || { value: '0.05' }).value || 0.05);
+      if (!isFinite(analysisAlpha) || analysisAlpha <= 0 || analysisAlpha >= 1) analysisAlpha = 0.05;
       
       const setup = lastBundle.setup || {};
       const explore = lastBundle.explore || {};
@@ -7204,12 +7206,12 @@
           test: "Mauchly",
           W: omnibus.mauchlyW,
           p: omnibus.mauchlyP,
-          violated: omnibus.mauchlyP < 0.05,
+          violated: omnibus.mauchlyP < analysisAlpha,
           epsilons: {
             GG: omnibus.ggEpsilon,
             HF: omnibus.hfEpsilon
           },
-          correction_applied: omnibus.mauchlyP < 0.05 ? "GG or HF recommended" : "none"
+          correction_applied: omnibus.mauchlyP < analysisAlpha ? "GG or HF recommended" : "none"
         },
         notes_for_user: [
           "If sphericity is violated, report GG/HF-corrected results.",
@@ -7232,9 +7234,9 @@
           p: omnibus.anovaP
         },
         sphericity_reporting: {
-          reported_as: omnibus.mauchlyP < 0.05 ? "corrected" : "uncorrected",
-          gg_corrected: omnibus.mauchlyP < 0.05 ? omnibus.anovaFGG : null,
-          hf_corrected: omnibus.mauchlyP < 0.05 ? omnibus.anovaFHF : null
+          reported_as: omnibus.mauchlyP < analysisAlpha ? "corrected" : "uncorrected",
+          gg_corrected: omnibus.mauchlyP < analysisAlpha ? omnibus.anovaFGG : null,
+          hf_corrected: omnibus.mauchlyP < analysisAlpha ? omnibus.anovaFHF : null
         }
       };
       
@@ -7321,7 +7323,7 @@
               name: isNonparametric ? "rank_biserial" : "dz", 
               value: pw.cohenDz || pw.dz || pw.effectSize || pw.rankBiserial || 0
             },
-            significant: adjP < 0.05
+            significant: adjP < analysisAlpha
           };
         }),
         display_rules: {
@@ -7329,7 +7331,7 @@
         },
         note: pairwiseData.length === 0 ? 
           "Post-hoc comparisons can be performed using the Pairwise tab in the results dialog." : 
-          `${pairwiseData.filter(p => (p.p || p.p_adj || 1) < 0.05).length} of ${pairwiseData.length} comparisons significant after ${pairwiseData[0]?.adjustment || 'Holm'} correction.`
+          `${pairwiseData.filter(p => (p.p || p.p_adj || 1) < analysisAlpha).length} of ${pairwiseData.length} comparisons have an adjusted p-value below alpha ${analysisAlpha} after ${pairwiseData[0]?.adjustment || 'Holm'} adjustment.`
       };
       
       // Power with cautions
@@ -7338,7 +7340,7 @@
         observed: {
           reported: powerAnalysisData?.observed_power != null,
           power: powerAnalysisData?.observed_power,
-          alpha: 0.05,
+          alpha: analysisAlpha,
           effect_size_source: "observed"
         },
         planning: {
@@ -7346,7 +7348,7 @@
           target_power_85: powerAnalysisData?.required_n_85,
           target_power_90: powerAnalysisData?.required_n_90,
           assumptions: { 
-            alpha: 0.05, 
+            alpha: analysisAlpha, 
             effect_size_basis: "cohens_f" 
           }
         },
@@ -7364,7 +7366,7 @@
           locale: "en",
           reporting: {
             style: "APA",
-            alpha: 0.05,
+            alpha: analysisAlpha,
             decimals: globalDecimalPrecision === "auto" ? 2 : parseInt(globalDecimalPrecision, 10),
             tone: "professional",
             length_words_max: 350
@@ -7381,8 +7383,8 @@
           } : primaryTest,
           robust_or_alternative: robustTest,
           omnibus_conclusion: {
-            significant: (isNonparametric ? nonparametricTest.statistic.p : primaryTest.statistic.p) < 0.05,
-            plain_language: (isNonparametric ? nonparametricTest.statistic.p : primaryTest.statistic.p) < 0.05 ? 
+            significant: (isNonparametric ? nonparametricTest.statistic.p : primaryTest.statistic.p) < analysisAlpha,
+            plain_language: (isNonparametric ? nonparametricTest.statistic.p : primaryTest.statistic.p) < analysisAlpha ? 
               "At least one timepoint differs significantly." : 
               "No significant differences were detected among timepoints."
           }

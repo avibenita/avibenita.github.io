@@ -35,7 +35,7 @@
   <script src="../../../src/shared/js/core/saved-analyses-manager.js"></script>
 
   <!-- Shared Header -->
-  <link rel="stylesheet" href="../shared-header.css?v=20261120hist1" />
+  <link rel="stylesheet" href="../shared-header.css?v=20261122glass" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
   <script src="../shared-header.js?v=20261120ctrl1"></script>
@@ -10585,18 +10585,18 @@ ${sectionsHtml}
       const outCls    = r.outlierCount>r.nObs*0.05 ? 'warning' : 'pass';
       const issueCount= [!r.normality,!r.homoscedasticity,!r.independence].filter(Boolean).length;
       const ovText = issueCount===0 && r.outlierCount<r.nObs*0.05
-        ? 'Model assumptions are largely satisfied'
+        ? 'The recorded residual checks did not flag a departure. That does not confirm the assumptions.'
         : issueCount<=1 && r.outlierCount<r.nObs*0.1
-          ? 'Model has minor assumption violations'
-          : 'Model has significant assumption violations';
+          ? 'One recorded residual check, or the standardized-residual flag, needs attention'
+          : 'More than one recorded residual check flagged a departure';
       const sw=r.tests.sw, bp=r.tests.bp, dw=r.tests.dw;
-      const swMark = _resVerdict(sw.p, '✓ Normality Assumed', '✗ Non-Normal', 'Inference is reliable', 'Inference may be biased');
-      const bpMark = _resVerdict(bp.p, '✓ Homoscedastic', '✗ Heteroscedastic', 'Standard errors are valid', 'Standard errors may be unreliable');
+      const swMark = _resVerdict(sw.p, 'No clear evidence of departure', 'Evidence of departure', 'A nonsignificant Shapiro–Wilk test does not establish normality', 'Residual inference can be sensitive to that departure');
+      const bpMark = _resVerdict(bp.p, 'No clear evidence of changing variance', 'Evidence of changing variance', 'A nonsignificant Breusch–Pagan test does not prove constant variance', 'Standard errors may be unreliable');
       const dwClose = Number.isFinite(dw.DW) && Math.abs(dw.DW - 2) < 0.5;
       const dwFar = Number.isFinite(dw.DW) && (dw.DW < 1.5 || dw.DW > 2.5);
       const dwMark = !Number.isFinite(dw.DW)
         ? { cls: '', result: 'Not available', impact: '' }
-        : { cls: dwClose ? 'pass' : (dwFar ? 'fail' : 'warning'), result: dwClose ? '✓ No Autocorrelation' : '⚠ Check Autocorrelation', impact: dwClose ? 'Residuals are independent' : 'Standard errors unreliable' };
+        : { cls: dwClose ? 'pass' : (dwFar ? 'fail' : 'warning'), result: dwClose ? 'Durbin–Watson is near 2' : 'Durbin–Watson is away from 2', impact: dwClose ? 'This rule does not prove the residuals are independent' : 'Standard errors may be unreliable' };
       const tooltip = (txt)=>`<span class="res-tooltip"><i class="fa-solid fa-circle-question" style="font-size:9px;color:var(--text-muted);cursor:help;opacity:.6;"></i><span class="res-tooltiptext">${txt}</span></span>`;
       if (window.StatisticoViewReadings) {
         window.StatisticoViewReadings.set('regression-diag-overview', [
@@ -11225,11 +11225,11 @@ ${sectionsHtml}
       const r = window._resDiagResults;
       const maxCook = Math.max(..._resData.cooksD);
       const findings = [
-        r.normality ? {t:'Residuals are approximately normally distributed',c:'success'} : {t:'Normality assumption violated — inference may be biased',c:'danger'},
-        r.homoscedasticity ? {t:'No heteroscedasticity detected — constant variance confirmed',c:'success'} : {t:'Heteroscedasticity detected — standard errors may be unreliable',c:'warning'},
-        r.independence ? {t:'No autocorrelation detected — residuals are independent',c:'success'} : {t:'Potential autocorrelation detected — check data ordering',c:'warning'},
-        r.outlierCount===0 ? {t:'No outliers detected',c:'success'} : r.outlierCount<r.nObs*0.05 ? {t:`${r.outlierCount} moderate outliers detected (acceptable)`,c:'success'} : {t:`${r.outlierCount} outliers detected — may affect model stability`,c:'warning'},
-        maxCook>1 ? {t:'Influential observations detected — model sensitive to specific data points',c:'warning'} : maxCook>0.5 ? {t:'Moderate influence detected in some observations',c:'warning'} : {t:'No highly influential observations detected',c:'success'}
+        r.normality ? {t:'Shapiro–Wilk does not show clear evidence of departure. That does not establish normality.',c:'success'} : {t:'Shapiro–Wilk shows evidence of departure from normality. Residual inference can be sensitive to that departure.',c:'danger'},
+        r.homoscedasticity ? {t:'Breusch–Pagan does not show clear evidence of changing variance. That does not prove constant variance.',c:'success'} : {t:'Breusch–Pagan shows evidence of changing variance. Standard errors may be unreliable.',c:'warning'},
+        r.independence ? {t:'Durbin–Watson is near 2. That rule does not prove the residuals are independent.',c:'success'} : {t:'Durbin–Watson is away from 2. Check the data order before trusting the standard errors.',c:'warning'},
+        r.outlierCount===0 ? {t:`No residuals were flagged by |standardized residual| > 2 (0 of ${r.nObs})`,c:'success'} : r.outlierCount<r.nObs*0.05 ? {t:`${r.outlierCount} of ${r.nObs} residuals were flagged by |standardized residual| > 2`,c:'success'} : {t:`${r.outlierCount} of ${r.nObs} residuals were flagged by |standardized residual| > 2`,c:'warning'},
+        maxCook>1 ? {t:'At least one Cook\'s distance exceeds 1. The fit may be sensitive to that case.',c:'warning'} : maxCook>0.5 ? {t:'At least one Cook\'s distance exceeds 0.5.',c:'warning'} : {t:'No Cook\'s distance exceeded 0.5. That threshold does not certify the fit.',c:'success'}
       ];
       if (window.StatisticoViewReadings) {
         window.StatisticoViewReadings.add('regression-diag-overview', findings.map(f => f.t));

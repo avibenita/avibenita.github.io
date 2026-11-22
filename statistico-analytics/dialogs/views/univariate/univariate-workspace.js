@@ -20,22 +20,19 @@
   }
 
   function insightMarkup() {
-    var skew = Number(text('stat-skewness', '0'));
-    var mean = Number(text('stat-mean', '0'));
-    var median = Number(text('stat-median', '0'));
-    var shape = 'approximately symmetric';
-    if (Number.isFinite(skew)) {
-      if (skew <= -0.5) shape = 'left-skewed';
-      else if (skew >= 0.5) shape = 'right-skewed';
-      else if (Math.abs(skew) >= 0.2) shape = 'mildly skewed';
+    var stats = window.__univariateComputedStats || null;
+    var skew = stats && Number.isFinite(Number(stats.skewness)) ? Number(stats.skewness) : Number(text('stat-skewness', ''));
+    var api = window.StatisticoInterpretation;
+    if (api && Number.isFinite(skew)) {
+      return api.describeShape({ skew: skew, kurtosis: stats ? stats.kurtosis : null }).text;
     }
-    var relationship = '';
-    if (Number.isFinite(mean) && Number.isFinite(median)) {
-      if (mean < median) relationship = ' · The mean is below the median.';
-      else if (mean > median) relationship = ' · The mean is above the median.';
-    }
-    return '<strong>' + shape.charAt(0).toUpperCase() + shape.slice(1)
-      + ' distribution</strong>' + relationship;
+    if (!Number.isFinite(skew)) return 'Skewness is not available for this sample.';
+    var shown = Math.abs(skew) >= 1 ? skew.toFixed(2) : skew.toFixed(3);
+    if (Math.abs(skew) < 0.2) return 'Skewness of ' + shown + ' suggests approximate symmetry.';
+    if (Math.abs(skew) < 0.5) return 'Skewness of ' + shown + ' suggests mild asymmetry.';
+    return skew > 0
+      ? 'Skewness of ' + shown + ' indicates a longer right tail.'
+      : 'Skewness of ' + shown + ' indicates a longer left tail.';
   }
 
   function createMetric(label, id) {

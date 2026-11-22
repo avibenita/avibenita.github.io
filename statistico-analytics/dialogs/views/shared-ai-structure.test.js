@@ -10,7 +10,7 @@ describe('Statistico AI structure (Cursor100)', () => {
     expect(header).toMatch(/Analyze all results/);
     expect(header).toMatch(/sb-ai-sup--all/);
     expect(header).toMatch(/sb-ai-panel--overall/);
-    expect(header).toMatch(/All results/);
+    expect(header).toMatch(/Full analysis/);
     expect(header).toMatch(/This view/);
     expect(header).toMatch(/Explain this view/);
     expect(header).toMatch(/View guide/);

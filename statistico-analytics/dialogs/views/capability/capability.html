@@ -127,7 +127,7 @@
     #view-setup input[type="number"] { width: 100%; background: var(--cfg-bg); color: var(--cfg-text); border: 1px solid var(--cfg-border); border-radius: 8px; padding: 7px 8px; }
     .spec-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
     .spec-row .field { width: 140px; }
-    .summary-row { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.85fr); gap: 12px; align-items: stretch; }
+    .summary-row { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.85fr); gap: 32px; align-items: stretch; }
     .fact-panel h2 { margin: 0 0 8px; font-size: 14px; }
     .fact-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 6px; }
     .fact-detail { margin: 4px 0 0; font-size: 11px; line-height: 1.35; color: var(--text-secondary, rgba(255,255,255,.75)); }
@@ -236,7 +236,12 @@
     #planner-mean-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
     #planner-mean-tools[hidden] { display: none !important; }
     #planner-mean-range { flex: 1 1 180px; accent-color: #f97316; }
-    #cpkGauge svg, #distributionChart svg { width: 100%; height: auto; display: block; }
+    #cpkGauge svg { width: 100%; height: auto; display: block; }
+    #view-results:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    #view-results:not([hidden]) #results-body:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    #distribution-card { flex: 1 1 auto; min-height: 280px; display: flex; flex-direction: column; margin-bottom: 0; }
+    #distributionChart { flex: 1 1 auto; min-height: 220px; display: flex; }
+    #distributionChart svg { width: 100%; height: 100%; display: block; }
     .table-wrap { overflow: auto; border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 10px; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 760px; }
     th, td { padding: 7px 8px; border-bottom: 1px solid var(--border, rgba(255,255,255,.1)); text-align: right; font-variant-numeric: tabular-nums; }
@@ -1182,17 +1187,18 @@
         if (proposedPeak > maxY) maxY = proposedPeak;
       }
       maxY = maxY * 1.12 || 1;
-      var W = 980;
-      var H = plan ? 176 : 156;
+      var host = chartNode();
+      if (!host) return;
+      host.textContent = '';
+      var frame = chartFrame(host, plan);
+      var W = frame.W;
+      var H = frame.H;
       var L = 16;
       var R = 16;
       var T = plan ? 58 : 40;
       var B = 16;
       function px(v) { return L + ((v - xMin) / (xMax - xMin)) * (W - L - R); }
       function py(v) { return T + (1 - v / maxY) * (H - T - B); }
-      var host = chartNode();
-      if (!host) return;
-      host.textContent = '';
       var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': plan && plan.overlay === 'curve' ? 'Current process and a hypothetical proposed scenario on the same density scale' : (plan && plan.overlay === 'specs' ? 'Actual process with proposed specification limits' : 'Process distribution and specification limits') });
       var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
       title.textContent = plan && plan.overlay === 'curve' ? (view === 'process' ? 'Current process and proposed process' : 'Current process and required scenario') : (plan && plan.overlay === 'specs' ? 'Actual process with proposed limits' : 'Process distribution and specification limits');
@@ -1293,17 +1299,19 @@
         if (currentPeak > maxY) maxY = currentPeak;
       }
       maxY = maxY * 1.12;
-      var W = 980;
-      var H = plan ? 176 : 156;
+      paintBinTable(bins, result);
+      var host = chartNode();
+      if (!host) return;
+      host.textContent = '';
+      var frame = chartFrame(host, plan);
+      var W = frame.W;
+      var H = frame.H;
       var L = 16;
       var R = 16;
       var T = plan ? 58 : 40;
       var B = 16;
       function px(v) { return L + ((v - xMin) / (xMax - xMin)) * (W - L - R); }
       function py(v) { return T + (1 - v / maxY) * (H - T - B); }
-      var host = chartNode();
-      if (!host) return;
-      host.textContent = '';
       var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': (plan && plan.overlay === 'curve' ? 'Observed histogram, current process, and hypothetical proposed scenario. ' : 'Histogram of measured values. ') + observed.count + ' of ' + observed.n + ' are out of spec.' });
       var title = svgEl('text', { x: String(W / 2), y: '16', 'text-anchor': 'middle', fill: ink(), 'font-size': '13', 'font-weight': '700' });
       title.textContent = plan && plan.overlay === 'curve' ? 'Current process and proposed scenario' : ('Measured values' + (showCurve ? ' with the normal curve' : ''));
@@ -1379,7 +1387,6 @@
       svg.appendChild(svgEl('line', { x1: L, y1: H - B, x2: W - R, y2: H - B, stroke: gridColor() }));
       drawObservedDots(svg, values, result, px, py(0));
       host.appendChild(svg);
-      paintBinTable(bins, result);
     }
 
     function metricCard(label, tip, valueHtml, primary, extra) {
@@ -1584,6 +1591,16 @@
         lowerOut: el('planner-lower-out') ? el('planner-lower-out').value : '',
         upperOut: el('planner-upper-out') ? el('planner-upper-out').value : ''
       };
+    }
+    function chartFrame(host, plan) {
+      var W = 980;
+      var H = plan ? 176 : 156;
+      if (!plan && host && host.id === 'distributionChart') {
+        var width = host.clientWidth;
+        var height = host.clientHeight;
+        if (width > 40 && height > 40) H = Math.max(156, Math.round(W * height / width));
+      }
+      return { W: W, H: H };
     }
     function chartNode() {
       var id = view === 'reach' ? 'reachChart' : view === 'process' ? 'processChart' : view === 'spec' ? 'specChart' : 'distributionChart';
@@ -2904,6 +2921,15 @@
     el('hist-bins').addEventListener('input', function () {
       el('hist-bins-value').textContent = el('hist-bins').value;
       redrawDistribution();
+    });
+    var chartResize = 0;
+    window.addEventListener('resize', function () {
+      if (view !== 'results' || !last || !last.ok) return;
+      if (chartResize) clearTimeout(chartResize);
+      chartResize = setTimeout(function () {
+        chartResize = 0;
+        drawDistribution(last.overall);
+      }, 80);
     });
     el('group-to-setup').addEventListener('click', function () { showView('setup'); });
     if (el('reach-to-setup')) el('reach-to-setup').addEventListener('click', function () { showView('setup'); });

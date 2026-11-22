@@ -9591,9 +9591,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261122calcs')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261122goal')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261122calcs');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261122goal');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;

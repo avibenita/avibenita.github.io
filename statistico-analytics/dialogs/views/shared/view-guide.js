@@ -2389,7 +2389,7 @@
         'Reach a capability goal',
         'Calculates the process change required to reach a Ppk goal. Specifications stay at their actual values.',
         [
-          'Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation. Calculate required change runs the plan. After that, choosing another method calculates it immediately, and editing a valid goal recalculates shortly afterward.',
+          'Ppk goal defaults to 1.33. The number and the slider stay in step, and the slider widens if you type a goal outside 0.5 to 3. Dragging the slider recalculates immediately. Choosing another method does the same, and a typed goal recalculates shortly afterward.',
           'Advanced holds modeled yield, expected PPM, and optional mean or standard-deviation bounds. Specification changes belong on Specification What-If.',
           'Current capability returns to the actual process. Changing the analyzed data clears the previous proposal and calculates again from the new baseline.'
         ],
@@ -2412,8 +2412,8 @@
         'Reach a capability goal',
         'Calculates the process change required to reach a Ppk goal. Specifications stay at their actual values.',
         [
-          'Ppk goal defaults to 1.33. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation.',
-          'After the first calculation, another method or a valid goal edit recalculates. An invalid goal clears the previous result.',
+          'Ppk goal defaults to 1.33. The number and the slider stay in step. Dragging the goal recalculates the required change immediately. What can change is Reduce variation, Shift mean, or Shift mean + reduce variation.',
+          'A typed goal recalculates shortly afterward. An invalid goal clears the previous result. Comparison lists Current, Required, and Change.',
           'Current capability returns to the observed process without applying the requirement.'
         ],
         [

@@ -18,7 +18,7 @@
   <script src="../shared/demo-fixtures.js?v=20261117demo6"></script>
   <script src="../shared/demo-data.js?v=20261119demo"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261122calcs"></script>
+  <script src="../shared-header.js?v=20261122goal"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
   <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
@@ -178,6 +178,9 @@
     #reach-panel[hidden] { display: none !important; }
     #reach-title { margin: 0 0 8px; font-size: 15px; }
     #reach-title:focus { outline: 2px solid #f97316; outline-offset: 3px; }
+    .plan-goal-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 8px; padding: 10px 12px; border: 1px solid rgba(249, 115, 22, 0.55); border-radius: 10px; background: rgba(249, 115, 22, 0.1); }
+    .plan-goal-row input[type="range"] { flex: 1 1 240px; min-width: 140px; accent-color: #f97316; }
+    html[data-theme="light"] .plan-goal-row { background: rgba(234, 88, 12, 0.08); border-color: rgba(234, 88, 12, 0.4); }
     .plan-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
     label.field.plan-goal { flex: 0 0 auto; min-width: 0; width: auto; }
     .plan-goal input { width: 4.5rem; }
@@ -437,10 +440,15 @@
           <div id="reach-body">
             <section id="reach-panel" class="cap-card" aria-labelledby="reach-title">
               <h2 id="reach-title" tabindex="-1">Reach a capability goal</h2>
-              <div class="plan-bar">
+              <div class="plan-goal-row">
                 <label class="field plan-goal" for="planner-goal">Ppk goal
                   <input id="planner-goal" type="number" step="0.01" value="1.33" inputmode="decimal" aria-describedby="planner-goal-error" />
                 </label>
+                <input id="planner-goal-range" type="range" min="0.5" max="3" step="0.01" value="1.33" aria-label="Ppk goal" />
+              </div>
+              <p id="planner-goal-error" class="cap-error" hidden></p>
+              <div id="planner-status" class="plan-strip" role="status" aria-live="polite" hidden></div>
+              <div class="plan-bar">
                 <fieldset class="plan-methods">
                   <legend>What can change?</legend>
                   <label class="plan-method is-selected">
@@ -461,10 +469,8 @@
                   <button type="button" id="planner-close">Current capability</button>
                 </div>
               </div>
-              <p id="planner-goal-error" class="cap-error" hidden></p>
-              <p id="planner-prompt">Choose what can change, then calculate the required change. The chart below shows the current process.</p>
+              <p id="planner-prompt">Drag the Ppk goal, or choose what can change. The required change updates as the goal moves.</p>
               <p id="planner-error" class="cap-error" role="alert" hidden></p>
-              <div id="planner-status" class="plan-strip" role="status" aria-live="polite" hidden></div>
               <details id="planner-detail" hidden>
                 <summary>Comparison</summary>
                 <div id="planner-compare"></div>
@@ -1625,6 +1631,55 @@
       if (!(n > 0)) return 'The goal has to be a positive number.';
       return '';
     }
+    function syncGoalRange() {
+      var range = el('planner-goal-range');
+      var input = el('planner-goal');
+      if (!range || !input) return;
+      var n = Number(input.value);
+      var min = 0.5;
+      var max = 3;
+      if (Number.isFinite(n) && n > 0) {
+        if (n < min) min = n;
+        if (n > max) max = n;
+        range.min = String(min);
+        range.max = String(max);
+        range.value = String(n);
+      }
+    }
+    function changeText(current, proposed, kind) {
+      if (!Number.isFinite(current) || !Number.isFinite(proposed)) return '—';
+      var delta = proposed - current;
+      if (Math.abs(delta) <= 1e-9) return '0';
+      if (kind === 'pct') {
+        var pct = current ? (delta / current) * 100 : NaN;
+        var pctText = Number.isFinite(pct) ? ' (' + (pct > 0 ? '+' : '') + pct.toFixed(1) + '%)' : '';
+        return signed(delta) + pctText;
+      }
+      if (kind === 'ppm') {
+        var abs = Math.abs(delta);
+        var body = abs < 100 ? (Number(abs.toFixed(2)) === 0 ? '< 0.01' : abs.toFixed(2)) : formatPpm(abs);
+        return (delta > 0 ? '+' : '−') + body;
+      }
+      return signed(delta);
+    }
+    function scheduleReach(delay) {
+      if (reachDebounce) clearTimeout(reachDebounce);
+      syncGoalField();
+      if (goalFieldError()) {
+        invalidateProposal();
+        return;
+      }
+      plannerFollowsMethod = true;
+      if (!delay) {
+        reachDebounce = 0;
+        runPlanner('ppk');
+        return;
+      }
+      reachDebounce = setTimeout(function () {
+        reachDebounce = 0;
+        runPlanner('ppk');
+      }, delay);
+    }
     function syncGoalField() {
       var message = goalFieldError();
       var input = el('planner-goal');
@@ -1634,6 +1689,7 @@
         err.hidden = !message;
         err.textContent = message;
       }
+      syncGoalRange();
       if (el('planner-find')) el('planner-find').disabled = !!message;
       if (el('planner-spec') && el('planner-spec-metric') && el('planner-spec-metric').value === 'index') {
         el('planner-spec').disabled = !!message;
@@ -1711,20 +1767,24 @@
     function comparisonTable(described) {
       var snap = plannerSnapshot;
       var proposal = described.proposal;
+      var spread = Number.isFinite(proposal.spread) ? proposal.spread : last.overall.cp;
       var rows = [
-        ['Mean', fmt(snap.mean) + unitSuffix(), fmt(proposal.mean) + unitSuffix()],
-        ['Overall SD', fmt(snap.sd) + unitSuffix(), fmt(proposal.sd) + unitSuffix()],
-        ['Pp', fmt(last.overall.cp), fmt(Number.isFinite(proposal.spread) ? proposal.spread : last.overall.cp)],
-        ['Ppk', fmt(described.baselineIndex), fmt(proposal.index)],
-        ['Expected out-of-spec rate', formatPpm(last.overall.ppm) + ' PPM', formatPpm(proposal.ppm) + ' PPM']
+        ['Mean', fmt(snap.mean) + unitSuffix(), fmt(proposal.mean) + unitSuffix(), changeText(snap.mean, proposal.mean)],
+        ['Overall SD', fmt(snap.sd) + unitSuffix(), fmt(proposal.sd) + unitSuffix(), changeText(snap.sd, proposal.sd, 'pct')],
+        ['Pp', fmt(last.overall.cp), fmt(spread), changeText(last.overall.cp, spread)],
+        ['Ppk', fmt(described.baselineIndex), fmt(proposal.index), changeText(described.baselineIndex, proposal.index)],
+        ['Expected out-of-spec rate', formatPpm(last.overall.ppm) + ' PPM', formatPpm(proposal.ppm) + ' PPM', changeText(last.overall.ppm, proposal.ppm, 'ppm')]
       ];
       if (Math.abs(proposal.lsl - snap.lsl) > 1e-6 || Math.abs(proposal.usl - snap.usl) > 1e-6) {
-        rows.splice(3, 0, ['LSL', fmt(snap.lsl) + unitSuffix(), fmt(proposal.lsl) + unitSuffix()], ['USL', fmt(snap.usl) + unitSuffix(), fmt(proposal.usl) + unitSuffix()]);
+        rows.splice(3, 0,
+          ['LSL', fmt(snap.lsl) + unitSuffix(), fmt(proposal.lsl) + unitSuffix(), changeText(snap.lsl, proposal.lsl)],
+          ['USL', fmt(snap.usl) + unitSuffix(), fmt(proposal.usl) + unitSuffix(), changeText(snap.usl, proposal.usl)]
+        );
       }
-      if (described.metric === 'yield') rows.push(['Modeled yield', formatYield(last.overall.yieldPct), formatYield(proposal.yieldPct)]);
-      return '<table class="plan-table"><thead><tr><th>Measure</th><th>Current</th><th>Proposed</th></tr></thead><tbody>' +
+      if (described.metric === 'yield') rows.push(['Modeled yield', formatYield(last.overall.yieldPct), formatYield(proposal.yieldPct), changeText(last.overall.yieldPct, proposal.yieldPct)]);
+      return '<table class="plan-table"><thead><tr><th>Measure</th><th>Current</th><th>Required</th><th>Change</th></tr></thead><tbody>' +
         rows.map(function (row) {
-          return '<tr><td>' + escapeHtml(row[0]) + '</td><td>' + escapeHtml(row[1]) + '</td><td>' + escapeHtml(row[2]) + '</td></tr>';
+          return '<tr><td>' + escapeHtml(row[0]) + '</td><td>' + escapeHtml(row[1]) + '</td><td>' + escapeHtml(row[2]) + '</td><td>' + escapeHtml(row[3]) + '</td></tr>';
         }).join('') + '</tbody></table>';
     }
     function renderPlanStrip(described) {
@@ -2598,6 +2658,7 @@
         if (el('reach-empty')) el('reach-empty').hidden = hasRun;
         if (el('reach-body')) el('reach-body').hidden = !hasRun;
         if (hasRun && last && last.ok) drawModel(last.overall, true);
+        syncGoalRange();
         if (options && options.focusPlanner && el('planner-goal')) el('planner-goal').focus();
       }
       if (view === 'process') paintProcess();
@@ -2799,22 +2860,16 @@
     el('planner-close').addEventListener('click', closePlanner);
     if (el('planner-spec')) el('planner-spec').addEventListener('click', function () { runPlanner('spec'); });
     el('planner-alt').addEventListener('click', function () { runPlanner('alt'); });
-    el('planner-goal').addEventListener('input', function () {
-      syncGoalField();
-      if (reachDebounce) clearTimeout(reachDebounce);
-      if (goalFieldError() || !plannerFollowsMethod) {
-        invalidateProposal();
-        return;
-      }
-      reachDebounce = setTimeout(function () {
-        reachDebounce = 0;
-        runPlanner('ppk');
-      }, 350);
+    el('planner-goal').addEventListener('input', function () { scheduleReach(200); });
+    el('planner-goal-range').addEventListener('input', function () {
+      var n = Number(el('planner-goal-range').value);
+      if (Number.isFinite(n)) el('planner-goal').value = n.toFixed(2);
+      scheduleReach(0);
     });
     document.querySelectorAll('input[name="plan-method"]').forEach(function (input) {
       input.addEventListener('change', function () {
         syncMethodChoice();
-        if (plannerFollowsMethod && !goalFieldError()) runPlanner('ppk');
+        if (!goalFieldError()) scheduleReach(0);
         else if (plannerDescribed) invalidateProposal();
       });
     });

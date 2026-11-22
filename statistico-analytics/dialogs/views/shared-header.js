@@ -2457,8 +2457,7 @@ const StatisticoHeader = {
             title: 'Capability',
             items: [
               resultItem('setup', 'setup', 'fa-pen-to-square', fitted ? 'Edit input' : 'Input & Setup', 'Choose the measurement and set the specification limits.'),
-              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Pp, Ppk, and the distribution against the specification limits.'),
-              resultItem('planner', 'planner', 'fa-bullseye', 'Capability Planner', 'Find a mean, standard deviation, or specification change that reaches a goal.')
+              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Pp, Ppk, and the distribution against the specification limits. Find settings opens planning on this screen.')
             ]
           }
         ],
@@ -9556,9 +9555,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-module-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261119help')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261122fit')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261119help');
+    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261122fit');
     const release = () => {
       const waiters = this._moduleGuideWaiters || [];
       this._moduleGuideWaiters = null;
@@ -9585,9 +9584,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261114guides')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261122fit')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261114guides');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261122fit');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -10131,9 +10130,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'capability-setup':
         'Choose one numeric measurement and enter the lower and upper specification limits. Leave the target blank to use the midpoint for Cpm. Run analysis opens the capability results. The worksheet is not changed. Do not invent Pp, Ppk, yield, or a planner result on this screen.',
       'capability-results':
-        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Histogram and Normal curve change the distribution display. Edit the specification limits here without returning to input.',
+        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Histogram and Normal curve change the distribution display. Edit the specification limits here without returning to input. Find settings opens Reach a capability goal above the same chart. Capability stays the selected view.',
       'capability-planner':
-        'Find settings searches for a mean, standard deviation, or outward specification change that reaches a Ppk, modeled-yield, or expected-PPM goal. When Ppk is reachable at the current standard deviation, the presets are the smallest mean shift and the most margin from centering. Pp and Ppk use the overall sample standard deviation (n − 1). Yield and expected PPM are normal-model estimates. The scenario stays in this view. The worksheet and the capability results keep the analyzed values.',
+        'Reach a capability goal is the planning panel on the capability results. Ppk goal, Reduce variation, Shift mean, and Both are the basic controls. Calculate required change draws one hypothetical proposal on the existing chart. Advanced holds specification exploration, modeled yield, and expected PPM, each with its own calculation. The proposal is not written to the worksheet or the capability results. Close planner restores the ordinary chart.',
       'capability-by-group':
         'Compare Pp and Ppk across the selected grouping column. The status describes whether capability stays in a similar band, varies, or changes which specification limit is binding. Group differences are descriptive and are not a formal test that the groups differ.',
       'regression-diag-overview':
@@ -10284,9 +10283,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'capability-setup':
         'This is the input form. The user chooses one numeric measurement and enters LSL, USL, and an optional target. Do not invent Pp, Ppk, yield, or a planner result. Say what still has to be set before Run analysis.',
       'capability-results':
-        'This is the capability result for one measurement: a Ppk gauge, cards for Pp, Ppk, Cpu, Cpl, Cpm, expected PPM, and yield, plus the distribution against LSL and USL. Pp and Ppk use the overall sample standard deviation (n − 1). Do not call them Cp or Cpk. Yield and expected PPM assume a normal distribution. The histogram, when it is on, shows the observed values. Describe the gauge, the binding limit, and whether the mean is centered. Do not treat the picture as proof the process is stable.',
+        'This is the capability result for one measurement: a Ppk gauge, cards for Pp, Ppk, Cpu, Cpl, Cpm, expected PPM, and yield, plus the distribution against LSL and USL. Find settings can open a planning panel above that same chart. Pp and Ppk use the overall sample standard deviation (n − 1). Do not call them Cp or Cpk. Yield and expected PPM assume a normal distribution. The histogram, when it is on, shows the observed values. A proposed scenario, when calculated, is hypothetical and is not the analyzed sample. Describe the gauge, the binding limit, and whether the mean is centered. Do not treat the picture as proof the process is stable.',
       'capability-planner':
-        'Start from the reachability sentence. When the goal is reachable at the current standard deviation, the presets are the smallest mean shift and the most margin from centering. When it is not, name the required reduction or the best attainable point. Current and the selected scenario share one mean and one standard deviation across the comparison and both charts. Process improvement does not increase the standard deviation. The scenario is not written back to the worksheet or the capability results. Yield and expected PPM are normal-model estimates.',
+        'This is the Reach a capability goal panel on the capability results, not a separate page. Describe the Ppk goal, the selected change (reduce variation, shift the mean, or both), and the current-versus-proposed comparison. The chart is the same distribution chart, with the current process and at most one hypothetical overlay. Specification exploration keeps the process curve and changes only the drawn limits. The scenario is not written back to the worksheet. Yield and expected PPM in Advanced are normal-model estimates and are not Ppk.',
       'capability-by-group':
         'This compares Pp and Ppk across groups. The status says whether capability stays in a similar band, varies, or changes which specification limit is binding. It is descriptive. Do not call it a test that the groups differ. Small groups are shown and are not used in the consistency status.',
       'process-settings-ps-scatters':

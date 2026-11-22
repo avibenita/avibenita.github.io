@@ -220,3 +220,145 @@ describe('capability planner', () => {
     expect(found.candidates[0].title).toMatch(/proposed specifications/);
   });
 });
+
+const screen = { lsl: 10, usl: 20, mean: 15.679, sd: 1.422, nominal: '' };
+
+function screenAsk(extra) {
+  return Planner.describePlan(Object.assign({
+    metric: 'index',
+    goal: 1.33,
+    mode: 'process',
+    adjust: 'sd',
+    baseline: screen,
+    meanMin: '',
+    meanMax: '',
+    sdMin: '',
+    unlockLower: true,
+    unlockUpper: true,
+    lowerOut: '',
+    upperOut: ''
+  }, extra));
+}
+
+describe('capability planner basic Ppk contract', () => {
+  test('fixture baseline, reduce variation, shift, both, and specification sides', () => {
+    const base = Planner.metricsOf(10, 20, 15.679, 1.422, '');
+    expect(base.index).toBeCloseTo(1.0128926395, 8);
+
+    const reduced = screenAsk({ adjust: 'sd' });
+    expect(reduced.status).toBe('reachable');
+    expect(reduced.proposal.sd).toBeCloseTo(1.0829573935, 8);
+    expect(reduced.proposal.mean).toBeCloseTo(15.679, 8);
+    expect(reduced.proposal.sdReductionPct).toBeCloseTo(23.8426586861, 6);
+    expect(reduced.proposal.index).toBeCloseTo(1.33, 8);
+    expect(reduced.overlay).toBe('curve');
+    expect(Planner.planCopy(reduced)).toMatch(/Required SD: at most/);
+    expect(Planner.planStrip(reduced).parts.map((part) => part.text).join(' | ')).toBe('Reduce SD by 23.8% | SD 1.42 → 1.08 | Ppk 1.01 → 1.33');
+
+    const shifted = screenAsk({ adjust: 'mean' });
+    expect(shifted.status).toBe('unreachable');
+    expect(shifted.proposal).toBeNull();
+    expect(shifted.overlay).toBe('none');
+    expect(shifted.bestIndex).toBeCloseTo(1.1720581341, 8);
+    expect(shifted.bestMean).toBeCloseTo(15, 8);
+    expect(Planner.planCopy(shifted)).toBe('Shifting alone cannot reach Ppk 1.33. Even at the centre, the maximum is approximately 1.17. Try reducing variation as well.');
+    expect(Planner.planStrip(shifted).text).toBe(Planner.planCopy(shifted));
+
+    const both = screenAsk({ adjust: 'both' });
+    expect(both.status).toBe('reachable');
+    expect(both.proposal.mean).toBeCloseTo(15, 8);
+    expect(both.proposal.sd).toBeCloseTo(1.2531328321, 8);
+    expect(both.proposal.sdReductionPct).toBeCloseTo(11.8753282644, 6);
+    expect(both.proposal.index).toBeCloseTo(1.33, 8);
+    expect(Planner.planCopy(both)).toMatch(/unrestricted mean movement/);
+    expect(Planner.planStrip(both).parts.map((part) => part.text).join(' | ')).toBe('Reduce SD by 11.9% | Mean 15.68 → 15.00 | SD 1.42 → 1.25 | Ppk 1.01 → 1.33');
+
+    const lowerOnly = screenAsk({ mode: 'spec', unlockLower: true, unlockUpper: false });
+    expect(lowerOnly.status).toBe('unreachable');
+    expect(lowerOnly.proposal).toBeNull();
+    expect(lowerOnly.sideIndex).toBeCloseTo(1.0128926395, 8);
+    expect(Planner.planCopy(lowerOnly)).toMatch(/upper limit is locked/);
+
+    const outward = screenAsk({ mode: 'spec', unlockLower: true, unlockUpper: true });
+    expect(outward.status).toBe('reachable');
+    expect(outward.overlay).toBe('specs');
+    expect(outward.proposal.lsl).toBeCloseTo(10, 8);
+    expect(outward.proposal.usl).toBeCloseTo(21.35278, 4);
+    expect(outward.proposal.mean).toBeCloseTo(15.679, 8);
+    expect(outward.proposal.sd).toBeCloseTo(1.422, 8);
+    expect(outward.proposal.index).toBeCloseTo(1.33, 8);
+    expect(Planner.planCopy(outward)).toMatch(/does not improve production/);
+    expect(Planner.planCopy(outward)).toMatch(/lower limit already satisfies/);
+  });
+
+  test('an already-met goal proposes no change for the basic methods', () => {
+    const met = { lsl: 10, usl: 20, mean: 15, sd: 1, nominal: '' };
+    expect(Planner.metricsOf(10, 20, 15, 1, '').index).toBeCloseTo(1.6666666667, 8);
+    ['sd', 'mean', 'both'].forEach((adjust) => {
+      const found = screenAsk({ adjust: adjust, baseline: met });
+      expect(found.status).toBe('already-met');
+      expect(found.proposal).toBeNull();
+      expect(found.overlay).toBe('none');
+      expect(Planner.planCopy(found)).toBe('Your current process already meets this goal. No change is required.');
+    });
+  });
+
+  test('shift mean on an exact boundary returns that single mean', () => {
+    const found = screenAsk({
+      adjust: 'mean',
+      goal: 1,
+      baseline: { lsl: 0, usl: 6, mean: 2, sd: 1, nominal: '' }
+    });
+    expect(found.status).toBe('reachable');
+    expect(found.proposal.mean).toBeCloseTo(3, 8);
+    expect(found.proposal.sd).toBeCloseTo(1, 8);
+    expect(found.proposal.index).toBeCloseTo(1, 8);
+    expect(found.feasibleMean.lo).toBeCloseTo(3, 6);
+    expect(found.feasibleMean.hi).toBeCloseTo(3, 6);
+  });
+
+  test('a mean outside the limits is not solved by reducing variation', () => {
+    const found = screenAsk({
+      adjust: 'sd',
+      baseline: { lsl: 10, usl: 20, mean: 21, sd: 1, nominal: '' }
+    });
+    expect(found.status).toBe('unreachable');
+    expect(found.proposal).toBeNull();
+    expect(Planner.planCopy(found)).toMatch(/mean must move inside the specifications/);
+  });
+
+  test('nominal value does not change Ppk', () => {
+    const plain = Planner.metricsOf(10, 20, 15.679, 1.422, '');
+    const named = Planner.metricsOf(10, 20, 15.679, 1.422, 15);
+    expect(named.index).toBeCloseTo(plain.index, 12);
+    expect(named.index).not.toBe(named.spread);
+  });
+
+  test('a changed goal, method, or dataset drops a saved proposal', () => {
+    const state = {
+      baseline: screen,
+      goal: '1.33',
+      altGoal: '',
+      method: 'sd',
+      mode: 'process',
+      metric: 'index',
+      action: 'ppk',
+      meanMin: '',
+      meanMax: '',
+      sdMin: '',
+      unlockLower: true,
+      unlockUpper: true,
+      lowerOut: '',
+      upperOut: ''
+    };
+    const saved = Planner.controlSignature(state);
+    expect(Planner.proposalCurrent(saved, state)).toBe(true);
+    expect(Planner.proposalCurrent(saved, Object.assign({}, state, { goal: '1.67' }))).toBe(false);
+    expect(Planner.proposalCurrent(saved, Object.assign({}, state, { method: 'both' }))).toBe(false);
+    expect(Planner.proposalCurrent(saved, Object.assign({}, state, {
+      baseline: Object.assign({}, screen, { mean: 15.2 })
+    }))).toBe(false);
+    expect(Planner.proposalCurrent('', state)).toBe(false);
+    expect(Planner.proposalCurrent(null, state)).toBe(false);
+  });
+});

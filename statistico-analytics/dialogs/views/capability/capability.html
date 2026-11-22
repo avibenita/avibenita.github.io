@@ -18,7 +18,7 @@
   <script src="../shared/demo-fixtures.js?v=20261117demo6"></script>
   <script src="../shared/demo-data.js?v=20261119demo"></script>
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261121plan"></script>
+  <script src="../shared-header.js?v=20261122nav"></script>
   <script src="../../shared/column-type.js?v=20261112cap3"></script>
   <script src="../../shared/cpk-math.js?v=20261112cap3"></script>
   <script src="../../shared/by-group-standard.js?v=20261113plan"></script>
@@ -2261,6 +2261,7 @@
       plannerOpen = false;
       invalidateProposal();
       if (el('reach-panel')) el('reach-panel').hidden = true;
+      syncShell();
       var opener = el('open-planner');
       if (opener) {
         opener.setAttribute('aria-expanded', 'false');
@@ -2269,13 +2270,14 @@
     }
 
     function syncShell() {
-      window.__capView = view;
+      var shellView = view === 'results' && plannerOpen ? 'planner' : view;
+      window.__capView = shellView;
       window.__capFitted = hasRun;
       var titles = { setup: 'Input & Setup', results: 'Process Capability', planner: 'Capability Planner', 'by-group': 'By-Group Analysis' };
       var views = { setup: 'cap-setup', results: 'cap-results', planner: 'cap-planner', 'by-group': 'cap-by-group' };
       if (!window.StatisticoHeader) return;
-      StatisticoHeader.currentView = views[view] || view;
-      StatisticoHeader.updateTitle(titles[view] || 'Process Capability');
+      StatisticoHeader.currentView = views[shellView] || shellView;
+      StatisticoHeader.updateTitle(titles[shellView] || 'Process Capability');
       StatisticoHeader.updateVariable(measure || 'Measurement', last && last.ok ? last.overall.n : 0);
       StatisticoHeader.updateGroupLabel(view === 'by-group' && groupName ? groupName : '');
       if (typeof StatisticoHeader._renderSharedSidebar === 'function') StatisticoHeader._renderSharedSidebar();
@@ -2284,10 +2286,18 @@
     }
 
     function showView(next, options) {
+      options = options || {};
       if (next === 'planner') {
-        plannerOpen = true;
-        next = 'results';
-        options = Object.assign({}, options || {}, { focusPlanner: true });
+        if (!hasRun || !last || !last.ok) {
+          plannerOpen = false;
+          next = 'results';
+        } else {
+          plannerOpen = true;
+          next = 'results';
+          options.focusPlanner = true;
+        }
+      } else if (next === 'results' && options.closePlanner) {
+        plannerOpen = false;
       }
       view = next;
       document.body.classList.toggle('cap-config', view === 'setup');

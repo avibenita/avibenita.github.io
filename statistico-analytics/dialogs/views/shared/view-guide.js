@@ -2371,7 +2371,7 @@
         'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
         [
           'LSL, USL, and Target can be edited here. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
-          'Find settings opens Reach a capability goal on this screen, above the distribution chart. It does not leave the results.',
+          'Capability Planner in the sidebar, and Find settings, open Reach a capability goal on this screen, above the distribution chart.',
           'Histogram draws the observed values. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
         ],
         [

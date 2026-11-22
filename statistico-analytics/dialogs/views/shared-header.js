@@ -2447,7 +2447,17 @@ const StatisticoHeader = {
             title: 'Capability',
             items: [
               resultItem('setup', 'setup', 'fa-pen-to-square', fitted ? 'Edit input' : 'Input & Setup', 'Choose the measurement and set the specification limits.'),
-              resultItem('results', 'results', 'fa-gauge-high', 'Capability', 'Pp, Ppk, and the distribution against the specification limits. Find settings opens planning on this screen.')
+              {
+                type: 'js',
+                onclick: "switchCapabilityView('results', {closePlanner:true})",
+                view: 'cap-results',
+                tab: 'results',
+                icon: 'fa-gauge-high',
+                label: 'Capability',
+                description: fitted ? 'Pp, Ppk, and the distribution against the specification limits.' : 'Available after the measurement is analyzed.',
+                active: active === 'results'
+              },
+              resultItem('planner', 'planner', 'fa-bullseye', 'Capability Planner', 'Reach a capability goal on this screen, above the distribution chart.')
             ]
           }
         ],
@@ -9538,9 +9548,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     script.id = 'statistico-module-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261121plan')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/module-guide.js?v=20261122nav')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261121plan');
+    script.src = fromHeader || this.resolveDialogUrl('shared/module-guide.js?v=20261122nav');
     const release = () => {
       const waiters = this._moduleGuideWaiters || [];
       this._moduleGuideWaiters = null;
@@ -9567,9 +9577,9 @@ REPORT: [one polished paragraph suitable for a report]`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261121plan')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261122nav')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261121plan');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261122nav');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -10113,7 +10123,7 @@ REPORT: [one polished paragraph suitable for a report]`;
       'capability-setup':
         'Choose one numeric measurement and enter the lower and upper specification limits. Leave the target blank to use the midpoint for Cpm. Run analysis opens the capability results. The worksheet is not changed. Do not invent Pp, Ppk, yield, or a planner result on this screen.',
       'capability-results':
-        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Histogram and Normal curve change the distribution display. Edit the specification limits here without returning to input. Find settings opens Reach a capability goal above the same chart.',
+        'Pp and Ppk are calculated from the measurement column. Mean and standard deviation come from the selected values; the standard deviation is the overall sample standard deviation (n − 1), not a within-process estimate. The gauge, yield, and parts per million assume a normal distribution. Histogram and Normal curve change the distribution display. Edit the specification limits here without returning to input. Capability Planner in the sidebar, and Find settings, open Reach a capability goal above the same chart.',
       'capability-planner':
         'Reach a capability goal is the planning panel on the capability results. Ppk goal, Reduce variation, Shift mean, and Both are the basic controls. Calculate required change draws one hypothetical proposal on the existing chart. Advanced holds specification exploration, modeled yield, and expected PPM, each with its own calculation. The proposal is not written to the worksheet or the capability results. Close planner restores the ordinary chart.',
       'capability-by-group':

@@ -2370,9 +2370,9 @@
         'Process capability',
         'Shows how the analysed measurement sits against the specification, using the overall sample standard deviation.',
         [
-          'LSL, USL, and Target can be edited here. The results recalculate from the same rows. Leave Target blank to use the midpoint.',
+          'Descriptives and the specification from the input are shown as cards. The limits are not edited on this screen.',
           'Find settings opens Reach a capability goal on this screen, above the distribution chart. Capability stays selected.',
-          'Histogram draws the observed values. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
+          'Histogram draws the observed values and adds a two-row table of bin ranges and the number of observations in each. The bins slider sets the number of intervals. Normal curve overlays the normal model. Histogram off and Normal curve on leaves the smooth curve.'
         ],
         [
           'The gauge is Ppk. Pp is the spread relative to the specification width, as if the mean were centred. Ppk is the worse of Cpu and Cpl.',

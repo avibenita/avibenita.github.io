@@ -136,7 +136,7 @@
       [
         'The header methods only decide which cases are offered. IQR 1.5, IQR 3, Z-score, MAD, and Grubbs each screen the same eligible values. Changing the method returns the comparison to all outliers removed.',
         'The view opens with All outliers removed checked: every flagged case is left out together. Uncheck any of them to keep that case, or check several to leave out only that group. All cases included puts every eligible value back.',
-        'The middle table is the resulting statistics. Change = retained sample − all cases.',
+        'Reset to all, at the top of the case list, puts every eligible value back. The compact table under the cases is the original sample beside the sample with the checked cases left out.',
         'The index and its four components sit apart from the checklist and the table. The gauge is the index. Each bar is that component’s own normalized change, from 0 to 100. The bars are not weights, and they do not add up to the index.'
       ],
       [
@@ -146,7 +146,7 @@
         'The small boxes share one numeric axis. The box is the middle 50%, the line is the median, and the whiskers run from the minimum to the maximum.'
       ],
       [
-        'The index does not say a case is an error, and it is not a reason to delete the case. Detection and the index answer different questions.',
+        'The reading says what to do with the flagged cases from the summary they move. A range change is about the ends, a spread change is about the standard deviation, and a mean change is a reason to compare the mean with the median. The index still does not prove a row is an error.',
         'The comparison stays inside this view. Other Univariate views keep the full eligible sample. The worksheet data remain unchanged.',
         'The index needs at least two observations in the original sample and at least two remaining. Otherwise it is unavailable, rather than shown as zero.',
         'Quartiles follow the box plot: each quartile is an ordered value in the sample. IQR fences are computed once on all eligible cases and are not recomputed after a case is unchecked.'

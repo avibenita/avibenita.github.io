@@ -519,6 +519,48 @@
     };
   }
 
+  function outlierFocus(impact) {
+    var parts = [
+      ['mean', impact.dMean || 0],
+      ['median', impact.dMedian || 0],
+      ['sd', impact.dSD || 0],
+      ['range', impact.dRange || 0]
+    ];
+    var best = parts[0];
+    parts.forEach(function (part) { if (part[1] > best[1]) best = part; });
+    return impact.strongest || best[0];
+  }
+
+  function outlierAdvice(impact) {
+    if (!impact) return 'Leave the flagged cases out, then read which summary moves.';
+    if (impact.available === false) return 'At least two observations have to remain. Use Reset to all, or uncheck some rows, before deciding what to do with the flagged values.';
+    if (!impact.excluded) {
+      return impact.flagged
+        ? 'Nothing is left out, so the index stays at 0. That does not mean the flagged cases are harmless. Leave them out and see which summary moves before you decide whether to keep them in the reported sample.'
+        : 'This rule flags no case. Keep the full sample. There is no outlier to set aside.';
+    }
+    var score = impact.display != null ? impact.display : Math.round(Number(impact.score) || 0);
+    if (!score) return 'Keep the flagged cases in. Leaving them out does not change the mean, the median, the standard deviation, or the range.';
+    var focus = outlierFocus(impact);
+    if (focus === 'range') return 'These cases are stretching the minimum or the maximum. If you need the full span, keep them and say the range includes those extremes. If you are describing the typical values, also report the range with those cases left out.';
+    if (focus === 'sd') return 'These cases are widening the spread. Keep them when they are real observations and report the larger standard deviation. If the question is the typical case, also report the standard deviation with those cases left out.';
+    if (focus === 'median') return 'The middle of the sample moves when these cases are left out, so the typical value depends on them. Report both medians, and check whether those rows are a different situation before you choose one summary.';
+    return 'These cases are pulling the mean. Prefer the median for a typical value, or report the mean both with and without them. Check the rows for a data-entry error or a different situation before you leave them out of a later analysis.';
+  }
+
+  function outlierNext(impact) {
+    if (!impact) return 'Leave the flagged cases out and read the index.';
+    if (impact.available === false) return 'Put cases back until at least two observations remain.';
+    if (!impact.excluded) return impact.flagged ? 'Check All outliers removed, then read which summary moves.' : 'Keep every eligible value in the reported sample.';
+    var score = impact.display != null ? impact.display : Math.round(Number(impact.score) || 0);
+    if (!score) return 'Leave the flagged cases in the reported sample.';
+    var focus = outlierFocus(impact);
+    if (focus === 'range') return 'Report the range with the flagged cases and again without them.';
+    if (focus === 'sd') return 'Report the standard deviation with the flagged cases and again without them.';
+    if (focus === 'median') return 'Report both medians, then inspect the flagged rows.';
+    return 'Report the mean with and without the flagged cases, and compare it with the median.';
+  }
+
   function buildUnivariateViewAssessment(input, view) {
     var full = buildUnivariateAssessment(input);
     var key = String(view || '');
@@ -526,6 +568,7 @@
     var evidence = full.sections.FINDINGS.slice();
     var meaning = full.sections.INTERPRETATION;
     var checks = [];
+    var next = [];
     if (key === 'confidence') {
       bottom = describeInterval(input.confidence || { status: 'not_run', reason: 'No confidence interval has been computed for this view.' }).text;
       evidence = [bottom];
@@ -535,6 +578,20 @@
       bottom = resolveNormality(input.normality || { status: 'not_run' }).text;
       evidence = [bottom];
       meaning = 'A single significant test is evidence about that test. It is not a vote across the battery, and a nonsignificant test does not prove normality.';
+    } else if (key === 'outlier-impact') {
+      var impactView = input.sensitivity && input.sensitivity.impact;
+      if (impactView && impactView.reading) {
+        bottom = impactView.available === false
+          ? impactView.reading
+          : 'Outlier Impact Index is ' + impactView.score + '. ' + impactView.reading;
+        evidence = evidence.filter(function (line) {
+          return line && line.indexOf('Outlier Impact Index is') !== 0 && line !== impactView.reading;
+        });
+        evidence.unshift(bottom);
+      }
+      meaning = outlierAdvice(impactView);
+      checks.push('This comparison stays in this view. It does not delete worksheet rows, and the other Univariate views keep the full sample.');
+      if (outlierNext(impactView)) next = [outlierNext(impactView)];
     } else if (key === 'outliers' || key === 'boxplot-outliers') {
       bottom = describeOutliers(Object.assign({ n: input.n }, input.outliers || { status: 'not_run' }));
       bottom = bottom.text;
@@ -560,7 +617,7 @@
         EVIDENCE: evidence.filter(Boolean),
         MEANING: meaning,
         CHECKS: checks,
-        NEXT: []
+        NEXT: next
       },
       meta: { ruleBased: true, omitStrengthBadge: true, primarySignal: full.meta.primarySignal }
     };
@@ -1450,6 +1507,8 @@
     describeHypothesis: describeHypothesis,
     buildUnivariateAssessment: buildUnivariateAssessment,
     buildUnivariateViewAssessment: buildUnivariateViewAssessment,
+    outlierAdvice: outlierAdvice,
+    outlierNext: outlierNext,
     assembleUnivariateInput: assembleUnivariateInput,
     assessmentPlainText: assessmentPlainText,
     acceptResponse: acceptResponse,

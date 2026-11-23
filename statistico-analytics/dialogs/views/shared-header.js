@@ -11,7 +11,7 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
   if (typeof document === 'undefined' || document.readyState !== 'loading') return;
   var script = document.currentScript;
   if (!script || !script.src || typeof document.write !== 'function') return;
-  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/interpretation-facts.js?v=20261123oii');
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/interpretation-facts.js?v=20261123act');
   if (src === script.src) return;
   document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
 })();
@@ -21,7 +21,7 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
   if (typeof document === 'undefined' || document.readyState !== 'loading') return;
   var script = document.currentScript;
   if (!script || !script.src || typeof document.write !== 'function') return;
-  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123oii');
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123act');
   if (src === script.src) return;
   document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
 })();
@@ -9663,9 +9663,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261123tabs1')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261123act')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261123tabs1');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261123act');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;

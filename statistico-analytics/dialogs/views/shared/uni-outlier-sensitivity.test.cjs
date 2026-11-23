@@ -292,4 +292,52 @@ assert.ok(assembledText.indexOf('Outlier Impact Index is ' + impactInput.impact.
 assert.ok(assembledText.indexOf('No outlier-rule result') < 0);
 assert.ok(assembledText.indexOf('n = 9') >= 0);
 
+const spreadAdvice = interpretation.outlierAdvice({ available: true, score: 77, display: 77, excluded: 1, flagged: 1, dMean: 0.32, dMedian: 0, dSD: 0.97, dRange: 0.98 });
+assert.ok(spreadAdvice.indexOf('stretching the minimum') >= 0, spreadAdvice);
+const meanAdvice = interpretation.outlierAdvice({ available: true, score: 40, display: 40, excluded: 1, flagged: 1, dMean: 0.8, dMedian: 0.1, dSD: 0.2, dRange: 0.1 });
+assert.ok(meanAdvice.indexOf('pulling the mean') >= 0, meanAdvice);
+const keepAdvice = interpretation.outlierAdvice({ available: true, score: 0, display: 0, excluded: 1, flagged: 1, dMean: 0, dMedian: 0, dSD: 0, dRange: 0 });
+assert.ok(keepAdvice.indexOf('Keep the flagged cases') >= 0, keepAdvice);
+const idleAdvice = interpretation.outlierAdvice({ available: true, score: 0, display: 0, excluded: 0, flagged: 3, dMean: 0, dMedian: 0, dSD: 0, dRange: 0 });
+assert.ok(idleAdvice.indexOf('Leave them out') >= 0, idleAdvice);
+
+const live = api.session();
+live.sync(payloadFrom(ordinary));
+globalThis.StatisticoHeader = { currentView: 'outlier-impact' };
+const choiceStore = {};
+globalThis.sessionStorage = {
+  getItem: function (key) { return Object.prototype.hasOwnProperty.call(choiceStore, key) ? choiceStore[key] : null; },
+  setItem: function (key, value) { choiceStore[key] = String(value); }
+};
+const removed = api.interpretationInput();
+assert.strictEqual(removed.impact.score, 77);
+assert.ok(removed.impact.reading.indexOf('Leaving 1 of 10') >= 0, removed.impact.reading);
+assert.ok(removed.impact.reading.indexOf('No exclusion is in effect') < 0);
+const viewReading = interpretation.buildUnivariateViewAssessment({
+  variable: 'x',
+  n: 10,
+  mean: 19.9,
+  sd: 28.156,
+  median: 11,
+  min: 10,
+  max: 100,
+  q1: 10,
+  q3: 12,
+  sensitivity: removed
+}, 'outlier-impact');
+assert.ok(viewReading.sections.BOTTOMLINE.indexOf('Outlier Impact Index is 77') === 0);
+assert.ok(viewReading.sections.MEANING.indexOf('stretching the minimum') >= 0, viewReading.sections.MEANING);
+assert.strictEqual(viewReading.sections.NEXT.length, 1);
+const liveSnap = live.snapshot();
+choiceStore['statistico.oii.choice'] = JSON.stringify({
+  sampleKey: liveSnap.cases.map(function (row) { return row.id; }).join(','),
+  rule: liveSnap.rule,
+  mode: 'none',
+  ids: []
+});
+const restored = api.interpretationInput();
+assert.strictEqual(restored.impact.score, 0);
+assert.ok(restored.impact.reading.indexOf('No case is left out') >= 0, restored.impact.reading);
+delete globalThis.StatisticoHeader;
+
 console.log('uni-outlier-sensitivity tests passed');

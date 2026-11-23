@@ -1715,6 +1715,87 @@
       rootObject.setTimeout(wrapDataReceiver, 0);
     }
 
+    function pageChoice(snap) {
+      var flagged = snap.flagged || [];
+      var stored = { mode: 'flagged', ids: [] };
+      try {
+        var raw = rootObject.sessionStorage && rootObject.sessionStorage.getItem('statistico.oii.choice');
+        var parsed = raw ? JSON.parse(raw) : null;
+        var key = (snap.cases || []).map(function (row) { return row.id; }).join(',');
+        var rule = snap.rule || (Number(snap.k) === 3 ? 'iqr3' : 'iqr15');
+        if (parsed && parsed.sampleKey === key && parsed.rule === rule) {
+          if (parsed.mode === 'none' || parsed.id === 'none') stored = { mode: 'none', ids: [] };
+          else if (parsed.mode === 'some' && Array.isArray(parsed.ids)) stored = { mode: 'some', ids: parsed.ids };
+          else if (parsed.id && parsed.id !== 'flagged') stored = { mode: 'some', ids: [parsed.id] };
+        }
+      } catch (e) {}
+      var allowed = {};
+      flagged.forEach(function (row) { allowed[row.id] = true; });
+      var selectedIds = !flagged.length || stored.mode === 'none'
+        ? []
+        : (stored.mode === 'flagged'
+          ? flagged.map(function (row) { return row.id; })
+          : (stored.ids || []).filter(function (id) { return allowed[id]; }));
+      if (stored.mode === 'some' && !selectedIds.length && flagged.length) {
+        selectedIds = flagged.map(function (row) { return row.id; });
+      }
+      return selectedIds;
+    }
+
+    function impactFromPageChoice(input) {
+      var snap = session.snapshot();
+      if (!snap || snap.unavailable || !Array.isArray(snap.cases) || !snap.cases.length) return input;
+      var drop = {};
+      pageChoice(snap).forEach(function (id) { drop[id] = true; });
+      var all = [];
+      var kept = [];
+      snap.cases.forEach(function (row) {
+        all.push(row.value);
+        if (!drop[row.id]) kept.push(row.value);
+      });
+      var baseline = summarize(all);
+      var active = summarize(kept);
+      var impact = impactIndex(baseline, active);
+      var excluded = Object.keys(drop).length;
+      var flagged = (snap.flagged || []).length;
+      var parts = [
+        ['the mean', impact.dMean, 'mean'],
+        ['the median', impact.dMedian, 'median'],
+        ['the standard deviation', impact.dSD, 'sd'],
+        ['the range', impact.dRange, 'range']
+      ];
+      var strongest = parts[0];
+      parts.forEach(function (part) { if (part[1] > strongest[1]) strongest = part; });
+      var reading = !impact.available
+        ? impact.reason
+        : (!excluded
+          ? (flagged ? 'No case is left out, so the index is 0.' : 'This method flags no case, so the index is 0.')
+          : (impact.score === 0
+            ? 'Leaving the flagged cases out does not change the mean, median, standard deviation, or range, so the index is 0.'
+            : 'Leaving ' + excluded + ' of ' + (baseline ? baseline.n : 0) + ' cases out changes the mean by ' + signed(active && baseline ? active.mean - baseline.mean : null) + ' and the standard deviation by ' + signed(active && baseline ? active.sd - baseline.sd : null) + '. The largest normalized component change is in ' + strongest[0] + '.'));
+      return Object.assign({}, input, {
+        mode: 'all',
+        excluded: excluded,
+        flagged: flagged,
+        baselineN: baseline ? baseline.n : input.baselineN,
+        retainedN: active ? active.n : input.retainedN,
+        impact: {
+          available: impact.available,
+          formula: impact.formula,
+          score: impact.display,
+          exact: impact.score,
+          dMean: impact.dMean,
+          dMedian: impact.dMedian,
+          dSD: impact.dSD,
+          dRange: impact.dRange,
+          strongest: strongest[2],
+          excluded: excluded,
+          flagged: flagged,
+          reading: reading
+        }
+      });
+    }
+
     installStorage();
     if (rootObject && rootObject.document) {
       if (rootObject.document.readyState === 'loading') {
@@ -1745,9 +1826,8 @@
         if (!input || !input.impact) return input;
         var header = rootObject.StatisticoHeader;
         var onImpactView = !!(header && header.currentView === 'outlier-impact');
-        if (!onImpactView && input.mode !== 'subset') {
-          return Object.assign({}, input, { impact: null });
-        }
+        if (onImpactView) return impactFromPageChoice(input);
+        if (input.mode !== 'subset') return Object.assign({}, input, { impact: null });
         return input;
       },
       chartPoints: function () { return session.chartPoints(); },

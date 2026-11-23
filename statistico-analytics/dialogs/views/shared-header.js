@@ -16,6 +16,16 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
   document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
 })();
 
+(function loadOutlierSensitivity() {
+  if (typeof window === 'undefined' || window.StatisticoOutlierSensitivity) return;
+  if (typeof document === 'undefined' || document.readyState !== 'loading') return;
+  var script = document.currentScript;
+  if (!script || !script.src || typeof document.write !== 'function') return;
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123os6');
+  if (src === script.src) return;
+  document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
+})();
+
 (function () {
   if (typeof Storage === 'undefined' || Storage.prototype.__statisticoOptionalWrite) return;
   var nativeSetItem = Storage.prototype.setItem;
@@ -4439,10 +4449,17 @@ const StatisticoHeader = {
     this._syncExploreTabPanels(cfg);
   },
 
+  _mountUniOutlierSensitivity() {
+    const api = window.StatisticoOutlierSensitivity;
+    if (!api || typeof api.mount !== 'function') return;
+    try { api.mount(this); } catch (err) { console.warn('Outlier sensitivity could not be mounted', err); }
+  },
+
   _renderUnivariateResultsTabs() {
     const byGroup = this._getByGroupExploreConfig();
     if (byGroup) {
       this._paintExploreViewBar(byGroup);
+      this._mountUniOutlierSensitivity();
       return;
     }
     if (this.module !== 'univariate') {
@@ -4451,7 +4468,10 @@ const StatisticoHeader = {
     }
     this._ensureUnivariateWorkspaceTabAssets();
     const rightCol = document.querySelector('.right-col');
-    if (!rightCol) return;
+    if (!rightCol) {
+      this._mountUniOutlierSensitivity();
+      return;
+    }
 
     const activeSection = this._getActiveUnivariateSection();
     const viewTabs = this._getUnivariateResultsViewTabs(activeSection);
@@ -4467,6 +4487,7 @@ const StatisticoHeader = {
       }
       if (shell) shell.classList.remove('statistico-shell--with-views');
       if (headerBar) headerBar.classList.remove('statistico-header--with-views');
+      this._mountUniOutlierSensitivity();
       return;
     }
 
@@ -4547,6 +4568,7 @@ const StatisticoHeader = {
       tabs: viewTabs,
       getActive: () => activeInPageTab
     });
+    this._mountUniOutlierSensitivity();
   },
 
   _renderSidebarNavItem(item) {
@@ -11161,7 +11183,10 @@ ${this._overallAiReplyFormat()}`;
       descriptives: this._getUnivariateDescriptives(),
       collected: collected || {},
       groups: groupInput,
-      hypothesis: hypothesis
+      hypothesis: hypothesis,
+      sensitivity: window.StatisticoOutlierSensitivity && typeof window.StatisticoOutlierSensitivity.interpretationInput === 'function'
+        ? window.StatisticoOutlierSensitivity.interpretationInput()
+        : null
     };
     return ix ? ix.assembleUnivariateInput(input) : input;
   },
@@ -13024,6 +13049,9 @@ Do not recommend switching to a setting that is already selected.`;
       bits.push(String(stored).length + ':' + String(stored).slice(0, 64));
     } catch (_e) {}
     try { bits.push(this._liveControlLines(document).join(';')); } catch (_e2) {}
+    if (this.module === 'univariate' && window.StatisticoOutlierSensitivity && typeof window.StatisticoOutlierSensitivity.fingerprint === 'function') {
+      try { bits.push(window.StatisticoOutlierSensitivity.fingerprint()); } catch (_e3) {}
+    }
     return bits.join('|');
   },
 

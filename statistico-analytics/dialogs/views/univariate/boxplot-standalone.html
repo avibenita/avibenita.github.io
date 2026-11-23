@@ -18,7 +18,7 @@
   <!-- Shared Components -->
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">  <script src="../shared-brand-logo.js?v=20261005light1"></script>
 
-  <script src="../shared-header.js?v=20261120ctrl1"></script>
+  <script src="../shared-header.js?v=20261123os6"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -631,6 +631,25 @@
       createBoxPlotWithoutOutliers(boxData, nDisplay);
     }
 
+    if (!window.__uniBoxHighlightBound) {
+      window.__uniBoxHighlightBound = true;
+      document.addEventListener('uni-outlier-highlight', function (event) {
+        var id = event.detail && event.detail.id;
+        if (!id || typeof Highcharts === 'undefined' || !Highcharts.charts) return;
+        Highcharts.charts.forEach(function (chart) {
+          if (!chart || !chart.renderTo || chart.renderTo.id !== 'withOutliers') return;
+          chart.series.forEach(function (series) {
+            (series.points || []).forEach(function (point) {
+              var caseId = point.custom && point.custom.caseId;
+              if (!caseId) return;
+              point.update({ marker: { radius: caseId === id ? 8 : 5, lineWidth: caseId === id ? 2 : 1 } }, false);
+            });
+          });
+          chart.redraw();
+        });
+      });
+    }
+
     // Create box plot with outliers
     function createBoxPlotWithOutliers(boxData, nDisplay) {
       // Use ABSOLUTE min/max from ALL data
@@ -702,6 +721,29 @@
                 <b>Minimum:</b> ${this.low != null ? this.low.toFixed(2) : '--'}<br/>
                 <b>n = ${boxData.allData.length}</b>
               `;
+            }
+          }
+        }, {
+          name: 'Screening flags',
+          type: 'scatter',
+          data: (function () {
+            var api = window.StatisticoOutlierSensitivity;
+            var points = api && typeof api.chartPoints === 'function' ? api.chartPoints() : [];
+            return points.map(function (point) {
+              var parts = [];
+              if (point.baselineReason) parts.push('Baseline screening: ' + point.baselineReason);
+              if (point.activeReason) parts.push('Active box plot fence: ' + point.activeReason + '. This mark is not added to the exclusion list.');
+              return { x: 0, y: point.value, name: point.label + ' · ' + parts.join(' · '), custom: { caseId: point.id } };
+            });
+          })(),
+          marker: { radius: 5, fillColor: 'rgb(255, 165, 120)', lineColor: '#ffffff', lineWidth: 1 },
+          tooltip: { pointFormat: '{point.name}' },
+          point: {
+            events: {
+              click: function () {
+                var caseId = this.custom && this.custom.caseId;
+                if (caseId && window.StatisticoOutlierSensitivity) window.StatisticoOutlierSensitivity.highlight(caseId);
+              }
             }
           }
         }, {

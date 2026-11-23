@@ -464,6 +464,12 @@
     pushUnique(limitations, hypothesis);
     if (planning && planning.text) pushUnique(limitations, planning.text);
     limitations.push('These summaries do not establish that the observations are independent or that the sample is representative.');
+    if (input.sensitivity && input.sensitivity.mode === 'subset' && input.sensitivity.status !== 'failed') {
+      limitations.push('Sensitivity analysis: these results describe the chosen subset (' + Math.round(input.sensitivity.retainedN) + ' of ' + Math.round(input.sensitivity.baselineN) + ' eligible cases). Intervals and tests do not adjust for selecting exclusions after inspecting the data. A change in a normality-test result does not establish that the population became normal.');
+      if (conclusionParts.length) conclusionParts[0] = 'Sensitivity analysis. ' + conclusionParts[0];
+    } else if (input.sensitivity && input.sensitivity.mode === 'all') {
+      limitations.push('Flagged cases may be valid observations. Compare results before deciding how to handle them.');
+    }
 
     var synthesis = [];
     if (mean !== null && finite(input.median) !== null && sd !== null && sd > 0) {
@@ -642,7 +648,8 @@
       groups: groups,
       hypothesis: hypothesis,
       qqplot: collected.qqplot || null,
-      imageInspected: false
+      imageInspected: false,
+      sensitivity: sources.sensitivity || null
     };
   }
 

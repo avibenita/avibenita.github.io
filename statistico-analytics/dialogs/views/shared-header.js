@@ -4266,7 +4266,6 @@ const StatisticoHeader = {
       const onBox = this.currentView === 'boxplot';
       return [
         { tabKey: 'boxplot-main', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'main', panelId: 'boxplotPanel-main', inPage: onBox },
-        { tabKey: 'boxplot-outliers', label: 'Outliers', icon: 'fa-map-location-dot', panel: 'outliers', panelId: 'boxplotPanel-outliers', inPage: onBox },
         { tabKey: 'outlier-impact', label: 'Impact', icon: 'fa-bolt', view: 'outlier-impact', file: 'univariate/outlier-impact.html' }
       ];
     }

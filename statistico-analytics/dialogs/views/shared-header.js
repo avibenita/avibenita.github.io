@@ -21,7 +21,7 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
   if (typeof document === 'undefined' || document.readyState !== 'loading') return;
   var script = document.currentScript;
   if (!script || !script.src || typeof document.write !== 'function') return;
-  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123os18');
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123os19');
   if (src === script.src) return;
   document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
 })();
@@ -1207,7 +1207,7 @@ const StatisticoHeader = {
       'hypothesis': 'One-Sample Test',
       'outliers': 'Outliers',
       'percentile': 'Distribution \u00B7 Percentiles',
-      'outlier-impact': 'Explore outliers impact',
+      'outlier-impact': 'Explore outlier impact',
       // Correlation views
       'correlation-matrix': 'Correlation Matrix',
       'correlation-network': 'Correlation Network',
@@ -2089,7 +2089,7 @@ const StatisticoHeader = {
       percentile: 'Percentile cut points.',
       kernel: 'Smoothed density estimate.',
       'by-group': 'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.',
-      'outlier-impact': 'How flagged cases move the mean, spread, and range.',
+      'outlier-impact': 'See how excluding one flagged case moves the mean, spread, and range.',
       normality: 'Shapiro-Wilk, Anderson-Darling, and friends.',
       qqplot: 'PP and QQ probability plots.',
       hypothesis: 'One-sample mean / median test.',
@@ -2192,8 +2192,8 @@ const StatisticoHeader = {
             view: 'outlier-impact',
             file: 'univariate/outlier-impact.html',
             icon: 'fa-bolt',
-            label: 'Explore outliers impact',
-            description: 'How flagged cases move the mean, spread, and range.'
+            label: 'Explore outlier impact',
+            description: 'See how excluding one flagged case moves the mean, spread, and range.'
           });
           return nav;
         })(this)
@@ -9629,9 +9629,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261122noclose')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261123os19')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261122noclose');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261123os19');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Explore outliers impact - Statistico</title>
+  <title>Explore outlier impact - Statistico</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
     if (new URLSearchParams(location.search).get('embed') !== '1') {
@@ -14,7 +14,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261123os18"></script>
+  <script src="../shared-header.js?v=20261123os19"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <style>
@@ -134,15 +134,13 @@
       font-size: 13px;
       box-shadow: 0 12px 28px rgba(0,0,0,0.35);
     }
-    .oi-score {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 4px;
-    }
-    .oi-score svg { width: 168px; height: 104px; flex: 0 0 auto; }
-    .oi-score strong { font-size: 42px; line-height: 1; display: block; }
-    .oi-band { text-transform: capitalize; color: var(--text-muted); }
+    .oi-moves { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 12px; }
+    .oi-moves strong { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+    .oi-moves span { color: var(--text-primary); }
+    .oi-scoreline { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; }
+    .oi-scoreline strong { color: var(--text-primary); font-size: 15px; }
+    .oi-chart { width: 100%; height: auto; display: block; color: var(--text-primary); }
+    .oi-formula { margin-top: 8px; color: var(--text-muted); font-size: 12px; }
     .oi-meters { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
     .oi-meter span { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); }
     .oi-track { height: 7px; border-radius: 99px; background: rgba(255,255,255,0.12); overflow: hidden; margin-top: 4px; }
@@ -188,10 +186,38 @@
         return String(rounded);
       }
 
+      function decimalsFor(values) {
+        var probe = 0;
+        var level = 0;
+        values.forEach(function (value) {
+          if (value == null || !isFinite(value)) return;
+          level = Math.max(level, Math.abs(value));
+          probe = Math.max(probe, Math.abs(value));
+        });
+        if (probe === 0) return 0;
+        if (probe < 0.01) return 3;
+        if (probe < 1 || (level >= 100 && probe < 1)) return probe < 0.1 ? 3 : 2;
+        if (level >= 10) return 1;
+        return 2;
+      }
+
+      function fmtAt(value, digits) {
+        if (value == null || !isFinite(value)) return '—';
+        return value.toFixed(digits);
+      }
+
+      function signedAt(value, digits) {
+        if (value == null || !isFinite(value)) return '—';
+        var text = fmtAt(Math.abs(value), digits);
+        if (value > 0) return '+' + text;
+        if (value < 0) return '−' + text;
+        return text;
+      }
+
       function signed(value) {
         if (value == null || !isFinite(value)) return '—';
-        var text = fmt(value);
-        return value > 0 ? '+' + text : text;
+        var digits = decimalsFor([value]);
+        return signedAt(value, digits);
       }
 
       function keptValues(cases, ids) {
@@ -200,76 +226,131 @@
         return (cases || []).filter(function (row) { return !drop[row.id]; }).map(function (row) { return row.value; });
       }
 
-      function bandColor(band) {
-        if (band === 'slight') return '#e6c15a';
-        if (band === 'moderate') return '#f0a05a';
-        if (band === 'strong') return '#f07178';
-        return 'rgba(255,255,255,0.45)';
+      function bandLabel(band) {
+        if (band === 'slight') return 'Slight';
+        if (band === 'moderate') return 'Moderate';
+        if (band === 'strong') return 'Strong';
+        return 'None';
       }
 
-      function gauge(score, band) {
-        var length = Math.PI * 78;
-        var dash = Math.max(0, Math.min(100, score)) / 100 * length;
-        return '<svg viewBox="0 0 200 118" aria-hidden="true">'
-          + '<path d="M22 100 A78 78 0 0 1 178 100" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="12" stroke-linecap="round"/>'
-          + '<path d="M22 100 A78 78 0 0 1 178 100" fill="none" stroke="' + bandColor(band) + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + dash.toFixed(2) + ' ' + length.toFixed(2) + '"/>'
-          + '</svg>';
+      function rowPhrase(label) {
+        return String(label || 'case').replace(/^Row\s+/i, 'row ');
+      }
+
+      function changePhrase(noun, before, after) {
+        if (before == null || after == null || !isFinite(before) || !isFinite(after)) return noun + ' is unavailable';
+        var delta = after - before;
+        var digits = decimalsFor([before, after, delta]);
+        var amount = fmtAt(Math.abs(delta), digits);
+        if (Number(amount) === 0) return noun + ' is unchanged';
+        return noun + (delta < 0 ? ' decreases by ' : ' increases by ') + amount;
+      }
+
+      function coverageSentence(coverage) {
+        if (!coverage || !coverage.rangeRows || coverage.rangeRows === coverage.eligible) return '';
+        var notes = [];
+        var filteredOut = coverage.rangeRows - coverage.analysisRows;
+        if (filteredOut > 0) notes.push(filteredOut + ' of those rows are outside the current row filter');
+        if (coverage.blank || coverage.nonNumeric) {
+          var cells = [];
+          if (coverage.blank) cells.push(coverage.blank + ' blank ' + (coverage.blank === 1 ? 'cell' : 'cells'));
+          if (coverage.nonNumeric) cells.push(coverage.nonNumeric + ' non-numeric ' + (coverage.nonNumeric === 1 ? 'cell' : 'cells'));
+          var dropped = (coverage.blank || 0) + (coverage.nonNumeric || 0);
+          notes.push(cells.join(' and ') + ' in this column ' + (dropped === 1 ? 'is not numeric' : 'are not numeric'));
+        }
+        return 'The header counts ' + coverage.rangeRows + ' rows in the selected range. This comparison uses ' + coverage.eligible + ' eligible numeric values.'
+          + (notes.length ? ' ' + notes.join('. ') + '.' : '');
       }
 
       function meters(impact) {
         var rows = [
-          ['Location', impact.location, 'Mean shift, scaled by the original standard deviation'],
-          ['Spread', impact.spread, 'Standard-deviation shift, on the same scale'],
-          ['Extremes', impact.extremes, 'Range shift, scaled by the original range']
+          ['Mean', impact.location],
+          ['Standard deviation', impact.spread],
+          ['Range', impact.extremes]
         ];
         return '<div class="oi-meters">' + rows.map(function (row) {
+          var tone = row[1] < 34 ? '#e6c15a' : row[1] < 67 ? '#f0a05a' : '#f07178';
           return '<div class="oi-meter"><span><b>' + row[0] + '</b><b>' + row[1] + '</b></span>'
-            + '<div class="oi-track"><div class="oi-fill" style="width:' + row[1] + '%;background:' + bandColor(row[1] < 34 ? 'slight' : row[1] < 67 ? 'moderate' : 'strong') + '"></div></div>'
-            + '<small class="oi-note">' + row[2] + '</small></div>';
-        }).join('') + '</div>';
+            + '<div class="oi-track"><div class="oi-fill" style="width:' + row[1] + '%;background:' + tone + '"></div></div></div>';
+        }).join('') + '<p class="oi-formula">Parts of the score, on a 0–100 scale. They are not the size of the change.</p></div>';
       }
 
-      function boxRow(label, values, scaleMin, scaleMax, y) {
-        var engine = api();
-        var sorted = values.slice().sort(function (a, b) { return a - b; });
-        if (!sorted.length) return '';
-        var min = sorted[0];
-        var max = sorted[sorted.length - 1];
-        var q1 = engine.quartile(sorted, 0.25);
-        var med = engine.quartile(sorted, 0.5);
-        var q3 = engine.quartile(sorted, 0.75);
-        var span = (scaleMax - scaleMin) || 1;
-        function x(value) { return 86 + ((value - scaleMin) / span) * 210; }
-        var mid = y + 16;
-        return '<g>'
-          + '<text x="4" y="' + (y + 20) + '" fill="currentColor" font-size="12">' + esc(label) + '</text>'
-          + '<line x1="' + x(min) + '" y1="' + mid + '" x2="' + x(max) + '" y2="' + mid + '" stroke="currentColor" stroke-width="1.4"/>'
-          + '<line x1="' + x(min) + '" y1="' + (mid - 8) + '" x2="' + x(min) + '" y2="' + (mid + 8) + '" stroke="currentColor"/>'
-          + '<line x1="' + x(max) + '" y1="' + (mid - 8) + '" x2="' + x(max) + '" y2="' + (mid + 8) + '" stroke="currentColor"/>'
-          + '<rect x="' + x(q1) + '" y="' + (mid - 12) + '" width="' + Math.max(2, x(q3) - x(q1)) + '" height="24" fill="rgba(255,165,120,0.28)" stroke="#ffb088"/>'
-          + '<line x1="' + x(med) + '" y1="' + (mid - 12) + '" x2="' + x(med) + '" y2="' + (mid + 12) + '" stroke="#fff" stroke-width="2"/>'
-          + '</g>';
+      function niceTicks(min, max) {
+        var span = max - min;
+        if (!(span > 0)) return [min];
+        var raw = span / 4;
+        var pow = Math.pow(10, Math.floor(Math.log10(raw)));
+        var err = raw / pow;
+        var step = err >= 7.5 ? 10 * pow : err >= 3.5 ? 5 * pow : err >= 1.5 ? 2 * pow : pow;
+        var start = Math.ceil((min - step * 1e-8) / step) * step;
+        var ticks = [];
+        for (var value = start; value <= max + step * 0.001 && ticks.length < 6; value += step) {
+          ticks.push(Math.round(value * 1e9) / 1e9);
+        }
+        return ticks.length ? ticks : [min, max];
       }
 
-      function boxes(allValues, chosenValues, chosenLabel) {
-        var both = allValues.concat(chosenValues);
-        if (!both.length) return '';
-        var scaleMin = Math.min.apply(null, both);
-        var scaleMax = Math.max.apply(null, both);
-        return '<svg viewBox="0 0 320 108" width="100%" height="108" role="img" aria-label="Box comparison of all cases and the chosen exclusion">'
-          + boxRow('All cases', allValues, scaleMin, scaleMax, 4)
-          + boxRow(chosenLabel, chosenValues, scaleMin, scaleMax, 54)
-          + '</svg>';
+      function boxes(allValues, chosenValues, chosenLabel, marks) {
+        var pool = allValues.concat(chosenValues || []);
+        if (!pool.length) return '';
+        var dataMin = Math.min.apply(null, pool);
+        var dataMax = Math.max.apply(null, pool);
+        var pad = ((dataMax - dataMin) || 1) * 0.08;
+        var scaleMin = dataMin - pad;
+        var scaleMax = dataMax + pad;
+        var plotL = 156;
+        var plotR = 430;
+        var two = !!(chosenValues && chosenValues.length);
+        var mids = two ? [34, 84] : [34];
+        var axisY = two ? 122 : 74;
+        var height = two ? 156 : 108;
+        function x(value) { return plotL + ((value - scaleMin) / (scaleMax - scaleMin)) * (plotR - plotL); }
+        function boxAt(label, values, mid) {
+          var engine = api();
+          var sorted = values.slice().sort(function (a, b) { return a - b; });
+          var min = sorted[0];
+          var max = sorted[sorted.length - 1];
+          var q1 = engine.quartile(sorted, 0.25);
+          var med = engine.quartile(sorted, 0.5);
+          var q3 = engine.quartile(sorted, 0.75);
+          return '<text x="4" y="' + (mid + 4) + '" fill="currentColor" font-size="12">' + esc(label) + '</text>'
+            + '<line x1="' + x(min) + '" y1="' + mid + '" x2="' + x(max) + '" y2="' + mid + '" stroke="currentColor" stroke-width="1.4"/>'
+            + '<line x1="' + x(min) + '" y1="' + (mid - 8) + '" x2="' + x(min) + '" y2="' + (mid + 8) + '" stroke="currentColor"/>'
+            + '<line x1="' + x(max) + '" y1="' + (mid - 8) + '" x2="' + x(max) + '" y2="' + (mid + 8) + '" stroke="currentColor"/>'
+            + '<rect x="' + x(q1) + '" y="' + (mid - 12) + '" width="' + Math.max(2, x(q3) - x(q1)) + '" height="24" fill="rgba(255,165,120,0.28)" stroke="#ffb088"/>'
+            + '<line x1="' + x(med) + '" y1="' + (mid - 14) + '" x2="' + x(med) + '" y2="' + (mid + 14) + '" stroke="#fff" stroke-width="2"/>';
+        }
+        var ticks = niceTicks(scaleMin, scaleMax);
+        var digits = decimalsFor(ticks);
+        var axis = '<line x1="' + plotL + '" y1="' + axisY + '" x2="' + plotR + '" y2="' + axisY + '" stroke="currentColor" opacity="0.35"/>'
+          + ticks.map(function (tick) {
+            var px = x(tick);
+            return '<line x1="' + px + '" y1="' + axisY + '" x2="' + px + '" y2="' + (axisY + 6) + '" stroke="currentColor" opacity="0.45"/>'
+              + '<text x="' + px + '" y="' + (axisY + 20) + '" text-anchor="middle" font-size="11" fill="currentColor">' + esc(fmtAt(tick, digits)) + '</text>';
+          }).join('');
+        var dots = (marks || []).map(function (mark) {
+          var px = x(mark.value);
+          var cy = mids[0];
+          var dot = '<circle cx="' + px + '" cy="' + cy + '" r="' + (mark.strong ? 5 : 3.5) + '" fill="' + (mark.strong ? '#f07178' : '#e6c15a') + '"><title>' + esc(fmt(mark.value)) + '</title></circle>';
+          if (!mark.strong) return dot;
+          var anchor = px > plotR - 42 ? 'end' : 'start';
+          var tx = anchor === 'end' ? px - 8 : px + 8;
+          return dot + '<text x="' + tx + '" y="' + (cy - 10) + '" text-anchor="' + anchor + '" font-size="11" fill="#f07178">' + esc(fmt(mark.value)) + '</text>';
+        }).join('');
+        return '<svg class="oi-chart" viewBox="0 0 448 ' + height + '" role="img" aria-label="Distribution before and after exclusion">'
+          + boxAt('All cases', allValues, mids[0])
+          + (two ? boxAt(chosenLabel, chosenValues, mids[1]) : '')
+          + dots + axis + '</svg>';
       }
 
-      function comparisonTable(rows, inEffect) {
-        var chosen = inEffect ? 'Excluding selected' : 'If excluded';
-        return '<table><thead><tr><th>Metric</th><th>All cases</th><th>' + chosen + '</th><th>Change</th></tr></thead><tbody>'
+      function comparisonTable(rows, afterLabel) {
+        return '<table><thead><tr><th>Metric</th><th>All cases</th><th>' + esc(afterLabel) + '</th><th>Change</th></tr></thead><tbody>'
           + rows.map(function (row) {
-            var change = row.change == null ? '—' : signed(row.change);
-            return '<tr><td>' + esc(row.metric) + '</td><td>' + fmt(row.baseline) + '</td><td>' + fmt(row.subset) + '</td><td>' + change + '</td></tr>';
+            var digits = row.metric === 'Eligible n' ? 0 : decimalsFor([row.baseline, row.subset, row.change]);
+            var change = row.change == null ? '—' : signedAt(row.change, digits);
+            return '<tr><td>' + esc(row.metric) + '</td><td>' + fmtAt(row.baseline, digits) + '</td><td>' + fmtAt(row.subset, digits) + '</td><td>' + change + '</td></tr>';
           }).join('')
-          + '</tbody></table>';
+          + '</tbody></table><p class="oi-formula">Change = excluding selected − all cases</p>';
       }
 
       function radio(name, value, checked, title, detail) {
@@ -286,7 +367,7 @@
         var session = engine.session();
         var snap = session.snapshot();
         if (!snap || snap.unavailable) {
-          root.innerHTML = '<div class="oi-card"><h2>Explore outliers impact</h2><p class="oi-empty">'
+          root.innerHTML = '<div class="oi-card"><h2>Explore outlier impact</h2><p class="oi-empty">'
             + esc((snap && snap.reason) || 'Run Univariate on a numeric column, then open this view.') + '</p></div>';
           return;
         }
@@ -300,72 +381,75 @@
         var inEffect = snap.mode === 'subset' && snap.status !== 'failed';
         var selected = {};
         (snap.selectedIds || []).forEach(function (id) { selected[id] = true; });
-        var allFlaggedSelected = flagged.length > 0 && flagged.every(function (row) { return selected[row.id]; }) && snap.selectedIds.length === flagged.length;
-        var singleId = snap.selectedIds.length === 1 ? snap.selectedIds[0] : '';
+        var allFlaggedSelected = flagged.length > 0 && flagged.every(function (row) { return selected[row.id]; }) && (snap.selectedIds || []).length === flagged.length;
+        var single = inEffect && (snap.selectedIds || []).length === 1
+          ? flagged.filter(function (row) { return row.id === snap.selectedIds[0]; })[0]
+          : null;
+        var excluded = inEffect ? flagged.filter(function (row) { return selected[row.id]; }) : [];
         var allValues = (snap.cases || []).map(function (row) { return row.value; });
-        var activeIds = inEffect ? snap.selectedIds : (snap.selectedIds.length ? snap.selectedIds : flagged.map(function (row) { return row.id; }));
-        var chosenValues = keptValues(snap.cases, activeIds);
+        var chosenValues = inEffect ? keptValues(snap.cases, snap.selectedIds) : null;
         var baseline = engine.summarize(allValues);
         var active = engine.summarize(inEffect ? chosenValues : allValues);
-        var shown = engine.summarize(chosenValues.length ? chosenValues : allValues);
-        var impact = inEffect ? engine.impactIndex(baseline, active) : { score: 0, band: 'none', location: 0, spread: 0, extremes: 0 };
-        var potential = engine.impactIndex(baseline, shown);
-        var input = session.interpretationInput();
-        var reading = (input && input.impact && input.impact.reading)
-          || (impact.score === 0 ? 'No exclusion is in effect, so the index is 0.' : '');
-        var fenceNote = bounds.zeroIqr
+        var impact = inEffect ? engine.impactIndex(baseline, active) : null;
+        var fenceDigits = decimalsFor([bounds.lower, bounds.upper]);
+        var countLine = flagged.length
+          ? flagged.length + ' potential outlier' + (flagged.length === 1 ? '' : 's') + ' flagged among ' + snap.baselineN + ' eligible cases.'
+          : 'No potential outliers flagged among ' + snap.baselineN + ' eligible cases.';
+        var fenceLine = bounds.zeroIqr
           ? 'IQR is zero; flags identify values outside the middle 50% range. Review repeated values carefully.'
-          : 'Quartiles use the box plot convention: the ordered value at floor(n × p). A case is flagged only when it falls strictly outside the fence.';
-        var summary = snap.baselineN + ' eligible cases. Q1 ' + fmt(bounds.q1) + ', Q3 ' + fmt(bounds.q3)
-          + ', IQR ' + fmt(bounds.iqr) + '. Fences at ' + fmt(bounds.lower) + ' and ' + fmt(bounds.upper)
-          + ' (k = ' + snap.k + '). ' + flagged.length + (flagged.length === 1 ? ' case sits' : ' cases sit') + ' strictly outside.';
-        var effectRadios = radio('oi-effect', 'none', !inEffect, 'Keep all cases', 'Detection stays visible. Nothing is removed from the result.');
+          : 'Values below ' + signedAt(bounds.lower, fenceDigits).replace(/^\+/, '') + ' or above ' + fmtAt(bounds.upper, fenceDigits) + ' are flagged.';
+        var afterLabel = !inEffect ? '' : (single ? ('Excluding ' + rowPhrase(single.label)) : ('Excluding ' + excluded.length + ' cases'));
+        var effectRadios = radio('oi-effect', 'none', !inEffect, 'All cases included', '');
         flagged.forEach(function (row) {
           var side = row.reason === 'low' ? 'Below the lower fence' : 'Above the upper fence';
-          effectRadios += radio('oi-effect', row.id, inEffect && singleId === row.id, row.label + ' · ' + fmt(row.value), side);
+          effectRadios += radio('oi-effect', row.id, !!(single && single.id === row.id), 'Exclude ' + rowPhrase(row.label) + ' · Value: ' + fmt(row.value), side);
         });
         if (flagged.length > 1) {
-          effectRadios += radio('oi-effect', 'all', inEffect && allFlaggedSelected, 'Exclude every flagged case', flagged.length + ' cases');
+          effectRadios += radio('oi-effect', 'all', inEffect && allFlaggedSelected, 'Exclude every flagged case', 'One comparison of all ' + flagged.length + ' flagged cases');
         }
-        if (inEffect && !singleId && !allFlaggedSelected) {
-          effectRadios += radio('oi-effect', 'custom', true, 'Current selection', snap.selectedIds.length + ' cases');
-        }
-        var table = session.compare();
+        var table = inEffect ? session.compare() : null;
         var rows = table && table.rows ? table.rows.filter(function (row) {
           return row.metric !== '95% confidence interval for the mean';
         }) : [];
-        var movers = rows.filter(function (row) { return row.change != null && row.change !== 0; });
-        var displayRows = (movers.length ? movers : rows).slice(0, 5);
-        var potentialLine = !inEffect && potential.score
-          ? 'If the flagged cases were excluded, the index would be ' + potential.score + ' (' + potential.band + '). That comparison is not in effect.'
+        var moves = inEffect
+          ? '<div class="oi-moves"><strong>' + esc(changePhrase('Mean', baseline.mean, active.mean)) + '</strong><span>'
+            + esc(changePhrase('SD', baseline.sd, active.sd)) + ' · ' + esc(changePhrase('Maximum', baseline.max, active.max)) + '</span></div>'
+          : '<div class="oi-moves"><strong>No case is excluded.</strong><span>Choose one flagged case to see what changes.</span></div>';
+        var info = '<details class="oi-info"><summary aria-label="About the impact score">i</summary>'
+          + '<p>Score from 0 to 100. It describes the size of the changes already shown. It is not a test, and a higher score is not a better result. Mean is 40% of the score: the absolute change in the mean, divided by the original standard deviation, then capped at 100. Standard deviation is 35%, on that same scale. Range is 25%: the absolute change in the range, divided by the original range, then capped at 100. Slight is below 34, Moderate is below 67, and Strong is 67 to 100.</p></details>';
+        var scoreLine = inEffect && impact
+          ? '<div class="oi-scoreline"><span>Score <strong>' + impact.score + '</strong> of 100 · ' + bandLabel(impact.band) + '</span>' + info + '</div>' + meters(impact)
           : '';
+        var marks = (inEffect ? excluded : flagged).map(function (row) {
+          return { value: row.value, strong: inEffect };
+        });
+        var gap = coverageSentence(snap.coverage);
         root.innerHTML = ''
           + '<div class="oi-grid">'
-          + '<section class="oi-card"><div class="oi-kicker">Outlier detection</div><h2>Which cases take effect</h2>'
-          + '<p class="oi-summary">' + esc(summary) + '</p><p class="oi-note">' + esc(fenceNote) + '</p>'
-          + '<fieldset class="oi-fieldset"><legend>Fence</legend><div class="oi-radios inline">'
-          + radio('oi-fence', '1.5', Number(snap.k) === 1.5, 'Standard fence', 'k = 1.5')
-          + radio('oi-fence', '3', Number(snap.k) === 3, 'Far fence', 'k = 3')
+          + '<section class="oi-card"><div class="oi-kicker">One case at a time</div><h2>Choose a case to exclude</h2>'
+          + '<p class="oi-summary">' + esc(countLine) + '</p><p class="oi-summary">' + esc(fenceLine) + '</p>'
+          + (gap ? '<p class="oi-note">' + esc(gap) + '</p>' : '')
+          + '<fieldset class="oi-fieldset"><legend>Detection rule</legend><div class="oi-radios inline">'
+          + radio('oi-fence', '1.5', Number(snap.k) === 1.5, 'Standard · 1.5 × IQR', '')
+          + radio('oi-fence', '3', Number(snap.k) === 3, 'Outer · 3 × IQR', '')
           + '</div></fieldset>'
-          + '<fieldset class="oi-fieldset"><legend>Take effect</legend><div class="oi-radios">' + effectRadios + '</div></fieldset>'
+          + '<fieldset class="oi-fieldset"><legend>Temporary exclusion</legend><div class="oi-radios">' + effectRadios + '</div></fieldset>'
+          + '<p class="oi-note">Choose one option. This is not a multiple selection.</p>'
+          + '<p class="oi-note">This exclusion is temporary. Other Univariate views use it until you choose All cases included. The worksheet data remain unchanged.</p>'
           + '</section>'
-          + '<section class="oi-card"><div class="oi-index-head"><div><div class="oi-kicker">Outlier Impact Index</div><h2>Strength of the movement</h2></div>'
-          + '<details class="oi-info"><summary aria-label="About the Outlier Impact Index">i</summary>'
-          + '<p>The index runs from 0 to 100, in the same spirit as the Normality Strength Index: one reading of several changes, not a hypothesis test. Location is 40%, spread is 35%, and extremes are 25%. A higher index means the chosen exclusion moves the summaries more. It is not a better result.</p></details></div>'
-          + '<div class="oi-score">' + gauge(impact.score, impact.band) + '<div><strong style="color:' + bandColor(impact.band) + '">' + impact.score + '</strong><div class="oi-band">' + esc(impact.band) + '</div></div></div>'
-          + meters(impact)
-          + '<p class="oi-note">' + esc(reading) + (potentialLine ? ' ' + esc(potentialLine) : '') + '</p>'
+          + '<section class="oi-card"><div class="oi-kicker">What moves</div><h2>' + (inEffect ? esc(afterLabel) : 'All cases included') + '</h2>'
+          + moves + scoreLine
           + '</section></div>'
           + '<div class="oi-charts">'
-          + '<section class="oi-card"><div class="oi-kicker">Comparison</div><h2>' + (inEffect ? 'What changes' : 'What would change') + '</h2>'
-          + (displayRows.length ? comparisonTable(displayRows, inEffect) : '<p class="oi-note">No numeric comparison is available.</p>')
-          + '<p class="oi-note">Intervals and tests are not adjusted for choosing exclusions after looking at the data.</p></section>'
-          + '<section class="oi-card"><div class="oi-kicker">Shape</div><h2>Center and fences</h2>'
-          + boxes(allValues, chosenValues.length ? chosenValues : allValues, inEffect ? 'Chosen' : 'If excluded')
-          + '<p class="oi-note">Each bar is the box-plot convention: whiskers at the minimum and maximum, the box from Q1 to Q3, and the median as the bright line.</p></section>'
+          + '<section class="oi-card"><div class="oi-kicker">Comparison</div><h2>Before and after exclusion</h2>'
+          + (inEffect && rows.length ? comparisonTable(rows, afterLabel) : '<p class="oi-note">Choose one case to see the comparison.</p>')
+          + '</section>'
+          + '<section class="oi-card"><div class="oi-kicker">Distribution</div><h2>Distribution before and after</h2>'
+          + boxes(allValues, chosenValues, afterLabel || 'All cases', marks)
+          + '<p class="oi-note">Box: middle 50% · Line: median · Whiskers: minimum–maximum.</p></section>'
           + '</div>';
         if (window.StatisticoHeader && snap.baselineN) {
-          window.StatisticoHeader.updateTitle('Explore outliers impact');
+          window.StatisticoHeader.updateTitle('Explore outlier impact');
         }
       }
 
@@ -403,7 +487,7 @@
         }
         StatisticoHeader.init('outlier-impact', 'Variable', 0, 'univariate');
         StatisticoHeader.initSidebarPage();
-        StatisticoHeader.updateTitle('Explore outliers impact');
+        StatisticoHeader.updateTitle('Explore outlier impact');
         paint();
       }
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

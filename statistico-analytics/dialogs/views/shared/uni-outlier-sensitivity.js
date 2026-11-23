@@ -37,6 +37,12 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  function cellKind(value) {
+    if (value === null || value === undefined) return 'blank';
+    if (typeof value === 'string' && !String(value).trim()) return 'blank';
+    return numericOf(value) === null ? 'nonNumeric' : 'numeric';
+  }
+
   function fences(q1, q3, k) {
     var iqr = q3 - q1;
     return {
@@ -247,36 +253,61 @@
     if (rows && rows.length && Array.isArray(rows[0])) {
       var indexes = alignIndexes(allRows || rows, rows);
       var fromRows = [];
+      var blank = 0;
+      var nonNumeric = 0;
       rows.forEach(function (row, i) {
-        var value = numericOf(row[meta.columnIndex]);
-        if (value === null) return;
+        var kind = cellKind(row[meta.columnIndex]);
+        if (kind === 'blank') { blank += 1; return; }
+        if (kind === 'nonNumeric') { nonNumeric += 1; return; }
         var sourceIndex = indexes[i];
         fromRows.push({
           id: 'case:' + sourceIndex,
           sourceIndex: sourceIndex,
           label: caseLabel(sourceIndex, start),
-          value: value
+          value: numericOf(row[meta.columnIndex])
         });
       });
-      return { cases: fromRows, meta: meta, unavailable: null, reason: '' };
+      return {
+        cases: fromRows,
+        meta: meta,
+        unavailable: null,
+        reason: '',
+        coverage: {
+          rangeRows: allRows && allRows.length ? allRows.length : rows.length,
+          analysisRows: rows.length,
+          eligible: fromRows.length,
+          blank: blank,
+          nonNumeric: nonNumeric
+        }
+      };
     }
     var raw = Array.isArray(payload.values) ? payload.values
       : (Array.isArray(payload.rawData) ? payload.rawData : (Array.isArray(payload.data) ? payload.data : []));
     var fromValues = [];
+    var valueBlank = 0;
+    var valueNonNumeric = 0;
     raw.forEach(function (value, index) {
-      var n = numericOf(value);
-      if (n === null) return;
+      var kind = cellKind(value);
+      if (kind === 'blank') { valueBlank += 1; return; }
+      if (kind === 'nonNumeric') { valueNonNumeric += 1; return; }
       fromValues.push({
         id: 'case:' + index,
         sourceIndex: index,
         label: caseLabel(index, start),
-        value: n
+        value: numericOf(value)
       });
     });
+    var valueCoverage = {
+      rangeRows: raw.length,
+      analysisRows: raw.length,
+      eligible: fromValues.length,
+      blank: valueBlank,
+      nonNumeric: valueNonNumeric
+    };
     if (!fromValues.length) {
-      return { unavailable: 'empty', reason: 'No eligible values.', cases: [], meta: meta };
+      return { unavailable: 'empty', reason: 'No eligible values.', cases: [], meta: meta, coverage: valueCoverage };
     }
-    return { cases: fromValues, meta: meta, unavailable: null, reason: '' };
+    return { cases: fromValues, meta: meta, unavailable: null, reason: '', coverage: valueCoverage };
   }
 
   function valuesOf(cases, selected, subset) {
@@ -321,6 +352,7 @@
         screen: screened,
         flagged: flagged,
         selectedIds: flagged.map(function (f) { return f.id; }),
+        coverage: extracted.coverage || null,
         highlightId: null,
         cache: {},
         settings: ''
@@ -345,6 +377,7 @@
       }
       state = previous;
       state.cases = extracted.cases;
+      state.coverage = extracted.coverage || null;
       state.unavailable = extracted.unavailable;
       state.reason = extracted.reason || '';
       if (!extracted.unavailable) {
@@ -542,6 +575,7 @@
           row('Sample SD', baseline.sd, subset.sd),
           row('Minimum', baseline.min, subset.min),
           row('Maximum', baseline.max, subset.max),
+          row('Range', baseline.max == null || baseline.min == null ? null : baseline.max - baseline.min, subset.max == null || subset.min == null ? null : subset.max - subset.min),
           {
             metric: '95% confidence interval for the mean',
             baseline: baseline.ci,
@@ -591,6 +625,7 @@
         highlightId: state.highlightId,
         screen: state.screen,
         baselineN: baseline ? baseline.n : (state.cases ? state.cases.length : 0),
+        coverage: state.coverage || null,
         convention: QUARTILE_CONVENTION,
         generation: generation
       };

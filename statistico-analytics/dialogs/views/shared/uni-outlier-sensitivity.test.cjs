@@ -171,6 +171,17 @@ assert.strictEqual(merged.values.length, 10);
 assert.strictEqual(merged.values[9], 100);
 assert.ok(!merged.__uniSensitivityProjection);
 
+const mixed = api.casesFromPayload({
+  column: 'x',
+  sourceHeaders: ['x'],
+  sourceRowsAll: [[10], [null], ['a'], [12], [11], [100]],
+  sourceRows: [[10], [null], ['a'], [12], [11], [100]]
+});
+assert.strictEqual(mixed.coverage.rangeRows, 6);
+assert.strictEqual(mixed.coverage.eligible, 4);
+assert.strictEqual(mixed.coverage.blank, 1);
+assert.strictEqual(mixed.coverage.nonNumeric, 1);
+
 const grouped = api.casesFromPayload(payloadFrom(ordinary, { weighted: true }));
 assert.strictEqual(grouped.unavailable, 'weighted');
 

@@ -130,6 +130,28 @@
       ]
     ),
 
+    'outlier-impact': guide(
+      'Explore outlier impact',
+      'Compares the full numeric sample with the same sample after one flagged case is left out, so you can see what that case does to the mean, the standard deviation, and the range.',
+      [
+        'Choose one case. The radios are a single comparison, not a multiple selection. All cases included puts every eligible value back.',
+        'Detection rule sets the fence. Standard uses 1.5 × IQR. Outer uses 3 × IQR. Changing the rule returns the comparison to all cases and screens the same sample again.',
+        'The header count is every row in the selected range. Eligible cases are the numeric values in this column.'
+      ],
+      [
+        'The opening lines name how many values sit strictly outside the fence, and where that fence is.',
+        'The sentences under the score are the changes: excluding the case, minus all cases. The score is a 0–100 description of those changes. Mean is 40%, standard deviation is 35%, and range is 25%. Slight is below 34, Moderate is below 67, and Strong is 67 to 100. A higher score is a larger movement, not a better result.',
+        'The boxes share one numeric axis. The box is the middle 50%, the line is the median, and the whiskers run from the minimum to the maximum. The marked point is the excluded value on the original distribution.',
+        'In the table, Change = excluding selected − all cases. Range is the maximum minus the minimum.'
+      ],
+      [
+        'Quartiles follow the box plot: each quartile is an ordered value in the sample. Q1, Q3, and the IQR set the fence. A case is flagged only when it is strictly outside that fence.',
+        'The exclusion is temporary. Other Univariate views use it until you choose All cases included. The worksheet data remain unchanged.',
+        'Intervals and tests are not adjusted for choosing an exclusion after looking at the data. A change in those results would not show that the population became normal, and it would not show that the result improved.',
+        'When the IQR is zero, flags identify values outside the middle 50% range. Review repeated values carefully.'
+      ]
+    ),
+
     outliers: guide(
       'Outliers',
       'Applies several unusual-value rules to the same variable, so you can see which points each rule flags.',

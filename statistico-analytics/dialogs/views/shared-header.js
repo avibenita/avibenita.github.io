@@ -11,7 +11,7 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
   if (typeof document === 'undefined' || document.readyState !== 'loading') return;
   var script = document.currentScript;
   if (!script || !script.src || typeof document.write !== 'function') return;
-  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/interpretation-facts.js?v=20261121ix1');
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/interpretation-facts.js?v=20261123os18');
   if (src === script.src) return;
   document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
 })();
@@ -21,7 +21,7 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
   if (typeof document === 'undefined' || document.readyState !== 'loading') return;
   var script = document.currentScript;
   if (!script || !script.src || typeof document.write !== 'function') return;
-  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123os17');
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123os18');
   if (src === script.src) return;
   document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
 })();
@@ -1207,6 +1207,7 @@ const StatisticoHeader = {
       'hypothesis': 'One-Sample Test',
       'outliers': 'Outliers',
       'percentile': 'Distribution \u00B7 Percentiles',
+      'outlier-impact': 'Explore outliers impact',
       // Correlation views
       'correlation-matrix': 'Correlation Matrix',
       'correlation-network': 'Correlation Network',
@@ -2088,6 +2089,7 @@ const StatisticoHeader = {
       percentile: 'Percentile cut points.',
       kernel: 'Smoothed density estimate.',
       'by-group': 'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.',
+      'outlier-impact': 'How flagged cases move the mean, spread, and range.',
       normality: 'Shapiro-Wilk, Anderson-Darling, and friends.',
       qqplot: 'PP and QQ probability plots.',
       hypothesis: 'One-sample mean / median test.',
@@ -2179,11 +2181,22 @@ const StatisticoHeader = {
             ]
           }
         ],
-        pinnedNav: this._byGroupPinnedNav({
-          type: 'navigate',
-          view: 'by-group',
-          file: 'univariate/by-group.html'
-        })
+        pinnedNav: (function (header) {
+          var nav = header._byGroupPinnedNav({
+            type: 'navigate',
+            view: 'by-group',
+            file: 'univariate/by-group.html'
+          });
+          nav.items.push({
+            type: 'navigate',
+            view: 'outlier-impact',
+            file: 'univariate/outlier-impact.html',
+            icon: 'fa-bolt',
+            label: 'Explore outliers impact',
+            description: 'How flagged cases move the mean, spread, and range.'
+          });
+          return nav;
+        })(this)
       };
     }
 

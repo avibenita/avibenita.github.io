@@ -123,6 +123,38 @@
     return { n: n, mean: mean, median: medianOf(values), sd: sd, min: min, max: max, ci: ci };
   }
 
+  function clampPercent(before, after, scale) {
+    if (before == null || after == null || !Number.isFinite(before) || !Number.isFinite(after)) return 0;
+    var delta = Math.abs(after - before);
+    if (!(scale > 0)) return delta === 0 ? 0 : 100;
+    return Math.max(0, Math.min(100, delta / scale * 100));
+  }
+
+  function impactIndex(baseline, subset) {
+    var empty = { score: 0, band: 'none', location: 0, spread: 0, extremes: 0 };
+    if (!baseline || !subset || !baseline.n || !subset.n) return empty;
+    var location = clampPercent(baseline.mean, subset.mean, baseline.sd);
+    var spread = clampPercent(baseline.sd, subset.sd, baseline.sd);
+    var range0 = baseline.max != null && baseline.min != null ? baseline.max - baseline.min : 0;
+    var range1 = subset.max != null && subset.min != null ? subset.max - subset.min : 0;
+    var extremes = clampPercent(range0, range1, range0);
+    if (location === 0 && spread === 0 && extremes === 0) return empty;
+    var score = Math.round((0.4 * location) + (0.35 * spread) + (0.25 * extremes));
+    return {
+      score: score,
+      band: score < 34 ? 'slight' : score < 67 ? 'moderate' : 'strong',
+      location: Math.round(location),
+      spread: Math.round(spread),
+      extremes: Math.round(extremes)
+    };
+  }
+
+  function signed(value) {
+    if (value == null || !Number.isFinite(value)) return '—';
+    var rounded = Math.round(value * 1000) / 1000;
+    return (rounded > 0 ? '+' : '') + String(rounded);
+  }
+
   function sameList(a, b) {
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
     for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
@@ -646,6 +678,13 @@
         if (!state || state.unavailable) return null;
         var baseline = summary('all');
         var active = state.mode === 'subset' ? summary('subset') : baseline;
+        var impact = impactIndex(baseline, active);
+        var strongest = impact.location >= impact.spread && impact.location >= impact.extremes
+          ? 'the mean'
+          : (impact.spread >= impact.extremes ? 'the standard deviation' : 'the range');
+        var reading = impact.score === 0
+          ? 'No exclusion is in effect, so the index is 0.'
+          : 'Excluding ' + state.selectedIds.length + ' of ' + (baseline ? baseline.n : 0) + ' cases moves the mean by ' + signed(active && baseline ? active.mean - baseline.mean : null) + ' and the sample standard deviation by ' + signed(active && baseline ? active.sd - baseline.sd : null) + '. The strongest movement is in ' + strongest + '.';
         return {
           mode: state.mode,
           status: state.status,
@@ -653,7 +692,23 @@
           retainedN: active ? active.n : 0,
           excluded: state.mode === 'subset' ? state.selectedIds.length : 0,
           k: state.k,
-          flagged: (state.flagged || []).length
+          flagged: (state.flagged || []).length,
+          active: active ? {
+            n: active.n,
+            mean: active.mean,
+            sd: active.sd,
+            median: active.median,
+            min: active.min,
+            max: active.max
+          } : null,
+          impact: {
+            score: impact.score,
+            band: impact.band,
+            location: impact.location,
+            spread: impact.spread,
+            extremes: impact.extremes,
+            reading: reading
+          }
         };
       },
       annotateDataView: function (result) {
@@ -994,16 +1049,7 @@
     function place(strip, chip) {
       var doc = rootObject.document;
       if (!chip) chip = doc.getElementById('uniOsHeader');
-      if (chip) {
-        var rail = doc.querySelector('.sb-group--comparison .sb-items-rail');
-        if (rail) {
-          chip.hidden = false;
-          if (chip.parentNode !== rail) rail.appendChild(chip);
-        } else if (!chip.parentNode) {
-          chip.hidden = true;
-          doc.body.appendChild(chip);
-        }
-      }
+      if (chip && chip.parentNode) chip.parentNode.removeChild(chip);
       if (!strip) return;
       var results = doc.getElementById('results-container') || doc.querySelector('.results-container');
       if (results) {
@@ -1298,37 +1344,6 @@
         ].join('');
         doc.head.appendChild(style);
       }
-      var chip = doc.getElementById('uniOsHeader');
-      if (!chip) {
-        chip = doc.createElement('div');
-        chip.id = 'uniOsHeader';
-        chip.className = 'uni-os-chip';
-        chip.setAttribute('role', 'group');
-        chip.setAttribute('aria-label', 'Outlier sensitivity');
-        chip.innerHTML = [
-          '<div class="uni-os-copy">',
-          '<div class="uni-os-label">Exclude flagged cases</div>',
-          '<div class="uni-os-detail" data-role="n-line">Checking the sample</div>',
-          '</div>',
-          '<div class="uni-os-controls">',
-          '<label class="uni-os-switch">',
-          '<input type="checkbox" data-role="exclude-toggle" aria-label="Exclude flagged cases">',
-          '<span class="uni-os-track" aria-hidden="true"></span>',
-          '</label>',
-          '<button type="button" class="uni-os-info" data-role="info" aria-expanded="false" aria-label="About excluding flagged cases">i</button>',
-          '</div>',
-          '<div class="uni-os-pop" data-role="info-pop" hidden>',
-          '<p data-role="info-text"></p>',
-          '<div class="uni-os-links">',
-          '<button type="button" data-role="review">Review cases</button>',
-          '<button type="button" data-role="settings">Settings</button>',
-          '<button type="button" data-role="compare">Compare</button>',
-          '<button type="button" data-role="reset">Reset</button>',
-          '</div></div>'
-        ].join('');
-        chip.addEventListener('click', function (event) { controlClick(header, event); });
-        chip.addEventListener('change', function (event) { onExcludeToggle(header, event); });
-      }
       if (!doc.documentElement.__uniOsOutside) {
         doc.documentElement.__uniOsOutside = true;
         doc.addEventListener('click', function (event) {
@@ -1438,6 +1453,7 @@
       classify: classify,
       screenCases: screenCases,
       summarize: summarize,
+      impactIndex: impactIndex,
       casesFromPayload: casesFromPayload,
       createSession: createSession,
       memoryStorage: memoryStorage,
@@ -1446,7 +1462,16 @@
       mount: mount,
       session: function () { return session; },
       fingerprint: function () { return session.fingerprint(); },
-      interpretationInput: function () { return session.interpretationInput(); },
+      interpretationInput: function () {
+        var input = session.interpretationInput();
+        if (!input || !input.impact) return input;
+        var header = rootObject.StatisticoHeader;
+        var onImpactView = !!(header && header.currentView === 'outlier-impact');
+        if (!onImpactView && input.mode !== 'subset') {
+          return Object.assign({}, input, { impact: null });
+        }
+        return input;
+      },
       chartPoints: function () { return session.chartPoints(); },
       exportMeta: function () { return session.exportMeta(); },
       project: function (payload) { return session.project(payload); },
@@ -1460,6 +1485,7 @@
     classify: classify,
     screenCases: screenCases,
     summarize: summarize,
+    impactIndex: impactIndex,
     casesFromPayload: casesFromPayload,
     createSession: createSession,
     memoryStorage: memoryStorage,

@@ -187,4 +187,45 @@ assert.ok(text.indexOf('Sensitivity analysis') >= 0);
 assert.ok(text.indexOf('does not establish that the population became normal') >= 0);
 assert.ok(!/improvement/i.test(text));
 
+const impact = api.impactIndex(allSummary, subsetSummary);
+assert.strictEqual(impact.band, 'strong');
+assert.ok(impact.score >= 67 && impact.score <= 100, 'impact score ' + impact.score);
+assert.strictEqual(api.impactIndex(allSummary, allSummary).score, 0);
+assert.strictEqual(api.impactIndex(allSummary, allSummary).band, 'none');
+
+const impactSession = sessionFor(ordinary);
+assert.strictEqual(impactSession.interpretationInput().impact.score, 0);
+assert.strictEqual(impactSession.interpretationInput().impact.band, 'none');
+impactSession.setMode('subset');
+const impactInput = impactSession.interpretationInput();
+assert.strictEqual(impactInput.impact.band, 'strong');
+assert.ok(impactInput.impact.reading.indexOf('Excluding 1 of 10') >= 0);
+assert.ok(impactInput.impact.reading.indexOf('strongest movement') >= 0);
+
+const assessedImpact = interpretation.buildUnivariateAssessment({
+  variable: 'x',
+  n: 9,
+  mean: 11,
+  sd: 0.8660254037844386,
+  median: 11,
+  sensitivity: impactInput
+});
+const impactText = interpretation.assessmentPlainText(assessedImpact);
+assert.ok(impactText.indexOf('Outlier Impact Index is ' + impactInput.impact.score) >= 0);
+assert.ok(impactText.indexOf('No outlier-rule result') < 0);
+assert.ok(impactText.indexOf('not a better result') >= 0);
+assert.ok(!/improvement/i.test(impactText));
+
+const assembled = interpretation.assembleUnivariateInput({
+  stored: { column: 'x', n: 10, descriptive: { n: 10, mean: 19.9, sd: 28.156, median: 11, min: 10, max: 100, q1: 10, q3: 12 } },
+  sensitivity: impactInput
+});
+assert.strictEqual(assembled.n, 9);
+assert.strictEqual(assembled.mean, 11);
+assert.strictEqual(assembled.q1, null);
+const assembledText = interpretation.assessmentPlainText(interpretation.buildUnivariateAssessment(assembled));
+assert.ok(assembledText.indexOf('Outlier Impact Index is ' + impactInput.impact.score) >= 0);
+assert.ok(assembledText.indexOf('No outlier-rule result') < 0);
+assert.ok(assembledText.indexOf('n = 9') >= 0);
+
 console.log('uni-outlier-sensitivity tests passed');

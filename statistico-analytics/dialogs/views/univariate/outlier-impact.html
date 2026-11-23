@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Explore outliers impact - Statistico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    if (new URLSearchParams(location.search).get('embed') !== '1') {
+      document.write('<script src="https://appsforoffice.microsoft.com/lib/1\/hosted\/office.js"><\/script>');
+    } else {
+      window.Office = window.Office || {};
+    }
+  </script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="../shared-header.css?v=20261122glass">
+  <script src="../shared-brand-logo.js?v=20261005light1"></script>
+  <script src="../shared-header.js?v=20261123os18"></script>
+  <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
+  <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
+  <style>
+    :root {
+      --surface-0: #0E141B;
+      --surface-1: #242C37;
+      --text-primary: #ffffff;
+      --text-muted: rgba(255,255,255,0.72);
+    }
+    :root[data-theme="light"] {
+      --surface-0: #eef0f4;
+      --surface-1: #ffffff;
+      --text-primary: #111827;
+      --text-muted: #4b5563;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--surface-0);
+      color: var(--text-primary);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .right-col { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .results-container { flex: 1; min-height: 0; overflow: auto; }
+    .oi {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 16px 18px 28px;
+    }
+    .oi-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.15fr) minmax(260px, 0.85fr);
+      gap: 14px;
+    }
+    .oi-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 16px 18px 18px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    :root[data-theme="light"] .oi-card {
+      background: #fff;
+      border-color: rgba(20,24,32,0.1);
+      box-shadow: 0 8px 22px rgba(20,24,32,0.06);
+    }
+    .oi-kicker {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .oi h2 { margin: 0 0 8px; font-size: 18px; font-weight: 650; }
+    .oi p { margin: 0; line-height: 1.45; }
+    .oi-summary { margin: 8px 0 14px; color: var(--text-primary); }
+    .oi-note { margin-top: 8px; color: var(--text-muted); font-size: 13px; }
+    .oi-fieldset {
+      border: 0;
+      margin: 12px 0 0;
+      padding: 0;
+    }
+    .oi-fieldset legend {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .oi-radios { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow: auto; }
+    .oi-radios.inline { flex-direction: row; flex-wrap: wrap; max-height: none; }
+    .oi-radio {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: rgba(255,255,255,0.04);
+      cursor: pointer;
+    }
+    .oi-radio:has(input:checked) {
+      border-color: rgba(255,165,120,0.7);
+      background: rgba(255,165,120,0.14);
+    }
+    .oi-radio input { margin-top: 3px; }
+    .oi-radio span { display: block; }
+    .oi-radio small { display: block; color: var(--text-muted); }
+    .oi-index-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .oi-info { position: relative; }
+    .oi-info summary {
+      list-style: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.28);
+      display: grid;
+      place-items: center;
+      font-family: Georgia, serif;
+      font-style: italic;
+      cursor: pointer;
+      user-select: none;
+    }
+    .oi-info summary::-webkit-details-marker { display: none; }
+    .oi-info p {
+      position: absolute;
+      right: 0;
+      top: 28px;
+      width: 280px;
+      z-index: 3;
+      padding: 12px;
+      border-radius: 12px;
+      background: #121820;
+      border: 1px solid rgba(255,255,255,0.14);
+      color: #fff;
+      font-size: 13px;
+      box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+    }
+    .oi-score {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .oi-score svg { width: 168px; height: 104px; flex: 0 0 auto; }
+    .oi-score strong { font-size: 42px; line-height: 1; display: block; }
+    .oi-band { text-transform: capitalize; color: var(--text-muted); }
+    .oi-meters { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .oi-meter span { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); }
+    .oi-track { height: 7px; border-radius: 99px; background: rgba(255,255,255,0.12); overflow: hidden; margin-top: 4px; }
+    .oi-fill { height: 100%; border-radius: 99px; background: #f0a05a; }
+    .oi-charts { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; }
+    .oi table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    .oi th, .oi td { text-align: right; padding: 7px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .oi th:first-child, .oi td:first-child { text-align: left; }
+    .oi th { color: var(--text-muted); font-weight: 600; }
+    .oi-empty { padding: 28px 8px; color: var(--text-muted); }
+    @media (max-width: 860px) {
+      .oi-grid, .oi-charts { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="sb-nav" id="sidebarNav"></nav>
+  <div class="right-col">
+    <div id="header-container"></div>
+    <div class="results-container" id="results-container">
+      <div id="oi-root" class="oi"></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var root = document.getElementById('oi-root');
+
+      function api() { return window.StatisticoOutlierSensitivity; }
+
+      function esc(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function fmt(value) {
+        if (value == null || !isFinite(value)) return '—';
+        var abs = Math.abs(value);
+        if (abs !== 0 && (abs < 0.001 || abs >= 100000)) return value.toExponential(2);
+        var rounded = Math.round(value * 1000) / 1000;
+        return String(rounded);
+      }
+
+      function signed(value) {
+        if (value == null || !isFinite(value)) return '—';
+        var text = fmt(value);
+        return value > 0 ? '+' + text : text;
+      }
+
+      function keptValues(cases, ids) {
+        var drop = {};
+        (ids || []).forEach(function (id) { drop[id] = true; });
+        return (cases || []).filter(function (row) { return !drop[row.id]; }).map(function (row) { return row.value; });
+      }
+
+      function bandColor(band) {
+        if (band === 'slight') return '#e6c15a';
+        if (band === 'moderate') return '#f0a05a';
+        if (band === 'strong') return '#f07178';
+        return 'rgba(255,255,255,0.45)';
+      }
+
+      function gauge(score, band) {
+        var length = Math.PI * 78;
+        var dash = Math.max(0, Math.min(100, score)) / 100 * length;
+        return '<svg viewBox="0 0 200 118" aria-hidden="true">'
+          + '<path d="M22 100 A78 78 0 0 1 178 100" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="12" stroke-linecap="round"/>'
+          + '<path d="M22 100 A78 78 0 0 1 178 100" fill="none" stroke="' + bandColor(band) + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + dash.toFixed(2) + ' ' + length.toFixed(2) + '"/>'
+          + '</svg>';
+      }
+
+      function meters(impact) {
+        var rows = [
+          ['Location', impact.location, 'Mean shift, scaled by the original standard deviation'],
+          ['Spread', impact.spread, 'Standard-deviation shift, on the same scale'],
+          ['Extremes', impact.extremes, 'Range shift, scaled by the original range']
+        ];
+        return '<div class="oi-meters">' + rows.map(function (row) {
+          return '<div class="oi-meter"><span><b>' + row[0] + '</b><b>' + row[1] + '</b></span>'
+            + '<div class="oi-track"><div class="oi-fill" style="width:' + row[1] + '%;background:' + bandColor(row[1] < 34 ? 'slight' : row[1] < 67 ? 'moderate' : 'strong') + '"></div></div>'
+            + '<small class="oi-note">' + row[2] + '</small></div>';
+        }).join('') + '</div>';
+      }
+
+      function boxRow(label, values, scaleMin, scaleMax, y) {
+        var engine = api();
+        var sorted = values.slice().sort(function (a, b) { return a - b; });
+        if (!sorted.length) return '';
+        var min = sorted[0];
+        var max = sorted[sorted.length - 1];
+        var q1 = engine.quartile(sorted, 0.25);
+        var med = engine.quartile(sorted, 0.5);
+        var q3 = engine.quartile(sorted, 0.75);
+        var span = (scaleMax - scaleMin) || 1;
+        function x(value) { return 86 + ((value - scaleMin) / span) * 210; }
+        var mid = y + 16;
+        return '<g>'
+          + '<text x="4" y="' + (y + 20) + '" fill="currentColor" font-size="12">' + esc(label) + '</text>'
+          + '<line x1="' + x(min) + '" y1="' + mid + '" x2="' + x(max) + '" y2="' + mid + '" stroke="currentColor" stroke-width="1.4"/>'
+          + '<line x1="' + x(min) + '" y1="' + (mid - 8) + '" x2="' + x(min) + '" y2="' + (mid + 8) + '" stroke="currentColor"/>'
+          + '<line x1="' + x(max) + '" y1="' + (mid - 8) + '" x2="' + x(max) + '" y2="' + (mid + 8) + '" stroke="currentColor"/>'
+          + '<rect x="' + x(q1) + '" y="' + (mid - 12) + '" width="' + Math.max(2, x(q3) - x(q1)) + '" height="24" fill="rgba(255,165,120,0.28)" stroke="#ffb088"/>'
+          + '<line x1="' + x(med) + '" y1="' + (mid - 12) + '" x2="' + x(med) + '" y2="' + (mid + 12) + '" stroke="#fff" stroke-width="2"/>'
+          + '</g>';
+      }
+
+      function boxes(allValues, chosenValues, chosenLabel) {
+        var both = allValues.concat(chosenValues);
+        if (!both.length) return '';
+        var scaleMin = Math.min.apply(null, both);
+        var scaleMax = Math.max.apply(null, both);
+        return '<svg viewBox="0 0 320 108" width="100%" height="108" role="img" aria-label="Box comparison of all cases and the chosen exclusion">'
+          + boxRow('All cases', allValues, scaleMin, scaleMax, 4)
+          + boxRow(chosenLabel, chosenValues, scaleMin, scaleMax, 54)
+          + '</svg>';
+      }
+
+      function comparisonTable(rows, inEffect) {
+        var chosen = inEffect ? 'Excluding selected' : 'If excluded';
+        return '<table><thead><tr><th>Metric</th><th>All cases</th><th>' + chosen + '</th><th>Change</th></tr></thead><tbody>'
+          + rows.map(function (row) {
+            var change = row.change == null ? '—' : signed(row.change);
+            return '<tr><td>' + esc(row.metric) + '</td><td>' + fmt(row.baseline) + '</td><td>' + fmt(row.subset) + '</td><td>' + change + '</td></tr>';
+          }).join('')
+          + '</tbody></table>';
+      }
+
+      function radio(name, value, checked, title, detail) {
+        return '<label class="oi-radio"><input type="radio" name="' + name + '" value="' + esc(value) + '"' + (checked ? ' checked' : '') + '>'
+          + '<span>' + esc(title) + (detail ? '<small>' + esc(detail) + '</small>' : '') + '</span></label>';
+      }
+
+      function paint() {
+        var engine = api();
+        if (!engine) {
+          root.innerHTML = '<p class="oi-empty">Outlier impact is still loading.</p>';
+          return;
+        }
+        var session = engine.session();
+        var snap = session.snapshot();
+        if (!snap || snap.unavailable) {
+          root.innerHTML = '<div class="oi-card"><h2>Explore outliers impact</h2><p class="oi-empty">'
+            + esc((snap && snap.reason) || 'Run Univariate on a numeric column, then open this view.') + '</p></div>';
+          return;
+        }
+        var screen = snap.screen || {};
+        if (!screen.ok) {
+          root.innerHTML = '<div class="oi-card"><h2>Outlier detection</h2><p>' + esc(screen.message || 'Outlier screening requires at least 4 observations.') + '</p></div>';
+          return;
+        }
+        var bounds = screen.bounds || {};
+        var flagged = snap.flagged || [];
+        var inEffect = snap.mode === 'subset' && snap.status !== 'failed';
+        var selected = {};
+        (snap.selectedIds || []).forEach(function (id) { selected[id] = true; });
+        var allFlaggedSelected = flagged.length > 0 && flagged.every(function (row) { return selected[row.id]; }) && snap.selectedIds.length === flagged.length;
+        var singleId = snap.selectedIds.length === 1 ? snap.selectedIds[0] : '';
+        var allValues = (snap.cases || []).map(function (row) { return row.value; });
+        var activeIds = inEffect ? snap.selectedIds : (snap.selectedIds.length ? snap.selectedIds : flagged.map(function (row) { return row.id; }));
+        var chosenValues = keptValues(snap.cases, activeIds);
+        var baseline = engine.summarize(allValues);
+        var active = engine.summarize(inEffect ? chosenValues : allValues);
+        var shown = engine.summarize(chosenValues.length ? chosenValues : allValues);
+        var impact = inEffect ? engine.impactIndex(baseline, active) : { score: 0, band: 'none', location: 0, spread: 0, extremes: 0 };
+        var potential = engine.impactIndex(baseline, shown);
+        var input = session.interpretationInput();
+        var reading = (input && input.impact && input.impact.reading)
+          || (impact.score === 0 ? 'No exclusion is in effect, so the index is 0.' : '');
+        var fenceNote = bounds.zeroIqr
+          ? 'IQR is zero; flags identify values outside the middle 50% range. Review repeated values carefully.'
+          : 'Quartiles use the box plot convention: the ordered value at floor(n × p). A case is flagged only when it falls strictly outside the fence.';
+        var summary = snap.baselineN + ' eligible cases. Q1 ' + fmt(bounds.q1) + ', Q3 ' + fmt(bounds.q3)
+          + ', IQR ' + fmt(bounds.iqr) + '. Fences at ' + fmt(bounds.lower) + ' and ' + fmt(bounds.upper)
+          + ' (k = ' + snap.k + '). ' + flagged.length + (flagged.length === 1 ? ' case sits' : ' cases sit') + ' strictly outside.';
+        var effectRadios = radio('oi-effect', 'none', !inEffect, 'Keep all cases', 'Detection stays visible. Nothing is removed from the result.');
+        flagged.forEach(function (row) {
+          var side = row.reason === 'low' ? 'Below the lower fence' : 'Above the upper fence';
+          effectRadios += radio('oi-effect', row.id, inEffect && singleId === row.id, row.label + ' · ' + fmt(row.value), side);
+        });
+        if (flagged.length > 1) {
+          effectRadios += radio('oi-effect', 'all', inEffect && allFlaggedSelected, 'Exclude every flagged case', flagged.length + ' cases');
+        }
+        if (inEffect && !singleId && !allFlaggedSelected) {
+          effectRadios += radio('oi-effect', 'custom', true, 'Current selection', snap.selectedIds.length + ' cases');
+        }
+        var table = session.compare();
+        var rows = table && table.rows ? table.rows.filter(function (row) {
+          return row.metric !== '95% confidence interval for the mean';
+        }) : [];
+        var movers = rows.filter(function (row) { return row.change != null && row.change !== 0; });
+        var displayRows = (movers.length ? movers : rows).slice(0, 5);
+        var potentialLine = !inEffect && potential.score
+          ? 'If the flagged cases were excluded, the index would be ' + potential.score + ' (' + potential.band + '). That comparison is not in effect.'
+          : '';
+        root.innerHTML = ''
+          + '<div class="oi-grid">'
+          + '<section class="oi-card"><div class="oi-kicker">Outlier detection</div><h2>Which cases take effect</h2>'
+          + '<p class="oi-summary">' + esc(summary) + '</p><p class="oi-note">' + esc(fenceNote) + '</p>'
+          + '<fieldset class="oi-fieldset"><legend>Fence</legend><div class="oi-radios inline">'
+          + radio('oi-fence', '1.5', Number(snap.k) === 1.5, 'Standard fence', 'k = 1.5')
+          + radio('oi-fence', '3', Number(snap.k) === 3, 'Far fence', 'k = 3')
+          + '</div></fieldset>'
+          + '<fieldset class="oi-fieldset"><legend>Take effect</legend><div class="oi-radios">' + effectRadios + '</div></fieldset>'
+          + '</section>'
+          + '<section class="oi-card"><div class="oi-index-head"><div><div class="oi-kicker">Outlier Impact Index</div><h2>Strength of the movement</h2></div>'
+          + '<details class="oi-info"><summary aria-label="About the Outlier Impact Index">i</summary>'
+          + '<p>The index runs from 0 to 100, in the same spirit as the Normality Strength Index: one reading of several changes, not a hypothesis test. Location is 40%, spread is 35%, and extremes are 25%. A higher index means the chosen exclusion moves the summaries more. It is not a better result.</p></details></div>'
+          + '<div class="oi-score">' + gauge(impact.score, impact.band) + '<div><strong style="color:' + bandColor(impact.band) + '">' + impact.score + '</strong><div class="oi-band">' + esc(impact.band) + '</div></div></div>'
+          + meters(impact)
+          + '<p class="oi-note">' + esc(reading) + (potentialLine ? ' ' + esc(potentialLine) : '') + '</p>'
+          + '</section></div>'
+          + '<div class="oi-charts">'
+          + '<section class="oi-card"><div class="oi-kicker">Comparison</div><h2>' + (inEffect ? 'What changes' : 'What would change') + '</h2>'
+          + (displayRows.length ? comparisonTable(displayRows, inEffect) : '<p class="oi-note">No numeric comparison is available.</p>')
+          + '<p class="oi-note">Intervals and tests are not adjusted for choosing exclusions after looking at the data.</p></section>'
+          + '<section class="oi-card"><div class="oi-kicker">Shape</div><h2>Center and fences</h2>'
+          + boxes(allValues, chosenValues.length ? chosenValues : allValues, inEffect ? 'Chosen' : 'If excluded')
+          + '<p class="oi-note">Each bar is the box-plot convention: whiskers at the minimum and maximum, the box from Q1 to Q3, and the median as the bright line.</p></section>'
+          + '</div>';
+        if (window.StatisticoHeader && snap.baselineN) {
+          window.StatisticoHeader.updateTitle('Explore outliers impact');
+        }
+      }
+
+      function applyChoice(name, value) {
+        var session = api().session();
+        if (name === 'oi-fence') {
+          session.setK(Number(value));
+        } else if (value === 'none') {
+          session.setMode('all');
+        } else if (value === 'all') {
+          session.selectAll();
+          session.setMode('subset');
+        } else if (value !== 'custom') {
+          session.setSelected([value]);
+          session.setMode('subset');
+        }
+        paint();
+      }
+
+      root.addEventListener('change', function (event) {
+        var input = event.target;
+        if (!input || input.type !== 'radio' || !api()) return;
+        applyChoice(input.name, input.value);
+      });
+
+      window.handleDataReceived = function (payload) {
+        if (api() && payload) api().session().sync(payload);
+        paint();
+      };
+
+      function boot() {
+        if (!window.StatisticoHeader || !api()) {
+          setTimeout(boot, 80);
+          return;
+        }
+        StatisticoHeader.init('outlier-impact', 'Variable', 0, 'univariate');
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle('Explore outliers impact');
+        paint();
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+      else boot();
+    })();
+  </script>
+</body>
+</html>

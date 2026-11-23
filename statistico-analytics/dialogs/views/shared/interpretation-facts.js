@@ -447,7 +447,9 @@
     if (finite(input.min) !== null && finite(input.max) !== null) {
       pushUnique(findings, 'The observed range is ' + formatEstimate(input.min) + ' to ' + formatEstimate(input.max) + '.');
     }
-    pushUnique(findings, outliers.text);
+    var outlierLine = outliers.text;
+    if (input.sensitivity && input.sensitivity.impact && input.outliers && input.outliers.status === 'unavailable') outlierLine = '';
+    if (outlierLine) pushUnique(findings, outlierLine);
 
     if (finite(input.missing) !== null || finite(input.excluded) !== null) {
       support.push('The analyzed n excludes the counts named in the limitations.');
@@ -469,6 +471,11 @@
       if (conclusionParts.length) conclusionParts[0] = 'Sensitivity analysis. ' + conclusionParts[0];
     } else if (input.sensitivity && input.sensitivity.mode === 'all') {
       limitations.push('Flagged cases may be valid observations. Compare results before deciding how to handle them.');
+    }
+    if (input.sensitivity && input.sensitivity.impact && input.sensitivity.impact.reading) {
+      var impact = input.sensitivity.impact;
+      pushUnique(findings, 'Outlier Impact Index is ' + impact.score + ' (' + impact.band + '). ' + impact.reading);
+      pushUnique(limitations, 'The index describes how far the chosen exclusion moves the mean, the sample standard deviation, and the range. A higher index is not a better result.');
     }
 
     var synthesis = [];
@@ -620,6 +627,25 @@
     }
     var groups = sources.groups || groupsFromContext(null);
     var hypothesis = sources.hypothesis || { status: 'unavailable', reason: 'No completed reference-value test is available for this assessment.' };
+    var median = pickNumber(descriptive.median, computed.med, computed.median);
+    var minValue = pickNumber(descriptive.min, computed.min);
+    var maxValue = pickNumber(descriptive.max, computed.max);
+    var sensitivity = sources.sensitivity || null;
+    if (sensitivity && sensitivity.mode === 'subset' && sensitivity.status !== 'failed' && sensitivity.active) {
+      var activeSample = sensitivity.active;
+      n = pickNumber(activeSample.n, n);
+      mean = pickNumber(activeSample.mean, mean);
+      sd = pickNumber(activeSample.sd, sd);
+      median = pickNumber(activeSample.median, median);
+      minValue = pickNumber(activeSample.min, minValue);
+      maxValue = pickNumber(activeSample.max, maxValue);
+      skew = null;
+      kurt = null;
+      q1 = null;
+      q3 = null;
+      iqr = null;
+      confidence = { status: 'unavailable', reason: 'The interval was not recomputed for this sensitivity reading.' };
+    }
     var excludedCount = pickNumber(stored.excludedCount, stored.excluded);
     if (excludedCount === null && stored.rowFilterActive && Array.isArray(stored.sourceRowsAll) && Array.isArray(stored.sourceRows)) {
       var droppedRows = stored.sourceRowsAll.length - stored.sourceRows.length;
@@ -631,12 +657,12 @@
       n: n,
       mean: mean,
       sd: sd,
-      median: pickNumber(descriptive.median, computed.med, computed.median),
+      median: median,
       q1: q1,
       q3: q3,
       iqr: iqr,
-      min: pickNumber(descriptive.min, computed.min),
-      max: pickNumber(descriptive.max, computed.max),
+      min: minValue,
+      max: maxValue,
       skew: skew,
       kurt: kurt,
       missing: pickNumber(stored.missingCount, stored.missing, stored.excludedMissing),
@@ -649,7 +675,7 @@
       hypothesis: hypothesis,
       qqplot: collected.qqplot || null,
       imageInspected: false,
-      sensitivity: sources.sensitivity || null
+      sensitivity: sensitivity
     };
   }
 

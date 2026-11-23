@@ -14,7 +14,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261123oii"></script>
+  <script src="../shared-header.js?v=20261123oii2"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <style>
@@ -95,6 +95,18 @@
       background-color: #818cf8;
       border-color: #818cf8;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M2.2 6.2 4.8 8.8 9.8 3.2'/%3E%3C/svg%3E");
+    }
+    .oi-check-lead {
+      margin-top: 12px;
+      padding: 14px 14px 13px;
+      border: 1px solid rgba(129,140,248,0.7);
+      background: rgba(129,140,248,0.16);
+    }
+    .oi-check-lead span { font-size: 16px; font-weight: 700; }
+    .oi-check-lead:has(input:checked) {
+      border-color: #818cf8;
+      background: rgba(129,140,248,0.28);
+      box-shadow: 0 0 0 1px rgba(129,140,248,0.45);
     }
     .oi-check input { margin-top: 3px; }
     .oi-check small { display: block; color: var(--text-muted); }
@@ -465,8 +477,8 @@
           + '</tbody></table><p class="oi-formula">Change = retained − all cases.</p>';
       }
 
-      function checkRow(checked, title, detail, attrs) {
-        return '<label class="oi-check"><input type="checkbox" ' + attrs + (checked ? ' checked' : '') + '>'
+      function checkRow(checked, title, detail, attrs, extraClass) {
+        return '<label class="oi-check' + (extraClass ? ' ' + extraClass : '') + '"><input type="checkbox" ' + attrs + (checked ? ' checked' : '') + '>'
           + '<span>' + esc(title) + (detail ? '<small>' + esc(detail) + '</small>' : '') + '</span></label>';
       }
 
@@ -491,50 +503,60 @@
         }
         var flagged = snap.flagged || [];
         var key = sampleKey(snap);
-        var chosenId = readChoice(key, rule);
-        var chosen = flagged.filter(function (row) { return row.id === chosenId; })[0] || null;
-        if (chosenId && !chosen) writeChoice(key, rule, '');
-        var inEffect = !!chosen;
+        var stored = readChoice(key, rule);
+        var chosen = stored && stored !== 'none' && stored !== 'flagged'
+          ? (flagged.filter(function (row) { return row.id === stored; })[0] || null)
+          : null;
+        if (stored && stored !== 'none' && stored !== 'flagged' && !chosen) writeChoice(key, rule, 'flagged');
+        var mode = !flagged.length || stored === 'none' ? 'none' : (chosen ? 'one' : 'flagged');
+        var excluded = mode === 'one' ? [chosen] : (mode === 'flagged' ? flagged : []);
         var allValues = (snap.cases || []).map(function (row) { return row.value; });
-        var kept = inEffect ? keptValues(snap.cases, [chosen.id]) : allValues;
+        var kept = excluded.length ? keptValues(snap.cases, excluded.map(function (row) { return row.id; })) : allValues;
         var baseline = engine.summarize(allValues);
         var active = engine.summarize(kept);
         var impact = engine.impactIndex(baseline, active);
         var countLine = flagged.length
           ? flagged.length + ' case' + (flagged.length === 1 ? '' : 's') + ' flagged among ' + snap.baselineN + ' eligible cases.'
           : 'No cases flagged among ' + snap.baselineN + ' eligible cases.';
-        var afterLabel = inEffect ? ('Excluding ' + rowPhrase(chosen.label)) : 'All cases included';
-        var checks = checkRow(!inEffect, 'All cases included', 'Nothing is left out of the comparison.', 'data-all="1"');
+        var excludeLabel = mode === 'one'
+          ? rowPhrase(chosen.label)
+          : (flagged.length === 1 ? rowPhrase(flagged[0].label) : (flagged.length + ' flagged cases'));
+        var afterLabel = mode === 'none' ? 'All cases included' : (mode === 'flagged' ? 'All outliers removed' : ('Excluding ' + excludeLabel));
+        var lead = flagged.length
+          ? checkRow(mode === 'flagged', 'All outliers removed', 'Every flagged case is left out. This is the starting comparison.', 'data-all-flagged="1"', 'oi-check-lead')
+          : '';
+        var checks = checkRow(mode === 'none', 'All cases included', 'Nothing is left out of the comparison.', 'data-all="1"');
         flagged.forEach(function (row) {
-          checks += checkRow(inEffect && chosen.id === row.id, 'Exclude ' + rowPhrase(row.label) + ' · Value: ' + fmt(row.value), sideText(rule, row.reason), 'data-case="' + esc(row.id) + '"');
+          checks += checkRow(mode === 'one' && chosen.id === row.id, 'Exclude ' + rowPhrase(row.label) + ' · Value: ' + fmt(row.value), sideText(rule, row.reason), 'data-case="' + esc(row.id) + '"');
         });
         if (!flagged.length) checks += '<p class="oi-note">This method does not flag any eligible case.</p>';
         var methods = METHODS.map(function (method) {
           return '<button type="button" class="oi-method' + (method.id === rule ? ' is-on' : '') + '" data-rule="' + method.id + '" aria-pressed="' + (method.id === rule ? 'true' : 'false') + '"><b>' + method.name + '</b><small>' + method.rule + '</small></button>';
         }).join('');
-        var marks = (inEffect ? [chosen] : []).map(function (row) { return { value: row.value, strong: true }; });
+        var marks = excluded.map(function (row) { return { value: row.value, strong: true }; });
         var gap = coverageSentence(snap.coverage);
-        var chartLabel = inEffect ? afterLabel : 'All cases';
+        var chartLabel = mode === 'none' ? 'All cases' : afterLabel;
         root.innerHTML = ''
           + '<header class="oi-head"><div><div class="oi-kicker">Detection</div><h2>Explore outlier impact</h2>'
           + '<p class="oi-note">These methods only decide which cases can be checked. The index below is a separate description of what changes.</p></div>'
           + '<div class="oi-methods" role="group" aria-label="Detection method">' + methods + '</div>'
           + '<p class="oi-summary">' + esc(ruleLine(rule, screen)) + '</p></header>'
           + '<div class="oi-split">'
-          + '<section class="oi-card oi-zone"><div class="oi-kicker">1 · Cases</div><h2>Choose a case to exclude</h2>'
+          + '<section class="oi-card oi-zone"><div class="oi-kicker">1 · Cases</div><h2>Choose what to leave out</h2>'
           + '<p class="oi-summary">' + esc(countLine) + '</p>'
           + (gap ? '<p class="oi-note">' + esc(gap) + '</p>' : '')
+          + lead
           + '<div class="oi-checks">' + checks + '</div>'
-          + '<p class="oi-note">Check one case. This is not a multiple selection. Temporary comparison within this view. Original data remain unchanged.</p></section>'
+          + '<p class="oi-note">All outliers removed is the starting comparison. Check one case to look at that case alone. Temporary comparison within this view. Original data remain unchanged.</p></section>'
           + '<section class="oi-card oi-zone"><div class="oi-kicker">2 · Statistics</div><h2>Before and after exclusion</h2>'
           + comparisonTable(metricRows(baseline, active), afterLabel)
           + '</section></div>'
           + '<section class="oi-card oi-zone"><div class="oi-kicker">3 · Outlier Impact Index</div><h2>Outlier Impact Index</h2>'
           + '<p class="oi-note">Change in descriptive statistics. Summarizes changes in mean, median, standard deviation and range when the selected case is excluded. Larger values indicate greater sensitivity.</p>'
           + '<div class="oi-oii-body">' + gauge(impact) + componentRows(impact) + '</div>'
-          + '<p class="oi-read">' + esc(impactSentence(inEffect, inEffect ? rowPhrase(chosen.label) : '', baseline, active, impact)) + '</p>'
-          + boxes(allValues, inEffect ? kept : null, chartLabel, marks)
-          + '<p class="oi-note">All cases on the first row' + (inEffect ? ', and the retained sample underneath' : '') + '. Box: middle 50% · Line: median · Whiskers: minimum to maximum.</p>'
+          + '<p class="oi-read">' + esc(impactSentence(mode !== 'none', excludeLabel, baseline, active, impact)) + '</p>'
+          + boxes(allValues, mode === 'none' ? null : kept, chartLabel, marks)
+          + '<p class="oi-note">All cases on the first row' + (mode === 'none' ? '' : ', and the retained sample underneath') + '. Box: middle 50% · Line: median · Whiskers: minimum to maximum.</p>'
           + '</section>';
         if (window.StatisticoHeader && snap.baselineN) {
           window.StatisticoHeader.updateTitle('Explore outlier impact');
@@ -562,8 +584,9 @@
         if (!snap) return;
         var key = sampleKey(snap);
         var rule = snap.rule || 'iqr15';
-        if (input.hasAttribute('data-all')) writeChoice(key, rule, '');
-        else if (input.hasAttribute('data-case')) writeChoice(key, rule, input.checked ? input.getAttribute('data-case') : '');
+        if (input.hasAttribute('data-all-flagged')) writeChoice(key, rule, input.checked ? 'flagged' : 'none');
+        else if (input.hasAttribute('data-all')) writeChoice(key, rule, input.checked ? 'none' : 'flagged');
+        else if (input.hasAttribute('data-case')) writeChoice(key, rule, input.checked ? input.getAttribute('data-case') : 'flagged');
         session.setMode('all');
         paint();
       });

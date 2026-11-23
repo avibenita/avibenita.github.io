@@ -21,7 +21,7 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
   if (typeof document === 'undefined' || document.readyState !== 'loading') return;
   var script = document.currentScript;
   if (!script || !script.src || typeof document.write !== 'function') return;
-  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123os6');
+  var src = script.src.replace(/shared-header\.js(?:\?[^#]*)?/, 'shared/uni-outlier-sensitivity.js?v=20261123os14');
   if (src === script.src) return;
   document.write('<script src="' + src.replace(/"/g, '%22') + '"><\/script>');
 })();

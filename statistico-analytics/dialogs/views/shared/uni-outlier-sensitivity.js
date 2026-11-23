@@ -991,8 +991,20 @@
       header.__uniSensActions = true;
     }
 
-    function place(strip) {
+    function place(strip, chip) {
       var doc = rootObject.document;
+      if (!chip) chip = doc.getElementById('uniOsHeader');
+      if (chip) {
+        var row = doc.querySelector('.statistico-header .view-switcher-row');
+        var headerRight = doc.querySelector('.statistico-header .header-right');
+        var headerBar = doc.querySelector('.statistico-header');
+        var host = row || headerRight || headerBar;
+        if (host && chip.parentNode !== host) {
+          if (host === headerRight) host.insertBefore(chip, host.firstChild);
+          else host.appendChild(chip);
+        }
+      }
+      if (!strip) return;
       var results = doc.getElementById('results-container') || doc.querySelector('.results-container');
       if (results) {
         if (strip.parentNode !== results) results.insertBefore(strip, results.firstChild);
@@ -1004,55 +1016,70 @@
 
     function render(header) {
       if (!rootObject.document) return;
-      var strip = rootObject.document.getElementById('uniOutlierSensitivity');
-      if (!strip) return;
+      ensureDom(header);
+      var doc = rootObject.document;
+      var strip = doc.getElementById('uniOutlierSensitivity');
+      var chip = doc.getElementById('uniOsHeader');
+      if (!strip && !chip) return;
       var snap = session.snapshot();
-      var count = strip.querySelector('[data-role="count"]');
-      var banner = strip.querySelector('[data-role="banner"]');
-      var allBtn = strip.querySelector('[data-role="all"]');
-      var subsetBtn = strip.querySelector('[data-role="subset"]');
-      var compareBtn = strip.querySelector('[data-role="compare"]');
-      var reviewBtn = strip.querySelector('[data-role="review"]');
-      var settingsBtn = strip.querySelector('[data-role="settings"]');
+      if (pageContext(header).grouped) {
+        snap = { unavailable: true, reason: 'Outlier sensitivity is not available for grouped or weighted analyses yet.', mode: 'all' };
+      }
+      var toggle = chip && chip.querySelector('[data-role="exclude-toggle"]');
+      var nActive = chip && chip.querySelector('[data-role="n-active"]');
+      var nBase = chip && chip.querySelector('[data-role="n-base"]');
+      var infoText = chip && chip.querySelector('[data-role="info-text"]');
+      var compareBtn = chip && chip.querySelector('[data-role="compare"]');
+      var reviewBtn = chip && chip.querySelector('[data-role="review"]');
+      var settingsBtn = chip && chip.querySelector('[data-role="settings"]');
+      var excluding = snap.mode === 'subset' && snap.status !== 'failed';
+      if (doc.documentElement) doc.documentElement.classList.toggle('uni-os-on', excluding);
+      if (chip) chip.classList.toggle('is-on', excluding);
       if (snap.unavailable) {
-        if (count) count.textContent = snap.reason || 'Outlier sensitivity is unavailable.';
-        if (allBtn) allBtn.disabled = true;
-        if (subsetBtn) subsetBtn.disabled = true;
+        if (toggle) {
+          toggle.checked = false;
+          toggle.disabled = true;
+        }
+        if (nActive) nActive.textContent = '—';
+        if (nBase) nBase.textContent = '—';
+        if (infoText) infoText.textContent = snap.reason || 'Outlier sensitivity is unavailable.';
         if (compareBtn) compareBtn.disabled = true;
         if (reviewBtn) reviewBtn.disabled = true;
-        if (banner) banner.hidden = true;
+        if (settingsBtn) settingsBtn.disabled = true;
+        if (strip) strip.hidden = true;
         return;
       }
       var flaggedN = (snap.flagged || []).length;
       var selectedN = (snap.selectedIds || []).length;
-      if (count) count.textContent = flaggedN + ' flagged / ' + snap.baselineN + ' cases';
-      if (allBtn) {
-        allBtn.disabled = false;
-        allBtn.setAttribute('aria-pressed', snap.mode === 'all' ? 'true' : 'false');
+      var subset = excluding ? session.summary('subset') : null;
+      var activeN = subset && subset.n != null ? subset.n : snap.baselineN;
+      if (toggle) {
+        toggle.checked = excluding;
+        toggle.disabled = !snap.screen || !snap.screen.ok || selectedN === 0;
       }
-      if (subsetBtn) {
-        subsetBtn.disabled = !snap.screen || !snap.screen.ok || selectedN === 0;
-        subsetBtn.textContent = 'Excluding selected (' + selectedN + ')';
-        subsetBtn.setAttribute('aria-pressed', snap.mode === 'subset' ? 'true' : 'false');
-      }
+      if (nActive) nActive.textContent = activeN == null ? '—' : String(activeN);
+      if (nBase) nBase.textContent = snap.baselineN == null ? '—' : String(snap.baselineN);
       if (compareBtn) compareBtn.disabled = selectedN === 0 || !snap.screen || !snap.screen.ok;
       if (reviewBtn) reviewBtn.disabled = !snap.screen || !snap.screen.ok;
       if (settingsBtn) settingsBtn.disabled = false;
-      if (banner) {
+      if (infoText) {
         if (snap.status === 'failed') {
-          banner.hidden = false;
-          banner.textContent = (snap.error || 'The subset could not be calculated.') + ' Showing all cases. Retry the subset or continue with all cases.';
-        } else if (snap.mode === 'subset') {
-          var subset = session.summary('subset');
-          banner.hidden = false;
-          banner.textContent = 'Sensitivity analysis · ' + selectedN + ' excluded · n = ' + (subset ? subset.n : '—') + ' of ' + snap.baselineN + '.';
+          infoText.textContent = (snap.error || 'The subset could not be calculated.') + ' Showing all cases.';
+        } else if (!snap.screen || !snap.screen.ok) {
+          infoText.textContent = (snap.screen && snap.screen.message) || 'Outlier screening requires at least 4 observations.';
+        } else if (excluding) {
+          infoText.textContent = 'Sensitivity analysis. ' + selectedN + ' excluded. n = ' + (subset ? subset.n : '—') + ' of ' + snap.baselineN + '. Flagged cases may be valid observations. Intervals and tests describe this subset and do not adjust for selecting exclusions after inspecting the data.';
         } else {
-          banner.hidden = true;
+          infoText.textContent = flaggedN + ' flagged, ' + selectedN + ' selected. Flagged cases may be valid observations. Compare results before deciding how to handle them.';
         }
       }
-      renderReview(strip, snap);
-      renderSettings(strip, snap);
-      renderCompare(strip);
+      var openPanel = strip && strip.querySelector('.uni-os-panel:not([hidden])');
+      if (strip) strip.hidden = !openPanel;
+      if (strip) {
+        renderReview(strip, snap);
+        renderSettings(strip, snap);
+        renderCompare(strip);
+      }
       if (header && typeof header.syncCaseSelection === 'function' && snap.highlightId) {
         header._caseTrace = caseTrace();
         try { header.syncCaseSelection(); } catch (_e) {}
@@ -1145,44 +1172,181 @@
       }).join('');
     }
 
+    function controlClick(header, event) {
+      var target = event.target && event.target.closest ? event.target.closest('[data-role]') : null;
+      if (!target) return;
+      var role = target.getAttribute('data-role');
+      if (!role || role === 'exclude-toggle') return;
+      var doc = rootObject.document;
+      var strip = doc.getElementById('uniOutlierSensitivity');
+      var chip = doc.getElementById('uniOsHeader');
+      if (role === 'info') {
+        var pop = chip && chip.querySelector('[data-role="info-pop"]');
+        if (pop) {
+          pop.hidden = !pop.hidden;
+          target.setAttribute('aria-expanded', pop.hidden ? 'false' : 'true');
+        }
+        return;
+      }
+      if (role === 'review' || role === 'settings' || role === 'compare') {
+        var panel = strip && strip.querySelector('[data-role="' + (role === 'review' ? 'review-panel' : role === 'settings' ? 'settings-panel' : 'compare-panel') + '"]');
+        if (panel) panel.hidden = !panel.hidden;
+        var popClose = chip && chip.querySelector('[data-role="info-pop"]');
+        if (popClose) popClose.hidden = true;
+        render(header);
+      } else if (role === 'reset') {
+        session.reset();
+        session.setMode('all');
+        applySample(header);
+      } else if (role === 'retry') {
+        session.debugFailSubset(false);
+        var again = session.setMode('subset');
+        if (again.ok) applySample(header);
+        else render(header);
+      } else if (role === 'select-all') {
+        session.selectAll();
+        if (session.snapshot().mode === 'subset') applySample(header);
+        else render(header);
+      } else if (role === 'clear') {
+        session.clearSelection();
+        applySample(header);
+      } else if (role === 'sort-source' || role === 'sort-value') {
+        var review = strip && strip.querySelector('[data-role="review-panel"]');
+        if (review) review.setAttribute('data-sort', role === 'sort-value' ? 'value' : 'source');
+        render(header);
+      } else if (role === 'focus') {
+        session.highlight(target.getAttribute('data-id'));
+        var traceHeader = header || rootObject.StatisticoHeader;
+        if (traceHeader) {
+          traceHeader._caseTrace = caseTrace();
+          if (typeof traceHeader.syncCaseSelection === 'function') traceHeader.syncCaseSelection();
+        }
+        try {
+          doc.dispatchEvent(new rootObject.CustomEvent('uni-outlier-highlight', { detail: { id: target.getAttribute('data-id') } }));
+        } catch (_e) {}
+      }
+    }
+
+    function onExcludeToggle(header, event) {
+      var input = event.target;
+      if (!input || !input.getAttribute || input.getAttribute('data-role') !== 'exclude-toggle') return;
+      if (input.checked) {
+        var chosen = session.setMode('subset');
+        if (chosen.ok) applySample(header);
+        else render(header);
+      } else {
+        session.setMode('all');
+        applySample(header);
+      }
+    }
+
     function ensureDom(header) {
       var doc = rootObject.document;
-      if (!doc || doc.getElementById('uniOutlierSensitivity')) return doc.getElementById('uniOutlierSensitivity');
+      if (!doc) return null;
       if (!doc.getElementById('uniOutlierSensitivityStyle')) {
         var style = doc.createElement('style');
         style.id = 'uniOutlierSensitivityStyle';
         style.textContent = [
-          '#uniOutlierSensitivity{box-sizing:border-box;max-width:100%;margin:0 0 12px;padding:8px 10px;border:1px solid rgba(255,165,120,.45);border-radius:10px;display:flex;flex-direction:column;gap:8px;font:inherit;color:inherit}',
+          '#uniOsHeader{position:relative;box-sizing:border-box;display:inline-flex;align-items:center;gap:8px;max-width:100%;margin:0 0 0 auto;padding:4px 6px 4px 8px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.04));box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 8px 18px rgba(0,0,0,.22);color:inherit;z-index:30}',
+          '#uniOsHeader.is-on{border-color:rgba(255,150,140,.72);background:linear-gradient(180deg,rgba(176,48,48,.72),rgba(110,24,32,.82));box-shadow:inset 0 1px 0 rgba(255,210,200,.28),0 8px 18px rgba(80,10,16,.35)}',
+          '#uniOsHeader *{box-sizing:border-box}',
+          '#uniOsHeader .uni-os-switch{position:relative;display:inline-flex;width:36px;height:20px;flex:0 0 auto}',
+          '#uniOsHeader .uni-os-switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}',
+          '#uniOsHeader .uni-os-switch input:disabled{cursor:not-allowed}',
+          '#uniOsHeader .uni-os-track{position:absolute;inset:0;border-radius:999px;background:rgba(255,255,255,.18);box-shadow:inset 0 1px 2px rgba(0,0,0,.35);transition:background .18s ease}',
+          '#uniOsHeader .uni-os-track:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .18s ease}',
+          '#uniOsHeader .uni-os-switch input:checked + .uni-os-track{background:linear-gradient(180deg,#ffb1a6,#e25b4a)}',
+          '#uniOsHeader .uni-os-switch input:checked + .uni-os-track:before{transform:translateX(16px)}',
+          '#uniOsHeader .uni-os-switch input:focus-visible + .uni-os-track{outline:2px solid #fff;outline-offset:2px}',
+          '#uniOsHeader .uni-os-ns{display:inline-flex;align-items:baseline;gap:8px;min-width:0;font-size:12px;line-height:1;font-variant-numeric:tabular-nums}',
+          '#uniOsHeader .uni-os-n{display:inline-flex;align-items:baseline;gap:3px;white-space:nowrap}',
+          '#uniOsHeader .uni-os-n abbr{font-size:10px;font-weight:700;letter-spacing:.04em;text-decoration:none;opacity:.72}',
+          '#uniOsHeader .uni-os-n b{font-size:13px;font-weight:700}',
+          '#uniOsHeader .uni-os-info{width:20px;height:20px;flex:0 0 auto;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);color:inherit;font:italic 700 12px/18px Georgia,"Times New Roman",serif;cursor:pointer}',
+          '#uniOsHeader .uni-os-info[aria-expanded="true"]{background:rgba(255,255,255,.2)}',
+          '#uniOsHeader .uni-os-pop{position:absolute;top:calc(100% + 8px);right:0;width:min(320px,calc(100vw - 24px));padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:#1a222c;color:#e8eef6;box-shadow:0 16px 36px rgba(0,0,0,.4);text-align:left}',
+          '#uniOsHeader .uni-os-pop p{margin:0 0 8px;font-size:12px;line-height:1.4}',
+          '#uniOsHeader .uni-os-links{display:flex;flex-wrap:wrap;gap:6px}',
+          '#uniOsHeader .uni-os-links button{font:inherit;font-size:12px;color:inherit;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:4px 8px;cursor:pointer}',
+          '#uniOsHeader .uni-os-links button:disabled{opacity:.45;cursor:not-allowed}',
+          '.view-switcher{position:relative}',
+          '.view-switcher-row > #uniOsHeader{position:absolute;top:50%;right:8px;margin:0;transform:translateY(-50%);z-index:40}',
+          'html[data-tabs="contained"] .statistico-header .view-switcher-row > .view-switcher-bar.ws-mode-bar--connected.ws-mode-bar--attached,html[data-tabs="contained"] .statistico-header .view-switcher-row > .ws-mode-bar.ws-mode-bar--connected{width:calc(100% - 188px) !important;max-width:calc(100% - 188px) !important}',
+          'html[data-tabs="contained"] .statistico-header .view-switcher-bar .ws-tab-scroll-wrap,html[data-tabs="contained"] .statistico-header .view-switcher-bar .ws-tab-scroll{max-width:100% !important;overflow:hidden !important}',
+          'html[data-tabs="contained"] .statistico-header .view-switcher-bar.ws-mode-bar--connected .ws-tab-cluster{width:100% !important;max-width:100% !important}',
+          'html[data-tabs="contained"] .statistico-header .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab{flex:1 1 0 !important;min-width:0 !important;width:auto !important;padding-left:8px !important;padding-right:8px !important}',
+          'html[data-tabs="contained"] .statistico-header .ws-tab-scroll-btn{display:none !important}',
+          '#uniOutlierSensitivity{box-sizing:border-box;max-width:100%;margin:0 0 12px;padding:8px 10px;border:1px solid rgba(255,165,120,.45);border-radius:10px;display:flex;flex-direction:column;gap:8px;font:inherit;color:inherit;background:rgba(20,16,18,.35)}',
+          '#uniOutlierSensitivity[hidden]{display:none}',
           '#uniOutlierSensitivity *{box-sizing:border-box}',
-          '#uniOutlierSensitivity .uni-os-row,#uniOutlierSensitivity .uni-os-modes,#uniOutlierSensitivity .uni-os-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:100%}',
-          '#uniOutlierSensitivity button, #uniOutlierSensitivity label{font:inherit;color:inherit}',
-          '#uniOutlierSensitivity .uni-os-modes button[aria-pressed="true"]{outline:2px solid rgb(255,165,120);font-weight:700}',
+          '#uniOutlierSensitivity .uni-os-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
+          '#uniOutlierSensitivity button,#uniOutlierSensitivity label{font:inherit;color:inherit}',
           '#uniOutlierSensitivity .uni-os-panel{max-width:100%;overflow:auto}',
           '#uniOutlierSensitivity table{width:100%;border-collapse:collapse;font-size:.92em}',
           '#uniOutlierSensitivity th,#uniOutlierSensitivity td{text-align:left;padding:4px 6px;vertical-align:top;white-space:normal}',
-          '#uniOutlierSensitivity .uni-os-banner{margin:0}',
-          'html[data-theme="light"] #uniOutlierSensitivity{background:rgba(255,255,255,.72)}'
+          'html.uni-os-on .right-col,html.uni-os-on .results-container,html.uni-os-on #results-container,html.uni-os-on .view-wrap,html.uni-os-on .content-area,html.uni-os-on .main-content{background-color:#3a1c20 !important}',
+          'html.uni-os-on #results-container .panel,html.uni-os-on #results-container .card,html.uni-os-on #results-container .stat-panel,html.uni-os-on .results-container .panel,html.uni-os-on .results-container .card{background-color:#32181c !important;border-color:rgba(255,160,150,.28) !important}',
+          'html.uni-os-on .statistico-header,html.uni-os-on .statistico-shell,html.uni-os-on .view-switcher-host,html.uni-os-on .uni-results-tab-stack{background-color:var(--surface-0,#0E141B) !important}',
+          'html[data-theme="light"] #uniOsHeader{background:linear-gradient(180deg,#fff,#f4f6f8);border-color:rgba(20,24,32,.12);color:#1c2430;box-shadow:inset 0 1px 0 #fff,0 6px 14px rgba(20,24,32,.08)}',
+          'html[data-theme="light"] #uniOsHeader.is-on{background:linear-gradient(180deg,#fde8e4,#f6cfc9);border-color:rgba(176,48,48,.45);color:#3a1418}',
+          'html[data-theme="light"] #uniOsHeader .uni-os-track{background:rgba(20,24,32,.16)}',
+          'html[data-theme="light"] #uniOsHeader .uni-os-info{border-color:rgba(20,24,32,.2);background:rgba(20,24,32,.04)}',
+          'html[data-theme="light"] #uniOsHeader .uni-os-pop{background:#fff;color:#1c2430;border-color:rgba(20,24,32,.12)}',
+          'html[data-theme="light"] #uniOsHeader .uni-os-links button{background:rgba(20,24,32,.04);border-color:rgba(20,24,32,.12)}',
+          'html[data-theme="light"].uni-os-on .right-col,html[data-theme="light"].uni-os-on .results-container,html[data-theme="light"].uni-os-on #results-container{background-color:#f8e6e4 !important}',
+          'html[data-theme="light"].uni-os-on #results-container .panel,html[data-theme="light"].uni-os-on #results-container .card,html[data-theme="light"].uni-os-on .results-container .panel{background-color:#fbf1ef !important;border-color:rgba(176,48,48,.28) !important}',
+          'html[data-theme="light"].uni-os-on .statistico-header,html[data-theme="light"].uni-os-on .statistico-shell,html[data-theme="light"].uni-os-on .view-switcher-host{background-color:var(--surface-0,#fff) !important}'
         ].join('');
         doc.head.appendChild(style);
       }
-      var strip = doc.createElement('section');
+      var chip = doc.getElementById('uniOsHeader');
+      if (!chip) {
+        chip = doc.createElement('div');
+        chip.id = 'uniOsHeader';
+        chip.className = 'uni-os-chip';
+        chip.setAttribute('role', 'group');
+        chip.setAttribute('aria-label', 'Outlier sensitivity');
+        chip.innerHTML = [
+          '<label class="uni-os-switch">',
+          '<input type="checkbox" data-role="exclude-toggle" aria-label="Exclude selected outliers">',
+          '<span class="uni-os-track" aria-hidden="true"></span>',
+          '</label>',
+          '<span class="uni-os-ns">',
+          '<span class="uni-os-n" title="Cases in the current result"><abbr>n</abbr> <b data-role="n-active">—</b></span>',
+          '<span class="uni-os-n" title="Eligible cases"><abbr>N</abbr> <b data-role="n-base">—</b></span>',
+          '</span>',
+          '<button type="button" class="uni-os-info" data-role="info" aria-expanded="false" aria-label="Outlier sensitivity details">i</button>',
+          '<div class="uni-os-pop" data-role="info-pop" hidden>',
+          '<p data-role="info-text"></p>',
+          '<div class="uni-os-links">',
+          '<button type="button" data-role="review">Review cases</button>',
+          '<button type="button" data-role="settings">Settings</button>',
+          '<button type="button" data-role="compare">Compare</button>',
+          '<button type="button" data-role="reset">Reset</button>',
+          '</div></div>'
+        ].join('');
+        chip.addEventListener('click', function (event) { controlClick(header, event); });
+        chip.addEventListener('change', function (event) { onExcludeToggle(header, event); });
+      }
+      if (!doc.documentElement.__uniOsOutside) {
+        doc.documentElement.__uniOsOutside = true;
+        doc.addEventListener('click', function (event) {
+          var liveChip = doc.getElementById('uniOsHeader');
+          var pop = liveChip && liveChip.querySelector('[data-role="info-pop"]');
+          if (!pop || pop.hidden) return;
+          if (liveChip.contains(event.target)) return;
+          pop.hidden = true;
+          var info = liveChip.querySelector('[data-role="info"]');
+          if (info) info.setAttribute('aria-expanded', 'false');
+        });
+      }
+      var strip = doc.getElementById('uniOutlierSensitivity');
+      if (!strip) {
+      strip = doc.createElement('section');
       strip.id = 'uniOutlierSensitivity';
+      strip.hidden = true;
       strip.setAttribute('aria-label', 'Outliers and sensitivity');
       strip.innerHTML = [
-        '<div class="uni-os-row">',
-        '<strong>Outliers &amp; Sensitivity · <span data-role="count">0 flagged / 0 cases</span></strong>',
-        '<div class="uni-os-modes" role="group" aria-label="Analyzed sample">',
-        '<button type="button" data-role="all" aria-pressed="true">All cases</button>',
-        '<button type="button" data-role="subset" aria-pressed="false">Excluding selected (0)</button>',
-        '</div>',
-        '<div class="uni-os-links">',
-        '<button type="button" data-role="review">Review cases</button>',
-        '<button type="button" data-role="settings">Settings</button>',
-        '<button type="button" data-role="compare">Compare results</button>',
-        '<button type="button" data-role="reset">Reset</button>',
-        '<button type="button" data-role="retry" hidden>Retry subset</button>',
-        '</div></div>',
-        '<p class="uni-os-banner" data-role="banner" hidden></p>',
         '<div class="uni-os-panel" data-role="review-panel" hidden>',
         '<p>Flagged cases may be valid observations. Compare results before deciding how to handle them. Baseline screening flags stay fixed. Points that look unusual only after a case is removed are active-sample box plot marks, and they are not added to the selection.</p>',
         '<button type="button" data-role="select-all">Select all flagged</button>',
@@ -1205,54 +1369,7 @@
         '<table><thead><tr><th>Metric</th><th>All cases</th><th>Excluding selected</th><th>Change</th></tr></thead><tbody data-role="compare-body"></tbody></table>',
         '</div>'
       ].join('');
-      strip.addEventListener('click', function (event) {
-        var target = event.target;
-        if (!target || !target.getAttribute) return;
-        var role = target.getAttribute('data-role');
-        if (!role) return;
-        if (role === 'all') {
-          session.setMode('all');
-          applySample(header);
-        } else if (role === 'subset') {
-          var chosen = session.setMode('subset');
-          if (chosen.ok) applySample(header);
-          else render(header);
-        } else if (role === 'review' || role === 'settings' || role === 'compare') {
-          var panel = strip.querySelector('[data-role="' + (role === 'review' ? 'review-panel' : role === 'settings' ? 'settings-panel' : 'compare-panel') + '"]');
-          if (panel) panel.hidden = !panel.hidden;
-          render(header);
-        } else if (role === 'reset') {
-          session.reset();
-          session.setMode('all');
-          applySample(header);
-        } else if (role === 'retry') {
-          session.debugFailSubset(false);
-          var again = session.setMode('subset');
-          if (again.ok) applySample(header);
-          else render(header);
-        } else if (role === 'select-all') {
-          session.selectAll();
-          if (session.snapshot().mode === 'subset') applySample(header);
-          else render(header);
-        } else if (role === 'clear') {
-          session.clearSelection();
-          applySample(header);
-        } else if (role === 'sort-source' || role === 'sort-value') {
-          var review = strip.querySelector('[data-role="review-panel"]');
-          if (review) review.setAttribute('data-sort', role === 'sort-value' ? 'value' : 'source');
-          render(header);
-        } else if (role === 'focus') {
-          session.highlight(target.getAttribute('data-id'));
-          var traceHeader = header || rootObject.StatisticoHeader;
-          if (traceHeader) {
-            traceHeader._caseTrace = caseTrace();
-            if (typeof traceHeader.syncCaseSelection === 'function') traceHeader.syncCaseSelection();
-          }
-          try {
-            rootObject.document.dispatchEvent(new rootObject.CustomEvent('uni-outlier-highlight', { detail: { id: target.getAttribute('data-id') } }));
-          } catch (_e) {}
-        }
-      });
+      strip.addEventListener('click', function (event) { controlClick(header, event); });
       strip.addEventListener('change', function (event) {
         var target = event.target;
         if (target && target.getAttribute && target.getAttribute('data-role') === 'pick') {
@@ -1271,7 +1388,8 @@
           applySample(header);
         }
       });
-      place(strip);
+      }
+      place(strip, chip);
       return strip;
     }
 
@@ -1282,19 +1400,7 @@
       if (!rootObject.document) return;
       if (pageContext(header).grouped) {
         ensureDom(header);
-        var groupedStrip = rootObject.document.getElementById('uniOutlierSensitivity');
-        var groupedCount = groupedStrip && groupedStrip.querySelector('[data-role="count"]');
-        if (groupedCount) groupedCount.textContent = 'Outlier sensitivity is not available for grouped or weighted analyses yet.';
         render(header);
-        var live = session.snapshot();
-        if (groupedStrip && live && !live.unavailable) {
-          var count = groupedStrip.querySelector('[data-role="count"]');
-          if (count) count.textContent = 'Outlier sensitivity is not available for grouped or weighted analyses yet.';
-          ['all', 'subset', 'compare', 'review', 'settings', 'reset'].forEach(function (role) {
-            var button = groupedStrip.querySelector('[data-role="' + role + '"]');
-            if (button) button.disabled = true;
-          });
-        }
         return;
       }
       installStorage();

@@ -44,7 +44,7 @@
   <!-- build: 20260519u -->
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261123os20"></script>
+  <script src="../shared-header.js?v=20261123oi1"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1336,6 +1336,10 @@
               <input type="checkbox" id="showMedianLine" onchange="createHistogram()">
               Median
             </label>
+            <label class="overlay-toggle" for="showBoxPlot" title="Quartiles and whiskers on the same value scale">
+              <input type="checkbox" id="showBoxPlot" checked onchange="createHistogram()">
+              Box
+            </label>
           </div>
 
           <!-- Data Range — own row so the track stays wide enough to drag -->
@@ -2014,12 +2018,149 @@
     let isSliderMoving = false;
     let sliderTimeout = null;
 
+    let histogramBoxSpec = null;
+
+    function histogramBoxSummary(data) {
+      const n = data && data.length;
+      if (!n) return null;
+      const sorted = data.slice().sort(function (a, b) { return a - b; });
+      const q1 = sorted[Math.floor(n * 0.25)];
+      const median = sorted[Math.floor(n * 0.5)];
+      const q3 = sorted[Math.floor(n * 0.75)];
+      const iqr = q3 - q1;
+      const lower = q1 - 1.5 * iqr;
+      const upper = q3 + 1.5 * iqr;
+      let low = null;
+      let high = null;
+      const outliers = [];
+      for (let i = 0; i < n; i++) {
+        const v = sorted[i];
+        if (v < lower || v > upper) outliers.push(v);
+        else {
+          if (low == null || v < low) low = v;
+          if (high == null || v > high) high = v;
+        }
+      }
+      if (low == null) {
+        low = q1;
+        high = q3;
+      }
+      return {
+        q1: q1,
+        median: median,
+        q3: q3,
+        low: low,
+        high: high,
+        min: sorted[0],
+        max: sorted[n - 1],
+        outliers: outliers
+      };
+    }
+
+    function histogramBoxPalette() {
+      const light = document.documentElement.getAttribute('data-theme') === 'light';
+      if (light) {
+        return {
+          track: 'rgba(51,65,85,0.28)',
+          whisker: 'rgba(30,41,59,0.62)',
+          box: 'rgba(99,102,241,0.14)',
+          stroke: 'rgba(67,56,202,0.5)',
+          median: 'rgba(15,23,42,0.9)',
+          dot: 'rgba(234,88,12,0.78)'
+        };
+      }
+      return {
+        track: 'rgba(226,232,240,0.28)',
+        whisker: 'rgba(226,232,240,0.72)',
+        box: 'rgba(165,180,252,0.22)',
+        stroke: 'rgba(224,231,255,0.78)',
+        median: 'rgba(255,255,255,0.92)',
+        dot: 'rgba(253,186,116,0.82)'
+      };
+    }
+
+    function paintHistogramBox(chart) {
+      if (!chart || !chart.renderer) return;
+      if (chart._histBoxGroup) {
+        chart._histBoxGroup.destroy();
+        chart._histBoxGroup = null;
+      }
+      const spec = histogramBoxSpec;
+      if (!spec || !chart.xAxis || !chart.xAxis[0] || !chart.plotWidth) return;
+      const xAxis = chart.xAxis[0];
+      const ink = histogramBoxPalette();
+      const span = (spec.max - spec.min) || 1;
+      const xOf = function (v) {
+        const idx = ((v - spec.min) / span) * (spec.bins - 1);
+        return xAxis.toPixels(idx, false);
+      };
+      const y = Math.max(4, chart.plotTop - 22);
+      const h = 12;
+      const mid = y + h / 2;
+      const xMin = xOf(spec.min);
+      const xMax = xOf(spec.max);
+      const xLow = xOf(spec.low);
+      const xHigh = xOf(spec.high);
+      const xQ1 = xOf(spec.q1);
+      const xQ3 = xOf(spec.q3);
+      const xMed = xOf(spec.median);
+      const boxX = Math.min(xQ1, xQ3);
+      const boxW = Math.max(2, Math.abs(xQ3 - xQ1));
+      const d = currentDecimals;
+      const fmt = function (v) { return Number.isFinite(v) ? v.toFixed(d) : '—'; };
+      const tip = 'Box plot'
+        + '  ·  min ' + fmt(spec.min)
+        + '  ·  Q1 ' + fmt(spec.q1)
+        + '  ·  median ' + fmt(spec.median)
+        + '  ·  Q3 ' + fmt(spec.q3)
+        + '  ·  max ' + fmt(spec.max)
+        + (spec.outliers.length ? '  ·  ' + spec.outliers.length + ' outside 1.5×IQR' : '');
+      const g = chart.renderer.g('hist-box').attr({ zIndex: 7, role: 'img', 'aria-label': tip }).add();
+      chart._histBoxGroup = g;
+      const stroke = function (path, color, width) {
+        return chart.renderer.path(path).attr({
+          stroke: color,
+          'stroke-width': width,
+          'stroke-linecap': 'round',
+          fill: 'none',
+          zIndex: 7
+        }).add(g);
+      };
+      stroke(['M', xMin, mid, 'L', xMax, mid], ink.track, 1);
+      stroke(['M', xLow, mid, 'L', xHigh, mid], ink.whisker, 1.25);
+      stroke(['M', xLow, mid - 4, 'L', xLow, mid + 4], ink.whisker, 1.25);
+      stroke(['M', xHigh, mid - 4, 'L', xHigh, mid + 4], ink.whisker, 1.25);
+      const box = chart.renderer.rect(boxX, y, boxW, h, 3).attr({
+        fill: ink.box,
+        stroke: ink.stroke,
+        'stroke-width': 1,
+        zIndex: 8
+      }).add(g);
+      stroke(['M', xMed, y - 1, 'L', xMed, y + h + 1], ink.median, 1.6);
+      const drawn = spec.outliers.length > 48 ? spec.outliers.filter(function (_, i) { return i % 2 === 0; }) : spec.outliers;
+      drawn.forEach(function (v) {
+        chart.renderer.circle(xOf(v), mid, 2.15).attr({
+          fill: ink.dot,
+          stroke: 'rgba(255,255,255,0.28)',
+          'stroke-width': 0.6,
+          zIndex: 9
+        }).add(g);
+      });
+      const ns = 'http://www.w3.org/2000/svg';
+      if (box.element) {
+        const title = document.createElementNS(ns, 'title');
+        title.textContent = tip;
+        box.element.appendChild(title);
+      }
+    }
+
     function createHistogram() {
       if (!isSliderMoving) applyHistogramChrome();
       const numBinsInput = document.getElementById('numBins');
       const showNormal = document.getElementById('showNormalCurve').checked;
       const showMeanLine = document.getElementById('showMeanLine').checked;
       const showMedianLine = document.getElementById('showMedianLine').checked;
+      const showBox = !!(document.getElementById('showBoxPlot') && document.getElementById('showBoxPlot').checked);
       
       let numBins = parseInt(numBinsInput.value, 10);
       const method = document.getElementById('binningMethod').value;
@@ -2110,6 +2251,36 @@
           yAxis: 0
         });
       }
+
+      histogramBoxSpec = null;
+      if (showBox) {
+        histogramBoxSpec = histogramBoxSummary(currentData);
+        if (histogramBoxSpec) histogramBoxSpec.bins = numBins;
+        series.push({
+          id: 'hist-box-legend',
+          name: 'Box plot',
+          type: 'line',
+          data: [],
+          color: 'rgba(165,180,252,0.92)',
+          legendSymbol: 'rectangle',
+          lineWidth: 8,
+          showInLegend: true,
+          enableMouseTracking: false,
+          includeInDataExport: false,
+          marker: { enabled: false },
+          states: { inactive: { opacity: 1 }, hover: { enabled: false } },
+          events: {
+            legendItemClick: function () {
+              const input = document.getElementById('showBoxPlot');
+              if (input) {
+                input.checked = false;
+                createHistogram();
+              }
+              return false;
+            }
+          }
+        });
+      }
       
       // Determine if animation should be enabled
       const enableAnimation = !isSliderMoving;
@@ -2147,6 +2318,7 @@
               plotLines: _chartPlotLines,
               plotBands: _chartPlotBands
             },
+            chart: { spacingTop: showBox ? 36 : 10 },
             series: series
           }, true, false, false);
           return;
@@ -2163,7 +2335,7 @@
           backgroundColor: '#242C37',
           style: { fontFamily: 'Inter, Segoe UI, system-ui, sans-serif' },
           animation: enableAnimation ? { duration: 420 } : false,
-          spacingTop: 10,
+          spacingTop: showBox ? 36 : 10,
           spacingBottom: 8,
           spacingLeft: 6,
           spacingRight: 10,
@@ -2171,7 +2343,10 @@
           plotBackgroundColor: null,
           plotBorderColor: null,
           plotBorderWidth: 0,
-          plotShadow: false
+          plotShadow: false,
+          events: {
+            render: function () { paintHistogramBox(this); }
+          }
         },
         title: {
           text: null
@@ -2203,7 +2378,8 @@
             style: { color: 'rgba(228,232,240,0.85)', fontSize: '14px', fontFamily: 'JetBrains Mono, Consolas, monospace' }
           },
           gridLineColor: 'rgba(255,255,255,0.08)',
-          gridLineDashStyle: 'Dot'
+          gridLineDashStyle: 'Dot',
+          min: 0
         },
         legend: {
           itemStyle: { color: 'rgba(228,232,240,0.9)', fontSize: '14px', fontWeight: '500', fontFamily: 'Inter, sans-serif' },

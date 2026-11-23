@@ -131,7 +131,7 @@
     ),
 
     'outlier-impact': guide(
-      'Explore outlier impact',
+      'Outliers impact',
       'Compares the full numeric sample with the same sample after one flagged case is left out, so you can see what that case does to the mean, the standard deviation, and the range.',
       [
         'Choose one case. The radios are a single comparison, not a multiple selection. All cases included puts every eligible value back.',

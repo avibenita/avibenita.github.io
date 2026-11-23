@@ -1196,7 +1196,7 @@ const StatisticoHeader = {
     const viewTitles = {
       // Univariate views
       'histogram': 'Distribution \u00B7 Histogram',
-      'boxplot': 'Box Plot & Outliers',
+      'boxplot': 'Outliers impact \u00B7 Box plot',
       'qqplot': 'Normality \u00B7 PP/QQ',
       'normality': 'Normality \u00B7 Tests',
       'kernel': 'Kernel',
@@ -1207,7 +1207,7 @@ const StatisticoHeader = {
       'hypothesis': 'One-Sample Test',
       'outliers': 'Outliers',
       'percentile': 'Distribution \u00B7 Percentiles',
-      'outlier-impact': 'Explore outlier impact',
+      'outlier-impact': 'Outliers impact \u00B7 Impact',
       // Correlation views
       'correlation-matrix': 'Correlation Matrix',
       'correlation-network': 'Correlation Network',
@@ -1854,7 +1854,7 @@ const StatisticoHeader = {
       { id: 'histogram', label: 'Histogram', file: 'univariate/histogram-standalone-v2.html' },
       { id: 'cdf', label: 'CDF', file: 'univariate/cumulative-distribution.html' },
       { id: 'percentile', label: 'Percentiles', file: 'univariate/percentile-standalone.html' },
-      { id: 'boxplot', label: 'Box Plot & Outliers', file: 'univariate/boxplot-standalone.html' },
+      { id: 'boxplot', label: 'Outliers impact', file: 'univariate/boxplot-standalone.html' },
       { id: 'kernel', label: 'Kernel', file: 'univariate/kernel-standalone.html' },
       { id: 'separator-core-by-group', label: '---', file: null, isSeparator: true },
       { id: 'group-by-group', label: 'GROUP COMPARISON', file: null, isGroup: true },
@@ -2157,7 +2157,17 @@ const StatisticoHeader = {
                   { view: 'percentile', file: 'univariate/percentile-standalone.html',   label: 'Percentiles' }
                 ]
               },
-              { type: 'navigate', view: 'boxplot', file: 'univariate/boxplot-standalone.html', icon: 'fa-chart-gantt',  label: 'Box plot & outliers', description: 'Quartiles, whiskers, and outlier detection.' },
+              {
+                type: 'navigate',
+                view: 'boxplot',
+                icon: 'fa-chart-gantt',
+                label: 'Outliers impact',
+                description: 'Quartiles, flagged points, and how one case moves the summary.',
+                facets: [
+                  { view: 'boxplot', file: 'univariate/boxplot-standalone.html', label: 'Box plot' },
+                  { view: 'outlier-impact', file: 'univariate/outlier-impact.html', label: 'Impact' }
+                ]
+              },
               { type: 'navigate', view: 'kernel',  file: 'univariate/kernel-standalone.html',  icon: 'fa-bezier-curve', label: 'Kernel', description: 'Smoothed density estimate.' }
             ]
           },
@@ -2181,22 +2191,11 @@ const StatisticoHeader = {
             ]
           }
         ],
-        pinnedNav: (function (header) {
-          var nav = header._byGroupPinnedNav({
-            type: 'navigate',
-            view: 'by-group',
-            file: 'univariate/by-group.html'
-          });
-          nav.items.push({
-            type: 'navigate',
-            view: 'outlier-impact',
-            file: 'univariate/outlier-impact.html',
-            icon: 'fa-bolt',
-            label: 'Explore outlier impact',
-            description: 'See how excluding one flagged case moves the mean, spread, and range.'
-          });
-          return nav;
-        })(this)
+        pinnedNav: this._byGroupPinnedNav({
+          type: 'navigate',
+          view: 'by-group',
+          file: 'univariate/by-group.html'
+        })
       };
     }
 
@@ -2724,13 +2723,13 @@ const StatisticoHeader = {
         tabKey: 'uni-core',
         label: 'Core descriptive',
         icon: 'fa-chart-area',
-        views: ['histogram', 'cdf', 'percentile', 'boxplot', 'kernel'],
+        views: ['histogram', 'cdf', 'percentile', 'boxplot', 'kernel', 'outlier-impact'],
         defaultFile: 'univariate/histogram-standalone-v2.html',
         tabs: [
           { view: 'histogram', tabKey: 'histogram', label: 'Histogram', icon: 'fa-chart-column', file: 'univariate/histogram-standalone-v2.html' },
           { view: 'cdf', tabKey: 'cdf', label: 'Cumulative', icon: 'fa-chart-line', file: 'univariate/cumulative-distribution.html' },
           { view: 'percentile', tabKey: 'percentile', label: 'Percentiles', icon: 'fa-percent', file: 'univariate/percentile-standalone.html' },
-          { view: 'boxplot', tabKey: 'boxplot', label: 'Box plot & outliers', icon: 'fa-chart-gantt', file: 'univariate/boxplot-standalone.html' },
+          { view: 'boxplot', tabKey: 'boxplot', label: 'Outliers impact', icon: 'fa-chart-gantt', file: 'univariate/boxplot-standalone.html' },
           { view: 'kernel', tabKey: 'kernel', label: 'Kernel', icon: 'fa-bezier-curve', file: 'univariate/kernel-standalone.html' }
         ]
       },
@@ -2782,6 +2781,7 @@ const StatisticoHeader = {
       boxplot: 'Compare quartiles, fences, and extreme observations.',
       'boxplot-main': 'Inspect the full range and IQR fence in one view.',
       'boxplot-outliers': 'Review flagged points by detection method.',
+      'outlier-impact': 'See how excluding one flagged case moves the mean, spread, and range.',
       kernel: 'Inspect the smoothed density of the distribution.',
       normality: 'Review the formal normality test battery.',
       qqplot: 'Compare sample quantiles against a reference distribution.',
@@ -2836,10 +2836,10 @@ const StatisticoHeader = {
   _buildUniWsTabBtn(opts) {
     const active = opts.active ? ' active' : '';
     let onclick = '';
-    if (opts.inPage && opts.panel) {
-      if (opts.tabKey && opts.tabKey.indexOf('boxplot-') === 0) {
-        onclick = ` onclick="StatisticoHeader.setBoxplotResultsTab('${opts.panel}')"`;
-      } else if (opts.explore) {
+    if (opts.tabKey && opts.panel && String(opts.tabKey).indexOf('boxplot-') === 0) {
+      onclick = ` onclick="StatisticoHeader.setBoxplotResultsTab('${opts.panel}')"`;
+    } else if (opts.inPage && opts.panel) {
+      if (opts.explore) {
         onclick = ` onclick="StatisticoHeader.setExploreViewPanel('${opts.panel}')"`;
       } else {
         onclick = ` onclick="StatisticoHeader.setByGroupResultsTab('${opts.panel}')"`;
@@ -2895,9 +2895,15 @@ const StatisticoHeader = {
   },
 
   setBoxplotResultsTab(panel) {
-    globalThis.__boxplotActiveTab = panel || 'main';
+    const next = panel === 'outliers' ? 'outliers' : 'main';
+    if (this.currentView !== 'boxplot') {
+      try { sessionStorage.setItem('statistico.boxplot.panel', next); } catch (_e) {}
+      this.navigateTo('univariate/boxplot-standalone.html');
+      return;
+    }
+    globalThis.__boxplotActiveTab = next;
     if (typeof globalThis.switchBoxplotTab === 'function') {
-      globalThis.switchBoxplotTab(panel);
+      globalThis.switchBoxplotTab(next);
     }
     try { this._renderUnivariateResultsTabs(); } catch (_e) {}
     this._syncViewGuide();
@@ -4256,10 +4262,12 @@ const StatisticoHeader = {
 
   _getUnivariateResultsViewTabs(section) {
     if (!section || !Array.isArray(section.tabs) || !section.tabs.length) return [];
-    if (section.id === 'core' && this.currentView === 'boxplot') {
+    if (this.currentView === 'boxplot' || this.currentView === 'outlier-impact') {
+      const onBox = this.currentView === 'boxplot';
       return [
-        { tabKey: 'boxplot-main', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'main', panelId: 'boxplotPanel-main', inPage: true },
-        { tabKey: 'boxplot-outliers', label: 'Outliers', icon: 'fa-map-location-dot', panel: 'outliers', panelId: 'boxplotPanel-outliers', inPage: true }
+        { tabKey: 'boxplot-main', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'main', panelId: 'boxplotPanel-main', inPage: onBox },
+        { tabKey: 'boxplot-outliers', label: 'Outliers', icon: 'fa-map-location-dot', panel: 'outliers', panelId: 'boxplotPanel-outliers', inPage: onBox },
+        { tabKey: 'outlier-impact', label: 'Impact', icon: 'fa-bolt', view: 'outlier-impact', file: 'univariate/outlier-impact.html' }
       ];
     }
     const limit = typeof section.resultTabLimit === 'number' ? section.resultTabLimit : 3;
@@ -4270,7 +4278,7 @@ const StatisticoHeader = {
     const viewTabs = this._getUnivariateResultsViewTabs(activeSection);
     if (!viewTabs.length) return false;
     if (activeSection.id === 'group' && this.currentView === 'by-group') return true;
-    if (activeSection.id === 'core' && this.currentView === 'boxplot') return true;
+    if (this.currentView === 'boxplot' || this.currentView === 'outlier-impact') return true;
     if (activeSection.id === 'core' && ['histogram', 'cdf', 'percentile'].indexOf(this.currentView) !== -1) return true;
     return viewTabs.some((t) => t.view === this.currentView);
   },
@@ -4531,7 +4539,7 @@ const StatisticoHeader = {
 
     const activeInPageTab = this.currentView === 'boxplot'
       ? (globalThis.__boxplotActiveTab || 'main')
-      : (globalThis.__byGroupActiveTab || 'stats');
+      : (this.currentView === 'outlier-impact' ? '' : (globalThis.__byGroupActiveTab || 'stats'));
 
     const tabsHtml = viewTabs.map((t) => this._buildUniWsTabBtn({
       tabKey: t.tabKey,
@@ -4556,8 +4564,8 @@ const StatisticoHeader = {
       ? 'Normality and inference views'
       : activeSection.id === 'group'
         ? 'Grouped analysis views'
-        : (this.currentView === 'boxplot')
-          ? 'Box plot views'
+        : (this.currentView === 'boxplot' || this.currentView === 'outlier-impact')
+          ? 'Outliers impact views'
           : 'Distribution views';
     const describedBy = captionHtml ? ' aria-describedby="uniViewCaption"' : '';
 
@@ -9656,9 +9664,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261123os19')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261123oi1')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261123os19');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261123oi1');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -9816,7 +9824,8 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
   _getUnivariateViewLabels() {
     return {
       histogram: 'Histogram',
-      boxplot: 'Box Plot & Outliers',
+      boxplot: 'Outliers impact',
+      'outlier-impact': 'Impact',
       'boxplot-outliers': 'Outliers',
       cdf: 'CDF',
       percentile: 'Percentiles',

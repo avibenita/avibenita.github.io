@@ -995,13 +995,13 @@
       var doc = rootObject.document;
       if (!chip) chip = doc.getElementById('uniOsHeader');
       if (chip) {
-        var row = doc.querySelector('.statistico-header .view-switcher-row');
-        var headerRight = doc.querySelector('.statistico-header .header-right');
-        var headerBar = doc.querySelector('.statistico-header');
-        var host = row || headerRight || headerBar;
-        if (host && chip.parentNode !== host) {
-          if (host === headerRight) host.insertBefore(chip, host.firstChild);
-          else host.appendChild(chip);
+        var rail = doc.querySelector('.sb-group--comparison .sb-items-rail');
+        if (rail) {
+          chip.hidden = false;
+          if (chip.parentNode !== rail) rail.appendChild(chip);
+        } else if (!chip.parentNode) {
+          chip.hidden = true;
+          doc.body.appendChild(chip);
         }
       }
       if (!strip) return;
@@ -1026,8 +1026,7 @@
         snap = { unavailable: true, reason: 'Outlier sensitivity is not available for grouped or weighted analyses yet.', mode: 'all' };
       }
       var toggle = chip && chip.querySelector('[data-role="exclude-toggle"]');
-      var nActive = chip && chip.querySelector('[data-role="n-active"]');
-      var nBase = chip && chip.querySelector('[data-role="n-base"]');
+      var detail = chip && chip.querySelector('[data-role="n-line"]');
       var infoText = chip && chip.querySelector('[data-role="info-text"]');
       var compareBtn = chip && chip.querySelector('[data-role="compare"]');
       var reviewBtn = chip && chip.querySelector('[data-role="review"]');
@@ -1040,8 +1039,7 @@
           toggle.checked = false;
           toggle.disabled = true;
         }
-        if (nActive) nActive.textContent = '—';
-        if (nBase) nBase.textContent = '—';
+        if (detail) detail.textContent = snap.reason || 'Outlier sensitivity is unavailable.';
         if (infoText) infoText.textContent = snap.reason || 'Outlier sensitivity is unavailable.';
         if (compareBtn) compareBtn.disabled = true;
         if (reviewBtn) reviewBtn.disabled = true;
@@ -1052,13 +1050,16 @@
       var flaggedN = (snap.flagged || []).length;
       var selectedN = (snap.selectedIds || []).length;
       var subset = excluding ? session.summary('subset') : null;
-      var activeN = subset && subset.n != null ? subset.n : snap.baselineN;
       if (toggle) {
         toggle.checked = excluding;
         toggle.disabled = !snap.screen || !snap.screen.ok || selectedN === 0;
       }
-      if (nActive) nActive.textContent = activeN == null ? '—' : String(activeN);
-      if (nBase) nBase.textContent = snap.baselineN == null ? '—' : String(snap.baselineN);
+      if (detail) {
+        if (!snap.screen || !snap.screen.ok) detail.textContent = (snap.screen && snap.screen.message) || 'At least 4 observations are required.';
+        else if (excluding) detail.textContent = (subset && subset.n != null ? subset.n : '—') + ' of ' + snap.baselineN + ' cases in the result';
+        else if (flaggedN) detail.textContent = flaggedN + ' flagged of ' + snap.baselineN + ' cases';
+        else detail.textContent = snap.baselineN + ' cases, none flagged';
+      }
       if (compareBtn) compareBtn.disabled = selectedN === 0 || !snap.screen || !snap.screen.ok;
       if (reviewBtn) reviewBtn.disabled = !snap.screen || !snap.screen.ok;
       if (settingsBtn) settingsBtn.disabled = false;
@@ -1247,35 +1248,30 @@
         var style = doc.createElement('style');
         style.id = 'uniOutlierSensitivityStyle';
         style.textContent = [
-          '#uniOsHeader{position:relative;box-sizing:border-box;display:inline-flex;align-items:center;gap:8px;max-width:100%;margin:0 0 0 auto;padding:4px 6px 4px 8px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.04));box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 8px 18px rgba(0,0,0,.22);color:inherit;z-index:30}',
-          '#uniOsHeader.is-on{border-color:rgba(255,150,140,.72);background:linear-gradient(180deg,rgba(176,48,48,.72),rgba(110,24,32,.82));box-shadow:inset 0 1px 0 rgba(255,210,200,.28),0 8px 18px rgba(80,10,16,.35)}',
+          '#uniOsHeader{position:relative;box-sizing:border-box;display:flex;align-items:center;gap:10px;margin:2px 12px 10px 16px;padding:11px 10px 11px 12px;border:1px solid rgba(255,255,255,.12);border-radius:16px;background:linear-gradient(165deg,rgba(255,255,255,.1),rgba(255,255,255,.03) 42%,rgba(0,0,0,.12));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 12px 28px rgba(0,0,0,.22);color:inherit;z-index:30}',
+          '#uniOsHeader.is-on{border-color:rgba(255,170,156,.55);background:linear-gradient(165deg,rgba(196,72,72,.42),rgba(92,24,32,.55));box-shadow:inset 0 1px 0 rgba(255,220,210,.28),0 12px 28px rgba(90,16,24,.28)}',
           '#uniOsHeader *{box-sizing:border-box}',
-          '#uniOsHeader .uni-os-switch{position:relative;display:inline-flex;width:36px;height:20px;flex:0 0 auto}',
+          '#uniOsHeader .uni-os-copy{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}',
+          '#uniOsHeader .uni-os-label{font-family:Montserrat,Segoe UI,sans-serif;font-size:13px;font-weight:700;line-height:1.15;letter-spacing:.01em}',
+          '#uniOsHeader .uni-os-detail{font-size:11px;font-weight:500;line-height:1.3;color:rgba(226,232,240,.82)}',
+          '#uniOsHeader .uni-os-controls{display:flex;align-items:center;gap:8px;flex:0 0 auto}',
+          '#uniOsHeader .uni-os-switch{position:relative;display:inline-flex;width:48px;height:28px;flex:0 0 auto}',
           '#uniOsHeader .uni-os-switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}',
           '#uniOsHeader .uni-os-switch input:disabled{cursor:not-allowed}',
-          '#uniOsHeader .uni-os-track{position:absolute;inset:0;border-radius:999px;background:rgba(255,255,255,.18);box-shadow:inset 0 1px 2px rgba(0,0,0,.35);transition:background .18s ease}',
-          '#uniOsHeader .uni-os-track:before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .18s ease}',
-          '#uniOsHeader .uni-os-switch input:checked + .uni-os-track{background:linear-gradient(180deg,#ffb1a6,#e25b4a)}',
-          '#uniOsHeader .uni-os-switch input:checked + .uni-os-track:before{transform:translateX(16px)}',
+          '#uniOsHeader .uni-os-track{position:absolute;inset:0;border-radius:999px;background:linear-gradient(180deg,#24303c,#151c24);box-shadow:inset 0 2px 5px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.08);transition:background .18s ease,box-shadow .18s ease}',
+          '#uniOsHeader .uni-os-track:before{content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#e6ebf1 58%,#c5ced8);box-shadow:0 2px 5px rgba(0,0,0,.4),inset 0 1px 0 #fff;transition:transform .18s ease}',
+          '#uniOsHeader .uni-os-switch input:checked + .uni-os-track{background:linear-gradient(180deg,#ffb1a4,#e15a52 46%,#a32832);box-shadow:inset 0 1px 0 rgba(255,230,224,.65),0 0 14px rgba(225,90,82,.55)}',
+          '#uniOsHeader .uni-os-switch input:checked + .uni-os-track:before{transform:translateX(20px)}',
           '#uniOsHeader .uni-os-switch input:focus-visible + .uni-os-track{outline:2px solid #fff;outline-offset:2px}',
-          '#uniOsHeader .uni-os-ns{display:inline-flex;align-items:baseline;gap:8px;min-width:0;font-size:12px;line-height:1;font-variant-numeric:tabular-nums}',
-          '#uniOsHeader .uni-os-n{display:inline-flex;align-items:baseline;gap:3px;white-space:nowrap}',
-          '#uniOsHeader .uni-os-n abbr{font-size:10px;font-weight:700;letter-spacing:.04em;text-decoration:none;opacity:.72}',
-          '#uniOsHeader .uni-os-n b{font-size:13px;font-weight:700}',
-          '#uniOsHeader .uni-os-info{width:20px;height:20px;flex:0 0 auto;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);color:inherit;font:italic 700 12px/18px Georgia,"Times New Roman",serif;cursor:pointer}',
-          '#uniOsHeader .uni-os-info[aria-expanded="true"]{background:rgba(255,255,255,.2)}',
-          '#uniOsHeader .uni-os-pop{position:absolute;top:calc(100% + 8px);right:0;width:min(320px,calc(100vw - 24px));padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:#1a222c;color:#e8eef6;box-shadow:0 16px 36px rgba(0,0,0,.4);text-align:left}',
+          '#uniOsHeader .uni-os-info{width:22px;height:22px;flex:0 0 auto;padding:0;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05));color:inherit;font:italic 700 12px/20px Georgia,"Times New Roman",serif;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.2)}',
+          '#uniOsHeader .uni-os-info[aria-expanded="true"]{background:rgba(255,255,255,.22)}',
+          '#uniOsHeader .uni-os-pop{position:absolute;top:calc(100% + 8px);left:0;width:min(280px,calc(100vw - 24px));padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:#1a222c;color:#e8eef6;box-shadow:0 16px 36px rgba(0,0,0,.4);text-align:left}',
           '#uniOsHeader .uni-os-pop p{margin:0 0 8px;font-size:12px;line-height:1.4}',
           '#uniOsHeader .uni-os-links{display:flex;flex-wrap:wrap;gap:6px}',
           '#uniOsHeader .uni-os-links button{font:inherit;font-size:12px;color:inherit;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:4px 8px;cursor:pointer}',
           '#uniOsHeader .uni-os-links button:disabled{opacity:.45;cursor:not-allowed}',
-          '.view-switcher{position:relative}',
-          '.view-switcher-row > #uniOsHeader{position:absolute;top:50%;right:8px;margin:0;transform:translateY(-50%);z-index:40}',
-          'html[data-tabs="contained"] .statistico-header .view-switcher-row > .view-switcher-bar.ws-mode-bar--connected.ws-mode-bar--attached,html[data-tabs="contained"] .statistico-header .view-switcher-row > .ws-mode-bar.ws-mode-bar--connected{width:calc(100% - 188px) !important;max-width:calc(100% - 188px) !important}',
-          'html[data-tabs="contained"] .statistico-header .view-switcher-bar .ws-tab-scroll-wrap,html[data-tabs="contained"] .statistico-header .view-switcher-bar .ws-tab-scroll{max-width:100% !important;overflow:hidden !important}',
-          'html[data-tabs="contained"] .statistico-header .view-switcher-bar.ws-mode-bar--connected .ws-tab-cluster{width:100% !important;max-width:100% !important}',
-          'html[data-tabs="contained"] .statistico-header .view-switcher-bar.ws-mode-bar--connected .ws-mode-tab{flex:1 1 0 !important;min-width:0 !important;width:auto !important;padding-left:8px !important;padding-right:8px !important}',
-          'html[data-tabs="contained"] .statistico-header .ws-tab-scroll-btn{display:none !important}',
+          '.sb-nav.collapsed #uniOsHeader .uni-os-copy,.sb-nav.collapsed #uniOsHeader .uni-os-info,#sidebarNav.collapsed #uniOsHeader .uni-os-copy,#sidebarNav.collapsed #uniOsHeader .uni-os-info{display:none}',
+          '.sb-nav.collapsed #uniOsHeader,#sidebarNav.collapsed #uniOsHeader{margin:6px;padding:8px;justify-content:center}',
           '#uniOutlierSensitivity{box-sizing:border-box;max-width:100%;margin:0 0 12px;padding:8px 10px;border:1px solid rgba(255,165,120,.45);border-radius:10px;display:flex;flex-direction:column;gap:8px;font:inherit;color:inherit;background:rgba(20,16,18,.35)}',
           '#uniOutlierSensitivity[hidden]{display:none}',
           '#uniOutlierSensitivity *{box-sizing:border-box}',
@@ -1284,18 +1280,21 @@
           '#uniOutlierSensitivity .uni-os-panel{max-width:100%;overflow:auto}',
           '#uniOutlierSensitivity table{width:100%;border-collapse:collapse;font-size:.92em}',
           '#uniOutlierSensitivity th,#uniOutlierSensitivity td{text-align:left;padding:4px 6px;vertical-align:top;white-space:normal}',
-          'html.uni-os-on .right-col,html.uni-os-on .results-container,html.uni-os-on #results-container,html.uni-os-on .view-wrap,html.uni-os-on .content-area,html.uni-os-on .main-content{background-color:#3a1c20 !important}',
-          'html.uni-os-on #results-container .panel,html.uni-os-on #results-container .card,html.uni-os-on #results-container .stat-panel,html.uni-os-on .results-container .panel,html.uni-os-on .results-container .card{background-color:#32181c !important;border-color:rgba(255,160,150,.28) !important}',
-          'html.uni-os-on .statistico-header,html.uni-os-on .statistico-shell,html.uni-os-on .view-switcher-host,html.uni-os-on .uni-results-tab-stack{background-color:var(--surface-0,#0E141B) !important}',
+          'html.uni-os-on .right-col{--surface-0:#6e2c34;--surface-1:#7d3840;--st-contained-strip:#6e2c34;--st-contained-selected:#8d3d46;--st-header-band:#6e2c34;background:#6e2c34 !important;background-color:#6e2c34 !important}',
+          'html.uni-os-on[data-tabs] .right-col .ws-mode-tab.active,html.uni-os-on[data-tabs] .right-col .ws-mode-tab[aria-selected="true"],html.uni-os-on[data-tabs] .right-col .ws-mode-tab[aria-current="page"]{background:#8d3d46 !important;background-color:#8d3d46 !important}',
+          'html.uni-os-on .right-col .statistico-header,html.uni-os-on .right-col .statistico-shell,html.uni-os-on .right-col .view-switcher-host,html.uni-os-on .right-col .uni-results-tab-stack,html.uni-os-on .right-col .view-switcher,html.uni-os-on .right-col .view-switcher-bar,html.uni-os-on .right-col .ws-mode-bar,html.uni-os-on .right-col .results-container,html.uni-os-on .right-col #results-container,html.uni-os-on .right-col .panel,html.uni-os-on .right-col .card,html.uni-os-on .right-col .stat-panel,html.uni-os-on .right-col .panel-body,html.uni-os-on .right-col [id$="-chart"]{background:#6e2c34 !important;background-color:#6e2c34 !important}',
+          'html.uni-os-on .right-col .panel.chart-panel,html.uni-os-on .right-col #histogram-chart,html.uni-os-on #histogram-chart{background:#6e2c34 !important;background-color:#6e2c34 !important}',
+          'html.uni-os-on .right-col .highcharts-background,html.uni-os-on .right-col .highcharts-plot-background{fill:#6e2c34 !important}',
           'html[data-theme="light"] #uniOsHeader{background:linear-gradient(180deg,#fff,#f4f6f8);border-color:rgba(20,24,32,.12);color:#1c2430;box-shadow:inset 0 1px 0 #fff,0 6px 14px rgba(20,24,32,.08)}',
           'html[data-theme="light"] #uniOsHeader.is-on{background:linear-gradient(180deg,#fde8e4,#f6cfc9);border-color:rgba(176,48,48,.45);color:#3a1418}',
           'html[data-theme="light"] #uniOsHeader .uni-os-track{background:rgba(20,24,32,.16)}',
+          'html[data-theme="light"] #uniOsHeader .uni-os-detail{color:rgba(28,36,48,.72)}',
           'html[data-theme="light"] #uniOsHeader .uni-os-info{border-color:rgba(20,24,32,.2);background:rgba(20,24,32,.04)}',
           'html[data-theme="light"] #uniOsHeader .uni-os-pop{background:#fff;color:#1c2430;border-color:rgba(20,24,32,.12)}',
           'html[data-theme="light"] #uniOsHeader .uni-os-links button{background:rgba(20,24,32,.04);border-color:rgba(20,24,32,.12)}',
-          'html[data-theme="light"].uni-os-on .right-col,html[data-theme="light"].uni-os-on .results-container,html[data-theme="light"].uni-os-on #results-container{background-color:#f8e6e4 !important}',
-          'html[data-theme="light"].uni-os-on #results-container .panel,html[data-theme="light"].uni-os-on #results-container .card,html[data-theme="light"].uni-os-on .results-container .panel{background-color:#fbf1ef !important;border-color:rgba(176,48,48,.28) !important}',
-          'html[data-theme="light"].uni-os-on .statistico-header,html[data-theme="light"].uni-os-on .statistico-shell,html[data-theme="light"].uni-os-on .view-switcher-host{background-color:var(--surface-0,#fff) !important}'
+          'html[data-theme="light"].uni-os-on .right-col{--surface-0:#f6e4e1;--surface-1:#fbeeed;--st-contained-strip:#f3d5d1;--st-header-band:#f3d5d1;background:#f6e4e1 !important;background-color:#f6e4e1 !important}',
+          'html[data-theme="light"].uni-os-on .right-col .statistico-header,html[data-theme="light"].uni-os-on .right-col .statistico-shell,html[data-theme="light"].uni-os-on .right-col .view-switcher-host,html[data-theme="light"].uni-os-on .right-col .results-container,html[data-theme="light"].uni-os-on .right-col #results-container,html[data-theme="light"].uni-os-on .right-col .panel,html[data-theme="light"].uni-os-on .right-col .card,html[data-theme="light"].uni-os-on .right-col [id$="-chart"]{background:#f6e4e1 !important;background-color:#f6e4e1 !important}',
+          'html[data-theme="light"].uni-os-on .right-col .highcharts-background{fill:#f6e4e1 !important}'
         ].join('');
         doc.head.appendChild(style);
       }
@@ -1307,15 +1306,17 @@
         chip.setAttribute('role', 'group');
         chip.setAttribute('aria-label', 'Outlier sensitivity');
         chip.innerHTML = [
+          '<div class="uni-os-copy">',
+          '<div class="uni-os-label">Exclude flagged cases</div>',
+          '<div class="uni-os-detail" data-role="n-line">Checking the sample</div>',
+          '</div>',
+          '<div class="uni-os-controls">',
           '<label class="uni-os-switch">',
-          '<input type="checkbox" data-role="exclude-toggle" aria-label="Exclude selected outliers">',
+          '<input type="checkbox" data-role="exclude-toggle" aria-label="Exclude flagged cases">',
           '<span class="uni-os-track" aria-hidden="true"></span>',
           '</label>',
-          '<span class="uni-os-ns">',
-          '<span class="uni-os-n" title="Cases in the current result"><abbr>n</abbr> <b data-role="n-active">—</b></span>',
-          '<span class="uni-os-n" title="Eligible cases"><abbr>N</abbr> <b data-role="n-base">—</b></span>',
-          '</span>',
-          '<button type="button" class="uni-os-info" data-role="info" aria-expanded="false" aria-label="Outlier sensitivity details">i</button>',
+          '<button type="button" class="uni-os-info" data-role="info" aria-expanded="false" aria-label="About excluding flagged cases">i</button>',
+          '</div>',
           '<div class="uni-os-pop" data-role="info-pop" hidden>',
           '<p data-role="info-text"></p>',
           '<div class="uni-os-links">',

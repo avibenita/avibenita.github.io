@@ -306,13 +306,27 @@
     document.querySelectorAll('.ws-mode-bar--attached').forEach(updateIndicatorForBar);
   }
 
+  function clearTabTooltip(btn) {
+    var title = (btn.getAttribute('title') || '').trim();
+    var tip = (btn.getAttribute('data-st-tip') || '').trim();
+    if (!btn.getAttribute('data-caption')) {
+      var caption = tip || title;
+      if (caption) btn.setAttribute('data-caption', caption);
+    }
+    btn.removeAttribute('title');
+    btn.removeAttribute('data-st-tip');
+    btn.removeAttribute('data-st-tip-html');
+    btn.removeAttribute('data-tip');
+  }
+
   function enhanceWorkspaceTabs() {
     document.querySelectorAll('.ws-mode-tab').forEach(function(btn) {
+      clearTabTooltip(btn);
       if (btn.querySelector('.ws-tab-text')) return;
       var labelSpan = btn.querySelector('span:not(.ws-tab-label):not(.ws-tab-sub):not(.view-switcher-glow):not(.view-switcher-mark)');
       if (!labelSpan) return;
       var key = getTabKey(btn);
-      var titleAttr = btn.getAttribute('title') || '';
+      var titleAttr = btn.getAttribute('data-caption') || '';
       var skipSub = !!(btn.closest && btn.closest('.uni-view-tabs, .view-switcher-bar'));
       var sub = skipSub ? '' : (subtitles[key] || titleAttr);
       if (sub.length > 42) sub = sub.split('.')[0];
@@ -321,9 +335,6 @@
       text.innerHTML = '<span class="ws-tab-label">' + labelSpan.textContent + '</span>' +
         (sub ? '<span class="ws-tab-sub">' + sub + '</span>' : '');
       labelSpan.replaceWith(text);
-      if (sub && titleAttr && titleAttr.trim().toLowerCase() === sub.trim().toLowerCase()) {
-        btn.removeAttribute('title');
-      }
     });
   }
 
@@ -332,7 +343,7 @@
     var active = bar.querySelector('.ws-mode-tab.active') || bar.querySelector('.ws-mode-tab');
     if (!active) return '';
     var key = getTabKey(active);
-    var title = (active.getAttribute('title') || '').trim();
+    var title = (active.getAttribute('data-caption') || '').trim();
     var subEl = active.querySelector('.ws-tab-sub');
     var sub = subEl ? subEl.textContent.trim() : '';
     return title || sub || subtitles[key] || '';

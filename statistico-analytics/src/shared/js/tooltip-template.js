@@ -134,6 +134,32 @@
     return node;
   }
 
+  function isTabControl(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.getAttribute('role') === 'tab') return true;
+    const cls = el.classList;
+    if (!cls) return false;
+    return cls.contains('ws-mode-tab')
+      || cls.contains('hub-nav-tab')
+      || cls.contains('header-tab')
+      || cls.contains('sb-facet');
+  }
+
+  function clearTabTooltip(el) {
+    const title = (el.getAttribute('title') || '').trim();
+    const tip = (el.getAttribute('data-st-tip') || '').trim();
+    if (!el.getAttribute('data-caption')) {
+      const caption = tip || title;
+      if (caption) el.setAttribute('data-caption', caption);
+    }
+    el.removeAttribute('title');
+    el.removeAttribute('data-st-tip');
+    el.removeAttribute('data-st-tip-html');
+    el.removeAttribute('data-tip');
+    el.removeAttribute('data-st-title-orig');
+    el.removeAttribute(SCRIPT_FLAG);
+  }
+
   function resolveText(el) {
     if (!el) return '';
     return (
@@ -153,6 +179,10 @@
   function prepareElement(el) {
     if (!el) return;
     if (el.closest && el.closest(".hub-family-module")) return;
+    if (isTabControl(el)) {
+      clearTabTooltip(el);
+      return;
+    }
     const text = resolveText(el);
     const html = resolveHtml(el);
     if (!text && !html) return;
@@ -192,7 +222,9 @@
       prepareElement(el);
     });
 
-    scope.querySelectorAll('[data-st-tip], [data-st-tip-html], [data-tip], [title]').forEach(prepareElement);
+    scope.querySelectorAll(
+      '[data-st-tip], [data-st-tip-html], [data-tip], [title], .ws-mode-tab, .hub-nav-tab, .header-tab, .sb-facet, [role="tab"]'
+    ).forEach(prepareElement);
   }
 
   function positionTooltip(anchor, node) {
@@ -250,7 +282,12 @@
 
   function closestTooltipAnchor(target) {
     if (!target || !target.closest) return null;
-    return target.closest(`[${SCRIPT_FLAG}="1"]`);
+    const anchor = target.closest(`[${SCRIPT_FLAG}="1"]`);
+    if (anchor && isTabControl(anchor)) {
+      clearTabTooltip(anchor);
+      return null;
+    }
+    return anchor;
   }
 
   function isPointerOverAnchor(anchor, x, y) {

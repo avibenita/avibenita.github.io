@@ -244,7 +244,7 @@ console.log('Loading shared-header.js VERSION 2026-11-21-interpretation');
 
   const script = document.createElement('script');
   script.id = 'st-tooltip-template-script';
-  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20261118tip5');
+  script.src = resolveAssetUrl('src/shared/js/tooltip-template.js?v=20261123notab');
   script.async = true;
   script.onload = initTooltip;
   document.head.appendChild(script);
@@ -2849,7 +2849,7 @@ const StatisticoHeader = {
     } else if (opts.onSection) {
       onclick = ` onclick="StatisticoHeader.navigateTo('${opts.onSection}')"`;
     }
-    const titleAttr = opts.title ? ` title="${opts.title.replace(/"/g, '&quot;')}"` : '';
+    const titleAttr = opts.title ? ` data-caption="${opts.title.replace(/"/g, '&quot;')}"` : '';
     const showBadge = !!opts.badge;
     const showHelp = !!opts.help;
     const tabId = opts.tabKey ? ` id="st-tab-${opts.tabKey}"` : '';
@@ -2915,7 +2915,7 @@ const StatisticoHeader = {
     }
   },
 
-  _TAB_ASSET_VER: '20261119out1',
+  _TAB_ASSET_VER: '20261123notab',
   _SIM_PROFILE_SEEN_KEY: 'statistico.bygroup.similarityProfile.seen',
   _lastViewSwitcherGlowKey: null,
 

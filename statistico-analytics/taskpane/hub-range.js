@@ -508,6 +508,161 @@
     if (sizeEl) sizeEl.textContent = text || "";
   }
 
+  function columnIndexFor(headers, data) {
+    var name = data && (data.column || data.variableName || data.colName);
+    var i;
+    if (name) {
+      for (i = 0; i < headers.length; i++) {
+        if (String(headers[i]).trim() === String(name).trim()) return i;
+      }
+      return -1;
+    }
+    var idx = data && data.columnIndex != null ? Number(data.columnIndex) : -1;
+    if (idx >= 0 && idx < headers.length) return idx;
+    return -1;
+  }
+
+  function seriesFromColumn(rows, idx, trim, transform) {
+    var data = [];
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      var cell = rows[i] ? rows[i][idx] : null;
+      if (cell === "" || cell == null) continue;
+      var num = typeof cell === "number" ? cell : parseFloat(cell);
+      if (num === num) data.push(num);
+    }
+    var minPct = trim && trim.min != null ? Number(trim.min) : 0;
+    var maxPct = trim && trim.max != null ? Number(trim.max) : 100;
+    if ((minPct > 0 || maxPct < 100) && data.length) {
+      var sorted = data.slice().sort(function (a, b) { return a - b; });
+      var lower = sorted[Math.floor((sorted.length - 1) * minPct / 100)];
+      var upper = sorted[Math.floor((sorted.length - 1) * maxPct / 100)];
+      data = data.filter(function (v) { return v >= lower && v <= upper; });
+    }
+    var t = transform || "none";
+    if (t === "ln") return data.map(function (v) { return Math.log(v); }).filter(function (v) { return v === v && isFinite(v); });
+    if (t === "log10") return data.map(function (v) { return Math.log10(v); }).filter(function (v) { return v === v && isFinite(v); });
+    if (t === "sqrt") return data.map(function (v) { return Math.sqrt(v); }).filter(function (v) { return v === v && isFinite(v); });
+    if (t === "square") return data.map(function (v) { return v * v; });
+    if (t === "reciprocal") return data.map(function (v) { return v === 0 ? NaN : 1 / v; }).filter(function (v) { return v === v && isFinite(v); });
+    if (t === "z" && data.length) {
+      var mean = data.reduce(function (a, b) { return a + b; }, 0) / data.length;
+      var sd = Math.sqrt(data.reduce(function (acc, v) { return acc + (v - mean) * (v - mean); }, 0) / data.length);
+      if (!(sd > 0)) return data.slice();
+      return data.map(function (v) { return (v - mean) / sd; });
+    }
+    if (t === "minmax" && data.length) {
+      var lo = Math.min.apply(null, data);
+      var hi = Math.max.apply(null, data);
+      if (!(hi > lo)) return data.slice();
+      return data.map(function (v) { return (v - lo) / (hi - lo); });
+    }
+    return data;
+  }
+
+  function fillDescriptive(descriptive, nums) {
+    if (!descriptive || !nums.length) return;
+    var sorted = nums.slice().sort(function (a, b) { return a - b; });
+    var n = nums.length;
+    var mean = nums.reduce(function (a, b) { return a + b; }, 0) / n;
+    var variance = n > 1 ? nums.reduce(function (acc, v) { return acc + (v - mean) * (v - mean); }, 0) / (n - 1) : 0;
+    var sd = Math.sqrt(variance);
+    descriptive.mean = mean;
+    descriptive.stdDev = sd;
+    descriptive.variance = variance;
+    descriptive.min = sorted[0];
+    descriptive.max = sorted[n - 1];
+    descriptive.range = sorted[n - 1] - sorted[0];
+    descriptive.n = n;
+    if (n % 2) descriptive.median = sorted[(n - 1) / 2];
+    else descriptive.median = (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  }
+
+  /**
+   * Replace a stored univariate run with the rows just read from the sheet.
+   * A sampled run is left as the user configured it.
+   */
+  function patchStoredAnalysis(data, values, address) {
+    if (!data || !values || values.length < 2) return false;
+    if (data.sample && data.sample.mode === "sample") return false;
+    var headers = values[0] || [];
+    var idx = columnIndexFor(headers, data);
+    if (idx < 0) return false;
+    var rows = values.slice(1).map(function (row) { return (row || []).slice(); });
+    var nums = seriesFromColumn(rows, idx, data.trim, data.transform);
+    if (!nums.length) return false;
+    data.sourceHeaders = headers.slice();
+    data.sourceRows = rows;
+    data.sourceRowsAll = rows.map(function (row) { return row.slice(); });
+    data.columnIndex = idx;
+    data.rowFilterActive = false;
+    if (address) data.dataSource = address;
+    var existing = data.values;
+    var oneDimensional = !existing || !existing.length || !Array.isArray(existing[0]);
+    if (oneDimensional) {
+      data.values = nums.slice();
+      data.rawData = nums.slice();
+      data.data = nums.slice();
+      data.n = nums.length;
+    }
+    fillDescriptive(data.descriptive, nums);
+    return true;
+  }
+
+  function patchStoredJson(storage, key, values, address) {
+    if (!storage) return;
+    var raw;
+    try { raw = storage.getItem(key); } catch (e) { return; }
+    if (!raw) return;
+    try {
+      var parsed = JSON.parse(raw);
+      var body = parsed && parsed.data ? parsed.data : parsed;
+      if (!patchStoredAnalysis(body, values, address)) return;
+      storage.setItem(key, JSON.stringify(parsed));
+    } catch (e) {}
+  }
+
+  function syncAnalysisSnapshots(values, address) {
+    var live = window.__hubUnivariateLive;
+    if (live && live.data && patchStoredAnalysis(live.data, values, address)) {
+      try { sessionStorage.setItem("univariateHubRunData", JSON.stringify(live)); } catch (e) {}
+    }
+    patchStoredJson(window.sessionStorage, "univariateHubRunData", values, address);
+    patchStoredJson(window.sessionStorage, "univariateResults", values, address);
+    patchStoredJson(window.localStorage, "univariateRunResultPayload", values, address);
+    patchStoredJson(window.localStorage, "univariateResults", values, address);
+  }
+
+  function viewsAreOpen() {
+    var host = window.StatisticoDialogHost;
+    if (host && typeof host.hasOpenDialog === "function" && host.hasOpenDialog()) return true;
+    if (window.HubResultsBridge && typeof window.HubResultsBridge.hasActive === "function" && window.HubResultsBridge.hasActive()) return true;
+    return false;
+  }
+
+  var refreshTimer = null;
+  function scheduleInputRefresh() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function () {
+      refreshTimer = null;
+      if (viewsAreOpen()) return;
+      refreshGlobalRange();
+    }, 400);
+  }
+
+  function watchWorksheetChanges() {
+    if (typeof Excel === "undefined" || !Excel.run) return Promise.resolve();
+    return Excel.run(function (ctx) {
+      ctx.workbook.worksheets.onChanged.add(function () {
+        if (viewsAreOpen()) return;
+        scheduleInputRefresh();
+      });
+      return ctx.sync();
+    }).catch(function (e) {
+      console.warn("worksheet change watch:", e);
+    });
+  }
+
   function applyRangeData(values, address) {
     if (!values || values.length < 2) {
       setRangeSize("");
@@ -521,6 +676,7 @@
     if (window.StatisticoGlobalRange) {
       StatisticoGlobalRange.save(values, address || "", rangeMode);
     }
+    if (!viewsAreOpen()) syncAnalysisSnapshots(values, address);
   }
 
   var EMPTY_SHEET_MESSAGE = "This worksheet is empty. Add a header row and at least one data row, or load the demo data.";
@@ -745,6 +901,7 @@
     if (info.host !== Office.HostType.Excel) return;
     await loadNamedRanges();
     await watchSelection();
+    await watchWorksheetChanges();
     var gr = window.StatisticoGlobalRange && StatisticoGlobalRange.load();
     if (gr && gr.values && gr.values.length >= 2) {
       rangeMode = gr.mode === "manual" ? "used" : (gr.mode || "used");
@@ -766,6 +923,7 @@
   window.hubSetRangeMode = setRangeMode;
   window.hubPickRangeMode = pickRangeMode;
   window.hubRefreshGlobalRange = refreshGlobalRange;
+  window.hubRefreshInputAfterViewsClosed = scheduleInputRefresh;
   window.hubLoadFromNamedRange = loadFromNamedRange;
   window.hubToggleDataCard = toggleDataCard;
   window.hubToggleRangePicker = toggleRangePicker;
@@ -785,7 +943,8 @@
     describeWorksheetData: describeWorksheetData,
     countDataProblems: countDataProblems,
     formatRangeSize: formatRangeSize,
-    applyRangeData: applyRangeData
+    applyRangeData: applyRangeData,
+    patchStoredAnalysis: patchStoredAnalysis
   };
   if (typeof module === "object" && module.exports) {
     module.exports = window.StatisticoHubRange;

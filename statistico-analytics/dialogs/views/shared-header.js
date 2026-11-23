@@ -7455,8 +7455,13 @@ const StatisticoHeader = {
                 (d.values && Array.isArray(d.values.values) ? d.values.values : []))))));
     const len = values.length;
     const table = Array.isArray(d.descriptiveTable) ? d.descriptiveTable : [];
+    const rows = Array.isArray(d.sourceRowsAll) ? d.sourceRowsAll : (Array.isArray(d.sourceRows) ? d.sourceRows : []);
+    const col = d.columnIndex != null ? Number(d.columnIndex) : null;
+    const columnCells = col != null && rows.length
+      ? rows.map((row) => (row && col < row.length ? row[col] : null))
+      : [];
     const sample = len
-      ? [values[0], values[Math.floor(len / 2)], values[len - 1]].map((v) => Number(v).toPrecision ? Number(v).toPrecision(8) : String(v)).join('|')
+      ? this._uniContentToken(values)
       : (table.length ? `${table.length}|${table[0].Variable || table[0].name || ''}|${table[0].N || ''}` : '');
     const trim = d.trim ? `${d.trim.min || 0}-${d.trim.max || 100}` : '';
     return [
@@ -7464,12 +7469,34 @@ const StatisticoHeader = {
       d.column || d.variableName || d.variable || d.colName || '',
       len || table.length,
       sample,
+      this._uniContentToken(columnCells),
       d.transform || '',
       trim,
       d.rowFilterActive ? 'filtered' : '',
       d.sourceRows ? d.sourceRows.length : '',
       d.sourceRowsAll ? d.sourceRowsAll.length : ''
     ].join('::');
+  },
+
+  /* First/middle/last misses an edit in the middle of the column, so a saved
+     extreme was treated as the same run and the open view kept the old max. */
+  _uniContentToken(list) {
+    if (!Array.isArray(list) || !list.length) return '0';
+    let hash = 0;
+    let min = Infinity;
+    let max = -Infinity;
+    let n = 0;
+    for (let i = 0; i < list.length; i++) {
+      const raw = list[i];
+      const num = typeof raw === 'number' ? raw : parseFloat(raw);
+      if (num !== num) continue;
+      n += 1;
+      if (num < min) min = num;
+      if (num > max) max = num;
+      hash = (Math.imul(hash, 33) + Math.round(num * 1000) + i) | 0;
+    }
+    if (!n) return '0';
+    return n + ':' + min + ':' + max + ':' + hash;
   },
 
   shouldProcessUniPayload(data, viewKey, windowMs = 2500) {

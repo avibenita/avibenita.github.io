@@ -95,6 +95,155 @@
     };
   }
 
+  function tooFew() {
+    return {
+      ok: false,
+      message: 'Outlier screening requires at least 4 observations.',
+      flagged: [],
+      bounds: null
+    };
+  }
+
+  function flagRow(c, reason) {
+    return {
+      id: c.id,
+      label: c.label,
+      sourceIndex: c.sourceIndex,
+      value: c.value,
+      reason: reason
+    };
+  }
+
+  function invNorm(p) {
+    var a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+    var b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+    var c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+    var d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+    var plow = 0.02425;
+    var q;
+    var r;
+    if (p < plow) {
+      q = Math.sqrt(-2 * Math.log(p));
+      return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    }
+    if (p > 1 - plow) {
+      q = Math.sqrt(-2 * Math.log(1 - p));
+      return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+    }
+    q = p - 0.5;
+    r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+
+  function invStudentT(p, df) {
+    var z = invNorm(p);
+    var z2 = z * z;
+    var z3 = z2 * z;
+    var z5 = z3 * z2;
+    var z7 = z5 * z2;
+    var z9 = z7 * z2;
+    return z
+      + ((z3 + z) / 4) / df
+      + ((5 * z5 + 16 * z3 + 3 * z) / 96) / (df * df)
+      + ((3 * z7 + 19 * z5 + 17 * z3 - 15 * z) / 384) / (df * df * df)
+      + ((79 * z9 + 776 * z7 + 1482 * z5 - 1920 * z3 - 945 * z) / 92160) / (df * df * df * df);
+  }
+
+  function screenZ(cases) {
+    if (!cases || cases.length < 4) return tooFew();
+    var n = cases.length;
+    var sum = 0;
+    var i;
+    for (i = 0; i < n; i++) sum += cases[i].value;
+    var mean = sum / n;
+    var ss = 0;
+    for (i = 0; i < n; i++) ss += (cases[i].value - mean) * (cases[i].value - mean);
+    var sd = Math.sqrt(ss / n);
+    var flagged = [];
+    if (sd > 0) {
+      cases.forEach(function (c) {
+        var z = (c.value - mean) / sd;
+        if (Math.abs(z) > 3) flagged.push(flagRow(c, c.value < mean ? 'low' : 'high'));
+      });
+    }
+    return {
+      ok: true,
+      message: sd > 0 ? '' : 'The standard deviation is zero, so no z-score is flagged.',
+      detail: 'Flagged when |z| > 3. z uses the population standard deviation.',
+      flagged: flagged,
+      bounds: { mean: mean, sd: sd, lower: mean - 3 * sd, upper: mean + 3 * sd }
+    };
+  }
+
+  function screenMad(cases) {
+    if (!cases || cases.length < 4) return tooFew();
+    var sorted = cases.map(function (c) { return c.value; }).sort(function (a, b) { return a - b; });
+    var median = sorted[Math.floor(sorted.length / 2)];
+    var deviations = cases.map(function (c) { return Math.abs(c.value - median); }).sort(function (a, b) { return a - b; });
+    var mad = deviations[Math.floor(deviations.length / 2)];
+    var flagged = [];
+    cases.forEach(function (c) {
+      var modified = mad === 0 ? (c.value === median ? 0 : Infinity) : 0.6745 * (c.value - median) / mad;
+      if (Math.abs(modified) > 3.5) flagged.push(flagRow(c, c.value < median ? 'low' : 'high'));
+    });
+    var reach = mad === 0 ? 0 : 3.5 * mad / 0.6745;
+    return {
+      ok: true,
+      message: mad === 0 ? 'The median absolute deviation is zero. Values that differ from the median are flagged.' : '',
+      detail: 'Flagged when the modified z-score exceeds 3.5. The scale is the median absolute deviation.',
+      flagged: flagged,
+      bounds: { median: median, mad: mad, lower: median - reach, upper: median + reach }
+    };
+  }
+
+  function screenGrubbs(cases) {
+    if (!cases || cases.length < 4) return tooFew();
+    var n = cases.length;
+    var sum = 0;
+    var i;
+    for (i = 0; i < n; i++) sum += cases[i].value;
+    var mean = sum / n;
+    var ss = 0;
+    for (i = 0; i < n; i++) ss += (cases[i].value - mean) * (cases[i].value - mean);
+    var sd = Math.sqrt(ss / (n - 1));
+    var suspect = null;
+    if (sd > 0) {
+      cases.forEach(function (c) {
+        var deviation = Math.abs(c.value - mean);
+        if (!suspect || deviation > suspect.deviation) suspect = { row: c, deviation: deviation };
+      });
+    }
+    var flagged = [];
+    if (suspect) {
+      var df = n - 2;
+      var tCrit = invStudentT(1 - 0.05 / (2 * n), df);
+      var gCrit = ((n - 1) / Math.sqrt(n)) * Math.sqrt((tCrit * tCrit) / (df + tCrit * tCrit));
+      if (suspect.deviation / sd > gCrit) flagged.push(flagRow(suspect.row, suspect.row.value < mean ? 'low' : 'high'));
+    }
+    return {
+      ok: true,
+      message: sd > 0 ? '' : 'The standard deviation is zero, so Grubbs has nothing to flag.',
+      detail: 'Flags the single most extreme case when Grubbs’ statistic exceeds the 5% critical value.',
+      flagged: flagged,
+      bounds: { mean: mean, sd: sd, lower: mean - 3 * sd, upper: mean + 3 * sd }
+    };
+  }
+
+  function screenByRule(cases, rule) {
+    if (rule === 'z') return screenZ(cases);
+    if (rule === 'mad') return screenMad(cases);
+    if (rule === 'grubbs') return screenGrubbs(cases);
+    var screened = screenCases(cases, rule === 'iqr3' ? 3 : 1.5);
+    if (screened && screened.ok && screened.bounds) {
+      screened.detail = screened.bounds.zeroIqr
+        ? screened.message
+        : (rule === 'iqr3'
+          ? 'Flagged when a value sits strictly outside the 3 × IQR fences.'
+          : 'Flagged when a value sits strictly outside the 1.5 × IQR fences.');
+    }
+    return screened;
+  }
+
   function medianOf(values) {
     var sorted = values.slice().sort(function (a, b) { return a - b; });
     if (!sorted.length) return null;
@@ -136,22 +285,81 @@
     return Math.max(0, Math.min(100, delta / scale * 100));
   }
 
-  function impactIndex(baseline, subset) {
-    var empty = { score: 0, band: 'none', location: 0, spread: 0, extremes: 0 };
-    if (!baseline || !subset || !baseline.n || !subset.n) return empty;
-    var location = clampPercent(baseline.mean, subset.mean, baseline.sd);
-    var spread = clampPercent(baseline.sd, subset.sd, baseline.sd);
-    var range0 = baseline.max != null && baseline.min != null ? baseline.max - baseline.min : 0;
-    var range1 = subset.max != null && subset.min != null ? subset.max - subset.min : 0;
-    var extremes = clampPercent(range0, range1, range0);
-    if (location === 0 && spread === 0 && extremes === 0) return empty;
-    var score = Math.round((0.4 * location) + (0.35 * spread) + (0.25 * extremes));
+  function unavailableIndex(reason) {
     return {
+      available: false,
+      formula: 'OII v0.1',
+      reason: reason,
+      score: null,
+      display: null,
+      dMean: null,
+      dMedian: null,
+      dSD: null,
+      dRange: null,
+      mean: null,
+      median: null,
+      sd: null,
+      range: null
+    };
+  }
+
+  function unitChange(delta, scale) {
+    if (!Number.isFinite(delta)) return null;
+    if (!(scale > 0)) return delta === 0 ? 0 : null;
+    var value = Math.abs(delta) / scale;
+    if (value < 0) return 0;
+    if (value > 1) return 1;
+    return value;
+  }
+
+  function impactIndex(baseline, subset) {
+    if (!baseline || !subset || baseline.n < 2 || subset.n < 2 || baseline.sd == null || subset.sd == null) {
+      return unavailableIndex('OII unavailable — at least 2 observations must remain.');
+    }
+    var range0 = baseline.max - baseline.min;
+    var range1 = subset.max - subset.min;
+    if (range1 > range0) {
+      return unavailableIndex('OII unavailable — the retained sample is not a subset of the baseline.');
+    }
+    if (baseline.sd === 0 && range0 === 0) {
+      return {
+        available: true,
+        formula: 'OII v0.1',
+        reason: '',
+        score: 0,
+        display: 0,
+        dMean: 0,
+        dMedian: 0,
+        dSD: 0,
+        dRange: 0,
+        mean: 0,
+        median: 0,
+        sd: 0,
+        range: 0
+      };
+    }
+    var dMean = unitChange(subset.mean - baseline.mean, baseline.sd);
+    var dMedian = unitChange(subset.median - baseline.median, baseline.sd);
+    var dSD = unitChange(subset.sd - baseline.sd, baseline.sd);
+    var dRange = range0 > 0 ? unitChange(range0 - range1, range0) : 0;
+    if (dMean == null || dMedian == null || dSD == null || dRange == null) {
+      return unavailableIndex('OII unavailable — the comparison could not be calculated.');
+    }
+    var score = 100 * Math.sqrt(0.25 * dMean * dMean + 0.15 * dMedian * dMedian + 0.40 * dSD * dSD + 0.20 * dRange * dRange);
+    return {
+      available: true,
+      formula: 'OII v0.1',
+      reason: '',
       score: score,
-      band: score < 34 ? 'slight' : score < 67 ? 'moderate' : 'strong',
-      location: Math.round(location),
-      spread: Math.round(spread),
-      extremes: Math.round(extremes)
+      display: Math.round(score),
+      dMean: dMean,
+      dMedian: dMedian,
+      dSD: dSD,
+      dRange: dRange,
+      mean: 100 * dMean,
+      median: 100 * dMedian,
+      sd: 100 * dSD,
+      range: 100 * dRange
     };
   }
 
@@ -346,6 +554,7 @@
         reason: extracted.reason || '',
         cases: extracted.cases || [],
         k: 1.5,
+        rule: 'iqr15',
         mode: 'all',
         status: 'ready',
         error: '',
@@ -412,7 +621,8 @@
       var next = Number(k);
       if (next !== 1.5 && next !== 3) return publicState();
       state.k = next;
-      state.screen = screenCases(state.cases, next);
+      state.rule = next === 3 ? 'iqr3' : 'iqr15';
+      state.screen = screenByRule(state.cases, state.rule);
       state.flagged = state.screen.flagged || [];
       state.selectedIds = state.flagged.map(function (f) { return f.id; });
       state.mode = 'all';
@@ -467,12 +677,13 @@
       var cases = state.cases.slice();
       var keptKey = state.datasetKey;
       state.k = 1.5;
+      state.rule = 'iqr15';
       state.mode = 'all';
       state.status = 'ready';
       state.error = '';
       state.cases = cases;
       state.datasetKey = keptKey;
-      state.screen = screenCases(cases, 1.5);
+      state.screen = screenByRule(cases, 'iqr15');
       state.flagged = state.screen && state.screen.ok ? state.screen.flagged : [];
       state.selectedIds = state.flagged.map(function (f) { return f.id; });
       state.cache = {};
@@ -619,6 +830,7 @@
         status: state.status,
         error: state.error,
         k: state.k,
+        rule: state.rule || (Number(state.k) === 3 ? 'iqr3' : 'iqr15'),
         cases: state.cases,
         flagged: state.flagged || [],
         selectedIds: (state.selectedIds || []).slice(),
@@ -635,6 +847,24 @@
       sync: sync,
       load: function () { state = load(); return publicState(); },
       setK: setK,
+      setRule: function (rule) {
+        ensure();
+        if (!state || state.unavailable) return publicState();
+        var next = String(rule || '');
+        if (['iqr15', 'iqr3', 'z', 'mad', 'grubbs'].indexOf(next) < 0) return publicState();
+        state.rule = next;
+        state.k = next === 'iqr3' ? 3 : 1.5;
+        state.screen = screenByRule(state.cases, next);
+        state.flagged = state.screen && state.screen.ok ? (state.screen.flagged || []) : [];
+        state.selectedIds = [];
+        state.mode = 'all';
+        state.status = 'ready';
+        state.error = '';
+        state.cache = {};
+        generation += 1;
+        persist();
+        return publicState();
+      },
       setMode: setMode,
       setSelected: setSelected,
       selectAll: function () {
@@ -714,12 +944,21 @@
         var baseline = summary('all');
         var active = state.mode === 'subset' ? summary('subset') : baseline;
         var impact = impactIndex(baseline, active);
-        var strongest = impact.location >= impact.spread && impact.location >= impact.extremes
-          ? 'the mean'
-          : (impact.spread >= impact.extremes ? 'the standard deviation' : 'the range');
-        var reading = impact.score === 0
-          ? 'No exclusion is in effect, so the index is 0.'
-          : 'Excluding ' + state.selectedIds.length + ' of ' + (baseline ? baseline.n : 0) + ' cases moves the mean by ' + signed(active && baseline ? active.mean - baseline.mean : null) + ' and the sample standard deviation by ' + signed(active && baseline ? active.sd - baseline.sd : null) + '. The strongest movement is in ' + strongest + '.';
+        var parts = [
+          ['the mean', impact.dMean],
+          ['the median', impact.dMedian],
+          ['the standard deviation', impact.dSD],
+          ['the range', impact.dRange]
+        ];
+        var strongest = parts[0];
+        parts.forEach(function (part) { if (part[1] > strongest[1]) strongest = part; });
+        var reading = !impact.available
+          ? impact.reason
+          : (state.mode !== 'subset'
+            ? 'No exclusion is in effect, so the index is 0.'
+            : (impact.score === 0
+              ? 'The exclusion leaves the mean, median, standard deviation, and range unchanged, so the index is 0.'
+              : 'Excluding ' + state.selectedIds.length + ' of ' + (baseline ? baseline.n : 0) + ' cases changes the mean by ' + signed(active && baseline ? active.mean - baseline.mean : null) + ' and the standard deviation by ' + signed(active && baseline ? active.sd - baseline.sd : null) + '. The largest normalized component change is in ' + strongest[0] + '.'));
         return {
           mode: state.mode,
           status: state.status,
@@ -737,11 +976,14 @@
             max: active.max
           } : null,
           impact: {
-            score: impact.score,
-            band: impact.band,
-            location: impact.location,
-            spread: impact.spread,
-            extremes: impact.extremes,
+            available: impact.available,
+            formula: impact.formula,
+            score: impact.display,
+            exact: impact.score,
+            dMean: impact.dMean,
+            dMedian: impact.dMedian,
+            dSD: impact.dSD,
+            dRange: impact.dRange,
             reading: reading
           }
         };
@@ -1440,7 +1682,7 @@
         }
       });
       }
-      place(strip, chip);
+      place(strip, doc.getElementById('uniOsHeader'));
       return strip;
     }
 
@@ -1487,6 +1729,7 @@
       fences: fences,
       classify: classify,
       screenCases: screenCases,
+      screenByRule: screenByRule,
       summarize: summarize,
       impactIndex: impactIndex,
       casesFromPayload: casesFromPayload,

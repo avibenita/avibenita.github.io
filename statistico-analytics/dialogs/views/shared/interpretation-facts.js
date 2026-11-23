@@ -474,8 +474,12 @@
     }
     if (input.sensitivity && input.sensitivity.impact && input.sensitivity.impact.reading) {
       var impact = input.sensitivity.impact;
-      pushUnique(findings, 'Outlier Impact Index is ' + impact.score + ' (' + impact.band + '). ' + impact.reading);
-      pushUnique(limitations, 'The index describes how far the chosen exclusion moves the mean, the sample standard deviation, and the range. A higher index is not a better result.');
+      if (impact.available === false) {
+        pushUnique(findings, impact.reading);
+      } else {
+        pushUnique(findings, 'Outlier Impact Index is ' + impact.score + '. ' + impact.reading);
+      }
+      pushUnique(limitations, 'The index describes how far the chosen exclusion moves the mean, the median, the sample standard deviation, and the range. A higher index is not a better result, and it is not a reason to remove a case.');
     }
 
     var synthesis = [];

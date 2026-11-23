@@ -131,24 +131,25 @@
     ),
 
     'outlier-impact': guide(
-      'Outliers impact',
-      'Compares the full numeric sample with the same sample after one flagged case is left out, so you can see what that case does to the mean, the standard deviation, and the range.',
+      'Explore outlier impact',
+      'Shows how leaving one flagged case out of this view changes the mean, the median, the standard deviation, and the range. The Outlier Impact Index summarizes that movement.',
       [
-        'Choose one case. The radios are a single comparison, not a multiple selection. All cases included puts every eligible value back.',
-        'Detection rule sets the fence. Standard uses 1.5 × IQR. Outer uses 3 × IQR. Changing the rule returns the comparison to all cases and screens the same sample again.',
-        'The header count is every row in the selected range. Eligible cases are the numeric values in this column.'
+        'The header methods only decide which cases are offered. IQR 1.5, IQR 3, Z-score, MAD, and Grubbs each screen the same eligible values. Changing the method returns the comparison to all cases.',
+        'Check one case, or leave All cases included checked. Checking a case is a single comparison. Unchecking it puts every eligible value back.',
+        'The middle table is the resulting statistics. Change = retained sample − all cases.',
+        'The index and its four components sit apart from the checklist and the table. The gauge is the index. Each bar is that component’s own normalized change, from 0 to 100. The bars are not weights, and they do not add up to the index.'
       ],
       [
-        'The opening lines name how many values sit strictly outside the fence, and where that fence is.',
-        'The sentences under the score are the changes: excluding the case, minus all cases. The score is a 0–100 description of those changes. Mean is 40%, standard deviation is 35%, and range is 25%. Slight is below 34, Moderate is below 67, and Strong is 67 to 100. A higher score is a larger movement, not a better result.',
-        'The boxes share one numeric axis. The box is the middle 50%, the line is the median, and the whiskers run from the minimum to the maximum. The marked point is the excluded value on the original distribution.',
-        'In the table, Change = excluding selected − all cases. Range is the maximum minus the minimum.'
+        'An index of 0 means these four summaries did not move. A larger index means the summaries are more sensitive to leaving that case out. The number is points on a 0–100 scale, not a percentage and not a probability.',
+        'Mean and median changes are divided by the original sample standard deviation. The standard-deviation change uses that same original standard deviation. The range change is the reduction in the range, divided by the original range. Each ratio is capped at 1 before it enters the index.',
+        'The index is 100 × the square root of 0.25 × mean² + 0.15 × median² + 0.40 × SD² + 0.20 × range², using those capped ratios. This weighting is a proposed description for this view (OII v0.1). It is not an established test.',
+        'The small boxes share one numeric axis. The box is the middle 50%, the line is the median, and the whiskers run from the minimum to the maximum.'
       ],
       [
-        'Quartiles follow the box plot: each quartile is an ordered value in the sample. Q1, Q3, and the IQR set the fence. A case is flagged only when it is strictly outside that fence.',
-        'The exclusion is temporary. Other Univariate views use it until you choose All cases included. The worksheet data remain unchanged.',
-        'Intervals and tests are not adjusted for choosing an exclusion after looking at the data. A change in those results would not show that the population became normal, and it would not show that the result improved.',
-        'When the IQR is zero, flags identify values outside the middle 50% range. Review repeated values carefully.'
+        'The index does not say a case is an error, and it is not a reason to delete the case. Detection and the index answer different questions.',
+        'The comparison stays inside this view. Other Univariate views keep the full eligible sample. The worksheet data remain unchanged.',
+        'The index needs at least two observations in the original sample and at least two remaining. Otherwise it is unavailable, rather than shown as zero.',
+        'Quartiles follow the box plot: each quartile is an ordered value in the sample. IQR fences are computed once on all eligible cases and are not recomputed after a case is unchecked.'
       ]
     ),
 

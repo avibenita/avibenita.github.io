@@ -198,20 +198,73 @@ assert.ok(text.indexOf('Sensitivity analysis') >= 0);
 assert.ok(text.indexOf('does not establish that the population became normal') >= 0);
 assert.ok(!/improvement/i.test(text));
 
+function closeOii(actual, expected, label) {
+  const err = Math.abs(actual - expected);
+  assert.ok(err <= 1e-8, label + ' got ' + actual + ' expected ' + expected + ' err ' + err);
+}
+
 const impact = api.impactIndex(allSummary, subsetSummary);
-assert.strictEqual(impact.band, 'strong');
-assert.ok(impact.score >= 67 && impact.score <= 100, 'impact score ' + impact.score);
+assert.strictEqual(impact.formula, 'OII v0.1');
+assert.strictEqual(impact.available, true);
+closeOii(impact.dMean, 0.3160947742681616, 'B dMean');
+closeOii(impact.dMedian, 0, 'B dMedian');
+closeOii(impact.dSD, 0.9692420107281197, 'B dSD');
+closeOii(impact.dRange, 0.9777777777777777, 'B dRange');
+closeOii(impact.score, 76.938994227065, 'B OII');
+assert.strictEqual(impact.display, 77);
 assert.strictEqual(api.impactIndex(allSummary, allSummary).score, 0);
-assert.strictEqual(api.impactIndex(allSummary, allSummary).band, 'none');
+assert.strictEqual(api.impactIndex(allSummary, allSummary).display, 0);
+
+const fixtureA = api.summarize([1, 2, 3, 4, 5]);
+assert.strictEqual(api.impactIndex(fixtureA, fixtureA).score, 0);
+
+const fixtureC0 = api.summarize([-10, -1, 0, 1, 10]);
+const fixtureC1 = api.summarize([-1, 0, 1]);
+const fixtureC = api.impactIndex(fixtureC0, fixtureC1);
+closeOii(fixtureC.dMean, 0, 'C dMean');
+closeOii(fixtureC.dMedian, 0, 'C dMedian');
+closeOii(fixtureC.dSD, 0.8592804910539417, 'C dSD');
+closeOii(fixtureC.dRange, 0.9, 'C dRange');
+closeOii(fixtureC.score, 67.627301064168, 'C OII');
+
+const constants = api.summarize([5, 5, 5, 5, 5]);
+const constantsKept = api.summarize([5, 5, 5, 5]);
+assert.strictEqual(api.impactIndex(constants, constantsKept).score, 0);
+const spike = api.summarize([5, 5, 5, 5, 5, 5, 5, 5, 5, 100]);
+const spikeKept = api.summarize([5, 5, 5, 5, 5, 5, 5, 5, 5]);
+const fixtureD = api.impactIndex(spike, spikeKept);
+closeOii(fixtureD.dMean, 0.31622776601683794, 'D dMean');
+closeOii(fixtureD.dMedian, 0, 'D dMedian');
+closeOii(fixtureD.dSD, 1, 'D dSD');
+closeOii(fixtureD.dRange, 1, 'D dRange');
+closeOii(fixtureD.score, 79.056941504209, 'D OII');
+assert.strictEqual(api.impactIndex(spike, api.summarize([5])).available, false);
+assert.strictEqual(api.impactIndex(api.summarize([1, 2, 3]), api.summarize([0, 9])).available, false);
+
+function transformed(values, shift, scale) {
+  return values.map(function (value) { return shift + scale * value; });
+}
+const shifted = api.impactIndex(api.summarize(transformed(ordinary, 10, -3)), api.summarize(transformed(ordinary.slice(0, 9), 10, -3)));
+closeOii(shifted.score, impact.score, 'E scale OII');
 
 const impactSession = sessionFor(ordinary);
 assert.strictEqual(impactSession.interpretationInput().impact.score, 0);
-assert.strictEqual(impactSession.interpretationInput().impact.band, 'none');
+assert.strictEqual(impactSession.interpretationInput().impact.available, true);
 impactSession.setMode('subset');
 const impactInput = impactSession.interpretationInput();
-assert.strictEqual(impactInput.impact.band, 'strong');
+assert.strictEqual(impactInput.impact.score, 77);
 assert.ok(impactInput.impact.reading.indexOf('Excluding 1 of 10') >= 0);
-assert.ok(impactInput.impact.reading.indexOf('strongest movement') >= 0);
+assert.ok(impactInput.impact.reading.indexOf('largest normalized component') >= 0);
+const obvious = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50].map(function (value, index) {
+  return { id: 'case:' + index, value: value, label: 'Row ' + (index + 1), sourceIndex: index };
+});
+['z', 'mad', 'grubbs', 'iqr15', 'iqr3'].forEach(function (rule) {
+  assert.deepStrictEqual(api.screenByRule(obvious, rule).flagged.map(function (row) { return row.value; }), [50], rule);
+});
+const ruleSnap = ordinarySession.setRule('mad');
+assert.strictEqual(ruleSnap.rule, 'mad');
+assert.strictEqual(ruleSnap.mode, 'all');
+assert.deepStrictEqual(ruleSnap.selectedIds, []);
 
 const assessedImpact = interpretation.buildUnivariateAssessment({
   variable: 'x',

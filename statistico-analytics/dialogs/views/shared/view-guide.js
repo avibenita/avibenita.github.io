@@ -135,7 +135,7 @@
       'Shows how leaving one flagged case out of this view changes the mean, the median, the standard deviation, and the range. The Outlier Impact Index summarizes that movement.',
       [
         'The header methods only decide which cases are offered. IQR 1.5, IQR 3, Z-score, MAD, and Grubbs each screen the same eligible values. Changing the method returns the comparison to all outliers removed.',
-        'The view opens with All outliers removed checked: every flagged case is left out together. All cases included puts every eligible value back. Checking one case compares that case alone.',
+        'The view opens with All outliers removed checked: every flagged case is left out together. Uncheck any of them to keep that case, or check several to leave out only that group. All cases included puts every eligible value back.',
         'The middle table is the resulting statistics. Change = retained sample − all cases.',
         'The index and its four components sit apart from the checklist and the table. The gauge is the index. Each bar is that component’s own normalized change, from 0 to 100. The bars are not weights, and they do not add up to the index.'
       ],

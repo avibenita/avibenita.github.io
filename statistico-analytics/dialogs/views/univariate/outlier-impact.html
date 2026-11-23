@@ -14,7 +14,7 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261123oii2"></script>
+  <script src="../shared-header.js?v=20261123tabs1"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <style>
@@ -75,7 +75,8 @@
     .oi-method b { display: block; font-size: 13px; font-weight: 650; }
     .oi-method small { display: block; margin-top: 2px; color: var(--text-muted); font-size: 11px; }
     .oi-method.is-on { border-color: rgba(129,140,248,0.95); background: rgba(129,140,248,0.16); }
-    .oi-split { display: grid; grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.1fr); gap: 14px; }
+    .oi-stage { display: grid; grid-template-columns: minmax(280px, 0.86fr) minmax(440px, 1.14fr); gap: 14px; align-items: start; }
+    .oi-results { position: sticky; top: 8px; }
     .oi-zone { border-top: 3px solid rgba(129,140,248,0.85); }
     .oi-checks { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow: auto; margin-top: 12px; }
     .oi-check {
@@ -171,8 +172,9 @@
     .oi th:first-child, .oi td:first-child { text-align: left; }
     .oi th { color: var(--text-muted); font-weight: 600; }
     .oi-empty { padding: 28px 8px; color: var(--text-muted); }
-    @media (max-width: 860px) {
-      .oi-split, .oi-oii-body { grid-template-columns: 1fr; }
+    @media (max-width: 980px) {
+      .oi-stage, .oi-oii-body { grid-template-columns: 1fr; }
+      .oi-results { position: static; }
     }
   </style>
 </head>
@@ -187,6 +189,7 @@
   <script>
     (function () {
       var root = document.getElementById('oi-root');
+      var revealResults = false;
 
       function api() { return window.StatisticoOutlierSensitivity; }
 
@@ -298,15 +301,17 @@
       function readChoice(key, rule) {
         try {
           var parsed = JSON.parse(sessionStorage.getItem(CHOICE_KEY) || 'null');
-          if (!parsed || parsed.sampleKey !== key || parsed.rule !== rule) return '';
-          return parsed.id || '';
-        } catch (e) { return ''; }
+          if (!parsed || parsed.sampleKey !== key || parsed.rule !== rule) return { mode: 'flagged', ids: [] };
+          if (parsed.mode === 'none' || parsed.id === 'none') return { mode: 'none', ids: [] };
+          if (parsed.mode === 'some' && Array.isArray(parsed.ids)) return { mode: 'some', ids: parsed.ids };
+          if (parsed.id && parsed.id !== 'flagged') return { mode: 'some', ids: [parsed.id] };
+          return { mode: 'flagged', ids: [] };
+        } catch (e) { return { mode: 'flagged', ids: [] }; }
       }
 
-      function writeChoice(key, rule, id) {
+      function writeChoice(key, rule, mode, ids) {
         try {
-          if (!id) sessionStorage.removeItem(CHOICE_KEY);
-          else sessionStorage.setItem(CHOICE_KEY, JSON.stringify({ sampleKey: key, rule: rule, id: id }));
+          sessionStorage.setItem(CHOICE_KEY, JSON.stringify({ sampleKey: key, rule: rule, mode: mode, ids: ids || [] }));
         } catch (e) {}
       }
 
@@ -504,12 +509,18 @@
         var flagged = snap.flagged || [];
         var key = sampleKey(snap);
         var stored = readChoice(key, rule);
-        var chosen = stored && stored !== 'none' && stored !== 'flagged'
-          ? (flagged.filter(function (row) { return row.id === stored; })[0] || null)
-          : null;
-        if (stored && stored !== 'none' && stored !== 'flagged' && !chosen) writeChoice(key, rule, 'flagged');
-        var mode = !flagged.length || stored === 'none' ? 'none' : (chosen ? 'one' : 'flagged');
-        var excluded = mode === 'one' ? [chosen] : (mode === 'flagged' ? flagged : []);
+        var allowed = {};
+        flagged.forEach(function (row) { allowed[row.id] = true; });
+        var selectedIds = !flagged.length || stored.mode === 'none'
+          ? []
+          : (stored.mode === 'flagged'
+            ? flagged.map(function (row) { return row.id; })
+            : (stored.ids || []).filter(function (id) { return allowed[id]; }));
+        if (stored.mode === 'some' && !selectedIds.length && flagged.length) selectedIds = flagged.map(function (row) { return row.id; });
+        var selected = {};
+        selectedIds.forEach(function (id) { selected[id] = true; });
+        var allOn = flagged.length > 0 && selectedIds.length === flagged.length;
+        var excluded = flagged.filter(function (row) { return selected[row.id]; });
         var allValues = (snap.cases || []).map(function (row) { return row.value; });
         var kept = excluded.length ? keptValues(snap.cases, excluded.map(function (row) { return row.id; })) : allValues;
         var baseline = engine.summarize(allValues);
@@ -518,16 +529,18 @@
         var countLine = flagged.length
           ? flagged.length + ' case' + (flagged.length === 1 ? '' : 's') + ' flagged among ' + snap.baselineN + ' eligible cases.'
           : 'No cases flagged among ' + snap.baselineN + ' eligible cases.';
-        var excludeLabel = mode === 'one'
-          ? rowPhrase(chosen.label)
-          : (flagged.length === 1 ? rowPhrase(flagged[0].label) : (flagged.length + ' flagged cases'));
-        var afterLabel = mode === 'none' ? 'All cases included' : (mode === 'flagged' ? 'All outliers removed' : ('Excluding ' + excludeLabel));
+        var excludeLabel = excluded.length === 1
+          ? rowPhrase(excluded[0].label)
+          : (excluded.length === 2
+            ? rowPhrase(excluded[0].label) + ' and ' + rowPhrase(excluded[1].label)
+            : (excluded.length + ' flagged cases'));
+        var afterLabel = !excluded.length ? 'All cases included' : (allOn ? 'All outliers removed' : ('Excluding ' + excludeLabel));
         var lead = flagged.length
-          ? checkRow(mode === 'flagged', 'All outliers removed', 'Every flagged case is left out. This is the starting comparison.', 'data-all-flagged="1"', 'oi-check-lead')
+          ? checkRow(allOn, 'All outliers removed', 'Every flagged case is left out. This is the starting comparison.', 'data-all-flagged="1"', 'oi-check-lead')
           : '';
-        var checks = checkRow(mode === 'none', 'All cases included', 'Nothing is left out of the comparison.', 'data-all="1"');
+        var checks = checkRow(!excluded.length, 'All cases included', 'Nothing is left out of the comparison.', 'data-all="1"');
         flagged.forEach(function (row) {
-          checks += checkRow(mode === 'one' && chosen.id === row.id, 'Exclude ' + rowPhrase(row.label) + ' · Value: ' + fmt(row.value), sideText(rule, row.reason), 'data-case="' + esc(row.id) + '"');
+          checks += checkRow(!!selected[row.id], 'Exclude ' + rowPhrase(row.label) + ' · Value: ' + fmt(row.value), sideText(rule, row.reason), 'data-case="' + esc(row.id) + '"');
         });
         if (!flagged.length) checks += '<p class="oi-note">This method does not flag any eligible case.</p>';
         var methods = METHODS.map(function (method) {
@@ -535,31 +548,36 @@
         }).join('');
         var marks = excluded.map(function (row) { return { value: row.value, strong: true }; });
         var gap = coverageSentence(snap.coverage);
-        var chartLabel = mode === 'none' ? 'All cases' : afterLabel;
+        var chartLabel = excluded.length ? afterLabel : 'All cases';
         root.innerHTML = ''
           + '<header class="oi-head"><div><div class="oi-kicker">Detection</div><h2>Explore outlier impact</h2>'
-          + '<p class="oi-note">These methods only decide which cases can be checked. The index below is a separate description of what changes.</p></div>'
+          + '<p class="oi-note">These methods only decide which cases can be checked. The index beside the list shows what those choices change.</p></div>'
           + '<div class="oi-methods" role="group" aria-label="Detection method">' + methods + '</div>'
           + '<p class="oi-summary">' + esc(ruleLine(rule, screen)) + '</p></header>'
-          + '<div class="oi-split">'
+          + '<div class="oi-stage">'
           + '<section class="oi-card oi-zone"><div class="oi-kicker">1 · Cases</div><h2>Choose what to leave out</h2>'
           + '<p class="oi-summary">' + esc(countLine) + '</p>'
           + (gap ? '<p class="oi-note">' + esc(gap) + '</p>' : '')
           + lead
           + '<div class="oi-checks">' + checks + '</div>'
-          + '<p class="oi-note">All outliers removed is the starting comparison. Check one case to look at that case alone. Temporary comparison within this view. Original data remain unchanged.</p></section>'
-          + '<section class="oi-card oi-zone"><div class="oi-kicker">2 · Statistics</div><h2>Before and after exclusion</h2>'
-          + comparisonTable(metricRows(baseline, active), afterLabel)
-          + '</section></div>'
-          + '<section class="oi-card oi-zone"><div class="oi-kicker">3 · Outlier Impact Index</div><h2>Outlier Impact Index</h2>'
+          + '<p class="oi-note">Check any flagged cases. All outliers removed leaves every flagged case out. Temporary comparison within this view. Original data remain unchanged.</p></section>'
+          + '<section class="oi-card oi-zone oi-results" id="oi-results"><div class="oi-kicker">2 · Outlier Impact Index</div><h2>Outlier Impact Index</h2>'
           + '<p class="oi-note">Change in descriptive statistics. Summarizes changes in mean, median, standard deviation and range when the selected case is excluded. Larger values indicate greater sensitivity.</p>'
           + '<div class="oi-oii-body">' + gauge(impact) + componentRows(impact) + '</div>'
-          + '<p class="oi-read">' + esc(impactSentence(mode !== 'none', excludeLabel, baseline, active, impact)) + '</p>'
-          + boxes(allValues, mode === 'none' ? null : kept, chartLabel, marks)
-          + '<p class="oi-note">All cases on the first row' + (mode === 'none' ? '' : ', and the retained sample underneath') + '. Box: middle 50% · Line: median · Whiskers: minimum to maximum.</p>'
+          + '<p class="oi-read">' + esc(impactSentence(!!excluded.length, excludeLabel, baseline, active, impact)) + '</p>'
+          + boxes(allValues, excluded.length ? kept : null, chartLabel, marks)
+          + '<p class="oi-note">All cases on the first row' + (excluded.length ? ', and the retained sample underneath' : '') + '. Box: middle 50% · Line: median · Whiskers: minimum to maximum.</p>'
+          + '</section></div>'
+          + '<section class="oi-card oi-zone"><div class="oi-kicker">3 · Statistics</div><h2>Before and after exclusion</h2>'
+          + comparisonTable(metricRows(baseline, active), afterLabel)
           + '</section>';
         if (window.StatisticoHeader && snap.baselineN) {
           window.StatisticoHeader.updateTitle('Explore outlier impact');
+        }
+        if (revealResults) {
+          var panel = document.getElementById('oi-results');
+          if (panel && panel.scrollIntoView) panel.scrollIntoView({ block: 'nearest' });
+          revealResults = false;
         }
       }
 
@@ -570,7 +588,8 @@
         var before = session.snapshot();
         var next = method.getAttribute('data-rule');
         if (!before || before.rule === next) return;
-        writeChoice(sampleKey(before), before.rule, '');
+        writeChoice(sampleKey(before), next, 'flagged', []);
+        revealResults = true;
         session.setRule(next);
         session.setMode('all');
         paint();
@@ -584,9 +603,17 @@
         if (!snap) return;
         var key = sampleKey(snap);
         var rule = snap.rule || 'iqr15';
-        if (input.hasAttribute('data-all-flagged')) writeChoice(key, rule, input.checked ? 'flagged' : 'none');
-        else if (input.hasAttribute('data-all')) writeChoice(key, rule, input.checked ? 'none' : 'flagged');
-        else if (input.hasAttribute('data-case')) writeChoice(key, rule, input.checked ? input.getAttribute('data-case') : 'flagged');
+        if (input.hasAttribute('data-all-flagged')) writeChoice(key, rule, input.checked ? 'flagged' : 'none', []);
+        else if (input.hasAttribute('data-all')) writeChoice(key, rule, input.checked ? 'none' : 'flagged', []);
+        else if (input.hasAttribute('data-case')) {
+          var ids = [];
+          root.querySelectorAll('[data-case]').forEach(function (box) {
+            if (box.checked) ids.push(box.getAttribute('data-case'));
+          });
+          var flaggedCount = (snap.flagged || []).length;
+          writeChoice(key, rule, !ids.length ? 'none' : (ids.length === flaggedCount ? 'flagged' : 'some'), ids);
+        }
+        revealResults = true;
         session.setMode('all');
         paint();
       });

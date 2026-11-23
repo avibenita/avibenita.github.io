@@ -1196,7 +1196,7 @@ const StatisticoHeader = {
     const viewTitles = {
       // Univariate views
       'histogram': 'Distribution \u00B7 Histogram',
-      'boxplot': 'Outliers impact \u00B7 Box plot',
+      'boxplot': 'Outliers impact \u00B7 Outliers',
       'qqplot': 'Normality \u00B7 PP/QQ',
       'normality': 'Normality \u00B7 Tests',
       'kernel': 'Kernel',
@@ -2089,7 +2089,7 @@ const StatisticoHeader = {
       percentile: 'Percentile cut points.',
       kernel: 'Smoothed density estimate.',
       'by-group': 'Compare results across categories, segments, or conditions to reveal differences, consistency, and patterns hidden by the overall analysis.',
-      'outlier-impact': 'See how excluding one flagged case moves the mean, spread, and range.',
+      'outlier-impact': 'See how excluding flagged cases moves the mean, spread, and range.',
       normality: 'Shapiro-Wilk, Anderson-Darling, and friends.',
       qqplot: 'PP and QQ probability plots.',
       hypothesis: 'One-sample mean / median test.',
@@ -2162,9 +2162,9 @@ const StatisticoHeader = {
                 view: 'boxplot',
                 icon: 'fa-chart-gantt',
                 label: 'Outliers impact',
-                description: 'Quartiles, flagged points, and how one case moves the summary.',
+                description: 'Flagged points by several methods, and how those cases move the summary.',
                 facets: [
-                  { view: 'boxplot', file: 'univariate/boxplot-standalone.html', label: 'Box plot' },
+                  { view: 'boxplot', file: 'univariate/boxplot-standalone.html', label: 'Outliers' },
                   { view: 'outlier-impact', file: 'univariate/outlier-impact.html', label: 'Impact' }
                 ]
               },
@@ -2781,7 +2781,7 @@ const StatisticoHeader = {
       boxplot: 'Compare quartiles, fences, and extreme observations.',
       'boxplot-main': 'Inspect the full range and IQR fence in one view.',
       'boxplot-outliers': 'Review flagged points by detection method.',
-      'outlier-impact': 'See how excluding one flagged case moves the mean, spread, and range.',
+      'outlier-impact': 'See how excluding flagged cases moves the mean, spread, and range.',
       kernel: 'Inspect the smoothed density of the distribution.',
       normality: 'Review the formal normality test battery.',
       qqplot: 'Compare sample quantiles against a reference distribution.',
@@ -4265,7 +4265,7 @@ const StatisticoHeader = {
     if (this.currentView === 'boxplot' || this.currentView === 'outlier-impact') {
       const onBox = this.currentView === 'boxplot';
       return [
-        { tabKey: 'boxplot-main', label: 'Box plot', icon: 'fa-chart-gantt', panel: 'main', panelId: 'boxplotPanel-main', inPage: onBox },
+        { tabKey: 'boxplot-outliers', label: 'Outliers', icon: 'fa-circle-exclamation', panel: 'outliers', panelId: 'boxplotPanel-outliers', inPage: onBox },
         { tabKey: 'outlier-impact', label: 'Impact', icon: 'fa-bolt', view: 'outlier-impact', file: 'univariate/outlier-impact.html' }
       ];
     }
@@ -4537,7 +4537,7 @@ const StatisticoHeader = {
     if (headerBar) headerBar.classList.add('statistico-header--with-views');
 
     const activeInPageTab = this.currentView === 'boxplot'
-      ? (globalThis.__boxplotActiveTab || 'main')
+      ? (globalThis.__boxplotActiveTab || 'outliers')
       : (this.currentView === 'outlier-impact' ? '' : (globalThis.__byGroupActiveTab || 'stats'));
 
     const tabsHtml = viewTabs.map((t) => this._buildUniWsTabBtn({
@@ -9663,9 +9663,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261123oii2')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261123tabs1')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261123oii2');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261123tabs1');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;

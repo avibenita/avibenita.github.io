@@ -147,7 +147,7 @@
       ],
       [
         'The reading says what to do with the flagged cases from the summary they move. A range change is about the ends, a spread change is about the standard deviation, and a mean change is a reason to compare the mean with the median. The index still does not prove a row is an error.',
-        'The comparison stays inside this view. Other Univariate views keep the full eligible sample. The worksheet data remain unchanged.',
+        'The comparison stays inside this view. Other Univariate views keep the full eligible sample. The original worksheet is left as it is. New sheet without selected outliers writes a copy of the range, with those rows left out, onto a new worksheet.',
         'The index needs at least two observations in the original sample and at least two remaining. Otherwise it is unavailable, rather than shown as zero.',
         'Quartiles follow the box plot: each quartile is an ordered value in the sample. IQR fences are computed once on all eligible cases and are not recomputed after a case is unchecked.'
       ]

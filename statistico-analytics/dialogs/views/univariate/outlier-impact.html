@@ -16,7 +16,7 @@
   <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261123act"></script>
+  <script src="../shared-header.js?v=20261124sheet"></script>
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
   <style>
@@ -116,6 +116,26 @@
     .oi-reset:active { transform: translateY(1px); }
     .oi-reset:focus-visible { outline: 2px solid #c7d2fe; outline-offset: 2px; }
     .oi-reset-note { color: var(--text-muted); font-size: 12px; }
+    .oi-sheet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+    .oi-sheet {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid #c05621;
+      background: #ffb088;
+      color: #0e141b;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+      cursor: pointer;
+    }
+    .oi-sheet:hover { background: #ffc7a8; }
+    .oi-sheet:disabled { opacity: 0.45; cursor: default; }
+    .oi-sheet:focus-visible { outline: 2px solid #ffb088; outline-offset: 2px; }
+    .oi-sheet-note { color: var(--text-muted); font-size: 12px; }
     .oi-checks {
       display: flex;
       flex-direction: column;
@@ -355,6 +375,8 @@
       }
 
       var CHOICE_KEY = 'statistico.oii.choice';
+      var latestPayload = null;
+      var sheetMessage = '';
       var METHODS = [
         { id: 'iqr15', name: 'IQR', rule: '1.5 × IQR' },
         { id: 'iqr3', name: 'IQR', rule: '3 × IQR' },
@@ -382,6 +404,128 @@
         try {
           sessionStorage.setItem(CHOICE_KEY, JSON.stringify({ sampleKey: key, rule: rule, mode: mode, ids: ids || [] }));
         } catch (e) {}
+      }
+
+      function chosenIds(snap) {
+        var flagged = (snap && snap.flagged) || [];
+        var stored = readChoice(sampleKey(snap || {}), (snap && snap.rule) || 'iqr15');
+        var allowed = {};
+        flagged.forEach(function (row) { allowed[row.id] = true; });
+        var ids = !flagged.length || stored.mode === 'none'
+          ? []
+          : (stored.mode === 'flagged'
+            ? flagged.map(function (row) { return row.id; })
+            : (stored.ids || []).filter(function (id) { return allowed[id]; }));
+        if (stored.mode === 'some' && !ids.length && flagged.length) ids = flagged.map(function (row) { return row.id; });
+        return ids;
+      }
+
+      function analysisPayload() {
+        if (latestPayload && (latestPayload.sourceRowsAll || latestPayload.sourceRows || latestPayload.values)) return latestPayload;
+        try { return JSON.parse(localStorage.getItem('univariateResults') || 'null'); } catch (e) { return null; }
+      }
+
+      function sheetCell(value) {
+        if (value == null) return '';
+        if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string') return value;
+        return String(value);
+      }
+
+      function rowsWithoutOutliers(payload, excluded) {
+        var drop = {};
+        excluded.forEach(function (row) { drop[row.sourceIndex] = true; });
+        var body = payload && (payload.sourceRowsAll || payload.sourceRows);
+        if (Array.isArray(body) && body.length) {
+          var kept = body.filter(function (_row, index) { return !drop[index]; }).map(function (row) {
+            return (row || []).map(sheetCell);
+          });
+          if (Array.isArray(payload.sourceHeaders) && payload.sourceHeaders.length) {
+            kept.unshift(payload.sourceHeaders.map(sheetCell));
+          }
+          return kept;
+        }
+        var column = (payload && (payload.column || payload.variableName)) || 'Value';
+        var cases = [];
+        if (window.StatisticoOutlierSensitivity) {
+          var session = window.StatisticoOutlierSensitivity.session();
+          var snap = session && session.snapshot();
+          cases = (snap && snap.cases) || [];
+        }
+        var selected = {};
+        excluded.forEach(function (row) { selected[row.id] = true; });
+        return [[column]].concat(cases.filter(function (row) { return !selected[row.id]; }).map(function (row) {
+          return [sheetCell(row.value)];
+        }));
+      }
+
+      function sheetBaseName(column) {
+        var stem = String(column || 'Range').replace(/[\\/?*\[\]:]/g, ' ').replace(/\s+/g, ' ').trim() || 'Range';
+        var suffix = ' without outliers';
+        if (stem.length + suffix.length <= 31) return stem + suffix;
+        return stem.slice(0, Math.max(1, 31 - suffix.length)) + suffix;
+      }
+
+      function uniqueSheetName(base, taken) {
+        var name = base.slice(0, 31);
+        var n = 2;
+        while (taken[name.toLowerCase()]) {
+          var tail = ' ' + n;
+          name = base.slice(0, Math.max(1, 31 - tail.length)) + tail;
+          n += 1;
+        }
+        return name;
+      }
+
+      function createSheetWithoutOutliers() {
+        var engine = api();
+        var snap = engine && engine.session().snapshot();
+        if (!snap || snap.unavailable) return;
+        var ids = {};
+        chosenIds(snap).forEach(function (id) { ids[id] = true; });
+        var excluded = (snap.flagged || []).filter(function (row) { return ids[row.id]; });
+        if (!excluded.length) {
+          sheetMessage = 'Check the outliers to leave out first.';
+          paint();
+          return;
+        }
+        var payload = analysisPayload() || {};
+        var rows = rowsWithoutOutliers(payload, excluded);
+        if (!rows.length || rows.length < 2) {
+          sheetMessage = 'No rows remain for a new sheet.';
+          paint();
+          return;
+        }
+        if (typeof Excel === 'undefined' || !Excel.run) {
+          sheetMessage = 'Open this view in Excel to create the sheet.';
+          paint();
+          return;
+        }
+        var column = payload.column || payload.variableName || 'Range';
+        Excel.run(function (context) {
+          var sheets = context.workbook.worksheets;
+          sheets.load('items/name');
+          return context.sync().then(function () {
+            var taken = {};
+            sheets.items.forEach(function (sheet) { taken[String(sheet.name).toLowerCase()] = true; });
+            var name = uniqueSheetName(sheetBaseName(column), taken);
+            var sheet = sheets.add(name);
+            var width = rows.reduce(function (max, row) { return Math.max(max, row.length); }, 1);
+            var values = rows.map(function (row) {
+              var copy = row.slice();
+              while (copy.length < width) copy.push('');
+              return copy;
+            });
+            sheet.getRangeByIndexes(0, 0, values.length, width).values = values;
+            sheet.activate();
+            return context.sync().then(function () { return name; });
+          });
+        }).then(function (name) {
+          sheetMessage = 'Created sheet “' + name + '”.';
+          paint();
+        }).catch(function () {
+          sheetMessage = 'The new sheet could not be created.';
+          paint();
+        });
       }
 
       function sideText(rule, reason) {
@@ -687,16 +831,7 @@
           return;
         }
         var flagged = snap.flagged || [];
-        var key = sampleKey(snap);
-        var stored = readChoice(key, rule);
-        var allowed = {};
-        flagged.forEach(function (row) { allowed[row.id] = true; });
-        var selectedIds = !flagged.length || stored.mode === 'none'
-          ? []
-          : (stored.mode === 'flagged'
-            ? flagged.map(function (row) { return row.id; })
-            : (stored.ids || []).filter(function (id) { return allowed[id]; }));
-        if (stored.mode === 'some' && !selectedIds.length && flagged.length) selectedIds = flagged.map(function (row) { return row.id; });
+        var selectedIds = chosenIds(snap);
         var selected = {};
         selectedIds.forEach(function (id) { selected[id] = true; });
         var allOn = flagged.length > 0 && selectedIds.length === flagged.length;
@@ -743,6 +878,10 @@
           + lead
           + '<div class="oi-checks">' + checks + '</div>'
           + squeezeTable(engine, allValues, kept)
+          + '<div class="oi-sheet-row"><button type="button" class="oi-sheet" data-sheet="1"' + (excluded.length ? '' : ' disabled') + '>New sheet without selected outliers</button>'
+          + '<span class="oi-sheet-note">' + esc(sheetMessage || (excluded.length
+            ? 'Writes this range to a new worksheet, leaving out the checked outliers.'
+            : 'Check the outliers to leave out. The new sheet keeps every other row.')) + '</span></div>'
           + '</section>'
           + '<section class="oi-card oi-zone oi-results" id="oi-results"><h2>Outlier Impact Index\u2122</h2>'
           + '<p class="oi-note">Change in descriptive statistics. Summarizes changes in mean, median, standard deviation and range when the selected case is excluded. Larger values indicate greater sensitivity.</p>'
@@ -763,6 +902,12 @@
       }
 
       root.addEventListener('click', function (event) {
+        var sheet = event.target && event.target.closest ? event.target.closest('[data-sheet]') : null;
+        if (sheet) {
+          createSheetWithoutOutliers();
+          return;
+        }
+        sheetMessage = '';
         var reset = event.target && event.target.closest ? event.target.closest('[data-reset]') : null;
         if (reset && api()) {
           var resetSession = api().session();
@@ -789,6 +934,7 @@
       root.addEventListener('change', function (event) {
         var input = event.target;
         if (!input || input.type !== 'checkbox' || !api()) return;
+        sheetMessage = '';
         var session = api().session();
         var snap = session.snapshot();
         if (!snap) return;
@@ -809,6 +955,7 @@
       });
 
       window.handleDataReceived = function (payload) {
+        if (payload) latestPayload = payload;
         if (api() && payload) {
           var session = api().session();
           session.sync(payload);

@@ -2064,21 +2064,27 @@
       const light = document.documentElement.getAttribute('data-theme') === 'light';
       if (light) {
         return {
-          track: 'rgba(51,65,85,0.28)',
-          whisker: 'rgba(30,41,59,0.62)',
-          box: 'rgba(99,102,241,0.28)',
-          stroke: 'rgba(67,56,202,0.5)',
-          median: 'rgba(15,23,42,0.9)',
-          dot: 'rgba(234,88,12,0.78)'
+          boxTop: 'rgba(224,231,255,0.95)',
+          boxBottom: 'rgba(129,140,248,0.42)',
+          stroke: 'rgba(67,56,202,0.78)',
+          median: '#1e1b4b',
+          stem: 'rgba(67,56,202,0.62)',
+          shadow: 'rgba(30,41,59,0.14)',
+          dot: '#ea580c',
+          dotLine: '#fff7ed',
+          label: '#c05621'
         };
       }
       return {
-        track: 'rgba(226,232,240,0.28)',
-        whisker: 'rgba(226,232,240,0.72)',
-        box: 'rgba(165,180,252,0.38)',
-        stroke: 'rgba(224,231,255,0.78)',
-        median: 'rgba(255,255,255,0.92)',
-        dot: 'rgba(253,186,116,0.82)'
+        boxTop: 'rgba(224,231,255,0.72)',
+        boxBottom: 'rgba(99,102,241,0.50)',
+        stroke: 'rgba(238,242,255,0.95)',
+        median: '#f8fafc',
+        stem: 'rgba(199,210,254,0.92)',
+        shadow: 'rgba(2,6,23,0.42)',
+        dot: '#ffb088',
+        dotLine: '#fff6ea',
+        label: '#ffd8b0'
       };
     }
 
@@ -2097,18 +2103,17 @@
         const idx = ((v - spec.min) / span) * (spec.bins - 1);
         return xAxis.toPixels(idx, false);
       };
-      const y = Math.max(6, chart.plotTop - 32);
-      const h = 22;
+      const room = Math.max(0, chart.plotTop - 6);
+      const h = Math.max(18, Math.min(28, room - 4));
+      const y = Math.max(4, chart.plotTop - h - 6);
       const mid = y + h / 2;
-      const xMin = xOf(spec.min);
-      const xMax = xOf(spec.max);
       const xLow = xOf(spec.low);
       const xHigh = xOf(spec.high);
       const xQ1 = xOf(spec.q1);
       const xQ3 = xOf(spec.q3);
       const xMed = xOf(spec.median);
       const boxX = Math.min(xQ1, xQ3);
-      const boxW = Math.max(2, Math.abs(xQ3 - xQ1));
+      const boxW = Math.max(3, Math.abs(xQ3 - xQ1));
       const d = currentDecimals;
       const fmt = function (v) { return Number.isFinite(v) ? v.toFixed(d) : '—'; };
       const tip = 'Box plot'
@@ -2120,36 +2125,65 @@
         + (spec.outliers.length ? '  ·  ' + spec.outliers.length + ' outside 1.5×IQR' : '');
       const g = chart.renderer.g('hist-box').attr({ zIndex: 7, role: 'img', 'aria-label': tip }).add();
       chart._histBoxGroup = g;
-      const stroke = function (path, color, width) {
+      const stroke = function (path, color, width, z) {
         return chart.renderer.path(path).attr({
           stroke: color,
           'stroke-width': width,
           'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
           fill: 'none',
-          zIndex: 7
+          zIndex: z || 7
         }).add(g);
       };
-      stroke(['M', xMin, mid, 'L', xMax, mid], ink.track, 2.5);
-      stroke(['M', xLow, mid, 'L', xHigh, mid], ink.whisker, 3);
-      stroke(['M', xLow, mid - 8, 'L', xLow, mid + 8], ink.whisker, 3);
-      stroke(['M', xHigh, mid - 8, 'L', xHigh, mid + 8], ink.whisker, 3);
-      const box = chart.renderer.rect(boxX, y, boxW, h, 4).attr({
-        fill: ink.box,
+      const cap = Math.round(h * 0.42);
+      stroke(['M', xLow, mid, 'L', xHigh, mid], ink.stem, 2);
+      stroke(['M', xLow, mid - cap, 'L', xLow, mid + cap], ink.stem, 2.2);
+      stroke(['M', xHigh, mid - cap, 'L', xHigh, mid + cap], ink.stem, 2.2);
+      chart.renderer.rect(boxX + 1, y + 2, boxW, h, 6).attr({
+        fill: ink.shadow,
+        zIndex: 7
+      }).add(g);
+      const box = chart.renderer.rect(boxX, y, boxW, h, 6).attr({
+        fill: {
+          linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
+          stops: [[0, ink.boxTop], [1, ink.boxBottom]]
+        },
         stroke: ink.stroke,
-        'stroke-width': 1.75,
+        'stroke-width': 1.5,
         zIndex: 8
       }).add(g);
-      stroke(['M', xMed, y - 2, 'L', xMed, y + h + 2], ink.median, 3);
-      const drawn = spec.outliers.length > 48 ? spec.outliers.filter(function (_, i) { return i % 2 === 0; }) : spec.outliers;
-      drawn.forEach(function (v) {
-        chart.renderer.circle(xOf(v), mid, 3.4).attr({
-          fill: ink.dot,
-          stroke: 'rgba(255,255,255,0.28)',
-          'stroke-width': 0.6,
-          zIndex: 9
-        }).add(g);
-      });
+      stroke(['M', xMed, y + 3, 'L', xMed, y + h - 3], ink.median, 2.75, 9);
+      const drawn = spec.outliers.length > 48
+        ? spec.outliers.filter(function (_, i) { return i % 2 === 0; })
+        : spec.outliers;
+      let lastLabel = -1e9;
       const ns = 'http://www.w3.org/2000/svg';
+      drawn.forEach(function (v) {
+        const x = xOf(v);
+        const dot = chart.renderer.circle(x, mid, 4.6).attr({
+          fill: ink.dot,
+          stroke: ink.dotLine,
+          'stroke-width': 1.1,
+          zIndex: 10
+        }).add(g);
+        if (dot.element) {
+          const mark = document.createElementNS(ns, 'title');
+          mark.textContent = fmt(v);
+          dot.element.appendChild(mark);
+        }
+        if (y >= 18 && drawn.length <= 12 && x - lastLabel >= 36) {
+          chart.renderer.text(fmt(v), x, y - 5).attr({
+            align: 'center',
+            zIndex: 11
+          }).css({
+            color: ink.label,
+            fontSize: '11px',
+            fontWeight: '650',
+            fontFamily: 'Inter, Segoe UI, system-ui, sans-serif'
+          }).add(g);
+          lastLabel = x;
+        }
+      });
       if (box.element) {
         const title = document.createElementNS(ns, 'title');
         title.textContent = tip;
@@ -2312,6 +2346,7 @@
       const chartContainer = document.getElementById('histogram-chart');
       const reuseChart = isSliderMoving && histogramChart && histogramChart.renderer;
       let chartHeight = reuseChart ? histogramChart.chartHeight : getHistogramChartHeight();
+      const boxSpacing = showBox ? (chartHeight >= 300 ? 64 : 48) : 10;
       if (!reuseChart && chartContainer) chartContainer.style.height = chartHeight + 'px';
       if (reuseChart) {
         try {
@@ -2321,7 +2356,7 @@
               plotLines: _chartPlotLines,
               plotBands: _chartPlotBands
             },
-            chart: { spacingTop: showBox ? 48 : 10 },
+            chart: { spacingTop: boxSpacing },
             series: series
           }, true, false, false);
           return;
@@ -2338,7 +2373,7 @@
           backgroundColor: '#242C37',
           style: { fontFamily: 'Inter, Segoe UI, system-ui, sans-serif' },
           animation: enableAnimation ? { duration: 420 } : false,
-          spacingTop: showBox ? 48 : 10,
+          spacingTop: boxSpacing,
           spacingBottom: 8,
           spacingLeft: 6,
           spacingRight: 10,

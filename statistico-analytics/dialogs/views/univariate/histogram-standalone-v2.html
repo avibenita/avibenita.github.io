@@ -38,14 +38,13 @@
   
   <!-- Highcharts -->
   <script src="https://code.highcharts.com/highcharts.js"></script>
-  <script src="https://code.highcharts.com/highcharts-more.js"></script>
   <script src="https://code.highcharts.com/modules/histogram-bellcurve.js"></script>
   
   <!-- Shared Header -->
   <!-- build: 20260519u -->
   <link rel="stylesheet" href="../shared-header.css?v=20261123row2">
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261123notab"></script>
+  <script src="../shared-header.js?v=20261124box"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -1233,36 +1232,49 @@
       width: 100% !important;
       max-width: 100% !important;
     }
-    .histogram-stage {
-      position: relative;
-      flex: 1 1 0;
-      min-height: 0;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
+  </style>
+  <style>
+    #histogram-panel .range-track,
+    #histogram-panel .range-active {
+      height: 5px !important;
+      border-radius: 999px;
     }
-    #histogram-box-chart {
-      position: absolute;
-      left: 0;
-      top: 0;
-      z-index: 6;
-      pointer-events: none;
-      opacity: 0;
-      overflow: visible;
+    #histogram-panel .range-track {
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.16));
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.45);
     }
-    #histogram-box-chart.is-on {
-      pointer-events: auto;
-      opacity: 1;
-      animation: hist-box-appear 920ms cubic-bezier(0.16, 1, 0.3, 1);
+    #histogram-panel .range-active {
+      background: linear-gradient(90deg, #ffc7a8, #fb923c 55%, #ffb088);
+      box-shadow: 0 0 12px rgba(251,146,60,0.42);
     }
-    #histogram-box-chart .highcharts-background,
-    #histogram-box-chart .highcharts-plot-background {
-      fill: transparent !important;
+    #histogram-panel .range-sliders input[type="range"]::-webkit-slider-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 32% 30%, #ffffff 0%, #eef2ff 38%, #818cf8 72%);
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.42), 0 0 0 4px rgba(129,140,248,0.20);
+      cursor: ew-resize;
+      transition: box-shadow 0.16s ease, transform 0.16s ease;
     }
-    @keyframes hist-box-appear {
-      0% { opacity: 0; transform: translateY(-14px); }
-      40% { opacity: 1; }
-      100% { opacity: 1; transform: none; }
+    #histogram-panel .range-sliders input[type="range"]::-webkit-slider-thumb:hover {
+      box-shadow: 0 4px 14px rgba(15,23,42,0.5), 0 0 0 6px rgba(129,140,248,0.28);
+    }
+    #histogram-panel .range-sliders input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #c7d2fe;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.42), 0 0 0 4px rgba(129,140,248,0.20);
+      cursor: ew-resize;
+    }
+    html[data-theme="light"] #histogram-panel .range-track {
+      background: linear-gradient(180deg, rgba(15,23,42,0.08), rgba(15,23,42,0.16));
+      box-shadow: inset 0 1px 2px rgba(15,23,42,0.18);
+    }
+    html[data-theme="light"] #histogram-panel .range-sliders input[type="range"]::-webkit-slider-thumb {
+      background: radial-gradient(circle at 32% 30%, #ffffff 0%, #e0e7ff 40%, #6366f1 78%);
     }
   </style>
 </head>
@@ -1371,10 +1383,6 @@
               <input type="checkbox" id="showMedianLine" onchange="createHistogram()">
               Median
             </label>
-            <label class="overlay-toggle" for="showBoxPlot" title="Quartiles and whiskers on the same value scale">
-              <input type="checkbox" id="showBoxPlot" onchange="createHistogram()">
-              Box
-            </label>
           </div>
 
           <!-- Data Range shares the toolbar row and grows into the leftover width -->
@@ -1394,10 +1402,7 @@
         </div>
 
         <!-- Chart -->
-        <div class="histogram-stage">
-          <div id="histogram-chart"></div>
-          <div id="histogram-box-chart" aria-hidden="true"></div>
-        </div>
+        <div id="histogram-chart"></div>
       </div>
     </div>
 
@@ -2056,296 +2061,12 @@
     let isSliderMoving = false;
     let sliderTimeout = null;
 
-    let histogramBoxSpec = null;
-
-    function histogramBoxSummary(data) {
-      const n = data && data.length;
-      if (!n) return null;
-      const sorted = data.slice().sort(function (a, b) { return a - b; });
-      const q1 = sorted[Math.floor(n * 0.25)];
-      const median = sorted[Math.floor(n * 0.5)];
-      const q3 = sorted[Math.floor(n * 0.75)];
-      const iqr = q3 - q1;
-      const lower = q1 - 1.5 * iqr;
-      const upper = q3 + 1.5 * iqr;
-      let low = null;
-      let high = null;
-      const outliers = [];
-      for (let i = 0; i < n; i++) {
-        const v = sorted[i];
-        if (v < lower || v > upper) outliers.push(v);
-        else {
-          if (low == null || v < low) low = v;
-          if (high == null || v > high) high = v;
-        }
-      }
-      if (low == null) {
-        low = q1;
-        high = q3;
-      }
-      return {
-        q1: q1,
-        median: median,
-        q3: q3,
-        low: low,
-        high: high,
-        min: sorted[0],
-        max: sorted[n - 1],
-        outliers: outliers
-      };
-    }
-
-    let histogramBoxChart = null;
-    let histogramBoxFrame = 0;
-
-    function histogramBoxPalette() {
-      const light = document.documentElement.getAttribute('data-theme') === 'light';
-      if (light) {
-        return {
-          boxTop: 'rgba(224,231,255,0.95)',
-          boxBottom: 'rgba(129,140,248,0.42)',
-          stroke: 'rgba(67,56,202,0.78)',
-          median: '#1e1b4b',
-          stem: 'rgba(67,56,202,0.62)',
-          shadow: 'rgba(30,41,59,0.14)',
-          dot: '#ea580c',
-          dotLine: '#fff7ed',
-          label: '#c05621'
-        };
-      }
-      return {
-        boxTop: 'rgba(224,231,255,0.72)',
-        boxBottom: 'rgba(99,102,241,0.50)',
-        stroke: 'rgba(238,242,255,0.95)',
-        median: '#f8fafc',
-        stem: 'rgba(199,210,254,0.92)',
-        shadow: 'rgba(2,6,23,0.42)',
-        dot: '#ffb088',
-        dotLine: '#fff6ea',
-        label: '#ffd8b0'
-      };
-    }
-
-    function dismissHistogramBox() {
-      if (histogramBoxChart) {
-        try { histogramBoxChart.destroy(); } catch (e) {}
-        histogramBoxChart = null;
-      }
-      const host = document.getElementById('histogram-box-chart');
-      if (host) {
-        host.classList.remove('is-on');
-        host.setAttribute('aria-hidden', 'true');
-      }
-    }
-
-    function mountHistogramBox(hist, animate) {
-      const host = document.getElementById('histogram-box-chart');
-      const spec = histogramBoxSpec;
-      if (!host) return;
-      if (!spec) {
-        dismissHistogramBox();
-        return;
-      }
-      if (!hist || !hist.plotWidth || typeof Highcharts === 'undefined' || !Highcharts.seriesTypes || !Highcharts.seriesTypes.boxplot) return;
-      const ink = histogramBoxPalette();
-      const span = (spec.max - spec.min) || 1;
-      const bins = Math.max(2, spec.bins || 2);
-      const pad = (0.5 * span) / (bins - 1);
-      const axisMin = spec.min - pad;
-      const axisMax = spec.max + pad;
-      const marginLeft = hist.plotLeft;
-      const marginRight = Math.max(8, hist.chartWidth - hist.plotLeft - hist.plotWidth);
-      const height = Math.round(hist.plotTop);
-      if (height < 36) {
-        dismissHistogramBox();
-        return;
-      }
-      const marginTop = height >= 60 ? 16 : 6;
-      const pointWidth = Math.max(18, Math.min(34, height - marginTop - 12));
-      const width = hist.chartWidth;
-      const plotW = Math.max(1, width - marginLeft - marginRight);
-      const d = currentDecimals;
-      const fmt = function (v) { return Number.isFinite(v) ? v.toFixed(d) : '—'; };
-      host.style.width = width + 'px';
-      host.style.height = height + 'px';
-      host.setAttribute('aria-label', 'Box plot. Minimum ' + fmt(spec.min)
-        + ', Q1 ' + fmt(spec.q1) + ', median ' + fmt(spec.median)
-        + ', Q3 ' + fmt(spec.q3) + ', maximum ' + fmt(spec.max));
-      const drawn = spec.outliers.length > 48
-        ? spec.outliers.filter(function (_, i) { return i % 2 === 0; })
-        : spec.outliers.slice();
-      let lastLabel = -1e9;
-      const dots = drawn.map(function (value) {
-        const frac = (value - axisMin) / ((axisMax - axisMin) || 1);
-        const x = marginLeft + frac * plotW;
-        const showLabel = drawn.length <= 12 && x - lastLabel >= 36;
-        if (showLabel) lastLabel = x;
-        return { x: 0, y: value, dataLabels: { enabled: showLabel } };
-      });
-      const appear = animate ? { duration: 980, easing: function (t) { return 1 - Math.pow(1 - t, 3); } } : false;
-      const options = {
-        chart: {
-          type: 'boxplot',
-          inverted: true,
-          backgroundColor: 'rgba(0,0,0,0)',
-          plotBackgroundColor: null,
-          plotBorderWidth: 0,
-          animation: appear,
-          width: width,
-          height: height,
-          marginLeft: marginLeft,
-          marginRight: marginRight,
-          marginTop: marginTop,
-          marginBottom: 4,
-          spacing: [0, 0, 0, 0],
-          style: { fontFamily: 'Inter, Segoe UI, system-ui, sans-serif' }
-        },
-        title: { text: null },
-        credits: { enabled: false },
-        legend: { enabled: false },
-        xAxis: {
-          categories: ['Distribution'],
-          visible: false,
-          lineWidth: 0,
-          tickLength: 0,
-          min: -0.5,
-          max: 0.5
-        },
-        yAxis: {
-          min: axisMin,
-          max: axisMax,
-          visible: false,
-          startOnTick: false,
-          endOnTick: false,
-          gridLineWidth: 0
-        },
-        tooltip: {
-          outside: true,
-          backgroundColor: 'rgba(7,9,14,0.97)',
-          borderColor: 'rgba(255,255,255,0.12)',
-          borderRadius: 8,
-          shadow: false,
-          style: { color: '#e8eef6', fontSize: '12px' },
-          headerFormat: '',
-          pointFormatter: function () {
-            if (this.series.type === 'scatter') return 'Outside the fence <b>' + fmt(this.y) + '</b>';
-            return 'Upper whisker <b>' + fmt(this.high) + '</b><br/>'
-              + 'Q3 <b>' + fmt(this.q3) + '</b><br/>'
-              + 'Median <b>' + fmt(this.median) + '</b><br/>'
-              + 'Q1 <b>' + fmt(this.q1) + '</b><br/>'
-              + 'Lower whisker <b>' + fmt(this.low) + '</b>';
-          }
-        },
-        plotOptions: {
-          boxplot: {
-            animation: appear,
-            fillColor: {
-              linearGradient: { x1: 0, y1: 0, x2: 0, y2: 1 },
-              stops: [[0, ink.boxTop], [1, ink.boxBottom]]
-            },
-            color: ink.stroke,
-            lineWidth: 1.6,
-            medianColor: ink.median,
-            medianWidth: 2.6,
-            stemColor: ink.stem,
-            stemWidth: 2,
-            whiskerColor: ink.stem,
-            whiskerLength: '48%',
-            whiskerWidth: 2,
-            pointWidth: pointWidth,
-            groupPadding: 0
-          },
-          scatter: {
-            animation: appear ? { duration: 720, defer: 280 } : false,
-            marker: {
-              radius: 5,
-              symbol: 'circle',
-              fillColor: ink.dot,
-              lineColor: ink.dotLine,
-              lineWidth: 1.1
-            },
-            dataLabels: {
-              enabled: true,
-              allowOverlap: false,
-              crop: false,
-              overflow: 'allow',
-              formatter: function () { return fmt(this.y); },
-              style: {
-                color: ink.label,
-                fontSize: '11px',
-                fontWeight: '650',
-                textOutline: 'none',
-                fontFamily: 'Inter, Segoe UI, system-ui, sans-serif'
-              },
-              y: -12
-            }
-          }
-        },
-        series: [
-          {
-            type: 'boxplot',
-            name: 'Box plot',
-            data: [{ low: spec.low, q1: spec.q1, median: spec.median, q3: spec.q3, high: spec.high }],
-            animation: appear
-          },
-          {
-            type: 'scatter',
-            name: 'Outside the fence',
-            data: dots,
-            animation: appear ? { duration: 720, defer: 280 } : false
-          }
-        ]
-      };
-      if (!histogramBoxChart || animate) {
-        if (histogramBoxChart) {
-          try { histogramBoxChart.destroy(); } catch (e) {}
-          histogramBoxChart = null;
-        }
-        host.classList.remove('is-on');
-        void host.offsetWidth;
-        host.classList.add('is-on');
-        host.setAttribute('aria-hidden', 'false');
-        histogramBoxChart = Highcharts.chart(host, options);
-        return;
-      }
-      host.classList.add('is-on');
-      histogramBoxChart.update({
-        chart: {
-          width: width,
-          height: height,
-          marginLeft: marginLeft,
-          marginRight: marginRight,
-          marginTop: marginTop,
-          animation: false
-        },
-        plotOptions: { boxplot: { pointWidth: pointWidth } },
-        yAxis: { min: axisMin, max: axisMax },
-        series: options.series
-      }, true, false, false);
-    }
-
-    function paintHistogramBox(chart, attempt) {
-      if (histogramBoxFrame) cancelAnimationFrame(histogramBoxFrame);
-      const animate = !histogramBoxChart && !isSliderMoving;
-      const tryAt = attempt || 0;
-      histogramBoxFrame = requestAnimationFrame(function () {
-        histogramBoxFrame = 0;
-        if (histogramChart && chart !== histogramChart) return;
-        if (histogramBoxSpec && chart && !chart.plotWidth && tryAt < 8) {
-          paintHistogramBox(chart, tryAt + 1);
-          return;
-        }
-        mountHistogramBox(chart, animate);
-      });
-    }
-
     function createHistogram() {
       if (!isSliderMoving) applyHistogramChrome();
       const numBinsInput = document.getElementById('numBins');
       const showNormal = document.getElementById('showNormalCurve').checked;
       const showMeanLine = document.getElementById('showMeanLine').checked;
       const showMedianLine = document.getElementById('showMedianLine').checked;
-      const showBox = !!(document.getElementById('showBoxPlot') && document.getElementById('showBoxPlot').checked);
       
       let numBins = parseInt(numBinsInput.value, 10);
       const method = document.getElementById('binningMethod').value;
@@ -2437,36 +2158,6 @@
         });
       }
 
-      histogramBoxSpec = null;
-      if (showBox) {
-        histogramBoxSpec = histogramBoxSummary(currentData);
-        if (histogramBoxSpec) histogramBoxSpec.bins = numBins;
-        series.push({
-          id: 'hist-box-legend',
-          name: 'Box plot',
-          type: 'line',
-          data: [],
-          color: 'rgba(165,180,252,0.92)',
-          legendSymbol: 'rectangle',
-          lineWidth: 8,
-          showInLegend: true,
-          enableMouseTracking: false,
-          includeInDataExport: false,
-          marker: { enabled: false },
-          states: { inactive: { opacity: 1 }, hover: { enabled: false } },
-          events: {
-            legendItemClick: function () {
-              const input = document.getElementById('showBoxPlot');
-              if (input) {
-                input.checked = false;
-                createHistogram();
-              }
-              return false;
-            }
-          }
-        });
-      }
-      
       // Determine if animation should be enabled
       const enableAnimation = !isSliderMoving;
       
@@ -2494,7 +2185,6 @@
       const chartContainer = document.getElementById('histogram-chart');
       const reuseChart = isSliderMoving && histogramChart && histogramChart.renderer;
       let chartHeight = reuseChart ? histogramChart.chartHeight : getHistogramChartHeight();
-      const boxSpacing = showBox ? (chartHeight >= 240 ? 76 : 46) : 10;
       if (!reuseChart && chartContainer) chartContainer.style.height = chartHeight + 'px';
       if (reuseChart) {
         try {
@@ -2504,7 +2194,7 @@
               plotLines: _chartPlotLines,
               plotBands: _chartPlotBands
             },
-            chart: { spacingTop: boxSpacing },
+            chart: { spacingTop: 10 },
             series: series
           }, true, false, false);
           return;
@@ -2521,7 +2211,7 @@
           backgroundColor: '#242C37',
           style: { fontFamily: 'Inter, Segoe UI, system-ui, sans-serif' },
           animation: enableAnimation ? { duration: 420 } : false,
-          spacingTop: boxSpacing,
+          spacingTop: 10,
           spacingBottom: 8,
           spacingLeft: 6,
           spacingRight: 10,
@@ -2529,10 +2219,7 @@
           plotBackgroundColor: null,
           plotBorderColor: null,
           plotBorderWidth: 0,
-          plotShadow: false,
-          events: {
-            render: function () { paintHistogramBox(this); }
-          }
+          plotShadow: false
         },
         title: {
           text: null
@@ -2823,7 +2510,6 @@
     document.addEventListener('statistico-theme-changed', function() {
       if (typeof Highcharts !== 'undefined' && Highcharts.charts) {
         Highcharts.charts.forEach(function(c) { if (c) {
-          if (c.renderTo && c.renderTo.id === 'histogram-box-chart') return;
           var isLight = document.documentElement.getAttribute('data-theme') === 'light';
           var bg = isLight ? '#ffffff' : '#242C37';
           var tc = isLight ? '#111827' : '#ffffff';
@@ -2838,11 +2524,6 @@
             title: { style: { color: tc } }, subtitle: { style: { color: at } }
           }, true);
         }});
-        if (histogramBoxChart) {
-          try { histogramBoxChart.destroy(); } catch (e) {}
-          histogramBoxChart = null;
-        }
-        if (histogramChart && histogramBoxSpec) paintHistogramBox(histogramChart);
       }
     });
 

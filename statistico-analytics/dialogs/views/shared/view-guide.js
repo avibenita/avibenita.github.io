@@ -2615,6 +2615,7 @@
       if (moduleName === 'univariate' && (key === 'by-group' || key === 'by-group-stats')) {
         key = key === 'by-group' ? 'by-group-stats' : key;
       }
+      if (moduleName === 'univariate' && key === 'box-chart') key = 'boxplot';
       const table = this._guides[moduleName] || {};
       return table[key] || null;
     },

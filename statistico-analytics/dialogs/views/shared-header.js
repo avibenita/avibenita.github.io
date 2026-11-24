@@ -1207,6 +1207,7 @@ const StatisticoHeader = {
       'hypothesis': 'One-Sample Test',
       'outliers': 'Outliers',
       'percentile': 'Distribution \u00B7 Percentiles',
+      'box-chart': 'Distribution \u00B7 Boxplot',
       'outlier-impact': 'Explore outlier impact',
       // Correlation views
       'correlation-matrix': 'Correlation Matrix',
@@ -2150,11 +2151,12 @@ const StatisticoHeader = {
                 view: 'distribution',
                 icon: 'fa-chart-area',
                 label: 'Distribution',
-                description: 'Histogram, CDF, and percentile views.',
+                description: 'Histogram, CDF, percentiles, and the box plot.',
                 facets: [
                   { view: 'histogram',  file: 'univariate/histogram-standalone-v2.html', label: 'Histogram' },
                   { view: 'cdf',        file: 'univariate/cumulative-distribution.html', label: 'CDF' },
-                  { view: 'percentile', file: 'univariate/percentile-standalone.html',   label: 'Percentiles' }
+                  { view: 'percentile', file: 'univariate/percentile-standalone.html',   label: 'Percentiles' },
+                  { view: 'box-chart', file: 'univariate/boxplot-standalone.html?classic=1', label: 'Boxplot' }
                 ]
               },
               {
@@ -2723,12 +2725,14 @@ const StatisticoHeader = {
         tabKey: 'uni-core',
         label: 'Core descriptive',
         icon: 'fa-chart-area',
-        views: ['histogram', 'cdf', 'percentile', 'boxplot', 'kernel', 'outlier-impact'],
+        views: ['histogram', 'cdf', 'percentile', 'box-chart', 'boxplot', 'kernel', 'outlier-impact'],
         defaultFile: 'univariate/histogram-standalone-v2.html',
+        resultTabLimit: 4,
         tabs: [
           { view: 'histogram', tabKey: 'histogram', label: 'Histogram', icon: 'fa-chart-column', file: 'univariate/histogram-standalone-v2.html' },
           { view: 'cdf', tabKey: 'cdf', label: 'Cumulative', icon: 'fa-chart-line', file: 'univariate/cumulative-distribution.html' },
           { view: 'percentile', tabKey: 'percentile', label: 'Percentiles', icon: 'fa-percent', file: 'univariate/percentile-standalone.html' },
+          { view: 'box-chart', tabKey: 'box-chart', label: 'Boxplot', icon: 'fa-chart-simple', file: 'univariate/boxplot-standalone.html?classic=1' },
           { view: 'boxplot', tabKey: 'boxplot', label: 'Outliers impact', icon: 'fa-chart-gantt', file: 'univariate/boxplot-standalone.html' },
           { view: 'kernel', tabKey: 'kernel', label: 'Kernel', icon: 'fa-bezier-curve', file: 'univariate/kernel-standalone.html' }
         ]
@@ -4278,7 +4282,7 @@ const StatisticoHeader = {
     if (!viewTabs.length) return false;
     if (activeSection.id === 'group' && this.currentView === 'by-group') return true;
     if (this.currentView === 'boxplot' || this.currentView === 'outlier-impact') return true;
-    if (activeSection.id === 'core' && ['histogram', 'cdf', 'percentile'].indexOf(this.currentView) !== -1) return true;
+    if (activeSection.id === 'core' && ['histogram', 'cdf', 'percentile', 'box-chart'].indexOf(this.currentView) !== -1) return true;
     return viewTabs.some((t) => t.view === this.currentView);
   },
 
@@ -9663,9 +9667,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261124sheet')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261124box')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261124sheet');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261124box');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;

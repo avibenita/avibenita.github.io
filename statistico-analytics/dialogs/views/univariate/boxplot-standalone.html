@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Outliers impact · Outliers</title>
+  <script>
+    if (new URLSearchParams(location.search).get('classic') === '1') {
+      document.documentElement.classList.add('classic-box');
+      document.title = 'Distribution \u00B7 Boxplot';
+    }
+  </script>
   
   <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
@@ -18,7 +24,7 @@
   <!-- Shared Components -->
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">  <script src="../shared-brand-logo.js?v=20261005light1"></script>
 
-  <script src="../shared-header.js?v=20261123notab"></script>
+  <script src="../shared-header.js?v=20261124box"></script>
   <!-- Preload row-filter assets so the chip / banner / panel appear populated on first render. -->
   <script src="../shared/uni-row-filter.js?v=20260524a" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524a" data-filter-api="1"></script>
@@ -166,6 +172,9 @@
       display: flex;
     }
 
+    html.classic-box #boxplotPanel-main { display: flex; }
+    html.classic-box #boxplotPanel-outliers { display: none !important; }
+
     #boxplotPanel-main {
       gap: 12px;
     }
@@ -295,6 +304,8 @@
   </div>
 
   <script>
+    const classicBox = document.documentElement.classList.contains('classic-box');
+
     // Height fitter
     function fitLayout() {
       const frame   = document.querySelector('.right-col') || document.querySelector('.laptop-frame') || document.body;
@@ -345,7 +356,7 @@
     let originalData = [];
     let currentVariableName = 'Variable';
     let currentSampleSize = 0;
-    let activeBoxplotTab = 'outliers';
+    let activeBoxplotTab = classicBox ? 'main' : 'outliers';
     try {
       const savedPanel = sessionStorage.getItem('statistico.boxplot.panel');
       if (savedPanel === 'outliers') {
@@ -361,19 +372,22 @@
       frame.src = 'outliers-standalone.html?embed=1&parent=boxplot&cb=' + Date.now();
       frame.dataset.loaded = '1';
     }
-    ensureOutliersEmbed();
+    if (!classicBox) ensureOutliersEmbed();
 
     function switchBoxplotTab(tab) {
-      activeBoxplotTab = tab === 'main' ? 'outliers' : (tab || 'outliers');
+      var next = classicBox ? 'main' : (tab === 'main' ? 'outliers' : (tab || 'outliers'));
+      activeBoxplotTab = next;
       window.__boxplotActiveTab = activeBoxplotTab;
       document.querySelectorAll('.boxplot-panel').forEach((panel) => {
         panel.classList.toggle('is-active', panel.id === `boxplotPanel-${activeBoxplotTab}`);
       });
       if (activeBoxplotTab === 'outliers') ensureOutliersEmbed();
       if (typeof StatisticoHeader !== 'undefined' && StatisticoHeader.updateTitle) {
-        StatisticoHeader.updateTitle(activeBoxplotTab === 'outliers'
-          ? 'Outliers impact \u00B7 Outliers'
-          : 'Outliers impact \u00B7 Box plot');
+        StatisticoHeader.updateTitle(classicBox
+          ? 'Distribution \u00B7 Boxplot'
+          : (activeBoxplotTab === 'outliers'
+            ? 'Outliers impact \u00B7 Outliers'
+            : 'Outliers impact \u00B7 Box plot'));
       }
       fitLayout();
       requestAnimationFrame(function () {
@@ -446,9 +460,13 @@
       console.log('DOM Content Loaded');
       
       // Initialize shared header
-      StatisticoHeader.init('boxplot', 'Variable', 0);
-      if (typeof StatisticoHeader !== 'undefined') { StatisticoHeader.initSidebarPage(); StatisticoHeader.updateTitle('Outliers impact \u00B7 Outliers'); };
-      ensureOutliersEmbed();
+      StatisticoHeader.init(classicBox ? 'box-chart' : 'boxplot', 'Variable', 0);
+      if (typeof StatisticoHeader !== 'undefined') {
+        StatisticoHeader.initSidebarPage();
+        StatisticoHeader.updateTitle(classicBox ? 'Distribution \u00B7 Boxplot' : 'Outliers impact \u00B7 Outliers');
+      }
+      if (classicBox) switchBoxplotTab('main');
+      else ensureOutliersEmbed();
       console.log('? Shared header initialized');
       setTimeout(fitLayout, 120);
       
@@ -505,7 +523,7 @@
     // Handle data received
     function handleDataReceived(data) {
       try {
-        if (typeof StatisticoHeader !== 'undefined' && !StatisticoHeader.shouldProcessUniPayload(data, 'boxplot')) return;
+        if (typeof StatisticoHeader !== 'undefined' && !StatisticoHeader.shouldProcessUniPayload(data, classicBox ? 'box-chart' : 'boxplot')) return;
         console.log('Data received:', data);
         
         // Save to localStorage for view switching

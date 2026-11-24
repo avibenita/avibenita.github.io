@@ -60,7 +60,20 @@
       box-shadow: 0 8px 22px rgba(20,24,32,0.06);
     }
     .oi-head { display: flex; flex-direction: column; gap: 12px; }
-    .oi-methods { display: flex; flex-wrap: wrap; gap: 8px; }
+    .oi-methods-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .oi-methods { display: flex; flex: 1 1 280px; flex-wrap: wrap; gap: 8px; }
+    .oi-detect {
+      flex: 0 0 auto;
+      margin-left: auto;
+      min-width: 168px;
+      text-align: center;
+      padding: 8px 16px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 165, 120, 0.45);
+      background: rgba(255, 165, 120, 0.1);
+    }
+    .oi-detect-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+    .oi-detect-value { margin-top: 2px; font-size: 20px; font-weight: 650; color: #ffb088; line-height: 1.15; }
     .oi-method {
       appearance: none;
       border: 1px solid rgba(255,255,255,0.16);
@@ -197,16 +210,6 @@
     .oi-radio small { display: block; color: var(--text-muted); }
     .oi-hc { width: 100%; height: 230px; margin-top: 8px; }
     .oi-squeeze { margin-top: 12px; }
-    .oi-squeeze-head {
-      text-align: center;
-      padding: 8px 8px 6px;
-      border: 1px solid rgba(255,165,120,0.35);
-      border-bottom: 0;
-      border-radius: 8px 8px 0 0;
-      background: rgba(255,165,120,0.1);
-    }
-    .oi-squeeze-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
-    .oi-squeeze-value { margin-top: 2px; font-size: 20px; font-weight: 650; color: #ffb088; }
     .oi-squeeze-table { width: 100%; border-collapse: collapse; font-size: 11px; }
     .oi-squeeze-table th, .oi-squeeze-table td {
       padding: 5px 3px;
@@ -479,19 +482,16 @@
         };
       }
 
-      function squeezeTable(engine, flaggedCount, eligible, allValues, keptValues) {
+      function squeezeTable(engine, allValues, keptValues) {
         var original = rowStats(engine, allValues);
         var retained = rowStats(engine, keptValues);
         if (!original || !retained) return '';
-        var pct = eligible ? ((100 * flaggedCount) / eligible).toFixed(1) : '0.0';
         function cells(label, stats) {
           return '<tr><td>' + label + '</td><td>' + stats.n + '</td><td>' + oneDecimal(stats.mean) + '</td><td>' + oneDecimal(stats.sd)
             + '</td><td>' + oneDecimal(stats.min) + '</td><td>' + oneDecimal(stats.q1) + '</td><td>' + oneDecimal(stats.med)
             + '</td><td>' + oneDecimal(stats.q3) + '</td><td>' + oneDecimal(stats.max) + '</td></tr>';
         }
-        return '<div class="oi-squeeze"><div class="oi-squeeze-head"><div class="oi-squeeze-label">Outliers detected</div>'
-          + '<div class="oi-squeeze-value">' + flaggedCount + ' / ' + eligible + ' (' + pct + '%)</div></div>'
-          + '<table class="oi-squeeze-table"><thead><tr><th>Range</th><th>Count</th><th>Mean</th><th>Std</th><th>Min</th><th>Q25</th><th>Q50</th><th>Q75</th><th>Max</th></tr></thead><tbody>'
+        return '<div class="oi-squeeze"><table class="oi-squeeze-table"><thead><tr><th>Range</th><th>Count</th><th>Mean</th><th>Std</th><th>Min</th><th>Q25</th><th>Q50</th><th>Q75</th><th>Max</th></tr></thead><tbody>'
           + cells('Original', original)
           + cells('Without outliers', retained)
           + '</tbody></table></div>';
@@ -680,7 +680,9 @@
         root.innerHTML = ''
           + '<header class="oi-head"><div><div class="oi-kicker">Detection</div><h2>Explore outlier impact</h2>'
           + '<p class="oi-note">These methods only decide which cases can be checked. The index beside the list shows what those choices change.</p></div>'
-          + '<div class="oi-methods" role="group" aria-label="Detection method">' + methods + '</div>'
+          + '<div class="oi-methods-row"><div class="oi-methods" role="group" aria-label="Detection method">' + methods + '</div>'
+          + '<div class="oi-detect"><div class="oi-detect-label">Outliers detected</div><div class="oi-detect-value">'
+          + flagged.length + ' / ' + (snap.baselineN || allValues.length) + ' (' + (snap.baselineN ? ((100 * flagged.length) / snap.baselineN).toFixed(1) : '0.0') + '%)</div></div></div>'
           + '<p class="oi-summary">' + esc(ruleLine(rule, screen)) + '</p></header>'
           + '<div class="oi-stage">'
           + '<section class="oi-card oi-zone"><button type="button" class="oi-reset" data-reset="1">Reset to all<small>Nothing is left out of the comparison.</small></button>'
@@ -689,7 +691,7 @@
           + (gap ? '<p class="oi-note">' + esc(gap) + '</p>' : '')
           + lead
           + '<div class="oi-checks">' + checks + '</div>'
-          + squeezeTable(engine, flagged.length, snap.baselineN || allValues.length, allValues, kept)
+          + squeezeTable(engine, allValues, kept)
           + '</section>'
           + '<section class="oi-card oi-zone oi-results" id="oi-results"><div class="oi-kicker">2 · Outlier Impact Index</div><h2>Outlier Impact Index</h2>'
           + '<p class="oi-note">Change in descriptive statistics. Summarizes changes in mean, median, standard deviation and range when the selected case is excluded. Larger values indicate greater sensitivity.</p>'

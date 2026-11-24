@@ -73,6 +73,12 @@
       box-sizing: border-box;
     }
 
+    @keyframes outlier-star-shine {
+      0%, 100% { opacity: 0.78; filter: drop-shadow(0 0 1.5px rgba(255, 214, 170, 0.45)); }
+      50% { opacity: 1; filter: drop-shadow(0 0 5px rgba(255, 196, 140, 0.95)); }
+    }
+    .outlier-star { animation: outlier-star-shine 2.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+
     body {
       background-color: var(--surface-0);
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -972,6 +978,23 @@
       // Size containers BEFORE Highcharts reads clientHeight
       fitLayout();
 
+      if (!Highcharts.SVGRenderer.prototype.symbols.star) {
+        Highcharts.SVGRenderer.prototype.symbols.star = function (x, y, w, h) {
+          var cx = x + w / 2;
+          var cy = y + h / 2;
+          var outer = Math.min(w, h) / 2;
+          var inner = outer * 0.46;
+          var path = [];
+          for (var i = 0; i < 10; i++) {
+            var radius = i % 2 === 0 ? outer : inner;
+            var angle = -Math.PI / 2 + (i * Math.PI) / 5;
+            path.push(i ? 'L' : 'M', cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
+          }
+          path.push('Z');
+          return path;
+        };
+      }
+
       Highcharts.chart('outliersChart', {
         chart: {
           type: 'scatter',
@@ -1035,10 +1058,22 @@
           {
             name: 'Outliers',
             data: outlierPoints,
-            color: '#e74c3c',
-            marker: { radius: 6, symbol: 'diamond' }
+            color: '#ffd8b0',
+            marker: {
+              radius: 7,
+              symbol: 'star',
+              fillColor: '#ffd8b0',
+              lineColor: '#fff6ea',
+              lineWidth: 0.6
+            }
           }
         ]
+      }, function (chart) {
+        var series = chart.series && chart.series[1];
+        if (!series) return;
+        series.points.forEach(function (point) {
+          if (point.graphic && point.graphic.element) point.graphic.element.classList.add('outlier-star');
+        });
       });
       setTimeout(fitLayout, 80); // re-measure now chart exists
     }

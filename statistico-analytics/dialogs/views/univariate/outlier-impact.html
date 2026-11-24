@@ -132,11 +132,14 @@
       cursor: pointer;
     }
     :root[data-theme="light"] .oi-check { background: #f6f7fa; }
-    .oi-check:has(input:checked) { border-color: rgba(129,140,248,0.8); background: rgba(129,140,248,0.14); }
-    .oi-check::before { border-color: rgba(129,140,248,0.75); background-color: rgba(129,140,248,0.12); }
+    .oi-check:has(input:checked) { border-color: rgba(255,165,120,0.85); background: rgba(255,165,120,0.16); color: #ffb088; }
+    .oi-check:has(input:checked) small { color: #ffc7a8; }
+    html[data-theme="light"] .oi-check:has(input:checked),
+    html[data-theme="light"] .oi-check:has(input:checked) small { color: #c05621 !important; }
+    .oi-check::before { border-color: rgba(148,163,184,0.7); background-color: transparent; }
     .oi-check:has(> input[type="checkbox"]:checked)::before {
-      background-color: #818cf8;
-      border-color: #818cf8;
+      background-color: #ffb088;
+      border-color: #ffb088;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M2.2 6.2 4.8 8.8 9.8 3.2'/%3E%3C/svg%3E");
     }
     .oi-check-lead {
@@ -151,9 +154,9 @@
     .oi-check-lead small { display: block; margin-left: 0; }
     .oi-check-lead span { font-size: 16px; font-weight: 700; }
     .oi-check-lead:has(input:checked) {
-      border-color: #818cf8;
-      background: rgba(129,140,248,0.28);
-      box-shadow: 0 0 0 1px rgba(129,140,248,0.45);
+      border-color: #ffb088;
+      background: rgba(255,165,120,0.24);
+      box-shadow: 0 0 0 1px rgba(255,165,120,0.45);
     }
     .oi-check input { margin-top: 3px; }
     .oi-checks .oi-check { flex: 0 0 36px; align-items: center; min-height: 36px; padding: 0 10px; }
@@ -218,6 +221,8 @@
     }
     .oi-squeeze-table th { color: #9ecbff; font-weight: 650; background: rgba(255,255,255,0.04); }
     .oi-squeeze-table td:first-child, .oi-squeeze-table th:first-child { text-align: left; padding-left: 6px; }
+    .oi-squeeze-kept td { color: #ffb088; background: rgba(255,165,120,0.12); }
+    :root[data-theme="light"] .oi-squeeze-kept td { color: #c05621; background: rgba(255,165,120,0.16); }
     :root[data-theme="light"] .oi-squeeze-table th,
     :root[data-theme="light"] .oi-squeeze-table td { border-color: rgba(20,24,32,0.12); }
     .oi-formula { margin-top: 8px; color: var(--text-muted); font-size: 12px; }
@@ -486,14 +491,14 @@
         var original = rowStats(engine, allValues);
         var retained = rowStats(engine, keptValues);
         if (!original || !retained) return '';
-        function cells(label, stats) {
-          return '<tr><td>' + label + '</td><td>' + stats.n + '</td><td>' + oneDecimal(stats.mean) + '</td><td>' + oneDecimal(stats.sd)
+        function cells(label, stats, rowClass) {
+          return '<tr' + (rowClass ? ' class="' + rowClass + '"' : '') + '><td>' + label + '</td><td>' + stats.n + '</td><td>' + oneDecimal(stats.mean) + '</td><td>' + oneDecimal(stats.sd)
             + '</td><td>' + oneDecimal(stats.min) + '</td><td>' + oneDecimal(stats.q1) + '</td><td>' + oneDecimal(stats.med)
             + '</td><td>' + oneDecimal(stats.q3) + '</td><td>' + oneDecimal(stats.max) + '</td></tr>';
         }
         return '<div class="oi-squeeze"><table class="oi-squeeze-table"><thead><tr><th>Range</th><th>Count</th><th>Mean</th><th>Std</th><th>Min</th><th>Q25</th><th>Q50</th><th>Q75</th><th>Max</th></tr></thead><tbody>'
           + cells('Original', original)
-          + cells('Without outliers', retained)
+          + cells('Without outliers', retained, 'oi-squeeze-kept')
           + '</tbody></table></div>';
       }
 
@@ -538,8 +543,27 @@
         var ink = light ? '#1c2430' : '#e8eef6';
         var muted = light ? '#64748b' : 'rgba(232,238,246,0.72)';
         var grid = light ? 'rgba(20,24,32,0.08)' : 'rgba(255,255,255,0.08)';
-        var dots = full.outliers.map(function (value) { return { x: 0, y: value }; })
-          .concat(kept.outliers.map(function (value) { return { x: 1, y: value }; }));
+        function paintBox(point, fill, line, stem, median) {
+          return Object.assign({ x: point.x }, point, {
+            fillColor: fill,
+            color: line,
+            medianColor: median,
+            stemColor: stem,
+            whiskerColor: stem
+          });
+        }
+        var topBox = paintBox(Object.assign({ x: 0 }, full), 'rgba(129,140,248,0.38)', '#a5b4fc', '#c7d2fe', '#eef2ff');
+        var bottomBox = paintBox(Object.assign({ x: 1 }, kept), 'rgba(255,165,120,0.42)', '#ffb088', '#ffc7a8', '#ffe8d6');
+        var dots = full.outliers.map(function (value) {
+          return { x: 0, y: value, marker: { fillColor: '#818cf8', lineColor: '#ffffff' } };
+        }).concat(kept.outliers.map(function (value) {
+          return {
+            x: 1,
+            y: value,
+            marker: { fillColor: '#ffb088', lineColor: '#ffffff' },
+            dataLabels: { style: { color: '#ffb088' } }
+          };
+        }));
         oiChart = Highcharts.chart(host, {
           chart: {
             type: 'boxplot',
@@ -556,7 +580,14 @@
             categories: ['All cases', afterLabel],
             lineColor: grid,
             tickColor: grid,
-            labels: { style: { color: ink, fontSize: '12px', fontWeight: '600' } }
+            labels: {
+              useHTML: true,
+              formatter: function () {
+                var color = this.pos === 1 ? '#ffb088' : ink;
+                return '<span style="color:' + color + ';font-weight:600">' + this.value + '</span>';
+              },
+              style: { fontSize: '12px' }
+            }
           },
           yAxis: {
             title: { text: null },
@@ -607,7 +638,19 @@
             }
           },
           series: [
-            { name: 'All cases', data: [full, kept], pointPadding: 0.25, groupPadding: 0.15 },
+            { name: 'All cases', type: 'boxplot', data: [topBox], pointPadding: 0.25, groupPadding: 0.15 },
+            {
+              name: afterLabel,
+              type: 'boxplot',
+              data: [bottomBox],
+              fillColor: 'rgba(255,165,120,0.42)',
+              color: '#ffb088',
+              medianColor: '#ffe8d6',
+              stemColor: '#ffc7a8',
+              whiskerColor: '#ffc7a8',
+              pointPadding: 0.25,
+              groupPadding: 0.15
+            },
             { name: 'Outside the fence', type: 'scatter', data: dots }
           ]
         });

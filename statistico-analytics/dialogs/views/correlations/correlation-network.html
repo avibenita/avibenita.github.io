@@ -292,15 +292,15 @@
     .network-node-ring{
       fill:none;
       stroke:var(--accent-1);
-      stroke-opacity:0.78;
-      stroke-width:1.15;
+      stroke-opacity:0.8;
+      stroke-width:1.2;
       pointer-events:none;
     }
 
     .network-node-core{
       fill:var(--accent-1);
-      stroke:rgba(255,255,255,0.82);
-      stroke-width:0.7;
+      stroke:rgba(255,255,255,0.8);
+      stroke-width:0.55;
       pointer-events:none;
     }
 
@@ -323,26 +323,26 @@
     }
 
     .network-label{
-      font-size:12px;
+      font-size:13px;
       font-weight:500;
       letter-spacing:0.01em;
       fill:var(--accent-1);
-      text-anchor:middle;
       pointer-events:none;
       user-select:none;
       paint-order:stroke;
       stroke:var(--surface-1,#1a2332);
-      stroke-width:3px;
+      stroke-width:2.2px;
     }
 
     .network-corr-label{
-      font-size:10px;
+      font-size:10.5px;
+      font-weight:500;
       fill:var(--text-secondary);
       pointer-events:none;
       text-anchor:middle;
       paint-order:stroke;
       stroke:var(--surface-1,#1a2332);
-      stroke-width:3px;
+      stroke-width:2px;
     }
 
     .network-corr-label.dimmed{
@@ -380,9 +380,6 @@
       .network-container{
         min-height:400px;
       }
-      .network-label{
-        font-size:11px;
-      }
     }
 
     @media (max-width: 768px){
@@ -397,9 +394,6 @@
         margin:0 -10px;
         border-radius:0;
       }
-      .network-label{
-        font-size:11px;
-      }
     }
 
     @media (max-width: 480px){
@@ -409,12 +403,6 @@
       .network-container{
         min-height:300px;
         margin:0 -5px;
-      }
-      .network-label{
-        font-size:11px;
-      }
-      .network-corr-label{
-        font-size:9px;
       }
     }
 
@@ -428,9 +416,6 @@
     @media (min-width: 768px) and (max-width: 1024px){
       .network-container{
         min-height:450px;
-      }
-      .network-label{
-        font-size:11px;
       }
     }
   </style>
@@ -483,8 +468,8 @@
 
         <div class="control-group">
           <span class="slider-label">Chart size</span>
-          <input type="range" id="networkChartScaleSlider" min="0.55" max="1" step="0.05" value="0.85" oninput="updateNetworkChartScale(this.value)">
-          <span class="slider-value" id="networkChartScaleValue">0.85x</span>
+          <input type="range" id="networkChartScaleSlider" min="0.55" max="1" step="0.05" value="0.55" oninput="updateNetworkChartScale(this.value)">
+          <span class="slider-value" id="networkChartScaleValue">0.55x</span>
         </div>
 
         <div class="control-group">
@@ -521,16 +506,18 @@
     let networkThreshold = 0;
     let showCorr = true;
     let showOnlyConnected = false;
-    let networkChartScale = 0.85;
+    const NETWORK_CHART_MIN = 0.55;
+    let networkChartScale = NETWORK_CHART_MIN;
     let networkGraphGroup = null;
     let networkFitOnEnd = true;
     let networkLayoutLocked = false;
     let networkRenderFrame = null;
-    const NETWORK_NODE_CORE = 4.5;
-    const NETWORK_NODE_RING = 7;
-    const NETWORK_NODE_GLOW = 11;
-    const NETWORK_NODE_HIT = 18;
-    const NETWORK_LABEL_GAP = 16;
+    const NETWORK_NODE_CORE = 7;
+    const NETWORK_NODE_RING = 10;
+    const NETWORK_NODE_GLOW = 13.5;
+    const NETWORK_NODE_HIT = 20;
+    const NETWORK_LABEL_FONT = 13;
+    const NETWORK_CORR_FONT = 10.5;
     const NETWORK_COLLISION_RADIUS = 26;
     let thresholdRedrawTimer = null;
     let networkZoomBehavior = null;
@@ -770,13 +757,16 @@
       networkSimulation = null;
     }
 
-    function networkMarkerScale() {
+    function networkZoomScale() {
       if (!networkSvgSelection || !networkSvgSelection.node()) return 1;
       const k = d3.zoomTransform(networkSvgSelection.node()).k;
-      if (!(k > 0)) return 1;
-      // Constant size while zoomed in. When the chart is very small, let
-      // the markers shrink so they do not cover the whole graph.
-      return Math.min(1.15, 1 / k);
+      return k > 0 ? k : 1;
+    }
+
+    // Sizes are designed at the minimum chart scale. The slider enlarges
+    // markers, type, and connectors together from that baseline.
+    function networkMarkScale() {
+      return networkChartScale / (networkZoomScale() * NETWORK_CHART_MIN);
     }
 
     function drawNetwork(varNames, matrix) {
@@ -886,8 +876,8 @@
 
       const g = svg.append("g").style("opacity", 0);
 
-      // Add zoom. Marker size stays constant on screen, so chart scale
-      // changes spacing rather than inflating the dots.
+      // Chart scale enlarges markers, labels, and connectors together.
+      // Their designed size is the slider minimum.
       const zoom = d3.zoom()
         .scaleExtent([0.2, 8])
         .filter((event) => {
@@ -940,9 +930,9 @@
       node.append("circle").attr("class", "network-node-core").attr("r", NETWORK_NODE_CORE);
       node.append("circle")
         .attr("class", "network-node-highlight")
-        .attr("r", 1.35)
-        .attr("cx", -1.15)
-        .attr("cy", -1.35);
+        .attr("r", 1.6)
+        .attr("cx", -1.5)
+        .attr("cy", -1.7);
 
       // Node labels
       const labels = g.append("g")
@@ -954,6 +944,8 @@
         .attr("dy", "0.35em");
 
       function applyNetworkTick() {
+        const markScale = networkMarkScale();
+        const k = networkZoomScale();
         link
           .attr("x1", d => d.source.x)
           .attr("y1", d => d.source.y)
@@ -967,25 +959,35 @@
           const edx = tx - sx;
           const edy = ty - sy;
           const elen = Math.hypot(edx, edy) || 1;
+          const nudge = 8 / k;
           d3.select(this)
-            .attr("x", mx + (-edy / elen) * 14)
-            .attr("y", my + (edx / elen) * 14);
+            .attr("x", mx + (-edy / elen) * nudge)
+            .attr("y", my + (edx / elen) * nudge)
+            .style("font-size", (NETWORK_CORR_FONT * markScale) + "px")
+            .style("stroke-width", (2 * markScale) + "px");
         });
 
-        const markerScale = networkMarkerScale();
-        node.attr("transform", d => `translate(${d.x},${d.y}) scale(${markerScale})`);
+        node.attr("transform", d => `translate(${d.x},${d.y}) scale(${markScale})`);
 
         labels.each(function (d) {
           const dx = d.x - width / 2;
           const dy = d.y - height / 2;
           const len = Math.hypot(dx, dy) || 1;
-          const gap = NETWORK_NODE_GLOW * markerScale + NETWORK_LABEL_GAP;
+          const ux = dx / len;
+          const uy = dy / len;
+          const ringScreen = NETWORK_NODE_RING * networkChartScale / NETWORK_CHART_MIN;
+          const outward = Math.abs(ux) > 0.4 ? ringScreen + 8 : ringScreen + 14;
+          const anchor = ux > 0.4 ? "start" : ux < -0.4 ? "end" : "middle";
           d3.select(this)
-            .attr("x", d.x + (dx / len) * gap)
-            .attr("y", d.y + (dy / len) * gap);
+            .attr("text-anchor", anchor)
+            .attr("x", d.x + ux * (outward / k))
+            .attr("y", d.y + uy * (outward / k))
+            .style("font-size", (NETWORK_LABEL_FONT * markScale) + "px")
+            .style("stroke-width", (2.2 * markScale) + "px");
         });
 
         nodes.forEach(d => networkNodePositions.set(d.id, { x: d.x, y: d.y }));
+        applyNetworkThreshold(networkThreshold);
       }
 
       // Store references
@@ -1112,8 +1114,16 @@
       if (!window.networkElements) return;
       const { link, linkLabels } = window.networkElements;
       link
-        .attr("stroke-width", d => Math.abs(d.value) >= threshold ? Math.abs(d.value) * 5 : 0.8)
-        .attr("stroke-dasharray", d => Math.abs(d.value) >= threshold ? null : "3 7")
+        .attr("stroke-width", d => {
+          const weight = Math.abs(d.value);
+          const design = weight >= threshold ? Math.max(1.35, weight * 2.6) : 0.7;
+          return design * networkMarkScale();
+        })
+        .attr("stroke-dasharray", d => {
+          if (Math.abs(d.value) >= threshold) return null;
+          const s = networkMarkScale();
+          return `${2 * s} ${3.2 * s}`;
+        })
         .style("stroke-opacity", d => Math.abs(d.value) >= threshold ? 0.62 : 0.16)
         .classed("dimmed", d => Math.abs(d.value) < threshold);
       linkLabels

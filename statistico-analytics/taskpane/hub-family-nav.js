@@ -69,15 +69,27 @@
     {
       id: "planning",
       label: "Calculators & study planning",
-      tagline: "Plan a study, explore probability, or size staffing.",
-      help: "Power planning, precision, and probability calculators can begin with assumptions. Use the call-center calculator for staffing and service-level questions.",
+      tagline: "Plan a study or calculate from assumptions.",
+      help: "Power, precision, and probability calculators start from assumptions rather than a worksheet range. The CPk calculator estimates capability from specification limits, the mean, and the standard deviation.",
       icon: "fa-calculator",
       accent: "planning",
       modules: [
         { id: "calc-power", label: "Power & Sample Size" },
         { id: "calc-precision", label: "Precision Planning" },
         { id: "calc-distribution-hub", label: "Probability Distributions" },
-        { id: "calc-erlang", label: "Call Center Staffing" }
+        { id: "calc-cpk", label: "CPk Calculator", description: "Cp and Cpk from limits, mean, and standard deviation." }
+      ]
+    },
+    {
+      id: "staffing",
+      label: "Call center staffing",
+      tagline: "Estimate how many agents a service level needs.",
+      help: "Use the Erlang C model for a steady-state staffing estimate. Use Simulations when handle time or abandonment should be simulated.",
+      icon: "fa-headset",
+      accent: "staffing",
+      modules: [
+        { id: "calc-erlang", label: "Erlang C model" },
+        { id: "calc-erlang-sim", label: "Simulations" }
       ]
     },
     {
@@ -109,14 +121,15 @@
     {
       id: "utilities",
       label: "Data & reporting tools",
-      tagline: "Prepare data, make charts, and share results.",
-      help: "Use Prepare Data before analysis, 3D Charts to visualize data, and Publication Tables or EzPaste to share outputs. EzPaste is a proprietary innovation.",
+      tagline: "Prepare data and share results.",
+      help: "Use Prepare Data before analysis, and Publication Tables or EzPaste to share outputs. 3D Charts and EzPaste are utilities for viewing and moving results. EzPaste is a proprietary innovation.",
       icon: "fa-wrench",
       accent: "utilities",
       modules: [
         { id: "prepare-data", label: "Prepare Data" },
-        { id: "multivariable", label: "3D Charts" },
         { id: "publication-tables", label: "Publication Tables" },
+        { divider: "Utilities" },
+        { id: "multivariable", label: "3D Charts" },
         { id: "ezpaste-open", label: "EzPaste", mark: true }
       ]
     }
@@ -124,7 +137,8 @@
 
   var LAUNCHER_SECTIONS = [
     { id: "analysis", label: "Core statistical analysis", familyIds: ["explore", "compare", "model"] },
-    { id: "tools", label: "Planning, quality & utilities", familyIds: ["planning", "quality", "survey", "utilities"] }
+    { id: "planning", label: "Calculators & study planning", familyIds: ["planning"], modules: true },
+    { id: "applications", label: "Specialized applications", familyIds: ["quality", "staffing", "survey", "utilities"] }
   ];
 
   function escapeHtml(value) {
@@ -211,6 +225,7 @@
       return {
         id: section.id,
         label: section.label,
+        modules: !!section.modules,
         families: section.familyIds.map(function (id) { return packed[id]; }).filter(Boolean)
       };
     }).filter(function (section) { return section.families.length > 0; });
@@ -267,24 +282,33 @@
     );
   }
 
-  function cardHtml(family) {
+  function cardHtml(family, opts) {
+    var options = opts || {};
+    var headless = !!options.headless;
     var id = jsId(family.id);
     var helpId = "hub-family-help-" + id;
     var bodyId = "hub-family-body-" + id;
-    var html = '<section class="hub-family-card" data-family="' + escapeHtml(family.accent || family.id) + '">';
-    html += '<div class="hub-family-card-head">';
-    html += '<button type="button" class="hub-family-toggle" aria-expanded="false" aria-controls="' + bodyId + '" onclick="toggleHubFamilyCard(\'' + id + '\')">';
-    html += '<span class="hub-family-icon">' + iconHtml(family.icon) + "</span>";
-    html += '<span class="hub-family-copy"><span class="hub-family-title">' + escapeHtml(family.label) + "</span></span>";
-    html += '<i class="fa-solid fa-chevron-down hub-family-caret" aria-hidden="true"></i>';
-    html += "</button>";
-    html += '<button type="button" class="hub-family-info" aria-label="About ' + escapeHtml(family.label) + '" aria-controls="' + helpId + '" aria-expanded="false" onclick="toggleHubFamilyHelp(\'' + id + '\')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>';
-    html += "</div>";
+    var html = '<section class="hub-family-card' + (headless ? " is-open" : "") + '" data-family="' + escapeHtml(family.accent || family.id) + '"' + (headless ? " data-family-static" : "") + ">";
+    if (!headless) {
+      html += '<div class="hub-family-card-head">';
+      html += '<button type="button" class="hub-family-toggle" aria-expanded="false" aria-controls="' + bodyId + '" onclick="toggleHubFamilyCard(\'' + id + '\')">';
+      html += '<span class="hub-family-icon">' + iconHtml(family.icon) + "</span>";
+      html += '<span class="hub-family-copy"><span class="hub-family-title">' + escapeHtml(family.label) + "</span></span>";
+      html += '<i class="fa-solid fa-chevron-down hub-family-caret" aria-hidden="true"></i>';
+      html += "</button>";
+      html += '<button type="button" class="hub-family-info" aria-label="About ' + escapeHtml(family.label) + '" aria-controls="' + helpId + '" aria-expanded="false" onclick="toggleHubFamilyHelp(\'' + id + '\')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>';
+      html += "</div>";
+    }
     var helpText = [family.tagline, family.help].filter(function (part, index, list) {
       return part && list.indexOf(part) === index;
     }).join(" ");
-    html += '<div class="hub-family-body" id="' + bodyId + '" hidden>';
+    html += '<div class="hub-family-body" id="' + bodyId + '"' + (headless ? "" : " hidden") + ">";
     html += '<div class="hub-family-body-clip">';
+    if (headless) {
+      html += '<div class="hub-family-static-tools">';
+      html += '<button type="button" class="hub-family-info" aria-label="About ' + escapeHtml(family.label) + '" aria-controls="' + helpId + '" aria-expanded="false" onclick="toggleHubFamilyHelp(\'' + id + '\')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>';
+      html += "</div>";
+    }
     html += '<p class="hub-family-help" id="' + helpId + '" hidden>' + escapeHtml(helpText) + "</p>";
     html += '<div class="hub-family-modules">';
     var groupIndex = 0;
@@ -326,11 +350,12 @@
     var sections = (model && model.sections) || [];
     var html = errorHtml(error);
     sections.forEach(function (section) {
+      var families = section.families || [];
+      var inline = !!(section.modules && families.length === 1);
       html += '<h3 class="hub-launcher-section">' + escapeHtml(section.label) + "</h3>";
       html += '<div class="hub-launcher-stack">';
-      (section.families || []).forEach(function (family) {
-        html += cardHtml(family);
-      });
+      if (inline) html += cardHtml(families[0], { headless: true });
+      else families.forEach(function (family) { html += cardHtml(family); });
       html += "</div>";
     });
     return html;

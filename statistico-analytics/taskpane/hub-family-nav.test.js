@@ -12,7 +12,8 @@ const ALL = [
   "univariate", "correlations", "pca", "factor", "hierarchical", "kmeans",
   "independent", "dependent", "anova", "contingency",
   "regression", "logistic", "mixed",
-  "calc-power", "calc-precision", "calc-distribution-hub", "calc-erlang",
+  "calc-power", "calc-precision", "calc-distribution-hub", "calc-cpk",
+  "calc-erlang", "calc-erlang-sim",
   "pareto2080", "process-settings", "gage-rr", "capability-range",
   "split-index", "reliability",
   "prepare-data", "multivariable", "publication-tables", "ezpaste-open",
@@ -20,17 +21,26 @@ const ALL = [
 ];
 
 describe("family home catalog", () => {
-  test("groups analysis first, then planning, quality, survey, and reporting", () => {
+  test("groups analysis, calculators, and specialized applications", () => {
     const model = family.buildNavigationModel(catalog(ALL));
     expect(model.sections.map(function (section) { return section.label; })).toEqual([
       "Core statistical analysis",
-      "Planning, quality & utilities"
+      "Calculators & study planning",
+      "Specialized applications"
     ]);
     expect(model.sections[0].families.map(function (row) { return row.id; })).toEqual([
       "explore", "compare", "model"
     ]);
-    expect(model.sections[1].families.map(function (row) { return row.id; })).toEqual([
-      "planning", "quality", "survey", "utilities"
+    expect(model.sections[1].families.map(function (row) { return row.id; })).toEqual(["planning"]);
+    expect(model.sections[1].families[0].moduleIds).toEqual([
+      "calc-power", "calc-precision", "calc-distribution-hub", "calc-cpk"
+    ]);
+    expect(model.sections[2].families.map(function (row) { return row.id; })).toEqual([
+      "quality", "staffing", "survey", "utilities"
+    ]);
+    expect(model.sections[2].families[1].moduleIds).toEqual(["calc-erlang", "calc-erlang-sim"]);
+    expect(model.sections[2].families[3].moduleIds).toEqual([
+      "prepare-data", "publication-tables", "multivariable", "ezpaste-open"
     ]);
     expect(model.sections[0].families[0].moduleIds).toEqual([
       "univariate", "correlations", "pca", "factor", "hierarchical", "kmeans"
@@ -39,10 +49,10 @@ describe("family home catalog", () => {
       "independent", "dependent", "anova", "contingency", "meta-analysis"
     ]);
     expect(model.sections[0].families[2].moduleIds).toEqual(["regression", "logistic", "mixed"]);
-    expect(model.sections[1].families[1].moduleIds).toEqual([
+    expect(model.sections[2].families[0].moduleIds).toEqual([
       "pareto2080", "process-settings", "gage-rr", "capability-range"
     ]);
-    expect(model.sections[1].families[2].moduleIds).toEqual(["split-index", "reliability"]);
+    expect(model.sections[2].families[2].moduleIds).toEqual(["split-index", "reliability"]);
   });
 
   test("omits a family that has no displayable modules", () => {
@@ -86,7 +96,9 @@ describe("family home markup", () => {
     const html = family.renderHomeHtml(model, null);
     expect(html).not.toContain("Choose an analysis or tool");
     expect(html).toContain("Core statistical analysis");
-    expect(html).toContain("Planning, quality &amp; utilities");
+    expect(html).toContain("Calculators &amp; study planning");
+    expect(html).toContain("Specialized applications");
+    expect(html).not.toContain("Planning, quality");
     expect(html).toContain("Explore &amp; summarize");
     expect(html).toContain('onclick="launchHubFamilyModule(\'univariate\')"');
     expect(html).toContain('onclick="launchHubFamilyModule(\'split-index\')"');
@@ -122,7 +134,20 @@ describe("family home markup", () => {
     expect(html).toContain('class="hub-family-body" id="hub-family-body-explore" hidden');
     expect(html.indexOf("Explore &amp; summarize")).toBeLessThan(html.indexOf("Compare groups"));
     expect(html.indexOf("Model outcomes")).toBeLessThan(html.indexOf("Calculators &amp; study planning"));
+    expect(html.indexOf("Calculators &amp; study planning")).toBeLessThan(html.indexOf(">Power &amp; Sample Size<"));
+    expect(html.indexOf(">Power &amp; Sample Size<")).toBeLessThan(html.indexOf(">CPk Calculator<"));
+    expect(html.indexOf(">CPk Calculator<")).toBeLessThan(html.indexOf("Specialized applications"));
+    expect(html).toContain('data-family-static');
+    expect(html).not.toContain("toggleHubFamilyCard('planning')");
+    expect(html).toContain(">Erlang C model<");
+    expect(html).toContain(">Simulations<");
+    expect(html.indexOf("Quality &amp; process improvement")).toBeLessThan(html.indexOf("Call center staffing"));
+    expect(html.indexOf("Call center staffing")).toBeLessThan(html.indexOf("Survey analysis"));
     expect(html.indexOf("Survey analysis")).toBeLessThan(html.indexOf("Data &amp; reporting tools"));
+    expect(html.indexOf(">Prepare Data<")).toBeLessThan(html.indexOf(">Publication Tables<"));
+    expect(html.indexOf(">Publication Tables<")).toBeLessThan(html.indexOf(">Utilities<"));
+    expect(html.indexOf(">Utilities<")).toBeLessThan(html.indexOf(">3D Charts<"));
+    expect(html.indexOf(">3D Charts<")).toBeLessThan(html.indexOf(">EzPaste<sup>TM</sup>"));
   });
 
   test("a module hover title adds the catalog purpose", () => {

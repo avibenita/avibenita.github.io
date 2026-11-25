@@ -50,6 +50,7 @@
     ".hub-family-error{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;padding:8px 10px;border-radius:8px;background:rgba(239,68,68,.12);color:#fecaca;font-size:12px;line-height:1.4;}",
     ".hub-family-error button{border:0;border-radius:7px;padding:4px 8px;background:#f4c84a;color:#1c1404;font-weight:700;cursor:pointer;}",
     ".hub-launcher-section{margin:14px 2px 8px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;}",
+    ".hub-family-static-tools{display:flex;justify-content:flex-end;margin:0 2px 2px;}",
     ".hub-launcher-stack{display:flex;flex-direction:column;gap:10px;width:100%;min-width:0;}",
     ".hub-family-card{--hub-family-accent:#94a3b8;--hub-family-line:color-mix(in srgb, var(--hub-family-accent) 42%, #334963);box-sizing:border-box;width:100%;border:1px solid var(--hub-family-line);border-inline-start:3px solid var(--hub-family-accent);border-radius:12px;background:color-mix(in srgb, var(--hub-family-accent) 12%, #152033);background-clip:padding-box;padding:0;min-width:0;overflow:hidden;transition:background 300ms cubic-bezier(.22,.61,.36,1),border-color 300ms cubic-bezier(.22,.61,.36,1);}",
     ".hub-family-card[data-family='explore']{--hub-family-accent:#2dd4bf;}",
@@ -59,6 +60,7 @@
     ".hub-family-card[data-family='quality']{--hub-family-accent:#fb7185;}",
     ".hub-family-card[data-family='survey']{--hub-family-accent:#fda4af;}",
     ".hub-family-card[data-family='utilities']{--hub-family-accent:#cbd5e1;}",
+    ".hub-family-card[data-family='staffing']{--hub-family-accent:#f59e0b;}",
     ".hub-family-card:not(.is-open):hover{background:color-mix(in srgb, var(--hub-family-accent) 17%, #18283d);background-clip:padding-box;border-color:color-mix(in srgb, var(--hub-family-accent) 55%, #334963);}",
     ".hub-family-card.is-open{background:color-mix(in srgb, var(--hub-family-accent) 12%, #121c2b);background-clip:padding-box;border-color:color-mix(in srgb, var(--hub-family-accent) 66%, #5c7390);border-inline-start-color:color-mix(in srgb, var(--hub-family-accent) 70%, #fff);}",
     ".hub-family-card-head{display:flex;align-items:center;gap:8px;min-width:0;box-sizing:border-box;padding:12px 12px;border:0;border-radius:0;background:transparent;transition:background 300ms cubic-bezier(.22,.61,.36,1);}",
@@ -768,9 +770,15 @@ const CALCULATOR_CATEGORY_TILES = [
     modules: [
       {
         id: "calc-erlang",
-        label: "Erlang C & Simulation",
-        tip: "Open call-center staffing and simulation tools.",
+        label: "Erlang C model",
+        tip: "Steady-state staffing from the Erlang C model.",
         dialogUrl: "https://statistico.live/statistico-calculators/erlang/ErlangCalculator.html"
+      },
+      {
+        id: "calc-erlang-sim",
+        label: "Simulations",
+        tip: "Staff from a queue simulation, including abandonment and handle-time shape.",
+        dialogUrl: "https://statistico.live/statistico-calculators/erlang/ErlangCalculator.html?mode=simulation"
       }
     ]
   },
@@ -1266,6 +1274,7 @@ function finishFamilyMotion(body, motion, onDone) {
 function closeHubFamilyBody(body) {
   if (!body) return;
   var card = body.closest(".hub-family-card");
+  if (card && card.hasAttribute("data-family-static")) return;
   var btn = familyToggleButton(body);
   if (btn) btn.setAttribute("aria-expanded", "false");
   if (card) card.classList.remove("is-open");

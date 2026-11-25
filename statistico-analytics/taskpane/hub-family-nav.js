@@ -137,7 +137,7 @@
 
   var LAUNCHER_SECTIONS = [
     { id: "analysis", label: "Core statistical analysis", familyIds: ["explore", "compare", "model"] },
-    { id: "planning", label: "Calculators & study planning", familyIds: ["planning"], modules: true },
+    { id: "planning", label: "Calculators & study planning", familyIds: ["planning"] },
     { id: "applications", label: "Specialized applications", familyIds: ["quality", "staffing", "survey", "utilities"] }
   ];
 
@@ -225,7 +225,6 @@
       return {
         id: section.id,
         label: section.label,
-        modules: !!section.modules,
         families: section.familyIds.map(function (id) { return packed[id]; }).filter(Boolean)
       };
     }).filter(function (section) { return section.families.length > 0; });
@@ -350,12 +349,11 @@
     var sections = (model && model.sections) || [];
     var html = errorHtml(error);
     sections.forEach(function (section) {
-      var families = section.families || [];
-      var inline = !!(section.modules && families.length === 1);
       html += '<h3 class="hub-launcher-section">' + escapeHtml(section.label) + "</h3>";
       html += '<div class="hub-launcher-stack">';
-      if (inline) html += cardHtml(families[0], { headless: true });
-      else families.forEach(function (family) { html += cardHtml(family); });
+      (section.families || []).forEach(function (family) {
+        html += cardHtml(family);
+      });
       html += "</div>";
     });
     return html;

@@ -137,8 +137,9 @@ describe("family home markup", () => {
     expect(html.indexOf("Calculators &amp; study planning")).toBeLessThan(html.indexOf(">Power &amp; Sample Size<"));
     expect(html.indexOf(">Power &amp; Sample Size<")).toBeLessThan(html.indexOf(">CPk Calculator<"));
     expect(html.indexOf(">CPk Calculator<")).toBeLessThan(html.indexOf("Specialized applications"));
-    expect(html).toContain('data-family-static');
-    expect(html).not.toContain("toggleHubFamilyCard('planning')");
+    expect(html).not.toContain("data-family-static");
+    expect(html).toContain("toggleHubFamilyCard('planning')");
+    expect(html).toContain('class="hub-family-body" id="hub-family-body-planning" hidden');
     expect(html).toContain(">Erlang C model<");
     expect(html).toContain(">Simulations<");
     expect(html.indexOf("Quality &amp; process improvement")).toBeLessThan(html.indexOf("Call center staffing"));

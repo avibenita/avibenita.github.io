@@ -5017,6 +5017,12 @@ if (window.StatisticoHubEntitlement) {
   window.StatisticoHubEntitlement.openEarlyAccess = showHubEarlyAccess;
 }
 
+if (!HUB_USE_LEGACY_STRUCTURE && window.StatisticoHubFamily && document.getElementById("categoryTiles")) {
+  document.documentElement.setAttribute("data-hub-nav", "family");
+  restoreHubFamilyFromNavigation();
+  renderCategoryTiles("");
+}
+
 Office.onReady(function(info) {
   if (info.host !== Office.HostType.Excel) {
     showError("This add-in is designed for Excel only.");

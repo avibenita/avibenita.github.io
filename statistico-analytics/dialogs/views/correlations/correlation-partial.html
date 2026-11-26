@@ -1015,6 +1015,107 @@
       height:100%;
     }
 
+    .pane-scatter .case-dot{
+      cursor:crosshair;
+    }
+
+    .pane-scatter line{
+      pointer-events:none;
+    }
+
+    .pane-scatter .case-dot.case-dim{
+      opacity:0.15;
+    }
+
+    .pane-scatter .case-dot.case-hot{
+      opacity:1;
+      stroke:#fff;
+      stroke-width:1.6;
+    }
+
+    :root[data-theme="light"] .pane-scatter .case-dot.case-hot{
+      stroke:#111827;
+    }
+
+    .pair-change-strip{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:10px;
+      margin-bottom:10px;
+    }
+
+    .pair-change-card{
+      background:rgba(0,0,0,0.28);
+      border:1px solid var(--border);
+      border-radius:8px;
+      padding:10px 8px;
+      text-align:center;
+    }
+
+    .stat-ci{
+      margin-top:4px;
+      font-size:11px;
+      color:var(--text-muted);
+      font-weight:600;
+    }
+
+    .change-badge{
+      margin-top:4px;
+      font-size:16px;
+      font-weight:800;
+      color:var(--text-primary);
+    }
+
+    .change-badge.weaker{ color:var(--accent-1); }
+    .change-badge.stronger{ color:var(--accent-2); }
+    .change-badge.reversed{ color:#f5d76e; }
+    .change-badge.similar,
+    .change-badge.same{ color:var(--text-muted); }
+
+    .change-story,
+    .residual-note{
+      margin:0 4px 12px;
+      color:var(--text-secondary);
+      font-size:14px;
+      line-height:1.45;
+    }
+
+    .residual-note{
+      grid-column:1 / -1;
+      margin:4px 0 0;
+    }
+
+    .control-impact{
+      margin:4px 0 8px;
+    }
+
+    .control-impact h4{
+      margin:0 0 8px;
+      font-size:15px;
+      color:var(--text-primary);
+    }
+
+    .control-impact table{
+      width:100%;
+      min-width:0;
+    }
+
+    .control-impact th,
+    .control-impact td{
+      text-align:left;
+      font-size:13px;
+    }
+
+    .case-readout{
+      min-height:1.4em;
+    }
+
+    @media (max-width: 768px){
+      .pair-change-strip{
+        grid-template-columns:1fr 1fr;
+      }
+    }
+
     .correlation-section h4{
       margin-top:0;
       margin-bottom:2px;
@@ -1205,15 +1306,15 @@
           <div>
             <div class="variable-palette">
               <div class="workspace-title"><i class="fa-solid fa-grip"></i><span>Variable Capsules</span></div>
-              <div class="workspace-subtitle">Drag any variable into Control or Excluded. Drag it back here to restore it.</div>
+              <div class="workspace-subtitle">Drag a variable into Adjust for to hold it constant, or into Excluded to leave it out.</div>
               <div id="variableCapsules" class="variable-capsules" data-role="available" aria-label="Available variables"></div>
             </div>
 
             <div class="partial-spatial-row">
               <div id="controlDropZone" class="role-drop-zone control-zone" data-role="control">
                 <div class="drop-zone-content">
-                  <div class="drop-zone-title"><i class="fa-solid fa-filter"></i><span>Control / Adjustment Filter</span></div>
-                  <div class="drop-zone-copy">Influence removed statistically. Variables stay in the model as controls.</div>
+                  <div class="drop-zone-title"><i class="fa-solid fa-filter"></i><span>Adjust for</span></div>
+                  <div class="drop-zone-copy">Held constant. The results update as soon as a variable is placed here.</div>
                   <div id="controlBucketItems" class="role-items"></div>
                 </div>
               </div>
@@ -1231,7 +1332,7 @@
           <aside class="partial-explain-card" aria-label="Partial correlation role summary">
             <div class="explain-card-title"><i class="fa-solid fa-lightbulb"></i><span>Current Interpretation</span></div>
             <div class="explain-section">
-              <div class="explain-label">Controlling for</div>
+              <div class="explain-label">Adjusting for</div>
               <div id="controlSummary" class="explain-value explain-empty">None</div>
             </div>
             <div class="explain-section">
@@ -1240,14 +1341,14 @@
             </div>
             <div class="explain-section">
               <div class="explain-label">Matrix meaning</div>
-              <div id="partialMeaning" class="explain-value">The matrix shows ordinary relationships until variables are added to the adjustment filter.</div>
+              <div id="partialMeaning" class="explain-value">The matrix shows ordinary relationships until variables are placed in Adjust for.</div>
             </div>
           </aside>
         </div>
       </div>
 
       <div class="tip-line">
-        Tip: Drag variables into Control to adjust for them, or Excluded to remove them from the matrix. Drag a capsule back to restore it. Click correlations to compare.
+        Tip: Drop variables into Adjust for to hold them constant, or into Excluded to remove them from the matrix. Click a correlation to compare the original relationship with the adjusted one.
       </div>
 
       <!-- Matrix Panel -->
@@ -1322,13 +1423,35 @@
         <h3 id="modalTitle">Correlation Details</h3>
         <span class="close-modal">&times;</span>
       </div>
+
+      <div class="pair-change-strip">
+        <div class="pair-change-card">
+          <div class="stat-label">Ordinary r</div>
+          <div class="stat-value" id="stripOrdinary">—</div>
+        </div>
+        <div class="pair-change-card">
+          <div class="stat-label">Partial r</div>
+          <div class="stat-value" id="stripPartial">—</div>
+        </div>
+        <div class="pair-change-card">
+          <div class="stat-label">Change</div>
+          <div class="stat-value" id="stripDelta">—</div>
+          <div class="stat-ci">Partial − ordinary</div>
+        </div>
+        <div class="pair-change-card">
+          <div class="stat-label">Strength</div>
+          <div class="change-badge" id="changeBadge">—</div>
+        </div>
+      </div>
+      <p id="changeStory" class="change-story"></p>
       
       <div class="correlation-section regular-section">
-        <h4>Regular Correlation</h4>
+        <h4>Original relationship</h4>
         <div class="correlation-stats">
           <div class="stat-item">
-            <div class="stat-label">Correlation</div>
+            <div class="stat-label">Ordinary r</div>
             <div class="stat-value" id="regularR">-</div>
+            <div class="stat-ci" id="regularCi"></div>
           </div>
           <div class="stat-item">
             <div class="stat-label">P-Value</div>
@@ -1347,11 +1470,12 @@
       </div>
       
       <div class="correlation-section partial-section">
-        <h4>Partial Correlation</h4>
+        <h4 id="partialSectionTitle">After adjustment</h4>
         <div class="correlation-stats">
           <div class="stat-item">
-            <div class="stat-label">Correlation</div>
+            <div class="stat-label">Partial r</div>
             <div class="stat-value" id="partialR">-</div>
+            <div class="stat-ci" id="partialCi"></div>
           </div>
           <div class="stat-item">
             <div class="stat-label">P-Value</div>
@@ -1367,7 +1491,19 @@
           </div>
         </div>
         <div class="pane-scatter" id="partialScatter" role="img" aria-label="Partial scatter with a linear regression line"></div>
+        <p id="residualNote" class="residual-note"></p>
       </div>
+      <div id="controlImpact" class="control-impact" hidden>
+        <h4>Which adjustment changes this result most</h4>
+        <table>
+          <thead>
+            <tr><th>Adjustment</th><th>r</th><th>Change from none</th></tr>
+          </thead>
+          <tbody id="controlImpactBody"></tbody>
+        </table>
+        <p id="controlImpactNote" class="corr-info">Each control is applied on its own, using the same complete cases as the full adjustment. Those shifts overlap, so they do not add up to the result of adjusting for all of them together.</p>
+      </div>
+      <p id="caseReadout" class="corr-info case-readout">Hover a point to highlight that same case in both plots.</p>
       <p id="sameNNote" class="corr-info" style="margin:12px 4px 0;text-align:left;"></p>
     </div>
   </div>
@@ -2075,8 +2211,8 @@
       for (let g = 1; g <= 3; g++) {
         const gx = pad + ((w - pad * 2) * g) / 4;
         const gy = pad + ((h - pad * 2) * g) / 4;
-        parts.push('<line x1="' + gx.toFixed(1) + '" y1="' + pad + '" x2="' + gx.toFixed(1) + '" y2="' + (h - pad) + '" stroke="' + grid + '" stroke-width="1"/>');
-        parts.push('<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + gy.toFixed(1) + '" stroke="' + grid + '" stroke-width="1"/>');
+        parts.push('<line x1="' + gx.toFixed(1) + '" y1="' + pad + '" x2="' + gx.toFixed(1) + '" y2="' + (h - pad) + '" stroke="' + grid + '" stroke-width="1" pointer-events="none"/>');
+        parts.push('<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + gy.toFixed(1) + '" stroke="' + grid + '" stroke-width="1" pointer-events="none"/>');
       }
       if (!points.length) {
         const fill = light ? '#64748b' : 'rgba(255,255,255,0.55)';
@@ -2098,28 +2234,167 @@
       const plotH = h - pad * 2;
       const px = (x) => pad + ((x - xMin) / xSpan) * plotW;
       const py = (y) => pad + (1 - (y - yMin) / ySpan) * plotH;
-      const drawn = points.length <= 2500 ? points : points.filter((_, i) => i % Math.ceil(points.length / 2500) === 0);
-      const radius = drawn.length > 400 ? 2.3 : 3.4;
-      for (let i = 0; i < drawn.length; i++) {
-        parts.push('<circle cx="' + px(drawn[i][0]).toFixed(1) + '" cy="' + py(drawn[i][1]).toFixed(1) + '" r="' + radius + '" fill="' + color + '"/>');
-      }
+      const step = points.length <= 2500 ? 1 : Math.ceil(points.length / 2500);
+      const drawnCount = Math.ceil(points.length / step);
+      const radius = drawnCount > 400 ? 2.3 : 3.4;
       const fit = linearFit(points);
       if (fit) {
         const y1 = fit.intercept + fit.slope * xMin;
         const y2 = fit.intercept + fit.slope * xMax;
-        parts.push('<line x1="' + px(xMin).toFixed(1) + '" y1="' + py(y1).toFixed(1) + '" x2="' + px(xMax).toFixed(1) + '" y2="' + py(y2).toFixed(1) + '" stroke="' + color + '" stroke-width="2.4" stroke-linecap="round"/>');
+        parts.push('<line x1="' + px(xMin).toFixed(1) + '" y1="' + py(y1).toFixed(1) + '" x2="' + px(xMax).toFixed(1) + '" y2="' + py(y2).toFixed(1) + '" stroke="' + color + '" stroke-width="2.4" stroke-linecap="round" pointer-events="none"/>');
+      }
+      for (let i = 0; i < points.length; i += step) {
+        parts.push('<circle class="case-dot" data-case="' + i + '" data-r="' + radius + '" cx="' + px(points[i][0]).toFixed(1) + '" cy="' + py(points[i][1]).toFixed(1) + '" r="' + radius + '" fill="' + color + '"/>');
       }
       parts.push('</svg>');
       return parts.join('');
     }
 
     function renderComparisonScatters(xName, yName, controlNames, partialR, regularR) {
-      paneScatterState = { x: xName, y: yName, controls: controlNames.slice(), partialR: partialR, regularR: regularR };
       const cloud = pairCloud(xName, yName, controlNames);
+      paneScatterState = { x: xName, y: yName, controls: controlNames.slice(), partialR: partialR, regularR: regularR, cloud: cloud };
       const regularHost = document.getElementById('regularScatter');
       const partialHost = document.getElementById('partialScatter');
       if (regularHost) regularHost.innerHTML = paneScatterMarkup(cloud.raw, regularR);
       if (partialHost) partialHost.innerHTML = paneScatterMarkup(cloud.partial, partialR);
+      clearLinkedCase();
+    }
+
+    function highlightLinkedCase(index) {
+      const key = String(index);
+      document.querySelectorAll('#correlationModal .case-dot').forEach((dot) => {
+        const on = dot.getAttribute('data-case') === key;
+        dot.classList.toggle('case-hot', on);
+        dot.classList.toggle('case-dim', !on);
+        dot.setAttribute('r', on ? '6.4' : (dot.getAttribute('data-r') || '3.4'));
+      });
+      const readout = document.getElementById('caseReadout');
+      const cloud = paneScatterState && paneScatterState.cloud;
+      const i = Number(index);
+      if (!readout || !cloud || !cloud.raw[i]) return;
+      const raw = cloud.raw[i];
+      const part = cloud.partial[i] || raw;
+      const fmt = (value) => Number.isFinite(value) ? Number(value).toFixed(2) : '—';
+      readout.textContent = paneScatterState.x + ' ' + fmt(raw[0]) + ', ' + paneScatterState.y + ' ' + fmt(raw[1])
+        + ' · residuals ' + fmt(part[0]) + ', ' + fmt(part[1]);
+    }
+
+    function clearLinkedCase() {
+      document.querySelectorAll('#correlationModal .case-dot').forEach((dot) => {
+        dot.classList.remove('case-hot', 'case-dim');
+        dot.setAttribute('r', dot.getAttribute('data-r') || '3.4');
+      });
+      const readout = document.getElementById('caseReadout');
+      if (readout) readout.textContent = 'Hover a point to highlight that same case in both plots.';
+    }
+
+    function pearson(xs, ys) {
+      const n = Math.min(xs.length, ys.length);
+      if (n < 3) return null;
+      let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
+      for (let i = 0; i < n; i++) {
+        sx += xs[i]; sy += ys[i];
+        sxx += xs[i] * xs[i]; syy += ys[i] * ys[i]; sxy += xs[i] * ys[i];
+      }
+      const den = Math.sqrt((n * sxx - sx * sx) * (n * syy - sy * sy));
+      if (!den) return null;
+      const r = (n * sxy - sx * sy) / den;
+      return Number.isFinite(r) ? r : null;
+    }
+
+    function fisherCi(r, n, controls) {
+      const denom = n - 3 - (controls || 0);
+      if (!Number.isFinite(r) || denom < 1 || Math.abs(r) >= 0.999) return null;
+      const z = Math.atanh(r);
+      const se = 1 / Math.sqrt(denom);
+      const z95 = 1.959963984540054;
+      return { lo: Math.tanh(z - z95 * se), hi: Math.tanh(z + z95 * se) };
+    }
+
+    function fmtCi(ci) {
+      return ci ? ('95% CI ' + fmtCorr(ci.lo) + ' to ' + fmtCorr(ci.hi)) : '95% CI —';
+    }
+
+    function strengthLabel(r0, r1, hasControls) {
+      if (!hasControls) return { code: 'same', text: 'Unadjusted' };
+      if (!Number.isFinite(r0) || !Number.isFinite(r1)) return { code: 'unknown', text: '—' };
+      if (r0 * r1 < 0 && Math.abs(r0) >= 0.05 && Math.abs(r1) >= 0.05) return { code: 'reversed', text: 'Sign reversed' };
+      const shift = Math.abs(r1) - Math.abs(r0);
+      if (shift <= -0.05) return { code: 'weaker', text: 'Weaker' };
+      if (shift >= 0.05) return { code: 'stronger', text: 'Stronger' };
+      return { code: 'similar', text: 'Similar' };
+    }
+
+    function joinNames(names) {
+      if (!names.length) return '';
+      if (names.length === 1) return names[0];
+      return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    }
+
+    function changeSentence(xName, yName, controlNames, r0, label) {
+      if (!controlNames.length) return 'Nothing is being adjusted for, so both plots show the same unadjusted relationship.';
+      const held = joinNames(controlNames);
+      const direction = r0 < 0 ? 'negative' : 'positive';
+      if (label.code === 'reversed') return 'After accounting for ' + held + ', the ' + direction + ' association between ' + xName + ' and ' + yName + ' changes sign.';
+      if (label.code === 'weaker') return 'After accounting for ' + held + ', the ' + direction + ' association between ' + xName + ' and ' + yName + ' is weaker.';
+      if (label.code === 'stronger') return 'After accounting for ' + held + ', the association between ' + xName + ' and ' + yName + ' is stronger. Strength is judged from the absolute correlation.';
+      return 'After accounting for ' + held + ', the association between ' + xName + ' and ' + yName + ' is about the same.';
+    }
+
+    function residualSentence(xName, yName, controlNames) {
+      if (!controlNames.length) return '';
+      const held = joinNames(controlNames);
+      return 'Each point shows how far a case’s ' + xName + ' and ' + yName + ' fall above or below the values predicted from ' + held + '.';
+    }
+
+    function setPairText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    }
+
+    function renderControlImpact(xName, yName, controlNames, shownRegular, shownPartial) {
+      const host = document.getElementById('controlImpact');
+      const body = document.getElementById('controlImpactBody');
+      const note = document.getElementById('controlImpactNote');
+      if (!host || !body) return;
+      if (!controlNames.length) {
+        host.hidden = true;
+        return;
+      }
+      const cols = completeCaseColumns([xName, yName].concat(controlNames));
+      const rows = [{ label: 'None', r: shownRegular }];
+      controlNames.forEach((name, index) => {
+        const rx = columnResiduals(cols[0], [cols[index + 2]]);
+        const ry = columnResiduals(cols[1], [cols[index + 2]]);
+        rows.push({ label: name + ' only', r: pearson(rx, ry) });
+      });
+      if (controlNames.length > 1) rows.push({ label: 'All selected', r: shownPartial });
+      body.innerHTML = rows.map((row) => {
+        const delta = (Number.isFinite(row.r) && Number.isFinite(shownRegular)) ? row.r - shownRegular : null;
+        return '<tr><td>' + svgText(row.label) + '</td><td>' + fmtCorr(row.r) + '</td><td>' + fmtDelta(delta) + '</td></tr>';
+      }).join('');
+      if (note) note.hidden = controlNames.length < 2;
+      host.hidden = false;
+    }
+
+    function fillPairTeaching(xName, yName, controlNames, r0, r1, n) {
+      const label = strengthLabel(r0, r1, controlNames.length > 0);
+      const delta = (Number.isFinite(r0) && Number.isFinite(r1)) ? r1 - r0 : null;
+      setPairText('stripOrdinary', fmtCorr(r0));
+      setPairText('stripPartial', fmtCorr(r1));
+      setPairText('stripDelta', fmtDelta(delta));
+      const badge = document.getElementById('changeBadge');
+      if (badge) {
+        badge.textContent = label.text;
+        badge.className = 'change-badge ' + label.code;
+      }
+      setPairText('changeStory', changeSentence(xName, yName, controlNames, r0, label));
+      setPairText('regularCi', fmtCi(fisherCi(r0, n, 0)));
+      setPairText('partialCi', fmtCi(fisherCi(r1, n, controlNames.length)));
+      setPairText('residualNote', residualSentence(xName, yName, controlNames));
+      const title = document.getElementById('partialSectionTitle');
+      if (title) title.textContent = controlNames.length ? 'After adjusting for ' + joinNames(controlNames) : 'No adjustment selected';
+      renderControlImpact(xName, yName, controlNames, r0, r1);
     }
 
     function sortedPartialPairs() {
@@ -2647,11 +2922,12 @@
         if (note) {
           const nText = Number(cmp.n).toLocaleString();
           if (controlNames.length) {
-            note.textContent = `Both correlations use the same ${nText} complete-case observations. Only the partial correlation is adjusted for ${controlNames.join(', ')}.`;
+            note.textContent = `Both correlations use the same ${nText} complete-case observations. Only the partial correlation is adjusted for ${joinNames(controlNames)}.`;
           } else {
             note.textContent = `Both values use the same ${nText} complete-case observations. No controls are applied, so both are unadjusted correlations.`;
           }
         }
+        fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, cmp.n);
       } else {
         const regularCorr = calculatePartialCorrelation(var1Idx, var2Idx, []);
         const partialCorr = calculatePartialCorrelation(var1Idx, var2Idx, controlIndices);
@@ -2667,6 +2943,9 @@
         const pnEl = document.getElementById('partialN');
         if (nEl) nEl.textContent = Number.isFinite(regularCorr.n) ? Number(regularCorr.n).toLocaleString() : '-';
         if (pnEl) pnEl.textContent = Number.isFinite(partialCorr.n) ? Number(partialCorr.n).toLocaleString() : '-';
+        const note = document.getElementById('sameNNote');
+        if (note) note.textContent = '';
+        fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, Number.isFinite(partialCorr.n) ? partialCorr.n : regularCorr.n);
       }
 
       restoreSelectedPairHighlight();
@@ -2728,6 +3007,17 @@
           if (e.target === modal) {
             hideCorrelationModal();
           }
+        });
+        modal.addEventListener('mouseover', function(e) {
+          const dot = e.target.closest && e.target.closest('.case-dot');
+          if (!dot) return;
+          highlightLinkedCase(dot.getAttribute('data-case'));
+        });
+        modal.addEventListener('mouseout', function(e) {
+          const dot = e.target.closest && e.target.closest('.case-dot');
+          if (!dot) return;
+          const next = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.case-dot');
+          if (!next) clearLinkedCase();
         });
       }
       

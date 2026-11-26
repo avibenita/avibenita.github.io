@@ -647,8 +647,7 @@
       margin-top:4px;
     }
 
-    td.highlighted,
-    #partialPairsTable tbody tr.highlighted{
+    td.highlighted{
       background:linear-gradient(135deg, rgba(255,165,120,0.3), rgba(255,165,120,0.2))!important;
       box-shadow:inset 0 0 0 2px var(--accent-1);
     }
@@ -660,7 +659,118 @@
 
     #partialPairsTable{
       width:100%;
-      min-width:100%;
+      min-width:860px;
+    }
+
+    #partialPairsTable thead tr:first-child th{
+      top:0;
+      z-index:4;
+      height:54px;
+    }
+
+    #partialPairsTable thead tr:nth-child(2) th{
+      top:54px;
+      z-index:3;
+    }
+
+    #partialPairsTable .pairs-group-kicker{
+      display:block;
+      font-size:10px;
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+      font-weight:700;
+      opacity:0.82;
+      line-height:1.2;
+    }
+
+    #partialPairsTable .pairs-group-title{
+      display:block;
+      font-size:15px;
+      font-weight:800;
+      letter-spacing:0.01em;
+      line-height:1.2;
+    }
+
+    #partialPairsTable thead th.pairs-group-before,
+    #partialPairsTable thead th.pairs-sub-before{
+      background:rgba(255,165,120,0.20);
+      color:var(--accent-1);
+    }
+
+    #partialPairsTable thead th.pairs-group-before{
+      border-bottom:3px solid var(--accent-1);
+    }
+
+    #partialPairsTable thead th.pairs-group-after,
+    #partialPairsTable thead th.pairs-sub-after{
+      background:rgba(120,200,255,0.16);
+      color:var(--accent-2);
+    }
+
+    #partialPairsTable thead th.pairs-group-after{
+      border-bottom:3px solid var(--accent-2);
+    }
+
+    #partialPairsTable thead th.pairs-group-delta{
+      background:rgba(255,255,255,0.08);
+      color:var(--text-primary);
+    }
+
+    #partialPairsTable .pairs-block-start{
+      border-left:3px solid rgba(255,255,255,0.18);
+    }
+
+    #partialPairsTable tbody td.pairs-before{
+      background:rgba(255,165,120,0.07);
+    }
+
+    #partialPairsTable tbody td.pairs-after{
+      background:rgba(120,200,255,0.07);
+    }
+
+    #partialPairsTable tbody td.pairs-delta{
+      font-weight:800;
+      font-variant-numeric:tabular-nums;
+      white-space:nowrap;
+    }
+
+    #partialPairsTable tbody td.pairs-delta-down{
+      color:var(--accent-1);
+    }
+
+    #partialPairsTable tbody td.pairs-delta-up{
+      color:var(--accent-2);
+    }
+
+    .pairs-diff-chart{
+      margin:0 0 12px;
+      max-height:280px;
+      overflow:auto;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:rgba(0,0,0,0.22);
+    }
+
+    .pairs-diff-chart svg{
+      display:block;
+      width:100%;
+      height:auto;
+    }
+
+    .pairs-diff-chart .pairs-band{
+      cursor:pointer;
+    }
+
+    .pairs-diff-chart .pairs-band:hover{
+      fill:rgba(255,255,255,0.05);
+    }
+
+    :root[data-theme="light"] .pairs-diff-chart{
+      background:rgba(255,255,255,0.72);
+    }
+
+    :root[data-theme="light"] .pairs-diff-chart .pairs-band:hover{
+      fill:rgba(15,23,42,0.04);
     }
 
     #partialPairsTable thead th.pairs-sortable{
@@ -1120,6 +1230,7 @@
           </table>
         </div>
         <div class="table-container" id="partialPairsContainer" style="display:none;">
+          <div id="partialPairsChart" class="pairs-diff-chart" role="img" aria-label="Unadjusted and partial correlations, with the change in r"></div>
           <table id="partialPairsTable">
             <thead id="partialPairsHead"></thead>
             <tbody id="partialPairsBody"></tbody>
@@ -1376,6 +1487,19 @@
 
     function fmtCorr(value) {
       return Number.isFinite(value) ? Number(value).toFixed(3) : '—';
+    }
+
+    function fmtDelta(value) {
+      if (!Number.isFinite(value)) return '—';
+      return (value > 0 ? '+' : '') + Number(value).toFixed(3);
+    }
+
+    function svgText(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
     }
 
     function createScatterBadge() {
@@ -1934,23 +2058,124 @@
       });
     }
 
+    function pairsSortHeader(key, label, attrs, cls) {
+      const active = partialPairSort.key === key;
+      const icon = active ? (partialPairSort.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort';
+      return '<th class="pairs-sortable' + (cls ? ' ' + cls : '') + (active ? ' pairs-sort-active' : '') + '" data-key="' + key + '"' + (attrs || '') + '>' + label + ' <i class="fa ' + icon + '"></i></th>';
+    }
+
+    function renderPartialPairsChart() {
+      const host = document.getElementById('partialPairsChart');
+      if (!host) return;
+      const rows = sortedPartialPairs();
+      if (!rows.length) {
+        host.innerHTML = '';
+        return;
+      }
+      const light = document.documentElement.getAttribute('data-theme') === 'light';
+      const ink = light ? '#334155' : 'rgba(255,255,255,0.78)';
+      const muted = light ? '#64748b' : 'rgba(255,255,255,0.48)';
+      const grid = light ? 'rgba(15,23,42,0.10)' : 'rgba(255,255,255,0.10)';
+      const before = light ? '#c2410c' : 'rgb(255,165,120)';
+      const after = light ? '#1d4ed8' : 'rgb(120,200,255)';
+      const bar = light ? 'rgba(15,23,42,0.28)' : 'rgba(255,255,255,0.34)';
+      const labelW = 248;
+      const width = 1040;
+      const rowH = 40;
+      const legendH = 26;
+      const topAxis = 52;
+      const bottomAxis = 16;
+      const plotTop = legendH + topAxis;
+      const plotH = rows.length * rowH;
+      const height = plotTop + plotH + bottomAxis;
+      const plotLeft = labelW + 12;
+      const plotRight = width - 36;
+      const plotW = plotRight - plotLeft;
+      let rAbs = 0.2;
+      let dAbs = 0.05;
+      rows.forEach((row) => {
+        if (Number.isFinite(row.r)) rAbs = Math.max(rAbs, Math.abs(row.r));
+        if (Number.isFinite(row.partialR)) rAbs = Math.max(rAbs, Math.abs(row.partialR));
+        if (Number.isFinite(row.delta)) dAbs = Math.max(dAbs, Math.abs(row.delta));
+      });
+      const rLim = Math.min(1, rAbs * 1.18);
+      const dLim = dAbs * 1.28;
+      const xR = (value) => plotLeft + ((value + rLim) / (rLim * 2)) * plotW;
+      const xD = (value) => plotLeft + ((value + dLim) / (dLim * 2)) * plotW;
+      const yAt = (index) => plotTop + index * rowH + rowH / 2;
+      const ticks = (lim) => [-lim, -lim / 2, 0, lim / 2, lim];
+      const parts = ['<svg viewBox="0 0 ' + width + ' ' + height + '" role="img">'];
+      parts.push('<text x="' + plotLeft + '" y="18" fill="' + before + '" font-size="12" font-family="Segoe UI,sans-serif" font-weight="700">Unadjusted r</text>');
+      parts.push('<line x1="' + (plotLeft + 92) + '" y1="14" x2="' + (plotLeft + 118) + '" y2="14" stroke="' + before + '" stroke-width="2.4"/>');
+      parts.push('<text x="' + (plotLeft + 132) + '" y="18" fill="' + after + '" font-size="12" font-family="Segoe UI,sans-serif" font-weight="700">Partial r</text>');
+      parts.push('<line x1="' + (plotLeft + 196) + '" y1="14" x2="' + (plotLeft + 222) + '" y2="14" stroke="' + after + '" stroke-width="2.4"/>');
+      parts.push('<text x="' + (plotLeft + 236) + '" y="18" fill="' + ink + '" font-size="12" font-family="Segoe UI,sans-serif" font-weight="700">Δr bar</text>');
+      parts.push('<rect x="' + (plotLeft + 286) + '" y="9" width="18" height="8" rx="2" fill="' + before + '" opacity="0.7"/>');
+      ticks(dLim).forEach((tick) => {
+        const x = xD(tick);
+        parts.push('<text x="' + x.toFixed(1) + '" y="' + (plotTop - 30) + '" text-anchor="middle" fill="' + muted + '" font-size="11" font-family="Segoe UI,sans-serif">' + fmtDelta(tick) + '</text>');
+      });
+      parts.push('<text x="8" y="' + (plotTop - 30) + '" fill="' + muted + '" font-size="10" font-family="Segoe UI,sans-serif">Δr scale</text>');
+      ticks(rLim).forEach((tick) => {
+        const x = xR(tick);
+        parts.push('<line x1="' + x.toFixed(1) + '" y1="' + plotTop + '" x2="' + x.toFixed(1) + '" y2="' + (plotTop + plotH) + '" stroke="' + grid + '" stroke-width="1"' + (tick === 0 ? '' : ' stroke-dasharray="3 4"') + '/>');
+        parts.push('<text x="' + x.toFixed(1) + '" y="' + (plotTop - 12) + '" text-anchor="middle" fill="' + ink + '" font-size="11" font-family="Segoe UI,sans-serif">' + fmtDelta(tick) + '</text>');
+      });
+      parts.push('<text x="8" y="' + (plotTop - 12) + '" fill="' + ink + '" font-size="10" font-family="Segoe UI,sans-serif">r scale</text>');
+      parts.push('<line x1="' + xD(0).toFixed(1) + '" y1="' + plotTop + '" x2="' + xD(0).toFixed(1) + '" y2="' + (plotTop + plotH) + '" stroke="' + bar + '" stroke-width="1.4"/>');
+      const beforePts = [];
+      const afterPts = [];
+      rows.forEach((row, index) => {
+        const y = yAt(index);
+        const yLine = y - 7;
+        if (Number.isFinite(row.delta)) {
+          const x0 = xD(0);
+          const x1 = xD(row.delta);
+          const tone = row.delta < 0 ? before : after;
+          parts.push('<rect x="' + Math.min(x0, x1).toFixed(1) + '" y="' + (y + 2) + '" width="' + Math.max(1, Math.abs(x1 - x0)).toFixed(1) + '" height="8" rx="2" fill="' + tone + '" opacity="0.55"/>');
+        }
+        if (Number.isFinite(row.r)) beforePts.push(xR(row.r).toFixed(1) + ',' + yLine);
+        if (Number.isFinite(row.partialR)) afterPts.push(xR(row.partialR).toFixed(1) + ',' + yLine);
+      });
+      if (beforePts.length > 1) parts.push('<polyline points="' + beforePts.join(' ') + '" fill="none" stroke="' + before + '" stroke-width="2" stroke-linejoin="round"/>');
+      if (afterPts.length > 1) parts.push('<polyline points="' + afterPts.join(' ') + '" fill="none" stroke="' + after + '" stroke-width="2" stroke-linejoin="round"/>');
+      rows.forEach((row, index) => {
+        const y = yAt(index);
+        const yLine = y - 7;
+        const label = row.pair.length > 34 ? row.pair.slice(0, 32) + '…' : row.pair;
+        parts.push('<text x="' + (plotLeft - 10) + '" y="' + (y + 4) + '" text-anchor="end" fill="' + ink + '" font-size="12" font-family="Segoe UI,sans-serif"><title>' + svgText(row.pair) + '</title>' + svgText(label) + '</text>');
+        if (Number.isFinite(row.r)) parts.push('<circle cx="' + xR(row.r).toFixed(1) + '" cy="' + yLine + '" r="4.2" fill="' + before + '"/>');
+        if (Number.isFinite(row.partialR)) parts.push('<circle cx="' + xR(row.partialR).toFixed(1) + '" cy="' + yLine + '" r="4.2" fill="' + after + '"/>');
+        parts.push('<rect class="pairs-band" data-pair-index="' + index + '" x="0" y="' + (plotTop + index * rowH) + '" width="' + width + '" height="' + rowH + '" fill="transparent"/>');
+      });
+      parts.push('</svg>');
+      host.innerHTML = parts.join('');
+      host.onclick = (event) => {
+        const band = event.target.closest('[data-pair-index]');
+        if (!band) return;
+        const row = sortedPartialPairs()[Number(band.getAttribute('data-pair-index'))];
+        if (!row) return;
+        showCorrelationModal(row.idxA, row.idxB, row.varA, row.varB, null);
+      };
+    }
+
     function renderPartialPairsHead() {
       const head = document.getElementById('partialPairsHead');
       if (!head) return;
-      const cols = [
-        { key: 'pair', label: 'Pair' },
-        { key: 'r', label: 'r' },
-        { key: 'p', label: 'p' },
-        { key: 'partialR', label: 'partial r' },
-        { key: 'partialP', label: 'partial p' },
-        { key: 'n', label: 'N' }
-      ];
-      head.innerHTML = '<tr>' + cols.map((col) => {
-        const active = partialPairSort.key === col.key;
-        const icon = active ? (partialPairSort.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort';
-        return '<th class="pairs-sortable' + (active ? ' pairs-sort-active' : '') + '" data-key="' + col.key + '">' + col.label + ' <i class="fa ' + icon + '"></i></th>';
-      }).join('') + '</tr>';
-      head.querySelectorAll('th').forEach((th) => {
+      head.innerHTML =
+        '<tr>' +
+          pairsSortHeader('pair', 'Pair', ' rowspan="2"', 'pairs-corner') +
+          '<th class="pairs-group pairs-group-before" colspan="2"><span class="pairs-group-kicker">Before</span><span class="pairs-group-title">Unadjusted</span></th>' +
+          '<th class="pairs-group pairs-group-after pairs-block-start" colspan="2"><span class="pairs-group-kicker">After</span><span class="pairs-group-title">Partial</span></th>' +
+          pairsSortHeader('delta', '<span class="pairs-group-kicker">Change</span><span class="pairs-group-title">Δr</span>', ' rowspan="2"', 'pairs-group pairs-group-delta pairs-block-start') +
+          pairsSortHeader('n', 'N', ' rowspan="2"', 'pairs-corner') +
+        '</tr><tr>' +
+          pairsSortHeader('r', 'r', '', 'pairs-sub pairs-sub-before') +
+          pairsSortHeader('p', 'p', '', 'pairs-sub pairs-sub-before') +
+          pairsSortHeader('partialR', 'r', '', 'pairs-sub pairs-sub-after pairs-block-start') +
+          pairsSortHeader('partialP', 'p', '', 'pairs-sub pairs-sub-after') +
+        '</tr>';
+      head.querySelectorAll('th[data-key]').forEach((th) => {
         th.addEventListener('click', () => {
           const key = th.getAttribute('data-key');
           partialPairSort = {
@@ -1974,7 +2199,7 @@
         tr.dataset.varX = row.varA;
         tr.dataset.varY = row.varB;
         if (Number.isFinite(row.partialR)) tr.dataset.corr = String(row.partialR);
-        const open = () => showCorrelationModal(row.idxA, row.idxB, row.varA, row.varB, tr);
+        const open = () => showCorrelationModal(row.idxA, row.idxB, row.varA, row.varB, null);
         const name = document.createElement('td');
         name.className = 'pairs-name';
         const nameRow = document.createElement('div');
@@ -1986,6 +2211,7 @@
         name.appendChild(nameRow);
         tr.appendChild(name);
         const rCell = document.createElement('td');
+        rCell.className = 'pairs-before';
         const rRow = document.createElement('div');
         rRow.className = 'corr-value-row';
         const rText = document.createElement('span');
@@ -1996,10 +2222,11 @@
         rCell.appendChild(rRow);
         tr.appendChild(rCell);
         const pCell = document.createElement('td');
-        pCell.className = 'pairs-p';
+        pCell.className = 'pairs-p pairs-before';
         pCell.textContent = 'p = ' + formatPartialP(row.p);
         tr.appendChild(pCell);
         const partialCell = document.createElement('td');
+        partialCell.className = 'pairs-after pairs-block-start';
         const partialRow = document.createElement('div');
         partialRow.className = 'corr-value-row';
         const partialText = document.createElement('span');
@@ -2010,9 +2237,13 @@
         partialCell.appendChild(partialRow);
         tr.appendChild(partialCell);
         const partialPCell = document.createElement('td');
-        partialPCell.className = 'pairs-p';
+        partialPCell.className = 'pairs-p pairs-after';
         partialPCell.textContent = 'p = ' + formatPartialP(row.partialP);
         tr.appendChild(partialPCell);
+        const deltaCell = document.createElement('td');
+        deltaCell.className = 'pairs-delta pairs-block-start' + (row.delta > 0 ? ' pairs-delta-up' : row.delta < 0 ? ' pairs-delta-down' : '');
+        deltaCell.textContent = fmtDelta(row.delta);
+        tr.appendChild(deltaCell);
         const nCell = document.createElement('td');
         nCell.className = 'pairs-n';
         nCell.textContent = 'N = ' + (Number.isFinite(row.n) ? Number(row.n).toLocaleString() : '—');
@@ -2020,6 +2251,7 @@
         tr.addEventListener('click', open);
         body.appendChild(tr);
       });
+      renderPartialPairsChart();
     }
 
     function buildPartialPairsTable() {
@@ -2071,6 +2303,7 @@
             p: pAll,
             partialR: partial,
             partialP: pPart,
+            delta: (Number.isFinite(partial) && Number.isFinite(regular)) ? partial - regular : null,
             n: n
           });
         }
@@ -2261,11 +2494,11 @@
       const pair = (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._getPartialSelectedPair === 'function')
         ? StatisticoHeader._getPartialSelectedPair()
         : window.partialSelectedPair;
-      document.querySelectorAll('#correlationTable td.highlighted, #partialHeatmapTable td.highlighted, #partialPairsTable tr.highlighted').forEach((el) => {
+      document.querySelectorAll('#correlationTable td.highlighted, #partialHeatmapTable td.highlighted').forEach((el) => {
         el.classList.remove('highlighted');
       });
       if (!pair) return;
-      document.querySelectorAll('#correlationTable td[data-var-x], #partialHeatmapTable td[data-var-x], #partialPairsTable tr[data-var-x]').forEach((td) => {
+      document.querySelectorAll('#correlationTable td[data-var-x], #partialHeatmapTable td[data-var-x]').forEach((td) => {
         const match = (td.dataset.varX === pair.x && td.dataset.varY === pair.y)
           || (td.dataset.varX === pair.y && td.dataset.varY === pair.x);
         td.classList.toggle('highlighted', match);
@@ -2332,7 +2565,7 @@
       }
 
       restoreSelectedPairHighlight();
-      if (clickedCell) clickedCell.classList.add('highlighted');
+      if (clickedCell && clickedCell.tagName !== 'TR') clickedCell.classList.add('highlighted');
 
       renderComparisonScatters(var1Name, var2Name, controlNames, shownPartial, shownRegular);
 
@@ -2430,6 +2663,7 @@
       if (paneScatterState) {
         renderComparisonScatters(paneScatterState.x, paneScatterState.y, paneScatterState.controls, paneScatterState.partialR, paneScatterState.regularR);
       }
+      if (partialPairRows.length) renderPartialPairsChart();
       if (typeof Highcharts !== 'undefined' && Highcharts.charts) {
         Highcharts.charts.forEach(function(c) { if (c) {
           var isLight = document.documentElement.getAttribute('data-theme') === 'light';

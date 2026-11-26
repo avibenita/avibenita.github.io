@@ -11103,7 +11103,8 @@ ${this._overallAiReplyFormat()}`;
         prompt = window.buildFactorSuitabilityAiPrompt();
       } else {
         if (this.module === 'correlations' && this._ix()) {
-          const built = this._ix().buildKnownModuleAssessment('correlations', this._collectAllCorrelationViewsData());
+          const assessmentKind = viewKey === 'partial-correlations' ? 'partial-correlations' : 'correlations';
+          const built = this._ix().buildKnownModuleAssessment(assessmentKind, this._collectAllCorrelationViewsData());
           if (built) {
             this._lastAiMeta = built.meta;
             this._showAiOverlay(built.sections, viewKey, 'per-view', built.meta);
@@ -13495,8 +13496,8 @@ Do not recommend switching to a setting that is already selected.`;
     } else {
       const bottomLine = sections.BOTTOMLINE || sections.READING || sections.CONCLUSION || sections.INSIGHT;
       const meaning = sections.MEANING || sections.MEANS || sections.INTERPRETATION;
-      const evidence = sections.EVIDENCE;
-      const checks = sections.CHECKS;
+      const evidence = sections.EVIDENCE || sections.FINDINGS;
+      const checks = sections.CHECKS || sections.LIMITATIONS;
       const next = sections.NEXT || sections.ACTION;
       const reviewedGuide = this._reviewedGuideForView(view);
       bodyHtml = `

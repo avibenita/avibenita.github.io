@@ -364,6 +364,31 @@ describe('module distinctions', () => {
     expect(corr).toMatch(/header row count is 40/);
     expect(corr).toMatch(/does not establish causation/i);
 
+    const partialView = facts.assessmentPlainText(facts.buildKnownModuleAssessment('partial-correlations', {
+      data: { variables: ['Floor Area', 'Employees', 'Monthly Sales'], rows: 500 },
+      matrix: { pairs: [{ x: 'Floor Area', y: 'Employees', r: 0.613, n: 500 }], strongest: [{ x: 'Floor Area', y: 'Employees', r: 0.613, n: 500 }] },
+      partial: {
+        headerRows: 500,
+        controls: ['Monthly Sales'],
+        selected: {
+          x: 'Floor Area', y: 'Employees', n: 500, controls: ['Monthly Sales'], deltaR: -0.069,
+          unadjusted: { r: 0.613, p: 0.0001 }, partial: { r: 0.544, p: 0.0001 },
+          change: { code: 'persists', label: 'Association is similar after adjustment.' }
+        }
+      }
+    }));
+    expect(partialView).toMatch(/After adjusting for Monthly Sales/);
+    expect(partialView).toMatch(/partial r = 0\.544/);
+    expect(partialView).toMatch(/similar after adjustment/i);
+    expect(partialView).not.toMatch(/largest \|r\|/);
+
+    const noAdjust = facts.assessmentPlainText(facts.buildKnownModuleAssessment('partial-correlations', {
+      matrix: { strongest: [{ x: 'A', y: 'B', r: 0.4, n: 28 }] },
+      partial: { controls: [] }
+    }));
+    expect(noAdjust).toMatch(/Nothing is in Adjust for/);
+    expect(noAdjust).toMatch(/No partial correlation has been computed/);
+
     const power = facts.assessmentPlainText(facts.buildKnownModuleAssessment('power', {
       mode: 'power', f: 0.25, k: 3, alpha: 0.05, N: 60, power: 0.72, fromObserved: true
     }));

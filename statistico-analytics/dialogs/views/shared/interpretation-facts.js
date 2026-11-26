@@ -1396,6 +1396,79 @@
     });
   }
 
+  function buildPartialAssessment(allData) {
+    allData = allData || {};
+    var partial = allData.partial || {};
+    var controls = partial.controls || [];
+    var selected = partial.selected;
+    var matrix = allData.matrix;
+    var strongest = matrix && (matrix.strongest || matrix.pairs || [])[0];
+    if (!controls.length && !selected && !strongest) return null;
+
+    if (!controls.length) {
+      var ordinary = 'Nothing is in Adjust for, so this view is still the ordinary Pearson matrix. No partial correlation has been computed';
+      if (strongest) ordinary += '. The largest |r| is ' + numText(strongest.r) + ' between ' + strongest.x + ' and ' + strongest.y + ' (pair n = ' + strongest.n + ')';
+      return ruled({
+        conclusion: ordinary + '.',
+        findings: ['Place a variable in Adjust for to hold it constant. The partial r is then compared with the ordinary r on the same complete cases.'],
+        interpretation: 'Until a variable is held constant, the partial result is the unadjusted correlation. The view is not yet answering the adjusted question.',
+        limitations: ['A partial correlation is not a causal estimate. Which variable is adjusted for changes the question being asked.'],
+        signal: 'No adjustment',
+        source: 'partial-correlations'
+      });
+    }
+
+    if (!selected || !selected.unadjusted || !selected.partial || numText(selected.unadjusted.r) === null || numText(selected.partial.r) === null) {
+      return ruled({
+        conclusion: 'Adjusting for ' + controls.join(', ') + ', but a partial correlation could not be computed for the pairs in view.',
+        findings: ['Both values need complete cases on the pair and on every variable in Adjust for.'],
+        interpretation: 'The adjustment is set, but there is not yet a partial r to compare with the ordinary correlation.',
+        limitations: ['A partial correlation is not a causal estimate.'],
+        signal: 'Partial unavailable',
+        source: 'partial-correlations'
+      });
+    }
+
+    var focus = partial.selectedByUser ? 'For the open pair' : 'For the pair whose correlation changes most';
+    var pattern = selected.change && selected.change.label
+      ? selected.change.label.replace(/\.$/, '')
+      : 'The partial correlation differs from the ordinary correlation';
+    var delta = numText(selected.deltaR);
+    var conclusion = 'After adjusting for ' + controls.join(', ') + ', ' + selected.x + ' and ' + selected.y
+      + ' move from r = ' + numText(selected.unadjusted.r) + ' to partial r = ' + numText(selected.partial.r)
+      + ' (n = ' + selected.n + '). ' + pattern + '.';
+    var findings = [
+      focus + ', ordinary r = ' + numText(selected.unadjusted.r)
+        + (formatP(selected.unadjusted.p) ? ' (' + formatP(selected.unadjusted.p) + ')' : '')
+        + ' and partial r = ' + numText(selected.partial.r)
+        + (formatP(selected.partial.p) ? ' (' + formatP(selected.partial.p) + ')' : '')
+        + (delta !== null ? '. Change in r = ' + delta : '')
+        + '.'
+    ];
+    (partial.others || []).slice(0, 3).forEach(function (row) {
+      if (!row || numText(row.unadjusted && row.unadjusted.r) === null || numText(row.partial && row.partial.r) === null) return;
+      findings.push(row.x + ' and ' + row.y + ': r = ' + numText(row.unadjusted.r) + ' to partial r = ' + numText(row.partial.r) + ' (n = ' + row.n + ').');
+    });
+    if (partial.excluded && partial.excluded.length) {
+      findings.push('Left out of the matrix: ' + partial.excluded.join(', ') + '.');
+    }
+    var limitations = [
+      'Both r values use the same complete cases. The difference is the adjustment, not a change in who is included.',
+      'A weaker or stronger partial r does not show that the original association was caused by the adjusted variables. The result answers only the adjusted question.'
+    ];
+    if (partial.headerRows && selected.n != null && Number(selected.n) !== Number(partial.headerRows)) {
+      limitations.unshift('Use n = ' + selected.n + ', not the header row count ' + partial.headerRows + '.');
+    }
+    return ruled({
+      conclusion: conclusion,
+      findings: findings,
+      interpretation: 'Partial r correlates what remains of ' + selected.x + ' and ' + selected.y + ' after the part predictable from ' + controls.join(', ') + ' is removed. Both numbers use the same ' + selected.n + ' complete cases.',
+      limitations: limitations,
+      signal: 'partial r = ' + numText(selected.partial.r),
+      source: 'partial-correlations'
+    });
+  }
+
   function buildCorrelationAssessment(allData) {
     allData = allData || {};
     var matrix = allData.matrix;
@@ -1467,6 +1540,7 @@
     if (key === 'factor') return buildFactorAssessment(payload);
     if (key === 'cluster') return buildClusterAssessment(payload);
     if (key === 'correlations') return buildCorrelationAssessment(payload);
+    if (key === 'partial-correlations') return buildPartialAssessment(payload);
     if (key === 'power') return buildPowerAssessment(payload);
     return null;
   }

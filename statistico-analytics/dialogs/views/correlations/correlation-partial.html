@@ -17,7 +17,8 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">  <script src="../shared-brand-logo.js?v=20261005light1"></script>
 
-  <script src="../shared-header.js?v=20261123notab"></script>
+  <script src="../shared/interpretation-facts.js?v=20261126pair"></script>
+  <script src="../shared-header.js?v=20261126pair"></script>
   <!-- Preload filter assets so the page's installer finds them on first call (no flicker). -->
   <script src="../shared/uni-row-filter.js?v=20260524i" data-uni-row-filter="1"></script>
   <script src="../shared/filter.js?v=20260524i" data-filter-api="1"></script>
@@ -1039,7 +1040,7 @@
 
     .pair-change-strip{
       display:grid;
-      grid-template-columns:repeat(4, minmax(0, 1fr));
+      grid-template-columns:0.8fr 0.8fr 0.9fr 1.6fr;
       gap:10px;
       margin-bottom:10px;
     }
@@ -1061,16 +1062,69 @@
 
     .change-badge{
       margin-top:4px;
-      font-size:16px;
-      font-weight:800;
+      font-size:14px;
+      font-weight:700;
+      line-height:1.3;
       color:var(--text-primary);
     }
 
-    .change-badge.weaker{ color:var(--accent-1); }
-    .change-badge.stronger{ color:var(--accent-2); }
+    .change-badge.weaker,
+    .change-badge.attenuates{ color:var(--accent-1); }
+    .change-badge.stronger,
+    .change-badge.emerges{ color:var(--accent-2); }
     .change-badge.reversed{ color:#f5d76e; }
     .change-badge.similar,
     .change-badge.same{ color:var(--text-muted); }
+
+    .change-summary-row{
+      display:flex;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      gap:12px;
+      margin:0 4px 12px;
+    }
+
+    .change-summary-row .change-story{
+      flex:1 1 auto;
+      margin:0;
+    }
+
+    .interpret-comparison-btn{
+      flex:0 0 auto;
+      padding:8px 12px;
+      border-radius:8px;
+      border:1px solid var(--accent-2);
+      background:rgba(120,200,255,0.12);
+      color:var(--text-primary);
+      font-size:13px;
+      font-weight:700;
+      line-height:1.3;
+      cursor:pointer;
+    }
+
+    .interpret-comparison-btn:hover,
+    .interpret-comparison-btn[aria-expanded="true"]{
+      background:rgba(120,200,255,0.22);
+    }
+
+    .comparison-interpretation{
+      margin:0 4px 14px;
+      padding:12px 14px;
+      border:1px solid rgba(120,200,255,0.35);
+      border-radius:10px;
+      background:rgba(120,200,255,0.06);
+    }
+
+    .comparison-interpretation p{
+      margin:0 0 8px;
+      color:var(--text-secondary);
+      font-size:14px;
+      line-height:1.45;
+    }
+
+    .comparison-interpretation p:last-child{
+      margin-bottom:0;
+    }
 
     .change-story,
     .residual-note{
@@ -1089,10 +1143,33 @@
       margin:4px 0 8px;
     }
 
-    .control-impact h4{
+    .control-impact > summary{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
       margin:0 0 8px;
-      font-size:15px;
+      padding:8px 12px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:rgba(0,0,0,0.28);
       color:var(--text-primary);
+      font-size:14px;
+      font-weight:700;
+      cursor:pointer;
+      list-style:none;
+    }
+
+    .control-impact > summary::-webkit-details-marker{
+      display:none;
+    }
+
+    .control-impact > summary::before{
+      content:'▸';
+      color:var(--accent-2);
+    }
+
+    .control-impact[open] > summary::before{
+      content:'▾';
     }
 
     .control-impact table{
@@ -1439,11 +1516,15 @@
           <div class="stat-ci">Partial − ordinary</div>
         </div>
         <div class="pair-change-card">
-          <div class="stat-label">Strength</div>
+          <div class="stat-label">Result</div>
           <div class="change-badge" id="changeBadge">—</div>
         </div>
       </div>
-      <p id="changeStory" class="change-story"></p>
+      <div class="change-summary-row">
+        <p id="changeStory" class="change-story"></p>
+        <button type="button" id="interpretComparisonBtn" class="interpret-comparison-btn" aria-expanded="false" aria-controls="comparisonInterpretation">Interpret this comparison</button>
+      </div>
+      <div id="comparisonInterpretation" class="comparison-interpretation" hidden></div>
       
       <div class="correlation-section regular-section">
         <h4>Original relationship</h4>
@@ -1493,16 +1574,16 @@
         <div class="pane-scatter" id="partialScatter" role="img" aria-label="Partial scatter with a linear regression line"></div>
         <p id="residualNote" class="residual-note"></p>
       </div>
-      <div id="controlImpact" class="control-impact" hidden>
-        <h4>Which adjustment changes this result most</h4>
+      <details id="controlImpact" class="control-impact" hidden>
+        <summary>Compare adjustments</summary>
         <table>
           <thead>
             <tr><th>Adjustment</th><th>r</th><th>Change from none</th></tr>
           </thead>
           <tbody id="controlImpactBody"></tbody>
         </table>
-        <p id="controlImpactNote" class="corr-info">Each control is applied on its own, using the same complete cases as the full adjustment. Those shifts overlap, so they do not add up to the result of adjusting for all of them together.</p>
-      </div>
+        <p id="controlImpactNote" class="corr-info">Every row uses the same complete cases. Each control is applied on its own, and those shifts do not add up to adjusting for all of them together.</p>
+      </details>
       <p id="caseReadout" class="corr-info case-readout">Hover a point to highlight that same case in both plots.</p>
       <p id="sameNNote" class="corr-info" style="margin:12px 4px 0;text-align:left;"></p>
     </div>
@@ -1529,9 +1610,15 @@
     let partialPairRows = [];
     let partialPairSort = { key: 'pair', direction: 'asc' };
     let paneScatterState = null;
+    let comparisonFacts = null;
+    let openComparison = null;
+
+    // Bind popup controls before Office.js. A missing Office host must not
+    // skip the comparison reading. The function declaration is hoisted.
+    bindPartialModalEvents();
 
     // Initialize Office.js
-    Office.onReady(function(info) {
+    if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') Office.onReady(function(info) {
       console.log('Office initialized in partial correlations dialog');
       
       // Initialize shared header
@@ -2355,11 +2442,16 @@
     function renderControlImpact(xName, yName, controlNames, shownRegular, shownPartial) {
       const host = document.getElementById('controlImpact');
       const body = document.getElementById('controlImpactBody');
-      const note = document.getElementById('controlImpactNote');
       if (!host || !body) return;
-      if (!controlNames.length) {
+      if (controlNames.length < 2) {
         host.hidden = true;
+        host.open = false;
         return;
+      }
+      const pairKey = xName + '\0' + yName + '\0' + controlNames.join('\0');
+      if (host.dataset.pair !== pairKey) {
+        host.open = false;
+        host.dataset.pair = pairKey;
       }
       const cols = completeCaseColumns([xName, yName].concat(controlNames));
       const rows = [{ label: 'None', r: shownRegular }];
@@ -2368,27 +2460,59 @@
         const ry = columnResiduals(cols[1], [cols[index + 2]]);
         rows.push({ label: name + ' only', r: pearson(rx, ry) });
       });
-      if (controlNames.length > 1) rows.push({ label: 'All selected', r: shownPartial });
+      rows.push({ label: 'All selected', r: shownPartial });
       body.innerHTML = rows.map((row) => {
         const delta = (Number.isFinite(row.r) && Number.isFinite(shownRegular)) ? row.r - shownRegular : null;
         return '<tr><td>' + svgText(row.label) + '</td><td>' + fmtCorr(row.r) + '</td><td>' + fmtDelta(delta) + '</td></tr>';
       }).join('');
-      if (note) note.hidden = controlNames.length < 2;
       host.hidden = false;
     }
 
-    function fillPairTeaching(xName, yName, controlNames, r0, r1, n) {
-      const label = strengthLabel(r0, r1, controlNames.length > 0);
+    function pairReading(xName, yName, controlNames, r0, r1, n, p0, p1) {
+      if (typeof StatisticoInterpretation === 'undefined' || typeof StatisticoInterpretation.describePartialComparison !== 'function') return null;
+      return StatisticoInterpretation.describePartialComparison({
+        x: xName,
+        y: yName,
+        controls: controlNames.slice(),
+        ordinaryR: r0,
+        partialR: r1,
+        ordinaryP: p0,
+        partialP: p1,
+        n: n,
+        partialCi: fisherCi(r1, n, controlNames.length)
+      });
+    }
+
+    function renderComparisonReading() {
+      const panel = document.getElementById('comparisonInterpretation');
+      const btn = document.getElementById('interpretComparisonBtn');
+      if (!panel) return;
+      if (btn) btn.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+      if (panel.hidden) return;
+      while (panel.firstChild) panel.removeChild(panel.firstChild);
+      const paragraphs = (comparisonFacts && comparisonFacts.paragraphs) || ['This comparison does not have a reading yet.'];
+      paragraphs.forEach((text) => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        panel.appendChild(p);
+      });
+    }
+
+    function fillPairTeaching(xName, yName, controlNames, r0, r1, n, p0, p1) {
+      const reading = pairReading(xName, yName, controlNames, r0, r1, n, p0, p1);
+      const label = reading || strengthLabel(r0, r1, controlNames.length > 0);
       const delta = (Number.isFinite(r0) && Number.isFinite(r1)) ? r1 - r0 : null;
       setPairText('stripOrdinary', fmtCorr(r0));
       setPairText('stripPartial', fmtCorr(r1));
       setPairText('stripDelta', fmtDelta(delta));
       const badge = document.getElementById('changeBadge');
       if (badge) {
-        badge.textContent = label.text;
-        badge.className = 'change-badge ' + label.code;
+        badge.textContent = reading ? reading.badge : label.text;
+        badge.className = 'change-badge ' + (reading ? reading.code : label.code);
       }
-      setPairText('changeStory', changeSentence(xName, yName, controlNames, r0, label));
+      setPairText('changeStory', reading ? reading.story : changeSentence(xName, yName, controlNames, r0, label));
+      comparisonFacts = reading;
+      renderComparisonReading();
       setPairText('regularCi', fmtCi(fisherCi(r0, n, 0)));
       setPairText('partialCi', fmtCi(fisherCi(r1, n, controlNames.length)));
       setPairText('residualNote', residualSentence(xName, yName, controlNames));
@@ -2730,6 +2854,7 @@
         renderPartialPairsHead();
         renderPartialPairsBody();
         setPartialMatrixView(partialMatrixView);
+        refreshOpenComparison();
         return;
       }
       
@@ -2806,6 +2931,7 @@
       setPartialMatrixView(partialMatrixView);
       applyPartialThreshold();
       restoreSelectedPairHighlight();
+      refreshOpenComparison();
     }
 
     function buildPartialHeatmap(nonControlIndices, controlIndices) {
@@ -2888,7 +3014,19 @@
     /**
      * Show correlation comparison modal
      */
+    function refreshOpenComparison() {
+      const modal = document.getElementById('correlationModal');
+      if (!modal || modal.style.display === 'none' || !openComparison) return;
+      const analysis = getAnalysisIndices();
+      if (!analysis.includes(openComparison.i) || !analysis.includes(openComparison.j)) {
+        hideCorrelationModal();
+        return;
+      }
+      showCorrelationModal(openComparison.i, openComparison.j, openComparison.x, openComparison.y, null);
+    }
+
     function showCorrelationModal(var1Idx, var2Idx, var1Name, var2Name, clickedCell) {
+      openComparison = { i: var1Idx, j: var2Idx, x: var1Name, y: var2Name };
       persistSelectedPair(var1Name, var2Name);
       const controlIndices = getControlIndices();
       const controlNames = controlIndices.map((idx) => variableNames[idx]);
@@ -2927,7 +3065,7 @@
             note.textContent = `Both values use the same ${nText} complete-case observations. No controls are applied, so both are unadjusted correlations.`;
           }
         }
-        fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, cmp.n);
+        fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, cmp.n, cmp.unadjusted.p, cmp.partial.p);
       } else {
         const regularCorr = calculatePartialCorrelation(var1Idx, var2Idx, []);
         const partialCorr = calculatePartialCorrelation(var1Idx, var2Idx, controlIndices);
@@ -2945,7 +3083,7 @@
         if (pnEl) pnEl.textContent = Number.isFinite(partialCorr.n) ? Number(partialCorr.n).toLocaleString() : '-';
         const note = document.getElementById('sameNNote');
         if (note) note.textContent = '';
-        fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, Number.isFinite(partialCorr.n) ? partialCorr.n : regularCorr.n);
+        fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, Number.isFinite(partialCorr.n) ? partialCorr.n : regularCorr.n, regularCorr.pValue, partialCorr.pValue);
       }
 
       restoreSelectedPairHighlight();
@@ -2982,8 +3120,11 @@
       }
     }
 
-    // Event listeners
-    document.addEventListener('DOMContentLoaded', function() {
+    // Event listeners. Bind immediately when the document is already parsed,
+    // which happens if Office.js finishes loading before this script.
+    function bindPartialModalEvents() {
+      if (document.documentElement.dataset.partialModalEvents === '1') return;
+      document.documentElement.dataset.partialModalEvents = '1';
       // Toggle checkboxes
       const togglePval = document.getElementById('togglePval');
       const toggleN = document.getElementById('toggleN');
@@ -2996,6 +3137,16 @@
       }
       
       // Modal close
+      const interpretBtn = document.getElementById('interpretComparisonBtn');
+      if (interpretBtn) {
+        interpretBtn.addEventListener('click', function() {
+          const panel = document.getElementById('comparisonInterpretation');
+          if (!panel) return;
+          panel.hidden = !panel.hidden;
+          renderComparisonReading();
+        });
+      }
+
       const closeBtn = document.querySelector('.close-modal');
       if (closeBtn) {
         closeBtn.addEventListener('click', hideCorrelationModal);
@@ -3036,7 +3187,9 @@
         if (modal && modal.style.display === 'block') hideCorrelationModal();
         else if (chartModal && chartModal.style.display === 'block') hidePairsChart();
       });
-    });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindPartialModalEvents);
+    else bindPartialModalEvents();
 
     console.log('Partial Correlations Dialog loaded');
   

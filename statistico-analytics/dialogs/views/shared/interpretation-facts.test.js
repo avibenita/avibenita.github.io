@@ -389,6 +389,23 @@ describe('module distinctions', () => {
     expect(noAdjust).toMatch(/Nothing is in Adjust for/);
     expect(noAdjust).toMatch(/No partial correlation has been computed/);
 
+    const comparison = facts.describePartialComparison({
+      x: 'Advertising ($000)',
+      y: 'Local Income ($000)',
+      controls: ['Monthly Sales ($000)'],
+      ordinaryR: 0.006,
+      partialR: -0.227,
+      ordinaryP: 0.892,
+      partialP: 0.0001,
+      n: 500
+    });
+    expect(comparison.badge).toBe('Modest negative association emerges');
+    expect(comparison.paragraphs.join(' ')).toMatch(/almost no overall linear association \(r = 0\.006\)/);
+    expect(comparison.paragraphs.join(' ')).toMatch(/a modest negative association appears \(partial r = -0\.227; 95% CI -0\.309 to -0\.142; n = 500\)/);
+    expect(comparison.paragraphs.join(' ')).toMatch(/local income \(\$000\) below its predicted level/);
+    expect(comparison.paragraphs.join(' ')).toMatch(/does not establish causation/);
+    expect(comparison.paragraphs.join(' ')).not.toMatch(/spurious|suppression/i);
+
     const power = facts.assessmentPlainText(facts.buildKnownModuleAssessment('power', {
       mode: 'power', f: 0.25, k: 3, alpha: 0.05, N: 60, power: 0.72, fromObserved: true
     }));

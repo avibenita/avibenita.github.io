@@ -1396,6 +1396,152 @@
     });
   }
 
+  function joinLabels(names) {
+    names = (names || []).filter(Boolean);
+    if (!names.length) return '';
+    if (names.length === 1) return names[0];
+    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  }
+
+  function proseLabel(name) {
+    return String(name || '').toLowerCase();
+  }
+
+  function correlationMagnitude(r) {
+    var a = Math.abs(finite(r));
+    if (a === null) return null;
+    if (a < 0.10) return 'negligible';
+    if (a < 0.30) return 'modest';
+    if (a < 0.50) return 'moderate';
+    return 'strong';
+  }
+
+  function correlationDirection(r) {
+    var n = finite(r);
+    if (n === null || Math.abs(n) < 0.10) return '';
+    return n < 0 ? 'negative' : 'positive';
+  }
+
+  function sentenceCase(text) {
+    text = String(text || '');
+    if (!text) return text;
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  function fisherInterval(r, n, controls) {
+    var value = finite(r);
+    var size = finite(n);
+    var k = finite(controls);
+    if (k === null) k = 0;
+    if (value === null || size === null) return null;
+    var denom = size - 3 - k;
+    if (denom < 1 || Math.abs(value) >= 0.999) return null;
+    var z = Math.atanh(value);
+    var se = 1 / Math.sqrt(denom);
+    var z95 = 1.959963984540054;
+    return { lo: Math.tanh(z - z95 * se), hi: Math.tanh(z + z95 * se) };
+  }
+
+  function describePartialComparison(spec) {
+    spec = spec || {};
+    var x = spec.x || 'The first variable';
+    var y = spec.y || 'the second variable';
+    var controls = spec.controls || [];
+    var r0 = finite(spec.ordinaryR != null ? spec.ordinaryR : (spec.ordinary && spec.ordinary.r));
+    var r1 = finite(spec.partialR != null ? spec.partialR : (spec.partial && spec.partial.r));
+    var p0 = finite(spec.ordinaryP != null ? spec.ordinaryP : (spec.ordinary && spec.ordinary.p));
+    var p1 = finite(spec.partialP != null ? spec.partialP : (spec.partial && spec.partial.p));
+    var n = finite(spec.n);
+    var alpha = finite(spec.alpha);
+    if (alpha === null) alpha = 0.05;
+    var held = joinLabels(controls);
+    var ci = spec.partialCi || null;
+    if (!ci && controls.length) ci = fisherInterval(r1, n, controls.length);
+    var ciText = ci && numText(ci.lo) !== null && numText(ci.hi) !== null
+      ? '95% CI ' + numText(ci.lo) + ' to ' + numText(ci.hi)
+      : '';
+    var nText = n !== null ? 'n = ' + Math.round(n) : '';
+    var sampleClause = [ciText, nText].filter(Boolean).join('; ');
+
+    function ordinaryClause() {
+      if (r0 === null) return x + ' and ' + y + ' do not have an ordinary correlation to report';
+      if (Math.abs(r0) < 0.10) return x + ' and ' + y + ' show almost no overall linear association (r = ' + numText(r0) + ')';
+      return x + ' and ' + y + ' show a ' + correlationMagnitude(r0) + ' ' + correlationDirection(r0) + ' overall linear association (r = ' + numText(r0) + ')';
+    }
+
+    if (!controls.length) {
+      return {
+        code: 'same',
+        badge: 'Unadjusted',
+        story: 'Nothing is being adjusted for, so both plots show the same unadjusted relationship.',
+        paragraphs: [
+          ordinaryClause() + (nText ? ' (' + nText + ')' : '') + '. No variable is held constant, so this is the ordinary Pearson correlation.',
+          'Association does not establish causation.'
+        ]
+      };
+    }
+
+    if (r0 === null || r1 === null) {
+      return {
+        code: 'unknown',
+        badge: '—',
+        story: 'After accounting for ' + held + ', the partial correlation could not be computed.',
+        paragraphs: ['Both values need complete cases on ' + x + ', ' + y + ', and ' + held + '.']
+      };
+    }
+
+    var abs0 = Math.abs(r0);
+    var abs1 = Math.abs(r1);
+    var sig0 = p0 !== null && p0 < alpha;
+    var sig1 = p1 !== null && p1 < alpha;
+    var magnitude = correlationMagnitude(r1);
+    var direction = r1 < 0 ? 'negative' : 'positive';
+    var described = (magnitude === 'negligible' ? 'negligible' : magnitude + ' ' + direction) + ' association';
+    var code = 'similar';
+    var partialClause = 'a ' + described + ' remains';
+    var badge = sentenceCase(described) + ' is about the same';
+    var story = 'After accounting for ' + held + ', the association between ' + x + ' and ' + y + ' is about the same.';
+    if (r0 * r1 < 0 && abs0 >= 0.05 && abs1 >= 0.05) {
+      code = 'reversed';
+      partialClause = 'the association changes sign to a ' + described;
+      badge = 'Sign reverses to a ' + described;
+      story = 'After accounting for ' + held + ', the association between ' + x + ' and ' + y + ' changes sign.';
+    } else if (abs0 < 0.10 && !(sig0 && abs0 >= 0.05) && (abs1 >= 0.10 || sig1)) {
+      code = 'emerges';
+      partialClause = 'a ' + described + ' appears';
+      badge = sentenceCase(described) + ' emerges';
+      story = 'After accounting for ' + held + ', a ' + described + ' between ' + x + ' and ' + y + ' emerges.';
+    } else if ((abs0 >= 0.10 || sig0) && abs1 < 0.10 && !sig1) {
+      code = 'attenuates';
+      partialClause = 'little linear association remains';
+      badge = 'Association attenuates to near zero';
+      story = 'After accounting for ' + held + ', the association between ' + x + ' and ' + y + ' attenuates to near zero.';
+    } else if (abs1 > abs0 + 0.05) {
+      code = 'stronger';
+      partialClause = 'the ' + described + ' is stronger';
+      badge = sentenceCase(described) + ' strengthens';
+      story = 'After accounting for ' + held + ', the ' + direction + ' association between ' + x + ' and ' + y + ' is stronger. Strength is judged from the absolute correlation.';
+    } else if (abs1 < abs0 - 0.05) {
+      code = 'weaker';
+      partialClause = 'the ' + described + ' is weaker';
+      badge = sentenceCase(described) + ' weakens';
+      story = 'After accounting for ' + held + ', the ' + direction + ' association between ' + x + ' and ' + y + ' is weaker. Strength is judged from the absolute correlation.';
+    }
+
+    var stats = 'partial r = ' + numText(r1) + (sampleClause ? '; ' + sampleClause : '');
+    var first = ordinaryClause() + '. After accounting for ' + held + ', ' + partialClause + ' (' + stats + ').';
+    var second;
+    if (abs1 < 0.10) {
+      second = 'Once the part predictable from ' + held + ' is removed, little linear association remains.';
+    } else {
+      var lean = r1 < 0 ? 'below' : 'above';
+      second = 'Among observations with similar ' + held + ', ' + proseLabel(x) + ' above its predicted level tends to accompany ' + proseLabel(y) + ' ' + lean + ' its predicted level.';
+    }
+    var cases = n !== null ? ' on these ' + Math.round(n) + ' complete cases' : '';
+    second += ' This Pearson partial correlation describes an adjusted association' + cases + '; it does not establish causation.';
+    return { code: code, badge: badge, story: story, paragraphs: [first, second] };
+  }
+
   function buildPartialAssessment(allData) {
     allData = allData || {};
     var partial = allData.partial || {};
@@ -1597,6 +1743,7 @@
     groupsFromContext: groupsFromContext,
     hypothesisFromRecord: hypothesisFromRecord,
     buildKnownModuleAssessment: buildKnownModuleAssessment,
+    describePartialComparison: describePartialComparison,
     enforceRequiredFindings: enforceRequiredFindings,
     moduleGroundRules: moduleGroundRules
   };

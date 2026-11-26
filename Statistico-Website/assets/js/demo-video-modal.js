@@ -11,26 +11,29 @@
   var LOGO_SRC = '/Statistico-Website/assets/statistico-logo-dark-bg.svg';
   var opener = null;
   var session = 0;
+  var settleTimer = 0;
 
   function ensureStyles() {
     if (document.getElementById(STYLE_ID)) return;
     var style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = [
-      '.demo-video-backdrop{position:fixed;inset:0;z-index:9200;display:flex;align-items:center;justify-content:center;padding:28px 24px;background:rgba(6,10,16,.72);backdrop-filter:blur(10px);opacity:0;pointer-events:none}',
+      '.demo-video-backdrop{position:fixed;inset:0;z-index:9200;display:flex;align-items:center;justify-content:center;padding:16px 18px;background:rgba(6,10,16,.78);opacity:0;pointer-events:none}',
       '.demo-video-backdrop.is-open{opacity:1;pointer-events:auto}',
-      '.demo-video-dialog{position:relative;width:min(920px,100%);max-height:calc(100vh - 40px);overflow:hidden;display:flex;flex-direction:column;gap:0;padding:28px 28px 24px;border-radius:20px;background:#0e1622;color:#f8fafc;font-family:Inter,"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;box-shadow:0 28px 70px rgba(0,0,0,.42);opacity:0;transform:scale(.985)}',
+      '.demo-video-dialog{position:relative;width:min(1560px,calc(100vw - 36px));max-height:calc(100vh - 32px);overflow:hidden;display:flex;flex-direction:column;gap:0;padding:18px 20px 16px;border-radius:20px;background:#0e1622;color:#f8fafc;font-family:Inter,"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;box-shadow:0 28px 70px rgba(0,0,0,.42);opacity:0;transform:scale(.985)}',
       '.demo-video-dialog>*{flex-shrink:0}',
       '.demo-video-backdrop,.demo-video-dialog,.demo-video-preview{transition:opacity 250ms ease,transform 250ms ease}',
       '.demo-video-backdrop.is-open .demo-video-dialog{opacity:1;transform:scale(1)}',
+      '.demo-video-backdrop.is-settled,.demo-video-backdrop.is-settled .demo-video-dialog{transition:none;transform:none;opacity:1;filter:none}',
       '.demo-video-kicker{margin:0 48px 0 0;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(226,232,240,.68)}',
-      '.demo-video-title{margin:8px 48px 0 0;font-size:1.7rem;font-weight:650;line-height:1.22;letter-spacing:-.02em;color:#f8fafc}',
-      '.demo-video-lead{margin:10px 0 18px;max-width:40rem;font-size:1rem;font-weight:450;line-height:1.5;color:rgba(226,232,240,.82)}',
+      '.demo-video-title{margin:6px 44px 12px 0;font-size:1.55rem;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:#f8fafc}',
+      '.demo-video-lead{display:none}',
       '.demo-video-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:rgba(226,232,240,.78);cursor:pointer;font:400 26px/1 Inter,"Segoe UI",sans-serif}',
       '.demo-video-close:hover{color:#fff;background:rgba(255,255,255,.06)}',
       '.demo-video-close:focus-visible,.demo-video-play:focus-visible,.demo-video-link:focus-visible{outline:2px solid #e4c16a;outline-offset:3px}',
-      '.demo-video-frame{position:relative;width:min(100%,calc((100vh - 270px)*16/9));max-height:calc(100vh - 270px);margin-inline:auto;aspect-ratio:16/9;flex:none;border-radius:16px;overflow:hidden;background:#0c1422;box-shadow:0 22px 48px rgba(0,0,0,.36),0 0 0 1px rgba(228,193,106,.42)}',
-      '.demo-video-frame video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#0c1422;opacity:0}',
+      '.demo-video-frame{position:relative;width:min(100%,calc((100vh - 148px)*16/9));max-height:calc(100vh - 148px);margin-inline:auto;aspect-ratio:16/9;flex:none;border-radius:16px;overflow:hidden;background:#0c1422;box-shadow:0 22px 48px rgba(0,0,0,.36),0 0 0 1px rgba(228,193,106,.42)}',
+      '.demo-video-frame video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;opacity:0}',
+      '.demo-video-frame video:fullscreen,.demo-video-frame video:-webkit-full-screen{width:100%;height:100%;object-fit:contain;background:#000}',
       '.demo-video-frame video.is-ready{opacity:1}',
       '.demo-video-preview{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}',
       '.demo-video-preview.is-hidden{opacity:0;pointer-events:none}',
@@ -47,7 +50,7 @@
       '.demo-video-error{margin:12px 0 0;color:#e2e8f0;font-size:.92rem;line-height:1.45}',
       '.demo-video-link{color:#e4c16a;font-weight:700}',
       '@media (prefers-reduced-motion:reduce){.demo-video-backdrop,.demo-video-dialog,.demo-video-preview,.demo-video-progress span{transition:none;animation:none}}',
-      '@media (max-width:640px){.demo-video-backdrop{padding:12px}.demo-video-dialog{padding:22px 16px 16px;border-radius:16px}.demo-video-title{font-size:1.28rem}.demo-video-play{width:68px;height:68px}.demo-video-frame{width:min(100%,calc((100vh - 230px)*16/9));max-height:calc(100vh - 230px)}}'
+      '@media (max-width:640px){.demo-video-backdrop{padding:12px}.demo-video-dialog{padding:18px 14px 14px;border-radius:16px}.demo-video-title{font-size:1.2rem}.demo-video-play{width:68px;height:68px}.demo-video-frame{width:min(100%,calc((100vh - 128px)*16/9));max-height:calc(100vh - 128px)}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -88,7 +91,24 @@
       '</div>'
     ].join('');
     document.body.appendChild(wrap.firstChild);
-    return document.getElementById(ROOT_ID);
+    var backdrop = document.getElementById(ROOT_ID);
+    armFullscreen(backdrop.querySelector('video'), backdrop);
+    return backdrop;
+  }
+
+  function settle(backdrop) {
+    if (backdrop) backdrop.classList.add('is-settled');
+  }
+
+  function armFullscreen(video, backdrop) {
+    ['requestFullscreen', 'webkitRequestFullscreen'].forEach(function (name) {
+      var orig = video[name];
+      if (typeof orig !== 'function') return;
+      video[name] = function () {
+        settle(backdrop);
+        return orig.apply(video, arguments);
+      };
+    });
   }
 
   function els() {
@@ -155,13 +175,16 @@
     ui.video.src = options.src;
     backdrop.hidden = false;
     backdrop.classList.remove('is-open');
+    backdrop.classList.remove('is-settled');
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
+    clearTimeout(settleTimer);
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         backdrop.classList.add('is-open');
       });
     });
+    settleTimer = setTimeout(function () { settle(backdrop); }, 260);
     begin(token);
   }
 
@@ -169,6 +192,7 @@
     var ui = els();
     if (!ui.backdrop || ui.backdrop.hidden) return;
     session += 1;
+    clearTimeout(settleTimer);
     ui.video.pause();
     ui.video.removeAttribute('src');
     ui.video.load();

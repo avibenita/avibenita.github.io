@@ -12,6 +12,7 @@
   var opener = null;
   var session = 0;
   var settleTimer = 0;
+  var prepareTimer = 0;
 
   function ensureStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -22,7 +23,7 @@
       '.demo-video-backdrop.is-open{opacity:1;pointer-events:auto}',
       '.demo-video-dialog{position:relative;width:min(1560px,calc(100vw - 36px));max-height:calc(100vh - 32px);overflow:hidden;display:flex;flex-direction:column;gap:0;padding:18px 20px 16px;border-radius:20px;background:#0e1622;color:#f8fafc;font-family:Inter,"Segoe UI",Tahoma,Geneva,Verdana,sans-serif;box-shadow:0 28px 70px rgba(0,0,0,.42);opacity:0;transform:scale(.985)}',
       '.demo-video-dialog>*{flex-shrink:0}',
-      '.demo-video-backdrop,.demo-video-dialog,.demo-video-preview{transition:opacity 250ms ease,transform 250ms ease}',
+      '.demo-video-backdrop,.demo-video-dialog{transition:opacity 250ms ease,transform 250ms ease}',
       '.demo-video-backdrop.is-open .demo-video-dialog{opacity:1;transform:scale(1)}',
       '.demo-video-backdrop.is-settled,.demo-video-backdrop.is-settled .demo-video-dialog{transition:none;transform:none;opacity:1;filter:none}',
       '.demo-video-backdrop[hidden]{display:none !important}',
@@ -37,7 +38,8 @@
       '.demo-video-frame video:fullscreen,.demo-video-frame video:-webkit-full-screen{width:100%;height:100%;object-fit:contain;background:#000}',
       '.demo-video-frame video.is-ready{opacity:1}',
       '.demo-video-preview{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}',
-      '.demo-video-preview.is-hidden{opacity:0;pointer-events:none}',
+      '.demo-video-preview.is-hidden{opacity:0;visibility:hidden;pointer-events:none}',
+      '.demo-video-preview.is-preparing .demo-video-shot,.demo-video-preview.is-preparing .demo-video-veil,.demo-video-preview.is-preparing .demo-video-logo,.demo-video-preview.is-preparing .demo-video-play{display:none}',
       '.demo-video-shot{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}',
       '.demo-video-veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,16,32,.62),rgba(8,16,32,.34) 42%,rgba(8,16,32,.58))}',
       '.demo-video-logo{position:relative;z-index:1;width:min(240px,58%);height:auto;filter:drop-shadow(0 8px 18px rgba(0,0,0,.35))}',
@@ -50,7 +52,7 @@
       '@keyframes demo-video-progress{0%{transform:translateX(-130%)}100%{transform:translateX(280%)}}',
       '.demo-video-error{margin:12px 0 0;color:#e2e8f0;font-size:.92rem;line-height:1.45}',
       '.demo-video-link{color:#e4c16a;font-weight:700}',
-      '@media (prefers-reduced-motion:reduce){.demo-video-backdrop,.demo-video-dialog,.demo-video-preview,.demo-video-progress span{transition:none;animation:none}}',
+      '@media (prefers-reduced-motion:reduce){.demo-video-backdrop,.demo-video-dialog,.demo-video-progress span{transition:none;animation:none}}',
       '@media (max-width:640px){.demo-video-backdrop{padding:12px}.demo-video-dialog{padding:18px 14px 14px;border-radius:16px}.demo-video-title{font-size:1.2rem}.demo-video-play{width:68px;height:68px}.demo-video-frame{width:min(100%,calc((100vh - 128px)*16/9));max-height:calc(100vh - 128px)}}'
     ].join('');
     document.head.appendChild(style);
@@ -129,31 +131,50 @@
   function showCover(mode) {
     var ui = els();
     if (!ui.preview) return;
-    ui.preview.classList.remove('is-hidden');
-    ui.video.classList.remove('is-ready');
-    ui.video.controls = false;
+    ui.preview.classList.toggle('is-preparing', mode === 'preparing');
+    ui.preview.classList.toggle('is-hidden', mode === 'none');
+    if (mode === 'preparing' || mode === 'play') {
+      ui.video.classList.remove('is-ready');
+      ui.video.controls = false;
+    }
     ui.preparing.hidden = mode !== 'preparing';
-    ui.play.hidden = mode === 'preparing';
+    ui.play.hidden = mode !== 'play';
   }
 
   function revealVideo() {
     var ui = els();
-    if (!ui.video) return;
+    if (!ui.video || !ui.backdrop || ui.backdrop.hidden || !ui.video.getAttribute('src')) return;
+    clearTimeout(prepareTimer);
     ui.video.classList.add('is-ready');
     ui.video.controls = true;
+    ui.preview.classList.remove('is-preparing');
     ui.preview.classList.add('is-hidden');
     ui.preparing.hidden = true;
+    ui.play.hidden = true;
   }
 
   function begin(token) {
     var ui = els();
-    showCover('preparing');
+    clearTimeout(prepareTimer);
+    showCover('none');
+    prepareTimer = setTimeout(function () {
+      var current = els();
+      if (token !== session || !current.video || current.backdrop.hidden) return;
+      if (!current.play.hidden || !current.video.paused || current.video.readyState >= 2) return;
+      showCover('preparing');
+    }, 220);
     var pending = ui.video.play();
     if (!pending || !pending.then) return;
     pending.then(function () {
       if (token !== session) return;
+      revealVideo();
     }).catch(function () {
       if (token !== session) return;
+      clearTimeout(prepareTimer);
+      if (!ui.video.paused && ui.video.readyState >= 2) {
+        revealVideo();
+        return;
+      }
       showCover('play');
     });
   }
@@ -171,7 +192,7 @@
     ui.direct.href = options.src;
     ui.shot.src = options.poster || '';
     ui.shot.hidden = !options.poster;
-    showCover('preparing');
+    showCover('none');
     ui.video.pause();
     ui.video.src = options.src;
     backdrop.hidden = false;
@@ -194,6 +215,7 @@
     if (!ui.backdrop || ui.backdrop.hidden) return;
     session += 1;
     clearTimeout(settleTimer);
+    clearTimeout(prepareTimer);
     ui.backdrop.classList.remove('is-open');
     ui.backdrop.classList.remove('is-settled');
     ui.backdrop.hidden = true;
@@ -248,6 +270,8 @@
     ui.video.addEventListener('playing', revealVideo);
     ui.video.addEventListener('error', function () {
       if (!ui.backdrop || ui.backdrop.hidden || !ui.video.getAttribute('src')) return;
+      if (ui.video.error && ui.video.error.code === 1) return;
+      if (!ui.video.paused && ui.video.readyState >= 2) return;
       ui.error.hidden = false;
       showCover('play');
     });

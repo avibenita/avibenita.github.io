@@ -25,6 +25,7 @@
       '.demo-video-backdrop,.demo-video-dialog,.demo-video-preview{transition:opacity 250ms ease,transform 250ms ease}',
       '.demo-video-backdrop.is-open .demo-video-dialog{opacity:1;transform:scale(1)}',
       '.demo-video-backdrop.is-settled,.demo-video-backdrop.is-settled .demo-video-dialog{transition:none;transform:none;opacity:1;filter:none}',
+      '.demo-video-backdrop[hidden]{display:none !important}',
       '.demo-video-kicker{margin:0 48px 0 0;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(226,232,240,.68)}',
       '.demo-video-title{margin:6px 44px 12px 0;font-size:1.55rem;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:#f8fafc}',
       '.demo-video-lead{display:none}',
@@ -193,13 +194,14 @@
     if (!ui.backdrop || ui.backdrop.hidden) return;
     session += 1;
     clearTimeout(settleTimer);
+    ui.backdrop.classList.remove('is-open');
+    ui.backdrop.classList.remove('is-settled');
+    ui.backdrop.hidden = true;
     ui.video.pause();
     ui.video.removeAttribute('src');
     ui.video.load();
     ui.video.classList.remove('is-ready');
     ui.video.controls = false;
-    ui.backdrop.classList.remove('is-open');
-    ui.backdrop.hidden = true;
     document.documentElement.style.overflow = '';
     document.body.style.overflow = '';
     if (opener && typeof opener.focus === 'function') opener.focus();
@@ -245,6 +247,7 @@
     });
     ui.video.addEventListener('playing', revealVideo);
     ui.video.addEventListener('error', function () {
+      if (!ui.backdrop || ui.backdrop.hidden || !ui.video.getAttribute('src')) return;
       ui.error.hidden = false;
       showCover('play');
     });

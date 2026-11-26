@@ -1403,8 +1403,12 @@
     return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   }
 
+  function bareVariable(name) {
+    return String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  }
+
   function proseLabel(name) {
-    return String(name || '').toLowerCase();
+    return bareVariable(name).toLowerCase();
   }
 
   function correlationMagnitude(r) {
@@ -1444,9 +1448,9 @@
 
   function describePartialComparison(spec) {
     spec = spec || {};
-    var x = spec.x || 'The first variable';
-    var y = spec.y || 'the second variable';
-    var controls = spec.controls || [];
+    var x = bareVariable(spec.x) || 'The first variable';
+    var y = bareVariable(spec.y) || 'the second variable';
+    var controls = (spec.controls || []).map(bareVariable).filter(Boolean);
     var r0 = finite(spec.ordinaryR != null ? spec.ordinaryR : (spec.ordinary && spec.ordinary.r));
     var r1 = finite(spec.partialR != null ? spec.partialR : (spec.partial && spec.partial.r));
     var p0 = finite(spec.ordinaryP != null ? spec.ordinaryP : (spec.ordinary && spec.ordinary.p));
@@ -1460,13 +1464,11 @@
     var ciText = ci && numText(ci.lo) !== null && numText(ci.hi) !== null
       ? '95% CI ' + numText(ci.lo) + ' to ' + numText(ci.hi)
       : '';
-    var nText = n !== null ? 'n = ' + Math.round(n) : '';
-    var sampleClause = [ciText, nText].filter(Boolean).join('; ');
 
     function ordinaryClause() {
       if (r0 === null) return x + ' and ' + y + ' do not have an ordinary correlation to report';
-      if (Math.abs(r0) < 0.10) return x + ' and ' + y + ' show almost no overall linear association (r = ' + numText(r0) + ')';
-      return x + ' and ' + y + ' show a ' + correlationMagnitude(r0) + ' ' + correlationDirection(r0) + ' overall linear association (r = ' + numText(r0) + ')';
+      if (Math.abs(r0) < 0.10) return x + ' and ' + y + ' have almost no overall linear association (r = ' + numText(r0) + ')';
+      return x + ' and ' + y + ' have a ' + correlationMagnitude(r0) + ' ' + correlationDirection(r0) + ' overall linear association (r = ' + numText(r0) + ')';
     }
 
     if (!controls.length) {
@@ -1475,7 +1477,7 @@
         badge: 'Unadjusted',
         story: 'Nothing is being adjusted for, so both plots show the same unadjusted relationship.',
         paragraphs: [
-          ordinaryClause() + (nText ? ' (' + nText + ')' : '') + '. No variable is held constant, so this is the ordinary Pearson correlation.',
+          ordinaryClause() + '. No variable is held constant.',
           'Association does not establish causation.'
         ]
       };
@@ -1528,17 +1530,15 @@
       story = 'After accounting for ' + held + ', the ' + direction + ' association between ' + x + ' and ' + y + ' is weaker. Strength is judged from the absolute correlation.';
     }
 
-    var stats = 'partial r = ' + numText(r1) + (sampleClause ? '; ' + sampleClause : '');
+    var stats = 'partial r = ' + numText(r1) + (ciText ? '; ' + ciText : '');
     var first = ordinaryClause() + '. After accounting for ' + held + ', ' + partialClause + ' (' + stats + ').';
     var second;
     if (abs1 < 0.10) {
-      second = 'Once the part predictable from ' + held + ' is removed, little linear association remains.';
+      second = 'This adjusted association does not establish causation.';
     } else {
       var lean = r1 < 0 ? 'below' : 'above';
-      second = 'Among observations with similar ' + held + ', ' + proseLabel(x) + ' above its predicted level tends to accompany ' + proseLabel(y) + ' ' + lean + ' its predicted level.';
+      second = 'Cases with ' + proseLabel(x) + ' above the level predicted from ' + held + ' tend to have ' + proseLabel(y) + ' ' + lean + ' its predicted level. This adjusted association does not establish causation.';
     }
-    var cases = n !== null ? ' on these ' + Math.round(n) + ' complete cases' : '';
-    second += ' This Pearson partial correlation describes an adjusted association' + cases + '; it does not establish causation.';
     return { code: code, badge: badge, story: story, paragraphs: [first, second] };
   }
 

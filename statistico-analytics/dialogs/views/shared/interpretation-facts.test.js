@@ -400,11 +400,12 @@ describe('module distinctions', () => {
       n: 500
     });
     expect(comparison.badge).toBe('Modest negative association emerges');
-    expect(comparison.paragraphs.join(' ')).toMatch(/almost no overall linear association \(r = 0\.006\)/);
-    expect(comparison.paragraphs.join(' ')).toMatch(/a modest negative association appears \(partial r = -0\.227; 95% CI -0\.309 to -0\.142; n = 500\)/);
-    expect(comparison.paragraphs.join(' ')).toMatch(/local income \(\$000\) below its predicted level/);
-    expect(comparison.paragraphs.join(' ')).toMatch(/does not establish causation/);
-    expect(comparison.paragraphs.join(' ')).not.toMatch(/spurious|suppression/i);
+    const comparisonText = comparison.paragraphs.join(' ');
+    expect(comparisonText).toMatch(/have almost no overall linear association \(r = 0\.006\)/);
+    expect(comparisonText).toMatch(/a modest negative association appears \(partial r = -0\.227; 95% CI -0\.309 to -0\.142\)/);
+    expect(comparisonText).toMatch(/Cases with advertising above the level predicted from Monthly Sales tend to have local income below its predicted level/);
+    expect(comparisonText).toMatch(/This adjusted association does not establish causation/);
+    expect(comparisonText).not.toMatch(/\$000|n = 500|spurious|suppression/i);
 
     const power = facts.assessmentPlainText(facts.buildKnownModuleAssessment('power', {
       mode: 'power', f: 0.25, k: 3, alpha: 0.05, N: 60, power: 0.72, fromObserved: true

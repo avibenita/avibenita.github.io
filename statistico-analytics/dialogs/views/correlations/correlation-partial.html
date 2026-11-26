@@ -17,7 +17,7 @@
   <!-- Shared Header -->
   <link rel="stylesheet" href="../shared-header.css?v=20261122glass">  <script src="../shared-brand-logo.js?v=20261005light1"></script>
 
-  <script src="../shared/interpretation-facts.js?v=20261126pair"></script>
+  <script src="../shared/interpretation-facts.js?v=20261126fit"></script>
   <script src="../shared-header.js?v=20261126pair"></script>
   <!-- Preload filter assets so the page's installer finds them on first call (no flicker). -->
   <script src="../shared/uni-row-filter.js?v=20260524i" data-uni-row-filter="1"></script>
@@ -987,13 +987,13 @@
     }
 
     .correlation-section{
-      margin-bottom:16px;
-      padding:15px;
+      margin-bottom:8px;
+      padding:10px 12px;
       border-radius:8px;
       background:rgba(255,255,255,0.08);
       display:grid;
-      grid-template-columns:minmax(220px, 280px) minmax(220px, 1fr);
-      gap:8px 16px;
+      grid-template-columns:minmax(200px, 240px) minmax(220px, 1fr);
+      gap:6px 12px;
       align-items:stretch;
     }
 
@@ -1002,18 +1002,49 @@
     }
 
     .pane-scatter{
-      height:196px;
-      min-height:188px;
+      height:176px;
+      min-height:0;
       border-radius:8px;
       border:1px solid var(--border);
       background:rgba(0,0,0,0.28);
       overflow:hidden;
+      display:grid;
+      grid-template-columns:18px minmax(0, 1fr);
+      grid-template-rows:minmax(0, 1fr) 16px;
+      padding:4px 6px 2px 2px;
     }
 
     .pane-scatter svg{
+      grid-column:2;
+      grid-row:1;
       display:block;
       width:100%;
       height:100%;
+      min-height:0;
+    }
+
+    .scatter-axis-name{
+      color:var(--text-muted);
+      font-size:10px;
+      font-weight:700;
+      line-height:1;
+    }
+
+    .scatter-axis-name.y{
+      grid-column:1;
+      grid-row:1;
+      writing-mode:vertical-rl;
+      transform:rotate(180deg);
+      text-align:center;
+    }
+
+    .scatter-axis-name.x{
+      grid-column:2;
+      grid-row:2;
+      text-align:center;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
     .pane-scatter .case-dot{
@@ -1078,15 +1109,19 @@
 
     .change-summary-row{
       display:flex;
-      align-items:flex-start;
+      align-items:center;
+      justify-content:space-between;
       flex-wrap:wrap;
-      gap:12px;
-      margin:0 4px 12px;
+      gap:8px;
+      margin:0 4px 8px;
     }
 
-    .change-summary-row .change-story{
-      flex:1 1 auto;
+    .pair-sample{
       margin:0;
+      color:var(--text-secondary);
+      font-size:13px;
+      font-weight:700;
+      cursor:help;
     }
 
     .interpret-comparison-btn{
@@ -1108,8 +1143,8 @@
     }
 
     .comparison-interpretation{
-      margin:0 4px 14px;
-      padding:12px 14px;
+      margin:0 4px 8px;
+      padding:10px 12px;
       border:1px solid rgba(120,200,255,0.35);
       border-radius:10px;
       background:rgba(120,200,255,0.06);
@@ -1137,6 +1172,10 @@
     .residual-note{
       grid-column:1 / -1;
       margin:4px 0 0;
+    }
+
+    .residual-note:empty{
+      display:none;
     }
 
     .control-impact{
@@ -1301,7 +1340,7 @@
         grid-row:auto;
       }
       .pane-scatter{
-        min-height:200px;
+        height:200px;
       }
       .correlation-stats{
         gap:10px;
@@ -1521,7 +1560,7 @@
         </div>
       </div>
       <div class="change-summary-row">
-        <p id="changeStory" class="change-story"></p>
+        <p id="pairSample" class="pair-sample"></p>
         <button type="button" id="interpretComparisonBtn" class="interpret-comparison-btn" aria-expanded="false" aria-controls="comparisonInterpretation">Interpret this comparison</button>
       </div>
       <div id="comparisonInterpretation" class="comparison-interpretation" hidden></div>
@@ -1537,14 +1576,6 @@
           <div class="stat-item">
             <div class="stat-label">P-Value</div>
             <div class="stat-value" id="regularP">-</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">N</div>
-            <div class="stat-value" id="regularN">-</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">DF</div>
-            <div class="stat-value" id="regularDF">-</div>
           </div>
         </div>
         <div class="pane-scatter" id="regularScatter" role="img" aria-label="Unadjusted scatter with a linear regression line"></div>
@@ -1562,14 +1593,6 @@
             <div class="stat-label">P-Value</div>
             <div class="stat-value" id="partialP">-</div>
           </div>
-          <div class="stat-item">
-            <div class="stat-label">N</div>
-            <div class="stat-value" id="partialN">-</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-label">DF</div>
-            <div class="stat-value" id="partialDF">-</div>
-          </div>
         </div>
         <div class="pane-scatter" id="partialScatter" role="img" aria-label="Partial scatter with a linear regression line"></div>
         <p id="residualNote" class="residual-note"></p>
@@ -1585,7 +1608,6 @@
         <p id="controlImpactNote" class="corr-info">Every row uses the same complete cases. Each control is applied on its own, and those shifts do not add up to adjusting for all of them together.</p>
       </details>
       <p id="caseReadout" class="corr-info case-readout">Hover a point to highlight that same case in both plots.</p>
-      <p id="sameNNote" class="corr-info" style="margin:12px 4px 0;text-align:left;"></p>
     </div>
   </div>
 
@@ -2285,25 +2307,50 @@
       return Number.isFinite(slope) && Number.isFinite(intercept) ? { slope: slope, intercept: intercept } : null;
     }
 
-    function paneScatterMarkup(points, r) {
-      const w = 460;
-      const h = 250;
-      const pad = 16;
+    function scatterAxisName(name, residual) {
+      const base = String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+      if (!residual) return String(name || '');
+      return base ? base + ' residual' : 'Residual';
+    }
+
+    function fmtAxisTick(value) {
+      if (!Number.isFinite(value)) return '';
+      const abs = Math.abs(value);
+      const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : abs >= 1 ? 1 : 2;
+      const text = value.toFixed(digits);
+      return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+    }
+
+    function axisTicks(min, max) {
+      const span = (max - min) || 1;
+      const rough = span / 3;
+      const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+      const err = rough / mag;
+      const step = (err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1) * mag;
+      const start = Math.ceil((min + span * 0.02) / step) * step;
+      const ticks = [];
+      for (let value = start; value <= max - span * 0.02 + step * 0.001 && ticks.length < 4; value += step) ticks.push(value);
+      return ticks.length ? ticks : [min, max];
+    }
+
+    function paneScatterMarkup(points, tone, xLabel, yLabel) {
+      const w = 480;
+      const h = 230;
+      const padL = 42;
+      const padR = 12;
+      const padT = 10;
+      const padB = 22;
       const light = document.documentElement.getAttribute('data-theme') === 'light';
-      const grid = light ? 'rgba(15,23,42,0.10)' : 'rgba(255,255,255,0.10)';
-      const color = r < 0
-        ? (light ? 'rgba(194, 65, 12, 0.82)' : 'rgba(255, 165, 120, 0.92)')
-        : (light ? 'rgba(29, 78, 216, 0.78)' : 'rgba(120, 200, 255, 0.92)');
-      const parts = ['<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">'];
-      for (let g = 1; g <= 3; g++) {
-        const gx = pad + ((w - pad * 2) * g) / 4;
-        const gy = pad + ((h - pad * 2) * g) / 4;
-        parts.push('<line x1="' + gx.toFixed(1) + '" y1="' + pad + '" x2="' + gx.toFixed(1) + '" y2="' + (h - pad) + '" stroke="' + grid + '" stroke-width="1" pointer-events="none"/>');
-        parts.push('<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + gy.toFixed(1) + '" stroke="' + grid + '" stroke-width="1" pointer-events="none"/>');
-      }
+      const grid = light ? 'rgba(15,23,42,0.10)' : 'rgba(255,255,255,0.12)';
+      const ink = light ? '#475569' : 'rgba(255,255,255,0.72)';
+      const color = tone === 'partial'
+        ? (light ? 'rgba(29, 78, 216, 0.86)' : 'rgba(120, 200, 255, 0.95)')
+        : (light ? 'rgba(194, 65, 12, 0.88)' : 'rgba(255, 165, 120, 0.96)');
+      const names = '<div class="scatter-axis-name y">' + svgText(yLabel) + '</div>'
+        + '<div class="scatter-axis-name x">' + svgText(xLabel) + '</div>';
+      const parts = [names, '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'];
       if (!points.length) {
-        const fill = light ? '#64748b' : 'rgba(255,255,255,0.55)';
-        parts.push('<text x="' + (w / 2) + '" y="' + (h / 2) + '" text-anchor="middle" fill="' + fill + '" font-size="15" font-family="Segoe UI,sans-serif">No complete pairs</text></svg>');
+        parts.push('<text x="' + (w / 2) + '" y="' + (h / 2) + '" text-anchor="middle" fill="' + ink + '" font-size="13" font-family="Segoe UI,sans-serif">No complete pairs</text></svg>');
         return parts.join('');
       }
       let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
@@ -2317,10 +2364,24 @@
       }
       const xSpan = (xMax - xMin) || 1;
       const ySpan = (yMax - yMin) || 1;
-      const plotW = w - pad * 2;
-      const plotH = h - pad * 2;
-      const px = (x) => pad + ((x - xMin) / xSpan) * plotW;
-      const py = (y) => pad + (1 - (y - yMin) / ySpan) * plotH;
+      xMin -= xSpan * 0.06;
+      xMax += xSpan * 0.06;
+      yMin -= ySpan * 0.08;
+      yMax += ySpan * 0.08;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+      const px = (x) => padL + ((x - xMin) / (xMax - xMin)) * plotW;
+      const py = (y) => padT + (1 - (y - yMin) / (yMax - yMin)) * plotH;
+      axisTicks(xMin, xMax).forEach((tick) => {
+        const x = px(tick);
+        parts.push('<line x1="' + x.toFixed(1) + '" y1="' + padT + '" x2="' + x.toFixed(1) + '" y2="' + (h - padB) + '" stroke="' + grid + '" stroke-width="1" pointer-events="none"/>');
+        parts.push('<text x="' + x.toFixed(1) + '" y="' + (h - 6) + '" text-anchor="middle" fill="' + ink + '" font-size="11" font-family="Segoe UI,sans-serif">' + svgText(fmtAxisTick(tick)) + '</text>');
+      });
+      axisTicks(yMin, yMax).forEach((tick) => {
+        const y = py(tick);
+        parts.push('<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + y.toFixed(1) + '" stroke="' + grid + '" stroke-width="1" pointer-events="none"/>');
+        parts.push('<text x="' + (padL - 6) + '" y="' + (y + 3).toFixed(1) + '" text-anchor="end" fill="' + ink + '" font-size="11" font-family="Segoe UI,sans-serif">' + svgText(fmtAxisTick(tick)) + '</text>');
+      });
       const step = points.length <= 2500 ? 1 : Math.ceil(points.length / 2500);
       const drawnCount = Math.ceil(points.length / step);
       const radius = drawnCount > 400 ? 2.3 : 3.4;
@@ -2339,11 +2400,20 @@
 
     function renderComparisonScatters(xName, yName, controlNames, partialR, regularR) {
       const cloud = pairCloud(xName, yName, controlNames);
+      const adjusted = controlNames.length > 0;
       paneScatterState = { x: xName, y: yName, controls: controlNames.slice(), partialR: partialR, regularR: regularR, cloud: cloud };
       const regularHost = document.getElementById('regularScatter');
       const partialHost = document.getElementById('partialScatter');
-      if (regularHost) regularHost.innerHTML = paneScatterMarkup(cloud.raw, regularR);
-      if (partialHost) partialHost.innerHTML = paneScatterMarkup(cloud.partial, partialR);
+      if (regularHost) {
+        regularHost.innerHTML = paneScatterMarkup(cloud.raw, 'ordinary', xName, yName);
+        regularHost.setAttribute('aria-label', yName + ' against ' + xName);
+      }
+      if (partialHost) {
+        const xAxis = scatterAxisName(xName, adjusted);
+        const yAxis = scatterAxisName(yName, adjusted);
+        partialHost.innerHTML = paneScatterMarkup(cloud.partial, 'partial', xAxis, yAxis);
+        partialHost.setAttribute('aria-label', yAxis + ' against ' + xAxis);
+      }
       clearLinkedCase();
     }
 
@@ -2486,9 +2556,12 @@
     function renderComparisonReading() {
       const panel = document.getElementById('comparisonInterpretation');
       const btn = document.getElementById('interpretComparisonBtn');
-      if (!panel) return;
-      if (btn) btn.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
-      if (panel.hidden) return;
+      const open = !!(panel && !panel.hidden);
+      if (btn) {
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.textContent = open ? 'Hide interpretation' : 'Interpret this comparison';
+      }
+      if (!panel || !open) return;
       while (panel.firstChild) panel.removeChild(panel.firstChild);
       const paragraphs = (comparisonFacts && comparisonFacts.paragraphs) || ['This comparison does not have a reading yet.'];
       paragraphs.forEach((text) => {
@@ -2496,6 +2569,24 @@
         p.textContent = text;
         panel.appendChild(p);
       });
+    }
+
+    function setPairSample(n, ordinaryDf, partialDf) {
+      const el = document.getElementById('pairSample');
+      if (!el) return;
+      const count = Number(n);
+      if (!Number.isFinite(count)) {
+        el.textContent = '';
+        el.removeAttribute('title');
+        return;
+      }
+      const shown = Math.round(count).toLocaleString();
+      el.textContent = shown + (Math.round(count) === 1 ? ' observation' : ' observations');
+      const details = [];
+      if (ordinaryDf != null && ordinaryDf !== '-' && ordinaryDf !== '') details.push('Ordinary df = ' + ordinaryDf);
+      if (partialDf != null && partialDf !== '-' && partialDf !== '') details.push('Partial df = ' + partialDf);
+      if (details.length) el.title = details.join('. ') + '.';
+      else el.removeAttribute('title');
     }
 
     function fillPairTeaching(xName, yName, controlNames, r0, r1, n, p0, p1) {
@@ -2510,12 +2601,11 @@
         badge.textContent = reading ? reading.badge : label.text;
         badge.className = 'change-badge ' + (reading ? reading.code : label.code);
       }
-      setPairText('changeStory', reading ? reading.story : changeSentence(xName, yName, controlNames, r0, label));
       comparisonFacts = reading;
       renderComparisonReading();
       setPairText('regularCi', fmtCi(fisherCi(r0, n, 0)));
       setPairText('partialCi', fmtCi(fisherCi(r1, n, controlNames.length)));
-      setPairText('residualNote', residualSentence(xName, yName, controlNames));
+      setPairText('residualNote', '');
       const title = document.getElementById('partialSectionTitle');
       if (title) title.textContent = controlNames.length ? 'After adjusting for ' + joinNames(controlNames) : 'No adjustment selected';
       renderControlImpact(xName, yName, controlNames, r0, r1);
@@ -3041,6 +3131,12 @@
       }
 
       document.getElementById('modalTitle').textContent = `${var1Name} vs ${var2Name}`;
+      const readingPanel = document.getElementById('comparisonInterpretation');
+      const pairKey = var1Name + '\0' + var2Name;
+      if (readingPanel && readingPanel.dataset.pair !== pairKey) {
+        readingPanel.hidden = true;
+        readingPanel.dataset.pair = pairKey;
+      }
       let shownRegular = null;
       let shownPartial = null;
       if (cmp) {
@@ -3048,23 +3144,9 @@
         shownPartial = cmp.partial.r;
         document.getElementById('regularR').textContent = fmtCorr(cmp.unadjusted.r);
         document.getElementById('regularP').textContent = formatPartialP(cmp.unadjusted.p);
-        document.getElementById('regularDF').textContent = cmp.unadjusted.df || '-';
         document.getElementById('partialR').textContent = fmtCorr(cmp.partial.r);
         document.getElementById('partialP').textContent = formatPartialP(cmp.partial.p);
-        document.getElementById('partialDF').textContent = cmp.partial.df || '-';
-        const nEl = document.getElementById('regularN');
-        const pnEl = document.getElementById('partialN');
-        if (nEl) nEl.textContent = Number(cmp.n).toLocaleString();
-        if (pnEl) pnEl.textContent = Number(cmp.n).toLocaleString();
-        const note = document.getElementById('sameNNote');
-        if (note) {
-          const nText = Number(cmp.n).toLocaleString();
-          if (controlNames.length) {
-            note.textContent = `Both correlations use the same ${nText} complete-case observations. Only the partial correlation is adjusted for ${joinNames(controlNames)}.`;
-          } else {
-            note.textContent = `Both values use the same ${nText} complete-case observations. No controls are applied, so both are unadjusted correlations.`;
-          }
-        }
+        setPairSample(cmp.n, cmp.unadjusted.df, cmp.partial.df);
         fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, cmp.n, cmp.unadjusted.p, cmp.partial.p);
       } else {
         const regularCorr = calculatePartialCorrelation(var1Idx, var2Idx, []);
@@ -3073,16 +3155,9 @@
         shownPartial = partialCorr.correlation;
         document.getElementById('regularR').textContent = fmtCorr(regularCorr.correlation);
         document.getElementById('regularP').textContent = formatPartialP(regularCorr.pValue);
-        document.getElementById('regularDF').textContent = regularCorr.df || '-';
         document.getElementById('partialR').textContent = fmtCorr(partialCorr.correlation);
         document.getElementById('partialP').textContent = formatPartialP(partialCorr.pValue);
-        document.getElementById('partialDF').textContent = partialCorr.df || '-';
-        const nEl = document.getElementById('regularN');
-        const pnEl = document.getElementById('partialN');
-        if (nEl) nEl.textContent = Number.isFinite(regularCorr.n) ? Number(regularCorr.n).toLocaleString() : '-';
-        if (pnEl) pnEl.textContent = Number.isFinite(partialCorr.n) ? Number(partialCorr.n).toLocaleString() : '-';
-        const note = document.getElementById('sameNNote');
-        if (note) note.textContent = '';
+        setPairSample(Number.isFinite(partialCorr.n) ? partialCorr.n : regularCorr.n, regularCorr.df, partialCorr.df);
         fillPairTeaching(var1Name, var2Name, controlNames, shownRegular, shownPartial, Number.isFinite(partialCorr.n) ? partialCorr.n : regularCorr.n, regularCorr.pValue, partialCorr.pValue);
       }
 

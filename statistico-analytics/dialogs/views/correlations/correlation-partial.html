@@ -647,10 +647,59 @@
       margin-top:4px;
     }
 
-    td.highlighted{
+    td.highlighted,
+    #partialPairsTable tbody tr.highlighted{
       background:linear-gradient(135deg, rgba(255,165,120,0.3), rgba(255,165,120,0.2))!important;
+      box-shadow:inset 0 0 0 2px var(--accent-1);
+    }
+
+    td.highlighted{
       border:2px solid var(--accent-1)!important;
       box-shadow:0 0 15px rgba(255,165,120,0.4);
+    }
+
+    #partialPairsTable{
+      width:100%;
+      min-width:100%;
+    }
+
+    #partialPairsTable thead th.pairs-sortable{
+      cursor:pointer;
+      user-select:none;
+    }
+
+    #partialPairsTable thead th.pairs-sort-active{
+      color:var(--accent-1);
+    }
+
+    #partialPairsTable thead th.pairs-sortable i{
+      margin-left:5px;
+      font-size:11px;
+      opacity:0.75;
+    }
+
+    #partialPairsTable tbody td.pairs-name{
+      text-align:left;
+      font-weight:700;
+      color:var(--accent-2);
+      text-decoration:underline;
+      text-underline-offset:3px;
+    }
+
+    #partialPairsTable tbody td.pairs-p,
+    #partialPairsTable tbody td.pairs-n{
+      font-size:13px;
+      color:var(--text-muted);
+      white-space:nowrap;
+    }
+
+    #partialPairsTable tbody tr.threshold-highlight-row{
+      background:rgba(255,165,120,0.12)!important;
+      box-shadow:inset 0 0 0 1px rgba(255,165,120,0.28);
+    }
+
+    #partialPairsTable tbody tr{
+      cursor:pointer;
     }
 
     td.threshold-highlight{
@@ -694,6 +743,7 @@
       top:0;
       width:100%;
       height:100%;
+      overflow:auto;
       background:var(--modal-overlay,rgba(0,0,0,.48));
       backdrop-filter:blur(2px);
     }
@@ -703,8 +753,8 @@
       margin:5% auto;
       padding:25px;
       border-radius:12px;
-      width:90%;
-      max-width:500px;
+      width:min(960px, 94vw);
+      max-width:960px;
       box-shadow:0 10px 40px rgba(0,0,0,0.5);
       position:absolute;
       animation:modalSlideIn 0.3s ease;
@@ -758,15 +808,38 @@
     }
 
     .correlation-section{
-      margin-bottom:20px;
+      margin-bottom:16px;
       padding:15px;
       border-radius:8px;
       background:rgba(255,255,255,0.08);
+      display:grid;
+      grid-template-columns:minmax(220px, 280px) minmax(220px, 1fr);
+      gap:8px 16px;
+      align-items:stretch;
+    }
+
+    .correlation-section h4{
+      grid-column:1 / -1;
+    }
+
+    .pane-scatter{
+      height:196px;
+      min-height:188px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:rgba(0,0,0,0.28);
+      overflow:hidden;
+    }
+
+    .pane-scatter svg{
+      display:block;
+      width:100%;
+      height:100%;
     }
 
     .correlation-section h4{
       margin-top:0;
-      margin-bottom:10px;
+      margin-bottom:2px;
       font-size:16px;
     }
 
@@ -861,6 +934,18 @@
       .modal-content{
         width:95%;
         padding:20px;
+      }
+      .correlation-section{
+        grid-template-columns:1fr;
+      }
+      .correlation-section h4,
+      .correlation-stats,
+      .pane-scatter{
+        grid-column:1;
+        grid-row:auto;
+      }
+      .pane-scatter{
+        min-height:200px;
       }
       .correlation-stats{
         gap:10px;
@@ -996,6 +1081,7 @@
               <span>View:</span>
               <span class="view-toggle">
                 <button type="button" id="partialTableBtn" class="active" onclick="setPartialMatrixView('table')">Table</button>
+                <button type="button" id="partialPairsBtn" onclick="setPartialMatrixView('pairs')">Pairs</button>
                 <button type="button" id="partialHeatmapBtn" onclick="setPartialMatrixView('heatmap')">Heatmap</button>
               </span>
             </label>
@@ -1017,7 +1103,7 @@
 
         <div class="scroll-hint">
           <span class="scatter-hint-icon" aria-hidden="true"></span>
-          Select any correlation to compare it with the unadjusted r
+          <span id="partialViewHint">Select any correlation to compare it with the unadjusted r</span>
         </div>
 
         <div id="loadingMessage" class="loading">
@@ -1031,6 +1117,12 @@
               <tr id="headerRow"></tr>
             </thead>
             <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <div class="table-container" id="partialPairsContainer" style="display:none;">
+          <table id="partialPairsTable">
+            <thead id="partialPairsHead"></thead>
+            <tbody id="partialPairsBody"></tbody>
           </table>
         </div>
         <div class="heatmap-container" id="partialHeatmapContainer" style="display:none;">
@@ -1073,6 +1165,7 @@
             <div class="stat-value" id="regularDF">-</div>
           </div>
         </div>
+        <div class="pane-scatter" id="regularScatter" role="img" aria-label="Unadjusted scatter with a linear regression line"></div>
       </div>
       
       <div class="correlation-section partial-section">
@@ -1095,6 +1188,7 @@
             <div class="stat-value" id="partialDF">-</div>
           </div>
         </div>
+        <div class="pane-scatter" id="partialScatter" role="img" aria-label="Partial scatter with a linear regression line"></div>
       </div>
       <p id="sameNNote" class="corr-info" style="margin:12px 4px 0;text-align:left;"></p>
     </div>
@@ -1108,6 +1202,9 @@
     let variableRoles = [];
     let partialMatrixView = 'table';
     let partialThreshold = 0;
+    let partialPairRows = [];
+    let partialPairSort = { key: 'pair', direction: 'asc' };
+    let paneScatterState = null;
 
     // Initialize Office.js
     Office.onReady(function(info) {
@@ -1476,15 +1573,25 @@
     }
 
     function setPartialMatrixView(view) {
-      partialMatrixView = view === 'heatmap' ? 'heatmap' : 'table';
+      partialMatrixView = view === 'heatmap' ? 'heatmap' : (view === 'pairs' ? 'pairs' : 'table');
       const tableContainer = document.getElementById('tableContainer');
       const heatmapContainer = document.getElementById('partialHeatmapContainer');
+      const pairsContainer = document.getElementById('partialPairsContainer');
       const tableBtn = document.getElementById('partialTableBtn');
       const heatmapBtn = document.getElementById('partialHeatmapBtn');
+      const pairsBtn = document.getElementById('partialPairsBtn');
+      const hint = document.getElementById('partialViewHint');
       if (tableContainer) tableContainer.style.display = partialMatrixView === 'table' ? 'block' : 'none';
       if (heatmapContainer) heatmapContainer.style.display = partialMatrixView === 'heatmap' ? 'block' : 'none';
+      if (pairsContainer) pairsContainer.style.display = partialMatrixView === 'pairs' ? 'block' : 'none';
       if (tableBtn) tableBtn.classList.toggle('active', partialMatrixView === 'table');
       if (heatmapBtn) heatmapBtn.classList.toggle('active', partialMatrixView === 'heatmap');
+      if (pairsBtn) pairsBtn.classList.toggle('active', partialMatrixView === 'pairs');
+      if (hint) {
+        hint.textContent = partialMatrixView === 'pairs'
+          ? 'Select any pair to compare the unadjusted and partial correlations'
+          : 'Select any correlation to compare it with the unadjusted r';
+      }
     }
 
     function updatePartialThreshold(value) {
@@ -1495,9 +1602,11 @@
     }
 
     function applyPartialThreshold() {
-      document.querySelectorAll('#correlationTable td[data-corr], #partialHeatmapTable td[data-corr]').forEach(cell => {
+      document.querySelectorAll('#correlationTable td[data-corr], #partialHeatmapTable td[data-corr], #partialPairsTable tr[data-corr]').forEach(cell => {
         const corr = Math.abs(parseFloat(cell.dataset.corr || '0'));
-        cell.classList.toggle('threshold-highlight', partialThreshold > 0 && corr >= partialThreshold);
+        const on = partialThreshold > 0 && corr >= partialThreshold;
+        if (cell.tagName === 'TR') cell.classList.toggle('threshold-highlight-row', on);
+        else cell.classList.toggle('threshold-highlight', on);
       });
     }
 
@@ -1679,6 +1788,298 @@
       }
     }
 
+    function finiteValue(value) {
+      const n = typeof value === 'number' ? value : parseFloat(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function completeCaseColumns(names) {
+      const data = correlationData && correlationData.data;
+      const cols = names.map(() => []);
+      if (!data) return cols;
+      data.forEach((row) => {
+        const values = names.map((name) => finiteValue(rowField(row, name)));
+        if (values.some((v) => v == null)) return;
+        values.forEach((v, i) => cols[i].push(v));
+      });
+      return cols;
+    }
+
+    function columnResiduals(y, predictors) {
+      const n = y.length;
+      if (!n || !predictors.length) return y.slice();
+      const cols = [Array(n).fill(1)].concat(predictors);
+      const p = cols.length;
+      const xtx = Array.from({ length: p }, () => Array(p).fill(0));
+      const xty = Array(p).fill(0);
+      for (let i = 0; i < n; i++) {
+        for (let a = 0; a < p; a++) {
+          xty[a] += cols[a][i] * y[i];
+          for (let b = a; b < p; b++) xtx[a][b] += cols[a][i] * cols[b][i];
+        }
+      }
+      for (let a = 0; a < p; a++) {
+        for (let b = 0; b < a; b++) xtx[a][b] = xtx[b][a];
+      }
+      let beta;
+      try {
+        const inv = safeInvertMatrix(xtx);
+        beta = inv.map((row) => row.reduce((sum, value, j) => sum + value * xty[j], 0));
+      } catch (e) {
+        return y.slice();
+      }
+      return y.map((yi, i) => yi - cols.reduce((sum, col, j) => sum + beta[j] * col[i], 0));
+    }
+
+    function pairCloud(xName, yName, controlNames) {
+      const controls = (controlNames || []).filter((name) => name && name !== xName && name !== yName);
+      const cols = completeCaseColumns([xName, yName].concat(controls));
+      const n = cols[0].length;
+      const raw = [];
+      for (let i = 0; i < n; i++) raw.push([cols[0][i], cols[1][i]]);
+      if (!controls.length || n <= controls.length + 2) return { raw: raw, partial: raw.slice() };
+      const predictors = controls.map((_, index) => cols[index + 2]);
+      const rx = columnResiduals(cols[0], predictors);
+      const ry = columnResiduals(cols[1], predictors);
+      const partial = rx.map((x, i) => [x, ry[i]]);
+      return { raw: raw, partial: partial };
+    }
+
+    function linearFit(points) {
+      const n = points.length;
+      if (n < 2) return null;
+      let sx = 0, sy = 0, sxx = 0, sxy = 0;
+      for (let i = 0; i < n; i++) {
+        const x = points[i][0];
+        const y = points[i][1];
+        sx += x; sy += y; sxx += x * x; sxy += x * y;
+      }
+      const den = n * sxx - sx * sx;
+      if (!den) return null;
+      const slope = (n * sxy - sx * sy) / den;
+      const intercept = (sy - slope * sx) / n;
+      return Number.isFinite(slope) && Number.isFinite(intercept) ? { slope: slope, intercept: intercept } : null;
+    }
+
+    function paneScatterMarkup(points, r) {
+      const w = 460;
+      const h = 250;
+      const pad = 16;
+      const light = document.documentElement.getAttribute('data-theme') === 'light';
+      const grid = light ? 'rgba(15,23,42,0.10)' : 'rgba(255,255,255,0.10)';
+      const color = r < 0
+        ? (light ? 'rgba(194, 65, 12, 0.82)' : 'rgba(255, 165, 120, 0.92)')
+        : (light ? 'rgba(29, 78, 216, 0.78)' : 'rgba(120, 200, 255, 0.92)');
+      const parts = ['<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">'];
+      for (let g = 1; g <= 3; g++) {
+        const gx = pad + ((w - pad * 2) * g) / 4;
+        const gy = pad + ((h - pad * 2) * g) / 4;
+        parts.push('<line x1="' + gx.toFixed(1) + '" y1="' + pad + '" x2="' + gx.toFixed(1) + '" y2="' + (h - pad) + '" stroke="' + grid + '" stroke-width="1"/>');
+        parts.push('<line x1="' + pad + '" y1="' + gy.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + gy.toFixed(1) + '" stroke="' + grid + '" stroke-width="1"/>');
+      }
+      if (!points.length) {
+        const fill = light ? '#64748b' : 'rgba(255,255,255,0.55)';
+        parts.push('<text x="' + (w / 2) + '" y="' + (h / 2) + '" text-anchor="middle" fill="' + fill + '" font-size="15" font-family="Segoe UI,sans-serif">No complete pairs</text></svg>');
+        return parts.join('');
+      }
+      let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      for (let i = 0; i < points.length; i++) {
+        const x = points[i][0];
+        const y = points[i][1];
+        if (x < xMin) xMin = x;
+        if (x > xMax) xMax = x;
+        if (y < yMin) yMin = y;
+        if (y > yMax) yMax = y;
+      }
+      const xSpan = (xMax - xMin) || 1;
+      const ySpan = (yMax - yMin) || 1;
+      const plotW = w - pad * 2;
+      const plotH = h - pad * 2;
+      const px = (x) => pad + ((x - xMin) / xSpan) * plotW;
+      const py = (y) => pad + (1 - (y - yMin) / ySpan) * plotH;
+      const drawn = points.length <= 2500 ? points : points.filter((_, i) => i % Math.ceil(points.length / 2500) === 0);
+      const radius = drawn.length > 400 ? 2.3 : 3.4;
+      for (let i = 0; i < drawn.length; i++) {
+        parts.push('<circle cx="' + px(drawn[i][0]).toFixed(1) + '" cy="' + py(drawn[i][1]).toFixed(1) + '" r="' + radius + '" fill="' + color + '"/>');
+      }
+      const fit = linearFit(points);
+      if (fit) {
+        const y1 = fit.intercept + fit.slope * xMin;
+        const y2 = fit.intercept + fit.slope * xMax;
+        parts.push('<line x1="' + px(xMin).toFixed(1) + '" y1="' + py(y1).toFixed(1) + '" x2="' + px(xMax).toFixed(1) + '" y2="' + py(y2).toFixed(1) + '" stroke="' + color + '" stroke-width="2.4" stroke-linecap="round"/>');
+      }
+      parts.push('</svg>');
+      return parts.join('');
+    }
+
+    function renderComparisonScatters(xName, yName, controlNames, partialR, regularR) {
+      paneScatterState = { x: xName, y: yName, controls: controlNames.slice(), partialR: partialR, regularR: regularR };
+      const cloud = pairCloud(xName, yName, controlNames);
+      const regularHost = document.getElementById('regularScatter');
+      const partialHost = document.getElementById('partialScatter');
+      if (regularHost) regularHost.innerHTML = paneScatterMarkup(cloud.raw, regularR);
+      if (partialHost) partialHost.innerHTML = paneScatterMarkup(cloud.partial, partialR);
+    }
+
+    function sortedPartialPairs() {
+      const dir = partialPairSort.direction === 'asc' ? 1 : -1;
+      const key = partialPairSort.key;
+      return partialPairRows.slice().sort((a, b) => {
+        const av = a[key];
+        const bv = b[key];
+        if (typeof av === 'string' || typeof bv === 'string') return String(av).localeCompare(String(bv)) * dir;
+        const an = Number.isFinite(av) ? av : (dir > 0 ? Infinity : -Infinity);
+        const bn = Number.isFinite(bv) ? bv : (dir > 0 ? Infinity : -Infinity);
+        return (an - bn) * dir;
+      });
+    }
+
+    function renderPartialPairsHead() {
+      const head = document.getElementById('partialPairsHead');
+      if (!head) return;
+      const cols = [
+        { key: 'pair', label: 'Pair' },
+        { key: 'r', label: 'r' },
+        { key: 'p', label: 'p' },
+        { key: 'partialR', label: 'partial r' },
+        { key: 'partialP', label: 'partial p' },
+        { key: 'n', label: 'N' }
+      ];
+      head.innerHTML = '<tr>' + cols.map((col) => {
+        const active = partialPairSort.key === col.key;
+        const icon = active ? (partialPairSort.direction === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort';
+        return '<th class="pairs-sortable' + (active ? ' pairs-sort-active' : '') + '" data-key="' + col.key + '">' + col.label + ' <i class="fa ' + icon + '"></i></th>';
+      }).join('') + '</tr>';
+      head.querySelectorAll('th').forEach((th) => {
+        th.addEventListener('click', () => {
+          const key = th.getAttribute('data-key');
+          partialPairSort = {
+            key: key,
+            direction: partialPairSort.key === key && partialPairSort.direction === 'asc' ? 'desc' : 'asc'
+          };
+          renderPartialPairsHead();
+          renderPartialPairsBody();
+          applyPartialThreshold();
+          restoreSelectedPairHighlight();
+        });
+      });
+    }
+
+    function renderPartialPairsBody() {
+      const body = document.getElementById('partialPairsBody');
+      if (!body) return;
+      body.innerHTML = '';
+      sortedPartialPairs().forEach((row) => {
+        const tr = document.createElement('tr');
+        tr.dataset.varX = row.varA;
+        tr.dataset.varY = row.varB;
+        if (Number.isFinite(row.partialR)) tr.dataset.corr = String(row.partialR);
+        const open = () => showCorrelationModal(row.idxA, row.idxB, row.varA, row.varB, tr);
+        const name = document.createElement('td');
+        name.className = 'pairs-name';
+        const nameRow = document.createElement('div');
+        nameRow.className = 'corr-value-row';
+        const nameText = document.createElement('span');
+        nameText.textContent = row.pair;
+        nameRow.appendChild(nameText);
+        nameRow.appendChild(createScatterBadge());
+        name.appendChild(nameRow);
+        tr.appendChild(name);
+        const rCell = document.createElement('td');
+        const rRow = document.createElement('div');
+        rRow.className = 'corr-value-row';
+        const rText = document.createElement('span');
+        rText.className = 'clickable-correlation';
+        rText.textContent = fmtCorr(row.r);
+        rRow.appendChild(rText);
+        rRow.appendChild(createScatterBadge());
+        rCell.appendChild(rRow);
+        tr.appendChild(rCell);
+        const pCell = document.createElement('td');
+        pCell.className = 'pairs-p';
+        pCell.textContent = 'p = ' + formatPartialP(row.p);
+        tr.appendChild(pCell);
+        const partialCell = document.createElement('td');
+        const partialRow = document.createElement('div');
+        partialRow.className = 'corr-value-row';
+        const partialText = document.createElement('span');
+        partialText.className = 'clickable-correlation';
+        partialText.textContent = fmtCorr(row.partialR);
+        partialRow.appendChild(partialText);
+        partialRow.appendChild(createScatterBadge());
+        partialCell.appendChild(partialRow);
+        tr.appendChild(partialCell);
+        const partialPCell = document.createElement('td');
+        partialPCell.className = 'pairs-p';
+        partialPCell.textContent = 'p = ' + formatPartialP(row.partialP);
+        tr.appendChild(partialPCell);
+        const nCell = document.createElement('td');
+        nCell.className = 'pairs-n';
+        nCell.textContent = 'N = ' + (Number.isFinite(row.n) ? Number(row.n).toLocaleString() : '—');
+        tr.appendChild(nCell);
+        tr.addEventListener('click', open);
+        body.appendChild(tr);
+      });
+    }
+
+    function buildPartialPairsTable() {
+      const indices = getAnalysisIndices();
+      const controlNames = getControlIndices().map((index) => variableNames[index]);
+      const controlIndices = getControlIndices();
+      const rows = [];
+      for (let a = 0; a < indices.length; a++) {
+        for (let b = a + 1; b < indices.length; b++) {
+          const x = variableNames[indices[a]];
+          const y = variableNames[indices[b]];
+          let regular = null;
+          let partial = null;
+          let n = null;
+          let pAll = null;
+          let pPart = null;
+          if (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._partialComparisonOnCompleteCases === 'function') {
+            const cmp = StatisticoHeader._partialComparisonOnCompleteCases(
+              { headers: variableNames, raw: correlationData },
+              x,
+              y,
+              controlNames
+            );
+            if (cmp) {
+              regular = cmp.unadjusted.r;
+              partial = cmp.partial.r;
+              n = cmp.n;
+              pAll = cmp.unadjusted.p;
+              pPart = cmp.partial.p;
+            }
+          }
+          if (!Number.isFinite(regular) && !Number.isFinite(partial)) {
+            const reg = calculatePartialCorrelation(indices[a], indices[b], []);
+            const par = calculatePartialCorrelation(indices[a], indices[b], controlIndices);
+            regular = reg.correlation;
+            partial = par.correlation;
+            n = Number.isFinite(par.n) ? par.n : reg.n;
+            pAll = reg.pValue;
+            pPart = par.pValue;
+          }
+          if (!Number.isFinite(regular) && !Number.isFinite(partial)) continue;
+          rows.push({
+            pair: x + ' – ' + y,
+            varA: x,
+            varB: y,
+            idxA: indices[a],
+            idxB: indices[b],
+            r: regular,
+            p: pAll,
+            partialR: partial,
+            partialP: pPart,
+            n: n
+          });
+        }
+      }
+      partialPairRows = rows;
+      renderPartialPairsHead();
+      renderPartialPairsBody();
+    }
+
     /**
      * Generate partial correlation matrix table
      */
@@ -1712,6 +2113,9 @@
       if (nonControlIndices.length < 2) {
         tableBody.innerHTML = `<tr><td colspan="${Math.max(1, nonControlIndices.length + 1)}">At least two non-control, non-excluded variables are required.</td></tr>`;
         loading.style.display = 'none';
+        partialPairRows = [];
+        renderPartialPairsHead();
+        renderPartialPairsBody();
         setPartialMatrixView(partialMatrixView);
         return;
       }
@@ -1785,6 +2189,7 @@
       
       // Show table
       loading.style.display = 'none';
+      buildPartialPairsTable();
       setPartialMatrixView(partialMatrixView);
       applyPartialThreshold();
       restoreSelectedPairHighlight();
@@ -1856,11 +2261,11 @@
       const pair = (typeof StatisticoHeader !== 'undefined' && typeof StatisticoHeader._getPartialSelectedPair === 'function')
         ? StatisticoHeader._getPartialSelectedPair()
         : window.partialSelectedPair;
-      document.querySelectorAll('#correlationTable td.highlighted, #partialHeatmapTable td.highlighted').forEach((el) => {
+      document.querySelectorAll('#correlationTable td.highlighted, #partialHeatmapTable td.highlighted, #partialPairsTable tr.highlighted').forEach((el) => {
         el.classList.remove('highlighted');
       });
       if (!pair) return;
-      document.querySelectorAll('#correlationTable td[data-var-x], #partialHeatmapTable td[data-var-x]').forEach((td) => {
+      document.querySelectorAll('#correlationTable td[data-var-x], #partialHeatmapTable td[data-var-x], #partialPairsTable tr[data-var-x]').forEach((td) => {
         const match = (td.dataset.varX === pair.x && td.dataset.varY === pair.y)
           || (td.dataset.varX === pair.y && td.dataset.varY === pair.x);
         td.classList.toggle('highlighted', match);
@@ -1885,7 +2290,11 @@
       }
 
       document.getElementById('modalTitle').textContent = `${var1Name} vs ${var2Name}`;
+      let shownRegular = null;
+      let shownPartial = null;
       if (cmp) {
+        shownRegular = cmp.unadjusted.r;
+        shownPartial = cmp.partial.r;
         document.getElementById('regularR').textContent = fmtCorr(cmp.unadjusted.r);
         document.getElementById('regularP').textContent = formatPartialP(cmp.unadjusted.p);
         document.getElementById('regularDF').textContent = cmp.unadjusted.df || '-';
@@ -1908,6 +2317,8 @@
       } else {
         const regularCorr = calculatePartialCorrelation(var1Idx, var2Idx, []);
         const partialCorr = calculatePartialCorrelation(var1Idx, var2Idx, controlIndices);
+        shownRegular = regularCorr.correlation;
+        shownPartial = partialCorr.correlation;
         document.getElementById('regularR').textContent = fmtCorr(regularCorr.correlation);
         document.getElementById('regularP').textContent = formatPartialP(regularCorr.pValue);
         document.getElementById('regularDF').textContent = regularCorr.df || '-';
@@ -1922,6 +2333,8 @@
 
       restoreSelectedPairHighlight();
       if (clickedCell) clickedCell.classList.add('highlighted');
+
+      renderComparisonScatters(var1Name, var2Name, controlNames, shownPartial, shownRegular);
 
       document.getElementById('correlationModal').style.display = 'block';
       setTimeout(centerModal, 10);
@@ -1943,8 +2356,8 @@
       const modalContent = document.querySelector('.modal-content');
       if (modal && modalContent) {
         const modalRect = modal.getBoundingClientRect();
-        const centerX = (modalRect.width - modalContent.offsetWidth) / 2;
-        const centerY = (modalRect.height - modalContent.offsetHeight) / 2;
+        const centerX = Math.max(12, (modalRect.width - modalContent.offsetWidth) / 2);
+        const centerY = Math.max(12, (modalRect.height - modalContent.offsetHeight) / 2);
         modalContent.style.left = centerX + 'px';
         modalContent.style.top = centerY + 'px';
         modalContent.style.transform = 'none';
@@ -2014,6 +2427,9 @@
     });
     // Redraw Highcharts charts on theme change
     document.addEventListener('statistico-theme-changed', function() {
+      if (paneScatterState) {
+        renderComparisonScatters(paneScatterState.x, paneScatterState.y, paneScatterState.controls, paneScatterState.partialR, paneScatterState.regularR);
+      }
       if (typeof Highcharts !== 'undefined' && Highcharts.charts) {
         Highcharts.charts.forEach(function(c) { if (c) {
           var isLight = document.documentElement.getAttribute('data-theme') === 'light';

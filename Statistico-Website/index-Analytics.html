@@ -2715,7 +2715,8 @@
   <!-- Component Loader -->
   <script src="assets/js/nav-template.js?v=2026-10-08-contact"></script>
   <script src="assets/js/module-media-slideshow.js?v=2026-05-07-smooth-media-showcase"></script>
-  <script src="assets/js/demo-video-modal.js?v=20261126walk6"></script>
+  <script src="assets/js/walkthroughs.js?v=20261126chapters"></script>
+  <script src="assets/js/demo-video-modal.js?v=20261126chapters3"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const DEMO_MAP = {
@@ -3579,23 +3580,17 @@
       hierarchical: '/Statistico-Website/analytics/hierarchical.html',
       metaanalysis: '/Statistico-Website/analytics/meta-analysis.html'
     };
-    const MODULE_WATCH_DEMOS = {
-      univariate: {
-        kicker: 'Univariate analysis',
-        headline: 'Discover how much one variable can reveal.',
-        lead: 'A guided tour of interactive distributions, diagnostics, uncertainty, and group comparisons.',
-        durationLabel: '7:46',
-        src: '/Statistico-Website/media/demos/univariate/univariate__premium-transitions__r1940.mp4?v=20261125r1940',
-        poster: '/Statistico-Website/media/demos/univariate/univariate-walkthrough-preview.jpg?v=20261126preview'
-      },
-      correlations: {
-        kicker: 'Correlation analysis',
-        headline: 'See how relationships take shape.',
-        lead: 'A guided tour of the correlation matrix, scatter detail, and how the view responds as you refine it.',
-        durationLabel: '7:54',
-        src: '/Statistico-Website/media/demos/correlations/correlation__walkthrough__vo-ready.mp4?v=20261126vo'
-      }
-    };
+    const MODULE_WATCH_DEMOS = (function () {
+      var catalog = window.StatisticoWalkthroughs || {};
+      var demos = {};
+      Object.keys(catalog).forEach(function (key) {
+        var item = catalog[key];
+        demos[key] = Object.assign({}, item, {
+          headline: item.headline || item.title
+        });
+      });
+      return demos;
+    })();
     const MODULE_CASE_STUDIES = {
       univariate: {
         url: 'https://statistico.live/statistico-analytics/dialogs/views/univariate/histogram-standalone.html',
@@ -3901,14 +3896,12 @@
         if (watchBtn) {
           watchBtn.addEventListener('click', () => {
             if (!window.StatisticoDemoVideo) return;
-            window.StatisticoDemoVideo.open({
-              kicker: watch.kicker,
-              title: watch.headline,
-              lead: watch.lead,
-              src: watch.src,
-              poster: watch.poster,
+            window.StatisticoDemoVideo.open(Object.assign({}, watch, {
+              title: watch.title || watch.headline,
+              videoId: watch.id || key,
+              autoplay: true,
               returnFocus: watchBtn
-            });
+            }));
           });
         }
         return;
@@ -4114,10 +4107,17 @@
       chip.addEventListener('click', function() { window.showCapModule(this.dataset.module); });
     });
 
-    // ── Boot: honor a ?module=<key> deep link (e.g. from a module overview page), else default to Univariate ──
-    const deepLinkModule = new URLSearchParams(window.location.search).get('module');
-    const bootModule = (deepLinkModule && MODS[deepLinkModule]) ? deepLinkModule : 'univariate';
+    // ── Boot: honor ?module=<key>, and ?video=&chapter= for a walkthrough section ──
+    const bootParams = new URLSearchParams(window.location.search);
+    const deepLinkModule = bootParams.get('module');
+    const linkedVideo = bootParams.get('video');
+    const bootModule = (deepLinkModule && MODS[deepLinkModule])
+      ? deepLinkModule
+      : ((linkedVideo && MODS[linkedVideo]) ? linkedVideo : 'univariate');
     window.showCapModule(bootModule, { skipScroll: bootModule === 'univariate', skipRedraw: true });
+    if (linkedVideo && window.StatisticoDemoVideo && typeof window.StatisticoDemoVideo.openFromQuery === 'function') {
+      window.StatisticoDemoVideo.openFromQuery();
+    }
 
     var heroSlides = Array.prototype.slice.call(document.querySelectorAll('.hero-scene[data-slide]'));
     var heroLabels = Array.prototype.slice.call(document.querySelectorAll('.hero-analytics-label[data-slide]'));

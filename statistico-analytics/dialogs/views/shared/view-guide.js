@@ -1093,51 +1093,22 @@
         ]
       ),
       'regression-ix-summary': guide(
-        'Interactions — overview',
-        'Says whether a moderator changes the slope of a focal predictor.',
+        'Interactions',
+        'Tests whether a moderator changes the slope of a focal predictor, with the fitted interaction plot on the same screen.',
         [
-          'Read the interaction card and the simple-slopes summary for the term in the model.',
-          'The plot of those slopes is the visualization view. The coefficient and the change in R² are the technical view.'
+          'Use the bar to pick the interaction, read focal and moderator roles, and swap roles when both predictors are numeric.',
+          'The chart uses the focal predictor on the x-axis and one line per moderator level. Toggle CI bands or Expand for a larger plot.',
+          'The side panel shows the product-term coefficient and a compact model comparison (R², ΔR², F-change p).'
         ],
         [
-          'A simple slope is the focal predictor’s effect at one level of the moderator. Different slopes are the interaction.',
-          'The interaction p-value is about that product term, not about either predictor alone.'
+          'The headline sentence reflects the interaction p-value for the selected term.',
+          'Diverging or crossing lines suggest moderation; parallel lines fit a weak or non-significant interaction.',
+          'Simple slopes, full coefficient rows, F-change details, and coding notes live under Technical details.'
         ],
         [
-          'An interaction is not a cause and not a licence to tell a mechanism the design did not include.',
-          'If the model has no interaction term, this view has nothing to interpret.'
-        ]
-      ),
-      'regression-ix-viz': guide(
-        'Interactions — visualization',
-        'Draws the fitted lines at representative levels of the moderator.',
-        [
-          'The focal predictor is on the x-axis. Each line is one moderator level.',
-          'Read the picture with the interaction test. The picture alone is not the p-value.'
-        ],
-        [
-          'Lines that diverge or cross are a visible interaction. Parallel lines are a weak or absent interaction.',
-          'The vertical gap at a chosen x is the fitted difference at that point, not a new contrast you tested.'
-        ],
-        [
-          'The lines are fitted means from the model, not raw group means, unless the page says so.',
-          'A cross outside the observed range is extrapolation.'
-        ]
-      ),
-      'regression-ix-details': guide(
-        'Interactions — technical',
-        'Gives the interaction coefficient and how much fit it adds.',
-        [
-          'Read the coefficient, its interval, and the change in R² for the interaction term.',
-          'Coding notes on the page say how the moderator and the focal predictor were centred or contrasted.'
-        ],
-        [
-          'The coefficient is the change in the focal slope for a one-unit change in the moderator, on the coding the model used.',
-          'Delta R² is the extra sample fit from adding the term. It can be small even when the slope change is interesting in the units of the outcome.'
-        ],
-        [
-          'A significant product term is not a causal moderation.',
-          'The coding changes the number. Do not compare the coefficient with a model that centred the variables differently.'
+          'The interaction p-value is for the product term, not for either predictor alone.',
+          'An interaction is not a causal moderation.',
+          'Lines are model fits with other terms held at their means (or reference categories), not raw group means unless noted.'
         ]
       ),
       'regression-ancova-results': (function () {

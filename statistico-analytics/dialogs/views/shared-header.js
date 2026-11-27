@@ -9667,9 +9667,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261127adj')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261127ix1')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261127adj');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261127ix1');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -10083,9 +10083,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'regression-diag-overview':    'Diagnostics — Overview',
       'regression-diag-plots':       'Diagnostics — Residual Plots',
       'regression-diag-influence':   'Diagnostics — Influence',
-      'regression-ix-summary':       'Interactions — Overview',
-      'regression-ix-viz':           'Interactions — Visualization',
-      'regression-ix-details':       'Interactions — Technical',
+      'regression-ix-summary':       'Interactions',
+      'regression-ix-viz':           'Interactions',
+      'regression-ix-details':       'Interactions',
       'regression-ancova-results':     'ANCOVA — Results',
       'regression-ancova-assumptions': 'ANCOVA — Assumptions',
       'regression-ancova-viz':         'ANCOVA — Visualization',
@@ -10229,11 +10229,11 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'regression-diag-influence':
         'Read Cook\'s distance per observation against the 0.5 / 1.0 thresholds and the flagged-observations table. Use this view to identify single points that move the coefficients disproportionately.',
       'regression-ix-summary':
-        'Read interaction interpretation cards and the simple-slopes summary. Use this view to understand whether and how a moderator changes the effect of the focal predictor.',
+        'Read the headline interaction sentence, the main plot with focal on the x-axis and moderator levels as lines, and the side coefficient and model-comparison stats. Open Technical details for simple slopes, full tables, and coding notes.',
       'regression-ix-viz':
-        'Inspect the interaction plot — fitted lines for representative moderator levels with the focal predictor on the x-axis. Diverging lines indicate a stronger moderation; parallel lines indicate weak/no moderation.',
+        'Read the headline interaction sentence, the main plot with focal on the x-axis and moderator levels as lines, and the side coefficient and model-comparison stats. Open Technical details for simple slopes, full tables, and coding notes.',
       'regression-ix-details':
-        'Read interaction coefficients, delta-R^2 for the interaction term, and any coding notes. Use this view for the technical write-up.',
+        'Read the headline interaction sentence, the main plot with focal on the x-axis and moderator levels as lines, and the side coefficient and model-comparison stats. Open Technical details for simple slopes, full tables, and coding notes.',
       'regression-ancova-results':
         'Read the KPI strip, model formula, ANCOVA Type III table, and the auto-generated key finding. Use this view to report group differences after controlling for covariates.',
       'regression-ancova-assumptions':

@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261127adj" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261127adj"></script>
+  <script src="../shared-header.js?v=20261127ix1"></script>
   <script src="../shared-workspace-tabs.js?v=20261123notab"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -316,16 +316,12 @@
       background: transparent;
     }
 
-    /* Interaction sub-tabs — fill panel and scroll when needed */
-    #tab-ix-summary.active,
-    #tab-ix-viz.active,
-    #tab-ix-details.active {
+    /* Interactions — single view */
+    #tab-ix-summary.active {
       overflow-y: auto;
       min-height: 0;
     }
-    #tab-ix-summary .tab-panel,
-    #tab-ix-viz .tab-panel,
-    #tab-ix-details .tab-panel {
+    #tab-ix-summary .tab-panel {
       flex: 1 1 auto;
       width: 100%;
       min-height: 0;
@@ -2406,11 +2402,12 @@
     .ix-overview-panel .chart-panel-b {
       min-height: 280px;
     }
-    #tab-ix-summary #ixPreviewPlotContainer {
-      flex: 0 0 260px !important;
-      height: 260px !important;
-      min-height: 260px !important;
+    #tab-ix-summary #interactionPlotContainer {
       width: 100% !important;
+    }
+    #tab-ix-summary.ix-chart-expanded #interactionPlotContainer {
+      min-height: 480px !important;
+      height: min(52vh, 520px) !important;
     }
     .chart-panel.res-dist-panel,
     .chart-panel.res-hist-panel {
@@ -2722,6 +2719,97 @@
       background: rgba(120,200,255,.05); border: 1px solid rgba(120,200,255,.14);
       border-radius: 6px;
     }
+    .ix-swap-btn {
+      margin-left: auto;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-1);
+      color: var(--accent-2);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .ix-swap-btn:hover { border-color: var(--accent-2); }
+    .ix-swap-btn.is-active {
+      border-color: var(--accent-1);
+      background: rgba(232,118,58,.12);
+      color: var(--accent-1);
+    }
+    .ix-finding-line {
+      margin: 0 0 12px;
+      font-size: 14px;
+      line-height: 1.45;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .ix-unified-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.85fr) minmax(220px, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .ix-unified-layout { grid-template-columns: 1fr; }
+    }
+    #tab-ix-summary.ix-chart-expanded .ix-unified-side { display: none; }
+    .ix-chart-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 10px;
+      margin-bottom: 10px;
+    }
+    .ix-main-chart-panel .chart-panel-b { padding: 8px 10px 12px; }
+    .ix-mod-controls {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+    .ix-unified-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .ix-side-card {
+      background: var(--surface-0);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .ix-side-card h3 {
+      margin: 0 0 8px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .ix-side-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+      margin: 4px 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .ix-side-stat strong { color: var(--text-primary); font-weight: 700; }
+    .ix-tech-fold {
+      margin-top: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-0);
+      padding: 0 14px 12px;
+    }
+    .ix-tech-fold > summary {
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      padding: 12px 0 10px;
+      list-style: none;
+    }
+    .ix-tech-fold > summary::-webkit-details-marker { display: none; }
+    .ix-tech-fold-body { font-size: 13px; color: var(--text-secondary); }
     .ix-ctx-chip { display: flex; align-items: baseline; gap: 5px; font-size: 11px; color: var(--text-secondary); }
     .ix-ctx-label {
       font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
@@ -6404,185 +6492,88 @@
           </div>
         </div>
 
-        <!-- Shared interaction context (above in-page workspace tabs) -->
+        <!-- Interactions — control bar (shown when Interactions view is active) -->
         <div id="ixWorkspaceContext" class="ix-workspace-context" hidden>
           <div class="ix-context-banner">
-            <div class="ix-ctx-chip"><span class="ix-ctx-label">Outcome</span><strong class="ix-ctx-outcome">—</strong></div>
-            <div class="ix-ctx-chip"><span class="ix-ctx-label">Interaction</span><strong class="ix-ctx-interaction">—</strong></div>
-            <div class="ix-ctx-chip"><span class="ix-ctx-label">Focal</span><strong class="ix-ctx-focal">—</strong></div>
-            <div class="ix-ctx-chip"><span class="ix-ctx-label">Moderator</span><strong class="ix-ctx-moderator">—</strong></div>
             <div class="ix-ctx-select-wrap">
-              <label for="ixGlobalTermSelect">Term</label>
+              <label for="ixGlobalTermSelect">Interaction</label>
               <select id="ixGlobalTermSelect" class="ix-term-select" onchange="onIxGlobalTermChange(this)"><option value="">—</option></select>
             </div>
-            <span class="ix-ctx-sig-badge is-ns">—</span>
+            <div class="ix-ctx-chip"><span class="ix-ctx-label">Focal</span><strong class="ix-ctx-focal">—</strong></div>
+            <div class="ix-ctx-chip"><span class="ix-ctx-label">Moderator</span><strong class="ix-ctx-moderator">—</strong></div>
+            <button type="button" class="ix-swap-btn" id="ixSwapRolesBtn" onclick="toggleIxRoleSwap()" title="Swap which variable is focal and which is moderator on the plot">Swap roles</button>
           </div>
         </div>
 
-        <!-- Tab: Interactions – Overview (interpretation layer) -->
+        <!-- Tab: Interactions (single view) -->
         <div id="tab-ix-summary" class="tab-content">
           <div class="tab-panel ancova-sub-panel ix-workspace">
             <div class="ws-shell">
-            <div class="ws-chrome ws-chrome--attached">
-              <nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected" aria-label="Interaction views">
-                <button type="button" class="ws-mode-tab ix-ws-tab active" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')" data-caption="Interpretation, preview plot, and simple slopes">
-                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
-                </button>
-                <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')" data-caption="Full interaction plots and adjusted means">
-                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Visualization</span>
-                </button>
-                <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')" data-caption="Coefficients, ΔR², and model comparison">
-                  <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
-                </button>
-              </nav>
-            </div>
-
             <div class="ws-body">
 
-            <div class="ix-overview-grid">
-              <div class="ix-overview-left">
-                <div class="ix-section-title"><i class="fa-solid fa-circle-info"></i> Significance &amp; interpretation</div>
-                <div id="ixSumSignifCards" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;"></div>
-                <div id="ixSumInterpretation" style="font-size:13px;color:var(--text-secondary);font-style:italic;padding:8px 10px;background:var(--surface-0);border-left:3px solid var(--accent-2);border-radius:0 4px 4px 0;"></div>
-                <div id="ixOverviewConclusion" class="ix-conclusion" style="display:none;"></div>
-              </div>
-              <div class="chart-panel ix-overview-panel">
-                <div class="chart-panel-h"><i class="fa-solid fa-chart-line"></i> Interaction preview</div>
-                <div class="chart-panel-b">
-                  <div id="ixPreviewPlotContainer"></div>
-                  <button type="button" class="ix-crossnav-btn" style="margin-top:8px;" onclick="switchTab('ix-viz')">Expand in Visualization →</button>
-                </div>
-              </div>
-            </div>
+            <p id="ixFindingLine" class="ix-finding-line" hidden aria-live="polite">—</p>
 
-            <div style="margin-top:16px;">
-              <div class="ix-section-title"><i class="fa-solid fa-angles-right"></i> Simple slopes</div>
-              <div id="ixSumSlopesContainer">
-                <div style="color:var(--text-muted);font-size:12px;font-style:italic;">Select an interaction term above.</div>
-              </div>
-            </div>
-
-            <div class="ix-crossnav">
-              <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-viz')"><i class="fa-solid fa-chart-line"></i> View interaction geometry in Visualization →</button>
-              <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-details')"><i class="fa-solid fa-table-list"></i> Technical coefficients &amp; ΔR² →</button>
-            </div>
-
-            </div><!-- /ws-body -->
-            </div><!-- /ws-shell -->
-          </div>
-        </div>
-
-        <!-- Tab: Interactions – Visualization (conceptual / reporting layer) -->
-        <div id="tab-ix-viz" class="tab-content">
-          <div class="tab-panel ancova-sub-panel ix-workspace">
-            <div class="ws-shell">
-            <div class="ws-chrome ws-chrome--attached">
-              <nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected" aria-label="Interaction views">
-                <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')" data-caption="Interpretation, preview plot, and simple slopes">
-                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
-                </button>
-                <button type="button" class="ws-mode-tab ix-ws-tab active" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')" data-caption="Full interaction plots and adjusted means">
-                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Visualization</span>
-                </button>
-                <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-details" onclick="switchTab('ix-details')" data-caption="Coefficients, ΔR², and model comparison">
-                  <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
-                </button>
-              </nav>
-            </div>
-
-            <div class="ws-body">
-
-            <div class="ix-viz-layout">
-              <div>
-                <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                  <button class="ci-toggle-btn" id="ciToggleBtn" onclick="toggleCIBands()" title="Toggle 95% confidence bands">
+            <div class="ix-unified-layout">
+              <div class="ix-unified-main">
+                <div class="ix-chart-toolbar">
+                  <button type="button" class="ci-toggle-btn" id="ciToggleBtn" onclick="toggleCIBands()" title="Toggle 95% confidence bands on the plot">
                     <span class="ci-dot"></span>
-                    <i class="fa-solid fa-layer-group"></i>
-                    <span id="ciToggleBtnLabel">Show CI Bands</span>
+                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                    <span id="ciToggleBtnLabel">Show CI bands</span>
+                  </button>
+                  <button type="button" class="collapse-toggle" id="ixChartExpandBtn" aria-expanded="false" onclick="toggleIxChartExpand()">
+                    <i class="fa-solid fa-expand" aria-hidden="true"></i> Expand
                   </button>
                 </div>
-                <div class="chart-panel">
-                  <div class="chart-panel-h"><i class="fa-solid fa-chart-line"></i> Interaction plot</div>
+                <div class="chart-panel ix-main-chart-panel" id="ixMainChartPanel">
                   <div class="chart-panel-b">
-                    <div id="interactionPlotContainer" style="height:400px;min-height:320px;"></div>
+                    <div id="interactionPlotContainer" style="height:420px;min-height:320px;"></div>
                   </div>
                 </div>
+                <div id="ixModeratorControls" class="ix-mod-controls" hidden></div>
               </div>
-              <aside class="ix-viz-aside">
-                <h4>How to read this plot</h4>
-                <div id="ixVizInterpretation">Select an interaction to see guidance.</div>
+              <aside class="ix-unified-side">
+                <div class="ix-side-card" id="ixSideCoeffCard">
+                  <h3>Interaction coefficient</h3>
+                  <div id="ixSideCoeffBody"><span style="color:var(--text-muted);font-size:13px;">—</span></div>
+                </div>
+                <div class="ix-side-card" id="ixSideCompareCard">
+                  <h3>Model comparison</h3>
+                  <div id="ixSideCompareBody"><span style="color:var(--text-muted);font-size:13px;">—</span></div>
+                </div>
               </aside>
             </div>
 
-            <div id="emmVizSection" style="margin-top:20px;">
-              <div class="ix-section-title"><i class="fa-solid fa-chart-column"></i> Adjusted means (EMMeans)</div>
-              <p style="font-size:13px;color:var(--text-secondary);font-style:italic;margin:0 0 12px 0;">Group means at covariate grand means. Pairwise contrasts are Bonferroni-corrected.</p>
-              <div id="emmContainer"></div>
-            </div>
-
-            <div class="ix-crossnav">
-              <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-summary')"><i class="fa-solid fa-layer-group"></i> Back to Overview interpretation ←</button>
-              <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-details')"><i class="fa-solid fa-flask"></i> Technical coefficients &amp; ΔR² →</button>
-            </div>
-
-            </div><!-- /ws-body -->
-            </div><!-- /ws-shell -->
-          </div>
-        </div>
-
-        <!-- Tab: Interactions – Technical (diagnostics layer) -->
-        <div id="tab-ix-details" class="tab-content">
-          <div class="tab-panel ancova-sub-panel ix-workspace">
-            <div class="ws-shell">
-            <div class="ws-chrome ws-chrome--attached">
-              <nav class="ws-mode-bar ws-mode-bar--attached ws-mode-bar--connected" aria-label="Interaction views">
-                <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-summary" onclick="switchTab('ix-summary')" data-caption="Interpretation, preview plot, and simple slopes">
-                  <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Overview</span>
-                </button>
-                <button type="button" class="ws-mode-tab ix-ws-tab" data-ix-tab="ix-viz" onclick="switchTab('ix-viz')" data-caption="Full interaction plots and adjusted means">
-                  <i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>Visualization</span>
-                </button>
-                <button type="button" class="ws-mode-tab ix-ws-tab active" data-ix-tab="ix-details" onclick="switchTab('ix-details')" data-caption="Coefficients, ΔR², and model comparison">
-                  <i class="fa-solid fa-flask" aria-hidden="true"></i><span>Technical</span>
-                </button>
-              </nav>
-            </div>
-
-            <div class="ws-body">
-
-            <div class="ix-tech-card">
-              <div class="ix-section-title"><i class="fa-solid fa-sigma"></i> Interaction coefficients</div>
-              <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px 0;">OLS estimates for each product term. A significant β indicates moderation.</p>
-              <div class="table-responsive">
-                <table class="results-table" id="interactionCoeffTable">
-                  <thead>
-                    <tr>
-                      <th>Term</th><th>&beta;</th><th>SE</th><th>t</th><th>p-value</th>
-                      <th class="sig-cell">Sig.</th><th>95% CI lower</th><th>95% CI upper</th>
-                    </tr>
-                  </thead>
-                  <tbody id="interactionCoeffBody">
-                    <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px;">Run a model with interaction terms to see results</td></tr>
-                  </tbody>
-                </table>
+            <details class="ix-tech-fold" id="ixTechDetails">
+              <summary>Technical details</summary>
+              <div class="ix-tech-fold-body">
+                <div class="table-responsive" style="margin-bottom:14px;">
+                  <table class="results-table" id="interactionCoeffTable">
+                    <thead>
+                      <tr>
+                        <th>Term</th><th>&beta;</th><th>SE</th><th>t</th><th>p-value</th><th>95% CI lower</th><th>95% CI upper</th>
+                      </tr>
+                    </thead>
+                    <tbody id="interactionCoeffBody">
+                      <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">Run a model with interaction terms to see results</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div id="interactionPartialFContainer">
+                  <div style="color:var(--text-muted);font-style:italic;padding:6px 0;font-size:13px;">No interaction terms in current model.</div>
+                </div>
+                <div class="ix-section-title" style="margin-top:14px;"><i class="fa-solid fa-angles-right"></i> Simple slopes</div>
+                <div id="ixSumSlopesContainer">
+                  <div style="color:var(--text-muted);font-size:12px;font-style:italic;">Select an interaction above.</div>
+                </div>
+                <div id="emmVizSection" style="margin-top:16px;display:none;">
+                  <div class="ix-section-title"><i class="fa-solid fa-chart-column"></i> Adjusted means (EMMeans)</div>
+                  <p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px 0;">At covariate grand means. Pairwise contrasts use Bonferroni correction.</p>
+                  <div id="emmContainer"></div>
+                </div>
+                <div id="ixTechCodingNote" class="ix-conclusion" style="display:none;margin-top:12px;"></div>
               </div>
-              <div class="table-footnote">&#8224; p&lt;.10 &nbsp; * p&lt;.05 &nbsp; ** p&lt;.01 &nbsp; *** p&lt;.001</div>
-            </div>
-
-            <div class="ix-tech-card">
-              <div class="ix-section-title"><i class="fa-solid fa-flask"></i> Model comparison (&Delta;R&sup2;)</div>
-              <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px 0;">Partial F-test: main-effects-only vs. full model with interactions.</p>
-              <div id="interactionPartialFContainer">
-                <div style="color:var(--text-muted);font-style:italic;padding:10px 0;font-size:13px;">No interaction terms in current model.</div>
-              </div>
-            </div>
-
-            <div id="ixTechCodingNote" class="ix-conclusion" style="display:none;"></div>
-
-            <div class="ix-crossnav">
-              <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-viz')"><i class="fa-solid fa-chart-line"></i> Inspect interaction pattern visually →</button>
-              <button type="button" class="ix-crossnav-btn" onclick="switchTab('ix-summary')"><i class="fa-solid fa-layer-group"></i> Executive summary ←</button>
-            </div>
+            </details>
 
             </div><!-- /ws-body -->
             </div><!-- /ws-shell -->
@@ -7071,6 +7062,9 @@
         'ancova-results': 'ancova',
         'ancova-assumptions': 'ancova',
         'ancova-viz': 'ancova',
+        'ix-viz': 'ix-summary',
+        'ix-details': 'ix-summary',
+        'interactions': 'ix-summary',
       };
       return panelMap[tabName] || tabName;
     }
@@ -7362,25 +7356,13 @@
           window.ancovaLoaded = true;
         }
         renderANCOVASubTab(tabName);
-      } else if (['ix-summary','ix-viz','ix-details'].includes(tabName)) {
+      } else if (tabName === 'ix-summary' || tabName === 'ix-viz' || tabName === 'ix-details') {
         setTimeout(() => {
           if (!window._interactionTabData) {
-            showInteractionEmptyState(tabName);
+            showInteractionEmptyState();
             return;
           }
-          if (tabName === 'ix-summary') {
-            updateIxWorkspaceContext();
-            renderInteractionSummary();
-            renderInteractionSummarySlopes();
-            renderInteractionPreview();
-          } else if (tabName === 'ix-viz') {
-            updateIxWorkspaceContext();
-            renderInteractionPlot();
-            renderIxVizInterpretation();
-          } else if (tabName === 'ix-details') {
-            updateIxWorkspaceContext();
-            renderIxTechnicalNotes();
-          }
+          refreshIxWorkspaceViews();
         }, 50);
       }
       syncModelScopeBanners();
@@ -7433,6 +7415,8 @@
     function switchTab(tabName) {
       console.log('🔄 Switching to tab:', tabName);
 
+      if (tabName === 'ix-viz' || tabName === 'ix-details') tabName = 'ix-summary';
+
       // Legacy sidebar aliases → canonical workspace tabs
       const legacyRedirect = {
         'results': 'results-overview',
@@ -7456,9 +7440,9 @@
       const tabTitles = {
         'results-overview':  'Model Results \u2013 Overview',
         'results-detail':    'Model Results \u2013 Technical',
-        'ix-summary':        'Interactions \u2013 Overview',
-        'ix-viz':            'Interactions \u2013 Visualization',
-        'ix-details':        'Interactions \u2013 Technical',
+        'ix-summary':        'Interactions',
+        'ix-viz':            'Interactions',
+        'ix-details':        'Interactions',
         'pred-overview':     'Predictions \u2013 Overview',
         'pred-scenario':     'Predictions \u2013 Scenario Engine',
         'viz-partial':       'Visualization \u2013 Predictor Effects',
@@ -7492,7 +7476,6 @@
       }
 
       // In-page workspace tab highlights
-      if (tabName.startsWith('ix-')) highlightWsTab('ix-tab', tabName);
       if (['pred-overview', 'pred-scenario'].includes(tabName)) highlightWsTab('pred-tab', tabName);
       if (['viz-partial', 'viz-unique'].includes(tabName)) highlightWsTab('viz-tab', tabName);
       if (['diag-overview', 'diag-plots', 'diag-influence'].includes(tabName)) highlightWsTab('diag-tab', tabName);
@@ -8381,9 +8364,7 @@ ${sectionsHtml}
       const allSections = [
         { id: 'results-overview', label: 'Model Results — Overview', waitMs: 800 },
         { id: 'results-detail', label: 'Model Results — Technical', waitMs: 800 },
-        { id: 'ix-summary', label: 'Interactions — Overview', waitMs: 900 },
-        { id: 'ix-viz', label: 'Interactions — Visualization', waitMs: 1000 },
-        { id: 'ix-details', label: 'Interactions — Technical', waitMs: 900 },
+        { id: 'ix-summary', label: 'Interactions', waitMs: 1000 },
         { id: 'pred-overview', label: 'Predictions — Overview', waitMs: 900 },
         { id: 'pred-scenario', label: 'Predictions — Scenario Engine', waitMs: 1000 },
         { id: 'viz-partial', label: 'Visualization — Predictor Effects', waitMs: 1000 },
@@ -14043,34 +14024,50 @@ ${sectionsHtml}
       return (idx >= 0 && idx < results.coefficients.length) ? idx : -1;
     }
 
-    function showInteractionEmptyState(tabName) {
+    function showInteractionEmptyState() {
       const msg = '<div style="color:var(--text-muted);font-style:italic;padding:16px 0;font-size:13px;">No interaction results yet. Run a model with at least one interaction term (e.g. age × score).</div>';
-      if (tabName === 'ix-summary') {
-        const cards = document.getElementById('ixSumSignifCards');
-        const interp = document.getElementById('ixSumInterpretation');
-        const conclusion = document.getElementById('ixOverviewConclusion');
-        const preview = document.getElementById('ixPreviewPlotContainer');
-        const slopes = document.getElementById('ixSumSlopesContainer');
-        if (cards) cards.innerHTML = msg;
-        if (interp) interp.textContent = '';
-        if (conclusion) { conclusion.style.display = 'none'; conclusion.innerHTML = ''; }
-        if (preview) preview.innerHTML = '';
-        if (slopes) slopes.innerHTML = msg;
-      } else if (tabName === 'ix-viz') {
-        const plot = document.getElementById('interactionPlotContainer');
-        const aside = document.getElementById('ixVizInterpretation');
-        if (plot) plot.innerHTML = msg;
-        if (aside) aside.textContent = 'Run a model with interaction terms to explore the geometry.';
-      } else if (tabName === 'ix-details') {
-        const note = document.getElementById('ixTechCodingNote');
-        if (note) { note.style.display = 'none'; note.innerHTML = ''; }
+      const finding = document.getElementById('ixFindingLine');
+      if (finding) { finding.hidden = true; finding.textContent = ''; }
+      const plot = document.getElementById('interactionPlotContainer');
+      if (plot) plot.innerHTML = msg;
+      const slopes = document.getElementById('ixSumSlopesContainer');
+      if (slopes) slopes.innerHTML = msg;
+      const coeffSide = document.getElementById('ixSideCoeffBody');
+      const compareSide = document.getElementById('ixSideCompareBody');
+      if (coeffSide) coeffSide.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">—</span>';
+      if (compareSide) compareSide.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">—</span>';
+      const note = document.getElementById('ixTechCodingNote');
+      if (note) { note.style.display = 'none'; note.innerHTML = ''; }
+      document.querySelectorAll('.ix-ctx-focal, .ix-ctx-moderator').forEach(el => { el.textContent = '—'; });
+    }
+
+    function formatIxPValue(p) {
+      if (!Number.isFinite(p)) return '—';
+      if (p < 0.0001) return '< .0001';
+      return p.toFixed(3).replace(/^0\./, '.');
+    }
+
+    function toggleIxRoleSwap() {
+      window._ixRolesSwapped = !window._ixRolesSwapped;
+      const btn = document.getElementById('ixSwapRolesBtn');
+      if (btn) btn.classList.toggle('is-active', !!window._ixRolesSwapped);
+      refreshIxWorkspaceViews();
+    }
+
+    function toggleIxChartExpand() {
+      const tab = document.getElementById('tab-ix-summary');
+      const btn = document.getElementById('ixChartExpandBtn');
+      if (!tab) return;
+      const on = tab.classList.toggle('ix-chart-expanded');
+      if (btn) {
+        btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+        btn.innerHTML = on
+          ? '<i class="fa-solid fa-compress" aria-hidden="true"></i> Collapse'
+          : '<i class="fa-solid fa-expand" aria-hidden="true"></i> Expand';
       }
-      document.querySelectorAll('.ix-ctx-outcome, .ix-ctx-interaction, .ix-ctx-focal, .ix-ctx-moderator').forEach(el => { el.textContent = '—'; });
-      document.querySelectorAll('.ix-ctx-sig-badge').forEach(el => {
-        el.textContent = '—';
-        el.className = 'ix-ctx-sig-badge is-ns';
-        el.title = '';
-      });
+      setTimeout(function () {
+        if (typeof renderInteractionPlot === 'function') renderInteractionPlot();
+      }, 60);
     }
 
     function renderInteractionsTab(results, variableNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVar, rows, headers) {
@@ -14096,16 +14093,14 @@ ${sectionsHtml}
           const p   = results.p_values[coeffIdx];
           const cil = results.CI_lower[coeffIdx];
           const ciu = results.CI_upper[coeffIdx];
-          const sig = p < 0.001 ? '***' : p < 0.01 ? '**' : p < 0.05 ? '*' : p < 0.1 ? '†' : '';
           const pFmt = p < 0.0001 ? '< .0001' : p.toFixed(4);
-          const pClass = p < 0.05 ? 'style="color:var(--success);font-weight:600;"' : p < 0.1 ? 'style="color:var(--warning);"' : '';
+          const pClass = p < 0.05 ? 'style="color:var(--success);font-weight:600;"' : '';
           tbody.innerHTML += `<tr>
             <td style="font-weight:600;color:var(--accent-2);">${interactionColumnNames[i]}</td>
             <td>${b.toFixed(4)}</td>
             <td>${se.toFixed(4)}</td>
             <td>${t.toFixed(3)}</td>
             <td ${pClass}>${pFmt}</td>
-            <td class="sig-cell" style="font-weight:700;color:var(--accent-2);">${sig}</td>
             <td>${cil.toFixed(4)}</td>
             <td>${ciu.toFixed(4)}</td>
           </tr>`;
@@ -14126,8 +14121,16 @@ ${sectionsHtml}
         const ssrRestricted = mainResults.SSR;
         const partialF = q > 0 ? ((ssrRestricted - ssrFull) / q) / (ssrFull / (n - kF)) : 0;
         const pPartial = q > 0 ? 1 - fCDF(Math.max(partialF, 0), q, n - kF) : 1;
-        const pfSig = pPartial < 0.001 ? '***' : pPartial < 0.01 ? '**' : pPartial < 0.05 ? '*' : pPartial < 0.1 ? '†' : 'ns';
-        const pfClass = pPartial < 0.05 ? 'color:var(--success);font-weight:700;' : pPartial < 0.1 ? 'color:var(--warning);' : 'color:var(--text-muted);';
+        const pfClass = pPartial < 0.05 ? 'color:var(--success);font-weight:700;' : 'color:var(--text-muted);';
+        window._ixModelCompare = {
+          r2Full: results.R2,
+          r2Main: mainResults.R2,
+          r2Change: results.R2 - mainResults.R2,
+          partialF,
+          pPartial,
+          q,
+          df2: n - kF
+        };
         const pfDiv = document.getElementById('interactionPartialFContainer');
         if (pfDiv) {
           const r2Full = results.R2.toFixed(4);
@@ -14135,10 +14138,10 @@ ${sectionsHtml}
           const r2Change = (results.R2 - mainResults.R2).toFixed(4);
           pfDiv.innerHTML = `
             <table class="results-table" style="margin-bottom:12px;">
-              <thead><tr><th>Model comparison</th><th>R²</th><th>ΔR²</th><th>F-change</th><th>df1</th><th>df2</th><th>p (F-change)</th><th class="sig-cell">Sig.</th></tr></thead>
+              <thead><tr><th>Model comparison</th><th>R²</th><th>ΔR²</th><th>F-change</th><th>df1</th><th>df2</th><th>p (F-change)</th></tr></thead>
               <tbody>
                 <tr>
-                  <td>Main effects only</td><td>${r2Main}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+                  <td>Main effects only</td><td>${r2Main}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
                 </tr>
                 <tr style="background:rgba(167,139,250,0.06);">
                   <td style="font-weight:600;">+ Interactions</td>
@@ -14148,13 +14151,9 @@ ${sectionsHtml}
                   <td>${q}</td>
                   <td>${n - kF}</td>
                   <td style="${pfClass}">${pPartial < 0.0001 ? '< .0001' : pPartial.toFixed(4)}</td>
-                  <td style="${pfClass};font-size:13px;">${pfSig}</td>
                 </tr>
               </tbody>
-            </table>
-            <p class="table-footnote" style="margin:6px 0 0 0;">
-              The interaction block explains an additional <strong>ΔR² = ${r2Change}</strong> of variance.
-            </p>`;
+            </table>`;
           if (window.StatisticoViewReadings) {
             window.StatisticoViewReadings.add('regression-ix-summary', [
               pPartial < 0.05
@@ -14241,7 +14240,7 @@ ${sectionsHtml}
             emmHTML += `</tbody></table>`;
             emmHTML += `<div style="font-size:11px;color:var(--text-secondary);margin:4px 0 8px 0;font-weight:600;">Pairwise Contrasts (Bonferroni)</div>`;
             emmHTML += `<table class="results-table" style="margin-bottom:8px;">
-              <thead><tr><th>Comparison</th><th>Difference</th><th>SE</th><th>p (Bonferroni)</th><th class="sig-cell">Sig.</th></tr></thead><tbody>`;
+              <thead><tr><th>Comparison</th><th>Difference</th><th>SE</th><th>p (Bonferroni)</th></tr></thead><tbody>`;
             const pairs = [];
             for (let a = 0; a < catInfo.categories.length; a++) {
               for (let b = a + 1; b < catInfo.categories.length; b++) {
@@ -14259,14 +14258,12 @@ ${sectionsHtml}
               const t = diff / se;
               const rawP = 2 * (1 - tCDF(Math.abs(t), results.df));
               const adjP = Math.min(rawP * nPairs, 1);
-              const sig = adjP < 0.001 ? '***' : adjP < 0.01 ? '**' : adjP < 0.05 ? '*' : 'ns';
               const pClass = adjP < 0.05 ? 'color:var(--success);font-weight:600;' : 'color:var(--text-muted);';
               emmHTML += `<tr>
                 <td>${g1} vs ${g2}</td>
                 <td>${diff.toFixed(3)}</td>
                 <td>${se.toFixed(3)}</td>
                 <td style="${pClass}">${adjP < 0.0001 ? '< .0001' : adjP.toFixed(4)}</td>
-                <td style="${pClass}">${sig}</td>
               </tr>`;
             });
             emmHTML += `</tbody></table>`;
@@ -14293,15 +14290,7 @@ ${sectionsHtml}
       });
 
       try {
-        updateIxWorkspaceContext();
-        renderInteractionSummary();
-        renderInteractionSummarySlopes();
-        renderInteractionPreview();
-        const vizTab = document.getElementById('tab-ix-viz');
-        if (vizTab && vizTab.classList.contains('active')) {
-          renderInteractionPlot();
-          renderIxVizInterpretation();
-        }
+        refreshIxWorkspaceViews();
       } catch (e) {
         console.warn('Interaction workspace render failed:', e);
       }
@@ -14326,37 +14315,38 @@ ${sectionsHtml}
         focal = ix.var2;
         moderator = ix.var1;
       }
+      if (window._ixRolesSwapped) {
+        const t = focal;
+        focal = moderator;
+        moderator = t;
+      }
       return { focal, moderator };
     }
 
-    function highlightIxWorkspaceTab(tabName) {
-      document.querySelectorAll('.ws-mode-tab[data-ix-tab]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.ixTab === tabName);
-      });
+    function ixPlotPair(ix, ixi) {
+      if (!window._ixRolesSwapped || !(ixi.v1IsNumeric && ixi.v2IsNumeric)) return { ix, ixi };
+      return {
+        ix: { var1: ix.var2, var2: ix.var1 },
+        ixi: Object.assign({}, ixi, {
+          v1: ix.var2,
+          v2: ix.var1,
+          v1Idx: ixi.v2Idx,
+          v2Idx: ixi.v1Idx
+        })
+      };
     }
 
     function updateIxWorkspaceContext() {
       const data = window._interactionTabData;
       if (!data) return;
-      const { results, interactions, interactionInfo, interactionColumnNames, yVar } = data;
+      const { interactions, interactionInfo } = data;
       const idx = getIxSelectedTermIndex();
       const ix = interactions[idx];
       const ixi = interactionInfo[idx];
       if (!ix || !ixi) return;
       const roles = getIxRoleLabels(ix, ixi);
-      document.querySelectorAll('.ix-ctx-outcome').forEach(el => { el.textContent = yVar; });
-      document.querySelectorAll('.ix-ctx-interaction').forEach(el => { el.textContent = `${ix.var1} × ${ix.var2}`; });
       document.querySelectorAll('.ix-ctx-focal').forEach(el => { el.textContent = roles.focal; });
       document.querySelectorAll('.ix-ctx-moderator').forEach(el => { el.textContent = roles.moderator; });
-      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
-      const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
-      const sig = p < 0.05;
-      const pFmt = p < 0.0001 ? '< .0001' : p.toFixed(3);
-      document.querySelectorAll('.ix-ctx-sig-badge').forEach(el => {
-        el.textContent = sig ? 'Significant' : 'Not significant';
-        el.className = 'ix-ctx-sig-badge ' + (sig ? 'is-sig' : 'is-ns');
-        el.title = `Interaction term p = ${pFmt}`;
-      });
     }
 
     function syncIxTermSelects(fromValue) {
@@ -14377,15 +14367,88 @@ ${sectionsHtml}
 
     function refreshIxWorkspaceViews() {
       updateIxWorkspaceContext();
-      renderInteractionSummary();
+      renderInteractionFinding();
+      renderIxSidePanels();
+      renderIxModeratorControls();
       renderInteractionSummarySlopes();
-      renderInteractionPreview();
-      const vizTab = document.getElementById('tab-ix-viz');
-      if (vizTab && vizTab.classList.contains('active')) {
-        renderInteractionPlot();
-        renderIxVizInterpretation();
-      }
+      renderInteractionPlot();
       renderIxTechnicalNotes();
+    }
+
+    function renderInteractionFinding() {
+      const el = document.getElementById('ixFindingLine');
+      const data = window._interactionTabData;
+      if (!el || !data) return;
+      const { results, interactions, interactionColumnNames, interactionInfo, yVar } = data;
+      const idx = getIxSelectedTermIndex();
+      const ix = interactions[idx];
+      const ixi = interactionInfo[idx];
+      if (!ix || !ixi) { el.hidden = true; return; }
+      const roles = getIxRoleLabels(ix, ixi);
+      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
+      const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
+      const pFmt = formatIxPValue(p);
+      const focalLower = String(roles.focal).toLowerCase();
+      const modLower = String(roles.moderator).toLowerCase();
+      el.textContent = p < 0.05
+        ? `Evidence that ${roles.moderator} moderates the effect of ${roles.focal} on ${yVar} (p = ${pFmt}).`
+        : `No clear evidence of interaction between ${focalLower} and ${modLower} (p = ${pFmt}).`;
+      el.hidden = false;
+      const ixReadings = [el.textContent];
+      if (window.StatisticoViewReadings) window.StatisticoViewReadings.set('regression-ix-summary', ixReadings);
+    }
+
+    function renderIxSidePanels() {
+      const data = window._interactionTabData;
+      const coeffEl = document.getElementById('ixSideCoeffBody');
+      const compareEl = document.getElementById('ixSideCompareBody');
+      if (!data || !coeffEl || !compareEl) return;
+      const { results, interactions, interactionColumnNames, interactionInfo } = data;
+      const idx = getIxSelectedTermIndex();
+      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
+      if (coeffIdx < 0) {
+        coeffEl.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">—</span>';
+      } else {
+        const b = results.coefficients[coeffIdx];
+        const cil = results.CI_lower[coeffIdx];
+        const ciu = results.CI_upper[coeffIdx];
+        const p = results.p_values[coeffIdx];
+        coeffEl.innerHTML = ''
+          + '<div class="ix-side-stat"><span>β</span><strong>' + b.toFixed(4) + '</strong></div>'
+          + '<div class="ix-side-stat"><span>95% CI</span><strong>[' + cil.toFixed(3) + ', ' + ciu.toFixed(3) + ']</strong></div>'
+          + '<div class="ix-side-stat"><span>p-value</span><strong>' + formatIxPValue(p) + '</strong></div>';
+      }
+      const cmp = window._ixModelCompare;
+      if (!cmp) {
+        compareEl.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">—</span>';
+        return;
+      }
+      compareEl.innerHTML = ''
+        + '<div class="ix-side-stat"><span>Full model R²</span><strong>' + (100 * cmp.r2Full).toFixed(2) + '%</strong></div>'
+        + '<div class="ix-side-stat"><span>ΔR²</span><strong>' + (cmp.r2Change >= 0 ? '+' : '') + (100 * cmp.r2Change).toFixed(2) + ' pp</strong></div>'
+        + '<div class="ix-side-stat"><span>p (F-change)</span><strong>' + formatIxPValue(cmp.pPartial) + '</strong></div>';
+    }
+
+    function renderIxModeratorControls() {
+      const el = document.getElementById('ixModeratorControls');
+      const data = window._interactionTabData;
+      if (!el || !data) return;
+      const { interactions, interactionInfo } = data;
+      const idx = getIxSelectedTermIndex();
+      const ix = interactions[idx];
+      const ixi = interactionInfo[idx];
+      if (!ix || !ixi) { el.hidden = true; return; }
+      const roles = getIxRoleLabels(ix, ixi);
+      let text = '';
+      if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
+        text = 'Moderator <strong>' + roles.moderator + '</strong>: lines show −1 SD, mean, and +1 SD.';
+      } else if ((ixi.v1IsNumeric && ixi.v2Cat) || (ixi.v1Cat && ixi.v2IsNumeric)) {
+        text = 'Moderator <strong>' + roles.moderator + '</strong>: one fitted line per category.';
+      } else {
+        text = 'Each line is a fitted combination of dummy-coded categories.';
+      }
+      el.innerHTML = text;
+      el.hidden = false;
     }
 
     function renderIxTechnicalNotes() {
@@ -14464,9 +14527,12 @@ ${sectionsHtml}
       if (!data) return;
       const idx = getIxSelectedTermIndex();
       const { results, xnVars, xcVars, interactions, interactionInfo, yVar, rows, headers } = data;
-      const ix = interactions[idx];
-      const ixi = interactionInfo[idx];
-      if (!ix || !ixi) return;
+      const ix0 = interactions[idx];
+      const ixi0 = interactionInfo[idx];
+      if (!ix0 || !ixi0) return;
+      const pair = ixPlotPair(ix0, ixi0);
+      const ix = pair.ix;
+      const ixi = pair.ixi;
       if (ixi.v1IsNumeric && ixi.v2Cat) {
         _renderNumCatInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
       } else if (ixi.v1Cat && ixi.v2IsNumeric) {
@@ -14475,7 +14541,7 @@ ${sectionsHtml}
       } else if (ixi.v1IsNumeric && ixi.v2IsNumeric) {
         _renderNumNumInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar);
       } else {
-        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center;">Preview not available for this term type.</div>';
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center;">Plot not available for this term type.</div>';
       }
     }
 
@@ -14635,7 +14701,7 @@ ${sectionsHtml}
         </div>`;
         html += `<table class="results-table">
           <thead><tr>
-            <th>Moderator Level</th><th>M value</th><th>Slope of ${focalVar}</th><th>SE</th><th>t</th><th>p</th><th class="sig-cell">Sig.</th><th>95% CI</th>
+            <th>Moderator Level</th><th>M value</th><th>Slope of ${focalVar}</th><th>SE</th><th>t</th><th>p</th><th>95% CI</th>
           </tr></thead><tbody>`;
 
         levels.forEach(({ label, val }) => {
@@ -14643,7 +14709,6 @@ ${sectionsHtml}
           const se_s   = Math.sqrt(se_focal ** 2 + val ** 2 * se_ix ** 2);
           const t_s    = slope / se_s;
           const p_s    = 2 * (1 - tCDF(Math.abs(t_s), df));
-          const sig    = p_s < 0.001 ? '***' : p_s < 0.01 ? '**' : p_s < 0.05 ? '*' : p_s < 0.1 ? '†' : 'ns';
           const pFmt   = p_s < 0.0001 ? '&lt; .0001' : p_s.toFixed(3);
           const ci_lo  = (slope - 1.96 * se_s).toFixed(3);
           const ci_hi  = (slope + 1.96 * se_s).toFixed(3);
@@ -14655,14 +14720,11 @@ ${sectionsHtml}
             <td>${se_s.toFixed(4)}</td>
             <td>${t_s.toFixed(3)}</td>
             <td style="${pStyle}">${pFmt}</td>
-            <td class="sig-cell" style="${pStyle}">${sig}</td>
             <td>[${ci_lo}, ${ci_hi}]</td>
           </tr>`;
         });
         html += `</tbody></table>`;
-        html += `<div class="table-footnote">
-          SE approximation: &radic;(SE<sub>focal</sub>&sup2; + M&sup2;&middot;SE<sub>interaction</sub>&sup2;) &nbsp;&mdash;&nbsp; † p&lt;.10 &nbsp;* p&lt;.05 &nbsp;** p&lt;.01 &nbsp;*** p&lt;.001
-        </div>`;
+        html += `<div class="table-footnote">SE approximation: &radic;(SE<sub>focal</sub>&sup2; + M&sup2;&middot;SE<sub>interaction</sub>&sup2;)</div>`;
 
       } else {
         // Categorical moderator: one slope per category
@@ -14672,7 +14734,7 @@ ${sectionsHtml}
         </div>`;
         html += `<table class="results-table">
           <thead><tr>
-            <th>Group</th><th>Slope of ${focalVar}</th><th>SE (approx.)</th><th>t</th><th>p</th><th class="sig-cell">Sig.</th>
+            <th>Group</th><th>Slope of ${focalVar}</th><th>SE (approx.)</th><th>t</th><th>p</th>
           </tr></thead><tbody>`;
 
         // Reference category → slope = beta_focal (no interaction dummy active)
@@ -14680,14 +14742,12 @@ ${sectionsHtml}
         const se_focal = results.std_errors[focalColIdx + (results.includeIntercept ? 1 : 0)];
         const t_ref  = beta_focal / se_focal;
         const p_ref  = 2 * (1 - tCDF(Math.abs(t_ref), df));
-        const sig_ref = p_ref < 0.001 ? '***' : p_ref < 0.01 ? '**' : p_ref < 0.05 ? '*' : p_ref < 0.1 ? '†' : 'ns';
         html += `<tr>
           <td style="font-weight:600;">${refCat} (ref)</td>
           <td>${beta_focal.toFixed(4)}</td>
           <td>${se_focal.toFixed(4)}</td>
           <td>${t_ref.toFixed(3)}</td>
           <td style="${p_ref < 0.05 ? 'color:var(--success,#16a34a);font-weight:600;' : ''}">${p_ref < 0.0001 ? '&lt; .0001' : p_ref.toFixed(3)}</td>
-          <td>${sig_ref}</td>
         </tr>`;
 
         cats.slice(1).forEach((cat, ci) => {
@@ -14697,7 +14757,6 @@ ${sectionsHtml}
           const se_s    = Math.sqrt(se_focal ** 2 + ixSE ** 2);
           const t_s     = slope / se_s;
           const p_s     = 2 * (1 - tCDF(Math.abs(t_s), df));
-          const sig     = p_s < 0.001 ? '***' : p_s < 0.01 ? '**' : p_s < 0.05 ? '*' : p_s < 0.1 ? '†' : 'ns';
           const pStyle  = p_s < 0.05 ? 'color:var(--success,#16a34a);font-weight:600;' : '';
           html += `<tr>
             <td style="font-weight:600;">${cat}</td>
@@ -14705,13 +14764,10 @@ ${sectionsHtml}
             <td>${se_s.toFixed(4)}</td>
             <td>${t_s.toFixed(3)}</td>
             <td style="${pStyle}">${p_s < 0.0001 ? '&lt; .0001' : p_s.toFixed(3)}</td>
-            <td style="${pStyle}">${sig}</td>
           </tr>`;
         });
         html += `</tbody></table>`;
-        html += `<div class="table-footnote">
-          Slope for non-reference groups = &beta;<sub>focal</sub> + &beta;<sub>interaction</sub> &nbsp;&mdash;&nbsp; † p&lt;.10 &nbsp;* p&lt;.05 &nbsp;** p&lt;.01 &nbsp;*** p&lt;.001
-        </div>`;
+        html += `<div class="table-footnote">Slope for non-reference groups = &beta;<sub>focal</sub> + &beta;<sub>interaction</sub></div>`;
       }
 
       targetEl.innerHTML = html;
@@ -14721,16 +14777,25 @@ ${sectionsHtml}
     function renderInteractionPlot() {
       const container = document.getElementById('interactionPlotContainer');
       if (!container || typeof Highcharts === 'undefined') return;
-      const prev = window._ixPlotCompact;
+      const tab = document.getElementById('tab-ix-summary');
+      const expanded = tab && tab.classList.contains('ix-chart-expanded');
+      container.style.height = expanded ? '' : '420px';
+      container.style.minHeight = expanded ? '480px' : '320px';
       window._ixPlotCompact = false;
       try {
         _renderInteractionPlotInContainer(container);
-        renderIxVizInterpretation();
+        setTimeout(function () {
+          const w = container.clientWidth;
+          if (typeof Highcharts === 'undefined') return;
+          Highcharts.charts.forEach(function (chart) {
+            if (chart && chart.renderTo === container) {
+              try { chart.setSize(w > 40 ? w : null, container.clientHeight, false); } catch (_e) {}
+            }
+          });
+        }, 80);
       } catch (e) {
         console.warn('Interaction plot render failed:', e);
         container.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center;">Could not render interaction plot.</div>';
-      } finally {
-        window._ixPlotCompact = prev;
       }
     }
 
@@ -14742,8 +14807,7 @@ ${sectionsHtml}
       if (btn) btn.classList.toggle('active', window._showCIBands);
       const lbl = document.getElementById('ciToggleBtnLabel');
       if (lbl) lbl.textContent = label;
-      if (document.getElementById('tab-ix-viz')?.classList.contains('active')) renderInteractionPlot();
-      if (document.getElementById('tab-ix-summary')?.classList.contains('active')) renderInteractionPreview();
+      if (document.getElementById('tab-ix-summary')?.classList.contains('active')) renderInteractionPlot();
     }
 
     // ── Shared SE(ŷ) approximation ──────────────────────────────────────────────

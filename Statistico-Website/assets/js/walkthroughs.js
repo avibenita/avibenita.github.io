@@ -27,20 +27,14 @@
       durationTolerance: 0.5,
       src: '/Statistico-Website/media/demos/correlations/correlation__walkthrough__narrated.mp4?v=20261126narrated2',
       chapters: [
-        { id: 'introduction', start: 0, title: 'Welcome and overview' },
-        { id: 'demonstration-data', start: 20, title: 'Demonstration data' },
-        { id: 'setup', start: 32, title: 'Set up the analysis' },
-        { id: 'matrix-and-pairs', start: 52, title: 'Matrix, heatmap and ranked pairs' },
-        { id: 'interactive-scatter', start: 122, title: 'Interactive scatterplot' },
-        { id: 'highlight-results', start: 155, title: 'Highlight relationships' },
+        { id: 'setup', start: 20, title: 'Set up the analysis' },
+        { id: 'matrix-and-pairs', start: 52, title: 'Correlation Matrix' },
+        { id: 'interactive-scatter', start: 122, title: 'Interactive scatter plots' },
         { id: 'network', start: 177, title: 'Correlation network' },
-        { id: 'partial-correlation', start: 213, title: 'Partial correlation' },
-        { id: 'taylor-preview', start: 284.633, title: 'Taylor diagram — concept preview' },
-        { id: 'descriptives', start: 322.633, title: 'Descriptives and normality' },
-        { id: 'group-comparison', start: 343.633, title: 'Compare groups' },
-        { id: 'group-similarity', start: 390.633, title: 'Group similarity profile' },
-        { id: 'original-developments', start: 420.633, title: 'Original Statistico developments' },
-        { id: 'beyond-correlations', start: 479.933, title: 'Saving, AI interpretation and export' }
+        { id: 'partial-correlation', start: 213, title: 'Partial correlations' },
+        { id: 'taylor-preview', start: 282, title: 'Taylor Diagram' },
+        { id: 'group-comparison', start: 344, title: 'By Group Analysis' },
+        { id: 'original-developments', start: 421, title: 'Original Statistico Development' }
       ]
     }
   };

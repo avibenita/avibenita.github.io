@@ -8302,11 +8302,11 @@ const StatisticoHeader = {
     wrap.id = 'ancovaGroupNav';
     wrap.style.display = 'none';
     wrap.innerHTML = ''
-      + '<button type="button" class="sb-item" id="ancovaNavBtn" onclick="switchTab(\'ancova-results\')"'
+      + '<button type="button" class="sb-item" id="ancovaNavBtn" onclick="switchTab(\'ancova\')"'
       + ' data-tab="ancova" title="Adjusted group differences with covariate control.">'
       + '<i class="fa-solid fa-layer-group sb-item-icon"></i>'
       + '<span class="sb-item-copy"><span class="sb-item-label">ANCOVA</span>'
-      + '<span class="sb-item-description">Adjusted means, assumptions &amp; plots</span></span>'
+      + '<span class="sb-item-description">Adjusted comparison &amp; group lines</span></span>'
       + '</button>';
     const groups = body.querySelectorAll('.sb-group');
     if (groups.length >= 2) body.insertBefore(wrap, groups[1]);
@@ -10139,9 +10139,10 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'regression-ix-summary':       'Interactions',
       'regression-ix-viz':           'Interactions',
       'regression-ix-details':       'Interactions',
-      'regression-ancova-results':     'ANCOVA — Results',
-      'regression-ancova-assumptions': 'ANCOVA — Assumptions',
-      'regression-ancova-viz':         'ANCOVA — Visualization',
+      'regression-ancova':             'ANCOVA',
+      'regression-ancova-results':     'ANCOVA',
+      'regression-ancova-assumptions': 'ANCOVA',
+      'regression-ancova-viz':         'ANCOVA',
       'cluster-km-overview':    'K-means — Overview',
       'cluster-km-sizes':       'K-means — Sizes & Assignments',
       'cluster-km-profiles':    'K-means — Profiles & Centers',
@@ -10287,12 +10288,14 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
         'Read the headline interaction sentence, the main plot with focal on the x-axis and moderator levels as lines, and the side coefficient and model-comparison stats. Open Technical details for simple slopes, full tables, and coding notes.',
       'regression-ix-details':
         'Read the headline interaction sentence, the main plot with focal on the x-axis and moderator levels as lines, and the side coefficient and model-comparison stats. Open Technical details for simple slopes, full tables, and coding notes.',
+      'regression-ancova':
+        'Read the KPI strip and factor/covariate labels, then the adjusted-means CI chart and adjusted difference, alongside the group regression chart. Use the assumption strip for slope tests and residual status; open Diagnostics for full residual plots. Technical details holds the formula and slope table.',
       'regression-ancova-results':
-        'Read the KPI strip, model formula, ANCOVA Type III table, and the auto-generated key finding. Use this view to report group differences after controlling for covariates.',
+        'Read the KPI strip and factor/covariate labels, then the adjusted-means CI chart and adjusted difference, alongside the group regression chart. Use the assumption strip for slope tests and residual status; open Diagnostics for full residual plots. Technical details holds the formula and slope table.',
       'regression-ancova-assumptions':
-        'Read the homogeneity-of-slopes verdict and the residual-diagnostic mini charts (histogram, QQ, residuals vs fitted). Use this view to decide if the ANCOVA result is trustworthy.',
+        'Read the KPI strip and factor/covariate labels, then the adjusted-means CI chart and adjusted difference, alongside the group regression chart. Use the assumption strip for slope tests and residual status; open Diagnostics for full residual plots. Technical details holds the formula and slope table.',
       'regression-ancova-viz':
-        'Read the adjusted means, the adjusted mean difference (when there are two levels), the means-with-CI dot plot, and the group regression-lines chart. Parallel lines support homogeneity of slopes; diverging lines suggest a Factor x Covariate interaction.',
+        'Read the KPI strip and factor/covariate labels, then the adjusted-means CI chart and adjusted difference, alongside the group regression chart. Use the assumption strip for slope tests and residual status; open Diagnostics for full residual plots. Technical details holds the formula and slope table.',
 
       // Logistic — workspace sub-views (each describes the actual chart/table
       // shown, not a generic "logistic regression" overview).

@@ -1111,22 +1111,24 @@
           'Lines are model fits with other terms held at their means (or reference categories), not raw group means unless noted.'
         ]
       ),
-      'regression-ancova-results': (function () {
+      'regression-ancova': (function () {
         const entry = guide(
-          'ANCOVA — results',
-          'Adjusted group differences on a continuous outcome while controlling for continuous covariates.',
+          'ANCOVA',
+          'Adjusted group comparison on a continuous outcome while controlling for covariates.',
           [
-            'The cards name the outcome, the factor, and each covariate. Model details holds the formula.',
-            'The summary leads with R² and the overall model p-value. The table is the test of each source.'
+            'Top strip: R², model p, RMSE, N, and labels for the outcome, factors, and covariates.',
+            'Left: adjusted means with 95% CI; below that, the adjusted mean difference when a factor has two levels.',
+            'Right: observed points and full-model regression lines (covariate and factor selectors; Expand for a larger chart).',
+            'Bottom: compact Type III table; assumption strip (slopes from interaction tests when estimated; residuals only after diagnostics run).'
           ],
           [
-            'Each effect is tested after adjusting for the other model terms.',
-            'Partial η² is the share of remaining variance that source adds. About .01 is small, .06 is medium, and .14 is large (Cohen 1988).',
-            'The model row is the overall regression test. Its F and p-value are the same numbers as the summary.'
+            'Adjusted means are fitted values at grand means of continuous predictors, not raw group averages.',
+            'Lines use the same fitted model as the table—including interaction terms when present.',
+            'Slope verdicts come from factor×covariate tests in the model, not from whether lines look parallel.'
           ],
           [
-            'Adjustment is not an experiment that equalises the covariate.',
-            'If the slopes are not parallel, the single adjusted difference is the wrong summary. Check Assumptions.'
+            'Adjustment does not randomise or equalise covariates.',
+            'Use Diagnostics for histogram, QQ, and residuals-versus-fitted plots; the ANCOVA page does not duplicate them.'
           ]
         );
         entry.sections.push({
@@ -1134,44 +1136,13 @@
           title: 'Technical note',
           collapsed: true,
           paragraphs: [
-            'A source sum of squares is the extra residual sum of squares when that source is removed and the other terms stay in the model (Type III). For one coefficient this matches its t test. For a factor it is the joint test of that factor’s contrasts.',
-            'The error row is the residual sum of squares. The model degrees of freedom count the slope parameters and leave out the intercept. The model F is the overall regression F.'
+            'Type III sums of squares: extra residual SS when that source is removed while other terms remain.',
+            'Homogeneity of slopes: significant factor×covariate interaction in the fitted model implies non-parallel slopes.',
+            'Partial η² ≈ .01 small, .06 medium, .14 large (Cohen 1988).'
           ]
         });
         return entry;
       })(),
-      'regression-ancova-assumptions': guide(
-        'ANCOVA — assumptions',
-        'Checks whether one adjusted comparison is fair: parallel slopes, and residuals that are not patterned.',
-        [
-          'Read the homogeneity-of-slopes verdict first. Then the residual histogram, QQ plot, and residuals versus fitted.',
-          'A failed slope check means the group difference depends on the covariate. The visualization shows that.'
-        ],
-        [
-          'Parallel slopes support one adjusted mean difference. Diverging slopes mean you should describe the difference at stated values of the covariate.',
-          'Residual checks are the same idea as in linear regression: shape, spread, and odd points.'
-        ],
-        [
-          'A passed slope test in a small sample is weak comfort.',
-          'These checks do not make the group difference causal.'
-        ]
-      ),
-      'regression-ancova-viz': guide(
-        'ANCOVA — visualization',
-        'Shows the adjusted means and the group lines against the covariate.',
-        [
-          'Read the adjusted means, the adjusted difference when there are two levels, and the lines chart.',
-          'Parallel lines support the ANCOVA summary. Diverging lines are a factor-by-covariate interaction.'
-        ],
-        [
-          'The dot and its interval are the fitted mean at the covariate value the page used, not the raw group mean.',
-          'The gap between lines can change along the covariate. Quote the gap at a stated value.'
-        ],
-        [
-          'A picture of parallel lines is not a substitute for the slope test when the sample is small.',
-          'The lines do not show individual cases unless the page draws them.'
-        ]
-      ),
       'regression-power': guide(
         'Power and sample size',
         'Plans how many observations the regression needs for an assumed R², or how much power the current N has.',

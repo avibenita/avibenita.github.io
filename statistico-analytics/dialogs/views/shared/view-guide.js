@@ -1140,22 +1140,35 @@
           'The coding changes the number. Do not compare the coefficient with a model that centred the variables differently.'
         ]
       ),
-      'regression-ancova-results': guide(
-        'ANCOVA — results',
-        'Compares group means after a covariate is held fixed.',
-        [
-          'Read the model formula and the Type III table. The significance judgment is in Interpret results.',
-          'The adjusted means and the slope picture are on the visualization view. The slope check is on Assumptions.'
-        ],
-        [
-          'A group row is the difference between levels after the covariate. It is not the raw mean difference.',
-          'The covariate row is the association of that covariate with the outcome, not the group effect.'
-        ],
-        [
-          'Adjustment is not an experiment that equalises the covariate.',
-          'If the slopes are not parallel, the single adjusted difference is the wrong summary. Check Assumptions.'
-        ]
-      ),
+      'regression-ancova-results': (function () {
+        const entry = guide(
+          'ANCOVA — results',
+          'Adjusted group differences on a continuous outcome while controlling for continuous covariates.',
+          [
+            'The cards name the outcome, the factor, and each covariate. Model details holds the formula.',
+            'The summary leads with R² and the overall model p-value. The table is the test of each source.'
+          ],
+          [
+            'Each effect is tested after adjusting for the other model terms.',
+            'Partial η² is the share of remaining variance that source adds. About .01 is small, .06 is medium, and .14 is large (Cohen 1988).',
+            'The model row is the overall regression test. Its F and p-value are the same numbers as the summary.'
+          ],
+          [
+            'Adjustment is not an experiment that equalises the covariate.',
+            'If the slopes are not parallel, the single adjusted difference is the wrong summary. Check Assumptions.'
+          ]
+        );
+        entry.sections.push({
+          id: 'technical',
+          title: 'Technical note',
+          collapsed: true,
+          paragraphs: [
+            'A source sum of squares is the extra residual sum of squares when that source is removed and the other terms stay in the model (Type III). For one coefficient this matches its t test. For a factor it is the joint test of that factor’s contrasts.',
+            'The error row is the residual sum of squares. The model degrees of freedom count the slope parameters and leave out the intercept. The model F is the overall regression F.'
+          ]
+        });
+        return entry;
+      })(),
       'regression-ancova-assumptions': guide(
         'ANCOVA — assumptions',
         'Checks whether one adjusted comparison is fair: parallel slopes, and residuals that are not patterned.',

@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260916contained" />
   <link id="statistico-contained-tabs-css" rel="stylesheet" href="../shared-contained-tabs.css?v=20261105tabflush" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../../shared/by-group-standard.js?v=20260929levels15"></script>
+  <script src="../../shared/by-group-standard.js?v=20261127finding"></script>
   <script src="../shared-header.js?v=20261123notab"></script>
   <script src="../../shared/regression-similarity.js?v=20260919pair0"></script>
   <script src="../../shared/regression-pred-labels.js?v=20260916pred2"></script>
@@ -255,22 +255,18 @@
     .metric strong { font-size:18px; color:var(--accent-1); }
     .consistency-strip {
       margin-bottom:12px;
-      padding:14px 16px;
+      padding:12px 14px;
       border:1px solid var(--border);
       border-radius:10px;
-      background:linear-gradient(135deg, color-mix(in srgb, var(--accent-1) 8%, var(--surface-2)) 0%, var(--surface-2) 100%);
+      background:var(--surface-2);
       display:grid;
-      grid-template-columns:minmax(160px, 1fr) repeat(3, minmax(100px, auto));
-      gap:12px 16px;
+      grid-template-columns:repeat(3, minmax(100px, 1fr));
+      gap:10px 16px;
       align-items:center;
     }
-    .consistency-head { grid-column:1 / -1; display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .consistency-head { grid-column:1 / -1; display:flex; align-items:baseline; gap:12px; }
     .consistency-head strong { color:var(--accent-1); font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
     .consistency-head strong i { margin-right:6px; }
-    .consistency-head span { color:var(--text-secondary); font-size:12px; }
-    .consistency-verdict { font-size:26px; font-weight:800; color:var(--accent-1); line-height:1.1; }
-    .consistency-verdict.consistency-mixed { color:#d6a84a; }
-    .consistency-verdict.consistency-moderate { color:#fbbf24; }
     .consistency-stat label { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-secondary); margin-bottom:3px; }
     .consistency-stat strong { font-size:15px; font-variant-numeric:tabular-nums; }
     .assumption-strip {
@@ -608,9 +604,7 @@
             <div id="consistencyStrip" class="consistency-strip" style="display:none;">
               <div class="consistency-head">
                 <strong><i class="fa-solid fa-scale-balanced"></i> Consistency across groups</strong>
-                <span id="consistencySubtitle">similar direction and magnitude · descriptive unless a formal test supports a group effect</span>
               </div>
-              <div class="consistency-verdict" id="consistencyVerdict">—</div>
               <div class="consistency-stat"><label>Opposite signs</label><strong id="consistencyReversals">—</strong></div>
               <div class="consistency-stat"><label>Estimates vary</label><strong id="consistencyVaries">—</strong></div>
               <div class="consistency-stat"><label>R² range</label><strong id="consistencyR2Range">—</strong></div>
@@ -983,8 +977,12 @@
         headline = BG.similarityHeadline((regSimProfile.homogeneityBand || {}).label, regSimProfile.homogeneity);
         conclusion = BG.similarityConclusion(comps);
       }
+      const r2Text = Number.isFinite(summary.r2Min) && Number.isFinite(summary.r2Max)
+        ? `${fmt(summary.r2Min, 3)}–${fmt(summary.r2Max, 3)}`
+        : 'not available';
       BG.mountResultFirst({
         moduleKey: 'regression',
+        showFinding: false,
         header: {
           variable: (modelSpec && modelSpec.y) || 'Regression',
           groupName: sourceHeaders[groupIndex],
@@ -999,7 +997,8 @@
           ? 'At least one coefficient changes sign across groups.'
           : 'No coefficient sign reversal was detected among reliable groups.',
         warningText: warning,
-        directionChanges: status.directionChanges
+        directionChanges: status.directionChanges,
+        evidence: `Opposite signs: ${summary.reversals}. Estimates that vary in magnitude: ${summary.varies}. R² range: ${r2Text}.`
       });
     }
 
@@ -1007,9 +1006,6 @@
       const strip = document.getElementById('consistencyStrip');
       if (!strip || !summary) return;
       strip.style.display = 'grid';
-      const verdict = document.getElementById('consistencyVerdict');
-      verdict.textContent = summary.consistency;
-      verdict.className = `consistency-verdict ${summary.consistencyClass || ''}`;
       document.getElementById('consistencyReversals').textContent = String(summary.reversals);
       document.getElementById('consistencyVaries').textContent = String(summary.varies);
       document.getElementById('consistencyR2Range').textContent =

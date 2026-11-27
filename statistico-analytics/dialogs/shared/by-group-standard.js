@@ -493,7 +493,7 @@
     hideLegacyChrome();
     applyHeaderMeta(model.headerEl || '#subtitle', model.header || {});
     var hasResult = !!(model.headline || (model.status && model.status.label) || model.conclusion);
-    mount(model.findingEl || '#byGroupFinding', hasResult ? findingHtml(model) : '');
+    mount(model.findingEl || '#byGroupFinding', (hasResult && model.showFinding !== false) ? findingHtml(model) : '');
     mount('#byGroupInterpret', '');
     if (model.publish === false) return;
     if (!hasResult) {
@@ -505,7 +505,8 @@
       status: model.status,
       directionChanges: model.directionChanges,
       differsText: model.differsText,
-      warningText: model.warningText
+      warningText: model.warningText,
+      evidence: model.evidence || ''
     });
   }
 
@@ -541,6 +542,7 @@
       ctx.directionChanges ? 'PROMINENT: a direction reversal was detected.' : 'No direction reversal among reliable groups.',
       ctx.differsText ? 'Group that differs most: ' + ctx.differsText : '',
       ctx.warningText ? 'Warnings: ' + ctx.warningText : '',
+      ctx.evidence ? 'Evidence: ' + ctx.evidence : '',
       'Use the exact status label. Prominently report any strong difference or direction reversal.'
     ];
     return lines.filter(Boolean).join('\n');

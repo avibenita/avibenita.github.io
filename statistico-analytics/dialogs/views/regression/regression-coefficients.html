@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261127adj" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261127ix2"></script>
+  <script src="../shared-header.js?v=20261127ix3"></script>
   <script src="../shared-workspace-tabs.js?v=20261123notab"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -7367,6 +7367,9 @@
           }
           refreshIxWorkspaceViews();
         }, 50);
+        setTimeout(() => {
+          if (typeof renderInteractionPlot === 'function') renderInteractionPlot();
+        }, 220);
       }
       syncModelScopeBanners();
       if (tabName === 'power') annotatePowerFullModel();
@@ -14911,6 +14914,63 @@ ${sectionsHtml}
       return Math.sqrt(mse * leverage);
     }
 
+    function _destroyIxPlotIn(container) {
+      if (typeof Highcharts === 'undefined' || !container) return;
+      (Highcharts.charts || []).forEach(function (c) {
+        if (c && c.renderTo === container) {
+          try { c.destroy(); } catch (_e) {}
+        }
+      });
+    }
+
+    function _bindIxPlotResize(container) {
+      if (!container || container._ixResizeBound || typeof ResizeObserver === 'undefined') return;
+      container._ixResizeBound = true;
+      const ro = new ResizeObserver(function () {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        if (w < 40 || h < 40) return;
+        (Highcharts.charts || []).forEach(function (c) {
+          if (c && c.renderTo === container) {
+            try { c.setSize(w, h, false); } catch (_e) {}
+          }
+        });
+      });
+      ro.observe(container);
+    }
+
+    function _ixDesignPredict(inputs) {
+      const results = window.globalRegressionResults || (window._interactionTabData && window._interactionTabData.results);
+      const columns = window._regActiveColumns;
+      if (!results || !Array.isArray(columns) || !columns.length || typeof StatisticoCaseTrace === 'undefined') return null;
+      const row = StatisticoCaseTrace.designRowFromInputs(inputs, columns);
+      if (!row || row.some(function (v) { return !Number.isFinite(v); })) return null;
+      const x = results.includeIntercept ? [1].concat(row) : row.slice();
+      if (x.length !== results.coefficients.length) return null;
+      let pred = 0;
+      for (let i = 0; i < x.length; i++) pred += x[i] * results.coefficients[i];
+      return Number.isFinite(pred) ? pred : null;
+    }
+
+    function _ixProfileInputsForLine(data, focalVar, modFactor, focalVal, modLevel) {
+      const { xnVars, xcVars, rows, headers } = data;
+      const inputs = {};
+      (xnVars || []).forEach(function (v) {
+        if (v === focalVar) {
+          inputs[v] = focalVal;
+          return;
+        }
+        const vals = rows.map(function (r) { return parseFloat(r[headers.indexOf(v)]); }).filter(function (x) { return !isNaN(x); });
+        inputs[v] = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0;
+      });
+      (xcVars || []).forEach(function (v) {
+        const cats = [...new Set(rows.map(function (r) { return r[headers.indexOf(v)]; }).filter(function (x) { return x != null && x !== ''; }))].sort();
+        inputs[v] = cats.length ? cats[0] : '';
+      });
+      if (modFactor != null && modLevel != null) inputs[modFactor] = modLevel;
+      return inputs;
+    }
+
     function _renderNumCatInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar) {
       const numVar = ix.var1;
       const catVar = ix.var2 || (ixi.v2Cat && ixi.v2Cat.name);
@@ -14931,16 +14991,8 @@ ${sectionsHtml}
         return;
       }
       const xPoints = Array.from({length: 40}, (_, i) => xMin + (xMax - xMin) * i / 39);
-      const termIdx = getIxSelectedTermIndex();
-      const intCoeffBase = results.coefficients.length - (window.globalInteractionColumnNames || []).length
-        + _interactionColumnOffset(window._interactionTabData?.interactionInfo, termIdx);
-
-      // Compute covariate means for other variables
-      const covMeans = {};
-      xnVars.forEach(v => {
-        const vals = rows.map(r => parseFloat(r[headers.indexOf(v)])).filter(x => !isNaN(x));
-        covMeans[v] = vals.reduce((a, b) => a + b, 0) / vals.length;
-      });
+      const tabData = window._interactionTabData;
+      const modFactor = catInfo.name || catVar;
 
       // Stats for SE approximation
       const n = numVals.length;
@@ -14956,30 +15008,20 @@ ${sectionsHtml}
       const series = [];
       catInfo.categories.forEach((cat, ci) => {
         const color = palette[ci % palette.length];
-        const lineData = xPoints.map(xv => {
-          const numCovVals = xnVars.map(v => v === numVar ? xv : covMeans[v]);
-          const catDummies = catInfo.categories.slice(1).map(c => cat === c ? 1 : 0);
-          let pred = results.includeIntercept ? results.coefficients[0] : 0;
-          let coeffOff = results.includeIntercept ? 1 : 0;
-          xnVars.forEach((v, i) => { pred += numCovVals[i] * results.coefficients[coeffOff + i]; });
-          coeffOff += xnVars.length;
-          const varNamesMain = (window.regressionVariableNames || []).slice(0, (window.regressionVariableNames || []).length - (window.globalInteractionColumnNames || []).length);
-          catInfo.dummyNames.forEach((dn, di) => {
-            const dIdx = varNamesMain.indexOf(dn);
-            if (dIdx >= 0) pred += catDummies[di] * results.coefficients[results.includeIntercept ? dIdx + 1 : dIdx];
-          });
-          catDummies.forEach((d, di) => {
-            const ci = intCoeffBase + di;
-            if (d && ci < results.coefficients.length) pred += xv * d * results.coefficients[ci];
-          });
+        const lineData = xPoints.map(function (xv) {
+          if (!tabData) return null;
+          const inputs = _ixProfileInputsForLine(tabData, numVar, modFactor, xv, cat);
+          const pred = _ixDesignPredict(inputs);
+          if (pred == null) return null;
           return [parseFloat(xv.toFixed(3)), parseFloat(pred.toFixed(4))];
-        });
+        }).filter(Boolean);
 
         // Friendly label
         const label = ci === 0
           ? `${cat} (ref)`
           : cat;
 
+        if (!lineData.length) return;
         series.push({ name: label, type: 'line', data: lineData, color, zIndex: 2,
           marker: { enabled: false }, lineWidth: 2 });
 
@@ -15003,8 +15045,15 @@ ${sectionsHtml}
         }
       });
 
+      if (!series.some(function (s) { return s.type === 'line' && s.data && s.data.length; })) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Could not compute fitted lines for this interaction. Check that all model terms are active.</div>';
+        return;
+      }
+
+      _destroyIxPlotIn(container);
+      const plotH = window._ixPlotCompact ? 260 : Math.max(320, container.clientHeight || 400);
       Highcharts.chart(container, {
-        chart: { backgroundColor: 'transparent', animation: false, height: window._ixPlotCompact ? 260 : null },
+        chart: { backgroundColor: 'transparent', animation: false, height: plotH },
         title: window._ixPlotCompact ? { text: null } : { text: `${numVar} \u00D7 ${catVar}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
         subtitle: window._ixPlotCompact ? { text: null } : {
           text: 'Predicted ' + yVar + ' (other covariates at mean)' + (showCI ? ' · shaded = 95% CI' : ''),
@@ -15020,6 +15069,7 @@ ${sectionsHtml}
         series,
         credits: { enabled: false }
       });
+      _bindIxPlotResize(container);
     }
 
     function _renderNumNumInteractionPlot(container, ix, ixi, results, xnVars, xcVars, rows, headers, yVar) {
@@ -15038,11 +15088,8 @@ ${sectionsHtml}
       const xMin = Math.min(...v1Vals), xMax = Math.max(...v1Vals);
       const xPoints = Array.from({length: 40}, (_, i) => xMin + (xMax - xMin) * i / 39);
 
-      const covMeans = {};
-      xnVars.forEach(v => {
-        const vals = rows.map(r => parseFloat(r[headers.indexOf(v)])).filter(x => !isNaN(x));
-        covMeans[v] = vals.reduce((a, b) => a + b, 0) / vals.length;
-      });
+      const tabData = window._interactionTabData;
+      const modVar = ix.var2;
 
       // Stats for SE approximation on v1 axis
       const n = v1Vals.length;
@@ -15051,28 +15098,21 @@ ${sectionsHtml}
       const mse = results.MSE || (results.SSR / results.df) || 1;
       const showCI = !!window._showCIBands;
 
-      const nIntCols = (window.globalInteractionColumnNames || []).length;
-      const intCoeffIdx = results.coefficients.length - nIntCols;
-
       const palette = ['#78c8ff','#fbbf24','#fb7185'];
       const series = [];
 
       v2Levels.forEach((v2Val, li) => {
         const color = palette[li];
-        const lineData = xPoints.map(xv => {
-          let pred = results.includeIntercept ? results.coefficients[0] : 0;
-          let off = results.includeIntercept ? 1 : 0;
-          xnVars.forEach((v, i) => {
-            const val = v === ix.var1 ? xv : v === ix.var2 ? v2Val : covMeans[v];
-            pred += val * results.coefficients[off + i];
-          });
-          const ixColNames = window.globalInteractionColumnNames || [];
-          const colName = `${ix.var1} \u00D7 ${ix.var2}`;
-          const colIdx = ixColNames.indexOf(colName);
-          if (colIdx >= 0) pred += xv * v2Val * results.coefficients[intCoeffIdx + colIdx];
+        const lineData = xPoints.map(function (xv) {
+          if (!tabData) return null;
+          const inputs = _ixProfileInputsForLine(tabData, ix.var1, null, xv, null);
+          inputs[modVar] = v2Val;
+          const pred = _ixDesignPredict(inputs);
+          if (pred == null) return null;
           return [parseFloat(xv.toFixed(3)), parseFloat(pred.toFixed(4))];
-        });
+        }).filter(Boolean);
 
+        if (!lineData.length) return;
         series.push({ name: v2Labels[li], type: 'line', data: lineData, color, zIndex: 2,
           marker: { enabled: false }, lineWidth: 2 });
 
@@ -15096,8 +15136,15 @@ ${sectionsHtml}
         }
       });
 
+      if (!series.some(function (s) { return s.type === 'line' && s.data && s.data.length; })) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Could not compute fitted lines for this interaction.</div>';
+        return;
+      }
+
+      _destroyIxPlotIn(container);
+      const plotH = window._ixPlotCompact ? 260 : Math.max(320, container.clientHeight || 400);
       Highcharts.chart(container, {
-        chart: { backgroundColor: 'transparent', animation: false, height: window._ixPlotCompact ? 260 : null },
+        chart: { backgroundColor: 'transparent', animation: false, height: plotH },
         title: window._ixPlotCompact ? { text: null } : { text: `${ix.var1} \u00D7 ${ix.var2}`, style: { color: 'var(--text-primary)', fontSize: '13px' } },
         subtitle: window._ixPlotCompact ? { text: null } : {
           text: 'Predicted ' + yVar + ' at three levels of ' + ix.var2 + (showCI ? ' · shaded = 95% CI' : ''),
@@ -15113,6 +15160,7 @@ ${sectionsHtml}
         series,
         credits: { enabled: false }
       });
+      _bindIxPlotResize(container);
     }
 
     function initializeANCOVA() {

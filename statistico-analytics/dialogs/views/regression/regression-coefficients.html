@@ -4473,12 +4473,18 @@
       align-items: start;
       margin-bottom: 12px;
     }
-    .pred-scenario-left {
+    .pred-scenario-left,
+    .pred-scenario-right {
       display: flex;
       flex-direction: column;
       gap: 12px;
       min-width: 0;
       min-height: 0;
+    }
+    .pred-scenario-right > .pred-profile,
+    .pred-scenario-right > .pred-response-panel {
+      width: 100%;
+      box-sizing: border-box;
     }
     @media (max-width: 1100px) {
       .pred-scenario-grid { grid-template-columns: 1fr; }
@@ -5007,9 +5013,7 @@
     .predictions-container .scenarios-tip span i.fa-play { color: var(--text-secondary); }
 
     .pred-profile[hidden] {
-      display: flex !important;
-      visibility: hidden;
-      pointer-events: none;
+      display: none !important;
     }
     .pred-profile.chart-panel {
       padding: 0;
@@ -5967,54 +5971,9 @@
                     <!-- Dynamic inputs will be generated here -->
                   </div>
                 </div>
-
-                <div class="prediction-output pred-response-panel">
-                  <div class="pred-response-kicker">
-                    <i class="fa-solid fa-reply"></i> Predicted response
-                  </div>
-                  <div class="output-card main-prediction">
-                    <div class="output-label">Predicted <span id="predictedVariableName">Value</span></div>
-                    <div class="pred-focus-caption" id="predFocusCaption" hidden></div>
-                    <div class="output-value" id="predictedValue">-</div>
-                    <div class="output-sublabel">Point Estimate</div>
-                  </div>
-
-                  <div class="intervals-container">
-                    <div class="output-card interval-card">
-                      <div class="interval-label">
-                        <i class="fa-solid fa-chart-area"></i> 95% Confidence Interval
-                        <span class="tooltip-icon">
-                          ?
-                          <span class="tooltip-text">
-                            <strong>Confidence Interval:</strong> Range where the <em>average</em> predicted value for this combination of inputs is likely to fall. Narrower interval = more confident about the mean prediction.
-                          </span>
-                        </span>
-                      </div>
-                      <div class="interval-range" id="confidenceInterval">-</div>
-                      <div class="interval-desc">Mean prediction uncertainty</div>
-                    </div>
-
-                    <div class="output-card interval-card">
-                      <div class="interval-label">
-                        <i class="fa-solid fa-chart-scatter"></i> 95% Prediction Interval
-                        <span class="tooltip-icon">
-                          ?
-                          <span class="tooltip-text">
-                            <strong>Prediction Interval:</strong> Range where a <em>single future observation</em> is likely to fall. Wider than confidence interval because it accounts for both uncertainty in the mean AND individual variation.
-                          </span>
-                        </span>
-                      </div>
-                      <div class="interval-range" id="predictionInterval">-</div>
-                      <div class="interval-desc">Individual prediction range</div>
-                    </div>
-                  </div>
-
-                  <div class="prediction-viz">
-                    <canvas id="predictionChart" width="400" height="90"></canvas>
-                  </div>
-                </div>
               </div>
 
+              <div class="pred-scenario-right">
               <div class="chart-panel pred-profile" id="predProfilePanel" hidden>
                 <div class="chart-panel-h pred-profile-head">
                   <div class="pred-profile-copy">
@@ -6045,6 +6004,53 @@
                     </table>
                   </div>
                 </div>
+              </div>
+
+              <div class="prediction-output pred-response-panel">
+                <div class="pred-response-kicker">
+                  <i class="fa-solid fa-reply"></i> Predicted response
+                </div>
+                <div class="output-card main-prediction">
+                  <div class="output-label">Predicted <span id="predictedVariableName">Value</span></div>
+                  <div class="pred-focus-caption" id="predFocusCaption" hidden></div>
+                  <div class="output-value" id="predictedValue">-</div>
+                  <div class="output-sublabel">Point Estimate</div>
+                </div>
+
+                <div class="intervals-container">
+                  <div class="output-card interval-card">
+                    <div class="interval-label">
+                      <i class="fa-solid fa-chart-area"></i> 95% Confidence Interval
+                      <span class="tooltip-icon">
+                        ?
+                        <span class="tooltip-text">
+                          <strong>Confidence Interval:</strong> Range where the <em>average</em> predicted value for this combination of inputs is likely to fall. Narrower interval = more confident about the mean prediction.
+                        </span>
+                      </span>
+                    </div>
+                    <div class="interval-range" id="confidenceInterval">-</div>
+                    <div class="interval-desc">Mean prediction uncertainty</div>
+                  </div>
+
+                  <div class="output-card interval-card">
+                    <div class="interval-label">
+                      <i class="fa-solid fa-chart-scatter"></i> 95% Prediction Interval
+                      <span class="tooltip-icon">
+                        ?
+                        <span class="tooltip-text">
+                          <strong>Prediction Interval:</strong> Range where a <em>single future observation</em> is likely to fall. Wider than confidence interval because it accounts for both uncertainty in the mean AND individual variation.
+                        </span>
+                      </span>
+                    </div>
+                    <div class="interval-range" id="predictionInterval">-</div>
+                    <div class="interval-desc">Individual prediction range</div>
+                  </div>
+                </div>
+
+                <div class="prediction-viz">
+                  <canvas id="predictionChart" width="400" height="90"></canvas>
+                </div>
+              </div>
               </div>
             </div>
 
@@ -13448,19 +13454,42 @@ ${sectionsHtml}
         return { mean: mean, ci: ci, pi: pi };
       }
 
-      function marked(data) {
-        if (!data.length || !Number.isFinite(curX)) return data;
-        let best = 0;
-        let bestD = Infinity;
-        data.forEach((p, i) => {
-          const d = Math.abs(p[0] - curX);
-          if (d < bestD) { bestD = d; best = i; }
-        });
-        return data.map((p, i) => ({
-          x: p[0],
-          y: p[1],
-          marker: { enabled: i === best, radius: 5, lineColor: '#fff', lineWidth: 1.5 }
-        }));
+      function currentPointSeries(x, y) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        const light = document.documentElement.getAttribute('data-theme') === 'light';
+        return {
+          name: 'Current scenario',
+          type: 'scatter',
+          data: [[x, y]],
+          color: '#fb923c',
+          zIndex: 6,
+          showInLegend: false,
+          enableMouseTracking: false,
+          marker: {
+            symbol: 'triangle',
+            radius: 12,
+            fillColor: '#fb923c',
+            lineColor: '#ffffff',
+            lineWidth: 2.5,
+            states: { hover: { enabled: true, radius: 12, lineWidth: 2.5 } }
+          },
+          dataLabels: {
+            enabled: true,
+            formatter: function () { return this.y.toFixed(2); },
+            align: 'center',
+            verticalAlign: 'bottom',
+            y: -16,
+            crop: false,
+            overflow: 'allow',
+            allowOverlap: true,
+            style: {
+              color: light ? '#c2410c' : '#ffedd5',
+              fontSize: '14px',
+              fontWeight: '700',
+              textOutline: light ? 'none' : '3px rgba(15,23,42,0.92)'
+            }
+          }
+        };
       }
 
       let mean = [];
@@ -13486,8 +13515,9 @@ ${sectionsHtml}
             });
           }
           series.push({
-            name: String(level), type: 'line', data: marked(curve.mean), color: color,
+            name: String(level), type: 'line', data: curve.mean, color: color,
             dashStyle: predLevelDash(factor, level), lineWidth: isFocus ? 2.6 : 1.8,
+            marker: { enabled: false },
             zIndex: 3, predLevel: level
           });
           mean = mean.concat(curve.mean);
@@ -13504,14 +13534,15 @@ ${sectionsHtml}
         series = [
           { name: '95% individual PI', type: 'arearange', data: pi, color: 'rgba(147,197,253,.55)', fillOpacity: 0.22, lineWidth: 0, marker: { enabled: false }, zIndex: 1 },
           { name: '95% mean CI', type: 'arearange', data: ci, color: 'rgba(251,191,36,.7)', fillOpacity: 0.28, lineWidth: 0, marker: { enabled: false }, zIndex: 2 },
-          { name: 'Predicted mean', type: 'line', data: mean, color: '#2dd4bf', lineWidth: 2, marker: { enabled: false }, zIndex: 3 },
-          { name: 'Current scenario', type: 'scatter', data: (curP && Number.isFinite(curP.value) && Number.isFinite(curX)) ? [[curX, curP.value]] : [], color: '#fb923c', marker: { radius: 6, lineColor: '#fff', lineWidth: 1.5 }, zIndex: 4 }
+          { name: 'Predicted mean', type: 'line', data: mean, color: '#2dd4bf', lineWidth: 2, marker: { enabled: false }, zIndex: 3 }
         ];
       }
       if (!factor && (!curP || !Number.isFinite(curP.value) || !mean.length)) {
         panel.hidden = true;
         return;
       }
+      const pointSeries = currentPointSeries(curX, curP && curP.value);
+      if (pointSeries) series.push(pointSeries);
 
       const heldBits = [];
       (predictionData.categoricalVars || []).forEach(v => {
@@ -13611,7 +13642,7 @@ ${sectionsHtml}
 
       const fmtNum = (n) => (typeof n === 'number' && Number.isFinite(n) ? n.toFixed(2) : '–');
       window._predProfileChart = Highcharts.chart('predProfileChart', {
-        chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [8, 10, 6, 6], height: PRED_PROFILE_CHART_H },
+        chart: { backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, spacing: [28, 12, 8, 8], height: PRED_PROFILE_CHART_H },
         title: { text: null },
         xAxis: Object.assign({
           title: { text: focal, style: { color: th.textColor } },

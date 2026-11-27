@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261127adj" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261127anc4"></script>
+  <script src="../shared-header.js?v=20261127anc5"></script>
   <script src="../shared-workspace-tabs.js?v=20261123notab"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -10247,10 +10247,6 @@ ${sectionsHtml}
           : 'Add interaction terms in the model to enable this section';
       }
       if (interactionsTabButton) interactionsTabButton.style.display = 'none'; // always hide legacy btn
-      if (hasInteractions) {
-        renderInteractionsTab(results, varNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVarName, window.regressionRows || [], window.regressionHeaders || []);
-        // Stay on current tab (do not auto-navigate to ix-summary)
-      }
       requestAnimationFrame(updateRegSidebarScrollHint);
       
       // Populate Model Fit panel. Parentheses are the full model when a term was dropped.
@@ -10336,6 +10332,14 @@ ${sectionsHtml}
       
       // Populate coefficients table, including terms the user has dropped
       renderCoefficientIncludeTable(results, allVars);
+
+      if (hasInteractions) {
+        try {
+          renderInteractionsTab(results, varNames, xnVars, xcVars, interactions, interactionColumnNames, interactionInfo, yVarName, window.regressionRows || [], window.regressionHeaders || []);
+        } catch (ixErr) {
+          console.error('Interactions tab render failed (overview still shown):', ixErr);
+        }
+      }
       
       // Generate and display regression equation inline
       const equationTerms = results.coefficients.map((coef, i) => ({
@@ -15224,6 +15228,7 @@ ${sectionsHtml}
       renderANCOVAResidualStatus();
       refreshANCOVAPlot();
     }
+    window.refreshANCOVAView = renderANCOVAView;
 
     /**
      * Build a one-sentence "Key Findings" summary for the ANCOVA table.
@@ -15506,7 +15511,6 @@ ${sectionsHtml}
         </div>
       `;
       card.innerHTML = inner;
-      const compact = document.getElementById('ancovaMeanDiffCompact');
       if (compact) {
         compact.hidden = false;
         compact.innerHTML = '<strong>Adjusted difference</strong><br>' + b.level + ' \u2212 ' + a.level

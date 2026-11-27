@@ -2361,7 +2361,7 @@ const StatisticoHeader = {
               resultItem('results-overview', { navTab: 'model-results', id: 'modelResultsNavBtn', icon: 'fa-square-poll-vertical', label: 'Model Results', description: 'Overview & technical specification', active: true }),
               resultItem('ix-summary', { navTab: 'interactions', id: 'interactionsNavBtn', icon: 'fa-arrows-split-up-and-left', label: 'Interactions', description: 'Moderation, plots & tests' }),
               resultItem('pred-overview', { navTab: 'predictions', icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' }),
-              resultItem('viz-partial', { navTab: 'visualization', icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & unique contribution' }),
+              resultItem('viz-partial', { navTab: 'visualization', icon: 'fa-chart-line', label: 'Visualization', description: 'Predictor effects & adjusted relationships' }),
               resultItem('diag-overview', { navTab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' }),
               resultItem('power', { navTab: 'power', id: 'regPowerNavBtn', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' })
             ]
@@ -9667,9 +9667,9 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
     script.id = 'statistico-view-guide-js';
     const headerScript = document.querySelector('script[src*="shared-header.js"]');
     const fromHeader = headerScript && headerScript.src
-      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261124box')
+      ? headerScript.src.replace(/shared-header\.js(\?[^#]*)?/, 'shared/view-guide.js?v=20261127adj')
       : '';
-    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261124box');
+    script.src = fromHeader || this.resolveDialogUrl('shared/view-guide.js?v=20261127adj');
     const release = () => {
       const waiters = this._viewGuideWaiters || [];
       this._viewGuideWaiters = null;
@@ -10068,7 +10068,7 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'regression-pred-overview':    'Predictions — Overview',
       'regression-pred-scenario':    'Predictions — Scenario Engine',
       'regression-viz-partial':      'Visualization — Predictor Effects',
-      'regression-viz-unique':       'Visualization — Unique Contribution',
+      'regression-viz-unique':       'Visualization — Adjusted Relationships',
       'ps-scatters': 'Predictor Scatters',
       'process-settings-ps-overview': 'Process Results — Overview',
       'process-settings-ps-technical': 'Process Results — Technical',
@@ -10207,7 +10207,7 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'regression-viz-partial':
         'Read the selected-predictor strip (β, standardised β, SE, t, p, 95% CI), the coefficient table (click a row to switch predictors), and the partial-effect chart (observed data, adjusted prediction line, 95% confidence band). Global fit metrics (R², RMSE) live on Predictions → Overview — interpret the effect of the chosen predictor here.',
       'regression-viz-unique':
-        'Each small chart is a partial regression (added-variable) plot: the x-axis shows the predictor after removing the linear influence of all other predictors (e(x | others)), and the y-axis shows the outcome with the same adjustment (e(y | others)). The slope is exactly the multiple-regression coefficient for that predictor. Read whether the line is clearly tilted (unique contribution), whether it is flat (no effect after controlling), and whether points hug the line tightly or scatter widely (how much remains unexplained).',
+        'Each panel is one predictor. The line under the name is B, SE, and p. The chart is the adjusted relationship: both axes are what remains after the other predictors, and the slope equals that predictor’s coefficient. It does not show a unique percentage of variance. How to read the axes is in the view guide.',
       'process-settings-ps-overview':
         'Read the analyzed n, R², adjusted R², and the overall F-test. Predictor contribution is the drop in full-model R², in percentage points, when that predictor is removed from the same analyzed rows. The coefficient table and fitted equation use this fit. The recipe, specifications, and Open Prediction Profiler sit above the results. Significance, fit strength, and sample-size judgments are in the computed readings, not printed on the view.',
       'process-settings-ps-technical':
@@ -10366,7 +10366,7 @@ ${rules ? 'GROUNDED RULES:\n' + rules : ''}`;
       'regression-viz-partial':
         'This is a partial-effect plot for one selected predictor: observed data, an adjusted prediction line (others at mean), and a 95% confidence band. The strip above shows that predictor\'s β, SE, t, p, and CI. Describe the slope, band width, and scatter — global R² / RMSE belong on Overview.',
       'regression-viz-unique':
-        'Axes are residualised: e(x | others) on x and e(y | others) on y. The slope of the fitted line equals the predictor\'s multiple-regression coefficient. Describe slopes and scatter, not coefficients / SE / p-values.',
+        'Each chart is an adjusted relationship. The line above it is B, SE, and p. Axes are residualised: e(x | others) on x and e(y | others) on y, and the slope equals that predictor’s coefficient. Describe the slope, the scatter, and that compact line. Do not call the picture a unique percentage of variance.',
       'capability-setup':
         'This is the input form. The user chooses one numeric measurement and enters LSL, USL, and an optional target. Do not invent Pp, Ppk, yield, or a planner result. Say what still has to be set before Run analysis.',
       'capability-results':

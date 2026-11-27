@@ -1009,27 +1009,41 @@
           'Scatter around the line is leftover variation. Global R² and RMSE live on Predictions, not here.'
         ],
         [
-          'The slope is an adjusted association. It is not a unique percentage of variance. Unique contribution is the other visualization.',
+          'The slope is an adjusted association. It is not a unique percentage of variance. Adjusted Relationships is the other visualization.',
           'A categorical predictor is a contrast against its reference level, not a one-unit slope on a continuous scale.'
         ]
       ),
-      'regression-viz-unique': guide(
-        'Unique contribution',
-        'Shows the adjusted relationship as an added-variable plot: both axes are what remains after the other predictors.',
-        [
-          'Each small chart is one predictor. The x-axis is that predictor after the others. The y-axis is the outcome after the others.',
-          'Read the sentence under the title for the adjusted association and its p-value. Hover a point for where that case sits relative to the line.'
-        ],
-        [
-          'The slope of the line equals that predictor’s coefficient in the full model. The annotation is the slope and its standard error.',
-          'A point to the right is higher on the predictor than the other predictors expected. A point above the line is higher on the outcome than this adjusted line expected.',
-          'Negative axis values are differences from what was expected. They are not negative measurements.'
-        ],
-        [
-          'This view does not display the percentage of variance uniquely explained by the predictor.',
-          'It illustrates the adjusted relationship. It is not a test that the predictor causes the outcome.'
-        ]
-      ),
+      'regression-viz-unique': (function () {
+        const entry = guide(
+          'Adjusted relationships',
+          'Each chart shows the relationship between a predictor and the outcome after accounting for the other predictors. These plots show adjusted relationships. They do not show each predictor’s unique percentage of explained variance.',
+          [
+            'Each panel is one numeric predictor. Expand opens that chart on its own.',
+            'The line under the name is that predictor’s coefficient (B), its standard error, and its p-value.'
+          ],
+          [
+            'Each dot is one observation. Both axes are differences remaining after the other predictors.',
+            'Right of zero: that predictor is higher than expected from the other predictors. Above zero: the outcome is higher than expected from the other predictors.',
+            'Dots closer to the line follow this relationship more closely.',
+            'Negative axis values are differences from expected values. They are not negative predictor values or a negative outcome.',
+            'The slope of the line is that predictor’s coefficient in the full model.'
+          ],
+          [
+            'The picture is an adjusted association, not a cause.',
+            'It does not display the percentage of variance uniquely explained.'
+          ]
+        );
+        entry.sections.push({
+          id: 'technical',
+          title: 'Technical explanation',
+          collapsed: true,
+          paragraphs: [
+            'This is an added-variable plot. The horizontal axis is the residual of the predictor after the other predictors, e(predictor | others). The vertical axis is the residual of the outcome, e(outcome | others).',
+            'The fitted slope equals that predictor’s coefficient in the full regression. The chart illustrates that adjusted relationship. It does not itself display the percentage of variance uniquely explained by the predictor.'
+          ]
+        });
+        return entry;
+      })(),
       'regression-diag-overview': guide(
         'Diagnostics — overview',
         'Gives the assumption verdict before the residual plots.',
@@ -2743,6 +2757,12 @@
           blocks.push('<ul>' + section.items.map(function (item) {
             return '<li>' + escapeHtml(item) + '</li>';
           }).join('') + '</ul>');
+        }
+        if (section.collapsed) {
+          return '<details class="vg-section vg-fold" data-guide-section="' + escapeHtml(section.id) + '">'
+            + '<summary>' + escapeHtml(section.title) + '</summary>'
+            + '<div class="vg-fold-body">' + blocks.join('') + '</div>'
+            + '</details>';
         }
         return '<section class="vg-section" data-guide-section="' + escapeHtml(section.id) + '">'
           + '<h3>' + escapeHtml(section.title) + '</h3>'

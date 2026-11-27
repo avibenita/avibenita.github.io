@@ -298,6 +298,7 @@
           status: 'unavailable',
           id: group.id,
           name: group.name,
+          kind: group.kind,
           order: group.order,
           reason: 'The reduced fit did not produce a finite R².'
         };
@@ -310,6 +311,7 @@
           status: 'unavailable',
           id: group.id,
           name: group.name,
+          kind: group.kind,
           order: group.order,
           reason: 'The reduced fit did not produce a finite R².'
         };
@@ -320,6 +322,7 @@
           status: 'unavailable',
           id: group.id,
           name: group.name,
+          kind: group.kind,
           order: group.order,
           reason: 'The reduced fit is not a valid comparison for this predictor.'
         };
@@ -329,6 +332,7 @@
         status: 'ready',
         id: group.id,
         name: group.name,
+        kind: group.kind,
         order: group.order,
         drop: drop,
         reducedR2: plan.fullR2 - drop,
@@ -342,6 +346,7 @@
         status: 'unavailable',
         id: group.id,
         name: group.name,
+        kind: group.kind,
         order: group.order,
         reason: 'The reduced fit could not be computed.'
       };

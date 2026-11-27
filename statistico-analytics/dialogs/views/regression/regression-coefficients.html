@@ -28,7 +28,7 @@
   <!-- Regression computation library -->
   <script src="../../../src/shared/js/core/regression-compute.js"></script>
   <script src="../../shared/regression-case-trace.js?v=20261109multi"></script>
-  <script src="../../shared/regression-predictor-contribution.js?v=20261110contrib"></script>
+  <script src="../../shared/regression-predictor-contribution.js?v=20261127cat"></script>
   <script src="../../shared/regression-effect-plot.js?v=20261105factor"></script>
   
   <!-- Saved analyses manager -->
@@ -3822,13 +3822,39 @@
     }
     .regression-table td:first-child .var-intercept,
     .regression-table td:first-child .var-numeric,
-    .regression-table td:first-child .var-categorical,
     .regression-table .var-intercept,
-    .regression-table .var-numeric,
-    .regression-table .var-categorical {
+    .regression-table .var-numeric {
       color: var(--text-primary) !important;
       font-weight: 600 !important;
       text-shadow: none !important;
+    }
+    .regression-table .var-categorical {
+      color: #f472b6 !important;
+      font-weight: 700 !important;
+    }
+    .coef-kind-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 0 5px;
+      border: 1px solid rgba(244, 114, 182, 0.75);
+      border-radius: 999px;
+      background: rgba(244, 114, 182, 0.16);
+      color: #f9a8d4;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.5;
+      text-transform: uppercase;
+      vertical-align: 1px;
+    }
+    html[data-theme="light"] .regression-table .var-categorical { color: #be185d !important; }
+    html[data-theme="light"] .coef-kind-badge {
+      border-color: rgba(190, 24, 93, 0.45);
+      background: rgba(244, 114, 182, 0.16);
+      color: #9d174d;
+    }
+    .regression-table tbody tr.coef-row-categorical td {
+      background: rgba(244, 114, 182, 0.08);
     }
     .regression-table tbody tr:hover {
       background-color: rgba(148,163,184,.05);
@@ -4060,9 +4086,39 @@
     .pred-contrib-name,
     .pred-contrib-value { min-width: 0; }
     .pred-contrib-name {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+    }
+    .pred-contrib-name-text {
+      min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .pred-contrib-kind {
+      flex: 0 0 auto;
+      padding: 0 5px;
+      border: 1px solid rgba(244, 114, 182, 0.75);
+      border-radius: 999px;
+      background: rgba(244, 114, 182, 0.16);
+      color: #f9a8d4;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      line-height: 1.5;
+      text-transform: uppercase;
+    }
+    .pred-contrib-row.is-categorical .pred-contrib-name-text { color: #f9a8d4; }
+    .pred-contrib-row.is-categorical .pred-contrib-fill {
+      background: linear-gradient(90deg, #be185d, #f472b6);
+    }
+    html[data-theme="light"] .pred-contrib-kind,
+    html[data-theme="light"] .pred-contrib-row.is-categorical .pred-contrib-name-text { color: #9d174d; }
+    html[data-theme="light"] .pred-contrib-kind {
+      border-color: rgba(190, 24, 93, 0.45);
+      background: rgba(244, 114, 182, 0.16);
     }
     .pred-contrib-selected-tag {
       display: inline-block;
@@ -9385,12 +9441,13 @@ ${sectionsHtml}
           : (interactive ? activeCoefficientIndex(term, results, design, excluded) : termIndex);
         const row = document.createElement('tr');
         row.setAttribute('data-term-key', term.key);
-        if (dropped) row.className = 'coef-row-excluded';
+        if (dropped) row.classList.add('coef-row-excluded');
 
         let varClass = 'var-numeric';
         if (term.kind === 'intercept') varClass = 'var-intercept';
         else if (term.kind === 'dummy') varClass = 'var-categorical';
         else if (String(term.name).indexOf('_') !== -1 && term.kind !== 'interaction') varClass = 'var-categorical';
+        if (varClass === 'var-categorical') row.classList.add('coef-row-categorical');
 
         if (!dropped) {
           if (term.kind === 'intercept') row.style.background = 'rgba(251, 191, 36, 0.08)';
@@ -9417,7 +9474,8 @@ ${sectionsHtml}
         const nameTd = document.createElement('td');
         nameTd.className = 'coef-var-cell';
         const droppedTag = dropped ? '<span class="coef-dropped-tag">Dropped</span>' : '';
-        nameTd.innerHTML = `<strong class="${varClass}">${escapeHtmlText(term.name)}</strong>${droppedTag}`;
+        const kindBadge = varClass === 'var-categorical' ? '<span class="coef-kind-badge">Category</span>' : '';
+        nameTd.innerHTML = `<strong class="${varClass}">${escapeHtmlText(term.name)}</strong>${kindBadge}${droppedTag}`;
         row.appendChild(nameTd);
 
         const hasStat = statIndex >= 0 && Number.isFinite(results.coefficients[statIndex]);
@@ -9909,11 +9967,13 @@ ${sectionsHtml}
           const points = formatContributionPoints(bar.drop);
           const width = axisMax > 0 ? Math.max(0, Math.min(100, 100 * (100 * bar.drop) / axisMax)) : 0;
           const valueInside = width >= 22;
-          html += '<button type="button" class="pred-contrib-row' + (isSelected ? ' is-selected' : '') + '"'
+          const categorical = bar.kind === 'factor';
+          html += '<button type="button" class="pred-contrib-row' + (categorical ? ' is-categorical' : '') + (isSelected ? ' is-selected' : '') + '"'
             + ' data-pred-contrib-id="' + escapeHtmlText(bar.id) + '"'
             + ' aria-pressed="' + (isSelected ? 'true' : 'false') + '"'
-            + ' title="' + escapeHtmlText(bar.name + ': ' + points + ' percentage points') + '">'
-            + '<span class="pred-contrib-name">' + escapeHtmlText(bar.name)
+            + ' title="' + escapeHtmlText(bar.name + (categorical ? ' (category)' : '') + ': ' + points + ' percentage points') + '">'
+            + '<span class="pred-contrib-name"><span class="pred-contrib-name-text">' + escapeHtmlText(bar.name) + '</span>'
+            + (categorical ? '<span class="pred-contrib-kind">Category</span>' : '')
             + (isSelected ? '<span class="pred-contrib-selected-tag">Selected</span>' : '')
             + '</span>'
             + '<span class="pred-contrib-track">'

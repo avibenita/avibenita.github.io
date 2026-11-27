@@ -3901,11 +3901,39 @@
       text-transform: uppercase;
       vertical-align: 1px;
     }
+    .coef-kind-badge--intercept {
+      border-color: rgba(251, 191, 36, 0.7);
+      background: rgba(251, 191, 36, 0.14);
+      color: #fcd34d;
+    }
+    .coef-kind-badge--interaction {
+      border-color: rgba(167, 139, 250, 0.75);
+      background: rgba(167, 139, 250, 0.16);
+      color: #c4b5fd;
+    }
+    .regression-table .var-interaction {
+      color: #a78bfa !important;
+      font-weight: 700 !important;
+    }
+    .regression-table tbody tr.coef-row-interaction td {
+      background: rgba(167, 139, 250, 0.08);
+    }
     html[data-theme="light"] .regression-table .var-categorical { color: #be185d !important; }
+    html[data-theme="light"] .regression-table .var-interaction { color: #6d28d9 !important; }
     html[data-theme="light"] .coef-kind-badge {
       border-color: rgba(190, 24, 93, 0.45);
       background: rgba(244, 114, 182, 0.16);
       color: #9d174d;
+    }
+    html[data-theme="light"] .coef-kind-badge--intercept {
+      border-color: rgba(180, 83, 9, 0.45);
+      background: rgba(251, 191, 36, 0.18);
+      color: #b45309;
+    }
+    html[data-theme="light"] .coef-kind-badge--interaction {
+      border-color: rgba(109, 40, 217, 0.4);
+      background: rgba(167, 139, 250, 0.18);
+      color: #6d28d9;
     }
     .regression-table tbody tr.coef-row-categorical td {
       background: rgba(244, 114, 182, 0.08);
@@ -9145,6 +9173,14 @@ ${sectionsHtml}
         .replace(/"/g, '&quot;');
     }
 
+    function coefKindBadgeHtml(term) {
+      if (!term) return '';
+      if (term.kind === 'intercept') return '<span class="coef-kind-badge coef-kind-badge--intercept">Intercept</span>';
+      if (term.kind === 'interaction') return '<span class="coef-kind-badge coef-kind-badge--interaction">Interaction</span>';
+      if (term.kind === 'dummy') return '<span class="coef-kind-badge">Category</span>';
+      return '';
+    }
+
     function regressionFTestReady(results) {
       return !!(results && results.k > 1 && Number.isFinite(results.F_stat) && Number.isFinite(results.F_pvalue));
     }
@@ -9500,12 +9536,15 @@ ${sectionsHtml}
 
         let varClass = 'var-numeric';
         if (term.kind === 'intercept') varClass = 'var-intercept';
+        else if (term.kind === 'interaction') varClass = 'var-interaction';
         else if (term.kind === 'dummy') varClass = 'var-categorical';
-        else if (String(term.name).indexOf('_') !== -1 && term.kind !== 'interaction') varClass = 'var-categorical';
+        else if (String(term.name).indexOf('_') !== -1) varClass = 'var-categorical';
         if (varClass === 'var-categorical') row.classList.add('coef-row-categorical');
+        else if (term.kind === 'interaction') row.classList.add('coef-row-interaction');
 
         if (!dropped) {
           if (term.kind === 'intercept') row.style.background = 'rgba(251, 191, 36, 0.08)';
+          else if (term.kind === 'interaction') row.style.background = 'rgba(167, 139, 250, 0.08)';
           else if (varClass === 'var-categorical') row.style.background = 'rgba(244, 114, 182, 0.08)';
           else row.style.background = 'rgba(59, 130, 246, 0.05)';
         }
@@ -9529,7 +9568,7 @@ ${sectionsHtml}
         const nameTd = document.createElement('td');
         nameTd.className = 'coef-var-cell';
         const droppedTag = dropped ? '<span class="coef-dropped-tag">Dropped</span>' : '';
-        const kindBadge = varClass === 'var-categorical' ? '<span class="coef-kind-badge">Category</span>' : '';
+        const kindBadge = coefKindBadgeHtml(term);
         nameTd.innerHTML = `<strong class="${varClass}">${escapeHtmlText(term.name)}</strong>${kindBadge}${droppedTag}`;
         row.appendChild(nameTd);
 
@@ -9541,7 +9580,7 @@ ${sectionsHtml}
           else if (p < 0.01) sig = ' **';
           else if (p < 0.05) sig = ' *';
         }
-        const pClass = !hasStat ? '' : (p < 0.05 ? 'pvalue-good' : (p < 0.1 ? 'pvalue-warning' : 'pvalue-bad'));
+        const pClass = !hasStat ? '' : (p < 0.05 ? 'pvalue-good' : 'pvalue-bad');
         const pText = !hasStat ? '—' : (p < 0.0001 ? '< 0.0001' : p.toFixed(4));
         const vifIndex = statIndex - (results.includeIntercept ? 1 : 0);
         const vifText = !hasStat || term.kind === 'intercept'
@@ -12066,7 +12105,6 @@ ${sectionsHtml}
         if (Number.isNaN(p)) return;
         td.classList.remove('pvalue-good', 'pvalue-warning', 'pvalue-bad');
         if (p < 0.05) td.classList.add('pvalue-good');
-        else if (p < 0.1) td.classList.add('pvalue-warning');
         else td.classList.add('pvalue-bad');
       }
 

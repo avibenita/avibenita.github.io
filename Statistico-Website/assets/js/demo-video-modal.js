@@ -2,8 +2,8 @@
  * Guided-walkthrough player.
  * The branded preview is in the dialog immediately. The video file is
  * requested when the dialog opens, and playback starts as soon as it can.
- * Chapter navigation is optional and lives below the video, from the
- * walkthrough catalog. Videos without chapters keep this same player.
+ * Chapter navigation is optional. When a clip has chapters, they sit in a
+ * sidebar beside the video. Videos without chapters keep this same player.
  */
 (function () {
   'use strict';
@@ -26,7 +26,7 @@
   var pendingSeek = null;
   var seekSerial = 0;
   var seekWait = null;
-  var selectNavigating = false;
+  var shownChapterId = '';
 
   function ensureStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -46,9 +46,10 @@
       '.demo-video-lead{display:none}',
       '.demo-video-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:rgba(226,232,240,.78);cursor:pointer;font:400 26px/1 Inter,"Segoe UI",sans-serif}',
       '.demo-video-close:hover{color:#fff;background:rgba(255,255,255,.06)}',
-      '.demo-video-close:focus-visible,.demo-video-play:focus-visible,.demo-video-link:focus-visible,.demo-video-copy:focus-visible,.demo-video-jump select:focus-visible,.demo-video-copy-fallback:focus-visible{outline:2px solid #e4c16a;outline-offset:3px}',
+      '.demo-video-close:focus-visible,.demo-video-play:focus-visible,.demo-video-link:focus-visible,.demo-video-copy:focus-visible,.demo-video-chapter:focus-visible,.demo-video-copy-fallback:focus-visible{outline:2px solid #e4c16a;outline-offset:3px}',
+      '.demo-video-stage{display:flex;align-items:stretch;justify-content:center;gap:14px;min-width:0}',
       '.demo-video-frame{position:relative;width:min(100%,calc((100vh - 148px)*16/9));max-height:calc(100vh - 148px);margin-inline:auto;aspect-ratio:16/9;flex:none;border-radius:16px;overflow:hidden;background:#0c1422;box-shadow:0 22px 48px rgba(0,0,0,.36),0 0 0 1px rgba(228,193,106,.42)}',
-      '.demo-video-dialog.has-chapters .demo-video-frame{width:min(100%,calc((100vh - 228px)*16/9));max-height:calc(100vh - 228px)}',
+      '.demo-video-dialog.has-chapters .demo-video-frame{width:min(calc(100% - 286px),calc((100vh - 148px)*16/9));max-height:calc(100vh - 148px);margin-inline:0;flex:0 1 auto}',
       '.demo-video-frame video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;opacity:0}',
       '.demo-video-frame video:fullscreen,.demo-video-frame video:-webkit-full-screen{width:100%;height:100%;object-fit:contain;background:#000}',
       '.demo-video-frame video.is-ready{opacity:1}',
@@ -65,18 +66,26 @@
       '.demo-video-progress{width:84px;height:3px;border-radius:99px;background:rgba(255,255,255,.2);overflow:hidden}',
       '.demo-video-progress span{display:block;width:42%;height:100%;border-radius:inherit;background:#e4c16a;animation:demo-video-progress 1s ease-in-out infinite}',
       '@keyframes demo-video-progress{0%{transform:translateX(-130%)}100%{transform:translateX(280%)}}',
-      '.demo-video-chapters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:12px}',
-      '.demo-video-jump{display:flex;flex-direction:column;gap:4px;min-width:min(100%,240px);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(226,232,240,.68)}',
-      '.demo-video-jump select{width:min(420px,100%);height:36px;padding:0 10px;border-radius:8px;border:1px solid rgba(228,193,106,.45);background:#152033;color:#f8fafc;font:600 13px/1.2 Inter,"Segoe UI",sans-serif;letter-spacing:0;text-transform:none}',
-      '.demo-video-chapter-title{margin:0;flex:1 1 180px;min-width:min(100%,160px);font-size:.95rem;font-weight:650;line-height:1.3;color:#f8fafc}',
-      '.demo-video-copy{height:36px;padding:0 12px;border-radius:8px;border:1px solid rgba(125,211,252,.4);background:transparent;color:#7dd3fc;font:700 13px/1 Inter,"Segoe UI",sans-serif;cursor:pointer;white-space:nowrap}',
+      '.demo-video-chapters{position:relative;flex:0 0 272px;width:272px;min-width:0}',
+      '.demo-video-chapters-panel{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;padding:12px 8px 10px 12px;border-radius:16px;background:#121b2b;box-shadow:0 0 0 1px rgba(228,193,106,.32);overflow:hidden}',
+      '.demo-video-chapters-label{margin:0;padding:0 8px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(226,232,240,.68)}',
+      '.demo-video-chapter-list{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:2px;padding-right:4px}',
+      '.demo-video-chapter-list::-webkit-scrollbar{width:8px}',
+      '.demo-video-chapter-list::-webkit-scrollbar-thumb{background:rgba(228,193,106,.35);border-radius:99px}',
+      '.demo-video-chapter{display:grid;grid-template-columns:46px minmax(0,1fr);gap:8px;align-items:baseline;width:100%;margin:0;padding:8px;border:0;border-radius:10px;background:transparent;color:#e2e8f0;text-align:left;cursor:pointer;font:600 13.5px/1.35 Inter,"Segoe UI",sans-serif}',
+      '.demo-video-chapter time{color:#e4c16a;font-weight:700;font-variant-numeric:tabular-nums;font-size:12px}',
+      '.demo-video-chapter:hover{background:rgba(255,255,255,.06)}',
+      '.demo-video-chapter.is-current{background:rgba(228,193,106,.16);color:#fff;box-shadow:inset 2px 0 0 #e4c16a}',
+      '.demo-video-chapter-actions{display:flex;flex-direction:column;gap:6px;padding:0 4px 2px}',
+      '.demo-video-copy{height:34px;padding:0 12px;border-radius:8px;border:1px solid rgba(125,211,252,.4);background:transparent;color:#7dd3fc;font:700 13px/1 Inter,"Segoe UI",sans-serif;cursor:pointer}',
       '.demo-video-copy:hover{background:rgba(125,211,252,.08)}',
       '.demo-video-copy-status{min-height:1em;font-size:.82rem;font-weight:650;color:#e4c16a}',
-      '.demo-video-copy-fallback{flex:1 1 220px;min-width:min(100%,180px);height:36px;padding:0 10px;border-radius:8px;border:1px solid rgba(228,193,106,.45);background:#0c1422;color:#f8fafc;font:500 13px/1.2 Inter,"Segoe UI",sans-serif}',
+      '.demo-video-copy-fallback{width:100%;box-sizing:border-box;height:34px;padding:0 10px;border-radius:8px;border:1px solid rgba(228,193,106,.45);background:#0c1422;color:#f8fafc;font:500 13px/1.2 Inter,"Segoe UI",sans-serif}',
       '.demo-video-error{margin:12px 0 0;color:#e2e8f0;font-size:.92rem;line-height:1.45}',
       '.demo-video-link{color:#e4c16a;font-weight:700}',
-      '@media (max-height:760px){.demo-video-dialog.has-chapters{padding:12px 14px 12px}.demo-video-dialog.has-chapters .demo-video-title{font-size:1.25rem;margin-bottom:8px}.demo-video-dialog.has-chapters .demo-video-frame{width:min(100%,calc((100vh - 196px)*16/9));max-height:calc(100vh - 196px)}}',
-      '@media (max-width:640px){.demo-video-backdrop{padding:12px}.demo-video-dialog{padding:18px 14px 14px;border-radius:16px}.demo-video-title{font-size:1.2rem}.demo-video-play{width:68px;height:68px}.demo-video-frame{width:min(100%,calc((100vh - 128px)*16/9));max-height:calc(100vh - 128px)}.demo-video-dialog.has-chapters .demo-video-frame{width:min(100%,calc((100vh - 220px)*16/9));max-height:calc(100vh - 220px)}.demo-video-jump,.demo-video-jump select,.demo-video-chapter-title,.demo-video-copy{width:100%}}',
+      '@media (max-height:760px){.demo-video-dialog.has-chapters{padding:12px 14px 12px}.demo-video-dialog.has-chapters .demo-video-title{font-size:1.25rem;margin-bottom:8px}.demo-video-dialog.has-chapters .demo-video-frame{width:min(calc(100% - 286px),calc((100vh - 120px)*16/9));max-height:calc(100vh - 120px)}}',
+      '@media (max-width:860px){.demo-video-stage{flex-direction:column;align-items:stretch}.demo-video-chapters{position:static;flex:none;width:100%;height:min(240px,36vh)}.demo-video-chapters-panel{position:static;height:100%}.demo-video-dialog.has-chapters .demo-video-frame{width:min(100%,calc((100vh - 400px)*16/9));max-height:calc(100vh - 400px);margin-inline:auto}}',
+      '@media (max-width:640px){.demo-video-backdrop{padding:12px}.demo-video-dialog{padding:18px 14px 14px;border-radius:16px}.demo-video-title{font-size:1.2rem}.demo-video-play{width:68px;height:68px}.demo-video-frame{width:min(100%,calc((100vh - 128px)*16/9));max-height:calc(100vh - 128px)}.demo-video-dialog.has-chapters .demo-video-frame{width:min(100%,calc((100vh - 400px)*16/9));max-height:calc(100vh - 400px)}}',
       '@media (prefers-reduced-motion:reduce){.demo-video-backdrop,.demo-video-dialog,.demo-video-progress span{transition:none;animation:none}}'
     ].join('');
     document.head.appendChild(style);
@@ -97,27 +106,31 @@
       '    <p class="demo-video-kicker" id="demoVideoKicker"></p>',
       '    <h2 class="demo-video-title" id="demoVideoTitle"></h2>',
       '    <p class="demo-video-lead" id="demoVideoLead"></p>',
-      '    <div class="demo-video-frame">',
-      '      <video id="demoVideo" playsinline preload="auto"></video>',
-      '      <div class="demo-video-preview" id="demoVideoPreview">',
-      '        <img class="demo-video-shot" id="demoVideoShot" alt="">',
-      '        <div class="demo-video-veil"></div>',
-      '        <img class="demo-video-logo" src="' + LOGO_SRC + '" alt="Statistico Interactive">',
-      '        <button type="button" class="demo-video-play" id="demoVideoPlay" aria-label="Play the guided walkthrough">' + playIcon() + '</button>',
-      '        <p class="demo-video-preparing" id="demoVideoPreparing" hidden>',
-      '          <span class="demo-video-progress" aria-hidden="true"><span></span></span>',
-      '          Preparing your walkthrough\u2026',
-      '        </p>',
+      '    <div class="demo-video-stage" id="demoVideoStage">',
+      '      <div class="demo-video-frame">',
+      '        <video id="demoVideo" playsinline preload="auto"></video>',
+      '        <div class="demo-video-preview" id="demoVideoPreview">',
+      '          <img class="demo-video-shot" id="demoVideoShot" alt="">',
+      '          <div class="demo-video-veil"></div>',
+      '          <img class="demo-video-logo" src="' + LOGO_SRC + '" alt="Statistico Interactive">',
+      '          <button type="button" class="demo-video-play" id="demoVideoPlay" aria-label="Play the guided walkthrough">' + playIcon() + '</button>',
+      '          <p class="demo-video-preparing" id="demoVideoPreparing" hidden>',
+      '            <span class="demo-video-progress" aria-hidden="true"><span></span></span>',
+      '            Preparing your walkthrough\u2026',
+      '          </p>',
+      '        </div>',
       '      </div>',
-      '    </div>',
-      '    <div class="demo-video-chapters" id="demoVideoChapters" hidden>',
-      '      <label class="demo-video-jump" for="demoVideoChapterSelect">Jump to a section',
-      '        <select id="demoVideoChapterSelect"></select>',
-      '      </label>',
-      '      <p class="demo-video-chapter-title" id="demoVideoChapterTitle"></p>',
-      '      <button type="button" class="demo-video-copy" id="demoVideoCopy">Copy section link</button>',
-      '      <span class="demo-video-copy-status" id="demoVideoCopyStatus" role="status" aria-live="polite"></span>',
-      '      <input class="demo-video-copy-fallback" id="demoVideoCopyFallback" type="text" readonly hidden aria-label="Section link">',
+      '      <nav class="demo-video-chapters" id="demoVideoChapters" hidden aria-label="Chapters">',
+      '        <div class="demo-video-chapters-panel">',
+      '          <p class="demo-video-chapters-label">Chapters</p>',
+      '          <div class="demo-video-chapter-list" id="demoVideoChapterList"></div>',
+      '          <div class="demo-video-chapter-actions">',
+      '            <button type="button" class="demo-video-copy" id="demoVideoCopy">Copy section link</button>',
+      '            <span class="demo-video-copy-status" id="demoVideoCopyStatus" role="status" aria-live="polite"></span>',
+      '            <input class="demo-video-copy-fallback" id="demoVideoCopyFallback" type="text" readonly hidden aria-label="Section link">',
+      '          </div>',
+      '        </div>',
+      '      </nav>',
       '    </div>',
       '    <p class="demo-video-error" id="demoVideoError" hidden>',
       '      This walkthrough could not be played.',
@@ -160,8 +173,7 @@
       direct: document.getElementById('demoVideoDirect'),
       close: document.getElementById('demoVideoClose'),
       chapters: document.getElementById('demoVideoChapters'),
-      chapterSelect: document.getElementById('demoVideoChapterSelect'),
-      chapterTitle: document.getElementById('demoVideoChapterTitle'),
+      chapterList: document.getElementById('demoVideoChapterList'),
       copy: document.getElementById('demoVideoCopy'),
       copyStatus: document.getElementById('demoVideoCopyStatus'),
       copyFallback: document.getElementById('demoVideoCopyFallback')
@@ -266,36 +278,47 @@
     if (ui.dialog) ui.dialog.classList.remove('has-chapters');
   }
 
-  function renderChapterOptions(config, selectedId) {
+  function renderChapterMenu(config, selectedId) {
     var ui = els();
-    if (!ui.chapterSelect) return;
-    ui.chapterSelect.innerHTML = '';
-    var placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Jump to a section';
-    placeholder.disabled = true;
-    placeholder.hidden = true;
-    ui.chapterSelect.appendChild(placeholder);
+    if (!ui.chapterList) return;
+    ui.chapterList.innerHTML = '';
     config.chapters.forEach(function (chapter) {
-      var option = document.createElement('option');
-      option.value = chapter.id;
-      option.textContent = formatStamp(chapter.start) + '  ' + chapter.title;
-      ui.chapterSelect.appendChild(option);
+      var button = document.createElement('button');
+      var time = document.createElement('time');
+      var label = document.createElement('span');
+      button.type = 'button';
+      button.className = 'demo-video-chapter';
+      button.setAttribute('data-chapter-id', chapter.id);
+      button.setAttribute('aria-label', formatStamp(chapter.start) + ' ' + chapter.title);
+      time.textContent = formatStamp(chapter.start);
+      label.textContent = chapter.title;
+      button.appendChild(time);
+      button.appendChild(label);
+      ui.chapterList.appendChild(button);
     });
-    ui.chapterSelect.value = selectedId || '';
-    var selected = findChapter(config, ui.chapterSelect.value);
-    if (ui.chapterTitle) ui.chapterTitle.textContent = selected ? selected.title : '';
+    shownChapterId = '';
+    updateChapterUi(findChapter(config, selectedId));
   }
 
   function updateChapterUi(chapter) {
     var ui = els();
-    if (!chapter) {
-      if (ui.chapterTitle) ui.chapterTitle.textContent = '';
-      if (ui.chapterSelect && ui.chapterSelect.value !== '') ui.chapterSelect.value = '';
-      return;
+    var nextId = chapter ? chapter.id : '';
+    var buttons = ui.chapterList ? ui.chapterList.querySelectorAll('.demo-video-chapter') : [];
+    var current = null;
+    for (var i = 0; i < buttons.length; i++) {
+      var on = buttons[i].getAttribute('data-chapter-id') === nextId;
+      buttons[i].classList.toggle('is-current', on);
+      buttons[i].tabIndex = on || (!nextId && i === 0) ? 0 : -1;
+      if (on) {
+        buttons[i].setAttribute('aria-current', 'true');
+        current = buttons[i];
+      } else {
+        buttons[i].removeAttribute('aria-current');
+      }
     }
-    if (ui.chapterTitle) ui.chapterTitle.textContent = chapter.title;
-    if (ui.chapterSelect && ui.chapterSelect.value !== chapter.id) ui.chapterSelect.value = chapter.id;
+    if (nextId === shownChapterId) return;
+    shownChapterId = nextId;
+    if (current && current.scrollIntoView) current.scrollIntoView({ block: 'nearest' });
   }
 
   function sectionUrl(videoId, chapterId) {
@@ -401,7 +424,7 @@
   function syncFromTime() {
     if (mediaToken !== session || !chaptersEnabled || pendingSeek) return;
     var ui = els();
-    if (!ui.video || selectNavigating) return;
+    if (!ui.video) return;
     updateChapterUi(chapterAt(ui.video.currentTime));
   }
 
@@ -439,8 +462,8 @@
 
   function copySectionLink() {
     var ui = els();
-    if (!activeConfig || !activeConfig.id || !ui.chapterSelect) return;
-    var chapter = findChapter(activeConfig, ui.chapterSelect.value) || chapterAt(ui.video ? ui.video.currentTime : 0);
+    if (!activeConfig || !activeConfig.id) return;
+    var chapter = findChapter(activeConfig, shownChapterId) || chapterAt(ui.video ? ui.video.currentTime : 0);
     if (!chapter) return;
     var url = sectionUrl(activeConfig.id, chapter.id);
     writeUrl(activeConfig.id, chapter.id);
@@ -470,7 +493,7 @@
     var ui = els();
     var token = ++session;
     openedForChapter = false;
-    selectNavigating = false;
+    shownChapterId = '';
     opener = options.returnFocus || document.activeElement;
     activeConfig = {
       id: options.videoId || options.id || '',
@@ -495,7 +518,7 @@
     bindMedia(token);
     ui.video.src = options.src;
     if (activeConfig.chapters.length && !invalidChapter && (!mediaReady || durationOk)) {
-      renderChapterOptions(activeConfig, requested ? requested.id : '');
+      renderChapterMenu(activeConfig, requested ? requested.id : '');
       showChapters();
     } else {
       hideChapters();
@@ -526,7 +549,7 @@
     var ui = els();
     if (!ui.backdrop || ui.backdrop.hidden) return;
     session += 1;
-    selectNavigating = false;
+    shownChapterId = '';
     clearTimeout(settleTimer);
     clearTimeout(prepareTimer);
     releaseMedia();
@@ -594,14 +617,30 @@
     openFromCatalog(config, requested ? requested.id : null, !requested, link);
   }
 
-  function onChapterChange() {
+  function onChapterPick(chapterId) {
     if (!activeConfig || !activeConfig.chapters.length) return;
-    var ui = els();
-    var chapter = findChapter(activeConfig, ui.chapterSelect.value);
+    var chapter = findChapter(activeConfig, chapterId);
     if (!chapter) return;
-    if (ui.chapterTitle) ui.chapterTitle.textContent = chapter.title;
     if (activeConfig.id) writeUrl(activeConfig.id, chapter.id);
     requestSeek(chapter, true, session);
+  }
+
+  function onChapterKey(event) {
+    var ui = els();
+    var button = event.target && event.target.closest ? event.target.closest('.demo-video-chapter') : null;
+    if (!button || !ui.chapterList || !ui.chapterList.contains(button)) return;
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
+    var buttons = Array.prototype.slice.call(ui.chapterList.querySelectorAll('.demo-video-chapter'));
+    var index = buttons.indexOf(button);
+    var next = index;
+    if (event.key === 'ArrowDown') next = Math.min(buttons.length - 1, index + 1);
+    else if (event.key === 'ArrowUp') next = Math.max(0, index - 1);
+    else if (event.key === 'Home') next = 0;
+    else next = buttons.length - 1;
+    if (next === index || !buttons[next]) return;
+    event.preventDefault();
+    onChapterPick(buttons[next].getAttribute('data-chapter-id'));
+    buttons[next].focus();
   }
 
   function onPlayClick() {
@@ -650,13 +689,12 @@
     ui.backdrop.addEventListener('click', function (event) {
       if (event.target === ui.backdrop) close();
     });
-    ui.chapterSelect.addEventListener('keydown', function () { selectNavigating = true; });
-    ui.chapterSelect.addEventListener('mousedown', function () { selectNavigating = true; });
-    ui.chapterSelect.addEventListener('blur', function () { selectNavigating = false; });
-    ui.chapterSelect.addEventListener('change', function () {
-      selectNavigating = false;
-      onChapterChange();
+    ui.chapterList.addEventListener('click', function (event) {
+      var button = event.target && event.target.closest ? event.target.closest('.demo-video-chapter') : null;
+      if (!button || !ui.chapterList.contains(button)) return;
+      onChapterPick(button.getAttribute('data-chapter-id'));
     });
+    ui.chapterList.addEventListener('keydown', onChapterKey);
     ui.copy.addEventListener('click', copySectionLink);
     ui.video.addEventListener('playing', revealVideo);
     ui.video.addEventListener('error', function () {

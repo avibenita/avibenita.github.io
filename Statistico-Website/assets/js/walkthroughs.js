@@ -14,8 +14,21 @@
       title: 'Discover how much one variable can reveal.',
       lead: 'A guided tour of interactive distributions, diagnostics, uncertainty, and group comparisons.',
       durationLabel: '7:46',
+      expectedDuration: 466.2,
+      durationTolerance: 0.5,
       src: '/Statistico-Website/media/demos/univariate/univariate__premium-transitions__r1940.mp4?v=20261125r1940',
-      poster: '/Statistico-Website/media/demos/univariate/univariate-walkthrough-preview.jpg?v=20261126preview'
+      poster: '/Statistico-Website/media/demos/univariate/univariate-walkthrough-preview.jpg?v=20261126preview',
+      chapters: [
+        { id: 'setup', start: 18.63, title: 'Set up the analysis' },
+        { id: 'distribution', start: 56.63, title: 'Distribution' },
+        { id: 'outlier-impact', start: 100.73, title: 'Outliers and their impact' },
+        { id: 'kernel-density', start: 149.63, title: 'Kernel density' },
+        { id: 'normality', start: 170.93, title: 'Normality' },
+        { id: 'confidence-intervals', start: 211.33, title: 'Confidence intervals' },
+        { id: 'one-sample-test', start: 285.53, title: 'One-sample test and power analysis' },
+        { id: 'by-group', start: 339.83, title: 'By Group Analysis' },
+        { id: 'original-developments', start: 382.83, title: 'Original Statistico Developments' }
+      ]
     },
     correlations: {
       id: 'correlations',

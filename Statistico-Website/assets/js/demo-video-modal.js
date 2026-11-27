@@ -238,7 +238,7 @@
   function chapterAt(time) {
     var chapters = activeConfig && activeConfig.chapters;
     if (!chapters || !chapters.length) return null;
-    var found = chapters[0];
+    var found = null;
     for (var i = 0; i < chapters.length; i++) {
       if (chapters[i].start <= time + 0.05) found = chapters[i];
       else break;
@@ -270,20 +270,30 @@
     var ui = els();
     if (!ui.chapterSelect) return;
     ui.chapterSelect.innerHTML = '';
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Jump to a section';
+    placeholder.disabled = true;
+    placeholder.hidden = true;
+    ui.chapterSelect.appendChild(placeholder);
     config.chapters.forEach(function (chapter) {
       var option = document.createElement('option');
       option.value = chapter.id;
       option.textContent = formatStamp(chapter.start) + '  ' + chapter.title;
       ui.chapterSelect.appendChild(option);
     });
-    if (selectedId) ui.chapterSelect.value = selectedId;
-    var selected = findChapter(config, ui.chapterSelect.value) || config.chapters[0];
+    ui.chapterSelect.value = selectedId || '';
+    var selected = findChapter(config, ui.chapterSelect.value);
     if (ui.chapterTitle) ui.chapterTitle.textContent = selected ? selected.title : '';
   }
 
   function updateChapterUi(chapter) {
-    if (!chapter) return;
     var ui = els();
+    if (!chapter) {
+      if (ui.chapterTitle) ui.chapterTitle.textContent = '';
+      if (ui.chapterSelect && ui.chapterSelect.value !== '') ui.chapterSelect.value = '';
+      return;
+    }
     if (ui.chapterTitle) ui.chapterTitle.textContent = chapter.title;
     if (ui.chapterSelect && ui.chapterSelect.value !== chapter.id) ui.chapterSelect.value = chapter.id;
   }
@@ -485,8 +495,7 @@
     bindMedia(token);
     ui.video.src = options.src;
     if (activeConfig.chapters.length && !invalidChapter && (!mediaReady || durationOk)) {
-      var initial = requested || activeConfig.chapters[0];
-      renderChapterOptions(activeConfig, initial.id);
+      renderChapterOptions(activeConfig, requested ? requested.id : '');
       showChapters();
     } else {
       hideChapters();

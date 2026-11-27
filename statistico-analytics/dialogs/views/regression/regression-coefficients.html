@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="../shared-header.css?v=20261127adj" />
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260912exploretabs" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261127ancfit"></script>
+  <script src="../shared-header.js?v=20261127ix2"></script>
   <script src="../shared-workspace-tabs.js?v=20261123notab"></script>
   <link rel="stylesheet" href="../shared-power-template.css?v=20261105a" />
   <script src="../shared-power-template.js?v=20261105a"></script>
@@ -14019,12 +14019,80 @@ ${sectionsHtml}
     // INTERACTIONS TAB RENDERING
     // ============================================================================
 
-    function _interactionCoeffIndex(results, interactionColumnNames, interactionIndex) {
+    function _interactionColumnCount(ixi) {
+      if (!ixi) return 0;
+      if (ixi.v1IsNumeric && ixi.v2IsNumeric) return 1;
+      if (ixi.v1IsNumeric && ixi.v2Cat) return (ixi.v2Cat.dummyNames || []).length;
+      if (ixi.v1Cat && ixi.v2IsNumeric) return (ixi.v1Cat.dummyNames || []).length;
+      if (ixi.v1Cat && ixi.v2Cat) {
+        return (ixi.v1Cat.dummyNames || []).length * (ixi.v2Cat.dummyNames || []).length;
+      }
+      return 1;
+    }
+
+    function _interactionInfoList(interactionInfo) {
+      return interactionInfo
+        || window.globalInteractionInfo
+        || (window._interactionTabData && window._interactionTabData.interactionInfo)
+        || [];
+    }
+
+    function _interactionColumnOffset(interactionInfo, interactionIndex) {
+      const info = _interactionInfoList(interactionInfo);
+      let off = 0;
+      for (let i = 0; i < interactionIndex && i < info.length; i++) off += _interactionColumnCount(info[i]);
+      return off;
+    }
+
+    function _interactionBlockRange(interactionInfo, interactionIndex) {
+      const info = _interactionInfoList(interactionInfo);
+      const ixi = info[interactionIndex];
+      return { offset: _interactionColumnOffset(info, interactionIndex), count: _interactionColumnCount(ixi) };
+    }
+
+    function _interactionCoeffIndex(results, interactionColumnNames, interactionIndex, interactionInfo) {
       const nIntCols = (interactionColumnNames || []).length;
       if (!results || !Array.isArray(results.coefficients) || nIntCols === 0) return -1;
       const start = results.coefficients.length - nIntCols;
-      const idx = start + interactionIndex;
+      const colOff = _interactionColumnOffset(interactionInfo, interactionIndex);
+      const idx = start + colOff;
       return (idx >= 0 && idx < results.coefficients.length) ? idx : -1;
+    }
+
+    function _computeInteractionTermPartialF(results, variableNames, interactionColumnNames, interactionInfo, termIdx) {
+      const xFull = window.regressionData?.xMatrix;
+      const yVec = window.regressionData?.yVector;
+      if (!xFull || !yVec || !results) return null;
+      const nIntCols = interactionColumnNames.length;
+      const nMainCols = variableNames.length - nIntCols;
+      const { offset, count } = _interactionBlockRange(interactionInfo, termIdx);
+      if (count <= 0) return null;
+      const drop = new Set();
+      for (let j = 0; j < count; j++) drop.add(nMainCols + offset + j);
+      const xRestricted = xFull.map(row => row.filter((_, ci) => !drop.has(ci)));
+      const restricted = computeOLS(xRestricted, yVec, results.includeIntercept, 0.05);
+      const q = count;
+      const n = results.n;
+      const kF = results.k;
+      const ssrFull = results.SSR;
+      const ssrRestricted = restricted.SSR;
+      const partialF = q > 0 ? ((ssrRestricted - ssrFull) / q) / (ssrFull / (n - kF)) : 0;
+      const pPartial = q > 0 ? 1 - fCDF(Math.max(partialF, 0), q, n - kF) : 1;
+      return {
+        r2Full: results.R2,
+        r2Restricted: restricted.R2,
+        r2Change: results.R2 - restricted.R2,
+        partialF,
+        pPartial,
+        q
+      };
+    }
+
+    function _interactionTermPForFinding(results, interactionColumnNames, interactionInfo, termIdx) {
+      const termCmp = window._ixTermCompareByIndex && window._ixTermCompareByIndex[termIdx];
+      if (termCmp && Number.isFinite(termCmp.pPartial)) return termCmp.pPartial;
+      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, termIdx, interactionInfo);
+      return coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
     }
 
     function showInteractionEmptyState() {
@@ -14167,6 +14235,16 @@ ${sectionsHtml}
         }
       } catch(e) {
         console.warn('⚠️ Partial F computation failed:', e.message);
+      }
+
+      window._ixTermCompareByIndex = {};
+      for (let ti = 0; ti < interactionInfo.length; ti++) {
+        try {
+          const tc = _computeInteractionTermPartialF(results, variableNames, interactionColumnNames, interactionInfo, ti);
+          if (tc) window._ixTermCompareByIndex[ti] = tc;
+        } catch (e) {
+          console.warn('Per-term partial F failed for interaction', ti, e.message);
+        }
       }
 
       // ── EMMeans: shown when model has at least one categorical predictor ──
@@ -14388,8 +14466,7 @@ ${sectionsHtml}
       const ixi = interactionInfo[idx];
       if (!ix || !ixi) { el.hidden = true; return; }
       const roles = getIxRoleLabels(ix, ixi);
-      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
-      const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
+      const p = _interactionTermPForFinding(results, interactionColumnNames, interactionInfo, idx);
       const pFmt = formatIxPValue(p);
       const focalLower = String(roles.focal).toLowerCase();
       const modLower = String(roles.moderator).toLowerCase();
@@ -14408,7 +14485,7 @@ ${sectionsHtml}
       if (!data || !coeffEl || !compareEl) return;
       const { results, interactions, interactionColumnNames, interactionInfo } = data;
       const idx = getIxSelectedTermIndex();
-      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
+      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx, interactionInfo);
       if (coeffIdx < 0) {
         coeffEl.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">—</span>';
       } else {
@@ -14416,19 +14493,24 @@ ${sectionsHtml}
         const cil = results.CI_lower[coeffIdx];
         const ciu = results.CI_upper[coeffIdx];
         const p = results.p_values[coeffIdx];
+        const block = _interactionBlockRange(interactionInfo, idx);
+        const coefNote = block.count > 1
+          ? ' <span style="font-size:11px;color:var(--text-muted);">(first of ' + block.count + ' product terms)</span>'
+          : '';
         coeffEl.innerHTML = ''
           + '<div class="ix-side-stat"><span>β</span><strong>' + b.toFixed(4) + '</strong></div>'
           + '<div class="ix-side-stat"><span>95% CI</span><strong>[' + cil.toFixed(3) + ', ' + ciu.toFixed(3) + ']</strong></div>'
-          + '<div class="ix-side-stat"><span>p-value</span><strong>' + formatIxPValue(p) + '</strong></div>';
+          + '<div class="ix-side-stat"><span>p-value</span><strong>' + formatIxPValue(p) + '</strong>' + coefNote + '</div>';
       }
-      const cmp = window._ixModelCompare;
+      const cmp = (window._ixTermCompareByIndex && window._ixTermCompareByIndex[idx]) || window._ixModelCompare;
       if (!cmp) {
         compareEl.innerHTML = '<span style="color:var(--text-muted);font-size:13px;">—</span>';
         return;
       }
+      const dR2 = cmp.r2Change != null ? cmp.r2Change : 0;
       compareEl.innerHTML = ''
         + '<div class="ix-side-stat"><span>Full model R²</span><strong>' + (100 * cmp.r2Full).toFixed(2) + '%</strong></div>'
-        + '<div class="ix-side-stat"><span>ΔR²</span><strong>' + (cmp.r2Change >= 0 ? '+' : '') + (100 * cmp.r2Change).toFixed(2) + ' pp</strong></div>'
+        + '<div class="ix-side-stat"><span>ΔR²</span><strong>' + (dR2 >= 0 ? '+' : '') + (100 * dR2).toFixed(2) + ' pp</strong></div>'
         + '<div class="ix-side-stat"><span>p (F-change)</span><strong>' + formatIxPValue(cmp.pPartial) + '</strong></div>';
     }
 
@@ -14479,8 +14561,7 @@ ${sectionsHtml}
       const ixi = interactionInfo[idx];
       if (!ix || !ixi) return;
       const roles = getIxRoleLabels(ix, ixi);
-      const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
-      const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
+      const p = _interactionTermPForFinding(results, interactionColumnNames, interactionInfo, idx);
       const sig = p < 0.05;
       let geom = 'Compare line slopes: diverging or crossing lines suggest moderation; parallel lines suggest little interaction.';
       if (!sig) {
@@ -14527,12 +14608,18 @@ ${sectionsHtml}
 
     function _renderInteractionPlotInContainer(container) {
       const data = window._interactionTabData;
-      if (!data) return;
+      if (!data) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Run the model to see the interaction plot.</div>';
+        return;
+      }
       const idx = getIxSelectedTermIndex();
       const { results, xnVars, xcVars, interactions, interactionInfo, yVar, rows, headers } = data;
       const ix0 = interactions[idx];
       const ixi0 = interactionInfo[idx];
-      if (!ix0 || !ixi0) return;
+      if (!ix0 || !ixi0) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Select an interaction term above.</div>';
+        return;
+      }
       const pair = ixPlotPair(ix0, ixi0);
       const ix = pair.ix;
       const ixi = pair.ixi;
@@ -14569,7 +14656,7 @@ ${sectionsHtml}
         if (nIntCols === 0) {
           html = '<div style="color:var(--warning);font-size:13px;padding:8px 0;">Interaction terms could not be matched to model coefficients.</div>';
         } else if (ix && ixi) {
-          const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
+          const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx, interactionInfo);
           if (coeffIdx >= 0) {
             const b = results.coefficients[coeffIdx];
             const t = results.t_values[coeffIdx];
@@ -14591,8 +14678,7 @@ ${sectionsHtml}
 
         const ixReadings = [];
         if (interpEl && ix && ixi && nIntCols > 0) {
-          const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
-          const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
+          const p = _interactionTermPForFinding(results, interactionColumnNames, interactionInfo, idx);
           interpEl.textContent = '';
           if (p < 0.05) {
             ixReadings.push(`Significant interaction. The effect of ${roles.focal} on ${yVar} depends on ${roles.moderator}. Review simple slopes and the preview plot.`);
@@ -14604,8 +14690,7 @@ ${sectionsHtml}
       }
 
       if (conclusionEl && ix && roles && nIntCols > 0) {
-        const coeffIdx = _interactionCoeffIndex(results, interactionColumnNames, idx);
-        const p = coeffIdx >= 0 ? results.p_values[coeffIdx] : 1;
+        const p = _interactionTermPForFinding(results, interactionColumnNames, interactionInfo, idx);
         conclusionEl.style.display = 'none';
         conclusionEl.textContent = '';
         const line = p < 0.05
@@ -14675,7 +14760,8 @@ ${sectionsHtml}
 
       // Get focal predictor index and interaction coefficient index
       const focalColIdx = variableNames.indexOf(focalVar);
-      const ixColIdx = interactionStart + idx; // position in coefficients[]
+      const ixColBase = interactionStart + _interactionColumnOffset(interactionInfo, idx);
+      const ixColIdx = ixColBase;
       const beta_focal = results.includeIntercept ? results.coefficients[focalColIdx + 1] : results.coefficients[focalColIdx];
       const beta_ix    = results.coefficients[ixColIdx];
       const se_ix      = results.std_errors[ixColIdx];
@@ -14754,8 +14840,8 @@ ${sectionsHtml}
         </tr>`;
 
         cats.slice(1).forEach((cat, ci) => {
-          const ixCoeff = results.coefficients[interactionStart + idx + ci] || 0;
-          const ixSE    = results.std_errors[interactionStart + idx + ci] || 0;
+          const ixCoeff = results.coefficients[interactionStart + ixColBase + ci] || 0;
+          const ixSE    = results.std_errors[interactionStart + ixColBase + ci] || 0;
           const slope   = beta_focal + ixCoeff;
           const se_s    = Math.sqrt(se_focal ** 2 + ixSE ** 2);
           const t_s     = slope / se_s;
@@ -14779,7 +14865,11 @@ ${sectionsHtml}
     // Render interaction plot for the selected term
     function renderInteractionPlot() {
       const container = document.getElementById('interactionPlotContainer');
-      if (!container || typeof Highcharts === 'undefined') return;
+      if (!container) return;
+      if (typeof Highcharts === 'undefined') {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Chart library is still loading. Try again in a moment.</div>';
+        return;
+      }
       const tab = document.getElementById('tab-ix-summary');
       const expanded = tab && tab.classList.contains('ix-chart-expanded');
       container.style.height = expanded ? '' : '420px';
@@ -14831,8 +14921,19 @@ ${sectionsHtml}
       }
       const numIdx = headers.indexOf(numVar);
       const numVals = rows.map(r => parseFloat(r[numIdx])).filter(x => !isNaN(x));
+      if (!numVals.length || numIdx < 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Not enough numeric data to draw this plot.</div>';
+        return;
+      }
       const xMin = Math.min(...numVals), xMax = Math.max(...numVals);
+      if (!Number.isFinite(xMin) || !Number.isFinite(xMax) || xMin === xMax) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:16px;text-align:center;">Predictor has no spread — plot is not shown.</div>';
+        return;
+      }
       const xPoints = Array.from({length: 40}, (_, i) => xMin + (xMax - xMin) * i / 39);
+      const termIdx = getIxSelectedTermIndex();
+      const intCoeffBase = results.coefficients.length - (window.globalInteractionColumnNames || []).length
+        + _interactionColumnOffset(window._interactionTabData?.interactionInfo, termIdx);
 
       // Compute covariate means for other variables
       const covMeans = {};
@@ -14867,7 +14968,10 @@ ${sectionsHtml}
             const dIdx = varNamesMain.indexOf(dn);
             if (dIdx >= 0) pred += catDummies[di] * results.coefficients[results.includeIntercept ? dIdx + 1 : dIdx];
           });
-          catDummies.forEach((d, di) => { pred += (xv * d) * results.coefficients[results.coefficients.length - (window.globalInteractionColumnNames || []).length + di]; });
+          catDummies.forEach((d, di) => {
+            const ci = intCoeffBase + di;
+            if (d && ci < results.coefficients.length) pred += xv * d * results.coefficients[ci];
+          });
           return [parseFloat(xv.toFixed(3)), parseFloat(pred.toFixed(4))];
         });
 

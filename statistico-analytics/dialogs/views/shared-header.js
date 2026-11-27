@@ -8048,12 +8048,64 @@ const StatisticoHeader = {
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden') return false;
     if (!el.getClientRects().length) return false;
+    if (el.closest('#tab-ancova, #tab-ix-summary')) return false;
+    if (el.querySelector('.ancova-subpanel, .ix-unified-layout')) return false;
+  /* ANCOVA / Interactions scroll inside .ws-body; compressing the outer pane clips sections. */
+    const wsBody = el.querySelector(':scope .ws-shell > .ws-body, :scope > .ws-body');
+    if (wsBody) {
+      const wsCs = getComputedStyle(wsBody);
+      if (wsCs.overflowY === 'auto' || wsCs.overflowY === 'scroll') return false;
+    }
     /* The window bar sits on the pane that fills the column, not an inner table. */
     if (el.clientHeight < right.clientHeight * 0.5) return false;
     return true;
   },
 
+  _resultsFitWorkspaceTab() {
+    return document.querySelector('#tab-ancova.tab-content.active, #tab-ix-summary.tab-content.active');
+  },
+
+  _resultsFitTouchesWorkspace(pane, workspaceTab) {
+    if (!pane || !workspaceTab) return false;
+    return pane === workspaceTab || workspaceTab.contains(pane) || pane.contains(workspaceTab);
+  },
+
+  _clearResultsFitOnPane(pane) {
+    if (!pane) return;
+    pane.classList.remove('results-fit-scroll');
+    ['overflow-x', 'overflow-y', 'display', 'flex-direction', 'min-height', 'gap', 'padding-top', 'padding-bottom', 'height', 'max-height'].forEach((prop) => {
+      pane.style.removeProperty(prop);
+    });
+    pane.querySelectorAll('.chart-panel, .chart-wrap, .boxplot-panel').forEach((chart) => {
+      ['flex', 'min-height', 'height', 'max-height', 'overflow', 'margin-bottom', 'margin'].forEach((prop) => {
+        chart.style.removeProperty(prop);
+      });
+      const inner = chart.querySelector('.chart-container, #histogram-chart');
+      if (inner) {
+        ['height', 'max-height', 'min-height'].forEach((prop) => inner.style.removeProperty(prop));
+      }
+    });
+  },
+
+  clearResultsFitForWorkspaceViews() {
+    const workspaceTab = this._resultsFitWorkspaceTab();
+    if (!workspaceTab) return;
+    const right = document.querySelector('.right-col');
+    if (!right) return;
+    this._resultsFitPanes(right).forEach((pane) => {
+      if (this._resultsFitTouchesWorkspace(pane, workspaceTab)) this._clearResultsFitOnPane(pane);
+    });
+    [workspaceTab, workspaceTab.querySelector('.tab-panel'), workspaceTab.querySelector('.ws-body'), workspaceTab.querySelector('.ws-shell')].forEach((el) => {
+      if (el) this._clearResultsFitOnPane(el);
+    });
+  },
+
   _compressResultsPane(pane, right) {
+    const workspaceTab = this._resultsFitWorkspaceTab();
+    if (workspaceTab && this._resultsFitTouchesWorkspace(pane, workspaceTab)) {
+      this._clearResultsFitOnPane(pane);
+      return;
+    }
     const overflow = () => pane.scrollHeight - pane.clientHeight;
     const charts = this._shrinkableCharts(pane);
     const flexHost = pane.matches('.results-container, #results-container, .responsive-container, .container');
@@ -8188,6 +8240,7 @@ const StatisticoHeader = {
     const nodes = [...pane.querySelectorAll('.chart-panel, .chart-wrap, .boxplot-panel, #histogram-panel')];
     return nodes.filter((chart) => {
       if (!pane.contains(chart) || chart === pane) return false;
+      if (chart.closest('#tab-ancova, #tab-ix-summary, .ancova-workspace')) return false;
       /* Histogram sizes itself in fitLayout. Collapsing it here clips the plot. */
       if (chart.id === 'histogram-panel') return false;
       if (nodes.some((other) => other !== chart && other.contains(chart))) return false;

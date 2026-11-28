@@ -278,6 +278,72 @@ function encodeLogisticY(raw, modelSpec) {
   return NaN;
 }
 
+function logisticDesignCell(col, row) {
+  if (col.kind === "num") return Number(row[col.idx]);
+  if (col.kind === "dum") return String(row[col.idx]) === col.level ? 1 : 0;
+  let prod = 1;
+  (col.factors || []).forEach(function (factor) {
+    if (factor.kind === "num") prod *= Number(row[factor.idx]);
+    else prod *= String(row[factor.idx]) === factor.level ? 1 : 0;
+  });
+  return prod;
+}
+
+function logisticInteractionColumns(modelSpec, xnIdx, xcIdx, catLevels) {
+  const numByName = {};
+  xnIdx.forEach(function (v) { numByName[v.name] = v; });
+  const catByName = {};
+  xcIdx.forEach(function (c) { catByName[c.name] = c; });
+  const cols = [];
+  (modelSpec.interactions || []).forEach(function (ix) {
+    if (!ix) return;
+    const v1 = ix.var1 || ix.v1;
+    const v2 = ix.var2 || ix.v2;
+    if (!v1 || !v2) return;
+    const n1 = numByName[v1];
+    const n2 = numByName[v2];
+    const c1 = catByName[v1];
+    const c2 = catByName[v2];
+    function numericFactor(v) { return { kind: "num", idx: v.idx, name: v.name }; }
+    function dummyFactor(c, level) { return { kind: "dum", idx: c.idx, level: level, name: c.name }; }
+    if (n1 && n2) {
+      cols.push({ kind: "ix", name: v1 + " × " + v2, factors: [numericFactor(n1), numericFactor(n2)] });
+      return;
+    }
+    const numeric = n1 || n2;
+    const categorical = c1 || c2;
+    if (numeric && categorical && numeric.name !== categorical.name) {
+      const levels = catLevels[categorical.name] || [];
+      const numFirst = !!n1 && !c1;
+      for (let i = 1; i < levels.length; i++) {
+        const dummyName = categorical.name + "_" + levels[i];
+        const factors = numFirst
+          ? [numericFactor(numeric), dummyFactor(categorical, levels[i])]
+          : [dummyFactor(categorical, levels[i]), numericFactor(numeric)];
+        const name = numFirst ? (numeric.name + " × " + dummyName) : (dummyName + " × " + numeric.name);
+        cols.push({ kind: "ix", name: name, factors: factors });
+      }
+      return;
+    }
+    if (c1 && c2) {
+      const levels1 = catLevels[c1.name] || [];
+      const levels2 = catLevels[c2.name] || [];
+      for (let i = 1; i < levels1.length; i++) {
+        for (let j = 1; j < levels2.length; j++) {
+          const d1 = c1.name + "_" + levels1[i];
+          const d2 = c2.name + "_" + levels2[j];
+          cols.push({
+            kind: "ix",
+            name: d1 + " × " + d2,
+            factors: [dummyFactor(c1, levels1[i]), dummyFactor(c2, levels2[j])]
+          });
+        }
+      }
+    }
+  });
+  return cols;
+}
+
 function computeLogisticBundle(headers, rows, modelSpec, threshold) {
   const yName = modelSpec.y || headers[0];
   const xn = modelSpec.xn || [];
@@ -319,6 +385,9 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
       if (!excluded.has(name)) columns.push({ kind: "dum", name: name, idx: c.idx, level: levels[i] });
     }
   });
+  logisticInteractionColumns(modelSpec, xnIdx, xcIdx, catLevels).forEach(function (col) {
+    if (!excluded.has(col.name)) columns.push(col);
+  });
   const predictorNames = columns.map(c => c.name);
   if (!includeIntercept && !columns.length) {
     throw new Error("At least one term has to stay in the model");
@@ -358,8 +427,7 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
     }
 
     const xRow = columns.map(function (col) {
-      if (col.kind === "num") return Number(r[col.idx]);
-      return String(r[col.idx]) === col.level ? 1 : 0;
+      return logisticDesignCell(col, r);
     });
 
     X.push(xRow);

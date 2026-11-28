@@ -1936,7 +1936,7 @@
             </section>
 
             <section class="tab-panel" data-view="interactions">
-              <section class="subview active" data-parent="interactions" data-sub="overview"><div class="panel"><div class="panel-h">Overview</div><div class="panel-b tiny">Interaction-ready workspace for logistic probabilities.</div></div></section>
+              <section class="subview active" data-parent="interactions" data-sub="overview"><div class="panel"><div class="panel-h">Interaction terms</div><div class="panel-b" id="logIxOverview"></div></div></section>
               <section class="subview" data-parent="interactions" data-sub="visualization"><div class="panel"><div class="panel-h">Visualization</div><div class="panel-b tiny">Probability interaction plots placeholder.</div></div></section>
               <section class="subview" data-parent="interactions" data-sub="technical"><div class="panel"><div class="panel-h">Technical</div><div class="panel-b tiny">Add explicit interaction terms in builder to surface technical tests.</div></div></section>
             </section>
@@ -3665,6 +3665,7 @@
       if (tab === "power") initLogisticPowerCloud(true);
       if (tab === "predictive-performance") renderPredictivePerformance();
       if (tab === "probabilities") renderProbabilities();
+      if (tab === "interactions") renderLogisticInteractions();
       updateEmbedTabHeader(tab);
       if (typeof StatisticoHeader !== "undefined") {
         var labels = {
@@ -4065,7 +4066,53 @@
           xNames.push(varName + "_" + levels[i]);
         }
       });
+      appendLogScenarioInteractions(xVector, xNames, inputs);
       return { xVector: xVector, xNames: xNames };
+    }
+    function appendLogScenarioInteractions(xVector, xNames, inputs) {
+      var spec = (state.dataContext && state.dataContext.modelSpec) || {};
+      var numeric = {};
+      (logScenarioData.numericVars || []).forEach(function (name) { numeric[name] = true; });
+      var levelsOf = logScenarioData.categoricalLevels || {};
+      function numVal(name) { var v = Number(inputs[name]); return isFinite(v) ? v : 0; }
+      function dum(name, level) { return String(inputs[name]) === String(level) ? 1 : 0; }
+      (spec.interactions || []).forEach(function (ix) {
+        if (!ix) return;
+        var v1 = ix.var1 || ix.v1;
+        var v2 = ix.var2 || ix.v2;
+        if (!v1 || !v2) return;
+        var n1 = !!numeric[v1];
+        var n2 = !!numeric[v2];
+        var levels1 = levelsOf[v1] || [];
+        var levels2 = levelsOf[v2] || [];
+        if (n1 && n2) {
+          xNames.push(v1 + " × " + v2);
+          xVector.push(numVal(v1) * numVal(v2));
+          return;
+        }
+        if (n1 && levels2.length > 1) {
+          for (var j = 1; j < levels2.length; j++) {
+            xNames.push(v1 + " × " + v2 + "_" + levels2[j]);
+            xVector.push(numVal(v1) * dum(v2, levels2[j]));
+          }
+          return;
+        }
+        if (n2 && levels1.length > 1) {
+          for (var i = 1; i < levels1.length; i++) {
+            xNames.push(v1 + "_" + levels1[i] + " × " + v2);
+            xVector.push(dum(v1, levels1[i]) * numVal(v2));
+          }
+          return;
+        }
+        if (levels1.length > 1 && levels2.length > 1) {
+          for (var a = 1; a < levels1.length; a++) {
+            for (var b = 1; b < levels2.length; b++) {
+              xNames.push(v1 + "_" + levels1[a] + " × " + v2 + "_" + levels2[b]);
+              xVector.push(dum(v1, levels1[a]) * dum(v2, levels2[b]));
+            }
+          }
+        }
+      });
     }
     function calculateLogisticScenario(inputs) {
       var built = buildLogScenarioXVector(inputs);
@@ -4942,6 +4989,22 @@
         validation: (r.validationStatus || r.externalValidation) ? String(r.validationStatus || r.externalValidation) : "External validation was not assessed."
       };
     };
+    function renderLogisticInteractions() {
+      var host = document.getElementById("logIxOverview");
+      if (!host) return;
+      var rows = (state.coefficients || []).filter(function (c) {
+        return String(c.Variable || "").indexOf(" × ") >= 0;
+      });
+      if (!rows.length) {
+        host.innerHTML = "<p class='tiny'>This model has no interaction term. Check a pair in the model builder, then run the analysis again.</p>";
+        return;
+      }
+      host.innerHTML = "<table class='metric-table'><thead><tr><th>Term</th><th>Beta</th><th>Odds ratio</th><th>p</th></tr></thead><tbody>" +
+        rows.map(function (c) {
+          return "<tr><td>" + esc(friendlyVarName(c.Variable)) + "</td><td>" + esc(c.Beta) + "</td><td>" + esc(c.OR) + "</td><td>" + esc(c.PValue) + "</td></tr>";
+        }).join("") +
+        "</tbody></table><p class='log-chart-note'>The term is the product of the two predictors, in the same units as the source columns. Its odds ratio is the change in odds for a one-unit increase in that product.</p>";
+    }
     function renderAll() {
       rememberFullModel();
       syncLogScopeBanner();
@@ -4949,6 +5012,7 @@
       renderTables();
       renderProbabilityBands();
       syncLogisticAi();
+      renderLogisticInteractions();
       if (logScenarioData.initialized) {
         logScenarioData.initialized = false;
         if (document.querySelector('.subview[data-parent="probabilities"][data-sub="scenario-engine"].active')) {

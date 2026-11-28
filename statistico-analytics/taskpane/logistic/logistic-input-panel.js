@@ -396,6 +396,8 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
   const X = [];
   const y = [];
   let droppedMissing = 0;
+  let fittedIndex = 0;
+  const skipFitted = Number.isInteger(modelSpec.excludeFittedRow) ? modelSpec.excludeFittedRow : -1;
 
   rows.forEach(r => {
     const yValRaw = r[yIdx];
@@ -429,6 +431,12 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
     const xRow = columns.map(function (col) {
       return logisticDesignCell(col, r);
     });
+
+    if (fittedIndex === skipFitted) {
+      fittedIndex++;
+      return;
+    }
+    fittedIndex++;
 
     X.push(xRow);
     y.push(yNum);
@@ -502,7 +510,8 @@ function computeLogisticBundle(headers, rows, modelSpec, threshold) {
       coefficients: coeffRows,
       predictions: metrics.predictionRows,
       diagnostics,
-      descriptives
+      descriptives,
+      covariance: fit.covariance || null
     }
   };
 }
@@ -583,7 +592,7 @@ function computeClassificationMetrics(y, probabilities, threshold) {
   const f1 = (prec + sens) > 0 ? (2 * prec * sens) / (prec + sens) : 0;
 
   return {
-    predictionRows: rows.slice(0, 500),
+    predictionRows: rows,
     resultsPatch: {
       accuracy: fmtPct(acc),
       sensitivity: fmtPct(sens),
@@ -691,6 +700,7 @@ function computeDiagnostics(y, p, X, covariance) {
   const levCutStrict = (3 * k) / Math.max(1, nObs);
   const cookCut = 4 / Math.max(1, nObs);
   const top = [];
+  const cases = [];
 
   for (let i = 0; i < nObs; i++) {
     const pi = clamp(p[i], 1e-9, 1 - 1e-9);
@@ -732,7 +742,8 @@ function computeDiagnostics(y, p, X, covariance) {
     if (cook > cookMax) cookMax = cook;
     if (cook > cookCut) cookHigh++;
     if (cook > 1) cookExtreme++;
-    keepTopInfluence(top, { row: i + 1, cooksD: cook, leverage: h, deviance: dr }, 10);
+    keepTopInfluence(top, { row: i + 1, cooksD: cook, leverage: h, deviance: dr, probability: p[i] }, 10);
+    cases.push({ row: i + 1, probability: p[i], deviance: dr, leverage: h, cooksD: cook });
 
     if (covariance && rowX.length) {
       const scoreScale = (yi - pi) / Math.max(1e-8, (1 - h));
@@ -751,6 +762,7 @@ function computeDiagnostics(y, p, X, covariance) {
 
   return {
     n: nObs,
+    cases: cases,
     parameterCount: k,
     influenceComputed: !!covariance,
     devianceResidualMean: fmt(devMean),

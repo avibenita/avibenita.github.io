@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="../shared-workspace-tabs.css?v=20260828viewcta" />
   <link rel="stylesheet" href="../shared-logistic-power.css?v=20260708b" />
   <script src="../shared-brand-logo.js?v=20261005light1"></script>
-  <script src="../shared-header.js?v=20261128local1"></script>
+  <script src="../shared-header.js?v=20261128align1"></script>
   <script src="../shared-workspace-tabs.js?v=20261123notab"></script>
   <script src="../shared-logistic-power.js?v=20260708c"></script>
 
@@ -1623,7 +1623,7 @@
                 </div>
               </section>
 
-              <section class="subview" data-parent="model-results" data-sub="technical">
+              <section class="subview" data-parent="model-results" data-sub="coefficients">
                 <div class="panel">
                   <div class="panel-h">Full Coefficient Table</div>
                   <div class="panel-b"><table><thead><tr>
@@ -1639,16 +1639,15 @@
                       <div class="equation-meta" id="equationMeta"></div>
                     </div>
                   </div>
-                  <div class="panel">
-                    <div class="panel-h">Top Odds Ratios</div>
-                    <div class="panel-b"><table><thead><tr><th>Variable</th><th>OR</th><th>95% CI</th><th>p</th></tr></thead><tbody id="topOrBody"></tbody></table></div>
-                  </div>
                 </div>
+                <details class="adv-metrics" style="margin-top:12px;">
+                  <summary>Statistical details</summary>
                 <div class="grid three" style="margin-top:12px;">
                   <div class="panel"><div class="panel-h">Global Tests</div><div class="panel-b tiny stat-list" id="testsTech"></div></div>
                   <div class="panel"><div class="panel-h">Model Fit</div><div class="panel-b tiny stat-list" id="fitTech"></div></div>
                   <div class="panel"><div class="panel-h">Estimation Details</div><div class="panel-b tiny stat-list" id="modelInfoTech"></div></div>
                 </div>
+                </details>
                 <div class="exec-section-label" style="margin-top:14px;">Advanced Diagnostics</div>
                 <div class="grid three">
                   <div class="panel">
@@ -1701,7 +1700,7 @@
                 <div class="perf-overview-split">
                   <div class="panel">
                     <div class="panel-h">Confusion Matrix</div>
-                    <div class="panel-b" id="cmMatrix"><div class="empty">Awaiting classification counts...</div></div>
+                    <div class="panel-b tiny">Open Classification &amp; ROC for the threshold-linked matrix.</div>
                   </div>
                   <div class="perf-overview-side">
                     <div class="panel">
@@ -1719,10 +1718,17 @@
                   </div>
                 </div>
               </section>
-              <section class="subview" data-parent="predictive-performance" data-sub="roc-thresholds">
+              <section class="subview active" data-parent="predictive-performance" data-sub="roc-thresholds">
+                <div class="perf-overview-split">
+                  <div class="panel">
+                    <div class="panel-h">Confusion matrix at the current threshold</div>
+                    <div class="panel-b tiny">These counts use every fitted case, not the case-prediction preview.</div>
+                    <div class="panel-b" id="cmMatrix"><div class="empty">Awaiting classification counts...</div></div>
+                  </div>
+                </div>
                 <div class="opt-threshold-bar" id="optThresholdBar">
                   <span>Recommended threshold: <strong id="optThresholdVal">—</strong> <span class="tiny">(maximum Youden index)</span></span>
-                  <button type="button" class="opt-thr-btn" id="useOptThresholdBtn"><i class="fa-solid fa-crosshairs"></i> Use optimal threshold</button>
+                  <button type="button" class="opt-thr-btn" id="useOptThresholdBtn"><i class="fa-solid fa-crosshairs"></i> Use Youden threshold</button>
                 </div>
                 <div class="controls"><label for="thr">Threshold</label><input id="thr" type="range" min="0.05" max="0.95" step="0.01" value="0.50"><span id="thrVal">0.50</span></div>
                 <div class="split-two">
@@ -1780,7 +1786,7 @@
             </section>
 
             <section class="tab-panel" data-view="probabilities">
-              <section class="subview active" data-parent="probabilities" data-sub="overview">
+              <section class="subview" data-parent="probabilities" data-sub="case-predictions">
                 <div class="grid two">
                   <div class="panel">
                     <div class="panel-h">Risk Distribution</div>
@@ -1806,12 +1812,12 @@
                 <div class="panel" style="margin-top:12px;">
                   <div class="panel-h">Prediction Sample</div>
                   <div class="panel-b">
-                    <p class="log-chart-note">Each row is the observed outcome, the predicted probability, and the class at the threshold set on Predictive Performance → ROC &amp; Thresholds.</p>
+                    <p class="log-chart-note" id="predSampleNote">Each row is one fitted case: the observed event, the predicted event probability, and the class at the current threshold. The table may show a preview. Classification, calibration, and distributions use every fitted case.</p>
                     <table><thead><tr><th>Observed</th><th>Probability</th><th>Class</th></tr></thead><tbody id="predBody"></tbody></table>
                   </div>
                 </div>
               </section>
-              <section class="subview" data-parent="probabilities" data-sub="scenario-engine">
+              <section class="subview active" data-parent="probabilities" data-sub="scenario-engine">
                 <div class="predictions-container">
                   <div class="prediction-header">
                     <div class="prediction-subtitle">Adjust variable values below to explore "what-if" scenarios</div>
@@ -1839,26 +1845,16 @@
                           <div class="interval-label">
                             <i class="fa-solid fa-chart-area"></i> 95% Confidence Interval
                             <span class="tooltip-icon">?
-                              <span class="tooltip-text"><strong>Confidence interval:</strong> Range where the <em>mean</em> predicted probability for this predictor profile is likely to fall (Wald interval on the log-odds scale).</span>
+                              <span class="tooltip-text"><strong>Confidence interval:</strong> Wald interval for the mean event probability at this predictor profile. It uses the full coefficient covariance: eta = x'beta, SE = sqrt(x'Cov x), then the probability interval is expit(eta ± z SE). A single binary outcome is 0 or 1, so this is not a range for an individual 0/1 result.</span>
                             </span>
                           </div>
                           <div class="interval-range" id="logScenarioConfidenceInterval">—</div>
-                          <div class="interval-desc">Mean prediction uncertainty</div>
-                        </div>
-                        <div class="output-card interval-card">
-                          <div class="interval-label">
-                            <i class="fa-solid fa-chart-scatter"></i> 95% Prediction Interval
-                            <span class="tooltip-icon">?
-                              <span class="tooltip-text"><strong>Prediction interval:</strong> Wider range accounting for uncertainty in the mean plus individual outcome variability on the probability scale.</span>
-                            </span>
-                          </div>
-                          <div class="interval-range" id="logScenarioPredictionInterval">—</div>
-                          <div class="interval-desc">Individual outcome range</div>
+                          <div class="interval-desc">Mean event probability</div>
                         </div>
                       </div>
                       <div class="log-scenario-meta">
                         <div class="output-card">
-                          <div class="output-label">Risk band</div>
+                          <div class="output-label">Event probability band</div>
                           <div class="meta-val" id="logScenarioRiskBand">—</div>
                         </div>
                         <div class="output-card">
@@ -1867,7 +1863,7 @@
                         </div>
                       </div>
                       <div class="prediction-viz">
-                        <canvas id="logScenarioChart" width="400" height="90"></canvas>
+                        <canvas id="logScenarioChart" width="520" height="180" aria-label="Event probability across the selected predictor"></canvas>
                       </div>
                       <div id="logComparePanel" class="log-compare-panel" hidden>
                         <div class="log-compare-hint" id="logCompareHint"></div>
@@ -1913,7 +1909,6 @@
                             <th>Scenario</th>
                             <th>Predicted Risk</th>
                             <th>95% CI</th>
-                            <th>95% PI</th>
                             <th>Actions</th>
                           </tr>
                         </thead>
@@ -1936,9 +1931,12 @@
             </section>
 
             <section class="tab-panel" data-view="interactions">
-              <section class="subview active" data-parent="interactions" data-sub="overview"><div class="panel"><div class="panel-h">Interaction terms</div><div class="panel-b" id="logIxOverview"></div></div></section>
-              <section class="subview" data-parent="interactions" data-sub="visualization"><div class="panel"><div class="panel-h">Visualization</div><div class="panel-b tiny">Probability interaction plots placeholder.</div></div></section>
-              <section class="subview" data-parent="interactions" data-sub="technical"><div class="panel"><div class="panel-h">Technical</div><div class="panel-b tiny">Add explicit interaction terms in builder to surface technical tests.</div></div></section>
+              <section class="subview active" data-parent="interactions" data-sub="workspace">
+                <div class="panel">
+                  <div class="panel-h">Interaction</div>
+                  <div class="panel-b" id="logIxOverview"></div>
+                </div>
+              </section>
             </section>
 
             <section class="tab-panel" data-view="diagnostics">
@@ -1974,6 +1972,15 @@
                 <div class="panel">
                   <div class="panel-h">Cutoffs</div>
                   <div class="panel-b"><table class="metric-table"><tbody id="diagInfluenceCuts"></tbody></table></div>
+                </div>
+                <div class="panel">
+                  <div class="panel-h">Cook's distance by fitted case</div>
+                  <div class="panel-b">
+                    <div id="diagCookChart"></div>
+                    <p class="log-chart-note" id="diagCookNote"></p>
+                    <button type="button" id="diagCompareBtn" class="opt-thr-btn" disabled>Compare without this case</button>
+                    <div id="diagCompareOut" class="log-chart-note"></div>
+                  </div>
                 </div>
                 <div class="panel" style="margin-top:12px;">
                   <div class="panel-h">Largest Cook's distances</div>
@@ -2012,20 +2019,19 @@
   (function() {
     "use strict";
     var SUBTAB_CONFIG = {
-      "model-results": ["overview", "technical"],
-      "predictive-performance": ["overview", "roc-thresholds", "calibration"],
-      "probabilities": ["overview", "scenario-engine"],
-      "interactions": ["overview", "visualization", "technical"],
-      "diagnostics": ["overview", "residuals", "influence"],
+      "model-results": ["overview", "coefficients"],
+      "predictive-performance": ["roc-thresholds", "calibration"],
+      "probabilities": ["scenario-engine", "case-predictions"],
+      "interactions": [],
+      "diagnostics": ["residuals", "influence"],
       "correlations": [],
       "descriptives": [],
       "power": []
     };
     var SUBTAB_LABELS = {
-      overview: "Overview", technical: "Technical", "roc-thresholds": "ROC & Thresholds", calibration: "Calibration",
-      "scenario-engine": "Scenario Engine", predictions: "Predictions", visualization: "Visualization",
-      residuals: "Residual Plots", influence: "Influence",
-      "model-results:technical": "Technical"
+      overview: "Overview", coefficients: "Coefficients", "roc-thresholds": "Classification & ROC", calibration: "Calibration",
+      "scenario-engine": "Scenario Engine", "case-predictions": "Case Predictions",
+      residuals: "Residuals", influence: "Influence"
     };
     var SUBTAB_SUBTITLES = {
       overview: "Summary statistics",
@@ -2382,6 +2388,7 @@
       state.coefficients = bundle.coefficients || [];
       state.predictions = bundle.predictions || [];
       state.diagnostics = bundle.diagnostics || {};
+      state.covariance = bundle.covariance || state.covariance || null;
       if (bundle.descriptives) state.descriptives = bundle.descriptives;
       logScenarioData.initialized = false;
       logScenarioData.dataKey = "";
@@ -2396,6 +2403,25 @@
       var wasExcluded = logExcluded.has(key);
       if (wantIncluded) logExcluded.delete(key);
       else logExcluded.add(key);
+      if (!wantIncluded && key.indexOf(" × ") < 0) {
+        var blocksInteraction = (state.coefficients || []).some(function (row) {
+          var term = String(row.Variable || "");
+          if (term.indexOf(" × ") < 0 || logExcluded.has(term)) return false;
+          return term.split(" × ").some(function (part) { return part === key; });
+        });
+        if (blocksInteraction) {
+          if (wasExcluded) logExcluded.add(key);
+          else logExcluded.delete(key);
+          document.querySelectorAll(".coef-include-check").forEach(function (box) {
+            if (box.getAttribute("data-term-key") === key) box.checked = true;
+          });
+          setCoefIncludeStatus(
+            '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Keep <strong>' + esc(key) + "</strong> while an interaction that uses it stays in the model. Remove the interaction first.</span>",
+            true
+          );
+          return;
+        }
+      }
       var remaining = coefficientDisplayRows().filter(function (row) { return !logExcluded.has(row.name); }).length;
       if (remaining < 1) {
         if (wasExcluded) logExcluded.add(key);
@@ -2456,7 +2482,7 @@
         if (!link) return;
         event.preventDefault();
         if (currentPrimary !== "model-results") switchTab("model-results");
-        switchSub("model-results", "technical");
+        switchSub("model-results", "coefficients");
       });
       window.addEventListener("message", function (event) {
         var data = event.data || {};
@@ -2529,7 +2555,7 @@
     }
     function formatPctCell(v) {
       var x = toUnit(v);
-      return isFinite(x) ? (x * 100).toFixed(1) + "%" : "-";
+      return isFinite(x) ? (x * 100).toFixed(1) + "%" : "unavailable";
     }
     function aucBand(auc) {
       if (!isFinite(auc)) return { label: "Not available", detail: "AUC unavailable for interpretation.", cls: "poor" };
@@ -2762,7 +2788,7 @@
         row("Sensitivity", formatPctCell(m.sensitivity), "True positives ÷ actual events.") +
         row("Specificity", formatPctCell(m.specificity), "True negatives ÷ actual non-events.") +
         row("False positive rate", formatPctCell(m.fpr), "False positives ÷ actual non-events.") +
-        row("Events / non-events", (actualPos || "—") + " / " + (actualNeg || "—"), "Counts at the current classification threshold.") +
+        row("Events / non-events", displayCount(actualPos) + " / " + displayCount(actualNeg), "Counts at the current classification threshold. Zero is a real count.") +
         "</tbody></table>";
     }
     function renderPerfClassMetrics(counts, m) {
@@ -3550,13 +3576,13 @@
       var MAX_TERMS = 5;
       var parts = ["<span class='eq-lhs'>logit(P)</span><span class='eq-op'>=</span>"];
       if (isFinite(intercept)) {
-        parts.push("<span class='eq-term'>" + intercept.toFixed(2) + "</span>");
+        parts.push("<span class='eq-term'>" + displayNumber(intercept, 2) + "</span>");
       }
       terms.slice(0, MAX_TERMS).forEach(function (t, i) {
         var first = !isFinite(intercept) && i === 0;
         var sign = t.beta >= 0 ? (first ? "" : "+") : "−";
         parts.push("<span class='eq-op'>" + sign + "</span><span class='eq-term'>" +
-          Math.abs(t.beta).toFixed(2) + " × <span class='eq-var'>" + esc(t.name) + "</span></span>");
+          displayNumber(Math.abs(t.beta), 2) + " × <span class='eq-var'>" + esc(t.name) + "</span></span>");
       });
       if (terms.length > MAX_TERMS) {
         parts.push("<span class='eq-op'>+</span><span class='eq-term'>… (" + (terms.length - MAX_TERMS) + " more)</span>");
@@ -3656,7 +3682,8 @@
       document.querySelectorAll(".tab-panel").forEach((v) => v.classList.toggle("active", v.dataset.view === tab));
       document.querySelectorAll(".sb-item[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
       var chrome = document.querySelector(".ws-chrome");
-      if (chrome) chrome.style.display = tab === "power" ? "none" : "";
+      var subtabs = SUBTAB_CONFIG[tab] || [];
+      if (chrome) chrome.style.display = subtabs.length ? "" : "none";
       mountSubtabs(tab);
       var first = (SUBTAB_CONFIG[tab] || [])[0];
       if (first) switchSub(tab, first);
@@ -3802,6 +3829,58 @@
             }).join("")
           : "<tr><td colspan='4' class='empty'>No fitted rows.</td></tr>";
       }
+      renderCookChart(d);
+    }
+
+    function renderCookChart(d) {
+      var host = document.getElementById("diagCookChart");
+      var note = document.getElementById("diagCookNote");
+      var btn = document.getElementById("diagCompareBtn");
+      if (!host) return;
+      var cases = (d && d.cases) || [];
+      if (!cases.length) {
+        host.innerHTML = "";
+        if (note) note.textContent = "Cook's distance by case is available after the model is fit with a covariance matrix.";
+        if (btn) btn.disabled = true;
+        return;
+      }
+      var ranked = cases.slice().sort(function (a, b) { return b.cooksD - a.cooksD; }).slice(0, 40);
+      var maxC = ranked.reduce(function (m, c) { return Math.max(m, Number(c.cooksD) || 0); }, 0) || 1;
+      var selected = window.__logCookRow || ranked[0].row;
+      host.innerHTML = "<div class='resid-chart'>" + ranked.map(function (c) {
+        var h = Math.max(2, Math.round(120 * (Number(c.cooksD) / maxC)));
+        var on = c.row === selected ? " resid-tail" : "";
+        return "<div class='resid-col" + on + "' data-cook-row='" + c.row + "' title='Fitted row " + c.row + "'><b>" + diagNum(c.cooksD) + "</b><div class='resid-fill' style='height:" + h + "px'></div><em>" + c.row + "</em></div>";
+      }).join("") + "</div>";
+      if (note) note.textContent = "Fitted sample n = " + cases.length + ". Bars are the 40 largest Cook's distances. Selecting a bar does not change the model.";
+      host.querySelectorAll("[data-cook-row]").forEach(function (el) {
+        el.addEventListener("click", function () {
+          window.__logCookRow = Number(el.getAttribute("data-cook-row"));
+          renderCookChart(d);
+        });
+      });
+      if (btn) {
+        btn.disabled = false;
+        btn.onclick = function () {
+          var rowNumber = window.__logCookRow || ranked[0].row;
+          var out = document.getElementById("diagCompareOut");
+          if (!canRefitLogistic()) {
+            if (out) out.textContent = "Source data is not available, so the case cannot be left out. The original model is unchanged.";
+            return;
+          }
+          if (out) out.textContent = "Refitting without fitted row " + rowNumber + "…";
+          var spec = Object.assign({}, (state.dataContext && state.dataContext.modelSpec) || {});
+          spec.excludeFittedRow = rowNumber - 1;
+          refitLogistic(spec).then(function (bundle) {
+            var lines = (bundle.coefficients || []).slice(0, 8).map(function (c) {
+              return friendlyVarName(c.Variable) + " OR " + c.OR;
+            });
+            if (out) out.textContent = "Temporary fit without fitted row " + rowNumber + ". The original model is unchanged. " + lines.join("; ");
+          }).catch(function (err) {
+            if (out) out.textContent = "Comparison did not run: " + ((err && err.message) || "the refit failed") + ". The original model is unchanged.";
+          });
+        };
+      }
     }
 
     function renderKPIs() {
@@ -3880,15 +3959,17 @@
               "<td>" + withFull(row.current ? r.PValue : "—", prior && prior.PValue) + "</td></tr>";
           }).join("")
         : "<tr><td colspan='8' class='empty'>No coefficients</td></tr>";
-      var ranked = coef.filter((r) => String(r.Variable || "").toLowerCase() !== "intercept").sort((a, b) => n(a.PValue) - n(b.PValue)).slice(0, 8);
-      document.getElementById("topOrBody").innerHTML = ranked.length
-        ? ranked.map((r) => "<tr><td>" + esc(r.Variable) + "</td><td>" + esc(r.OR) + "</td><td>" + esc(r.OR_CI_Lower) + " - " + esc(r.OR_CI_Upper) + "</td><td>" + esc(r.PValue) + "</td></tr>").join("")
-        : "<tr><td colspan='4' class='empty'>No OR rows</td></tr>";
 
       var predRows = state.predictions || [];
       document.getElementById("predBody").innerHTML = predRows.length
         ? predRows.slice(0, 60).map((r) => "<tr><td>" + esc(r.Observed) + "</td><td>" + esc(r.Probability) + "</td><td>" + esc(r.PredictedClass) + "</td></tr>").join("")
         : "<tr><td colspan='3' class='empty'>No predictions</td></tr>";
+      var predNote = document.getElementById("predSampleNote");
+      if (predNote) {
+        predNote.textContent = predRows.length
+          ? ("Showing 60 of " + predRows.length + " fitted cases. Classification, calibration, and the distribution counts use all " + predRows.length + " cases.")
+          : "No fitted cases.";
+      }
     }
     function riskBandStats(pairs) {
       var bands = {
@@ -4028,7 +4109,7 @@
       return isFinite(p) ? (p * 100).toFixed(2) + "%" : "—";
     }
     function formatProbInterval(lo, hi) {
-      if (!isFinite(lo) || !isFinite(hi)) return "—";
+      if (!isFinite(lo) || !isFinite(hi)) return "Confidence interval unavailable";
       return "[" + (lo * 100).toFixed(1) + "%, " + (hi * 100).toFixed(1) + "%]";
     }
     function getClassificationThreshold() {
@@ -4119,19 +4200,16 @@
       var xVector = built.xVector;
       var xNames = built.xNames;
       var eta = 0;
-      var seEtaSq = 0;
       var contributions = [];
       for (var i = 0; i < xNames.length; i++) {
         var name = xNames[i];
         var coeff = logScenarioData.betaMap[name] || { beta: 0, se: 0 };
         var b = coeff.beta;
-        var s = coeff.se;
         var x = xVector[i];
         var contrib = b * x;
         eta += contrib;
-        seEtaSq += Math.pow(isFinite(s) ? s * x : 0, 2);
-        if (name !== "Intercept" && x !== 0) {
-          var displayVal = x;
+        if (name !== "Intercept" && x !== 0 || name === "Intercept") {
+          var displayVal = name === "Intercept" ? 1 : x;
           if (x === 1 && name.indexOf("_") > 0) {
             displayVal = name.substring(name.indexOf("_") + 1);
           }
@@ -4139,26 +4217,50 @@
         }
       }
       var p = sigmoid(eta);
-      var seEta = Math.sqrt(Math.max(0, seEtaSq));
-      var z = 1.96;
-      var ciLo = sigmoid(eta - z * seEta);
-      var ciHi = sigmoid(eta + z * seEta);
-      var piScale = Math.sqrt(Math.max(0, seEtaSq + p * (1 - p)));
-      var piLo = sigmoid(eta - z * piScale);
-      var piHi = sigmoid(eta + z * piScale);
+      var seEta = NaN;
+      var ciLo = NaN;
+      var ciHi = NaN;
+      var cov = state.covariance;
+      var covOk = !!(cov && cov.length === xVector.length);
+      if (covOk) {
+        var quad = 0;
+        for (var a = 0; a < xVector.length && covOk; a++) {
+          var covRow = cov[a];
+          if (!covRow || covRow.length !== xVector.length) covOk = false;
+          else {
+            var acc = 0;
+            for (var b = 0; b < xVector.length; b++) {
+              var covCell = Number(covRow[b]);
+              if (!isFinite(covCell)) covOk = false;
+              acc += covCell * xVector[b];
+            }
+            quad += xVector[a] * acc;
+          }
+        }
+        if (covOk && quad >= 0 && isFinite(quad)) {
+          seEta = Math.sqrt(quad);
+          var z = 1.959963984540054;
+          ciLo = sigmoid(eta - z * seEta);
+          ciHi = sigmoid(eta + z * seEta);
+        } else {
+          covOk = false;
+          seEta = NaN;
+          ciLo = NaN;
+          ciHi = NaN;
+        }
+      }
       var threshold = getClassificationThreshold();
-      var riskBand = p < 0.33 ? "Low" : (p < 0.66 ? "Medium" : "High");
+      var probBand = p < 0.33 ? "Lower" : (p < 0.66 ? "Middle" : "Higher");
       var predClass = p >= threshold ? "Event (1)" : "Non-event (0)";
       contributions.sort(function (a, b) { return Math.abs(b.contrib) - Math.abs(a.contrib); });
       return {
         value: p,
         eta: eta,
+        seEta: seEta,
         ci_lower: ciLo,
         ci_upper: ciHi,
-        pi_lower: piLo,
-        pi_upper: piHi,
         contributions: contributions,
-        riskBand: riskBand,
+        probBand: probBand,
         predClass: predClass,
         threshold: threshold
       };
@@ -4170,61 +4272,81 @@
       var width = canvas.width;
       var height = canvas.height;
       ctx.clearRect(0, 0, width, height);
-      var lo = Math.max(0, prediction.pi_lower - 0.05);
-      var hi = Math.min(1, prediction.pi_upper + 0.05);
-      if (hi <= lo) { lo = 0; hi = 1; }
-      var range = hi - lo;
-      var scale = (width - 60) / range;
-      var offsetX = 30;
-      var piY = 48;
-      var piH = 24;
-      var piX1 = (prediction.pi_lower - lo) * scale + offsetX;
-      var piX2 = (prediction.pi_upper - lo) * scale + offsetX;
-      ctx.fillStyle = "rgba(120, 200, 255, 0.25)";
-      ctx.fillRect(piX1, piY, piX2 - piX1, piH);
-      ctx.strokeStyle = "rgba(120, 200, 255, 0.8)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(piX1, piY, piX2 - piX1, piH);
-      var ciY = 52;
-      var ciH = 16;
-      var ciX1 = (prediction.ci_lower - lo) * scale + offsetX;
-      var ciX2 = (prediction.ci_upper - lo) * scale + offsetX;
-      ctx.fillStyle = "rgba(255, 165, 120, 0.4)";
-      ctx.fillRect(ciX1, ciY, ciX2 - ciX1, ciH);
-      ctx.strokeStyle = "rgba(255, 165, 120, 1)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(ciX1, ciY, ciX2 - ciX1, ciH);
-      var predX = (prediction.value - lo) * scale + offsetX;
-      ctx.strokeStyle = "#FFA578";
-      ctx.lineWidth = 3;
+      var names = logScenarioData.numericVars || [];
+      var plotName = window.__logScenarioAxis && names.indexOf(window.__logScenarioAxis) >= 0 ? window.__logScenarioAxis : names[0];
+      var ink = document.documentElement.getAttribute("data-theme") === "light" ? "#1f2937" : "#e2e8f0";
+      if (!plotName) {
+        ctx.fillStyle = ink;
+        ctx.font = '12px "Segoe UI", sans-serif';
+        ctx.fillText("No numeric predictor to plot.", 16, 28);
+        return;
+      }
+      var range = (logScenarioData.numericRanges || {})[plotName] || { min: 0, max: 1 };
+      var x0 = Number(range.min);
+      var x1 = Number(range.max);
+      if (!isFinite(x0) || !isFinite(x1) || x1 <= x0) { x0 = 0; x1 = 1; }
+      var base = Object.assign({}, logScenarioData.currentInputs || {});
+      var pts = [];
+      for (var s = 0; s <= 40; s++) {
+        var x = x0 + (x1 - x0) * (s / 40);
+        var trial = Object.assign({}, base);
+        trial[plotName] = x;
+        var pred = calculateLogisticScenario(trial);
+        pts.push(pred && isFinite(pred.value) ? pred.value : NaN);
+      }
+      var padL = 36;
+      var padR = 12;
+      var padT = 16;
+      var padB = 28;
+      function sx(x) { return padL + (width - padL - padR) * ((x - x0) / (x1 - x0)); }
+      function sy(p) { return height - padB - (height - padT - padB) * Math.min(1, Math.max(0, p)); }
+      ctx.strokeStyle = ink;
+      ctx.globalAlpha = 0.35;
       ctx.beginPath();
-      ctx.moveTo(predX, 44);
-      ctx.lineTo(predX, 76);
+      ctx.moveTo(padL, padT);
+      ctx.lineTo(padL, height - padB);
+      ctx.lineTo(width - padR, height - padB);
       ctx.stroke();
-      ctx.fillStyle = "#FFA578";
-      ctx.beginPath();
-      ctx.arc(predX, 60, 7, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.strokeStyle = "#FFFFFF";
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "#7eb6ff";
       ctx.lineWidth = 2;
+      ctx.beginPath();
+      var started = false;
+      pts.forEach(function (p, i) {
+        if (!isFinite(p)) { started = false; return; }
+        var px = sx(x0 + (x1 - x0) * (i / 40));
+        var py = sy(p);
+        if (!started) { ctx.moveTo(px, py); started = true; }
+        else ctx.lineTo(px, py);
+      });
       ctx.stroke();
-      ctx.fillStyle = "#FFA578";
-      ctx.font = 'bold 13px "Segoe UI", sans-serif';
-      ctx.textAlign = "center";
-      ctx.fillText(formatProbPct(prediction.value), predX, 30);
-      ctx.font = '10px "Segoe UI", sans-serif';
-      ctx.fillStyle = document.documentElement.getAttribute("data-theme") === "light" ? "rgba(15,23,42,.55)" : "rgba(255,255,255,.5)";
+      var currentX = Number(base[plotName]);
+      if (isFinite(currentX) && isFinite(prediction.value)) {
+        var mx = sx(Math.min(x1, Math.max(x0, currentX)));
+        var my = sy(prediction.value);
+        ctx.fillStyle = "#f0c674";
+        ctx.beginPath();
+        ctx.arc(mx, my, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      ctx.fillStyle = ink;
+      ctx.font = '11px "Segoe UI", sans-serif';
       ctx.textAlign = "left";
-      ctx.fillText((prediction.pi_lower * 100).toFixed(0) + "%", piX1 - 5, 85);
+      ctx.fillText(friendlyVarName(plotName), padL, height - 8);
       ctx.textAlign = "right";
-      ctx.fillText((prediction.pi_upper * 100).toFixed(0) + "%", piX2 + 5, 85);
+      ctx.fillText("Event probability", width - padR, 12);
     }
     function updateLogisticScenario() {
       if (!logScenarioData.initialized) return;
       var inputs = {};
       logScenarioData.numericVars.forEach(function (varName) {
         var input = document.getElementById("log-input-" + varName);
-        if (input) inputs[varName] = Number(input.value);
+        if (!input) return;
+        var shown = Number(Number(input.value).toFixed(2));
+        if (!isFinite(shown)) return;
+        inputs[varName] = shown;
+        var valueDisplay = document.getElementById("log-value-" + varName);
+        if (valueDisplay) valueDisplay.value = shown.toFixed(2);
       });
       logScenarioData.categoricalVars.forEach(function (varName) {
         var input = document.getElementById("log-input-" + varName);
@@ -4241,8 +4363,8 @@
       var contribEl = document.getElementById("logScenarioContribBody");
       if (predEl) predEl.textContent = formatProbPct(prediction.value);
       if (ciEl) ciEl.textContent = formatProbInterval(prediction.ci_lower, prediction.ci_upper);
-      if (piEl) piEl.textContent = formatProbInterval(prediction.pi_lower, prediction.pi_upper);
-      if (bandEl) bandEl.textContent = prediction.riskBand + " risk";
+      if (piEl) piEl.textContent = "";
+      if (bandEl) bandEl.textContent = prediction.probBand + " probability";
       if (classEl) classEl.textContent = prediction.predClass + " @ " + (prediction.threshold * 100).toFixed(0) + "%";
       if (contribEl) {
         contribEl.innerHTML = prediction.contributions.length
@@ -4687,7 +4809,7 @@
       var tbody = document.getElementById("logScenariosTableBody");
       if (!tbody) return;
       if (!logScenarioData.savedScenarios.length) {
-        tbody.innerHTML = "<tr class='no-scenarios'><td colspan='5' style='text-align:center;color:var(--text-muted);padding:20px;'>" +
+        tbody.innerHTML = "<tr class='no-scenarios'><td colspan='4' style='text-align:center;color:var(--text-muted);padding:20px;'>" +
           "<i class='fa-solid fa-info-circle'></i> No scenarios saved yet.<br><span style='font-size:0.85rem;'>Adjust sliders above, then click \"Save Current\" to bookmark this combination.</span></td></tr>";
         return;
       }
@@ -4696,7 +4818,6 @@
         return "<tr><td><strong>" + esc(scenario.name) + "</strong><br><small style='color:var(--text-muted);font-size:0.8rem;'>" + esc(scenario.summary) + "</small></td>" +
           "<td style='font-weight:600;color:var(--accent-1);'>" + formatProbPct(p.value) + "</td>" +
           "<td style='font-size:0.85rem;'>" + formatProbInterval(p.ci_lower, p.ci_upper) + "</td>" +
-          "<td style='font-size:0.85rem;'>" + formatProbInterval(p.pi_lower, p.pi_upper) + "</td>" +
           "<td class='scenario-actions'>" +
           "<button type='button' class='scenario-btn load' onclick='loadLogisticScenario(" + index + ")'><i class='fa-solid fa-play'></i> Apply</button> " +
           "<button type='button' class='scenario-btn delete' onclick='deleteLogisticScenario(" + index + ")' title='Delete this scenario'><i class='fa-solid fa-trash'></i> Delete</button>" +
@@ -4989,6 +5110,52 @@
         validation: (r.validationStatus || r.externalValidation) ? String(r.validationStatus || r.externalValidation) : "External validation was not assessed."
       };
     };
+    function logFactorLevels() {
+      var levels = Object.assign({}, logScenarioData.categoricalLevels || {});
+      var spec = (state.dataContext && state.dataContext.modelSpec) || {};
+      var headers = (state.dataContext && state.dataContext.headers) || [];
+      var rows = (state.dataContext && state.dataContext.rows) || [];
+      (spec.xc || []).forEach(function (name) {
+        if (levels[name] && levels[name].length) return;
+        var idx = headers.indexOf(name);
+        if (idx < 0) return;
+        var seen = {};
+        rows.forEach(function (row) {
+          var value = row[idx];
+          if (value != null && String(value) !== "") seen[String(value)] = true;
+        });
+        levels[name] = Object.keys(seen).sort();
+      });
+      return levels;
+    }
+    function describeInteractionToken(token, factorLevels) {
+      var names = Object.keys(factorLevels).sort(function (a, b) { return b.length - a.length; });
+      for (var i = 0; i < names.length; i++) {
+        var prefix = names[i] + "_";
+        if (token.indexOf(prefix) === 0) {
+          return { variable: names[i], level: token.slice(prefix.length), numeric: false };
+        }
+      }
+      return { variable: token, level: null, numeric: true };
+    }
+    function interactionFamilies(rows) {
+      var factorLevels = logFactorLevels();
+      var families = [];
+      var byKey = {};
+      rows.forEach(function (row) {
+        var parts = String(row.Variable || "").split(" × ");
+        if (parts.length < 2) return;
+        var left = describeInteractionToken(parts[0], factorLevels);
+        var right = describeInteractionToken(parts.slice(1).join(" × "), factorLevels);
+        var key = left.variable + " × " + right.variable;
+        if (!byKey[key]) {
+          byKey[key] = { key: key, left: left, right: right, rows: [] };
+          families.push(byKey[key]);
+        }
+        byKey[key].rows.push(row);
+      });
+      return families;
+    }
     function renderLogisticInteractions() {
       var host = document.getElementById("logIxOverview");
       if (!host) return;
@@ -4996,14 +5163,174 @@
         return String(c.Variable || "").indexOf(" × ") >= 0;
       });
       if (!rows.length) {
-        host.innerHTML = "<p class='tiny'>This model has no interaction term. Check a pair in the model builder, then run the analysis again.</p>";
+        host.innerHTML = "<p class='tiny'>No interaction terms in this model. Edit the model and check a pair, then run the analysis again.</p>";
         return;
       }
-      host.innerHTML = "<table class='metric-table'><thead><tr><th>Term</th><th>Beta</th><th>Odds ratio</th><th>p</th></tr></thead><tbody>" +
-        rows.map(function (c) {
-          return "<tr><td>" + esc(friendlyVarName(c.Variable)) + "</td><td>" + esc(c.Beta) + "</td><td>" + esc(c.OR) + "</td><td>" + esc(c.PValue) + "</td></tr>";
-        }).join("") +
-        "</tbody></table><p class='log-chart-note'>The term is the product of the two predictors, in the same units as the source columns. Its odds ratio is the change in odds for a one-unit increase in that product.</p>";
+      var families = interactionFamilies(rows);
+      var selected = window.__logIxName && families.some(function (f) { return f.key === window.__logIxName; })
+        ? window.__logIxName
+        : families[0].key;
+      window.__logIxName = selected;
+      var family = families.filter(function (f) { return f.key === selected; })[0] || families[0];
+      var options = families.map(function (f) {
+        return "<option value='" + esc(f.key) + "'" + (f.key === selected ? " selected" : "") + ">" + esc(friendlyVarName(f.key)) + "</option>";
+      }).join("");
+      var body = family.rows.map(function (term) {
+        return "<tr><td>" + esc(friendlyVarName(term.Variable)) + "</td><td>" + esc(term.Beta) + "</td><td>" + esc(term.OR) + "</td><td>" + esc(term.OR_CI_Lower) + " – " + esc(term.OR_CI_Upper) + "</td><td>" + esc(term.PValue) + "</td></tr>";
+      }).join("");
+      host.innerHTML =
+        "<label for='logIxSelect'>Interaction term</label> <select id='logIxSelect'>" + options + "</select>" +
+        "<p class='log-chart-note'>Selecting a term only changes this plot. It does not refit the model. Other predictors stay at the Scenario Engine values, or at their means when the scenario has not been opened.</p>" +
+        "<div id='logIxPlot'></div>" +
+        "<table class='metric-table'><thead><tr><th>Term</th><th>Beta</th><th>Odds ratio</th><th>95% CI</th><th>p</th></tr></thead><tbody>" +
+        body +
+        "</tbody></table>" +
+        "<p class='log-chart-note'>Each row is one design column. A factor interaction can use several columns, and those p-values are not a joint test of the whole interaction.</p>";
+      var sel = document.getElementById("logIxSelect");
+      if (sel) sel.addEventListener("change", function () {
+        window.__logIxName = sel.value;
+        renderLogisticInteractions();
+      });
+      drawLogInteractionPlot(family);
+    }
+    function drawLogInteractionPlot(family) {
+      var host = document.getElementById("logIxPlot");
+      if (!host || !family) return;
+      var headers = (state.dataContext && state.dataContext.headers) || [];
+      var rows = (state.dataContext && state.dataContext.rows) || [];
+      function colValues(name) {
+        var idx = headers.indexOf(name);
+        if (idx < 0) return [];
+        return rows.map(function (row) { return Number(row[idx]); }).filter(function (v) { return isFinite(v); }).sort(function (a, b) { return a - b; });
+      }
+      function pct(arr, p) {
+        var i = Math.min(arr.length - 1, Math.max(0, Math.round((arr.length - 1) * p)));
+        return arr[i];
+      }
+      var base = {};
+      (logScenarioData.numericVars || []).forEach(function (name) {
+        var range = (logScenarioData.numericRanges || {})[name];
+        base[name] = range ? range.mean : 0;
+      });
+      var factorLevels = logFactorLevels();
+      Object.keys(factorLevels).forEach(function (name) {
+        if (factorLevels[name] && factorLevels[name].length) base[name] = factorLevels[name][0];
+      });
+      if (logScenarioData.currentInputs) {
+        Object.keys(logScenarioData.currentInputs).forEach(function (name) {
+          base[name] = logScenarioData.currentInputs[name];
+        });
+      }
+      var left = family.left;
+      var right = family.right;
+      var numericSide = left.numeric ? left : (right.numeric ? right : null);
+      var otherSide = numericSide === left ? right : left;
+      if (left.numeric && right.numeric) {
+        var xVals = colValues(left.variable);
+        var mVals = colValues(right.variable);
+        if (xVals.length < 2 || mVals.length < 2) {
+          host.innerHTML = "<p class='tiny'>The observed values do not vary enough to draw this interaction.</p>";
+          return;
+        }
+        var mods = [pct(mVals, 0.25), pct(mVals, 0.5), pct(mVals, 0.75)];
+        var seen = {};
+        mods = mods.filter(function (v) {
+          var key = v.toFixed(6);
+          if (seen[key]) return false;
+          seen[key] = true;
+          return true;
+        });
+        host.innerHTML = probabilityCurveSvg(left.variable, xVals[0], xVals[xVals.length - 1], mods.map(function (mod) {
+          return {
+            label: friendlyVarName(right.variable) + " = " + displayNumber(mod, 2),
+            inputsFor: function (x) {
+              var inputs = Object.assign({}, base);
+              inputs[left.variable] = x;
+              inputs[right.variable] = mod;
+              return inputs;
+            }
+          };
+        }), mods.length < 3 ? "Repeated percentiles were combined because the moderator takes fewer than three distinct values." : "Moderator lines are the observed 25th, 50th, and 75th percentiles.");
+        return;
+      }
+      if (numericSide && !otherSide.numeric) {
+        var xName = numericSide.variable;
+        var xRange = colValues(xName);
+        var levels = factorLevels[otherSide.variable] || [];
+        if (xRange.length < 2 || levels.length < 2) {
+          host.innerHTML = "<p class='tiny'>The observed values do not vary enough to draw one curve per factor level.</p>";
+          return;
+        }
+        host.innerHTML = probabilityCurveSvg(xName, xRange[0], xRange[xRange.length - 1], levels.map(function (level) {
+          return {
+            label: friendlyVarName(otherSide.variable) + " = " + level,
+            inputsFor: function (x) {
+              var inputs = Object.assign({}, base);
+              inputs[xName] = x;
+              inputs[otherSide.variable] = level;
+              return inputs;
+            }
+          };
+        }), "One curve for each observed level, including the reference level.");
+        return;
+      }
+      var levelsA = factorLevels[left.variable] || [];
+      var levelsB = factorLevels[right.variable] || [];
+      if (levelsA.length < 2 || levelsB.length < 2) {
+        host.innerHTML = "<p class='tiny'>Both factors need at least two observed levels to draw this interaction.</p>";
+        return;
+      }
+      var bars = [];
+      levelsA.forEach(function (a) {
+        levelsB.forEach(function (b) {
+          var inputs = Object.assign({}, base);
+          inputs[left.variable] = a;
+          inputs[right.variable] = b;
+          var pred = calculateLogisticScenario(inputs);
+          bars.push({ label: a + " × " + b, p: pred && isFinite(pred.value) ? pred.value : NaN });
+        });
+      });
+      var w = 520;
+      var h = 220;
+      var pad = 36;
+      var gap = (w - pad * 2) / bars.length;
+      var svg = "<svg viewBox='0 0 " + w + " " + h + "' width='100%' role='img' aria-label='Predicted event probability by factor combination'>";
+      bars.forEach(function (bar, i) {
+        if (!isFinite(bar.p)) return;
+        var bh = (h - pad * 2) * bar.p;
+        var x = pad + i * gap + 4;
+        svg += "<rect x='" + x.toFixed(1) + "' y='" + (h - pad - bh).toFixed(1) + "' width='" + Math.max(4, gap - 8).toFixed(1) + "' height='" + bh.toFixed(1) + "' fill='#7eb6ff'/>";
+      });
+      svg += "</svg>";
+      host.innerHTML = svg + "<p class='log-chart-note'>" + bars.map(function (bar) {
+        return esc(bar.label) + " " + (isFinite(bar.p) ? formatProbPct(bar.p) : "unavailable");
+      }).join(" · ") + ". Other predictors stay at the current scenario.</p>";
+    }
+    function probabilityCurveSvg(xName, x0, x1, series, note) {
+      var w = 520;
+      var h = 220;
+      var pad = 36;
+      var colors = ["#7eb6ff", "#f0c674", "#e07a7a", "#8fd18f", "#d4a5ff"];
+      function sx(x) { return pad + (w - pad * 2) * ((x - x0) / Math.max(1e-9, x1 - x0)); }
+      function sy(p) { return h - pad - (h - pad * 2) * Math.min(1, Math.max(0, p)); }
+      var svg = "<svg viewBox='0 0 " + w + " " + h + "' width='100%' role='img' aria-label='Predicted event probability across " + esc(xName) + "'>";
+      svg += "<line x1='" + pad + "' y1='" + (h - pad) + "' x2='" + (w - pad) + "' y2='" + (h - pad) + "' stroke='currentColor' opacity='0.35'/>";
+      svg += "<line x1='" + pad + "' y1='" + pad + "' x2='" + pad + "' y2='" + (h - pad) + "' stroke='currentColor' opacity='0.35'/>";
+      series.forEach(function (item, si) {
+        var d = "";
+        for (var s = 0; s <= 24; s++) {
+          var x = x0 + (x1 - x0) * (s / 24);
+          var pred = calculateLogisticScenario(item.inputsFor(x));
+          if (!pred || !isFinite(pred.value)) continue;
+          d += (d ? "L" : "M") + sx(x).toFixed(1) + " " + sy(pred.value).toFixed(1);
+        }
+        svg += "<path d='" + d + "' fill='none' stroke='" + colors[si % colors.length] + "' stroke-width='2'/>";
+      });
+      svg += "</svg>";
+      var legend = series.map(function (item, i) {
+        return "<span style='color:" + colors[i % colors.length] + "'>" + esc(item.label) + "</span>";
+      }).join(" · ");
+      return svg + "<p class='log-chart-note'>Curves use the observed range of " + esc(friendlyVarName(xName)) + ". " + esc(note) + " " + legend + "</p>";
     }
     function renderAll() {
       rememberFullModel();
@@ -5085,6 +5412,7 @@
         state.coefficients = message.payload.coefficients || [];
         state.predictions = message.payload.predictions || [];
         state.diagnostics = message.payload.diagnostics || {};
+        state.covariance = message.payload.covariance || null;
         state.descriptives = message.payload.descriptives || {};
         state.dataContext = message.payload.dataContext || null;
       } else if (message.type === "LOGISTIC_RESULTS") state.results = Object.assign({}, state.results, message.payload || {});

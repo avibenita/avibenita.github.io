@@ -2556,7 +2556,7 @@ const StatisticoHeader = {
               { type: 'tab', tab: 'probabilities', icon: 'fa-crosshairs', label: 'Predictions', description: 'Fit, what-if & intervals' },
               { type: 'tab', tab: 'predictive-performance', icon: 'fa-chart-area', label: 'Predictive Performance', description: 'Classification, ROC, and calibration' },
               { type: 'tab', tab: 'diagnostics', icon: 'fa-stethoscope', label: 'Diagnostics', description: 'Assumptions & residuals' },
-              { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Required N, achieved power & detectable R²' }
+              { type: 'tab', tab: 'power', icon: 'fa-bolt', label: 'Power & Sample Size', description: 'Sample size, power, and events per parameter' }
             ]
           },
           {

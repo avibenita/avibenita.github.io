@@ -49,6 +49,27 @@
         { id: 'group-comparison', start: 344, title: 'By Group Analysis' },
         { id: 'original-developments', start: 421, title: 'Original Statistico Development' }
       ]
+    },
+    regression: {
+      id: 'regression',
+      kicker: 'Linear regression',
+      title: 'See how a fitted model takes shape.',
+      lead: 'A guided tour of results, interactions, predictions, diagnostics, and group comparisons.',
+      durationLabel: '5:30',
+      expectedDuration: 329.5,
+      durationTolerance: 0.5,
+      src: '/Statistico-Website/media/demos/regression/regression__walkthrough__synced.mp4?v=20261128synced',
+      chapters: [
+        { id: 'setup', start: 22.7, title: 'Set up the regression' },
+        { id: 'model-results', start: 53.4, title: 'Model Results' },
+        { id: 'interactions', start: 83.9, title: 'Interactions' },
+        { id: 'predictions', start: 98.8, title: 'Predictions & Scenarios' },
+        { id: 'visualization', start: 126.0, title: 'Visualization' },
+        { id: 'diagnostics', start: 145.0, title: 'Diagnostics & Influence' },
+        { id: 'power', start: 190.4, title: 'Power & Sample Size' },
+        { id: 'ancova', start: 208.9, title: 'ANCOVA' },
+        { id: 'by-group', start: 230.6, title: 'By Group Analysis' }
+      ]
     }
   };
 })(window);
